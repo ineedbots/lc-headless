@@ -7,9 +7,11 @@
 #include "../Protocol/ServerProt.hpp"
 #include "../Protocol/WordPack.hpp"
 #include "../ProtocolError.hpp"
+#include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Interfaces_s.hpp"
 #include "../State/Social_s.hpp"
+#include "../State/Stat_s.hpp"
 #include "../Tile_s.hpp"
 #include "NpcInfoDecoder.hpp"
 #include "PlayerInfoDecoder.hpp"
@@ -123,11 +125,18 @@ namespace
         interfaces.countDialogOpen = false;
     }
 
+    void AddModalEvent(GameState_s& state)
+    {
+        const auto& interfaces = state.interfaces;
+        StateLog::AddEvent(state, ModalChanged_s{.mainModal = interfaces.mainModal, .sideModal = interfaces.sideModal, .chatModal = interfaces.chatModal});
+    }
+
     void DecodeOpenMain(Packet& packet, GameState_s& state)
     {
         auto& interfaces = state.interfaces;
         CloseModals(interfaces);
         interfaces.mainModal = packet.G2();
+        AddModalEvent(state);
     }
 
     void DecodeOpenSide(Packet& packet, GameState_s& state)
@@ -135,6 +144,7 @@ namespace
         auto& interfaces = state.interfaces;
         CloseModals(interfaces);
         interfaces.sideModal = packet.G2();
+        AddModalEvent(state);
     }
 
     void DecodeOpenChat(Packet& packet, GameState_s& state)
@@ -143,6 +153,7 @@ namespace
         interfaces.mainModal = -1;
         interfaces.sideModal = -1;
         interfaces.chatModal = packet.G2();
+        AddModalEvent(state);
     }
 
     void DecodeOpenMainSide(Packet& packet, GameState_s& state)
@@ -151,6 +162,19 @@ namespace
         CloseModals(interfaces);
         interfaces.mainModal = packet.G2();
         interfaces.sideModal = packet.G2();
+        AddModalEvent(state);
+    }
+
+    void DecodeClose(GameState_s& state)
+    {
+        CloseModals(state.interfaces);
+        AddModalEvent(state);
+    }
+
+    void DecodeCountDialog(GameState_s& state)
+    {
+        state.interfaces.countDialogOpen = true;
+        AddModalEvent(state);
     }
 
     void DecodeSetModel(Packet& packet, GameState_s& state, ComponentModelKind_e kind)
@@ -182,6 +206,7 @@ namespace
         }
 
         state.inventories.insert_or_assign(com, std::move(inventory));
+        StateLog::AddEvent(state, InventoryChanged_s{.com = com});
     }
 
     void DecodeInvPartial(Packet& packet, GameState_s& state)
@@ -201,6 +226,22 @@ namespace
 
             inventory.slots[slot] = item;
         }
+
+        StateLog::AddEvent(state, InventoryChanged_s{.com = com});
+    }
+
+    void DecodeInvStopTransmit(Packet& packet, GameState_s& state)
+    {
+        const auto com = packet.G2();
+        state.inventories.erase(com);
+        StateLog::AddEvent(state, InventoryChanged_s{.com = com});
+    }
+
+    void SetVarp(GameState_s& state, u16 varp, s32 value)
+    {
+        const auto previous = state.GetVarp(varp);
+        state.varps.insert_or_assign(varp, value);
+        StateLog::AddEvent(state, VarpChanged_s{.varp = varp, .previous = previous, .value = value});
     }
 
     void DecodeMessageGame(Packet& packet, GameState_s& state)
@@ -435,7 +476,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
         DecodeOpenMainSide(packet, state);
         return;
     case ServerProt_e::IfClose:
-        CloseModals(interfaces);
+        DecodeClose(state);
         return;
     case ServerProt_e::IfOpenOverlay:
         interfaces.overlay = packet.G2B();
@@ -447,7 +488,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
         interfaces.activeTab = packet.G1();
         return;
     case ServerProt_e::PCountDialog:
-        interfaces.countDialogOpen = true;
+        DecodeCountDialog(state);
         return;
     case ServerProt_e::TutOpen:
         interfaces.tutorialComponent = packet.G2B();
@@ -514,19 +555,19 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
         DecodeInvPartial(packet, state);
         return;
     case ServerProt_e::UpdateInvStopTransmit:
-        state.inventories.erase(packet.G2());
+        DecodeInvStopTransmit(packet, state);
         return;
 
     case ServerProt_e::VarpSmall:
     {
         const auto varp = packet.G2();
-        state.varps.insert_or_assign(varp, packet.G1B());
+        SetVarp(state, varp, packet.G1B());
         return;
     }
     case ServerProt_e::VarpLarge:
     {
         const auto varp = packet.G2();
-        state.varps.insert_or_assign(varp, packet.G4());
+        SetVarp(state, varp, packet.G4());
         return;
     }
     case ServerProt_e::ResetClientVarCache:
@@ -548,6 +589,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
         return;
     case ServerProt_e::UpdateRebootTimer:
         state.rebootTimer = RebootTimer_s{.ticks = packet.G2(), .tick = state.tick};
+        StateLog::AddEvent(state, RebootStarted_s{.ticks = state.rebootTimer->ticks});
         return;
     case ServerProt_e::LastLoginInfo:
         DecodeLastLogin(packet, state);
@@ -649,7 +691,9 @@ void ServerPacketDecoder::DecodeStat(Packet& packet, GameState_s& state)
         return;
     }
 
+    const auto previous = state.stats[stat];
     state.stats[stat] = Stat_s{.xp = xp, .level = level, .baseLevel = GetBaseLevel(xp)};
+    StateLog::AddEvent(state, StatChanged_s{.stat = stat, .previous = previous, .current = state.stats[stat]});
 }
 
 void ServerPacketDecoder::DecodeTab(Packet& packet, GameState_s& state)

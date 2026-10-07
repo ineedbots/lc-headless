@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Social_s.hpp"
 
@@ -19,4 +20,5 @@ public:
     }
 
     static void AddMessage(GameState_s& state, MessageType_e type, std::string sender, u64 sender37, u8 rights, std::string text);
+    static void AddEvent(GameState_s& state, GameEventData data);
 };

@@ -24,6 +24,7 @@ private:
     [[nodiscard]] Zone_s GetZone(const GameState_s& state) const;
 
     static void SetLoc(GameState_s& state, const Tile_s& tile, u8 info, s32 id);
+    static void AddObj(GameState_s& state, const Tile_s& tile, u16 obj, s32 count);
     static void DeleteObj(GameState_s& state, const Tile_s& tile, u16 obj);
     static void CountObj(GameState_s& state, const Tile_s& tile, u16 obj, u16 oldCount, u16 newCount);
 

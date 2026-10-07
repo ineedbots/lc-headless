@@ -2,10 +2,12 @@
 
 #include "../Tile_s.hpp"
 #include "Entity_s.hpp"
+#include "GameEvent_s.hpp"
 #include "Interfaces_s.hpp"
 #include "Npc_s.hpp"
 #include "Player_s.hpp"
 #include "Social_s.hpp"
+#include "Stat_s.hpp"
 #include "Zone_s.hpp"
 
 // The 104x104-tile area the server builds around the player. Local coordinates are absolute minus base.
@@ -32,13 +34,6 @@ struct Inventory_s
     u16 com = 0;
     std::vector<Item_s> slots;
     u64 tick = 0;
-};
-
-struct Stat_s
-{
-    s32 xp = 0;
-    u8 level = 0;
-    u8 baseLevel = 1;
 };
 
 struct SoundEffect_s
@@ -94,13 +89,15 @@ struct Audio_s
 
 // Everything the server has told this client. Ticks count PLAYER_INFO packets, one per server tick.
 // Packets a script sends during a server tick arrive before that tick's PLAYER_INFO, so they carry
-// the previous count; everything from PLAYER_INFO onward carries the new one.
+// the previous count; everything from PLAYER_INFO onward carries the new one. Messages and events are
+// numbered from 1, and a fresh login resets the state, so the numbering starts over after one.
 struct GameState_s
 {
     static constexpr std::size_t STAT_COUNT = 25;
     static constexpr std::size_t PLAYER_OP_COUNT = 5;
     static constexpr std::size_t MAX_MESSAGES = 100;
     static constexpr std::size_t MAX_EFFECTS = 64;
+    static constexpr std::size_t MAX_EVENTS = 1024;
 
     u64 tick = 0;
     u16 pid = 0;
@@ -127,6 +124,8 @@ struct GameState_s
     Social_s social;
     u64 messageCount = 0;
     std::deque<ChatMessage_s> messages;
+    u64 eventCount = 0;
+    std::deque<GameEvent_s> events;
 
     std::deque<Projectile_s> projectiles;
     std::deque<MapAnim_s> mapAnims;
@@ -152,4 +151,5 @@ struct GameState_s
     [[nodiscard]] s32 GetVarp(u16 varp) const;
     [[nodiscard]] std::vector<const GroundItem_s*> GetGroundItemsAt(const Tile_s& tile) const;
     [[nodiscard]] std::vector<const ChatMessage_s*> GetMessagesAfter(u64 sequence) const;
+    [[nodiscard]] std::vector<const GameEvent_s*> GetEventsAfter(u64 sequence) const;
 };

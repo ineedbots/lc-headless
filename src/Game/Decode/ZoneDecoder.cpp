@@ -5,6 +5,7 @@
 #include "../Protocol/ServerProt.hpp"
 #include "../ProtocolError.hpp"
 #include "../State/Entity_s.hpp"
+#include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Zone_s.hpp"
 #include "../Tile_s.hpp"
@@ -130,7 +131,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         const auto count = packet.G2();
         if (inBuildArea)
         {
-            state.groundItems.push_back({.tile = tile, .id = obj, .count = count, .tick = state.tick});
+            AddObj(state, tile, obj, count);
         }
         return;
     }
@@ -161,7 +162,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         const auto receiver = packet.G2();
         if (inBuildArea && receiver != state.pid)
         {
-            state.groundItems.push_back({.tile = tile, .id = obj, .count = count, .tick = state.tick});
+            AddObj(state, tile, obj, count);
         }
         return;
     }
@@ -321,10 +322,20 @@ void ZoneDecoder::SetLoc(GameState_s& state, const Tile_s& tile, u8 info, s32 id
     if (existing == state.locChanges.end())
     {
         state.locChanges.push_back(change);
-        return;
+    }
+    else
+    {
+        *existing = change;
     }
 
-    *existing = change;
+    StateLog::AddEvent(state, LocChanged_s{.change = change});
+}
+
+void ZoneDecoder::AddObj(GameState_s& state, const Tile_s& tile, u16 obj, s32 count)
+{
+    const auto item = GroundItem_s{.tile = tile, .id = obj, .count = count, .tick = state.tick};
+    state.groundItems.push_back(item);
+    StateLog::AddEvent(state, GroundItemAdded_s{.item = item});
 }
 
 void ZoneDecoder::DeleteObj(GameState_s& state, const Tile_s& tile, u16 obj)
@@ -335,10 +346,13 @@ void ZoneDecoder::DeleteObj(GameState_s& state, const Tile_s& tile, u16 obj)
         return item.tile == tile && item.id == id;
     });
 
-    if (found != state.groundItems.end())
+    if (found == state.groundItems.end())
     {
-        state.groundItems.erase(found);
+        return;
     }
+
+    StateLog::AddEvent(state, GroundItemRemoved_s{.item = *found});
+    state.groundItems.erase(found);
 }
 
 void ZoneDecoder::CountObj(GameState_s& state, const Tile_s& tile, u16 obj, u16 oldCount, u16 newCount)
@@ -349,8 +363,11 @@ void ZoneDecoder::CountObj(GameState_s& state, const Tile_s& tile, u16 obj, u16 
         return item.tile == tile && item.id == id && item.count == oldCount;
     });
 
-    if (found != state.groundItems.end())
+    if (found == state.groundItems.end())
     {
-        found->count = newCount;
+        return;
     }
+
+    found->count = newCount;
+    StateLog::AddEvent(state, GroundItemCountChanged_s{.item = *found, .previousCount = oldCount});
 }

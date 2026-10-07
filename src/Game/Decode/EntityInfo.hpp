@@ -33,9 +33,10 @@ public:
 
     // Walks the first `count` entries of the tracked list in server order, applies their movement,
     // and returns the survivors in the same order. Positions in the result whose entity carries an
-    // extended block are appended to `extended`.
+    // extended block are appended to `extended`. Entities the server removes, and any tracked past
+    // `count`, are moved to `removed`.
     template <typename TEntity>
-    [[nodiscard]] static std::vector<TEntity> ReadTracked(Packet& packet, std::vector<TEntity>& tracked, std::vector<std::size_t>& extended, u64 tick)
+    [[nodiscard]] static std::vector<TEntity> ReadTracked(Packet& packet, std::vector<TEntity>& tracked, std::vector<std::size_t>& extended, std::vector<TEntity>& removed, u64 tick)
     {
         const auto count = static_cast<std::size_t>(packet.GBit(COUNT_BITS));
         if (count > tracked.size())
@@ -57,6 +58,7 @@ public:
             const auto moveType = packet.GBit(MOVE_TYPE_BITS);
             if (moveType == MOVE_REMOVE)
             {
+                removed.push_back(std::move(entity));
                 continue;
             }
 
@@ -67,6 +69,11 @@ public:
             {
                 extended.push_back(survivors.size() - 1);
             }
+        }
+
+        for (auto i = count; i < tracked.size(); ++i)
+        {
+            removed.push_back(std::move(tracked[i]));
         }
 
         return survivors;

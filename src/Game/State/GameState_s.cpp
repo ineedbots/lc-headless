@@ -3,6 +3,7 @@
 
 #include "../Protocol/Base37.hpp"
 #include "../Tile_s.hpp"
+#include "GameEvent_s.hpp"
 #include "Npc_s.hpp"
 #include "Player_s.hpp"
 #include "Social_s.hpp"
@@ -115,6 +116,18 @@ std::vector<const ChatMessage_s*> GameState_s::GetMessagesAfter(u64 sequence) co
         {
             found.push_back(&message);
         }
+    }
+
+    return found;
+}
+
+std::vector<const GameEvent_s*> GameState_s::GetEventsAfter(u64 sequence) const
+{
+    auto found = std::vector<const GameEvent_s*>{};
+    const auto first = std::ranges::upper_bound(events, sequence, {}, &GameEvent_s::sequence);
+    for (auto event = first; event != events.end(); ++event)
+    {
+        found.push_back(&*event);
     }
 
     return found;

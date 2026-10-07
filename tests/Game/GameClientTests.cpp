@@ -10,6 +10,7 @@
 #include "Game/Net/LoginError.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
+#include "Game/State/GameEvent_s.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Game/Tile_s.hpp"
 #include "Io/Packet.hpp"
@@ -111,6 +112,16 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
     REQUIRE(snapshot.FindInventory(INVENTORY) != nullptr);
     CHECK(snapshot.FindInventory(INVENTORY)->slots[0].id == 1511);
     CHECK(snapshot.messages.back().text == "Welcome to RuneScape.");
+    CHECK(std::ranges::any_of(snapshot.events, [](const GameEvent_s& event)
+    {
+        const auto* added = std::get_if<NpcAdded_s>(&event.data);
+        return added != nullptr && added->npc.index == NPC_INDEX;
+    }));
+    CHECK(std::ranges::any_of(snapshot.events, [](const GameEvent_s& event)
+    {
+        const auto* changed = std::get_if<InventoryChanged_s>(&event.data);
+        return changed != nullptr && changed->com == INVENTORY;
+    }));
 
     SECTION("an NPC interaction walks toward it, then sends the option, in one flush")
     {

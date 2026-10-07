@@ -6,6 +6,7 @@
 #include "../Protocol/WordPack.hpp"
 #include "../ProtocolError.hpp"
 #include "../State/Entity_s.hpp"
+#include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Player_s.hpp"
 #include "../State/Social_s.hpp"
@@ -62,6 +63,16 @@ namespace
     {
         return {.x = state.buildArea.baseX + localX, .z = state.buildArea.baseZ + localZ, .level = level};
     }
+
+    GameEventData ToHitEvent(const Player_s& player, bool isLocal)
+    {
+        if (isLocal)
+        {
+            return LocalHit_s{.hit = player.hits.back()};
+        }
+
+        return PlayerHit_s{.index = player.index, .hit = player.hits.back()};
+    }
 }
 
 void PlayerInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
@@ -70,17 +81,20 @@ void PlayerInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
 
     auto packet = Packet{payload};
     auto extended = std::vector<ExtendedTarget_s>{};
+    auto removed = std::vector<Player_s>{};
+    auto hits = std::vector<GameEventData>{};
 
     packet.GBitStart();
     ReadLocal(packet, state, extended);
 
     auto trackedExtended = std::vector<std::size_t>{};
-    auto players = EntityInfo::ReadTracked(packet, state.players, trackedExtended, state.tick);
+    auto players = EntityInfo::ReadTracked(packet, state.players, trackedExtended, removed, state.tick);
     for (const auto position : trackedExtended)
     {
         extended.push_back({.isLocal = false, .position = position});
     }
 
+    const auto firstAdded = players.size();
     ReadNew(packet, state, players, extended);
     packet.GBitEnd();
     state.players = std::move(players);
@@ -88,12 +102,27 @@ void PlayerInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
     for (const auto& target : extended)
     {
         auto& player = target.isLocal ? state.localPlayer : state.players[target.position];
-        ReadExtended(packet, state, player, target.isLocal);
+        ReadExtended(packet, state, player, target.isLocal, hits);
     }
 
     if (packet.GetAvailable() != 0)
     {
         throw ProtocolError{std::format("PLAYER_INFO has {} bytes left after the last extended block", packet.GetAvailable())};
+    }
+
+    for (auto& player : removed)
+    {
+        StateLog::AddEvent(state, PlayerRemoved_s{.player = std::move(player)});
+    }
+
+    for (auto i = firstAdded; i < state.players.size(); ++i)
+    {
+        StateLog::AddEvent(state, PlayerAdded_s{.player = state.players[i]});
+    }
+
+    for (auto& hit : hits)
+    {
+        StateLog::AddEvent(state, std::move(hit));
     }
 }
 
@@ -231,7 +260,7 @@ void PlayerInfoDecoder::ReadNew(Packet& packet, GameState_s& state, std::vector<
     }
 }
 
-void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_s& player, bool isLocal)
+void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_s& player, bool isLocal, std::vector<GameEventData>& hits)
 {
     const auto tick = state.tick;
     auto mask = u32{packet.G1()};
@@ -276,6 +305,7 @@ void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_
     if ((mask & MASK_DAMAGE) != 0)
     {
         EntityInfo::ReadHit(packet, player, tick);
+        hits.push_back(ToHitEvent(player, isLocal));
     }
 
     if ((mask & MASK_FACE_COORD) != 0)
@@ -311,6 +341,7 @@ void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_
     if ((mask & MASK_DAMAGE2) != 0)
     {
         EntityInfo::ReadHit(packet, player, tick);
+        hits.push_back(ToHitEvent(player, isLocal));
     }
 }
 

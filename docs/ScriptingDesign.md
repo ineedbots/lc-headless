@@ -101,7 +101,7 @@ rs2004-headless/
 
 ### Per VM, when a slot is taken
 
-`ScriptVm` does steps 1�4 itself; `ScriptHost` does the rest.
+`ScriptVm` does steps 1–4 itself; `ScriptHost` does the rest.
 
 1. `py_setvmctx(vm)`, so callbacks and bound functions find their `ScriptVm`.
 2. `py_callbacks()`: `importfile` resolves inside `scripts/` and `scripts/lib/` only, packages included; `print` and `flush` write to the account's logger, one line per log entry.
@@ -183,16 +183,18 @@ Hooks see the state as it stands after the whole pump, not as it was when the ev
 
 ## 5. Events
 
-`GameState_s` gains an event log next to `messages`:
+`GameState_s` gains an event log next to `messages`. The event types live in `src/Game/State/GameEvent_s.hpp`. `Stat_s` moved to its own header so the event can carry it.
 
 ```cpp
+using GameEventData = std::variant<NpcAdded_s, NpcRemoved_s, NpcHit_s, PlayerAdded_s, PlayerRemoved_s,
+    PlayerHit_s, LocalHit_s, GroundItemAdded_s, GroundItemRemoved_s, GroundItemCountChanged_s,
+    LocChanged_s, InventoryChanged_s, StatChanged_s, VarpChanged_s, ModalChanged_s, RebootStarted_s>;
+
 struct GameEvent_s
 {
     u64 sequence = 0;
     u64 tick = 0;
-    std::variant<NpcAdded_s, NpcRemoved_s, NpcHit_s, PlayerAdded_s, PlayerRemoved_s, PlayerHit_s,
-                 LocalHit_s, GroundItemAdded_s, GroundItemRemoved_s, LocChanged_s,
-                 InventoryChanged_s, StatChanged_s, VarpChanged_s, ModalChanged_s, RebootStarted_s> data;
+    GameEventData data;
 };
 
 // in GameState_s
@@ -206,21 +208,25 @@ std::deque<GameEvent_s> events;
 |---|---|---|
 | `NpcAdded_s` / `NpcRemoved_s` (with the `Npc_s`) | `NpcInfoDecoder` | `on_npc_spawned(npc)` / `on_npc_despawned(npc)` |
 | `NpcHit_s` (index, `Hit_s`) | `NpcInfoDecoder` | `on_npc_damaged(npc, damage)` |
-| `PlayerAdded_s` / `PlayerRemoved_s` | `PlayerInfoDecoder` | `on_player_spawned(player)` / `on_player_despawned(player)` |
-| `PlayerHit_s` / `LocalHit_s` | `PlayerInfoDecoder` | `on_player_damaged(player, damage)` / `on_damaged(damage)` |
-| `GroundItemAdded_s` / `GroundItemRemoved_s` | `ZoneDecoder` (`OBJ_ADD`, `OBJ_REVEAL`, `OBJ_DEL`, `OBJ_COUNT`) | `on_ground_item_spawned(item)` / `on_ground_item_despawned(item)` |
-| `LocChanged_s` | `ZoneDecoder` (`LOC_ADD_CHANGE`, `LOC_DEL`) | `on_loc_changed(loc)` |
-| `InventoryChanged_s` (com) | `ServerPacketDecoder` | `on_inventory_changed(com)` |
-| `StatChanged_s` (stat) | `ServerPacketDecoder` | `on_stat_changed(stat)` |
-| `VarpChanged_s` (varp, value) | `ServerPacketDecoder` | `on_varp_changed(varp, value)` |
-| `ModalChanged_s` | `ServerPacketDecoder` | `on_interface_changed()` |
-| `RebootStarted_s` (seconds) | `ServerPacketDecoder` | `on_system_update(seconds)` |
+| `PlayerAdded_s` / `PlayerRemoved_s` (with the `Player_s`) | `PlayerInfoDecoder` | `on_player_spawned(player)` / `on_player_despawned(player)` |
+| `PlayerHit_s` (index, `Hit_s`) / `LocalHit_s` (`Hit_s`) | `PlayerInfoDecoder` | `on_player_damaged(player, damage)` / `on_damaged(damage)` |
+| `GroundItemAdded_s` / `GroundItemRemoved_s` (with the `GroundItem_s`) | `ZoneDecoder` (`OBJ_ADD`, `OBJ_REVEAL` / `OBJ_DEL`) | `on_ground_item_spawned(item)` / `on_ground_item_despawned(item)` |
+| `GroundItemCountChanged_s` (the item, previous count) | `ZoneDecoder` (`OBJ_COUNT`) | `on_ground_item_changed(item, previous_count)` |
+| `LocChanged_s` (the `LocChange_s`) | `ZoneDecoder` (`LOC_ADD_CHANGE`, `LOC_DEL`) | `on_loc_changed(loc)` |
+| `InventoryChanged_s` (com) | `ServerPacketDecoder` (`UPDATE_INV_FULL`, `_PARTIAL`, `_STOP_TRANSMIT`) | `on_inventory_changed(com)` |
+| `StatChanged_s` (stat, previous and current `Stat_s`) | `ServerPacketDecoder` | `on_stat_changed(stat)` |
+| `VarpChanged_s` (varp, previous, value) | `ServerPacketDecoder` | `on_varp_changed(varp, value)` |
+| `ModalChanged_s` (main, side and chat modal after the change) | `ServerPacketDecoder` (`IF_OPEN*`, `IF_CLOSE`, `P_COUNTDIALOG`) | `on_interface_changed()` |
+| `RebootStarted_s` (ticks) | `ServerPacketDecoder` | `on_system_update(seconds)` |
 | messages (existing log) | existing | `on_server_message(msg)`, `on_chat_message(msg, sender)`, `on_private_message(msg, sender)`, `on_trade_request(name)`, `on_duel_request(name)` |
 
 Rules:
 
-- Events describe what the server said. Zone resets, rebuilds and pruning of inactive zones change the state silently and emit nothing. The state is the truth, and scripts should query it rather than mirror it from events.
+- Events describe what the server said. Zone resets, rebuilds and pruning of inactive zones change the state silently and emit nothing. An `OBJ_DEL` for an item that isn't tracked emits nothing either. The state is the truth, and scripts should query it rather than mirror it from events.
+- An info packet's events come in three groups: removals, then additions, then hits, each in packet order. An entity counts as removed when the server removes it explicitly, and also when it's tracked past the count the server sends. An added entity's event carries it after its extended blocks, so a new player has its appearance and a new NPC its first animation.
+- Events are recorded even when a value didn't change, such as a varp sent with the value it already had.
 - The log keeps the newest `MAX_EVENTS`. The host dispatches after every pump, so it can only fall behind if a single pump decodes more than that. If a gap shows up in the sequence numbers, the host logs a warning saying how many events were dropped.
+- A fresh login resets `GameState_s`, so sequence numbers start again at 1; a reconnect keeps them. The host notices the restart through `GetLoginCount()` (§8).
 - Other C++ code can read the same log through `GetEventsAfter`, as it already does with `GetMessagesAfter`.
 
 ---
@@ -366,7 +372,7 @@ The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared
 
 | Where | Change | Phase |
 |---|---|---|
-| `GameState_s`, decoders | The event log (§5) | 2 |
+| `GameState_s`, decoders | The event log (§5); `Stat_s` moves to `Stat_s.hpp` | 2 |
 | `Logger` | An optional name shown on each line, for per-account loggers that share one sink | 3 |
 | `ConfigFile`, `ConfigDesign.md` | Remove `account`, add `scripting` | 3 |
 | `Application` | Builds `ScriptRuntime` and `AccountRunner`; the smoke-test summary moves into `Account` | 3 |

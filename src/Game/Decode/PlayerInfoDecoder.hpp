@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Io/Packet.hpp"
+#include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Player_s.hpp"
 
@@ -27,7 +28,7 @@ private:
 
     static void ReadLocal(Packet& packet, GameState_s& state, std::vector<ExtendedTarget_s>& extended);
     void ReadNew(Packet& packet, GameState_s& state, std::vector<Player_s>& players, std::vector<ExtendedTarget_s>& extended);
-    void ReadExtended(Packet& packet, GameState_s& state, Player_s& player, bool isLocal);
+    void ReadExtended(Packet& packet, GameState_s& state, Player_s& player, bool isLocal, std::vector<GameEventData>& hits);
     static void ReadChat(Packet& packet, GameState_s& state, Player_s& player);
 
     // Kept across removals: the server skips APPEARANCE for a player whose current look this viewer has seen.

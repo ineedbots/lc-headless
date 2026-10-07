@@ -4,9 +4,11 @@
 #include "../../Io/Packet.hpp"
 #include "../ProtocolError.hpp"
 #include "../State/Entity_s.hpp"
+#include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Npc_s.hpp"
 #include "EntityInfo.hpp"
+#include "StateLog.hpp"
 
 namespace
 {
@@ -25,21 +27,39 @@ void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
 {
     auto packet = Packet{payload};
     auto extended = std::vector<std::size_t>{};
+    auto removed = std::vector<Npc_s>{};
+    auto hits = std::vector<NpcHit_s>{};
 
     packet.GBitStart();
-    auto npcs = EntityInfo::ReadTracked(packet, state.npcs, extended, state.tick);
+    auto npcs = EntityInfo::ReadTracked(packet, state.npcs, extended, removed, state.tick);
+    const auto firstAdded = npcs.size();
     ReadNew(packet, state, npcs, extended);
     packet.GBitEnd();
     state.npcs = std::move(npcs);
 
     for (const auto position : extended)
     {
-        ReadExtended(packet, state, state.npcs[position]);
+        ReadExtended(packet, state, state.npcs[position], hits);
     }
 
     if (packet.GetAvailable() != 0)
     {
         throw ProtocolError{std::format("NPC_INFO has {} bytes left after the last extended block", packet.GetAvailable())};
+    }
+
+    for (auto& npc : removed)
+    {
+        StateLog::AddEvent(state, NpcRemoved_s{.npc = std::move(npc)});
+    }
+
+    for (auto i = firstAdded; i < state.npcs.size(); ++i)
+    {
+        StateLog::AddEvent(state, NpcAdded_s{.npc = state.npcs[i]});
+    }
+
+    for (const auto& hit : hits)
+    {
+        StateLog::AddEvent(state, hit);
     }
 }
 
@@ -83,7 +103,7 @@ void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vect
     }
 }
 
-void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc)
+void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits)
 {
     const auto tick = state.tick;
     const auto mask = u32{packet.G1()};
@@ -91,6 +111,7 @@ void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc
     if ((mask & MASK_DAMAGE2) != 0)
     {
         EntityInfo::ReadHit(packet, npc, tick);
+        hits.push_back({.index = npc.index, .hit = npc.hits.back()});
     }
 
     if ((mask & MASK_ANIM) != 0)
@@ -111,6 +132,7 @@ void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc
     if ((mask & MASK_DAMAGE) != 0)
     {
         EntityInfo::ReadHit(packet, npc, tick);
+        hits.push_back({.index = npc.index, .hit = npc.hits.back()});
     }
 
     if ((mask & MASK_CHANGE_TYPE) != 0)
