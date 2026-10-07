@@ -72,8 +72,14 @@ namespace
     }
 }
 
-Packet::Packet(std::vector<u8> data)
-    : m_data{std::move(data)}
+Packet::Packet()
+    : m_mode{Mode_e::Write}
+{
+}
+
+Packet::Packet(std::span<const u8> data)
+    : m_mode{Mode_e::Read}
+    , m_readData{data}
 {
 }
 
@@ -93,24 +99,30 @@ bool Packet::CheckCrc(std::span<const u8> source, s32 expected)
     return GetCrc(source) == expected;
 }
 
-std::span<u8> Packet::GetData()
-{
-    return m_data;
-}
-
 std::span<const u8> Packet::GetData() const
 {
-    return m_data;
+    if (m_mode == Mode_e::Read)
+    {
+        return m_readData;
+    }
+
+    return std::span{m_writeData}.first(m_pos);
 }
 
 std::size_t Packet::GetLength() const
 {
-    return m_data.size();
+    if (m_mode == Mode_e::Read)
+    {
+        return m_readData.size();
+    }
+
+    return m_pos;
 }
 
 std::size_t Packet::GetAvailable() const
 {
-    return m_data.size() - m_pos;
+    assert(m_mode == Mode_e::Read && "GetAvailable called on a write-mode packet");
+    return m_readData.size() - m_pos;
 }
 
 std::size_t Packet::GetPos() const
@@ -120,19 +132,19 @@ std::size_t Packet::GetPos() const
 
 void Packet::SetPos(std::size_t pos)
 {
-    assert(pos <= m_data.size() && "Packet pos set past the end");
+    assert(pos <= (m_mode == Mode_e::Read ? m_readData.size() : m_writeData.size()) && "Packet pos set past the end");
     m_pos = pos;
 }
 
-void Packet::SetRandom(std::unique_ptr<Isaac> random)
+u8 Packet::G1Enc(Isaac& random)
 {
-    m_random = std::move(random);
+    const auto encoded = u32{G1()};
+    return static_cast<u8>(encoded - static_cast<u32>(random.NextInt()));
 }
 
 u8 Packet::G1()
 {
-    RequireBytes(sizeof(u8));
-    return m_data[m_pos++];
+    return NextRead(sizeof(u8))[0];
 }
 
 s8 Packet::G1B()
@@ -142,10 +154,7 @@ s8 Packet::G1B()
 
 u16 Packet::G2()
 {
-    RequireBytes(sizeof(u16));
-    const auto value = LoadBig<u16>(std::span{m_data}.subspan(m_pos));
-    m_pos += sizeof(u16);
-    return value;
+    return LoadBig<u16>(NextRead(sizeof(u16)));
 }
 
 s16 Packet::G2B()
@@ -155,33 +164,26 @@ s16 Packet::G2B()
 
 s32 Packet::G3()
 {
-    RequireBytes(3);
-    const auto high = u32{m_data[m_pos]};
-    const auto low = u32{LoadBig<u16>(std::span{m_data}.subspan(m_pos + 1))};
-    m_pos += 3;
+    const auto bytes = NextRead(3);
+    const auto high = u32{bytes[0]};
+    const auto low = u32{LoadBig<u16>(bytes.subspan(1))};
     return static_cast<s32>((high << 16) | low);
 }
 
 s32 Packet::G4()
 {
-    RequireBytes(sizeof(s32));
-    const auto value = LoadBig<s32>(std::span{m_data}.subspan(m_pos));
-    m_pos += sizeof(s32);
-    return value;
+    return LoadBig<s32>(NextRead(sizeof(s32)));
 }
 
 s64 Packet::G8()
 {
-    RequireBytes(sizeof(s64));
-    const auto value = LoadBig<s64>(std::span{m_data}.subspan(m_pos));
-    m_pos += sizeof(s64);
-    return value;
+    return LoadBig<s64>(NextRead(sizeof(s64)));
 }
 
 s32 Packet::GSmart()
 {
     RequireBytes(1);
-    if (m_data[m_pos] < SMART_ONE_BYTE_LIMIT)
+    if (m_readData[m_pos] < SMART_ONE_BYTE_LIMIT)
     {
         return G1();
     }
@@ -192,7 +194,7 @@ s32 Packet::GSmart()
 s32 Packet::GSmarts()
 {
     RequireBytes(1);
-    if (m_data[m_pos] < SMART_ONE_BYTE_LIMIT)
+    if (m_readData[m_pos] < SMART_ONE_BYTE_LIMIT)
     {
         return G1() - SMARTS_ONE_BYTE_OFFSET;
     }
@@ -203,7 +205,7 @@ s32 Packet::GSmarts()
 std::string Packet::GJStr()
 {
     RequireBytes(1);
-    const auto unread = std::span{m_data}.subspan(m_pos);
+    const auto unread = m_readData.subspan(m_pos);
     const auto terminator = std::ranges::find(unread, STRING_TERMINATOR);
     if (terminator != unread.end())
     {
@@ -213,103 +215,88 @@ std::string Packet::GJStr()
     }
 
     // TS checks for the end of the buffer before keeping each byte, so it drops the last one.
-    m_pos = m_data.size();
+    m_pos = m_readData.size();
     return ToString(unread.first(unread.size() - 1));
 }
 
 void Packet::GData(std::span<u8> destination)
 {
-    RequireBytes(destination.size());
-    std::ranges::copy(std::span{m_data}.subspan(m_pos, destination.size()), destination.begin());
-    m_pos += destination.size();
+    std::ranges::copy(NextRead(destination.size()), destination.begin());
 }
 
-void Packet::P1Enc(s32 opcode)
+void Packet::P1Enc(Isaac& random, s32 opcode)
 {
-    RequireBytes(1);
-    const auto key = m_random ? m_random->NextInt() : 0;
-    m_data[m_pos++] = static_cast<u8>(static_cast<u32>(opcode) + static_cast<u32>(key));
+    const auto destination = NextWrite(sizeof(u8));
+    destination[0] = static_cast<u8>(static_cast<u32>(opcode) + static_cast<u32>(random.NextInt()));
 }
 
 void Packet::P1(s32 value)
 {
-    RequireBytes(1);
-    m_data[m_pos++] = static_cast<u8>(value);
+    NextWrite(sizeof(u8))[0] = static_cast<u8>(value);
 }
 
 void Packet::P2(s32 value)
 {
-    RequireBytes(sizeof(u16));
-    StoreBig(std::span{m_data}.subspan(m_pos), static_cast<u16>(value));
-    m_pos += sizeof(u16);
+    StoreBig(NextWrite(sizeof(u16)), static_cast<u16>(value));
 }
 
 void Packet::IP2(s32 value)
 {
-    RequireBytes(sizeof(u16));
-    StoreLittle(std::span{m_data}.subspan(m_pos), static_cast<u16>(value));
-    m_pos += sizeof(u16);
+    StoreLittle(NextWrite(sizeof(u16)), static_cast<u16>(value));
 }
 
 void Packet::P3(s32 value)
 {
-    RequireBytes(3);
-    m_data[m_pos] = static_cast<u8>(value >> 16);
-    StoreBig(std::span{m_data}.subspan(m_pos + 1), static_cast<u16>(value));
-    m_pos += 3;
+    const auto destination = NextWrite(3);
+    destination[0] = static_cast<u8>(value >> 16);
+    StoreBig(destination.subspan(1), static_cast<u16>(value));
 }
 
 void Packet::P4(s32 value)
 {
-    RequireBytes(sizeof(s32));
-    StoreBig(std::span{m_data}.subspan(m_pos), value);
-    m_pos += sizeof(s32);
+    StoreBig(NextWrite(sizeof(s32)), value);
 }
 
 void Packet::IP4(s32 value)
 {
-    RequireBytes(sizeof(s32));
-    StoreLittle(std::span{m_data}.subspan(m_pos), value);
-    m_pos += sizeof(s32);
+    StoreLittle(NextWrite(sizeof(s32)), value);
 }
 
 void Packet::P8(s64 value)
 {
-    RequireBytes(sizeof(s64));
-    StoreBig(std::span{m_data}.subspan(m_pos), value);
-    m_pos += sizeof(s64);
+    StoreBig(NextWrite(sizeof(s64)), value);
 }
 
 void Packet::PJStr(std::string_view text)
 {
-    RequireBytes(text.size() + 1);
-    std::ranges::copy(text, m_data.begin() + static_cast<std::ptrdiff_t>(m_pos));
-    m_pos += text.size();
-    m_data[m_pos++] = STRING_TERMINATOR;
+    const auto destination = NextWrite(text.size() + 1);
+    std::ranges::copy(text, destination.begin());
+    destination.back() = STRING_TERMINATOR;
 }
 
 void Packet::PData(std::span<const u8> source)
 {
-    RequireBytes(source.size());
-    std::ranges::copy(source, m_data.begin() + static_cast<std::ptrdiff_t>(m_pos));
-    m_pos += source.size();
+    std::ranges::copy(source, NextWrite(source.size()).begin());
 }
 
 void Packet::PSize1(std::size_t size)
 {
+    assert(m_mode == Mode_e::Write && "PSize1 called on a read-mode packet");
     assert(size + 1 <= m_pos && "PSize1 size reaches before the start of the packet");
 
     // As in TS, the length byte is the placeholder written just before the last size bytes.
-    m_data[m_pos - size - 1] = static_cast<u8>(size);
+    m_writeData[m_pos - size - 1] = static_cast<u8>(size);
 }
 
 void Packet::GBitStart()
 {
+    assert(m_mode == Mode_e::Read && "GBitStart called on a write-mode packet");
     m_bitPos = m_pos * 8;
 }
 
 void Packet::GBitEnd()
 {
+    assert(m_mode == Mode_e::Read && "GBitEnd called on a write-mode packet");
     m_pos = (m_bitPos + 7) / 8;
 }
 
@@ -325,17 +312,17 @@ s32 Packet::GBit(u32 bitCount)
 
     for (; bitCount > remaining; remaining = 8)
     {
-        value += (m_data[bytePos++] & BIT_MASKS[remaining]) << (bitCount - remaining);
+        value += (m_readData[bytePos++] & BIT_MASKS[remaining]) << (bitCount - remaining);
         bitCount -= remaining;
     }
 
     if (bitCount == remaining)
     {
-        value += m_data[bytePos] & BIT_MASKS[remaining];
+        value += m_readData[bytePos] & BIT_MASKS[remaining];
     }
     else
     {
-        value += (u32{m_data[bytePos]} >> (remaining - bitCount)) & BIT_MASKS[bitCount];
+        value += (u32{m_readData[bytePos]} >> (remaining - bitCount)) & BIT_MASKS[bitCount];
     }
 
     return static_cast<s32>(value);
@@ -343,18 +330,14 @@ s32 Packet::GBit(u32 bitCount)
 
 void Packet::RsaEnc(const BigUInt& modulus, const BigUInt& exponent)
 {
+    assert(m_mode == Mode_e::Write && "RsaEnc called on a read-mode packet");
     assert(m_pos > 0 && "RsaEnc called with an empty block");
 
-    const auto block = BigUInt::FromBytesBigEndian(std::span{m_data}.first(m_pos));
+    const auto block = BigUInt::FromBytesBigEndian(GetData());
     const auto encrypted = BigUInt::ModPow(block, exponent, modulus).ToBytesBigEndian();
     if (encrypted.size() > MAX_RSA_BLOCK_SIZE)
     {
         throw std::length_error{std::format("Packet RSA block is {} bytes, more than a 1-byte length can hold", encrypted.size())};
-    }
-
-    if (encrypted.size() + 1 > m_data.size())
-    {
-        throw std::out_of_range{std::format("Packet RSA block needs {} bytes, but the packet holds {}", encrypted.size() + 1, m_data.size())};
     }
 
     // The length counts BigUInt's sign-padding byte, as TS's bigIntToBytes does.
@@ -363,8 +346,32 @@ void Packet::RsaEnc(const BigUInt& modulus, const BigUInt& exponent)
     PData(encrypted);
 }
 
+std::span<const u8> Packet::NextRead(std::size_t count)
+{
+    RequireBytes(count);
+    const auto bytes = m_readData.subspan(m_pos, count);
+    m_pos += count;
+    return bytes;
+}
+
+std::span<u8> Packet::NextWrite(std::size_t count)
+{
+    assert(m_mode == Mode_e::Write && "Packet write called on a read-mode packet");
+
+    const auto end = m_pos + count;
+    if (end > m_writeData.size())
+    {
+        m_writeData.resize(end);
+    }
+
+    const auto bytes = std::span{m_writeData}.subspan(m_pos, count);
+    m_pos = end;
+    return bytes;
+}
+
 void Packet::RequireBytes(std::size_t count) const
 {
+    assert(m_mode == Mode_e::Read && "Packet read called on a write-mode packet");
     if (count <= GetAvailable())
     {
         return;
@@ -375,7 +382,8 @@ void Packet::RequireBytes(std::size_t count) const
 
 void Packet::RequireBits(u32 bitCount) const
 {
-    const auto availableBits = m_data.size() * 8 - m_bitPos;
+    assert(m_mode == Mode_e::Read && "GBit called on a write-mode packet");
+    const auto availableBits = m_readData.size() * 8 - m_bitPos;
     if (bitCount <= availableBits)
     {
         return;

@@ -63,11 +63,6 @@ namespace
         s32 crc;
     };
 
-    Packet MakePacket(std::vector<u8> bytes)
-    {
-        return Packet{std::move(bytes)};
-    }
-
     std::vector<u8> ToVector(std::span<const u8> bytes)
     {
         return {bytes.begin(), bytes.end()};
@@ -78,28 +73,21 @@ namespace
         return {reinterpret_cast<const u8*>(text.data()), text.size()};
     }
 
-    std::vector<u8> PadTo(std::vector<u8> bytes, std::size_t size)
-    {
-        bytes.resize(size);
-        return bytes;
-    }
-
     void CheckRoundTrip(std::initializer_list<s64> values, void (*write)(Packet&, s64), s64 (*read)(Packet&))
     {
-        auto packet = MakePacket(std::vector<u8>(values.size() * sizeof(s64)));
+        auto writer = Packet{};
         for (const auto value : values)
         {
-            write(packet, value);
+            write(writer, value);
         }
 
-        const auto end = packet.GetPos();
-        packet.SetPos(0);
+        auto reader = Packet{writer.GetData()};
         for (const auto value : values)
         {
-            CHECK(read(packet) == value);
+            CHECK(read(reader) == value);
         }
 
-        CHECK(packet.GetPos() == end);
+        CHECK(reader.GetAvailable() == 0);
     }
 
     std::vector<u8> Decrypt(std::span<const u8> ciphertext)
@@ -125,52 +113,107 @@ namespace
     }
 }
 
-TEST_CASE("Packet construction and accessors", "[Packet]")
+TEST_CASE("Packet read mode", "[Packet]")
 {
-    SECTION("a new packet is zeroed, at pos 0")
+    SECTION("views the bytes without copying them, at pos 0")
     {
-        const auto packet = MakePacket(std::vector<u8>(5000));
+        const auto bytes = std::vector<u8>(5000);
+        const auto packet = Packet{bytes};
+        CHECK(packet.GetData().data() == bytes.data());
+        CHECK(packet.GetData().size() == 5000);
         CHECK(packet.GetLength() == 5000);
         CHECK(packet.GetPos() == 0);
         CHECK(packet.GetAvailable() == 5000);
-        CHECK(std::ranges::all_of(packet.GetData(), [](u8 byte)
-        {
-            return byte == 0;
-        }));
-    }
-
-    SECTION("the constructor moves the buffer instead of copying it")
-    {
-        auto bytes = std::vector<u8>(5000);
-        const auto* const original = bytes.data();
-        const auto packet = Packet{std::move(bytes)};
-        CHECK(packet.GetData().data() == original);
     }
 
     SECTION("an empty packet has nothing to read")
     {
-        auto packet = MakePacket({});
+        auto packet = Packet{std::span<const u8>{}};
         CHECK(packet.GetLength() == 0);
         CHECK_THROWS_AS(packet.G1(), std::out_of_range);
     }
 
-    SECTION("SetPos changes what is available")
+    SECTION("SetPos changes what is available, not the data or the length")
     {
-        auto packet = MakePacket(std::vector<u8>(10));
+        const auto bytes = std::vector<u8>(10);
+        auto packet = Packet{bytes};
         packet.SetPos(3);
         CHECK(packet.GetAvailable() == 7);
+        CHECK(packet.GetLength() == 10);
+        CHECK(packet.GetData().size() == 10);
         packet.SetPos(10);
         CHECK(packet.GetAvailable() == 0);
     }
+}
 
-    SECTION("bytes written through GetData are what reads return")
+TEST_CASE("Packet write mode", "[Packet]")
+{
+    SECTION("a new packet is empty, at pos 0")
     {
-        auto packet = MakePacket(std::vector<u8>(4));
-        const auto data = packet.GetData();
-        data[0] = 0xAB;
-        data[1] = 0xCD;
+        const auto packet = Packet{};
+        CHECK(packet.GetData().empty());
+        CHECK(packet.GetLength() == 0);
+        CHECK(packet.GetPos() == 0);
+    }
+
+    SECTION("the packet grows as it is written")
+    {
+        constexpr auto COUNT = 2000;
+        auto packet = Packet{};
+        for (auto i = 0; i < COUNT; ++i)
+        {
+            packet.P4(i);
+        }
+
+        CHECK(packet.GetLength() == COUNT * sizeof(s32));
+        CHECK(packet.GetPos() == COUNT * sizeof(s32));
+
+        auto reader = Packet{packet.GetData()};
+        for (auto i = 0; i < COUNT; ++i)
+        {
+            CHECK(reader.G4() == i);
+        }
+    }
+
+    SECTION("GetData and GetLength cover the bytes before pos")
+    {
+        auto packet = Packet{};
+        packet.P4(0x11223344);
+        packet.SetPos(1);
+        CHECK(packet.GetLength() == 1);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x11});
+
+        packet.SetPos(4);
+        CHECK(packet.GetLength() == 4);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x11, 0x22, 0x33, 0x44});
+    }
+
+    SECTION("writing after SetPos overwrites in place")
+    {
+        auto packet = Packet{};
+        packet.P4(0x11223344);
+        packet.SetPos(1);
+        packet.P1(0xAB);
+        packet.SetPos(4);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x11, 0xAB, 0x33, 0x44});
+    }
+
+    SECTION("a write across the end overwrites, then grows")
+    {
+        auto packet = Packet{};
+        packet.P2(0x1122);
+        packet.SetPos(1);
+        packet.P4(0x33445566);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x11, 0x33, 0x44, 0x55, 0x66});
+    }
+
+    SECTION("SetPos(0) starts the next message in the same packet")
+    {
+        auto packet = Packet{};
+        packet.P4(0x11223344);
         packet.SetPos(0);
-        CHECK(packet.G2() == 0xABCD);
+        packet.P1(0x55);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x55});
     }
 }
 
@@ -224,7 +267,7 @@ TEST_CASE("Packet fixed-width reads", "[Packet]")
         ReadCase_s{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, "G8", readG8, -1, 8});
 
     CAPTURE(testCase.call, testCase.bytes);
-    auto packet = MakePacket(testCase.bytes);
+    auto packet = Packet{testCase.bytes};
     CHECK(testCase.read(packet) == testCase.expected);
     CHECK(packet.GetPos() == testCase.posAfter);
 }
@@ -241,11 +284,11 @@ TEST_CASE("Packet smart reads", "[Packet]")
         SmartCase_s{{0xFF, 0xFF}, 32767, 16383, 2});
 
     CAPTURE(testCase.bytes);
-    auto smartPacket = MakePacket(testCase.bytes);
+    auto smartPacket = Packet{testCase.bytes};
     CHECK(smartPacket.GSmart() == testCase.smart);
     CHECK(smartPacket.GetPos() == testCase.posAfter);
 
-    auto smartsPacket = MakePacket(testCase.bytes);
+    auto smartsPacket = Packet{testCase.bytes};
     CHECK(smartsPacket.GSmarts() == testCase.smarts);
     CHECK(smartsPacket.GetPos() == testCase.posAfter);
 }
@@ -254,21 +297,24 @@ TEST_CASE("Packet string reads", "[Packet]")
 {
     SECTION("a terminated string")
     {
-        auto packet = MakePacket({0x61, 0x62, 0x63, 0x0A});
+        const auto bytes = std::vector<u8>{0x61, 0x62, 0x63, 0x0A};
+        auto packet = Packet{bytes};
         CHECK(packet.GJStr() == "abc");
         CHECK(packet.GetPos() == 4);
     }
 
     SECTION("an empty string")
     {
-        auto packet = MakePacket({0x0A});
+        const auto bytes = std::vector<u8>{0x0A};
+        auto packet = Packet{bytes};
         CHECK(packet.GJStr().empty());
         CHECK(packet.GetPos() == 1);
     }
 
     SECTION("two strings in a row")
     {
-        auto packet = MakePacket({0x61, 0x0A, 0x62, 0x0A});
+        const auto bytes = std::vector<u8>{0x61, 0x0A, 0x62, 0x0A};
+        auto packet = Packet{bytes};
         CHECK(packet.GJStr() == "a");
         CHECK(packet.GJStr() == "b");
         CHECK(packet.GetPos() == 4);
@@ -276,25 +322,29 @@ TEST_CASE("Packet string reads", "[Packet]")
 
     SECTION("a missing terminator drops the last byte, as TS does")
     {
-        auto packet = MakePacket({0x61, 0x62, 0x63});
+        const auto bytes = std::vector<u8>{0x61, 0x62, 0x63};
+        auto packet = Packet{bytes};
         CHECK(packet.GJStr() == "ab");
         CHECK(packet.GetPos() == 3);
 
-        auto single = MakePacket({0x61});
+        const auto singleBytes = std::vector<u8>{0x61};
+        auto single = Packet{singleBytes};
         CHECK(single.GJStr().empty());
         CHECK(single.GetPos() == 1);
     }
 
     SECTION("bytes are kept raw")
     {
-        auto packet = MakePacket({0xE9, 0xFF, 0x0A});
+        const auto bytes = std::vector<u8>{0xE9, 0xFF, 0x0A};
+        auto packet = Packet{bytes};
         CHECK(packet.GJStr() == "\xE9\xFF");
         CHECK(packet.GetPos() == 3);
     }
 
     SECTION("reading at the end throws")
     {
-        auto packet = MakePacket({0x61, 0x0A});
+        const auto bytes = std::vector<u8>{0x61, 0x0A};
+        auto packet = Packet{bytes};
         packet.SetPos(2);
         CHECK_THROWS_AS(packet.GJStr(), std::out_of_range);
         CHECK(packet.GetPos() == 2);
@@ -303,9 +353,11 @@ TEST_CASE("Packet string reads", "[Packet]")
 
 TEST_CASE("Packet GData", "[Packet]")
 {
+    const auto bytes = std::vector<u8>{0x01, 0x02, 0x03, 0x04, 0x05};
+    auto packet = Packet{bytes};
+
     SECTION("copies bytes from pos")
     {
-        auto packet = MakePacket({0x01, 0x02, 0x03, 0x04, 0x05});
         packet.SetPos(1);
         auto destination = std::array<u8, 3>{};
         packet.GData(destination);
@@ -315,15 +367,13 @@ TEST_CASE("Packet GData", "[Packet]")
 
     SECTION("an empty destination is a no-op, even at the end")
     {
-        auto packet = MakePacket({0x01, 0x02});
-        packet.SetPos(2);
+        packet.SetPos(5);
         CHECK_NOTHROW(packet.GData(std::span<u8>{}));
-        CHECK(packet.GetPos() == 2);
+        CHECK(packet.GetPos() == 5);
     }
 
     SECTION("too few bytes throws and changes nothing")
     {
-        auto packet = MakePacket({0x01, 0x02, 0x03, 0x04, 0x05});
         packet.SetPos(3);
         auto destination = std::array<u8, 3>{0x09, 0x09, 0x09};
         CHECK_THROWS_AS(packet.GData(destination), std::out_of_range);
@@ -361,9 +411,9 @@ TEST_CASE("Packet writes", "[Packet]")
         WriteCase_s{"PData({})", [](Packet& packet) { packet.PData({}); }, {}});
 
     CAPTURE(testCase.call);
-    auto packet = MakePacket(std::vector<u8>(8));
+    auto packet = Packet{};
     testCase.write(packet);
-    CHECK(ToVector(packet.GetData()) == PadTo(testCase.expected, 8));
+    CHECK(ToVector(packet.GetData()) == testCase.expected);
     CHECK(packet.GetPos() == testCase.expected.size());
 }
 
@@ -407,39 +457,37 @@ TEST_CASE("Packet writes read back unchanged", "[Packet]")
     SECTION("PJStr and GJStr")
     {
         const auto texts = std::array{"", "a", "hello world", "\xE9\xFF"};
-        auto packet = MakePacket(std::vector<u8>(64));
+        auto writer = Packet{};
         for (const auto* const text : texts)
         {
-            packet.PJStr(text);
+            writer.PJStr(text);
         }
 
-        const auto end = packet.GetPos();
-        packet.SetPos(0);
+        auto reader = Packet{writer.GetData()};
         for (const auto* const text : texts)
         {
-            CHECK(packet.GJStr() == text);
+            CHECK(reader.GJStr() == text);
         }
 
-        CHECK(packet.GetPos() == end);
+        CHECK(reader.GetAvailable() == 0);
     }
 
     SECTION("PData and GData")
     {
         const auto first = std::vector<u8>{0x00, 0xFF, 0x7F, 0x80};
         const auto second = std::vector<u8>{0x01};
-        auto packet = MakePacket(std::vector<u8>(16));
-        packet.PData(first);
-        packet.PData(second);
+        auto writer = Packet{};
+        writer.PData(first);
+        writer.PData(second);
 
-        const auto end = packet.GetPos();
-        packet.SetPos(0);
+        auto reader = Packet{writer.GetData()};
         auto readFirst = std::vector<u8>(first.size());
         auto readSecond = std::vector<u8>(second.size());
-        packet.GData(readFirst);
-        packet.GData(readSecond);
+        reader.GData(readFirst);
+        reader.GData(readSecond);
         CHECK(readFirst == first);
         CHECK(readSecond == second);
-        CHECK(packet.GetPos() == end);
+        CHECK(reader.GetAvailable() == 0);
     }
 }
 
@@ -447,8 +495,8 @@ TEST_CASE("Packet PSize1 fills in a length placeholder", "[Packet]")
 {
     SECTION("the placeholder before the sized bytes")
     {
-        auto packet = MakePacket(std::vector<u8>(16));
-        packet.P1Enc(42);
+        auto packet = Packet{};
+        packet.P1(42);
         packet.P1(0);
         const auto start = packet.GetPos();
         packet.PJStr("hello");
@@ -457,45 +505,29 @@ TEST_CASE("Packet PSize1 fills in a length placeholder", "[Packet]")
         packet.PSize1(end - start);
 
         CHECK(packet.GetPos() == end);
-        const auto expected = std::vector<u8>{42, 7, 'h', 'e', 'l', 'l', 'o', '\n', 7};
-        CHECK(ToVector(packet.GetData().first(end)) == expected);
-        CHECK(std::ranges::all_of(packet.GetData().subspan(end), [](u8 byte)
-        {
-            return byte == 0;
-        }));
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{42, 7, 'h', 'e', 'l', 'l', 'o', '\n', 7});
     }
 
     SECTION("a size of 0 right after the placeholder")
     {
-        auto packet = MakePacket(std::vector<u8>(4));
+        auto packet = Packet{};
         packet.P1(99);
         packet.PSize1(0);
-        CHECK(packet.GetData()[0] == 0);
-        CHECK(packet.GetPos() == 1);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0});
     }
 }
 
-TEST_CASE("Packet operations past the end throw and change nothing", "[Packet]")
+TEST_CASE("Packet reads past the end throw and leave pos unchanged", "[Packet]")
 {
     const auto testCase = GENERATE(
         BoundsCase_s{"G1", 1, [](Packet& packet) { packet.G1(); }},
         BoundsCase_s{"G1B", 1, [](Packet& packet) { packet.G1B(); }},
-        BoundsCase_s{"P1", 1, [](Packet& packet) { packet.P1(0x11); }},
-        BoundsCase_s{"P1Enc", 1, [](Packet& packet) { packet.P1Enc(0x11); }},
         BoundsCase_s{"G2", 2, [](Packet& packet) { packet.G2(); }},
         BoundsCase_s{"G2B", 2, [](Packet& packet) { packet.G2B(); }},
-        BoundsCase_s{"P2", 2, [](Packet& packet) { packet.P2(0x1111); }},
-        BoundsCase_s{"IP2", 2, [](Packet& packet) { packet.IP2(0x1111); }},
         BoundsCase_s{"G3", 3, [](Packet& packet) { packet.G3(); }},
-        BoundsCase_s{"P3", 3, [](Packet& packet) { packet.P3(0x111111); }},
         BoundsCase_s{"G4", 4, [](Packet& packet) { packet.G4(); }},
-        BoundsCase_s{"P4", 4, [](Packet& packet) { packet.P4(0x11111111); }},
-        BoundsCase_s{"IP4", 4, [](Packet& packet) { packet.IP4(0x11111111); }},
         BoundsCase_s{"G8", 8, [](Packet& packet) { packet.G8(); }},
-        BoundsCase_s{"P8", 8, [](Packet& packet) { packet.P8(0x1111111111111111); }},
-        BoundsCase_s{"PJStr(\"ab\")", 3, [](Packet& packet) { packet.PJStr("ab"); }},
         BoundsCase_s{"GData(5)", 5, [](Packet& packet) { auto destination = std::array<u8, 5>{}; packet.GData(destination); }},
-        BoundsCase_s{"PData(5)", 5, [](Packet& packet) { packet.PData(std::array<u8, 5>{0x11, 0x11, 0x11, 0x11, 0x11}); }},
         BoundsCase_s{"GSmart", 1, [](Packet& packet) { packet.GSmart(); }},
         BoundsCase_s{"GSmart, two-byte form", 2, [](Packet& packet) { packet.GSmart(); }},
         BoundsCase_s{"GSmarts", 1, [](Packet& packet) { packet.GSmarts(); }},
@@ -503,20 +535,18 @@ TEST_CASE("Packet operations past the end throw and change nothing", "[Packet]")
         BoundsCase_s{"GJStr", 1, [](Packet& packet) { packet.GJStr(); }});
 
     CAPTURE(testCase.call);
-    auto packet = MakePacket(std::vector<u8>(BOUNDS_START + testCase.bytesNeeded - 1, BOUNDS_FILL));
+    const auto bytes = std::vector<u8>(BOUNDS_START + testCase.bytesNeeded - 1, BOUNDS_FILL);
+    auto packet = Packet{bytes};
     packet.SetPos(BOUNDS_START);
-    auto cipher = std::make_unique<Isaac>(ISAAC_SEED);
-    packet.SetRandom(std::move(cipher));
-    const auto before = ToVector(packet.GetData());
 
     CHECK_THROWS_AS(testCase.operation(packet), std::out_of_range);
     CHECK(packet.GetPos() == BOUNDS_START);
-    CHECK(ToVector(packet.GetData()) == before);
 }
 
 TEST_CASE("Packet GBit stops at the end of the buffer", "[Packet]")
 {
-    auto packet = MakePacket({0xFF, 0xFF});
+    const auto bytes = std::vector<u8>{0xFF, 0xFF};
+    auto packet = Packet{bytes};
 
     packet.GBitStart();
     CHECK(packet.GBit(16) == 0xFFFF);
@@ -540,7 +570,7 @@ TEST_CASE("Packet bit reads", "[Packet]")
         BitCase_s{{0x12, 0x34}, 0, {9}, {0x24}, 2});
 
     CAPTURE(testCase.bytes, testCase.widths);
-    auto packet = MakePacket(testCase.bytes);
+    auto packet = Packet{testCase.bytes};
     for (std::size_t i = 0; i < testCase.bytesBeforeStart; ++i)
     {
         packet.G1();
@@ -558,13 +588,16 @@ TEST_CASE("Packet bit reads", "[Packet]")
 
 TEST_CASE("Packet GBit handles every width at every bit offset", "[Packet]")
 {
+    const auto allOnes = std::vector<u8>(5, 0xFF);
+    const auto allZeros = std::vector<u8>(5, 0x00);
+
     for (auto offset = u32{0}; offset < 8; ++offset)
     {
         for (auto width = u32{1}; width <= 32; ++width)
         {
             CAPTURE(offset, width);
 
-            auto ones = MakePacket(std::vector<u8>(5, 0xFF));
+            auto ones = Packet{allOnes};
             ones.GBitStart();
             if (offset > 0)
             {
@@ -573,7 +606,7 @@ TEST_CASE("Packet GBit handles every width at every bit offset", "[Packet]")
 
             CHECK(ones.GBit(width) == GetMask(width));
 
-            auto zeros = MakePacket(std::vector<u8>(5, 0x00));
+            auto zeros = Packet{allZeros};
             zeros.GBitStart();
             if (offset > 0)
             {
@@ -604,99 +637,93 @@ TEST_CASE("Packet CheckCrc", "[Packet]")
     CHECK(Packet::CheckCrc({}));
 }
 
-TEST_CASE("Packet P1Enc encodes opcodes with the ISAAC cipher", "[Packet]")
+TEST_CASE("Packet P1Enc and G1Enc code opcodes with the ISAAC cipher", "[Packet]")
 {
-    SECTION("without a cipher the opcode is written as is")
+    constexpr auto COUNT = std::size_t{600};
+
+    auto encoder = Isaac{ISAAC_SEED};
+    auto packet = Packet{};
+    for (std::size_t i = 0; i < COUNT; ++i)
     {
-        auto packet = MakePacket(std::vector<u8>(1));
-        packet.P1Enc(0x41);
-        CHECK(packet.GetData()[0] == 0x41);
+        packet.P1Enc(encoder, static_cast<s32>(i));
     }
 
-    SECTION("with a cipher each opcode is offset by the next ISAAC value")
+    SECTION("P1Enc offsets each opcode by the next ISAAC value")
     {
-        constexpr auto COUNT = std::size_t{600};
-        auto packet = MakePacket(std::vector<u8>(COUNT));
-        packet.SetRandom(std::make_unique<Isaac>(ISAAC_SEED));
-        for (std::size_t i = 0; i < COUNT; ++i)
-        {
-            packet.P1Enc(static_cast<s32>(i));
-        }
-
         auto twin = Isaac{ISAAC_SEED};
-        auto decoder = Isaac{ISAAC_SEED};
         const auto data = packet.GetData();
+        REQUIRE(data.size() == COUNT);
         for (std::size_t i = 0; i < COUNT; ++i)
         {
             CAPTURE(i);
-            const auto opcode = static_cast<u32>(i);
-            CHECK(data[i] == static_cast<u8>(opcode + static_cast<u32>(twin.NextInt())));
-            CHECK(static_cast<u8>(data[i] - static_cast<u32>(decoder.NextInt())) == static_cast<u8>(opcode));
+            CHECK(data[i] == static_cast<u8>(static_cast<u32>(i) + static_cast<u32>(twin.NextInt())));
         }
     }
 
-    SECTION("SetRandom(nullptr) goes back to plain writes")
+    SECTION("G1Enc takes the offset back off with a cipher seeded the same way")
     {
-        auto packet = MakePacket(std::vector<u8>(1));
-        packet.SetRandom(std::make_unique<Isaac>(ISAAC_SEED));
-        packet.SetRandom(nullptr);
-        packet.P1Enc(0x41);
-        CHECK(packet.GetData()[0] == 0x41);
+        auto decoder = Isaac{ISAAC_SEED};
+        auto reader = Packet{packet.GetData()};
+        for (std::size_t i = 0; i < COUNT; ++i)
+        {
+            CAPTURE(i);
+            CHECK(reader.G1Enc(decoder) == static_cast<u8>(i));
+        }
     }
 
-    SECTION("a failed write doesn't advance the cipher")
+    SECTION("a failed G1Enc doesn't advance the cipher")
     {
-        auto packet = MakePacket(std::vector<u8>(1));
-        packet.SetRandom(std::make_unique<Isaac>(ISAAC_SEED));
-        packet.SetPos(1);
-        CHECK_THROWS_AS(packet.P1Enc(0x41), std::out_of_range);
+        auto decoder = Isaac{ISAAC_SEED};
+        auto reader = Packet{packet.GetData()};
+        reader.SetPos(COUNT);
+        CHECK_THROWS_AS(reader.G1Enc(decoder), std::out_of_range);
+        CHECK(reader.GetPos() == COUNT);
 
-        packet.SetPos(0);
-        packet.P1Enc(0x41);
-        auto twin = Isaac{ISAAC_SEED};
-        CHECK(packet.GetData()[0] == static_cast<u8>(0x41 + static_cast<u32>(twin.NextInt())));
+        reader.SetPos(0);
+        CHECK(reader.G1Enc(decoder) == 0);
     }
 }
 
 TEST_CASE("Packet RsaEnc with small keys", "[Packet]")
 {
+    auto packet = Packet{};
+
     SECTION("textbook key")
     {
-        auto packet = MakePacket(std::vector<u8>(8));
         packet.P1(0x41);
         packet.RsaEnc(BigUInt::Parse("3233"), BigUInt::Parse("17"));
-        CHECK(ToVector(packet.GetData().first(3)) == std::vector<u8>{0x02, 0x0A, 0xE6});
-        CHECK(packet.GetPos() == 3);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x02, 0x0A, 0xE6});
     }
 
     SECTION("no sign padding when the top bit is clear")
     {
-        auto packet = MakePacket(std::vector<u8>(8));
         packet.P1(0x41);
         packet.RsaEnc(BigUInt::Parse("251"), BigUInt::Parse("1"));
-        CHECK(ToVector(packet.GetData().first(2)) == std::vector<u8>{0x01, 0x41});
-        CHECK(packet.GetPos() == 2);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x01, 0x41});
     }
 
     SECTION("sign padding when the top bit is set")
     {
-        auto packet = MakePacket(std::vector<u8>(8));
         packet.P1(0x80);
         packet.RsaEnc(BigUInt::Parse("251"), BigUInt::Parse("1"));
-        CHECK(ToVector(packet.GetData().first(3)) == std::vector<u8>{0x02, 0x00, 0x80});
-        CHECK(packet.GetPos() == 3);
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x02, 0x00, 0x80});
+    }
+
+    SECTION("a result shorter than the block leaves none of the block behind")
+    {
+        packet.PData(std::array<u8, 3>{0x00, 0x00, 0x41});
+        packet.RsaEnc(BigUInt::Parse("251"), BigUInt::Parse("1"));
+        CHECK(ToVector(packet.GetData()) == std::vector<u8>{0x01, 0x41});
     }
 
     SECTION("a block equal to the modulus throws")
     {
-        auto packet = MakePacket(std::vector<u8>(8));
         packet.PData(std::array<u8, 2>{0x0C, 0xA1});
         CHECK_THROWS_AS(packet.RsaEnc(BigUInt::Parse("3233"), BigUInt::Parse("17")), std::invalid_argument);
     }
 
     SECTION("a result over 255 bytes throws")
     {
-        auto packet = MakePacket(std::vector<u8>(5000));
         packet.P1(0x02);
         const auto modulus = BigUInt::Parse("0x8" + std::string(510, '0') + "1");
         CHECK_THROWS_AS(packet.RsaEnc(modulus, BigUInt::Parse("2046")), std::length_error);
@@ -714,20 +741,20 @@ TEST_CASE("Packet RsaEnc with a 512-bit key", "[Packet]")
         CAPTURE(length);
 
         const auto block = MakeBlock(length);
-        auto packet = MakePacket(std::vector<u8>(128));
+        auto packet = Packet{};
         packet.PData(block);
         packet.RsaEnc(modulus, exponent);
 
         const auto data = packet.GetData();
-        REQUIRE(packet.GetPos() == std::size_t{1} + data[0]);
-        const auto ciphertext = data.subspan(1, packet.GetPos() - 1);
+        REQUIRE(data.size() == std::size_t{1} + data[0]);
+        const auto ciphertext = data.subspan(1);
         CHECK(ToVector(ciphertext) == BigUInt::ModPow(BigUInt::FromBytesBigEndian(block), exponent, modulus).ToBytesBigEndian());
         CHECK(Decrypt(ciphertext) == block);
     }
 
     SECTION("the login block decrypts back exactly")
     {
-        auto packet = MakePacket(std::vector<u8>(128));
+        auto packet = Packet{};
         packet.P1(10);
         for (const auto seed : ISAAC_SEED)
         {
@@ -743,6 +770,6 @@ TEST_CASE("Packet RsaEnc with a 512-bit key", "[Packet]")
             0x0A, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04,
             0x00, 0x00, 0x05, 0x39, 0x75, 0x73, 0x65, 0x72, 0x0A, 0x70, 0x61, 0x73, 0x73, 0x0A,
         };
-        CHECK(Decrypt(packet.GetData().subspan(1, packet.GetPos() - 1)) == expected);
+        CHECK(Decrypt(packet.GetData().subspan(1)) == expected);
     }
 }

@@ -117,7 +117,7 @@ public:
 
     [[nodiscard]] std::size_t Available() const;
     void Peek(std::span<u8> destination) const;
-    void Read(std::span<u8> destination);
+    std::span<u8> Read(std::span<u8> destination);
     void Clear();
     void Append(std::span<const u8> bytes);
 
@@ -257,7 +257,7 @@ catch (const WebSocketError& e)
 }
 ```
 
-- `TryReadPacket` checks `Available()` and reads straight into a `Packet`: `m_socket.Read(m_in.GetData().first(size))`, then `m_in.SetPos(0)`.
+- `TryReadPacket` checks `Available()`, reads into a receive buffer and parses it in place: `auto in = Packet{m_socket.Read(std::span{m_inBuffer}.first(size))}`.
 - Handle the buffered bytes before reacting to `Closed`, because bytes that arrived before the close are still in the buffer.
 - To reconnect without `Connect` waiting, call `Close()` first. Then either keep pumping until `Pump()` returns `Closed`, or call `WaitClosed` as above.
 - `Close()` forgets any failure, so `WaitClosed` after it never throws. It can only time out. The I/O thread normally finishes within about 300 ms of an open connection's `Close()`, or as soon as a connection attempt notices the cancellation. If IXWebSocket loses the cancellation (see `Close` below), the attempt ends when it opens, fails or reaches `handshakeTimeout`.
@@ -368,6 +368,7 @@ catch (const WebSocketError& e)
 - **Receive buffer.**
     - Bytes before `m_readOffset` have already been read.
     - `Peek` and `Read` check the full size first. If fewer bytes are available, they throw `std::out_of_range`, consume nothing, and leave the destination untouched. An empty span is a no-op.
+    - `Read` returns `destination`, so a read can feed straight into a parse: `Packet{socket.Read(bytes)}`.
     - When `Read` consumes everything, the vector is cleared and keeps its capacity. Otherwise the buffer is compacted lazily, once the offset reaches `COMPACT_THRESHOLD` (4096) and at least half the vector has been read. A `Read` therefore never shifts the buffer on every call.
     - `Append` is public, so tests and tools can feed bytes in without a network. `Drain` uses it as well.
     - `Clear` drops only bytes that have already been pumped. Bytes still in the mailbox arrive on the next pump. `Connect` clears both.

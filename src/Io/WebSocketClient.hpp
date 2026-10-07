@@ -40,7 +40,7 @@ public:
 
     [[nodiscard]] std::size_t Available() const;
     void Peek(std::span<u8> destination) const;
-    void Read(std::span<u8> destination);
+    std::span<u8> Read(std::span<u8> destination);
     void Clear();
     void Append(std::span<const u8> bytes);
 

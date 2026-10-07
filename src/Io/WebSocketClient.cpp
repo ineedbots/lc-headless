@@ -257,14 +257,14 @@ void WebSocketClient::Peek(std::span<u8> destination) const
     std::ranges::copy(std::span{m_received}.subspan(m_readOffset, destination.size()), destination.begin());
 }
 
-void WebSocketClient::Read(std::span<u8> destination)
+std::span<u8> WebSocketClient::Read(std::span<u8> destination)
 {
     Peek(destination);
     m_readOffset += destination.size();
     if (m_readOffset == m_received.size())
     {
         Clear();
-        return;
+        return destination;
     }
 
     if (m_readOffset >= COMPACT_THRESHOLD && m_readOffset * 2 >= m_received.size())
@@ -272,6 +272,8 @@ void WebSocketClient::Read(std::span<u8> destination)
         m_received.erase(m_received.begin(), m_received.begin() + static_cast<std::ptrdiff_t>(m_readOffset));
         m_readOffset = 0;
     }
+
+    return destination;
 }
 
 void WebSocketClient::Clear()

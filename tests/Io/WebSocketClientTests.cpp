@@ -426,6 +426,19 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
         CHECK(client.Available() == 0);
     }
 
+    SECTION("read returns the span it was given")
+    {
+        client.Append(std::array<u8, 3>{1, 2, 3});
+        auto destination = std::array<u8, 3>{};
+        const auto partial = client.Read(std::span{destination}.first(2));
+        CHECK(partial.data() == destination.data());
+        CHECK(partial.size() == 2);
+
+        const auto rest = client.Read(std::span{destination}.subspan(2));
+        CHECK(rest.data() == destination.data() + 2);
+        CHECK(rest.size() == 1);
+    }
+
     SECTION("peek doesn't consume")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});

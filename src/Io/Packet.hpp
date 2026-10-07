@@ -6,19 +6,19 @@
 class Packet
 {
 public:
-    explicit Packet(std::vector<u8> data);
+    Packet();
+    explicit Packet(std::span<const u8> data);
 
     [[nodiscard]] static s32 GetCrc(std::span<const u8> source);
     [[nodiscard]] static bool CheckCrc(std::span<const u8> source, s32 expected = 0);
 
-    [[nodiscard]] std::span<u8> GetData();
     [[nodiscard]] std::span<const u8> GetData() const;
     [[nodiscard]] std::size_t GetLength() const;
     [[nodiscard]] std::size_t GetAvailable() const;
     [[nodiscard]] std::size_t GetPos() const;
     void SetPos(std::size_t pos);
-    void SetRandom(std::unique_ptr<Isaac> random);
 
+    u8 G1Enc(Isaac& random);
     u8 G1();
     s8 G1B();
     u16 G2();
@@ -31,7 +31,7 @@ public:
     std::string GJStr();
     void GData(std::span<u8> destination);
 
-    void P1Enc(s32 opcode);
+    void P1Enc(Isaac& random, s32 opcode);
     void P1(s32 value);
     void P2(s32 value);
     void IP2(s32 value);
@@ -50,13 +50,22 @@ public:
     void RsaEnc(const BigUInt& modulus, const BigUInt& exponent);
 
 private:
+    enum class Mode_e : u8
+    {
+        Read,
+        Write,
+    };
+
     static constexpr u8 STRING_TERMINATOR = '\n';
 
+    [[nodiscard]] std::span<const u8> NextRead(std::size_t count);
+    [[nodiscard]] std::span<u8> NextWrite(std::size_t count);
     void RequireBytes(std::size_t count) const;
     void RequireBits(u32 bitCount) const;
 
-    std::vector<u8> m_data;
+    Mode_e m_mode;
+    std::span<const u8> m_readData;
+    std::vector<u8> m_writeData;
     std::size_t m_pos = 0;
     std::size_t m_bitPos = 0;
-    std::unique_ptr<Isaac> m_random;
 };

@@ -18,7 +18,9 @@ Reference sources:
 | Method names | Mirror TS in PascalCase (`G1`, `P1Enc`, `GJStr`, ...) so `Client.ts` ports line by line |
 | Pooling | `alloc`/`release` and the size-class cache are omitted. The client only used `alloc` for three long-lived buffers and never called `release` |
 | Threading | Single-threaded. There is no static mutable state; an instance is not synchronized |
-| Out-of-range access | Throws `std::out_of_range`, leaving the packet unchanged |
+| Modes | A packet is either a reader over bytes it doesn't own or a writer into a vector it grows. The constructor picks the mode; calling a function from the other mode is a bug and asserts |
+| Out-of-range access | A read past the end throws `std::out_of_range`, leaving the packet unchanged. Writes never run out of room |
+| ISAAC | The packet holds no cipher. `P1Enc` and `G1Enc` take the caller's `Isaac` per call |
 | Logging | None. `Packet`, `Isaac` and `BigUInt` don't log, so none of them takes a logger. They are pure and on the hot path, and every failure is an exception that the caller logs where it handles it ([LoggerDesign.md](LoggerDesign.md) §4). `GJStr` running off the end of the buffer returns what TS returns, without a warning (§3) |
 | Tests | Hand-written spec tests. The few expected values that can't be worked out by hand were taken once from the TS sources and are listed in this document |
 
@@ -90,19 +92,19 @@ Not ported: the `Linkable2` base (it only served the pool) and the rest of `JsUt
 class Packet
 {
 public:
-    explicit Packet(std::vector<u8> data);
+    Packet();
+    explicit Packet(std::span<const u8> data);
 
     [[nodiscard]] static s32 GetCrc(std::span<const u8> source);
     [[nodiscard]] static bool CheckCrc(std::span<const u8> source, s32 expected = 0);
 
-    [[nodiscard]] std::span<u8> GetData();
     [[nodiscard]] std::span<const u8> GetData() const;
     [[nodiscard]] std::size_t GetLength() const;
     [[nodiscard]] std::size_t GetAvailable() const;
     [[nodiscard]] std::size_t GetPos() const;
     void SetPos(std::size_t pos);
-    void SetRandom(std::unique_ptr<Isaac> random);
 
+    u8 G1Enc(Isaac& random);
     u8 G1();
     s8 G1B();
     u16 G2();
@@ -115,7 +117,7 @@ public:
     std::string GJStr();
     void GData(std::span<u8> destination);
 
-    void P1Enc(s32 opcode);
+    void P1Enc(Isaac& random, s32 opcode);
     void P1(s32 value);
     void P2(s32 value);
     void IP2(s32 value);
@@ -134,28 +136,51 @@ public:
     void RsaEnc(const BigUInt& modulus, const BigUInt& exponent);
 
 private:
+    enum class Mode_e : u8
+    {
+        Read,
+        Write,
+    };
+
     static constexpr u8 STRING_TERMINATOR = '\n';
 
+    [[nodiscard]] std::span<const u8> NextRead(std::size_t count);
+    [[nodiscard]] std::span<u8> NextWrite(std::size_t count);
     void RequireBytes(std::size_t count) const;
     void RequireBits(u32 bitCount) const;
 
-    std::vector<u8> m_data;
+    Mode_e m_mode;
+    std::span<const u8> m_readData;
+    std::vector<u8> m_writeData;
     std::size_t m_pos = 0;
     std::size_t m_bitPos = 0;
-    std::unique_ptr<Isaac> m_random;
 };
 ```
 
 ### Behaviour
 
+- **Modes.** The two modes are exclusive, and the constructor picks one.
+
+    | | Read: `Packet{bytes}` | Write: `Packet{}` |
+    |---|---|---|
+    | Data | Views the caller's `std::span<const u8>`. Nothing is copied, so the bytes must outlive the packet | Owns a `std::vector<u8>` that grows as it is written |
+    | `GetData` | The whole span | `[0, pos)` |
+    | `GetLength` | The span's size | `pos`, the number of bytes written |
+    | `GetAvailable` | `length - pos` | Doesn't apply (asserts) |
+    | `SetPos` | Up to the span's size | Up to the furthest byte ever written, so a length placeholder can be patched and pos moved back to the end |
+    | Allowed calls | `G*`, `GBit*` | `P*`, `PSize1`, `RsaEnc` |
+
+    - Calling a function from the other mode is a bug, so it asserts.
+    - The socket pattern: receive into a buffer the caller owns, then parse it with `Packet{buffer}`.
+    - A writer is reused for the next message with `SetPos(0)`. The vector keeps its capacity, and `GetData` only shows what was written since.
 - **Construction.**
-    - The packet owns a `std::vector<u8>`, taken as a sink parameter. A downloaded buffer is moved in without a copy, which matches TS wrapping a `Uint8Array`.
-    - The constructor takes one argument, so it is `explicit` (CONVENTIONS §8).
-    - Port `Packet.alloc(1)` as `Packet{std::vector<u8>(5000)}`. Use parentheses: braces would make a one-element vector.
+    - The read constructor takes one argument, so it is `explicit` (CONVENTIONS §8).
+    - Port `Packet.alloc(1)` for output as `Packet{}`. There is nothing to size up front.
+    - `Packet{std::vector<u8>{...}}` would view a temporary that dies at the end of the statement. Name the bytes first.
 - **Copies.**
-    - Holding a `std::unique_ptr<Isaac>` makes `Packet` move-only (rule of zero), so a buffer can't be copied by accident.
+    - Rule of zero. Copying a reader copies the view; copying a writer copies its bytes.
 - **Includes.**
-    - `Packet.hpp` includes `Isaac.hpp`, since `Isaac` is a member and appears in `SetRandom`'s prototype, and `../Core/BigUInt.hpp`, since `BigUInt` appears in `RsaEnc`'s prototype.
+    - `Packet.hpp` includes `Isaac.hpp`, since `Isaac` appears in `P1Enc`'s and `G1Enc`'s prototypes, and `../Core/BigUInt.hpp`, since `BigUInt` appears in `RsaEnc`'s prototype.
     - `Packet.cpp` uses both, so it includes them again, plus `../Core/Endian.hpp`.
 - **Byte order.**
     - Big-endian, except `IP2`/`IP4`, which are little-endian.
@@ -180,9 +205,10 @@ private:
 
 - **Write parameters** are `s32` (`s64` for `P8`) and are truncated to the field width, like the DataView setters: `P1(-1)` writes `FF` and `P2(0x12345)` writes `23 45`. Exact-width parameters would force casts at hundreds of call sites under `/W4` with warnings treated as errors.
 - **Bounds.**
-    - Every operation checks its full width before touching any state, and throws `std::out_of_range` with a `std::format` message.
-    - Composite operations (`G3`, `P3`, `PJStr`, `P1Enc`, `GBit`, `RsaEnc`) check the whole width up front. A throw therefore leaves `pos`, the buffer and the cipher unchanged.
-    - Bugs are `assert`s: `PSize1` with `size + 1 > pos`, a `GBit` width outside 1 to 32, `SetPos` past the end, and `RsaEnc` at `pos == 0`.
+    - Every read checks its full width before touching any state, and throws `std::out_of_range` with a `std::format` message.
+    - Composite reads (`G3`, `GSmart`, `GSmarts`, `G1Enc`, `GBit`) check the whole width up front. A throw therefore leaves `pos` and the cipher unchanged.
+    - Writes grow the vector to `pos + width` when they pass its end. A write that starts before the end overwrites the bytes already there and grows only by the rest.
+    - Bugs are `assert`s: a call from the wrong mode, `PSize1` with `size + 1 > pos`, a `GBit` width outside 1 to 32, `SetPos` past the end, and `RsaEnc` at `pos == 0`.
 - **Strings.**
     - Strings are raw bytes with no encoding conversion, equivalent to `fromCharCode`/`charCodeAt` over 0 to 255.
     - `GJStr` reads up to `\n`, and `PJStr` writes the bytes followed by `\n`.
@@ -201,14 +227,14 @@ private:
     - The result is signed like TS's, so it compares directly against `G4`.
     - It takes a span. TS's `(offset, length)` actually treats `length` as an end index, and every caller passes `0, data.length`.
 - **ISAAC.**
-    - `P1Enc` writes `(opcode + (m_random ? m_random->NextInt() : 0)) & 0xFF`.
-    - The packet owns its outbound cipher, like `out.random`.
-    - The inbound cipher belongs to the client code (TS `randomIn`), which decodes with `(opcode - NextInt()) & 0xFF`.
+    - The client owns both ciphers (TS `out.random` and `randomIn`) and passes one to each call.
+    - `P1Enc(random, opcode)` writes `(opcode + random.NextInt()) & 0xFF`. Unencrypted opcodes use `P1`.
+    - `G1Enc(random)` reads a byte and returns `(byte - random.NextInt()) & 0xFF`.
 - **`RsaEnc`.**
     1. `m` is the big-endian number in `data[0, pos)`.
     2. `c = BigUInt::ModPow(m, exponent, modulus).ToBytesBigEndian()`.
     3. Throw `std::length_error` if `c.size() > 255`.
-    4. Set `pos = 0`, then `P1(c.size())`, then `PData(c)`.
+    4. Set `pos = 0`, then `P1(c.size())`, then `PData(c)`. When `c` is shorter than the block, `GetData` stops at the new pos, so none of the plaintext shows.
 - **Logging.**
     - Nothing in `Packet`, `Isaac` or `BigUInt` logs. A failed bounds check, parse or `ModPow` throws, and the caller logs it where it handles it ([LoggerDesign.md](LoggerDesign.md) §4).
     - Callers never log packet bytes, ISAAC seeds or the RSA block: the login block carries the password.
@@ -325,7 +351,9 @@ These get a short "why" comment in the code, because they look wrong at first gl
 | TS | C++ | Why |
 |---|---|---|
 | `gdata` past the end copies what is left and still advances `pos` | Throws; nothing changes | Network input must not be silently truncated |
-| A failed DataView access has already moved `pos` (and `p1Enc` has consumed an ISAAC value) | `pos`, buffer and cipher unchanged | The packet stays in a consistent state after an exception |
+| A failed DataView read has already moved `pos` | `pos` and the cipher unchanged | The packet stays in a consistent state after an exception |
+| One fixed-size buffer for reading and writing; writing past the end throws a `RangeError` | Exclusive read and write modes; a writer grows | Outgoing packets need no size guess, and incoming bytes are parsed where they were received |
+| `out.random` lives on the packet; `p1isaac` uses it | `P1Enc` and `G1Enc` take the cipher as an argument | The client owns both ciphers, and one packet type serves both directions |
 | `gdata`, `pdata`, `getcrc` take `(offset, length)` | Take spans | Idiomatic; removes `getcrc`'s end-index quirk |
 | `bigIntModPow` accepts `base >= modulus` and `modulus <= 1` | Throws `std::invalid_argument` | The server could not decrypt the result |
 | `rsaenc`'s `p1` truncates a length above 255 | Throws `std::length_error` | Only reachable with a modulus over 2040 bits |
@@ -341,7 +369,7 @@ All tests are spec tests: hand-written inputs, with expected values written dire
 
 Most expected values follow directly from the TS semantics. The few that can't be worked out by hand (ISAAC outputs and CRCs) were taken once from the TS sources and are listed here. In the tests they are plain constants; nothing is generated at build or test time.
 
-`PacketTests.cpp` builds packets through `MakePacket(std::vector<u8> bytes)` in its anonymous namespace. None of these classes logs, so no test needs a logger.
+`PacketTests.cpp` builds readers with `Packet{bytes}` over a named vector that outlives the packet, and writers with `Packet{}`. Round trips read a writer back through `Packet{writer.GetData()}`. None of these classes logs, so no test needs a logger.
 
 Out of scope:
 
@@ -419,13 +447,20 @@ Each of these throws `std::invalid_argument`: modulus 0, modulus 1, `base == mod
 
 ### 7.4 Packet
 
-**Construction and accessors**
+**Read mode**
 
-- `Packet{std::vector<u8>(5000)}`: length 5000, pos 0, available 5000, all bytes zero.
-- The constructor moves rather than copies: `GetData().data()` equals the source vector's `data()` captured before the move.
-- `Packet{std::vector<u8>{}}` has length 0, and `G1` throws.
-- On a length-10 packet, `SetPos(3)` gives available 7, and `SetPos(10)` gives available 0.
-- Bytes written through `GetData()` are what `G1` reads next. This is the socket pattern: read into the data, `SetPos(0)`, parse.
+- A reader over 5000 bytes: length 5000, pos 0, available 5000, and `GetData().data()` equals the vector's `data()`, so nothing was copied.
+- A reader over an empty span has length 0, and `G1` throws.
+- On a length-10 reader, `SetPos(3)` gives available 7 with length and data size still 10, and `SetPos(10)` gives available 0.
+
+**Write mode**
+
+- `Packet{}` has empty data, length 0 and pos 0.
+- 2000 `P4` calls give length and pos 8000, and read back unchanged.
+- After `P4(0x11223344)`, `SetPos(1)` gives length 1 and data `11`; `SetPos(4)` gives length 4 and data `11 22 33 44`.
+- After `P4(0x11223344)`, `SetPos(1)`, `P1(0xAB)`, `SetPos(4)`: data `11 AB 33 44`.
+- After `P2(0x1122)`, `SetPos(1)`, `P4(0x33445566)`: data `11 33 44 55 66`, so a write across the end overwrites and then grows.
+- After `P4(0x11223344)`, `SetPos(0)`, `P1(0x55)`: data `55`, the reuse pattern for the next message.
 
 **Fixed-width reads**
 
@@ -478,7 +513,7 @@ Each of these throws `std::invalid_argument`: modulus 0, modulus 1, `base == mod
 - An empty destination is a no-op, even at the end of the buffer.
 - A 3-byte destination with 2 bytes available throws. Pos and the destination are both unchanged (a deviation from TS).
 
-**Writes** (each on a fresh, zeroed 8-byte packet)
+**Writes** (each on a fresh `Packet{}`; `GetData` is exactly the bytes written)
 
 | Call | Bytes written | Pos after |
 |---|---|---|
@@ -513,32 +548,26 @@ Each of these throws `std::invalid_argument`: modulus 0, modulus 1, `base == mod
 
 For each pair:
 
-1. Write the read type's minimum, maximum, 0 and 1, plus -1 for signed types, in sequence.
-2. Call `SetPos(0)` and read every value back unchanged.
-3. Check that the final pos equals the pos after the writes.
+1. Write the read type's minimum, maximum, 0 and 1, plus -1 for signed types, in sequence, into a writer.
+2. Read every value back unchanged through a reader over the writer's data.
+3. Check that the reader has nothing left available.
 
 **PSize1**
 
-- Call `P1Enc(42)` (no cipher), `P1(0)`, record `start = GetPos()`, then `PJStr("hello")`, `P1(7)`, `PSize1(GetPos() - start)`.
-- `data[start - 1]` is 7, pos is unchanged, and every other byte is intact.
+- Call `P1(42)`, `P1(0)`, record `start = GetPos()`, then `PJStr("hello")`, `P1(7)`, `PSize1(GetPos() - start)`.
+- The data is `2A 07 68 65 6C 6C 6F 0A 07`, and pos is unchanged.
 - `PSize1(0)` right after the placeholder writes 0.
 
-**Bounds.** Each operation runs with exactly one byte fewer than it needs. It must:
-
-- throw `std::out_of_range`;
-- leave pos unchanged;
-- leave the buffer unchanged (writes);
-- leave the cipher unadvanced (`P1Enc`).
+**Bounds.** Each read runs with exactly one byte fewer than it needs. It must throw `std::out_of_range` and leave pos unchanged. Writes can't run out, so they have no bounds cases.
 
 | Operation | Bytes needed |
 |---|---|
-| `G1`, `G1B`, `P1`, `P1Enc` | 1 |
-| `G2`, `G2B`, `P2`, `IP2` | 2 |
-| `G3`, `P3` | 3 (TS's `p3` writes one byte before throwing; ours writes nothing) |
-| `G4`, `P4`, `IP4` | 4 |
-| `G8`, `P8` | 8 |
-| `PJStr("ab")` | 3 |
-| `GData`, `PData` with n bytes | n |
+| `G1`, `G1B` | 1 |
+| `G2`, `G2B` | 2 |
+| `G3` | 3 |
+| `G4` | 4 |
+| `G8` | 8 |
+| `GData` with n bytes | n |
 | `GSmart`, `GSmarts` | 1, or 2 when the first byte is `>= 0x80` |
 | `GJStr` | 1 (throws only when pos == length) |
 | `GBit` | on a 2-byte buffer, `GBit(16)` succeeds and `GBit(17)` throws |
@@ -575,26 +604,24 @@ For each pair:
 - `CheckCrc("123456789", -873187033)` is false.
 - `CheckCrc(empty)` is true, because the default expected value is 0.
 
-**ISAAC opcode encoding**
+**ISAAC opcode coding.** A writer runs 600 `P1Enc` calls with a cipher seeded `{1, 2, 3, 4}`, crossing two refills.
 
-- With no cipher, `P1Enc(0x41)` writes `41`.
-- With cipher seed `{1, 2, 3, 4}`, run 600 `P1Enc` calls (crossing two refills):
-    - Each byte equals `(opcode + twin.NextInt()) & 0xFF`, where `twin` is a separate `Isaac` with the same seed.
-    - Decoding with `(byte - twin2.NextInt()) & 0xFF` recovers every opcode.
-- `SetRandom(nullptr)` returns to plain writes.
-- `P1Enc` at the end of the buffer throws without advancing the cipher. After `SetPos(0)`, the next `P1Enc` matches the twin's next value.
+- Each byte equals `(opcode + twin.NextInt()) & 0xFF`, where `twin` is a separate `Isaac` with the same seed.
+- A reader over those bytes, calling `G1Enc` with another same-seed cipher, gets back every opcode.
+- `G1Enc` at the end of the reader throws without moving pos or advancing the cipher. After `SetPos(0)`, the next `G1Enc` still decodes the first opcode.
 
-**RsaEnc**
+**RsaEnc** (each on a fresh `Packet{}`)
 
 | Case | Expected |
 |---|---|
-| Textbook key `n = 3233`, `e = 17`; block `{41}` | data starts `02 0A E6`; pos 3 |
-| Modulus 251, exponent 1; block `{41}` | `01 41`; pos 2 (no sign padding) |
-| Modulus 251, exponent 1; block `{80}` | `02 00 80`; pos 3 (sign padding, because the top bit is set) |
-| A fixed 512-bit test key pair (`n`, `e = 65537`, `d`), stored as hex constants in `PacketTests.cpp`; blocks of 1 to 40 bytes starting with `0A` | `pos == 1 + data[0]`; `data[1, pos)` equals `ModPow(block, e, n).ToBytesBigEndian()`; `ModPow(ciphertext, d, n)` gives back the block |
+| Textbook key `n = 3233`, `e = 17`; block `{41}` | data `02 0A E6` |
+| Modulus 251, exponent 1; block `{41}` | data `01 41` (no sign padding) |
+| Modulus 251, exponent 1; block `{80}` | data `02 00 80` (sign padding, because the top bit is set) |
+| Modulus 251, exponent 1; block `{00 00 41}` | data `01 41`: the output is shorter than the block, and none of the block is left in `GetData` |
+| A fixed 512-bit test key pair (`n`, `e = 65537`, `d`), stored as hex constants in `PacketTests.cpp`; blocks of 1 to 40 bytes starting with `0A` | `length == 1 + data[0]`; `data[1, length)` equals `ModPow(block, e, n).ToBytesBigEndian()`; `ModPow(ciphertext, d, n)` gives back the block |
 | The login block with the 512-bit key: `P1(10)`, the seed `{1, 2, 3, 4}` as four `P4`s, `P4(1337)`, `PJStr("user")`, `PJStr("pass")` | Decrypting gives exactly `0A 00 00 00 01 00 00 00 02 00 00 00 03 00 00 00 04 00 00 05 39 75 73 65 72 0A 70 61 73 73 0A` |
 | Block `{0C A1}`, equal to modulus 3233 | Throws `std::invalid_argument` |
-| Modulus `2^2047 + 1`, exponent 2046, block `{02}`, on a 5000-byte packet | Throws `std::length_error`: `2^2046` needs 256 bytes |
+| Modulus `2^2047 + 1`, exponent 2046, block `{02}` | Throws `std::length_error`: `2^2046` needs 256 bytes |
 
 ### 7.5 Tooling
 

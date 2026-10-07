@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <csignal>
 #include <exception>
 #include <filesystem>
 #include <format>        // Linux: needs libstdc++ 13+ or libc++ 17+
