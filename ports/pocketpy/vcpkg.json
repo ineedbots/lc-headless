@@ -1,0 +1,18 @@
+{
+    "name": "pocketpy",
+    "version": "2.2.0",
+    "description": "A lightweight Python 3.x interpreter in C11 for embedding, built as a static library with the watchdog enabled.",
+    "homepage": "https://github.com/pocketpy/pocketpy",
+    "license": "MIT",
+    "supports": "!uwp",
+    "dependencies": [
+        {
+            "name": "vcpkg-cmake",
+            "host": true
+        },
+        {
+            "name": "vcpkg-cmake-config",
+            "host": true
+        }
+    ]
+}

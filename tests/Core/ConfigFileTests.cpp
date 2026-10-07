@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../DefaultLoggerScope.hpp"
 #include "../LogCapture.hpp"
+#include "../TempFolder.hpp"
 
 #include "Core/BigUInt.hpp"
 #include "Core/ConfigError.hpp"
@@ -142,33 +143,6 @@ namespace
         {"client", "logoutComponent"},
         {"client", "logLevel"},
         {"client", "idleSeconds"},
-    };
-
-    class TempFolder
-    {
-    public:
-        TempFolder()
-            : m_path{std::filesystem::temp_directory_path() / std::format("rs2004-config-tests-{}", std::chrono::steady_clock::now().time_since_epoch().count())}
-        {
-            std::filesystem::create_directories(m_path);
-        }
-
-        ~TempFolder()
-        {
-            auto ignored = std::error_code{};
-            std::filesystem::remove_all(m_path, ignored);
-        }
-
-        TempFolder(const TempFolder&) = delete;
-        TempFolder& operator=(const TempFolder&) = delete;
-
-        [[nodiscard]] const std::filesystem::path& GetPath() const
-        {
-            return m_path;
-        }
-
-    private:
-        std::filesystem::path m_path;
     };
 
     s32 Crc(u32 value)
@@ -845,7 +819,7 @@ TEST_CASE("ConfigFile logs through the default logger when given none", "[Config
 
     SECTION("Load")
     {
-        const auto folder = TempFolder{};
+        const auto folder = TempFolder{"rs2004-config-tests"};
         const auto path = folder.GetPath() / "client.jsonc";
         WriteFile(path, text);
         static_cast<void>(ConfigFile::Load(path));
@@ -859,7 +833,7 @@ TEST_CASE("ConfigFile logs through the default logger when given none", "[Config
 
 TEST_CASE("ConfigFile::Load", "[ConfigFile]")
 {
-    const auto folder = TempFolder{};
+    const auto folder = TempFolder{"rs2004-config-tests"};
     const auto path = folder.GetPath() / "client.jsonc";
     auto capture = LogCapture{};
     auto& logger = *capture.GetLogger();

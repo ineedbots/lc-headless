@@ -1,0 +1,4 @@
+pocketpy provides CMake targets:
+
+    find_package(pocketpy CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE pocketpy::pocketpy)

@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
 find_package(Catch2 3 CONFIG REQUIRED)
 find_package(ixwebsocket CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(pocketpy CONFIG REQUIRED)
 
 file(GLOB_RECURSE LIBRARY_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -43,7 +44,7 @@ target_sources(${PROJECT_NAME}Lib PRIVATE ${LIBRARY_SOURCES})
 configure_project_target(${PROJECT_NAME}Lib)
 target_compile_definitions(${PROJECT_NAME}Lib PRIVATE JSON_DIAGNOSTICS=1)
 target_link_libraries(${PROJECT_NAME}Lib
-    PUBLIC ixwebsocket::ixwebsocket
+    PUBLIC ixwebsocket::ixwebsocket pocketpy::pocketpy
     PRIVATE nlohmann_json::nlohmann_json)
 
 add_executable(${PROJECT_NAME})
