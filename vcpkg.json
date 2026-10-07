@@ -1,0 +1,15 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+    "name": "rs2004-headless",
+    "version": "0.1.0",
+    "dependencies": [
+        "catch2",
+        {
+            "name": "ixwebsocket",
+            "default-features": false,
+            "features": ["openssl"]
+        },
+        "nlohmann-json"
+    ],
+    "builtin-baseline": "3cbc1db4d867ec83c89fba4c461321c11f78b5e3"
+}

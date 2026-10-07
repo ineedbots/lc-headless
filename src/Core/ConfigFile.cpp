@@ -1,0 +1,397 @@
+#include "pch.hpp"
+#include "ConfigFile.hpp"
+
+#include "BigUInt.hpp"
+#include "ConfigError.hpp"
+#include "Logger.hpp"
+
+#include <ixwebsocket/IXUrlParser.h>
+#include <nlohmann/json.hpp>
+
+namespace
+{
+    constexpr auto INDENT = 4;
+    constexpr auto ALLOW_EXCEPTIONS = true;
+    constexpr auto IGNORE_COMMENTS = true;
+    constexpr auto TYPE_ERROR_ID = 302;
+    constexpr auto SAMPLE_HEADER =
+        "// Sample config, written because none was found.\n"
+        "// Set server.url, the account, and the login CRCs and RSA key, then run again.\n"sv;
+    constexpr auto HEX_PREFIX_LENGTH = std::size_t{2};
+    constexpr auto MAX_USERNAME_LENGTH = std::size_t{12};
+    constexpr auto MAX_PASSWORD_LENGTH = std::size_t{20};
+    constexpr auto MIN_IDLE_SECONDS = 1s;
+    constexpr auto MAX_IDLE_SECONDS = 300s;
+    constexpr auto FIRST_PRINTABLE = '\x20';
+    constexpr auto LAST_PRINTABLE = '\x7E';
+    constexpr auto SECURE_SCHEME = "wss"sv;
+    constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
+
+    struct LogLevelName_s
+    {
+        LogLevel_e level;
+        std::string_view name;
+    };
+
+    constexpr auto LOG_LEVEL_NAMES = std::array{
+        LogLevelName_s{LogLevel_e::Verbose, "verbose"},
+        LogLevelName_s{LogLevel_e::Info, "info"},
+        LogLevelName_s{LogLevel_e::Warning, "warning"},
+        LogLevelName_s{LogLevel_e::Error, "error"},
+    };
+
+    struct TextPosition_s
+    {
+        std::size_t line;
+        std::size_t column;
+    };
+
+    std::optional<u32> ParseU32(std::string_view text)
+    {
+        auto base = 10;
+        if (text.size() >= HEX_PREFIX_LENGTH && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+        {
+            text.remove_prefix(HEX_PREFIX_LENGTH);
+            base = 16;
+        }
+
+        auto value = u32{0};
+        const auto* const end = text.data() + text.size();
+        const auto [parsedEnd, error] = std::from_chars(text.data(), end, value, base);
+        if (error != std::errc{} || parsedEnd != end)
+        {
+            return std::nullopt;
+        }
+
+        return value;
+    }
+
+    std::string FormatHex(const BigUInt& value)
+    {
+        const auto bytes = value.ToBytesBigEndian();
+        const auto first = std::ranges::find_if(bytes, [](u8 byte)
+        {
+            return byte != 0;
+        });
+
+        if (first == bytes.end())
+        {
+            return "0x0";
+        }
+
+        auto text = std::format("0x{:x}", *first);
+        for (auto byte = std::next(first); byte != bytes.end(); ++byte)
+        {
+            std::format_to(std::back_inserter(text), "{:02x}", *byte);
+        }
+
+        return text;
+    }
+
+    std::string FormatCrc(s32 crc)
+    {
+        return std::format("0x{:08x}", std::bit_cast<u32>(crc));
+    }
+
+    TextPosition_s GetTextPosition(std::string_view text, std::size_t byte)
+    {
+        // nlohmann's byte is 1-based and counts the end of input, so it can be one past the text.
+        const auto offset = std::min(byte > 0 ? byte - 1 : 0, text.size());
+        const auto before = text.substr(0, offset);
+        const auto line = 1 + static_cast<std::size_t>(std::ranges::count(before, '\n'));
+        const auto lineStart = before.find_last_of('\n');
+        const auto column = lineStart == std::string_view::npos ? offset + 1 : offset - lineStart;
+        return {.line = line, .column = column};
+    }
+
+    nlohmann::json ParseJson(std::string_view text)
+    {
+        try
+        {
+            return nlohmann::json::parse(text, nullptr, ALLOW_EXCEPTIONS, IGNORE_COMMENTS);
+        }
+        catch (const nlohmann::json::parse_error& e)
+        {
+            // Not e.what(): lexer errors quote the text they stopped in, which can be part of the password.
+            const auto position = GetTextPosition(text, e.byte);
+            throw ConfigError{std::format("invalid JSON at line {}, column {}", position.line, position.column)};
+        }
+    }
+
+    std::string DescribeConversionError(const nlohmann::json::exception& e)
+    {
+        auto message = std::string_view{e.what()};
+        const auto idEnd = message.find("] ");
+        if (idEnd != std::string_view::npos)
+        {
+            message.remove_prefix(idEnd + 2);
+        }
+
+        const auto pointerEnd = message.find(") ");
+        if (!message.starts_with('(') || pointerEnd == std::string_view::npos)
+        {
+            return std::string{message};
+        }
+
+        auto path = std::string{message.substr(1, pointerEnd - 1)};
+        if (path.starts_with('/'))
+        {
+            path.erase(0, 1);
+        }
+
+        std::ranges::replace(path, '/', '.');
+        return std::format("{}: {}", path, message.substr(pointerEnd + 2));
+    }
+
+    void Check(bool valid, std::string_view path, std::string_view rule)
+    {
+        if (valid)
+        {
+            return;
+        }
+
+        throw ConfigError{std::format("{}: {}", path, rule)};
+    }
+
+    bool IsPrintableAscii(std::string_view text)
+    {
+        return std::ranges::all_of(text, [](char character)
+        {
+            return character >= FIRST_PRINTABLE && character <= LAST_PRINTABLE;
+        });
+    }
+
+    bool IsCredential(std::string_view text, std::size_t maxLength)
+    {
+        return !text.empty() && text.size() <= maxLength && IsPrintableAscii(text);
+    }
+
+    std::optional<std::string> GetUrlScheme(const std::string& url)
+    {
+        auto protocol = std::string{};
+        auto host = std::string{};
+        auto path = std::string{};
+        auto query = std::string{};
+        auto port = 0;
+        if (!ix::UrlParser::parse(url, protocol, host, path, query, port))
+        {
+            return std::nullopt;
+        }
+
+        return protocol;
+    }
+
+    bool IsWebSocketUrl(const std::string& url)
+    {
+        const auto scheme = GetUrlScheme(url);
+        return scheme == "ws" || scheme == SECURE_SCHEME;
+    }
+
+    void Validate(const Config_s& config)
+    {
+        const auto& server = config.server;
+        Check(IsWebSocketUrl(server.url), "server.url", "must be a ws:// or wss:// URL");
+        Check(server.origin.empty() || IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
+        Check(!server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
+
+        const auto& account = config.account;
+        Check(IsCredential(account.username, MAX_USERNAME_LENGTH), "account.username", std::format("must be 1 to {} printable ASCII characters", MAX_USERNAME_LENGTH));
+        Check(IsCredential(account.password, MAX_PASSWORD_LENGTH), "account.password", std::format("must be 1 to {} printable ASCII characters", MAX_PASSWORD_LENGTH));
+
+        const auto& login = config.login;
+        const auto one = BigUInt::Parse("1");
+        Check(login.rsaModulus > one, "login.rsaModulus", "must be greater than 1");
+        Check(login.rsaExponent > BigUInt{}, "login.rsaExponent", "must be greater than 0");
+        Check(login.revision == LoginSettings_s::SUPPORTED_REVISION, "login.revision", std::format("must be {}", LoginSettings_s::SUPPORTED_REVISION));
+
+        const auto& client = config.client;
+        Check(client.idleSeconds >= MIN_IDLE_SECONDS && client.idleSeconds <= MAX_IDLE_SECONDS, "client.idleSeconds", std::format("must be from {} to {}", MIN_IDLE_SECONDS.count(), MAX_IDLE_SECONDS.count()));
+    }
+
+    void WarnIfTlsVerificationDisabled(const Config_s& config, Logger& logger)
+    {
+        if (GetUrlScheme(config.server.url) != SECURE_SCHEME || config.server.tlsCaFile != NO_TLS_VERIFICATION)
+        {
+            return;
+        }
+
+        logger.Warning("Config disables TLS certificate verification (server.tlsCaFile is NONE)");
+    }
+
+    std::string ReadFile(const std::filesystem::path& path)
+    {
+        auto file = std::ifstream{path, std::ios::binary};
+        if (!file)
+        {
+            throw ConfigError{std::format("Failed to open config file {}", path.string())};
+        }
+
+        auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+        if (file.bad())
+        {
+            throw ConfigError{std::format("Failed to read config file {}", path.string())};
+        }
+
+        return text;
+    }
+
+    void WriteSample(const std::filesystem::path& path)
+    {
+        // A stream that failed to open ignores the writes, so one check covers opening and writing.
+        auto file = std::ofstream{path, std::ios::binary};
+        file << SAMPLE_HEADER << ConfigFile::Serialize(Config_s{});
+        file.flush();
+        if (!file)
+        {
+            throw ConfigError{std::format("{}: not found, and a sample couldn't be written there", path.string())};
+        }
+    }
+}
+
+namespace nlohmann
+{
+    template <>
+    struct adl_serializer<BigUInt>
+    {
+        static void from_json(const json& value, BigUInt& result)
+        {
+            try
+            {
+                result = BigUInt::Parse(value.get<std::string>());
+            }
+            catch (const std::invalid_argument&)
+            {
+                throw json::type_error::create(TYPE_ERROR_ID, "must be a decimal or 0x-hex number", &value);
+            }
+        }
+
+        static void to_json(ordered_json& value, const BigUInt& source)
+        {
+            value = FormatHex(source);
+        }
+    };
+
+    template <>
+    struct adl_serializer<LogLevel_e>
+    {
+        static void from_json(const json& value, LogLevel_e& result)
+        {
+            const auto name = value.get<std::string>();
+            const auto entry = std::ranges::find(LOG_LEVEL_NAMES, name, &LogLevelName_s::name);
+            if (entry == LOG_LEVEL_NAMES.end())
+            {
+                throw json::type_error::create(TYPE_ERROR_ID, "must be verbose, info, warning or error", &value);
+            }
+
+            result = entry->level;
+        }
+
+        static void to_json(ordered_json& value, LogLevel_e level)
+        {
+            const auto entry = std::ranges::find(LOG_LEVEL_NAMES, level, &LogLevelName_s::level);
+            assert(entry != LOG_LEVEL_NAMES.end() && "LogLevel_e value missing from LOG_LEVEL_NAMES");
+            value = std::string{entry->name};
+        }
+    };
+
+    template <>
+    struct adl_serializer<std::chrono::seconds>
+    {
+        static void from_json(const json& value, std::chrono::seconds& result)
+        {
+            result = std::chrono::seconds{value.get<s64>()};
+        }
+
+        static void to_json(ordered_json& value, std::chrono::seconds source)
+        {
+            value = source.count();
+        }
+    };
+
+    template <>
+    struct adl_serializer<std::array<s32, LoginSettings_s::CRC_COUNT>>
+    {
+        static void from_json(const json& value, std::array<s32, LoginSettings_s::CRC_COUNT>& result)
+        {
+            if (!value.is_array() || value.size() != result.size())
+            {
+                throw json::type_error::create(TYPE_ERROR_ID, std::format("must be an array of {} strings", result.size()), &value);
+            }
+
+            for (std::size_t i = 0; i < result.size(); ++i)
+            {
+                const auto crc = ParseU32(value[i].get<std::string>());
+                if (!crc)
+                {
+                    throw json::type_error::create(TYPE_ERROR_ID, "must be a decimal or 0x-hex number from 0 to 0xffffffff", &value[i]);
+                }
+
+                result[i] = std::bit_cast<s32>(*crc);
+            }
+        }
+
+        static void to_json(ordered_json& value, const std::array<s32, LoginSettings_s::CRC_COUNT>& source)
+        {
+            value = ordered_json::array();
+            for (const auto crc : source)
+            {
+                value.push_back(FormatCrc(crc));
+            }
+        }
+    };
+}
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, account, login, client)
+
+Config_s ConfigFile::Load(const std::filesystem::path& path, Logger& logger)
+{
+    if (!std::filesystem::exists(path))
+    {
+        WriteSample(path);
+        throw ConfigError{std::format("{}: not found, so a sample was written there; fill it in and run again", path.string())};
+    }
+
+    const auto text = ReadFile(path);
+    try
+    {
+        return Parse(text, logger);
+    }
+    catch (const ConfigError& e)
+    {
+        throw ConfigError{std::format("{}: {}", path.string(), e.what())};
+    }
+}
+
+Config_s ConfigFile::Parse(std::string_view text, Logger& logger)
+{
+    const auto root = ParseJson(text);
+    if (!root.is_object())
+    {
+        throw ConfigError{"the top level must be an object"};
+    }
+
+    auto config = Config_s{};
+    try
+    {
+        root.get_to(config);
+    }
+    catch (const nlohmann::json::exception& e)
+    {
+        throw ConfigError{DescribeConversionError(e)};
+    }
+
+    Validate(config);
+    WarnIfTlsVerificationDisabled(config, logger);
+    return config;
+}
+
+std::string ConfigFile::Serialize(const Config_s& config)
+{
+    // Parentheses, not braces: a braced ordered_json is an array holding the config.
+    const auto document = nlohmann::ordered_json(config);
+    return document.dump(INDENT) + '\n';
+}

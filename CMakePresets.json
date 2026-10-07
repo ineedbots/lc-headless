@@ -1,0 +1,45 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        },
+        {
+            "name": "windows-msvc",
+            "inherits": "base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "cl",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "linux-clang",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang++"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        }
+    ],
+    "buildPresets": [
+        { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug" },
+        { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release" },
+        { "name": "linux-debug",     "configurePreset": "linux-clang",  "configuration": "Debug" },
+        { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release" }
+    ],
+    "testPresets": [
+        { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug",   "output": { "outputOnFailure": true } },
+        { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release", "output": { "outputOnFailure": true } },
+        { "name": "linux-debug",     "configurePreset": "linux-clang",  "configuration": "Debug",   "output": { "outputOnFailure": true } },
+        { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release", "output": { "outputOnFailure": true } }
+    ]
+}
