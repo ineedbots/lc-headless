@@ -328,6 +328,11 @@ s32 Packet::GBit(u32 bitCount)
     return static_cast<s32>(value);
 }
 
+std::size_t Packet::GetBitPos() const
+{
+    return m_bitPos;
+}
+
 void Packet::RsaEnc(const BigUInt& modulus, const BigUInt& exponent)
 {
     assert(m_mode == Mode_e::Write && "RsaEnc called on a read-mode packet");

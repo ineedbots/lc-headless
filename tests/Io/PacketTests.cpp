@@ -586,6 +586,18 @@ TEST_CASE("Packet bit reads", "[Packet]")
     CHECK(packet.GetPos() == testCase.posAfterEnd);
 }
 
+TEST_CASE("Packet GetBitPos follows bit reads", "[Packet]")
+{
+    const auto bytes = std::vector<u8>{0x12, 0x34, 0x56};
+    auto packet = Packet{bytes};
+    packet.G1();
+    packet.GBitStart();
+    CHECK(packet.GetBitPos() == 8);
+    packet.GBit(3);
+    packet.GBit(11);
+    CHECK(packet.GetBitPos() == 22);
+}
+
 TEST_CASE("Packet GBit handles every width at every bit offset", "[Packet]")
 {
     const auto allOnes = std::vector<u8>(5, 0xFF);

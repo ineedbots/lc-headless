@@ -5,8 +5,10 @@
 #include <atomic>
 #include <bit>
 #include <cassert>
+#include <cctype>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <compare>
 #include <concepts>
 #include <condition_variable>
@@ -16,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
+#include <deque>
 #include <exception>
 #include <filesystem>
 #include <format>        // Linux: needs libstdc++ 13+ or libc++ 17+

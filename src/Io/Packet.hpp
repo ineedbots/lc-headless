@@ -46,6 +46,7 @@ public:
     void GBitStart();
     void GBitEnd();
     s32 GBit(u32 bitCount);
+    [[nodiscard]] std::size_t GetBitPos() const;
 
     void RsaEnc(const BigUInt& modulus, const BigUInt& exponent);
 
