@@ -39,6 +39,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <random>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

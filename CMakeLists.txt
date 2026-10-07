@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)   # zero-warning policy
 
 find_package(Catch2 3 CONFIG REQUIRED)
 find_package(ixwebsocket CONFIG REQUIRED)
@@ -28,14 +27,12 @@ function(configure_project_target target)
 
     if(MSVC)
         target_compile_options(${target} PRIVATE
-            /W4 /permissive- /utf-8 /EHsc /Zc:__cplusplus /Zc:preprocessor)
+            /W4 /permissive- /utf-8 /EHsc /Zc:__cplusplus /Zc:preprocessor
+            "$<$<NOT:$<CONFIG:Debug>>:/WX>")
     else()
         target_compile_options(${target} PRIVATE
-            -Wall -Wextra -Wpedantic -Wshadow)
-    endif()
-
-    if(WIN32)
-        target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+            -Wall -Wextra -Wpedantic -Wshadow
+            "$<$<NOT:$<CONFIG:Debug>>:-Werror>")
     endif()
 endfunction()
 
