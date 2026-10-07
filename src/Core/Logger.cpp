@@ -31,6 +31,20 @@ namespace
 
         return path.substr(separator + 1);
     }
+
+    struct DefaultLogger_s
+    {
+        std::mutex mutex;
+        std::shared_ptr<Logger> logger = std::make_shared<Logger>();
+    };
+
+    // A function-local static, so the default exists even when another file's static
+    // initializer asks for it before this file's globals would have been initialized.
+    DefaultLogger_s& GetDefaultLogger()
+    {
+        static auto defaultLogger = DefaultLogger_s{};
+        return defaultLogger;
+    }
 }
 
 Logger::Logger(LogLevel_e level, Sink sink)
@@ -59,6 +73,23 @@ Logger::Sink Logger::SetSink(Sink sink) noexcept
     const auto lock = std::scoped_lock{m_mutex};
     m_sink.swap(sink);
     return sink;
+}
+
+std::shared_ptr<Logger> Logger::GetDefault() noexcept
+{
+    auto& defaultLogger = GetDefaultLogger();
+    const auto lock = std::scoped_lock{defaultLogger.mutex};
+    return defaultLogger.logger;
+}
+
+std::shared_ptr<Logger> Logger::SetDefault(std::shared_ptr<Logger> logger) noexcept
+{
+    assert(logger && "The default logger can't be null");
+
+    auto& defaultLogger = GetDefaultLogger();
+    const auto lock = std::scoped_lock{defaultLogger.mutex};
+    defaultLogger.logger.swap(logger);
+    return logger;
 }
 
 void Logger::WriteToConsole(const LogEntry_s& entry)

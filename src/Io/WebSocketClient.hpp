@@ -26,7 +26,7 @@ struct WebSocketOptions_s
 class WebSocketClient
 {
 public:
-    explicit WebSocketClient(std::shared_ptr<Logger> logger);
+    explicit WebSocketClient(std::shared_ptr<Logger> logger = Logger::GetDefault());
     ~WebSocketClient();
 
     WebSocketClient(const WebSocketClient&) = delete;

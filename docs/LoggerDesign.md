@@ -1,6 +1,6 @@
 # Logger Design
 
-Design and test plan for `Logger`, the log the client's classes write to. The application creates one at startup and shares it, through `std::shared_ptr`, with every class that logs. It has four levels, `Verbose`, `Info`, `Warning` and `Error`, and can be called from any thread, including IXWebSocket's I/O thread. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8: the static library, Catch2, and the test presets. [PacketDesign.md](PacketDesign.md) and [WebSocketDesign.md](WebSocketDesign.md) log through it.
+Design and test plan for `Logger`, the log the client's classes write to. The application creates one at startup and shares it, through `std::shared_ptr`, with every class that logs. It has four levels, `Verbose`, `Info`, `Warning` and `Error`, and can be called from any thread, including IXWebSocket's I/O thread. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8: the static library, Catch2, and the test presets. [WebSocketDesign.md](WebSocketDesign.md) and [ConfigDesign.md](ConfigDesign.md) log through it.
 
 Reference sources:
 
@@ -15,6 +15,7 @@ Reference sources:
 |---|---|
 | Shape | An ordinary class, `Logger`. Each instance has its own threshold and sink. `main` creates one console logger and passes it to every class that logs |
 | Ownership | `std::shared_ptr<Logger>`. A class that logs takes one in its constructor and keeps it in `m_logger`. Ownership is genuinely shared (CONVENTIONS §8): the objects that log have unrelated lifetimes, and `WebSocketClient`'s I/O thread logs until the client's destructor joins it. The logger lives as long as its last user |
+| Default | `Logger::SetDefault` installs a process-wide default logger, and `Logger::GetDefault` returns it. Every constructor and function that takes a logger defaults to it, so a caller with no logger of its own can leave the argument out. `main` makes its console logger the default. Until something calls `SetDefault`, the default is a console logger at `Info` |
 | Levels | `Verbose`, `Info`, `Warning` and `Error`, in increasing severity. A message is written when its level is at or above the logger's threshold. The threshold starts at `Info` unless the constructor is given another. `Error` is never filtered |
 | Call style | `m_logger->Info("WebSocket connecting to {}", url)`. The format string converts to `LogFormat_s`, which holds a `std::format_string`, so it is checked at compile time as `std::format` checks its own |
 | Source location | Debug builds record the call site with `std::source_location` and end the line with `[WebSocketClient.cpp:412]`. Release builds record nothing. The switch is `NDEBUG`, the same one `assert` uses, and the call syntax is the same in both |
@@ -26,7 +27,7 @@ Reference sources:
 
 Rejected:
 
-- **A process-wide logger with static functions.** No class would need a constructor parameter, but the threshold and sink would be global. Every test that checks logging would have to save and restore them, and two objects could never log to different places.
+- **A process-wide logger with static functions.** No class would need a constructor parameter, but the threshold and sink would be global. Every test that checks logging would have to save and restore them, and two objects could never log to different places. The default logger isn't this: it's an ordinary instance, used only when a caller leaves the logger out, and each object keeps the logger it was built with.
 - **`Logger&` instead of `std::shared_ptr<Logger>`.** Every logger would have to outlive every object that uses it, by convention alone. `WebSocketClient`'s I/O thread logs until the client is destroyed, so getting that order wrong would be a use-after-free.
 - **Wrapping spdlog.** It would fit behind the same interface, but four levels and a console sink don't justify a dependency.
 - **Macros** (`LOG_INFO(...)`), which could add `__FILE__` and `__LINE__` or compile `Verbose` calls out of Release builds. CONVENTIONS §6 avoids macros, and `std::source_location` gives the call site without one. `Verbose` stays available in Release, which is the build run against the live server.
@@ -47,6 +48,8 @@ rs2004-headless/
 │       ├── Logger.hpp
 │       └── Logger.cpp
 └── tests/
+    ├── DefaultLoggerScope.hpp
+    ├── DefaultLoggerScope.cpp
     ├── LogCapture.hpp
     ├── LogCapture.cpp
     └── Core/
@@ -56,8 +59,8 @@ rs2004-headless/
 - `LogLevel_e`, `LogEntry_s` and `LogFormat_s` live in `Logger.hpp`, the header of the class that owns them.
 - `Logger` lives in `Core/`, because every subsystem uses it. A class that logs includes `../Core/Logger.hpp` in its header, because `Logger` appears in its constructor's prototype and its members, and again in its `.cpp` (CONVENTIONS §5).
 - `pch.hpp` gains `<atomic>` and `<mutex>` for the logger's members, `<source_location>` and `<type_traits>` for `LogFormat_s`, and `<thread>` for the threading tests.
-- `main.cpp` creates the logger and passes it to `Application`, which passes it on (see Usage).
-- `LogCapture` is the test fixture every test file uses to check logging (§6.1). It sits at the root of `tests/` because it isn't tied to one subsystem.
+- `main.cpp` creates the logger, makes it the default, and passes it to `Application`, which passes it on (see Usage).
+- `LogCapture` is the test fixture every test file uses to check logging (§6.1). `DefaultLoggerScope` swaps the default logger for the length of a test. Both sit at the root of `tests/` because they aren't tied to one subsystem.
 
 ---
 
@@ -93,22 +96,36 @@ struct LogFormat_s
 #ifdef NDEBUG
     template <typename T>
         requires std::convertible_to<const T&, std::string_view>
-    consteval LogFormat_s(const T& formatText)
+    consteval LogFormat_s(const T& formatText) noexcept
         : text{formatText}
     {
     }
 #else
     template <typename T>
         requires std::convertible_to<const T&, std::string_view>
-    consteval LogFormat_s(const T& formatText, std::source_location callSite = std::source_location::current())
+    consteval LogFormat_s(const T& formatText, std::source_location callSite = std::source_location::current()) noexcept
         : text{formatText}
         , location{callSite}
+        , hasLocation{true}
     {
     }
 #endif
 
+    [[nodiscard]] std::optional<std::source_location> GetLocation() const noexcept
+    {
+        if (!hasLocation)
+        {
+            return std::nullopt;
+        }
+
+        return location;
+    }
+
     std::format_string<TArgs...> text;
-    std::optional<std::source_location> location;
+    // Not a std::optional: MSVC 19.44 rejects a consteval conversion to any type with an
+    // optional member (C2440, "invalid aggregate initialization").
+    std::source_location location;
+    bool hasLocation = false;
 };
 
 class Logger
@@ -152,7 +169,7 @@ public:
 
         try
         {
-            Write(level, format.location, std::format(format.text, std::forward<TArgs>(args)...));
+            Write(level, format.GetLocation(), std::format(format.text, std::forward<TArgs>(args)...));
         }
         catch (const std::exception&)
         {
@@ -165,6 +182,9 @@ public:
     [[nodiscard]] bool IsEnabled(LogLevel_e level) const noexcept;
 
     Sink SetSink(Sink sink) noexcept;
+
+    [[nodiscard]] static std::shared_ptr<Logger> GetDefault() noexcept;
+    static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
 
     static void WriteToConsole(const LogEntry_s& entry);
     [[nodiscard]] static std::string FormatLine(const LogEntry_s& entry);
@@ -185,16 +205,17 @@ private:
 - `std::mutex` and `std::atomic` make `Logger` neither copyable nor movable, by the rule of zero. That suits shared ownership: there is one instance, and every user points to it.
 - `WriteToConsole` and `FormatLine` are static, because neither depends on a logger's state. `WriteToConsole` is the default sink.
 - `SetSink` isn't `[[nodiscard]]`, because discarding the old sink, for example to silence a logger with `SetSink(nullptr)`, is legitimate.
+- `GetDefault` and `SetDefault` are static, because the default belongs to no one logger. `SetDefault` returns the default it replaces, as `SetSink` does, so a caller can put it back. It isn't `[[nodiscard]]` either: `main` has no use for the old one.
 
 ### Usage
 
-A class that logs takes the logger in its constructor:
+A class that logs takes the logger in its constructor, defaulting to the default logger:
 
 ```cpp
 class WebSocketClient
 {
 public:
-    explicit WebSocketClient(std::shared_ptr<Logger> logger);
+    explicit WebSocketClient(std::shared_ptr<Logger> logger = Logger::GetDefault());
 
 private:
     std::shared_ptr<Logger> m_logger;
@@ -214,7 +235,6 @@ and logs through it:
 ```cpp
 m_logger->Info("WebSocket connecting to {}", options.url);
 m_logger->Verbose("WebSocket sending {} bytes", data.size());
-m_logger->Warning("Packet string has no terminator (started at pos {})", start);
 ```
 
 Logging a failure where it's handled:
@@ -231,7 +251,7 @@ catch (const WebSocketError& e)
 }
 ```
 
-`main.cpp` creates the logger. Its last-resort catch logs through it, replacing the `std::fprintf` in the CONVENTIONS §5 template:
+`main.cpp` creates the logger and makes it the default. Its last-resort catch logs through it, replacing the `std::fprintf` in the CONVENTIONS §5 template:
 
 ```cpp
 #include "pch.hpp"
@@ -242,6 +262,7 @@ catch (const WebSocketError& e)
 int main()
 {
     const auto logger = std::make_shared<Logger>();
+    Logger::SetDefault(logger);
     try
     {
         auto app = Application{logger};
@@ -256,9 +277,11 @@ int main()
 ```
 
 - **Passing it on.** Constructors take `std::shared_ptr<Logger>` by value and move it into `m_logger` (CONVENTIONS §8, sink parameters). A caller that keeps its own reference passes a copy, as `main` does; otherwise it moves its last use.
-- **Never null.** A missing logger is a bug, so every constructor that takes one asserts it. Code that wants silence passes a logger with no sink: `std::make_shared<Logger>(LogLevel_e::Error, nullptr)`.
-- **Only classes that log take one.** `Isaac` and `BigUInt` don't. A free function that logs only during a call takes `Logger&`, as `LogEvent` in `WebSocketClient.cpp` does.
-- **`main` creates it before the `try`,** so the last-resort catch can still use it after `Application` is gone. `std::make_shared` can only fail there by running out of memory at startup, which ends in `std::terminate`.
+- **Leaving it out.** Every public constructor and function that takes a logger defaults it: `std::shared_ptr<Logger> logger = Logger::GetDefault()` for one it keeps, `Logger& logger = *Logger::GetDefault()` for one it only uses during the call. `Application`, `WebSocketClient`, `ConfigFile::Load` and `ConfigFile::Parse` do. A constructor that becomes callable with one argument this way is `explicit` (CONVENTIONS §8). Helpers in an anonymous namespace, such as `LogEvent`, always get their caller's logger and take no default.
+- **The default is read at the call.** An object built without a logger keeps the default of that moment. A later `SetDefault` doesn't move it to the new one.
+- **Never null.** `GetDefault` never returns null, so leaving the logger out is always safe. Passing `nullptr` explicitly is a bug, so every constructor that takes a logger asserts it, and `SetDefault` asserts its argument. Code that wants silence passes a logger with no sink: `std::make_shared<Logger>(LogLevel_e::Error, nullptr)`.
+- **Only classes that log take one.** `Packet`, `Isaac` and `BigUInt` don't. A free function that logs only during a call takes `Logger&`, as `LogEvent` in `WebSocketClient.cpp` does.
+- **`main` creates it before the `try`,** and makes it the default there, so the last-resort catch can still use it after `Application` is gone. `main` still passes it to `Application` explicitly, because it's the owner. `std::make_shared` can only fail there by running out of memory at startup, which ends in `std::terminate`.
 - `Application` sets the threshold at startup with `SetLevel`, from the config file's `client.logLevel` key ([ConfigDesign.md](ConfigDesign.md) §4 Usage).
 - A runtime string is logged through `"{}"`: `m_logger->Info("{}", text)`. Passing it as the format string doesn't compile, so braces in network data can never be read as format fields.
 - `Log` takes the level as a value, for when it's only known at run time.
@@ -278,8 +301,10 @@ int main()
     - `LogFormat_s`'s constructor is `consteval` and implicit. The string literal converts to `LogFormat_s` at the call site, so the default argument `std::source_location::current()` is evaluated there. It names the line that called `m_logger->Info`, not a line in `Logger.hpp`.
     - `explicit` would defeat that, so this is a deliberate exception to CONVENTIONS §8's `explicit` rule, explained in the "why" comment.
     - The constructor also checks the format string: it builds the `std::format_string` member, whose own constructor is `consteval`. A runtime string still doesn't compile.
-    - `#ifdef NDEBUG` picks the constructor, the same switch `assert` uses. In a Debug build it records the call site. In a Release build it has no location parameter, so `current()` is never evaluated, `location` stays empty, and the binary carries no source paths or function names. This is the only `#ifdef` in `Logger`.
-    - Everything after the constructor is the same in both builds: `Log` passes `format.location` to `Write`, and `FormatLine` prints it only when it holds a value.
+    - `#ifdef NDEBUG` picks the constructor, the same switch `assert` uses. In a Debug build it records the call site. In a Release build it has no location parameter, so `current()` is never evaluated, `hasLocation` stays `false`, and the binary carries no source paths or function names. This is the only `#ifdef` in `Logger`.
+    - The location is a plain `std::source_location` plus a `hasLocation` flag, not a `std::optional`. MSVC 19.44 rejects the implicit `consteval` conversion to any type with a `std::optional` member, even a non-template one. `GetLocation()` turns the pair back into the `std::optional` that `Write` and `LogEntry_s` use, and the member gets a "why" comment.
+    - The constructors are `noexcept`, so `noexcept(logger.Info("x"))` holds: the conversion is part of the call expression, and a `consteval` constructor can't throw at run time anyway.
+    - Everything after the constructor is the same in both builds: `Log` passes `format.GetLocation()` to `Write`, and `FormatLine` prints it only when it holds a value.
     - The templates pass `format` along unchanged, so the hop from `Info` to `Log` keeps the caller's location. A helper that logs on its caller's behalf, such as `LogEvent` in `WebSocketClient.cpp`, reports its own line.
 - **Writing.**
 
@@ -306,6 +331,12 @@ int main()
 - **Several loggers.**
     - Each logger has its own threshold, mutex and sink, and loggers share nothing. A program normally has one; tests make one per test (§6.1).
     - Two console loggers still never split a line, because each line is a single `std::fwrite`, and the C library locks the stream for each call.
+- **Default logger.**
+    - It lives in a function-local static in `Logger.cpp`'s anonymous namespace: a `std::shared_ptr<Logger>` and the mutex that guards it. Function-local, so it exists even when another file's static initializer asks for it first. This gets a "why" comment in the code.
+    - It starts as `std::make_shared<Logger>()`, a console logger at `Info`, so `GetDefault` works without any setup.
+    - `GetDefault` returns a copy of the pointer under the mutex, and `SetDefault` swaps it under the mutex. Both can be called from any thread. A copy that `GetDefault` handed out keeps its logger alive even if `SetDefault` replaces it at once.
+    - Both are `noexcept`, like `SetSink`. The only failure is running out of memory while the first call creates the console logger, which ends in `std::terminate`.
+    - The static holds a share of the default until the process exits, so the default outlives `main`'s own pointer.
 - **Console.**
     - `WriteToConsole` writes `FormatLine(entry)` and a `\n` with one `std::fwrite`, then calls `std::fflush`. `Warning` and `Error` go to stderr, `Verbose` and `Info` to stdout.
     - Flushing every line means a crash loses nothing that was already logged, and stdout and stderr lines keep their order on a terminal.
@@ -330,14 +361,14 @@ int main()
 | Level | For | Examples |
 |---|---|---|
 | `Error` | A failure, logged where it's handled and not rethrown: `main`, a thread entry point, a reconnect loop | `Login failed: WebSocket error: Connection refused`, `Fatal error: ...` |
-| `Warning` | A problem the code noticed and carried on through: malformed input it tolerated, a timeout it recovered from, a risky setting it accepted | `Packet string has no terminator (started at pos 812)`, `Logout not confirmed within 5 s; closing the connection`, `Config disables TLS certificate verification (server.tlsCaFile is NONE)` |
+| `Warning` | A problem the code noticed and carried on through: malformed input it tolerated, a timeout it recovered from, a risky setting it accepted | `Logout not confirmed within 5 s; closing the connection`, `Config disables TLS certificate verification (server.tlsCaFile is NONE)` |
 | `Info` | Milestones that someone running the client wants to see by default | `WebSocket connecting to ws://localhost:43594/`, `WebSocket open`, `WebSocket closed (code 1000: Normal closure)` |
 | `Verbose` | Detail for debugging: traffic, internal events | `WebSocket received 42 bytes`, `WebSocket error event: ...` |
 
 - **Each failure is logged once, at `Error`, by the code that handles it.** Code that throws doesn't also log at `Error`, and code that catches only to rethrow doesn't log at all (CONVENTIONS §8). A class may log what led up to a failure at `Verbose`.
 - **A warning means the code carried on.** It is logged once, by the code that noticed the problem and worked around it. If the problem stops the operation, it is a failure instead: throw, and the handler logs it at `Error`.
 - **Never log secrets:** the password, the plaintext login block, ISAAC seeds. Log the size of network data, not its bytes.
-- **Messages from a subsystem start with its name** (`WebSocket ...`, `Packet ...`), so they can be told apart without a source location. They read like exception messages, without a trailing period.
+- **Messages from a subsystem start with its name** (`WebSocket ...`, `Config ...`), so they can be told apart without a source location. They read like exception messages, without a trailing period.
 - **Don't log while holding a mutex that another thread waits on.** A console write is slow; log after releasing it.
 
 ---
@@ -365,6 +396,7 @@ int main()
 ### 6.1 Strategy
 
 - Every test builds its own loggers, so tests share no logging state and nothing has to be restored. `[Logger]` tests give theirs a capture or their own sink, so nothing reaches the console.
+- The default logger is the one piece of shared state. A test that changes it uses `DefaultLoggerScope`, which puts the previous default back even when an assertion ends the test early. The whole suite passes in one process in any order (`--order rand`), which shows no test leaves the default changed.
 - The `Logger` tests check whole messages. Tests of other classes check a captured entry's level, its order among the others, and a fragment of its message, such as a URL or a byte count. As with exceptions, the rest of the text isn't checked.
 
 Out of scope:
@@ -414,6 +446,26 @@ private:
 - The destructor calls `m_logger->SetSink(nullptr)`. The object under test may still hold the logger, and a `WebSocketClient`'s I/O thread may still be logging. Once `SetSink` returns, no thread is inside the capture's sink (§3 Sinks), so destroying the capture is safe, and later calls through the logger reach nothing.
 - Its own mutex guards the entries, because the test thread reads them while other threads may still be logging. `GetEntries` returns a copy.
 - Its sink captures `this`, so it can be neither copied nor moved.
+
+**`DefaultLoggerScope`** (`tests/DefaultLoggerScope.hpp` / `.cpp`) makes a logger the default for its lifetime:
+
+```cpp
+class DefaultLoggerScope
+{
+public:
+    explicit DefaultLoggerScope(std::shared_ptr<Logger> logger);
+    ~DefaultLoggerScope();
+
+    DefaultLoggerScope(const DefaultLoggerScope&) = delete;
+    DefaultLoggerScope& operator=(const DefaultLoggerScope&) = delete;
+
+private:
+    std::shared_ptr<Logger> m_previous;
+};
+```
+
+- The constructor calls `SetDefault` and keeps the default it replaced. The destructor sets that one back.
+- A test declares it after its `LogCapture`, so the default is restored before the capture is destroyed: `const auto scope = DefaultLoggerScope{capture.GetLogger()};`.
 
 ### 6.2 Filtering
 
@@ -470,6 +522,13 @@ The file is the test file, not `Logger.hpp`: the location survives the hop from 
 - After `SetSink(nullptr)`, `Info("x")` returns normally and reaches no sink. A sink installed afterwards works again.
 - **Independent loggers.** Two loggers with different thresholds and sinks: a call on one never reaches the other's sink, and `SetLevel` on one leaves the other's threshold unchanged.
 - **Outliving the capture.** After a `LogCapture` is destroyed, logging through a copy of its logger returns normally and is captured nowhere.
+- **The default logger.**
+    - Before any `SetDefault`, `GetDefault` returns a non-null logger at `Info`, and the same one on every call.
+    - `SetDefault(x)` returns the previous default, and `GetDefault` then returns `x`. A call through it reaches `x`'s sink. `SetDefault` with the previous one returns `x` and restores the original.
+    - A `DefaultLoggerScope` sets the default for its lifetime and restores the original afterwards.
+- **Leaving the logger out.** With a `LogCapture`'s logger set as the default, each class built or called without a logger logs to it:
+    - `ConfigFile::Parse(text)` and `ConfigFile::Load(path)` of a file with a `wss` URL and `tlsCaFile` `NONE`: one `Warning` naming `server.tlsCaFile`.
+    - `WebSocketClient{}`, connected to a `LoopbackServer` ([WebSocketDesign.md](WebSocketDesign.md) §6.4): `connecting to` and `open` at `Info`. Tagged `[network]`.
 
 ### 6.6 Line format
 
@@ -494,11 +553,12 @@ Times are built as `std::chrono::sys_days{2026y / std::chrono::October / 5} + 18
 - **Swapping sinks under load.** 4 threads log continuously through one logger while the test thread installs a fresh counting sink on it 100 times. Each time, it records the replaced sink's count right after `SetSink` returns.
     - After the threads join, every replaced sink's count still equals the count recorded when it was replaced: no call reached it after `SetSink` returned.
     - The counts of all the sinks add up to the number of calls the threads made: nothing was lost or delivered twice.
+- **Replacing the default under load.** 4 threads log continuously through `GetDefault()` while the test thread switches the default between two captures' loggers 100 times. The entries in the two captures add up to the number of calls the threads made.
 
 ### 6.8 Tooling
 
-- Tag: `[Logger]`.
-- `LogCapture.cpp` builds into the test executable through the existing `tests/**/*.cpp` glob.
+- Tag: `[Logger]`, plus `[threads]` on the §6.7 cases.
+- `LogCapture.cpp` and `DefaultLoggerScope.cpp` build into the test executable through the existing `tests/**/*.cpp` glob.
 
 ### 6.9 Done when
 
@@ -509,10 +569,10 @@ Times are built as `std::chrono::sys_days{2026y / std::chrono::October / 5} + 18
 
 ## 7. Implementation order
 
-This comes right after the project setup (PacketDesign §8 step 1), so `Packet` and `WebSocketClient` can log from the start.
+This comes right after the project setup (PacketDesign §8 step 1), so `WebSocketClient` and `ConfigFile` can log from the start.
 
 1. **`pch.hpp`:** add `<atomic>`, `<mutex>`, `<source_location>`, `<thread>` and `<type_traits>`.
 2. **`LogFormat_s` on its own:** build one `logger.Info("{}", 1)` call on every preset, Debug and Release, before writing the rest. The wrapper relies on a `consteval` constructor that calls `std::format_string`'s, with `std::source_location::current()` as a default argument. If a toolchain rejects that pattern, it's best found here.
 3. **`Logger` and `LogCapture`,** plus the §6.2 to §6.6 tests.
 4. **Threads:** the §6.7 tests.
-5. **`main.cpp` and `Application`:** `main` creates the logger and passes it to `Application`, and the last-resort catch logs through it.
+5. **`main.cpp` and `Application`:** `main` creates the logger, makes it the default with `SetDefault`, and passes it to `Application`, and the last-resort catch logs through it.

@@ -263,8 +263,8 @@ public:
 
     ConfigFile() = delete;
 
-    [[nodiscard]] static Config_s Load(const std::filesystem::path& path, Logger& logger);
-    [[nodiscard]] static Config_s Parse(std::string_view text, Logger& logger);
+    [[nodiscard]] static Config_s Load(const std::filesystem::path& path, Logger& logger = *Logger::GetDefault());
+    [[nodiscard]] static Config_s Parse(std::string_view text, Logger& logger = *Logger::GetDefault());
     [[nodiscard]] static std::string Serialize(const Config_s& config);
 };
 ```
@@ -276,7 +276,7 @@ public:
     - Values that differ for each server or account are left empty or zero: `url`, the credentials, the CRCs and the RSA key. All of them but the CRCs fail `Validate` until the file sets them.
     - Code that builds a struct in place starts from the same values.
 - `Load` reads a file and calls `Parse`, or writes the sample when there's no file. `Parse` and `Serialize` work on text, which is what the tests call.
-- `Load` and `Parse` take the `Logger&` their one warning goes through. They log only during the call and don't keep the logger, so a reference is enough, as with a function that only reads the config ([LoggerDesign.md](LoggerDesign.md) §3 Usage). `Serialize` doesn't log, so it takes none.
+- `Load` and `Parse` take the `Logger&` their one warning goes through, and default to the default logger when it is left out. They log only during the call and don't keep the logger, so a reference is enough, as with a function that only reads the config ([LoggerDesign.md](LoggerDesign.md) §3 Usage). `Serialize` doesn't log, so it takes none.
 - `Serialize` is the inverse of `Parse`: for a valid `Config_s`, `Parse(Serialize(config))` gives the same members back.
 - All the structs follow the rule of zero, so a `Config_s` moves cheaply out of `Load` and into its `shared_ptr`.
 - `Load` and `Parse` return a plain `Config_s`, not a `shared_ptr`. The caller decides how to store it, and the tests compare members without dereferencing anything.
@@ -312,6 +312,7 @@ Fatal error: client.jsonc: login.crcs: must be an array of 9 strings
 int main(int argc, char** argv)
 {
     const auto logger = std::make_shared<Logger>();
+    Logger::SetDefault(logger);
     try
     {
         const auto args = std::span{argv, static_cast<std::size_t>(argc)};

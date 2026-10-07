@@ -1,13 +1,12 @@
 #pragma once
 
 #include "../Core/BigUInt.hpp"
-#include "../Core/Logger.hpp"
 #include "Isaac.hpp"
 
 class Packet
 {
 public:
-    Packet(std::vector<u8> data, std::shared_ptr<Logger> logger);
+    explicit Packet(std::vector<u8> data);
 
     [[nodiscard]] static s32 GetCrc(std::span<const u8> source);
     [[nodiscard]] static bool CheckCrc(std::span<const u8> source, s32 expected = 0);
@@ -60,5 +59,4 @@ private:
     std::size_t m_pos = 0;
     std::size_t m_bitPos = 0;
     std::unique_ptr<Isaac> m_random;
-    std::shared_ptr<Logger> m_logger;
 };

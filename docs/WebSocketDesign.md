@@ -103,7 +103,7 @@ struct WebSocketOptions_s
 class WebSocketClient
 {
 public:
-    explicit WebSocketClient(std::shared_ptr<Logger> logger);
+    explicit WebSocketClient(std::shared_ptr<Logger> logger = Logger::GetDefault());
     ~WebSocketClient();
 
     WebSocketClient(const WebSocketClient&) = delete;
@@ -169,7 +169,7 @@ private:
 
 - The header includes `<ixwebsocket/IXWebSocketMessage.h>` itself, even though `<ixwebsocket/IXWebSocket.h>` already brings it in.
 - `WebSocketClient.cpp` uses `Logger`, `ix::WebSocket` and `ix::WebSocketMessage`, so it includes all three headers again. It also includes `<ixwebsocket/IXUrlParser.h>`, `<ixwebsocket/IXWebSocketMessageType.h>`, `<ixwebsocket/IXWebSocketSendData.h>`, `<ixwebsocket/IXWebSocketCloseInfo.h>` and `<ixwebsocket/IXWebSocketErrorInfo.h>`, which only the implementation uses. `OnMessage` reads `message.closeInfo` and `message.errorInfo` without naming their types, and that still counts as using them.
-- The constructor moves the logger into `m_logger` and asserts it isn't null ([LoggerDesign.md](LoggerDesign.md) §3 Usage). It is defined in `WebSocketClient.cpp`.
+- The constructor defaults the logger to `Logger::GetDefault()`, moves it into `m_logger` and asserts it isn't null ([LoggerDesign.md](LoggerDesign.md) §3 Usage). It is defined in `WebSocketClient.cpp`.
 - The destructor stays user-declared, because it calls `Stop()`. That joins the I/O thread before any member its callback uses is destroyed, whatever order the members are declared in.
 
 ### Usage
@@ -801,6 +801,8 @@ Fixtures:
 | Sends `01 02 03 04` after 300 ms | `WaitAvailable(4)` | Returns |
 
 **Peer close and failure**
+
+When the server ends the connection as soon as it opens, the client calls `Connect` and goes straight to the wait under test, without `WaitOpen`. The end can arrive before the first pump sees `Open`, and `WaitOpen` would then throw, as §3 Waiting specifies. This applies to the rows here and to `Stop` after a text message.
 
 | Server | Client | Expected |
 |---|---|---|

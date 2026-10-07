@@ -3,7 +3,6 @@
 
 #include "../Core/BigUInt.hpp"
 #include "../Core/Endian.hpp"
-#include "../Core/Logger.hpp"
 #include "Isaac.hpp"
 
 namespace
@@ -73,11 +72,9 @@ namespace
     }
 }
 
-Packet::Packet(std::vector<u8> data, std::shared_ptr<Logger> logger)
+Packet::Packet(std::vector<u8> data)
     : m_data{std::move(data)}
-    , m_logger{std::move(logger)}
 {
-    assert(m_logger && "Packet needs a logger");
 }
 
 s32 Packet::GetCrc(std::span<const u8> source)
@@ -206,8 +203,7 @@ s32 Packet::GSmarts()
 std::string Packet::GJStr()
 {
     RequireBytes(1);
-    const auto start = m_pos;
-    const auto unread = std::span{m_data}.subspan(start);
+    const auto unread = std::span{m_data}.subspan(m_pos);
     const auto terminator = std::ranges::find(unread, STRING_TERMINATOR);
     if (terminator != unread.end())
     {
@@ -218,7 +214,6 @@ std::string Packet::GJStr()
 
     // TS checks for the end of the buffer before keeping each byte, so it drops the last one.
     m_pos = m_data.size();
-    m_logger->Warning("Packet string has no terminator (started at pos {})", start);
     return ToString(unread.first(unread.size() - 1));
 }
 

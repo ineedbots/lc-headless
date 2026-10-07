@@ -112,6 +112,9 @@ public:
 
     Sink SetSink(Sink sink) noexcept;
 
+    [[nodiscard]] static std::shared_ptr<Logger> GetDefault() noexcept;
+    static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
+
     static void WriteToConsole(const LogEntry_s& entry);
     [[nodiscard]] static std::string FormatLine(const LogEntry_s& entry);
 

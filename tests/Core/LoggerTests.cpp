@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../DefaultLoggerScope.hpp"
 #include "../LogCapture.hpp"
 
 #include "Core/Logger.hpp"
@@ -396,6 +397,89 @@ TEST_CASE("A logger outlives its LogCapture", "[Logger]")
 
     logger->Info("after");
     CHECK_FALSE(static_cast<bool>(logger->SetSink(nullptr)));
+}
+
+TEST_CASE("Logger has a console default at Info until one is set", "[Logger]")
+{
+    const auto logger = Logger::GetDefault();
+
+    REQUIRE(logger != nullptr);
+    CHECK(Logger::GetDefault() == logger);
+    CHECK(logger->GetLevel() == LogLevel_e::Info);
+}
+
+TEST_CASE("Logger SetDefault replaces the default and returns the old one", "[Logger]")
+{
+    const auto original = Logger::GetDefault();
+    auto capture = LogCapture{};
+
+    const auto previous = Logger::SetDefault(capture.GetLogger());
+    CHECK(previous == original);
+    CHECK(Logger::GetDefault() == capture.GetLogger());
+
+    Logger::GetDefault()->Info("x");
+    CHECK(capture.GetEntries().size() == 1);
+
+    CHECK(Logger::SetDefault(previous) == capture.GetLogger());
+    CHECK(Logger::GetDefault() == original);
+}
+
+TEST_CASE("DefaultLoggerScope restores the previous default", "[Logger]")
+{
+    const auto original = Logger::GetDefault();
+    {
+        auto capture = LogCapture{};
+        const auto scope = DefaultLoggerScope{capture.GetLogger()};
+        CHECK(Logger::GetDefault() == capture.GetLogger());
+    }
+
+    CHECK(Logger::GetDefault() == original);
+}
+
+TEST_CASE("Logger GetDefault is safe while another thread sets the default", "[Logger][threads]")
+{
+    constexpr auto THREAD_COUNT = 4;
+    constexpr auto SWAP_COUNT = 100;
+
+    auto first = LogCapture{};
+    auto second = LogCapture{};
+    const auto scope = DefaultLoggerScope{first.GetLogger()};
+    auto isStopping = std::atomic<bool>{false};
+    auto callCounts = std::array<u64, THREAD_COUNT>{};
+
+    auto threads = std::vector<std::thread>{};
+    for (auto thread = 0; thread < THREAD_COUNT; ++thread)
+    {
+        threads.emplace_back([&isStopping, &callCount = callCounts[thread]]
+        {
+            while (!isStopping)
+            {
+                Logger::GetDefault()->Info("x");
+                ++callCount;
+            }
+        });
+    }
+
+    for (auto swap = 0; swap < SWAP_COUNT; ++swap)
+    {
+        std::this_thread::sleep_for(1ms);
+        Logger::SetDefault(swap % 2 == 0 ? second.GetLogger() : first.GetLogger());
+    }
+
+    isStopping = true;
+    for (auto& thread : threads)
+    {
+        thread.join();
+    }
+
+    auto made = u64{0};
+    for (const auto count : callCounts)
+    {
+        made += count;
+    }
+
+    CHECK(made > 0);
+    CHECK(first.GetEntries().size() + second.GetEntries().size() == made);
 }
 
 TEST_CASE("Logger::FormatLine", "[Logger]")

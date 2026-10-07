@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../DefaultLoggerScope.hpp"
 #include "../LogCapture.hpp"
 
 #include "Core/BigUInt.hpp"
@@ -825,6 +826,35 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
         CHECK(config.login.rsaExponent == BigUInt::Parse("17"));
         CheckOptionalDefaults(config);
     }
+}
+
+TEST_CASE("ConfigFile logs through the default logger when given none", "[ConfigFile]")
+{
+    auto capture = LogCapture{};
+    const auto scope = DefaultLoggerScope{capture.GetLogger()};
+    const auto text = EditBase([](nlohmann::json& json)
+    {
+        json["server"]["url"] = "wss://w1.example.com:443";
+        json["server"]["tlsCaFile"] = "NONE";
+    });
+
+    SECTION("Parse")
+    {
+        static_cast<void>(ConfigFile::Parse(text));
+    }
+
+    SECTION("Load")
+    {
+        const auto folder = TempFolder{};
+        const auto path = folder.GetPath() / "client.jsonc";
+        WriteFile(path, text);
+        static_cast<void>(ConfigFile::Load(path));
+    }
+
+    const auto entries = capture.GetEntries();
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0].level == LogLevel_e::Warning);
+    CHECK_THAT(entries[0].message, Catch::Matchers::ContainsSubstring("server.tlsCaFile"));
 }
 
 TEST_CASE("ConfigFile::Load", "[ConfigFile]")

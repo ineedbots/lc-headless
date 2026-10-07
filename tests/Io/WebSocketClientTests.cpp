@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../DefaultLoggerScope.hpp"
 #include "../LogCapture.hpp"
 
 #include "Core/Logger.hpp"
@@ -821,7 +822,8 @@ TEST_CASE("WebSocketClient peer close and failure", "[WebSocketClient][network]"
             connection.close();
         }};
         auto client = WebSocketClient{MakeConsoleLogger()};
-        ConnectAndWaitOpen(client, server.Url());
+        // No WaitOpen: the server ends the connection as it opens, so a first pump may already see it ended.
+        client.Connect(MakeOptions(server.Url()));
 
         CHECK(GetOutcome([&]
         {
@@ -859,7 +861,8 @@ TEST_CASE("WebSocketClient peer close and failure", "[WebSocketClient][network]"
             connection.sendText("text");
         }};
         auto client = WebSocketClient{MakeConsoleLogger()};
-        ConnectAndWaitOpen(client, server.Url());
+        // No WaitOpen: the server ends the connection as it opens, so a first pump may already see it ended.
+        client.Connect(MakeOptions(server.Url()));
 
         CHECK(GetOutcome([&]
         {
@@ -887,7 +890,8 @@ TEST_CASE("WebSocketClient peer close and failure", "[WebSocketClient][network]"
             connection.sendText("text");
         }};
         auto client = WebSocketClient{MakeConsoleLogger()};
-        ConnectAndWaitOpen(client, server.Url());
+        // No WaitOpen: the server ends the connection as it opens, so a first pump may already see it ended.
+        client.Connect(MakeOptions(server.Url()));
 
         CHECK(GetOutcome([&]
         {
@@ -1096,7 +1100,8 @@ TEST_CASE("WebSocketClient Stop", "[WebSocketClient][network]")
             connection.sendText("text");
         }};
         auto client = WebSocketClient{MakeConsoleLogger()};
-        ConnectAndWaitOpen(client, server.Url());
+        // No WaitOpen: the server ends the connection as it opens, so a first pump may already see it ended.
+        client.Connect(MakeOptions(server.Url()));
         REQUIRE(GetOutcome([&]
         {
             static_cast<void>(client.WaitAvailable(1, WAIT));
@@ -1167,6 +1172,19 @@ TEST_CASE("WebSocketClient reconnects", "[WebSocketClient][network]")
         CHECK_THROWS_AS(client.Connect(MakeOptions("http://x")), std::invalid_argument);
         CheckEcho(client, {1});
     }
+}
+
+TEST_CASE("WebSocketClient logs through the default logger when given none", "[WebSocketClient][network]")
+{
+    auto capture = LogCapture{LogLevel_e::Verbose};
+    const auto scope = DefaultLoggerScope{capture.GetLogger()};
+    auto server = LoopbackServer{};
+    auto client = WebSocketClient{};
+
+    ConnectAndWaitOpen(client, server.Url());
+
+    CHECK(HasMessage(capture, LogLevel_e::Info, "connecting to"));
+    CHECK(HasMessage(capture, LogLevel_e::Info, "WebSocket open"));
 }
 
 TEST_CASE("WebSocketClient logging", "[WebSocketClient][network]")

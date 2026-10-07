@@ -6,7 +6,7 @@
 class Application
 {
 public:
-    Application(const std::filesystem::path& configPath, std::shared_ptr<Logger> logger);
+    explicit Application(const std::filesystem::path& configPath, std::shared_ptr<Logger> logger = Logger::GetDefault());
 
     [[nodiscard]] int Run();
 

@@ -1,6 +1,6 @@
 # Packet I/O Design
 
-Design and test plan for the C++ port of the 289 webclient's packet buffer, ISAAC cipher, and the big-integer support behind RSA. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). Logging goes through `Logger` from [LoggerDesign.md](LoggerDesign.md).
+Design and test plan for the C++ port of the 289 webclient's packet buffer, ISAAC cipher, and the big-integer support behind RSA. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). None of these classes log: their callers log the failures they handle, through `Logger` from [LoggerDesign.md](LoggerDesign.md).
 
 Reference sources:
 
@@ -19,7 +19,7 @@ Reference sources:
 | Pooling | `alloc`/`release` and the size-class cache are omitted. The client only used `alloc` for three long-lived buffers and never called `release` |
 | Threading | Single-threaded. There is no static mutable state; an instance is not synchronized |
 | Out-of-range access | Throws `std::out_of_range`, leaving the packet unchanged |
-| Logging | `Packet` takes a `std::shared_ptr<Logger>` in its constructor ([LoggerDesign.md](LoggerDesign.md)). Its only log line is a `Warning` when `GJStr` runs off the end of the buffer (§3). `Isaac` and `BigUInt` don't log, so they don't take a logger. These classes are pure and on the hot path, and every failure is an exception that the caller logs where it handles it |
+| Logging | None. `Packet`, `Isaac` and `BigUInt` don't log, so none of them takes a logger. They are pure and on the hot path, and every failure is an exception that the caller logs where it handles it ([LoggerDesign.md](LoggerDesign.md) §4). `GJStr` running off the end of the buffer returns what TS returns, without a warning (§3) |
 | Tests | Hand-written spec tests. The few expected values that can't be worked out by hand were taken once from the TS sources and are listed in this document |
 
 ---
@@ -85,13 +85,12 @@ Not ported: the `Linkable2` base (it only served the pool) and the rest of `JsUt
 #pragma once
 
 #include "../Core/BigUInt.hpp"
-#include "../Core/Logger.hpp"
 #include "Isaac.hpp"
 
 class Packet
 {
 public:
-    Packet(std::vector<u8> data, std::shared_ptr<Logger> logger);
+    explicit Packet(std::vector<u8> data);
 
     [[nodiscard]] static s32 GetCrc(std::span<const u8> source);
     [[nodiscard]] static bool CheckCrc(std::span<const u8> source, s32 expected = 0);
@@ -144,7 +143,6 @@ private:
     std::size_t m_pos = 0;
     std::size_t m_bitPos = 0;
     std::unique_ptr<Isaac> m_random;
-    std::shared_ptr<Logger> m_logger;
 };
 ```
 
@@ -152,13 +150,13 @@ private:
 
 - **Construction.**
     - The packet owns a `std::vector<u8>`, taken as a sink parameter. A downloaded buffer is moved in without a copy, which matches TS wrapping a `Uint8Array`.
-    - It shares the client's logger, also taken as a sink parameter and moved into `m_logger`. A null logger is a bug, so the constructor asserts it isn't one.
-    - Port `Packet.alloc(1)` as `Packet{std::vector<u8>(5000), logger}`. Use parentheses: braces would make a one-element vector.
+    - The constructor takes one argument, so it is `explicit` (CONVENTIONS §8).
+    - Port `Packet.alloc(1)` as `Packet{std::vector<u8>(5000)}`. Use parentheses: braces would make a one-element vector.
 - **Copies.**
-    - Holding a `std::unique_ptr<Isaac>` makes `Packet` move-only (rule of zero), so a buffer can't be copied by accident. A moved packet takes its logger reference with it.
+    - Holding a `std::unique_ptr<Isaac>` makes `Packet` move-only (rule of zero), so a buffer can't be copied by accident.
 - **Includes.**
-    - `Packet.hpp` includes `Isaac.hpp`, since `Isaac` is a member and appears in `SetRandom`'s prototype; `../Core/BigUInt.hpp`, since `BigUInt` appears in `RsaEnc`'s prototype; and `../Core/Logger.hpp`, since `Logger` appears in the constructor's prototype and is a member.
-    - `Packet.cpp` uses all three, so it includes them again, plus `../Core/Endian.hpp`.
+    - `Packet.hpp` includes `Isaac.hpp`, since `Isaac` is a member and appears in `SetRandom`'s prototype, and `../Core/BigUInt.hpp`, since `BigUInt` appears in `RsaEnc`'s prototype.
+    - `Packet.cpp` uses both, so it includes them again, plus `../Core/Endian.hpp`.
 - **Byte order.**
     - Big-endian, except `IP2`/`IP4`, which are little-endian.
     - All multi-byte access goes through `Endian::ToBig`/`FromBig`/`ToLittle`/`FromLittle` plus `std::memcpy`, using template helpers in `Packet.cpp`'s anonymous namespace.
@@ -188,7 +186,7 @@ private:
 - **Strings.**
     - Strings are raw bytes with no encoding conversion, equivalent to `fromCharCode`/`charCodeAt` over 0 to 255.
     - `GJStr` reads up to `\n`, and `PJStr` writes the bytes followed by `\n`.
-    - When `GJStr` reaches the end of the buffer without finding `\n`, it logs `Packet string has no terminator (started at pos {})` at `Warning` through `m_logger`. In the 5000-byte inbound buffer this means the parser has lost its place in the stream. The string is still returned as TS returns it (§6); the log line only makes the desync visible.
+    - When `GJStr` reaches the end of the buffer without finding `\n`, it returns what TS returns (§6) and logs nothing.
 - **Smart values.**
     - Peek at the next byte: below `0x80` the value is one byte, otherwise two.
     - `GSmart` returns `G1()` or `G2() - 0x8000`. `GSmarts` returns `G1() - 0x40` or `G2() - 0xC000`.
@@ -212,8 +210,8 @@ private:
     3. Throw `std::length_error` if `c.size() > 255`.
     4. Set `pos = 0`, then `P1(c.size())`, then `PData(c)`.
 - **Logging.**
-    - Apart from `GJStr`'s missing terminator, nothing in `Packet`, `Isaac` or `BigUInt` logs. A failed bounds check, parse or `ModPow` throws, and the caller logs it where it handles it ([LoggerDesign.md](LoggerDesign.md) §4).
-    - Never log packet bytes, ISAAC seeds or the RSA block: the login block carries the password.
+    - Nothing in `Packet`, `Isaac` or `BigUInt` logs. A failed bounds check, parse or `ModPow` throws, and the caller logs it where it handles it ([LoggerDesign.md](LoggerDesign.md) §4).
+    - Callers never log packet bytes, ISAAC seeds or the RSA block: the login block carries the password.
 
 ---
 
@@ -331,7 +329,6 @@ These get a short "why" comment in the code, because they look wrong at first gl
 | `gdata`, `pdata`, `getcrc` take `(offset, length)` | Take spans | Idiomatic; removes `getcrc`'s end-index quirk |
 | `bigIntModPow` accepts `base >= modulus` and `modulus <= 1` | Throws `std::invalid_argument` | The server could not decrypt the result |
 | `rsaenc`'s `p1` truncates a length above 255 | Throws `std::length_error` | Only reachable with a modulus over 2040 bits |
-| `gjstr` without a terminator returns silently | Same result, plus a `Warning` log line | Running off the end means the parser has lost its place in the stream |
 | `alloc` / `release` pool | Omitted | Unused by the client |
 
 ---
@@ -344,7 +341,7 @@ All tests are spec tests: hand-written inputs, with expected values written dire
 
 Most expected values follow directly from the TS semantics. The few that can't be worked out by hand (ISAAC outputs and CRCs) were taken once from the TS sources and are listed here. In the tests they are plain constants; nothing is generated at build or test time.
 
-Every packet is built with a logger. `PacketTests.cpp` builds them through `MakePacket(std::vector<u8> bytes)` in its anonymous namespace, which passes a logger with no sink: `std::make_shared<Logger>(LogLevel_e::Error, nullptr)`. The string logging cases pass a `LogCapture`'s logger instead. `Isaac` and `BigUInt` tests need no logger.
+`PacketTests.cpp` builds packets through `MakePacket(std::vector<u8> bytes)` in its anonymous namespace. None of these classes logs, so no test needs a logger.
 
 Out of scope:
 
@@ -424,9 +421,9 @@ Each of these throws `std::invalid_argument`: modulus 0, modulus 1, `base == mod
 
 **Construction and accessors**
 
-- `Packet{std::vector<u8>(5000), logger}`: length 5000, pos 0, available 5000, all bytes zero.
+- `Packet{std::vector<u8>(5000)}`: length 5000, pos 0, available 5000, all bytes zero.
 - The constructor moves rather than copies: `GetData().data()` equals the source vector's `data()` captured before the move.
-- `Packet{std::vector<u8>{}, logger}` has length 0, and `G1` throws.
+- `Packet{std::vector<u8>{}}` has length 0, and `G1` throws.
 - On a length-10 packet, `SetPos(3)` gives available 7, and `SetPos(10)` gives available 0.
 - Bytes written through `GetData()` are what `G1` reads next. This is the socket pattern: read into the data, `SetPos(0)`, parse.
 
@@ -474,14 +471,6 @@ Each of these throws `std::invalid_argument`: modulus 0, modulus 1, `base == mod
 | `61` | `GJStr` | `""` (same quirk) | 1 |
 | `E9 FF 0A` | `GJStr` | the raw bytes `E9 FF` | 3 |
 | pos == length | `GJStr` | throws `std::out_of_range` | unchanged |
-
-**String logging.** Each case builds its packet with the logger of a `LogCapture` at `Verbose` ([LoggerDesign.md](LoggerDesign.md) §6.1):
-
-| Bytes | Call | Captured |
-|---|---|---|
-| `61 62 63` | `GJStr` | Exactly one entry, at `Warning` |
-| `61 62 63 0A` | `GJStr` | Nothing |
-| pos == length | `GJStr` (throws) | Nothing |
 
 **GData**
 
@@ -618,7 +607,6 @@ For each pair:
 - **Test files:**
     - A test `.cpp` holds test cases rather than a class. This is an exception to "every `.cpp` has a class", like `main.cpp`.
     - The tables above become data-driven cases. Tags are `[BigUInt]`, `[Isaac]` and `[Packet]`.
-    - Tests that check logging use `LogCapture` from `tests/LogCapture.hpp` ([LoggerDesign.md](LoggerDesign.md) §6.1).
 
 ### 7.6 Done when
 

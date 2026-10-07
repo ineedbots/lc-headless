@@ -7,6 +7,7 @@
 int main(int argc, char** argv)
 {
     const auto logger = std::make_shared<Logger>();
+    Logger::SetDefault(logger);
     try
     {
         const auto args = std::span{argv, static_cast<std::size_t>(argc)};

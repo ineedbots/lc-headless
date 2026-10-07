@@ -1,8 +1,6 @@
 #include "pch.hpp"
-#include "../LogCapture.hpp"
 
 #include "Core/BigUInt.hpp"
-#include "Core/Logger.hpp"
 #include "Io/Isaac.hpp"
 #include "Io/Packet.hpp"
 
@@ -65,14 +63,9 @@ namespace
         s32 crc;
     };
 
-    std::shared_ptr<Logger> MakeSilentLogger()
-    {
-        return std::make_shared<Logger>(LogLevel_e::Error, nullptr);
-    }
-
     Packet MakePacket(std::vector<u8> bytes)
     {
-        return Packet{std::move(bytes), MakeSilentLogger()};
+        return Packet{std::move(bytes)};
     }
 
     std::vector<u8> ToVector(std::span<const u8> bytes)
@@ -150,7 +143,7 @@ TEST_CASE("Packet construction and accessors", "[Packet]")
     {
         auto bytes = std::vector<u8>(5000);
         const auto* const original = bytes.data();
-        const auto packet = Packet{std::move(bytes), MakeSilentLogger()};
+        const auto packet = Packet{std::move(bytes)};
         CHECK(packet.GetData().data() == original);
     }
 
@@ -305,35 +298,6 @@ TEST_CASE("Packet string reads", "[Packet]")
         packet.SetPos(2);
         CHECK_THROWS_AS(packet.GJStr(), std::out_of_range);
         CHECK(packet.GetPos() == 2);
-    }
-}
-
-TEST_CASE("Packet logs a string without a terminator", "[Packet]")
-{
-    auto capture = LogCapture{LogLevel_e::Verbose};
-
-    SECTION("a missing terminator logs one warning")
-    {
-        auto packet = Packet{{0x61, 0x62, 0x63}, capture.GetLogger()};
-        packet.GJStr();
-        const auto entries = capture.GetEntries();
-        REQUIRE(entries.size() == 1);
-        CHECK(entries[0].level == LogLevel_e::Warning);
-    }
-
-    SECTION("a terminated string logs nothing")
-    {
-        auto packet = Packet{{0x61, 0x62, 0x63, 0x0A}, capture.GetLogger()};
-        packet.GJStr();
-        CHECK(capture.GetEntries().empty());
-    }
-
-    SECTION("reading at the end logs nothing")
-    {
-        auto packet = Packet{{0x61}, capture.GetLogger()};
-        packet.SetPos(1);
-        CHECK_THROWS_AS(packet.GJStr(), std::out_of_range);
-        CHECK(capture.GetEntries().empty());
     }
 }
 
