@@ -112,7 +112,9 @@ struct GameState_s
 
     std::vector<GroundItem_s> groundItems;
     std::vector<LocChange_s> locChanges;
+    // Where the client last asked to walk, until the walk ends, and the tick it asked on.
     std::optional<Tile_s> walkDestination;
+    u64 walkRequestTick = 0;
 
     std::map<u16, Inventory_s> inventories;
     std::unordered_map<u16, s32> varps;

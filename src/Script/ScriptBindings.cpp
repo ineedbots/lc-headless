@@ -1,0 +1,1059 @@
+#include "pch.hpp"
+#include "ScriptBindings.hpp"
+
+#include "../Game/Protocol/Base37.hpp"
+#include "../Game/State/GameState_s.hpp"
+#include "../Game/State/Npc_s.hpp"
+#include "../Game/State/Player_s.hpp"
+#include "../Game/State/Social_s.hpp"
+#include "../Game/State/Zone_s.hpp"
+#include "../Game/Tile_s.hpp"
+#include "PyConvert.hpp"
+#include "ScriptApi.hpp"
+#include "ScriptRuntime.hpp"
+#include "ScriptVm.hpp"
+
+#include <pocketpy.h>
+
+namespace
+{
+    constexpr auto PRELUDE = R"python(
+class _Entity:
+    def is_moving(self):
+        return self.moving
+
+    def in_combat(self):
+        return self.last_hit_tick is not None and get_tick() - self.last_hit_tick <= COMBAT_TICKS
+
+
+class Npc(_Entity):
+    def __repr__(self):
+        return f'Npc(index={self.index}, id={self.id}, x={self.x}, z={self.z})'
+
+
+class Player(_Entity):
+    def __repr__(self):
+        return f'Player(index={self.index}, name={self.name}, x={self.x}, z={self.z})'
+
+
+class GroundItem:
+    def __repr__(self):
+        return f'GroundItem(id={self.id}, count={self.count}, x={self.x}, z={self.z})'
+
+
+class Loc:
+    def __repr__(self):
+        return f'Loc(id={self.id}, x={self.x}, z={self.z}, layer={self.layer})'
+
+
+class Item:
+    def __repr__(self):
+        return f'Item(id={self.id}, count={self.count}, slot={self.slot})'
+
+
+class Settings:
+    def __init__(self, values):
+        self._values = values
+        for key, value in values.items():
+            setattr(self, key, value)
+
+    def get(self, key, default=None):
+        return self._values.get(key, default)
+
+    def __contains__(self, key):
+        return key in self._values
+
+    def __repr__(self):
+        return f'Settings({self._values})'
+
+
+def _load_settings(text):
+    import json
+    return Settings(json.loads(text))
+)python"sv;
+
+    constexpr auto LOAD_SETTINGS = "settings = _load_settings(_settings_json)\ndel _settings_json\n"sv;
+    constexpr auto SETTINGS_JSON = "_settings_json";
+    constexpr auto MAX_COORD = s64{32767};
+    constexpr auto PERCENT = 100;
+    constexpr auto HITPOINTS = 3;
+
+    struct Constant_s
+    {
+        const char* name;
+        s64 value;
+    };
+
+    constexpr auto CONSTANTS = std::to_array<Constant_s>({
+        {"COMBAT_TICKS", static_cast<s64>(ScriptApi::COMBAT_TICKS)},
+        {"INVENTORY", ScriptApi::INVENTORY},
+        {"EQUIPMENT", ScriptApi::EQUIPMENT},
+        {"BANK", ScriptApi::BANK},
+        {"BANK_INVENTORY", ScriptApi::BANK_INVENTORY},
+        {"INVENTORY_SIZE", ScriptApi::INVENTORY_SIZE},
+        {"ATTACK", 0},
+        {"DEFENCE", 1},
+        {"STRENGTH", 2},
+        {"HITPOINTS", HITPOINTS},
+        {"RANGED", 4},
+        {"PRAYER", 5},
+        {"MAGIC", 6},
+        {"COOKING", 7},
+        {"WOODCUTTING", 8},
+        {"FLETCHING", 9},
+        {"FISHING", 10},
+        {"FIREMAKING", 11},
+        {"CRAFTING", 12},
+        {"SMITHING", 13},
+        {"MINING", 14},
+        {"HERBLORE", 15},
+        {"AGILITY", 16},
+        {"THIEVING", 17},
+        {"RUNECRAFT", 20},
+        {"LAYER_WALL", static_cast<s64>(LocLayer_e::Wall)},
+        {"LAYER_WALL_DECOR", static_cast<s64>(LocLayer_e::WallDecor)},
+        {"LAYER_GROUND", static_cast<s64>(LocLayer_e::Ground)},
+        {"LAYER_GROUND_DECOR", static_cast<s64>(LocLayer_e::GroundDecor)},
+    });
+
+    std::array<ScriptApi*, ScriptRuntime::MAX_VMS> boundApis{};
+
+    ScriptApi& GetApi()
+    {
+        auto* api = boundApis[static_cast<std::size_t>(py_currentvm())];
+        assert(api != nullptr && "A script function ran in a VM with no ScriptApi bound");
+        return *api;
+    }
+
+    // Script functions are called from pocketpy's C code, so every C++ exception becomes a Python one here.
+    template <typename TBody>
+    bool Guard(TBody body) noexcept
+    {
+        try
+        {
+            return body();
+        }
+        catch (const ScriptRaisedError&)
+        {
+            return false;
+        }
+        catch (const ScriptTypeError& e)
+        {
+            return py_exception(tp_TypeError, "%s", e.what());
+        }
+        catch (const std::invalid_argument& e)
+        {
+            return py_exception(tp_ValueError, "%s", e.what());
+        }
+        catch (const std::exception& e)
+        {
+            return py_exception(tp_RuntimeError, "%s", e.what());
+        }
+    }
+
+    bool ReturnNone()
+    {
+        py_newnone(py_retval());
+        return true;
+    }
+
+    bool ReturnInt(s64 value)
+    {
+        py_newint(py_retval(), value);
+        return true;
+    }
+
+    bool ReturnBool(bool value)
+    {
+        py_newbool(py_retval(), value);
+        return true;
+    }
+
+    bool ReturnString(std::string_view text)
+    {
+        PyConvert::FromString(py_retval(), text);
+        return true;
+    }
+
+    s32 ToCoord(py_Ref value, std::string_view name)
+    {
+        return static_cast<s32>(PyConvert::ToInt(value, name, 0, MAX_COORD));
+    }
+
+    std::optional<s32> ToRadius(py_Ref value)
+    {
+        const auto radius = PyConvert::ToOptionalInt(value, "radius");
+        if (!radius)
+        {
+            return std::nullopt;
+        }
+
+        return static_cast<s32>(PyConvert::ToInt(value, "radius", 0, MAX_COORD));
+    }
+
+    SearchFilter_s ToFilter(py_Ref ids, py_Ref radius)
+    {
+        return {.ids = PyConvert::ToIds(ids, "ids"), .radius = ToRadius(radius)};
+    }
+
+    void FromNpc(py_OutRef out, const Npc_s& npc)
+    {
+        PyConvert::FromNpc(out, npc, GetApi().GetState().tick);
+    }
+
+    void FromPlayer(py_OutRef out, const Player_s& player)
+    {
+        PyConvert::FromPlayer(out, player, GetApi().GetState().tick);
+    }
+
+    void FromFriend(py_OutRef out, const Friend_s& entry)
+    {
+        py_newtuple(out, 2);
+        py_newnone(py_tuple_getitem(out, 0));
+        py_newint(py_tuple_getitem(out, 1), entry.world);
+        PyConvert::FromString(py_tuple_getitem(out, 0), entry.name);
+    }
+
+    void FromName(py_OutRef out, u64 name37)
+    {
+        PyConvert::FromString(out, Base37::DecodeDisplayName(name37));
+    }
+
+    // Control and the local player
+
+    bool GetTick(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(static_cast<s64>(GetApi().GetState().tick)); });
+    }
+
+    bool StopScript(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            GetApi().RequestStop(StopRequest_e::Script);
+            return ReturnNone();
+        });
+    }
+
+    bool StopAccount(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            GetApi().RequestStop(StopRequest_e::Account);
+            return ReturnNone();
+        });
+    }
+
+    bool GetX(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetPosition().x); });
+    }
+
+    bool GetZ(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetPosition().z); });
+    }
+
+    bool GetLevel(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetPosition().level); });
+    }
+
+    bool GetPosition(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto position = GetApi().GetPosition();
+            PyConvert::FromPoint(py_retval(), position.x, position.z);
+            return true;
+        });
+    }
+
+    bool GetPid(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().pid); });
+    }
+
+    bool GetName(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto& appearance = GetApi().GetLocalPlayer().appearance;
+            return appearance ? ReturnString(appearance->name) : ReturnNone();
+        });
+    }
+
+    bool GetCombatLevel(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto& appearance = GetApi().GetLocalPlayer().appearance;
+            return ReturnInt(appearance ? appearance->combatLevel : 0);
+        });
+    }
+
+    bool GetRunEnergy(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().runEnergy); });
+    }
+
+    bool GetWeight(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().runWeight); });
+    }
+
+    bool IsMoving(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().IsMoving()); });
+    }
+
+    bool GetWalkDestination(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromOptional(py_retval(), GetApi().GetState().walkDestination, [](py_OutRef out, const Tile_s& tile)
+            {
+                PyConvert::FromPoint(out, tile.x, tile.z);
+            });
+            return true;
+        });
+    }
+
+    bool InCombat(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().InCombat()); });
+    }
+
+    bool IsRunning(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().IsRunning()); });
+    }
+
+    bool GetLocalPlayer(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            FromPlayer(py_retval(), GetApi().GetLocalPlayer());
+            return true;
+        });
+    }
+
+    // Stats
+
+    const Stat_s& GetStatArgument(py_StackRef argv)
+    {
+        return GetApi().GetStat(static_cast<s32>(PyConvert::ToInt(py_arg(0), "stat")));
+    }
+
+    bool GetCurrentStat(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnInt(GetStatArgument(argv).level); });
+    }
+
+    bool GetMaxStat(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnInt(GetStatArgument(argv).baseLevel); });
+    }
+
+    bool GetExperience(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnInt(GetStatArgument(argv).xp); });
+    }
+
+    bool GetHp(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetStat(HITPOINTS).level); });
+    }
+
+    bool GetMaxHp(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetStat(HITPOINTS).baseLevel); });
+    }
+
+    bool GetHpPercent(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto& hitpoints = GetApi().GetStat(HITPOINTS);
+            return ReturnInt(hitpoints.baseLevel == 0 ? 0 : hitpoints.level * PERCENT / hitpoints.baseLevel);
+        });
+    }
+
+    // Area
+
+    bool DistanceTo(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& api = GetApi();
+            return ReturnInt(api.GetPosition().GetDistance(api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
+        });
+    }
+
+    bool Distance(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto from = Tile_s{.x = ToCoord(py_arg(0), "x1"), .z = ToCoord(py_arg(1), "z1")};
+            const auto to = Tile_s{.x = ToCoord(py_arg(2), "x2"), .z = ToCoord(py_arg(3), "z2")};
+            return ReturnInt(from.GetDistance(to));
+        });
+    }
+
+    bool InRadiusOf(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& api = GetApi();
+            const auto centre = api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
+            return ReturnBool(api.GetPosition().GetDistance(centre) <= PyConvert::ToInt(py_arg(2), "radius"));
+        });
+    }
+
+    bool InRect(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto x = ToCoord(py_arg(0), "x");
+            const auto z = ToCoord(py_arg(1), "z");
+            const auto width = PyConvert::ToInt(py_arg(2), "width");
+            const auto height = PyConvert::ToInt(py_arg(3), "height");
+            const auto here = GetApi().GetPosition();
+            return ReturnBool(here.x >= x && here.x < x + width && here.z >= z && here.z < z + height);
+        });
+    }
+
+    bool At(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& api = GetApi();
+            return ReturnBool(api.GetPosition() == api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
+        });
+    }
+
+    // NPCs, players, ground items and scenery
+
+    bool GetNpcs(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetNpcs(ToFilter(py_arg(0), py_arg(1))), FromNpc);
+            return true;
+        });
+    }
+
+    bool GetNearestNpcById(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto inCombat = PyConvert::ToOptionalBool(py_arg(2), "in_combat");
+            PyConvert::FromOptional(py_retval(), GetApi().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat), FromNpc);
+            return true;
+        });
+    }
+
+    bool GetNpc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromOptional(py_retval(), GetApi().GetNpc(PyConvert::ToU16(py_arg(0), "index")), FromNpc);
+            return true;
+        });
+    }
+
+    bool GetPlayers(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetPlayers(ToRadius(py_arg(0))), FromPlayer);
+            return true;
+        });
+    }
+
+    bool GetPlayerByName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromOptional(py_retval(), GetApi().GetPlayerByName(PyConvert::ToString(py_arg(0), "name")), FromPlayer);
+            return true;
+        });
+    }
+
+    bool GetGroundItems(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetGroundItems(ToFilter(py_arg(0), py_arg(1))), PyConvert::FromGroundItem);
+            return true;
+        });
+    }
+
+    bool GetNearestGroundItemById(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1))), PyConvert::FromGroundItem);
+            return true;
+        });
+    }
+
+    bool GetLocAt(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto layer = std::optional<LocLayer_e>{};
+            if (!py_isnone(py_arg(2)))
+            {
+                layer = static_cast<LocLayer_e>(PyConvert::ToInt(py_arg(2), "layer", 0, static_cast<s64>(LocLayer_e::GroundDecor)));
+            }
+
+            const auto loc = GetApi().GetLocAt(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), layer);
+            PyConvert::FromOptional(py_retval(), loc, PyConvert::FromLoc);
+            return true;
+        });
+    }
+
+    // Inventories
+
+    bool GetInventory(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetInventory(PyConvert::ToU16(py_arg(0), "com")), PyConvert::FromItem);
+            return true;
+        });
+    }
+
+    bool GetEquipment(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetInventory(ScriptApi::EQUIPMENT), PyConvert::FromItem);
+            return true;
+        });
+    }
+
+    bool GetInventoryCountById(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto ids = PyConvert::ToIds(py_arg(0), "ids");
+            return ReturnInt(GetApi().CountItems(ids, PyConvert::ToU16(py_arg(1), "com")));
+        });
+    }
+
+    bool GetInventoryItemById(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto ids = PyConvert::ToIds(py_arg(0), "ids");
+            PyConvert::FromOptional(py_retval(), GetApi().FindItem(ids, PyConvert::ToU16(py_arg(1), "com")), PyConvert::FromItem);
+            return true;
+        });
+    }
+
+    bool GetEmptySlots(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetEmptySlots()); });
+    }
+
+    bool IsInventoryFull(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().GetEmptySlots() == 0); });
+    }
+
+    // Interfaces, varps and social lists
+
+    bool GetMainModal(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.mainModal); });
+    }
+
+    bool GetSideModal(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.sideModal); });
+    }
+
+    bool GetChatModal(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.chatModal); });
+    }
+
+    bool IsInterfaceOpen(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().IsInterfaceOpen(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")))); });
+    }
+
+    bool GetComponentText(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto text = GetApi().GetComponentText(PyConvert::ToU16(py_arg(0), "com"));
+            return text ? ReturnString(*text) : ReturnNone();
+        });
+    }
+
+    bool IsCountDialogOpen(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().GetState().interfaces.countDialogOpen); });
+    }
+
+    bool GetVarp(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnInt(GetApi().GetState().GetVarp(PyConvert::ToU16(py_arg(0), "id"))); });
+    }
+
+    bool GetFriends(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetState().social.friends, FromFriend);
+            return true;
+        });
+    }
+
+    bool GetIgnores(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetState().social.ignores, FromName);
+            return true;
+        });
+    }
+
+    // Movement and interactions
+
+    bool WalkTo(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyConvert::ToBool(py_arg(2), "run"));
+            return ReturnNone();
+        });
+    }
+
+    bool WalkPath(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            const auto points = PyConvert::ToPoints(py_arg(0), api.GetPosition().level, "points");
+            api.WalkPath(points, PyConvert::ToBool(py_arg(1), "run"));
+            return ReturnNone();
+        });
+    }
+
+    bool InteractNpc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto index = PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS);
+            return ReturnBool(GetApi().InteractNpc(index, PyConvert::ToOp(py_arg(1))));
+        });
+    }
+
+    bool TalkToNpc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_TALK)); });
+    }
+
+    bool AttackNpc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_ATTACK)); });
+    }
+
+    bool InteractPlayer(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto index = PyConvert::ToIndex(py_arg(0), "player", PyConvert::PLAYER_CLASS);
+            return ReturnBool(GetApi().InteractPlayer(index, PyConvert::ToOp(py_arg(1))));
+        });
+    }
+
+    bool InteractLoc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().InteractLoc(PyConvert::ToU16(py_arg(0), "id"), ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z"), PyConvert::ToOp(py_arg(3)));
+            return ReturnNone();
+        });
+    }
+
+    bool InteractLocVia(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            const auto points = PyConvert::ToPoints(py_arg(0), api.GetPosition().level, "points");
+            api.InteractLocVia(points, PyConvert::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"), PyConvert::ToOp(py_arg(4)));
+            return ReturnNone();
+        });
+    }
+
+    bool InteractGroundItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToGroundItem(py_arg(0), "item");
+            return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, PyConvert::ToOp(py_arg(1))));
+        });
+    }
+
+    bool TakeGroundItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToGroundItem(py_arg(0), "item");
+            return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, ScriptApi::OP_TAKE));
+        });
+    }
+
+    // Items
+
+    bool ItemOp(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), PyConvert::ToOp(py_arg(1)))); });
+    }
+
+    bool InvButton(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().InventoryButton(PyConvert::ToItem(py_arg(0), "item"), PyConvert::ToOp(py_arg(1)))); });
+    }
+
+    bool DropItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), ScriptApi::OP_DROP)); });
+    }
+
+    bool MoveItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().MoveItem(PyConvert::ToU16(py_arg(0), "com"), PyConvert::ToU16(py_arg(1), "from_slot"), PyConvert::ToU16(py_arg(2), "to_slot"));
+            return ReturnNone();
+        });
+    }
+
+    bool UseItemOnNpc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnNpc(item, PyConvert::ToIndex(py_arg(1), "npc", PyConvert::NPC_CLASS)));
+        });
+    }
+
+    bool UseItemOnPlayer(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnPlayer(item, PyConvert::ToIndex(py_arg(1), "player", PyConvert::PLAYER_CLASS)));
+        });
+    }
+
+    bool UseItemOnLoc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnLoc(item, PyConvert::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z")));
+        });
+    }
+
+    bool UseItemOnGroundItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            const auto target = PyConvert::ToGroundItem(py_arg(1), "ground_item");
+            return ReturnBool(GetApi().UseItemOnGroundItem(item, target.id, target.x, target.z));
+        });
+    }
+
+    bool UseItemOnItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnItem(item, PyConvert::ToItem(py_arg(1), "target")));
+        });
+    }
+
+    // Magic
+
+    bool CastOnNpc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
+            return ReturnBool(GetApi().CastOnNpc(spell, PyConvert::ToIndex(py_arg(1), "npc", PyConvert::NPC_CLASS)));
+        });
+    }
+
+    bool CastOnPlayer(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
+            return ReturnBool(GetApi().CastOnPlayer(spell, PyConvert::ToIndex(py_arg(1), "player", PyConvert::PLAYER_CLASS)));
+        });
+    }
+
+    bool CastOnLoc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().CastOnLoc(PyConvert::ToU16(py_arg(0), "spell"), PyConvert::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"));
+            return ReturnNone();
+        });
+    }
+
+    bool CastOnGroundItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
+            const auto target = PyConvert::ToGroundItem(py_arg(1), "ground_item");
+            return ReturnBool(GetApi().CastOnGroundItem(spell, target.id, target.x, target.z));
+        });
+    }
+
+    bool CastOnItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
+            return ReturnBool(GetApi().CastOnItem(spell, PyConvert::ToItem(py_arg(1), "item")));
+        });
+    }
+
+    // Interfaces, settings and chat
+
+    bool ClickButton(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().ClickButton(PyConvert::ToU16(py_arg(0), "com"));
+            return ReturnNone();
+        });
+    }
+
+    bool ContinueDialogue(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            GetApi().ContinueDialogue();
+            return ReturnNone();
+        });
+    }
+
+    bool AnswerCount(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto value = PyConvert::ToInt(py_arg(0), "value", 0, std::numeric_limits<s32>::max());
+            GetApi().AnswerCountDialog(static_cast<s32>(value));
+            return ReturnNone();
+        });
+    }
+
+    bool CloseInterfaces(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            GetApi().CloseInterfaces();
+            return ReturnNone();
+        });
+    }
+
+    bool SetRun(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().SetRun(PyConvert::ToBool(py_arg(0), "run"));
+            return ReturnNone();
+        });
+    }
+
+    bool Say(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().Say(PyConvert::ToString(py_arg(0), "text"));
+            return ReturnNone();
+        });
+    }
+
+    bool SendPm(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().SendPrivateMessage(PyConvert::ToString(py_arg(0), "name"), PyConvert::ToString(py_arg(1), "text"));
+            return ReturnNone();
+        });
+    }
+
+    bool Command(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            GetApi().SendCommand(PyConvert::ToString(py_arg(0), "text"));
+            return ReturnNone();
+        });
+    }
+
+    template <void (ScriptApi::*TCall)(std::string_view)>
+    bool CallWithName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            (GetApi().*TCall)(PyConvert::ToString(py_arg(0), "name"));
+            return ReturnNone();
+        });
+    }
+
+    struct Function_s
+    {
+        std::string signature;
+        py_CFunction function;
+    };
+
+    std::vector<Function_s> GetFunctions()
+    {
+        return {
+            {"get_tick()", GetTick},
+            {"stop_script()", StopScript},
+            {"stop_account()", StopAccount},
+            {"get_x()", GetX},
+            {"get_z()", GetZ},
+            {"get_level()", GetLevel},
+            {"get_position()", GetPosition},
+            {"get_pid()", GetPid},
+            {"get_name()", GetName},
+            {"get_combat_level()", GetCombatLevel},
+            {"get_run_energy()", GetRunEnergy},
+            {"get_weight()", GetWeight},
+            {"is_moving()", IsMoving},
+            {"get_walk_destination()", GetWalkDestination},
+            {"in_combat()", InCombat},
+            {"is_running()", IsRunning},
+            {"get_local_player()", GetLocalPlayer},
+            {"get_current_stat(stat)", GetCurrentStat},
+            {"get_max_stat(stat)", GetMaxStat},
+            {"get_experience(stat)", GetExperience},
+            {"get_hp()", GetHp},
+            {"get_max_hp()", GetMaxHp},
+            {"get_hp_percent()", GetHpPercent},
+            {"distance_to(x, z)", DistanceTo},
+            {"distance(x1, z1, x2, z2)", Distance},
+            {"in_radius_of(x, z, radius)", InRadiusOf},
+            {"in_rect(x, z, width, height)", InRect},
+            {"at(x, z)", At},
+            {"get_npcs(ids=None, radius=None)", GetNpcs},
+            {"get_nearest_npc_by_id(ids=None, radius=None, in_combat=None)", GetNearestNpcById},
+            {"get_npc(index)", GetNpc},
+            {"get_players(radius=None)", GetPlayers},
+            {"get_player_by_name(name)", GetPlayerByName},
+            {"get_ground_items(ids=None, radius=None)", GetGroundItems},
+            {"get_nearest_ground_item_by_id(ids=None, radius=None)", GetNearestGroundItemById},
+            {"get_loc_at(x, z, layer=None)", GetLocAt},
+            {std::format("get_inventory(com={})", ScriptApi::INVENTORY), GetInventory},
+            {"get_equipment()", GetEquipment},
+            {std::format("get_inventory_count_by_id(ids=None, com={})", ScriptApi::INVENTORY), GetInventoryCountById},
+            {std::format("get_inventory_item_by_id(ids=None, com={})", ScriptApi::INVENTORY), GetInventoryItemById},
+            {"get_empty_slots()", GetEmptySlots},
+            {"is_inventory_full()", IsInventoryFull},
+            {"get_main_modal()", GetMainModal},
+            {"get_side_modal()", GetSideModal},
+            {"get_chat_modal()", GetChatModal},
+            {"is_interface_open(id)", IsInterfaceOpen},
+            {"get_component_text(com)", GetComponentText},
+            {"is_count_dialog_open()", IsCountDialogOpen},
+            {"get_varp(id)", GetVarp},
+            {"get_friends()", GetFriends},
+            {"get_ignores()", GetIgnores},
+            {"walk_to(x, z, run=False)", WalkTo},
+            {"walk_path(points, run=False)", WalkPath},
+            {"interact_npc(npc, op)", InteractNpc},
+            {"talk_to_npc(npc)", TalkToNpc},
+            {"attack_npc(npc)", AttackNpc},
+            {"interact_player(player, op)", InteractPlayer},
+            {"interact_loc(id, x, z, op)", InteractLoc},
+            {"interact_loc_via(points, id, x, z, op)", InteractLocVia},
+            {"interact_ground_item(item, op)", InteractGroundItem},
+            {"take_ground_item(item)", TakeGroundItem},
+            {"item_op(item, op)", ItemOp},
+            {"inv_button(item, op)", InvButton},
+            {"drop_item(item)", DropItem},
+            {"move_item(com, from_slot, to_slot)", MoveItem},
+            {"use_item_on_npc(item, npc)", UseItemOnNpc},
+            {"use_item_on_player(item, player)", UseItemOnPlayer},
+            {"use_item_on_loc(item, id, x, z)", UseItemOnLoc},
+            {"use_item_on_ground_item(item, ground_item)", UseItemOnGroundItem},
+            {"use_item_on_item(item, target)", UseItemOnItem},
+            {"cast_on_npc(spell, npc)", CastOnNpc},
+            {"cast_on_player(spell, player)", CastOnPlayer},
+            {"cast_on_loc(spell, id, x, z)", CastOnLoc},
+            {"cast_on_ground_item(spell, ground_item)", CastOnGroundItem},
+            {"cast_on_item(spell, item)", CastOnItem},
+            {"click_button(com)", ClickButton},
+            {"continue_dialogue()", ContinueDialogue},
+            {"answer_count(value)", AnswerCount},
+            {"close_interfaces()", CloseInterfaces},
+            {"set_run(run)", SetRun},
+            {"say(text)", Say},
+            {"send_pm(name, text)", SendPm},
+            {"command(text)", Command},
+            {"add_friend(name)", CallWithName<&ScriptApi::AddFriend>},
+            {"remove_friend(name)", CallWithName<&ScriptApi::RemoveFriend>},
+            {"add_ignore(name)", CallWithName<&ScriptApi::AddIgnore>},
+            {"remove_ignore(name)", CallWithName<&ScriptApi::RemoveIgnore>},
+        };
+    }
+}
+
+void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
+{
+    const auto slot = static_cast<std::size_t>(vm.GetSlot());
+    assert(boundApis[slot] == nullptr && "The VM already has a ScriptApi bound");
+    boundApis[slot] = &api;
+
+    try
+    {
+        const auto builtins = vm.GetBuiltins();
+        for (const auto& constant : CONSTANTS)
+        {
+            auto value = py_TValue{};
+            py_newint(&value, constant.value);
+            py_setdict(builtins, py_name(constant.name), &value);
+        }
+
+        for (const auto& function : GetFunctions())
+        {
+            py_bind(builtins, function.signature.c_str(), function.function);
+        }
+
+        vm.RunSource(PRELUDE, "<prelude>", builtins);
+    }
+    catch (const std::exception&)
+    {
+        Unbind(vm);
+        throw;
+    }
+}
+
+void ScriptBindings::Unbind(const ScriptVm& vm) noexcept
+{
+    boundApis[static_cast<std::size_t>(vm.GetSlot())] = nullptr;
+}
+
+void ScriptBindings::SetSettings(ScriptVm& vm, std::string_view settingsJson)
+{
+    const auto builtins = vm.GetBuiltins();
+    PyConvert::FromString(py_r0(), settingsJson);
+    py_setdict(builtins, py_name(SETTINGS_JSON), py_r0());
+    vm.RunSource(LOAD_SETTINGS, "<settings>", builtins);
+}

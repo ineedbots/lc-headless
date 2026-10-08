@@ -9,10 +9,9 @@
 
 namespace
 {
-    using Clock = std::chrono::steady_clock;
-
     constexpr auto SEED_HEADER_SIZE = std::size_t{8};
     constexpr auto SERVER_SEED_SIZE = std::size_t{8};
+    constexpr auto LOGIN_DETAILS_SIZE = std::size_t{2};
     constexpr auto RSA_MARKER = 10;
     constexpr auto CLIENT_UID = 1337;
     constexpr auto REVISION_MARKER = 0xFF;
@@ -22,62 +21,138 @@ namespace
     constexpr auto MAX_BODY_SIZE = std::size_t{255};
     constexpr auto WORD_BITS = 32;
 
-    std::vector<u8> Receive(WebSocketClient& socket, std::size_t count, Clock::time_point deadline, std::string_view what)
-    {
-        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
-        if (!socket.WaitAvailable(count, std::max(remaining, 0ms)))
-        {
-            throw std::runtime_error{std::format("Login timed out waiting for the {}", what)};
-        }
-
-        auto bytes = std::vector<u8>(count);
-        socket.Read(bytes);
-        return bytes;
-    }
-
     std::vector<u8> ToVector(std::span<const u8> bytes)
     {
         return {bytes.begin(), bytes.end()};
     }
 }
 
-LoginResult_s LoginHandshake::Run(WebSocketClient& socket, const AccountSettings_s& account, const LoginSettings_s& login, bool reconnect, std::chrono::milliseconds timeout)
+LoginHandshake::LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, bool reconnect)
+    : m_account{account}
+    , m_login{login}
+    , m_reconnect{reconnect}
 {
-    const auto deadline = Clock::now() + timeout;
+}
 
-    socket.Send(BuildSeedRequest(account.username));
-    const auto seedStatus = Receive(socket, SEED_HEADER_SIZE + 1, deadline, "seed response").back();
-    if (seedStatus != STATUS_SEED_OK)
+std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
+{
+    while (true)
     {
-        throw LoginError{seedStatus};
+        switch (m_stage)
+        {
+        case Stage_e::SendSeedRequest:
+            socket.Send(BuildSeedRequest(m_account.username));
+            m_stage = Stage_e::SeedResponse;
+            break;
+        case Stage_e::SeedResponse:
+        {
+            const auto header = TryReceive(socket, SEED_HEADER_SIZE + 1);
+            if (!header)
+            {
+                return std::nullopt;
+            }
+
+            if (header->back() != STATUS_SEED_OK)
+            {
+                throw LoginError{header->back()};
+            }
+
+            m_stage = Stage_e::ServerSeed;
+            break;
+        }
+        case Stage_e::ServerSeed:
+        {
+            const auto serverSeed = TryReceive(socket, SERVER_SEED_SIZE);
+            if (!serverSeed)
+            {
+                return std::nullopt;
+            }
+
+            m_result.seed = MakeSeed(Packet{*serverSeed}.G8());
+            socket.Send(BuildLoginRequest(m_account, m_login, m_result.seed, m_reconnect));
+            m_stage = Stage_e::LoginResponse;
+            break;
+        }
+        case Stage_e::LoginResponse:
+        {
+            const auto response = TryReceive(socket, 1);
+            if (!response)
+            {
+                return std::nullopt;
+            }
+
+            const auto status = response->front();
+            if (status == STATUS_RECONNECTED)
+            {
+                m_result.reconnected = true;
+                m_stage = Stage_e::Done;
+                return m_result;
+            }
+
+            if (status == STATUS_LOGGED_IN)
+            {
+                m_stage = Stage_e::LoginDetails;
+                break;
+            }
+
+            if (status == STATUS_HOP_TIMER)
+            {
+                m_stage = Stage_e::HopTimer;
+                break;
+            }
+
+            throw LoginError{status};
+        }
+        case Stage_e::LoginDetails:
+        {
+            const auto details = TryReceive(socket, LOGIN_DETAILS_SIZE);
+            if (!details)
+            {
+                return std::nullopt;
+            }
+
+            m_result.staffLevel = (*details)[0];
+            m_result.mouseTracking = (*details)[1] == 1;
+            m_stage = Stage_e::Done;
+            return m_result;
+        }
+        case Stage_e::HopTimer:
+        {
+            const auto seconds = TryReceive(socket, 1);
+            if (!seconds)
+            {
+                return std::nullopt;
+            }
+
+            throw LoginError{STATUS_HOP_TIMER, std::format("{} seconds left", seconds->front())};
+        }
+        case Stage_e::Done:
+            return m_result;
+        }
+    }
+}
+
+std::string_view LoginHandshake::GetWaitingFor() const
+{
+    switch (m_stage)
+    {
+    case Stage_e::SendSeedRequest:
+    case Stage_e::SeedResponse:
+        return "seed response";
+    case Stage_e::ServerSeed:
+        return "server seed";
+    case Stage_e::LoginResponse:
+        return "login response";
+    case Stage_e::LoginDetails:
+        return "staff level and mouse tracking flag";
+    case Stage_e::HopTimer:
+        return "hop timer";
+    case Stage_e::Done:
+        return "nothing";
     }
 
-    const auto serverSeedBytes = Receive(socket, SERVER_SEED_SIZE, deadline, "server seed");
-    auto result = LoginResult_s{.seed = MakeSeed(Packet{serverSeedBytes}.G8())};
-
-    socket.Send(BuildLoginRequest(account, login, result.seed, reconnect));
-    const auto status = Receive(socket, 1, deadline, "login response").front();
-    if (status == STATUS_LOGGED_IN)
-    {
-        const auto details = Receive(socket, 2, deadline, "staff level and mouse tracking flag");
-        result.staffLevel = details[0];
-        result.mouseTracking = details[1] == 1;
-        return result;
-    }
-
-    if (status == STATUS_RECONNECTED)
-    {
-        result.reconnected = true;
-        return result;
-    }
-
-    if (status == STATUS_HOP_TIMER)
-    {
-        const auto seconds = Receive(socket, 1, deadline, "hop timer").front();
-        throw LoginError{status, std::format("{} seconds left", seconds)};
-    }
-
-    throw LoginError{status};
+    assert(false && "Unhandled login stage");
+    return "login";
 }
 
 std::vector<u8> LoginHandshake::BuildSeedRequest(std::string_view username)
@@ -146,4 +221,16 @@ std::array<s32, LoginResult_s::SEED_SIZE> LoginHandshake::GetInboundSeed(std::sp
     }
 
     return inbound;
+}
+
+std::optional<std::vector<u8>> LoginHandshake::TryReceive(WebSocketClient& socket, std::size_t count)
+{
+    if (socket.Available() < count)
+    {
+        return std::nullopt;
+    }
+
+    auto bytes = std::vector<u8>(count);
+    socket.Read(bytes);
+    return bytes;
 }

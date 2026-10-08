@@ -65,7 +65,7 @@ LogLevel_e Logger::GetLevel() const noexcept
 
 bool Logger::IsEnabled(LogLevel_e level) const noexcept
 {
-    return level >= GetLevel();
+    return level >= GetLevel() && (m_parent == nullptr || m_parent->IsEnabled(level));
 }
 
 Logger::Sink Logger::SetSink(Sink sink) noexcept
@@ -73,6 +73,20 @@ Logger::Sink Logger::SetSink(Sink sink) noexcept
     const auto lock = std::scoped_lock{m_mutex};
     m_sink.swap(sink);
     return sink;
+}
+
+const std::string& Logger::GetSource() const noexcept
+{
+    return m_source;
+}
+
+std::shared_ptr<Logger> Logger::CreateNamed(std::shared_ptr<Logger> parent, std::string source)
+{
+    assert(parent && "A named logger needs a parent");
+    auto named = std::make_shared<Logger>(LogLevel_e::Verbose, nullptr);
+    named->m_parent = std::move(parent);
+    named->m_source = std::move(source);
+    return named;
 }
 
 std::shared_ptr<Logger> Logger::GetDefault() noexcept
@@ -105,7 +119,13 @@ void Logger::WriteToConsole(const LogEntry_s& entry)
 std::string Logger::FormatLine(const LogEntry_s& entry)
 {
     const auto time = std::chrono::floor<std::chrono::milliseconds>(entry.time);
-    auto line = std::format("{:%FT%T}Z {:<7} {}", time, GetLevelName(entry.level), entry.message);
+    auto line = std::format("{:%FT%T}Z {:<7} ", time, GetLevelName(entry.level));
+    if (!entry.source.empty())
+    {
+        std::format_to(std::back_inserter(line), "[{}] ", entry.source);
+    }
+
+    line += entry.message;
     if (entry.location)
     {
         std::format_to(std::back_inserter(line), " [{}:{}]", GetFileName(entry.location->file_name()), entry.location->line());
@@ -116,6 +136,17 @@ std::string Logger::FormatLine(const LogEntry_s& entry)
 
 void Logger::Write(LogLevel_e level, std::optional<std::source_location> location, std::string_view message)
 {
+    Deliver(level, location, message, m_source);
+}
+
+void Logger::Deliver(LogLevel_e level, std::optional<std::source_location> location, std::string_view message, std::string_view source)
+{
+    if (m_parent)
+    {
+        m_parent->Deliver(level, location, message, source);
+        return;
+    }
+
     const auto lock = std::scoped_lock{m_mutex};
     if (!m_sink)
     {
@@ -123,5 +154,5 @@ void Logger::Write(LogLevel_e level, std::optional<std::source_location> locatio
     }
 
     // The time is read under the lock, so times in the output only go backwards if the wall clock does.
-    m_sink(LogEntry_s{.level = level, .time = std::chrono::system_clock::now(), .location = location, .message = message});
+    m_sink(LogEntry_s{.level = level, .time = std::chrono::system_clock::now(), .location = location, .message = message, .source = source});
 }

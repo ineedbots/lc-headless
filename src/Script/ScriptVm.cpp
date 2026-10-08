@@ -104,14 +104,14 @@ void ScriptVm::RunFile(const std::filesystem::path& relativePath)
     RunSource(*source, relativePath.generic_string());
 }
 
-void ScriptVm::RunSource(std::string_view source, std::string_view filename)
+void ScriptVm::RunSource(std::string_view source, std::string_view filename, py_GlobalRef module)
 {
     Activate();
     const auto sourceText = std::string{source};
     const auto filenameText = std::string{filename};
-    RunGuarded([&sourceText, &filenameText]
+    RunGuarded([&sourceText, &filenameText, module]
     {
-        return py_exec(sourceText.c_str(), filenameText.c_str(), EXEC_MODE, nullptr);
+        return py_exec(sourceText.c_str(), filenameText.c_str(), EXEC_MODE, module);
     });
 }
 

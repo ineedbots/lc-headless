@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../DefaultLoggerScope.hpp"
 #include "../LogCapture.hpp"
+#include "../LoopbackPort.hpp"
 
 #include "Core/Logger.hpp"
 #include "Io/NetSystem.hpp"
@@ -26,6 +27,9 @@ namespace
 
     constexpr auto FIRST_PORT = 47000;
     constexpr auto LAST_PORT = 47099;
+    // No test server listens in this range, so a free port here stays unused while a test relies on it.
+    constexpr auto FIRST_UNUSED_PORT = 47900;
+    constexpr auto LAST_UNUSED_PORT = 47999;
     constexpr auto LOOPBACK_HOST = "127.0.0.1";
     constexpr auto WAIT = 5s;
     constexpr auto AT_ONCE = 50ms;
@@ -87,6 +91,11 @@ namespace
     {
         for (auto port = FIRST_PORT; port <= LAST_PORT; ++port)
         {
+            if (!LoopbackPort::IsFree(port))
+            {
+                continue;
+            }
+
             auto server = create(port);
             if (!server->listen().first)
             {
@@ -345,8 +354,15 @@ namespace
 
     std::string GetUnusedUrl()
     {
-        const auto server = LoopbackServer{};
-        return server.Url();
+        for (auto port = FIRST_UNUSED_PORT; port <= LAST_UNUSED_PORT; ++port)
+        {
+            if (LoopbackPort::IsFree(port))
+            {
+                return GetUrl(port);
+            }
+        }
+
+        throw std::runtime_error{"No unused port for a refused connection"};
     }
 
     void CheckEcho(WebSocketClient& client, std::vector<u8> bytes)

@@ -2,6 +2,7 @@
 #include "../LogCapture.hpp"
 #include "FakeGameServer.hpp"
 #include "Fixtures.hpp"
+#include "TestWorld.hpp"
 
 #include "Core/ConfigFile.hpp"
 #include "Core/Logger.hpp"
@@ -23,44 +24,16 @@ namespace
 
     constexpr auto WAIT = 5s;
     constexpr auto PUMP_STEP = 20ms;
-    constexpr auto NPC_INDEX = u16{100};
-    constexpr auto NPC_TYPE = u16{50};
-    constexpr auto INVENTORY = u16{3214};
+    constexpr auto NPC_INDEX = TestWorld::NPC_INDEX;
+    constexpr auto INVENTORY = TestWorld::INVENTORY;
 
     GameClientOptions_s FastOptions()
     {
         return {
-            .reconnectDelay = 50ms,
+            .retryDelay = 50ms,
             .loginTimeout = 5s,
             .keepaliveInterval = 50ms,
         };
-    }
-
-    void SendWorld(FakeGameServer& server, bool reconnect)
-    {
-        server.Send(ServerProt_e::RebuildNormal, Fixtures::Rebuild());
-        if (!reconnect)
-        {
-            server.Send(ServerProt_e::UpdatePid, Fixtures::UpdatePid());
-        }
-
-        server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL, 0, Fixtures::Appearance(FakeGameServer::USERNAME)));
-        if (reconnect)
-        {
-            return;
-        }
-
-        server.Send(ServerProt_e::NpcInfo, Fixtures::AddNpc(NPC_INDEX, NPC_TYPE, 2, 0));
-        server.Send(ServerProt_e::UpdateZoneFullFollows, Fixtures::Zone(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL));
-        server.Send(ServerProt_e::ObjAdd, Fixtures::ObjAdd(0x11, 995, 10));
-
-        auto inventory = Packet{};
-        inventory.P2(INVENTORY);
-        inventory.P2(1);
-        inventory.P2(1512);
-        inventory.P1(3);
-        server.Send(ServerProt_e::UpdateInvFull, Fixtures::ToBytes(inventory));
-        server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("Welcome to RuneScape."));
     }
 
     template <typename TCondition>
@@ -88,8 +61,8 @@ namespace
 TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
 {
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{SendWorld};
-    auto client = GameClient{MakeConfig(server), capture.GetLogger(), FastOptions()};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
     REQUIRE(client.IsInGame());
@@ -164,8 +137,8 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
 TEST_CASE("GameClient reconnects when the connection drops", "[GameClient]")
 {
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{SendWorld};
-    auto client = GameClient{MakeConfig(server), capture.GetLogger(), FastOptions()};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
     REQUIRE(PumpUntil(client, [&client]
@@ -197,7 +170,7 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{};
     server.SetLoginStatus(3);
-    auto client = GameClient{MakeConfig(server), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     try
     {
@@ -216,8 +189,8 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
 TEST_CASE("GameClient ends the session when the server logs it out", "[GameClient]")
 {
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{SendWorld};
-    auto client = GameClient{MakeConfig(server), capture.GetLogger(), FastOptions()};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
     REQUIRE(PumpUntil(client, [&client]
@@ -232,4 +205,117 @@ TEST_CASE("GameClient ends the session when the server logs it out", "[GameClien
     }));
 
     CHECK_FALSE(client.IsInGame());
+}
+
+TEST_CASE("GameClient reconnects without making Pump wait", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto options = FastOptions();
+    options.loginTimeout = 300ms;
+    options.retryDelay = 100ms;
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+
+    client.Login();
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.GetState().placed;
+    }));
+
+    // The first reconnect attempt meets a stalled server and times out; the next one gets through.
+    server.SetLoginStatus(15);
+    server.SetStalled(true);
+    server.Close();
+
+    auto longestPump = 0ms;
+    const auto deadline = Clock::now() + WAIT;
+    auto unstalled = false;
+    while (Clock::now() < deadline && client.GetLoginCount() < 2)
+    {
+        const auto start = Clock::now();
+        client.Pump();
+        longestPump = std::max(longestPump, std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start));
+        if (!unstalled && client.GetStatus() == ClientStatus_e::Connecting && capture.GetEntries().back().message.starts_with("Trying again"))
+        {
+            server.SetStalled(false);
+            unstalled = true;
+        }
+
+        std::this_thread::sleep_for(5ms);
+    }
+
+    REQUIRE(client.GetLoginCount() == 2);
+    CHECK(client.IsInGame());
+    CHECK(unstalled);
+    CHECK(longestPump < 100ms);
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 18});
+}
+
+TEST_CASE("GameClient clicks logout again until the server agrees", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.GetState().placed;
+    }));
+
+    server.SetIgnoreLogout(true);
+
+    SECTION("a later click is answered")
+    {
+        client.RequestLogout(WAIT);
+        CHECK(client.GetStatus() == ClientStatus_e::LoggingOut);
+        REQUIRE(PumpUntil(client, [&server]
+        {
+            return server.GetPackets(ClientProt_e::IfButton).size() >= 2;
+        }));
+
+        server.SetIgnoreLogout(false);
+        REQUIRE(PumpUntil(client, [&client]
+        {
+            return client.GetStatus() == ClientStatus_e::LoggedOut;
+        }));
+
+        CHECK(server.GetPackets(ClientProt_e::IfButton).size() == 3);
+    }
+
+    SECTION("the connection closes when the deadline passes")
+    {
+        client.Logout(300ms);
+        CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+        CHECK(std::ranges::any_of(capture.GetEntries(), [](const CapturedLog_s& entry)
+        {
+            return entry.level == LogLevel_e::Warning && entry.message.find("didn't confirm the logout") != std::string::npos;
+        }));
+    }
+}
+
+TEST_CASE("GameClient retries a login the server can't take yet", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send};
+    server.SetLoginStatus(5);
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+
+    client.BeginLogin();
+    REQUIRE(PumpUntil(client, [&capture]
+    {
+        return std::ranges::any_of(capture.GetEntries(), [](const CapturedLog_s& entry)
+        {
+            return entry.message.starts_with("Login attempt 1 of") && entry.message.find("already logged in") != std::string::npos;
+        });
+    }));
+
+    CHECK(client.GetStatus() == ClientStatus_e::Connecting);
+    server.SetLoginStatus(2);
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.IsInGame();
+    }));
+
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 16});
+    CHECK(client.GetLoginCount() == 1);
 }

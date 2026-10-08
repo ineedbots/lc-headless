@@ -1,0 +1,26 @@
+// One account per file in this folder, named <anything>.jsonc. Copy this file to start one.
+// The file name (without .jsonc) is the account's name in log lines.
+{
+    "username": "myuser",
+    "password": "mypass",
+
+    // false to keep the file without running it.
+    "enabled": true,
+
+    // Uncomment to log this account into a different world than client.jsonc's server.
+    // "server": {"url": "wss://w2.example.com:443", "origin": "https://w2.example.com"},
+
+    // Leave "script" out to log in and idle, which logs a summary of the area every 10 seconds.
+    "script": {
+        // Relative to scripting.scriptsDirectory in client.jsonc.
+        "file": "examples/chicken_killer.py",
+
+        // Anything here reaches the script as its settings object: settings.loot_goal,
+        // settings.get("teleport"), and so on. Keys are used as written.
+        "settings": {
+            "npc_ids": [41],
+            "loot_ids": [526],
+            "loot_goal": 3
+        }
+    }
+}

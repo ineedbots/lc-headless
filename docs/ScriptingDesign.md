@@ -22,13 +22,14 @@ Reference sources:
 | Threads | One. pocketpy's current VM is process-global and switched with `py_switchvm`, so every call into Python switches to that account's VM first. `PK_ENABLE_THREADS` stays off |
 | Accounts | Several per process, one VM each. pocketpy has 16 VM slots, so one process runs at most 16 accounts; more accounts means more processes |
 | API location | Each VM's `builtins` module. Helper modules a script imports then see the API too, without plutonium's re-injection into every submodule |
-| Values | Query functions return copies wrapped in read-only Python objects (`Npc`, `Player`, `GroundItem`, `Loc`, `Item`). An object is a snapshot that stays valid after the entity is gone; actions look the entity up again by index |
+| Values | Query functions return copies as Python objects (`Npc`, `Player`, `GroundItem`, `Loc`, `Item`). The classes are defined by a short Python prelude that runs in each VM's `builtins`, and `PyConvert` creates instances with their fields set as attributes, so methods such as `in_combat()` are plain Python. An object is a snapshot that stays valid after the entity is gone; actions look the entity up again by index |
 | Actions | Return `True` when packets were queued, and `False` when the target is no longer tracked. Bad arguments (a wrong type, an option outside 1–5) raise `TypeError` or `ValueError` |
 | Events | Decoders append typed events to a log in `GameState_s`, numbered like `messages`. After each pump, the script host dispatches the ones it hasn't seen yet |
 | Runaway scripts | Each call into Python runs under pocketpy's watchdog (`scripting.callTimeoutMs`, 1000 ms by default). Overrunning raises `TimeoutError` in the script, which counts as a script error. `time.sleep` is replaced with a function that raises, because it would stall every account |
 | Script errors | An uncaught exception in `loop()` or a hook, or a non-integer return from `loop()`, logs the traceback, stops that account's script and logs that account out. Other accounts carry on |
-| Shutdown | The first Ctrl+C calls `on_kill_signal()` on each script that defines it, and logs the others out. A script with the hook keeps running until it calls `stop_account()` or `scripting.killGraceSeconds` runs out. A second Ctrl+C logs everyone out at once |
-| Config | `client.jsonc` keeps the process-wide settings and gains a `scripting` section. Accounts move to `accounts/*.jsonc`, one file per account, holding the credentials, the script and its settings. This is a breaking change: the `account` section leaves `client.jsonc` |
+| Shutdown | The first Ctrl+C calls `on_kill_signal()` on each script that defines it, and logs the others out. A script with the hook keeps running until it calls `stop_account()` or `scripting.killGraceSeconds` runs out. A second Ctrl+C logs everyone out at once, and one during a logout that the server is still refusing closes that connection without waiting. Accounts whose login hasn't started yet never start |
+| Config | `client.jsonc` keeps the process-wide settings and gains a `scripting` section. Accounts move to `accounts/*.jsonc`, one file per account, holding the credentials, the script and its settings. This is a breaking change: the `account` section leaves `client.jsonc`, and a config that still has one gets a warning saying where it went. `ConfigFile` parses account files too (`LoadAccount`, `ParseAccount`), so they share its comment handling, error paths and rule that no message quotes a value |
+| Logout | `GameClient::Logout` clicks the logout button again every 2 s until the server agrees, because the server refuses a logout during combat and for 10 s after it. Accounts allow 30 s |
 | Settings | An account file's `script.settings` object becomes the `settings` global, read by attribute (`settings.npc_ids`). Its keys are passed through unchanged, so script authors write them in Python's snake_case |
 | Imports | Host-controlled through pocketpy's `importfile` callback: `import x` loads `scripts/x.py`, then `scripts/lib/x.py`. Nothing else is searched |
 | Output | `log()`, `debug()` and `print` go to the account's logger, whose lines carry the account name |
@@ -57,10 +58,11 @@ rs2004-headless/
 ├── ports/pocketpy/                 overlay port: vcpkg.json, portfile.cmake, CMakeLists.txt, usage
 ├── accounts/
 │   └── example.jsonc.sample        committed; real account files are git-ignored
+├── pyrightconfig.json              points Pylance and Pyright at scripts/typings
 ├── scripts/
-│   ├── __builtins__.pyi            API declarations for editors
+│   ├── typings/__builtins__.pyi    API declarations for editors
 │   ├── lib/                        shared helper modules
-│   └── examples/                   idle.py, walker.py, chicken_killer.py, ...
+│   └── examples/                   walker.py, chicken_killer.py
 ├── docs/
 │   ├── ScriptingDesign.md          this file
 │   └── ScriptingApi.md             the script author's reference, like plutonium's API.md
@@ -69,25 +71,25 @@ rs2004-headless/
 │   │   ├── ScriptRuntime.hpp/.cpp  py_initialize/py_finalize, the 16 VM slots, the import and print callbacks
 │   │   ├── ScriptVm.hpp/.cpp       owns one VM slot: run a module, call a function under the watchdog
 │   │   ├── ScriptError.hpp         a script failed: compile error, exception, timeout, bad return
-│   │   ├── PyConvert.hpp/.cpp      static: JSON to Python, C++ values to Python, argument parsing
-│   │   ├── ScriptTypes.hpp/.cpp    registers Npc, Player, GroundItem, Loc and Item in a VM
+│   │   ├── PyConvert.hpp/.cpp      static: C++ values to Python objects, and argument parsing
 │   │   ├── ScriptApi.hpp/.cpp      binding-neutral queries and actions over GameState_s and GameActions
-│   │   ├── ScriptBindings.hpp/.cpp static: binds ScriptApi into a VM's builtins
+│   │   ├── ScriptBindings.hpp/.cpp static: the prelude, constants and functions in a VM's builtins
 │   │   └── ScriptHost.hpp/.cpp     one account's script: load, schedule loop(), dispatch events, handle errors
+│   ├── Core/ConfigFile.hpp/.cpp    also loads and validates accounts/*.jsonc
 │   ├── Accounts/
-│   │   ├── AccountFile.hpp/.cpp    static: loads and validates accounts/*.jsonc
-│   │   ├── Account.hpp/.cpp        GameClient + GameActions + ScriptHost + named logger, and its lifecycle
+│   │   ├── Account.hpp/.cpp        GameClient + ScriptHost + named logger, and its lifecycle
 │   │   └── AccountRunner.hpp/.cpp  the main loop over every account, and Ctrl+C
 │   └── Game/State/
 │       └── GameEvent_s.hpp         new: the event variant
 └── tests/
-    ├── Script/                     runtime, conversion, bindings and host tests
-    └── Accounts/                   account file and runner tests
+    ├── Game/TestWorld.hpp/.cpp     the world the fake server sends on login, shared by client, host and account tests
+    ├── Script/                     runtime, API, bindings and host tests, and a check that the examples load
+    └── Accounts/                   account and runner tests
 ```
 
 - `ScriptApi` holds all game logic the API needs, such as nearest-NPC filters and inventory counts, in plain C++. `ScriptBindings` only converts arguments and results. A later control server or another language binds the same `ScriptApi`.
 - Each `py_CFunction` thunk catches every C++ exception and turns it into a Python exception. A C++ exception must never unwind through pocketpy's C frames.
-- A thunk finds its account through `py_getvmctx()`, which `ScriptHost` sets to itself when it takes the slot.
+- A thunk finds its `ScriptApi` in a table indexed by the current VM slot, which `ScriptBindings::Bind` fills and `Unbind` clears. `py_getvmctx()` holds the `ScriptVm`, for the print and import callbacks.
 
 ---
 
@@ -107,7 +109,7 @@ rs2004-headless/
 2. `py_callbacks()`: `importfile` resolves inside `scripts/` and `scripts/lib/` only, packages included; `print` and `flush` write to the account's logger, one line per log entry.
 3. Bind `log(*args)` (Info) and `debug(*args)` (Verbose) into `builtins`.
 4. Replace `time.sleep` with a function that raises `RuntimeError`, telling the script to return a delay from `loop()` instead.
-5. Register the classes (`ScriptTypes`), then bind the API and constants into `builtins` (`ScriptBindings`).
+5. Bind the constants and the API functions into `builtins`, then run the prelude there, which defines the classes (`ScriptBindings`).
 6. Set `settings` in `builtins` from the account file.
 7. Execute the script as module `__main__`. A compile error, or an exception at module level, fails the account before it logs in.
 8. Look up `loop` (required) and every `on_*` hook the script defines (optional).
@@ -280,7 +282,7 @@ The initial surface. Names follow plutonium wherever 2004 has the same concept; 
 | Chat | `say(text)`, `send_pm(name, text)`, `command(text)`, `add_friend(name)`, `remove_friend(name)`, `add_ignore(name)`, `remove_ignore(name)` |
 | Control | `log(*args)`, `debug(*args)`, `stop_script()`, `stop_account()` |
 
-The option numbers behind the conveniences (`attack_npc` is op 2, `take_ground_item` op 3, `drop_item` op 5) and the component constants (`INVENTORY`, `EQUIPMENT`) are the usual 2004 values. They get checked against the engine's configs in Phase 3, before they're documented.
+The option numbers behind the conveniences and the component constants were checked against the engine in `289server/content`: `[opnpc2,_]` starts player combat, `[opobj3,...]` and `[opheld5,...]` handlers override take and drop, and `interface.pack` gives `inventory:inv` 3214, `wornitems:wear` 1688, `bank_main:inv` 5382, `bank_side:inv` 2006 and `controls:com_4`/`com_5` 152/153 for run off and on (varp 173 `option_run`). The engine's stat order is 0 to 17 as listed, then 20 for Runecraft.
 
 ### Constants
 
@@ -332,14 +334,18 @@ The `account` section moves out. A new `scripting` section is added:
 }
 ```
 
-- `AccountFile` loads it with the same nlohmann setup as `ConfigFile`, so it has the same comment support, error paths and no secrets in messages.
+- `ConfigFile::LoadAccount` reads it with the same nlohmann setup as `client.jsonc`, so it has the same comment support, error paths and no secrets in messages. The account's name is the file name without `.jsonc`.
 - A missing `script`, or an empty `file`, means the account just idles and logs a state summary every 10 s. That's today's smoke test.
-- `settings` may be any JSON object. `PyConvert` turns objects into `dict`s with string keys, arrays into `list`s, and keeps the scalars as they are. The top-level object becomes the attribute-access `settings` global.
+- `settings` may be any JSON object. It travels as JSON text, and the prelude's `json.loads` turns it into a `Settings` object with each key as an attribute, plus `get()` and `in`.
 - `accounts/*.jsonc` is git-ignored; `accounts/example.jsonc.sample` is committed.
 
 ### Command line
 
-`rs2004-headless [client.jsonc] [--account accounts/test.jsonc]`. Without `--account`, every enabled file in `accountsDirectory` runs.
+`rs2004-headless [client.jsonc] [--account accounts/test.jsonc]`. Without `--account`, every enabled file in `accountsDirectory` runs. Two files with the same username (ignoring case) are refused before any login, since the server would only kick one of them.
+
+### Another world
+
+An account file can carry its own `server` section, with the same keys as `client.jsonc`'s, to log that account into a different world. The rest of `client.jsonc` still applies.
 
 ---
 
@@ -356,13 +362,16 @@ until every account has finished:
     wait min(pollIntervalMs, time until the earliest loop() is due)
 ```
 
-Today `GameClient::Login`, `Reconnect` and `Logout(timeout)` block: the handshake can wait up to `loginTimeout`, and a reconnect can retry several times. With one loop, that would stall every other account's scripts and keepalives. Phase 4 changes `GameClient` so that:
+`GameClient` doesn't wait unless its caller lets it:
 
-- `BeginLogin()` starts the connection and returns. A new `ClientStatus_e::Connecting` covers the handshake, which `Pump` advances as bytes arrive. `LoginHandshake` becomes a step-wise state machine with the same messages and errors.
-- Reconnect attempts are scheduled and advanced from `Pump` the same way, with no sleeping.
-- `RequestLogout()` clicks the logout button and returns. `Pump` finishes the logout, and a deadline disconnects if the server never confirms.
-- `GetLoginCount()` rises on each successful login, so the host can tell a reconnect happened.
-- The blocking `Login()` and `Logout(timeout)` stay as wrappers that pump until done. The tests and single-account tools keep working unchanged.
+- `BeginLogin()` opens the connection and returns. `ClientStatus_e::Connecting` covers the handshake, which `Pump` advances as bytes arrive. `LoginHandshake` is a step machine with an `Advance` method that sends each request when its turn comes and reads each response once it has all arrived. A refusal is read even when the server closes the connection straight after it, so the error names the status rather than the close.
+- A dropped connection starts a reconnect from `Pump`. A login that fails with a retryable status (such as 5, "already logged in", after a crash) or a connection error is retried the same way. There are up to `connectAttempts` (10) attempts. The waits between them double from `retryDelay` (2 s) up to `maxRetryDelay` (30 s), roughly four minutes in all, enough for a server restart. Wrong credentials and other final statuses fail at once. A reconnect that gives up throws `ConnectionLostError`, and a login that gives up rethrows its last error.
+- `RequestLogout()` clicks the logout button and returns. `Pump` clicks it again every 2 s, because the server refuses during combat and for 10 s after it, and disconnects at the deadline (30 s for accounts) if the server never agrees. A logout requested while connecting abandons the login.
+- IXWebSocket waits up to about 300 ms for a peer's reply when an open connection closes. So `Disconnect` sets the closing socket aside and starts any next attempt on a fresh one, and later pumps free closed sockets once they report `Closed`. Without this, a login timing out against a stalled server stalled every account for 300 ms.
+- `GetLoginCount()` rises on each successful login or reconnect, so the host can tell a reconnect happened. `on_reconnect` waits until the player is placed again, because a reconnect after a restart becomes a fresh login that resets the state.
+- The blocking `Login()` and `Logout(timeout)` remain as wrappers that pump until done, for the tests and single-account tools.
+
+`Account::Step` never throws: a failed login, a connection that can't be restored or a desync logs an error and finishes that account as failed, and the others carry on. `AccountRunner::Run` returns true only when every account that started logged out cleanly, which `Application` turns into the exit code.
 
 The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared wake signal across all sockets can replace it later if it ever matters.
 
@@ -375,9 +384,15 @@ The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared
 | `GameState_s`, decoders | The event log (§5); `Stat_s` moves to `Stat_s.hpp` | 2 |
 | `Logger` | An optional name shown on each line, for per-account loggers that share one sink | 3 |
 | `ConfigFile`, `ConfigDesign.md` | Remove `account`, add `scripting` | 3 |
-| `Application` | Builds `ScriptRuntime` and `AccountRunner`; the smoke-test summary moves into `Account` | 3 |
-| `GameClient`, `LoginHandshake` | Non-blocking login, reconnect and logout (§8) | 4 |
+| `Application`, `main` | Builds `ScriptRuntime` and an `AccountRunner` over every enabled account, or the one named by `--account`; the smoke-test summary moves into `Account` | 3, 4 |
+| `GameClient` | Takes the account's credentials as a constructor argument; `GetLoginCount()`; the logout button is clicked again every 2 s until the server agrees | 3 |
+| `GameClient`, `LoginHandshake` | Non-blocking login, reconnect and logout, retried logins, and sockets closed without waiting (§8). `reconnectAttempts` and `reconnectDelay` became `connectAttempts`, `retryDelay` and `maxRetryDelay` | 4 |
+| `ServerPacketDecoder`, `GameState_s` | A walk ends when the player hasn't moved for three ticks after the request (`walkRequestTick`), because the engine sends `UNSET_MAP_FLAG` only for a walk that moved. Before this, a walk blocked at its first step left `is_moving()` true for good | 4 |
+| `ConfigFile` | An account file's optional `server` section | 4 |
 | `.gitignore` | `accounts/*.jsonc` | 3 |
+| Tests | `TempFolder` and `TestWorld` became shared helpers; `LogCapture` records each entry's logger name | 1, 3 |
+| Tests | `LoopbackPort::IsFree` probes a port with an exclusive bind before a test server takes it. IXWebSocket's server sets `SO_REUSEADDR`, which on Windows let two test servers listen on one port, so a client could reach the wrong one. This was also why socket tests failed under `ctest -j`, which now passes | 4 |
+| Tests | `FakeGameServer` can stall a login (`SetStalled`) and ignore logout clicks (`SetIgnoreLogout`). Its mutex is recursive, because IXWebSocket can deliver a Close inside `sendBinary` on the sending thread; with a plain mutex that re-entry threw on an IXWebSocket thread and killed the test process about half the time in Release. `WebSocketClient` doesn't hold its lock while sending, so the client never had this problem | 4 |
 
 ---
 
@@ -448,7 +463,7 @@ Unit tests run without a network. Anything that sends packets uses the existing 
     - Work: `GameEvent_s`, the log in `GameState_s`, and emitting from the decoders.
     - Done when: the event tests pass and the existing 113 tests still pass.
 3. **One scripted account.**
-    - Work: `PyConvert`, `ScriptTypes`, `ScriptApi`, `ScriptBindings`, `ScriptHost`, `AccountFile`, `Account`, the config changes, the named logger, the example scripts, `__builtins__.pyi` and `ScriptingApi.md`. It also covers checking the option numbers and component IDs against the engine.
+    - Work: `PyConvert`, `ScriptApi`, `ScriptBindings`, `ScriptHost`, `Account`, the config changes, the named logger, the example scripts, `__builtins__.pyi` and `ScriptingApi.md`. It also covers checking the option numbers and component IDs against the engine.
     - Done when: `--account accounts/test.jsonc` runs an example script against the local engine that walks, attacks an NPC and picks up its drop, and a script error logs a traceback and logs out cleanly.
 4. **Many accounts.**
     - Work: `AccountRunner`, the non-blocking `GameClient` (§8), and Ctrl+C with `on_kill_signal`.

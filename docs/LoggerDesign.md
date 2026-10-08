@@ -85,6 +85,8 @@ struct LogEntry_s
     std::chrono::system_clock::time_point time;
     std::optional<std::source_location> location;
     std::string_view message;
+    // The name of the logger that wrote the entry, empty for an unnamed one.
+    std::string_view source;
 };
 
 template <typename... TArgs>
@@ -182,6 +184,11 @@ public:
     [[nodiscard]] bool IsEnabled(LogLevel_e level) const noexcept;
 
     Sink SetSink(Sink sink) noexcept;
+    [[nodiscard]] const std::string& GetSource() const noexcept;
+
+    // A logger whose entries carry `source` and go through `parent`: the parent's level and sink apply,
+    // and the named logger's own level can only narrow them.
+    [[nodiscard]] static std::shared_ptr<Logger> CreateNamed(std::shared_ptr<Logger> parent, std::string source);
 
     [[nodiscard]] static std::shared_ptr<Logger> GetDefault() noexcept;
     static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
@@ -343,7 +350,7 @@ int main()
     - Write failures, such as a closed stdout, are ignored.
     - The message is written as given: UTF-8 (MSVC builds with `/utf-8`), with any embedded newline left in place.
 - **Line format.**
-    - `FormatLine` returns `{time} {level} {message}`, followed by ` [{file}:{line}]` when the entry has a location, and without a newline.
+    - `FormatLine` returns `{time} {level} {message}`, or `{time} {level} [{source}] {message}` for a named logger's entry, followed by ` [{file}:{line}]` when the entry has a location, and without a newline.
     - The time is `entry.time` floored to milliseconds, formatted with `{:%FT%T}` and followed by `Z`: `2026-10-05T18:34:12.345Z`.
     - The level is `VERBOSE`, `INFO`, `WARNING` or `ERROR`, padded to 7 characters, the length of `VERBOSE` and `WARNING`, so the messages line up. `GetLevelName` in the anonymous namespace maps it.
     - The location is `file_name()` after its last `/` or `\`, then the line: `2026-10-05T18:34:12.345Z INFO    WebSocket open [WebSocketClient.cpp:412]`. Compilers report the full path that CMake passed in, and the file name alone is enough because file names match class names. `GetFileName` in the anonymous namespace strips the folders.
@@ -355,6 +362,14 @@ int main()
     - Colours and asynchronous writing.
 
 ---
+
+### Named loggers
+
+Added for scripting ([ScriptingDesign.md](ScriptingDesign.md) Phase 3), where several accounts share one console.
+
+- `CreateNamed(parent, "bot1")` returns a logger that has no sink of its own. Each entry it writes carries `source = "bot1"` and is delivered through the parent, which takes its own lock and calls its own sink, so named loggers can't interleave lines with the parent or with each other.
+- `IsEnabled` on a named logger checks its own level and then the parent's, so changing the parent's level applies to every named logger at once. A named logger starts at `Verbose`, so by default only the parent's level filters. `SetLevel` on the named logger can only narrow that.
+- The parent is kept alive by the named logger's `shared_ptr`, so an account's logger outliving `Application`'s logger is safe.
 
 ## 4. Choosing a level
 

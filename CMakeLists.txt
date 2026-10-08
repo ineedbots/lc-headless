@@ -57,6 +57,8 @@ enable_testing()
 add_executable(${PROJECT_NAME}Tests)
 target_sources(${PROJECT_NAME}Tests PRIVATE ${TEST_SOURCES})
 configure_project_target(${PROJECT_NAME}Tests)
+# The example script tests load the repository's scripts folder.
+target_compile_definitions(${PROJECT_NAME}Tests PRIVATE RS2004_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     ${PROJECT_NAME}Lib
     nlohmann_json::nlohmann_json

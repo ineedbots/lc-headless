@@ -8,6 +8,7 @@ struct CapturedLog_s
     std::chrono::system_clock::time_point time;
     std::optional<std::source_location> location;
     std::string message;
+    std::string source;
 };
 
 class LogCapture

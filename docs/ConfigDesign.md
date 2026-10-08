@@ -98,10 +98,6 @@ rs2004-headless/
         "origin": "https://w1.rs2b2t.com",
         "tlsCaFile": "SYSTEM"
     },
-    "account": {
-        "username": "test",
-        "password": "test"
-    },
     "login": {
         "crcs": ["0x00000000", "0xde5b3345", "0x6026f8fe", "0x07550309", "0x9a13636e", "0xca2717bd", "0x368f1792", "0x1b1fb6b2", "0xa7129379"],
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
@@ -117,11 +113,19 @@ rs2004-headless/
         "logoutComponent": 2458,
         "logLevel": "verbose",
         "idleSeconds": 5
+    },
+    "scripting": {
+        "accountsDirectory": "accounts",
+        "scriptsDirectory": "scripts",
+        "callTimeoutMs": 1000,
+        "pollIntervalMs": 10,
+        "loginIntervalSeconds": 2,
+        "killGraceSeconds": 30
     }
 }
 ```
 
-`tlsCaFile`, `lowMemory`, `revision`, `logoutComponent` and `idleSeconds` hold their defaults here, so this file could leave them out and load the same.
+`tlsCaFile`, `lowMemory`, `revision`, `logoutComponent`, `idleSeconds` and the whole `scripting` section hold their defaults here, so this file could leave them out and load the same. The account that `client.ini` held now goes in its own file (see Account files, below).
 
 ### Generated sample
 
@@ -129,16 +133,13 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 
 ```jsonc
 // Sample config, written because none was found.
-// Set server.url, the account, and the login CRCs and RSA key, then run again.
+// Set server.url and the login CRCs and RSA key, then run again.
+// Each account goes in its own file in scripting.accountsDirectory.
 {
     "server": {
         "url": "",
         "origin": "",
         "tlsCaFile": "SYSTEM"
-    },
-    "account": {
-        "username": "",
-        "password": ""
     },
     "login": {
         "crcs": [
@@ -161,11 +162,19 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
         "logoutComponent": 2458,
         "logLevel": "info",
         "idleSeconds": 5
+    },
+    "scripting": {
+        "accountsDirectory": "accounts",
+        "scriptsDirectory": "scripts",
+        "callTimeoutMs": 1000,
+        "pollIntervalMs": 10,
+        "loginIntervalSeconds": 2,
+        "killGraceSeconds": 30
     }
 }
 ```
 
-- The two comment lines are the fixed `SAMPLE_HEADER` constant. Everything after them is `Serialize(Config_s{})`.
+- The three comment lines are the fixed `SAMPLE_HEADER` constant. Everything after them is `Serialize(Config_s{})`.
 - Every value is its key's default. A file that sets nothing behaves exactly like this one: it fails `Validate`, starting with `server.url`.
 
 ### Keys
@@ -175,8 +184,6 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `server.url` | string | `""` | A URL that `ix::UrlParser` accepts, with the scheme `ws` or `wss`: the check `WebSocketClient::Connect` makes ([WebSocketDesign.md](WebSocketDesign.md) §3, step 1) |
 | `server.origin` | string | `""`: no `Origin` header | Empty, or printable ASCII |
 | `server.tlsCaFile` | string | `"SYSTEM"` | Not empty: a PEM CA bundle path, `SYSTEM` for the platform trust store, or `NONE` for no verification. Only used for `wss` |
-| `account.username` | string | `""` | 1 to 12 printable ASCII characters |
-| `account.password` | string | `""` | 1 to 20 printable ASCII characters |
 | `login.crcs` | array | Nine `"0x00000000"` | Exactly 9 strings, each a number from 0 to `0xFFFFFFFF`. Stored as `s32` with the same 32 bits, the type `Packet::P4` and `Packet::GetCrc` use |
 | `login.rsaModulus` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 1 |
 | `login.rsaExponent` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 0 |
@@ -185,13 +192,19 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `client.logoutComponent` | integer | `2458` | 0 to 65535 |
 | `client.logLevel` | string | `"info"` | `verbose`, `info`, `warning` or `error` |
 | `client.idleSeconds` | integer | `5` | 1 to 300. Stored as `std::chrono::seconds` |
+| `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
+| `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
+| `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run. Stored as `std::chrono::milliseconds` |
+| `scripting.pollIntervalMs` | integer | `10` | 1 to 1000. The longest the main loop waits between passes |
+| `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins |
+| `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
 
-- **Keys that must be set.** The defaults of `server.url`, `account.username`, `account.password`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
+- **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
 - **`login.crcs`** defaults to nine zeros, which are valid numbers, so a file without it loads. A server that checks CRCs then rejects the login, and the login code reports that.
 
 ### Rules
 
-- **Structure.** The top level is an object, and each section present is an object. Any section or key can be left out, and takes its default. Unknown sections and keys are ignored without a warning, so a misspelled key is ignored too, and its member keeps the default.
+- **Structure.** The top level is an object, and each section present is an object. Any section or key can be left out, and takes its default. Unknown sections and keys are ignored without a warning, so a misspelled key is ignored too, and its member keeps the default. The one exception is a leftover `account` section: it isn't read, and a warning says it belongs in an account file now.
 - **Repeated keys.** A key set twice in the same object takes its last value. With alternatives kept as comments, as in the example, forgetting to comment one out means the later line wins.
 - **Types.** Strings, booleans and arrays must have their JSON type, and a key set to `null` is a wrong type. To get a key's default, leave it out.
 - **Integers.** nlohmann converts any JSON number, and a boolean, to an integer member with a `static_cast`:
@@ -203,6 +216,32 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 - **Numbers in strings** are decimal digits, or `0x` or `0X` followed by hex digits in either case. `"0xde5b3345"`, `"0XDE5B3345"` and `"0xDe5B3345"` are the same number. There's no sign, no whitespace and nothing after the digits. This is the rule `BigUInt::Parse` already uses.
 - **Printable ASCII** is `0x20` to `0x7E`, so a username can contain spaces.
 - **Case.** Section names, keys and other string values, such as `"info"` and `"SYSTEM"`, are case-sensitive. Hex numbers are the one exception (above).
+
+### Account files
+
+Each account has its own file in `scripting.accountsDirectory`, read by `ConfigFile::LoadAccount` with the same syntax rules, error paths and secret handling as `client.jsonc`. The file name without `.jsonc` is the account's name. A missing file is an error; no sample is written, and `accounts/example.jsonc.sample` is the template instead. Account files are git-ignored.
+
+```jsonc
+{
+    "username": "bot1",
+    "password": "s3cret-pw",
+    "enabled": true,
+    "script": {
+        "file": "examples/chicken_killer.py",
+        "settings": {"npc_ids": [41], "loot_goal": 3}
+    }
+}
+```
+
+| Key | Type | Default | Rule |
+|---|---|---|---|
+| `username` | string | none | 1 to 12 printable ASCII characters |
+| `password` | string | none | 1 to 20 printable ASCII characters |
+| `enabled` | boolean | `true` | |
+| `server` | object or `null` | none: `client.jsonc`'s | The same keys and rules as `client.jsonc`'s `server` section, with `url` required. Logs this account into another world |
+| `script` | object or `null` | none: the account idles | |
+| `script.file` | string | none | Not empty. Relative to `scripting.scriptsDirectory` |
+| `script.settings` | object | `{}` | Any object. It's kept as JSON text and becomes the script's `settings` ([ScriptingDesign.md](ScriptingDesign.md) §7) |
 
 ---
 
@@ -248,26 +287,60 @@ struct ClientSettings_s
     std::chrono::seconds idleSeconds = 5s;
 };
 
+struct ScriptingSettings_s
+{
+    std::string accountsDirectory = "accounts";
+    std::string scriptsDirectory = "scripts";
+    std::chrono::milliseconds callTimeoutMs = 1000ms;
+    std::chrono::milliseconds pollIntervalMs = 10ms;
+    std::chrono::seconds loginIntervalSeconds = 2s;
+    std::chrono::seconds killGraceSeconds = 30s;
+};
+
 struct Config_s
 {
     ServerSettings_s server;
-    AccountSettings_s account;
     LoginSettings_s login;
     ClientSettings_s client;
+    ScriptingSettings_s scripting;
+};
+
+struct ScriptConfig_s
+{
+    std::string file;
+    // The settings object as JSON text; the script reads it as its settings global.
+    std::string settings = "{}";
+};
+
+// One account file. Without a script, the account logs in and idles.
+struct AccountConfig_s
+{
+    std::string name;
+    AccountSettings_s credentials;
+    bool enabled = true;
+    std::optional<ScriptConfig_s> script;
 };
 
 class ConfigFile
 {
 public:
     static constexpr auto DEFAULT_PATH = "client.jsonc";
+    static constexpr auto ACCOUNT_EXTENSION = ".jsonc";
 
     ConfigFile() = delete;
 
     [[nodiscard]] static Config_s Load(const std::filesystem::path& path, Logger& logger = *Logger::GetDefault());
     [[nodiscard]] static Config_s Parse(std::string_view text, Logger& logger = *Logger::GetDefault());
     [[nodiscard]] static std::string Serialize(const Config_s& config);
+
+    // The account's name is the file's name without its extension.
+    [[nodiscard]] static AccountConfig_s LoadAccount(const std::filesystem::path& path);
+    [[nodiscard]] static AccountConfig_s ParseAccount(std::string_view text, std::string name);
 };
 ```
+
+- `AccountSettings_s` (the username and password) is no longer part of `Config_s`. `GameClient` takes it as a constructor argument, from an `AccountConfig_s`.
+- Account files are only read, and a script's settings can be any object, so `AccountConfig_s` and `ScriptConfig_s` have hand-written `from_json` functions instead of the macro. Neither has a `to_json`, and there's no account sample to serialize.
 
 - The member names are the JSON keys, so renaming a member renames its key.
 - `ServerSettings_s` uses the member names and the `tlsCaFile` default of `WebSocketOptions_s`, so building the options is a member-by-member copy (see Usage).
@@ -460,7 +533,8 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, account, login, client)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
 
     (The comment inside the `nlohmann` namespace is there for this document only.)
@@ -576,6 +650,8 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 ---
 
 ## 6. Test plan
+
+The plan below was written while `client.jsonc` held the account. Since the account moved to its own file ([ScriptingDesign.md](ScriptingDesign.md) Phase 3), its cases have moved with it. The username and password rules, and the checks that no message quotes a credential, now run against `ConfigFile::ParseAccount`, in the `[AccountFile]` cases of `ConfigFileTests.cpp`. Those cases also cover `enabled`, `script`, `script.file`, `script.settings` and `LoadAccount`. The config file's cases cover the `scripting` section's defaults, limits and wrong types instead, and a leftover `account` section's warning. Where the plan below mentions `account.*`, read it as the account file.
 
 ### 6.1 Strategy
 

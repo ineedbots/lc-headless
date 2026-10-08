@@ -32,6 +32,9 @@ namespace
     constexpr auto TRADE_REQUEST_TEXT = "wishes to trade with you."sv;
     constexpr auto DUEL_REQUEST_TEXT = "wishes to duel with you."sv;
     constexpr auto REMOVED_PLAYER_OP = "null"sv;
+    // A walk requested during a tick starts on the next one; a third tick allows for a slow connection.
+    // A player that still isn't moving after that isn't going to.
+    constexpr auto WALK_START_TICKS = u64{3};
 
     constexpr auto HINT_NPC = u8{1};
     constexpr auto HINT_FIRST_TILE = u8{2};
@@ -674,7 +677,16 @@ void ServerPacketDecoder::DecodePlayerInfo(Packet& packet, GameState_s& state)
     packet.SetPos(packet.GetLength());
 
     ZoneDecoder::PruneInactive(state);
-    if (state.walkDestination && state.placed && state.localPlayer.tile == *state.walkDestination)
+    if (!state.walkDestination || !state.placed)
+    {
+        return;
+    }
+
+    // UNSET_MAP_FLAG ends a walk that moved, but a walk blocked from its first step gets nothing, so
+    // standing still once the server has had time to start the walk ends it too.
+    const auto arrived = state.localPlayer.tile == *state.walkDestination;
+    const auto stalled = state.localPlayer.movedTick != state.tick && state.tick >= state.walkRequestTick + WALK_START_TICKS;
+    if (arrived || stalled)
     {
         state.walkDestination.reset();
     }

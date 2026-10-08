@@ -30,5 +30,5 @@ std::vector<CapturedLog_s> LogCapture::GetEntries() const
 void LogCapture::Append(const LogEntry_s& entry)
 {
     const auto lock = std::scoped_lock{m_mutex};
-    m_entries.push_back({.level = entry.level, .time = entry.time, .location = entry.location, .message = std::string{entry.message}});
+    m_entries.push_back({.level = entry.level, .time = entry.time, .location = entry.location, .message = std::string{entry.message}, .source = std::string{entry.source}});
 }

@@ -27,7 +27,8 @@ public:
     ScriptVm& operator=(const ScriptVm&) = delete;
 
     void RunFile(const std::filesystem::path& relativePath);
-    void RunSource(std::string_view source, std::string_view filename);
+    // Runs in __main__ unless a module, such as GetBuiltins(), is given.
+    void RunSource(std::string_view source, std::string_view filename, py_GlobalRef module = nullptr);
     [[nodiscard]] bool HasFunction(std::string_view name);
     py_GlobalRef Call(std::string_view function, std::span<const py_Ref> args = {});
 

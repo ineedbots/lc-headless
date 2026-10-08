@@ -16,12 +16,20 @@ namespace
     constexpr auto TYPE_ERROR_ID = 302;
     constexpr auto SAMPLE_HEADER =
         "// Sample config, written because none was found.\n"
-        "// Set server.url, the account, and the login CRCs and RSA key, then run again.\n"sv;
+        "// Set server.url and the login CRCs and RSA key, then run again.\n"
+        "// Each account goes in its own file in scripting.accountsDirectory.\n"sv;
     constexpr auto HEX_PREFIX_LENGTH = std::size_t{2};
     constexpr auto MAX_USERNAME_LENGTH = std::size_t{12};
     constexpr auto MAX_PASSWORD_LENGTH = std::size_t{20};
     constexpr auto MIN_IDLE_SECONDS = 1s;
     constexpr auto MAX_IDLE_SECONDS = 300s;
+    constexpr auto MIN_CALL_TIMEOUT = 10ms;
+    constexpr auto MAX_CALL_TIMEOUT = 60000ms;
+    constexpr auto MIN_POLL_INTERVAL = 1ms;
+    constexpr auto MAX_POLL_INTERVAL = 1000ms;
+    constexpr auto MAX_LOGIN_INTERVAL = 60s;
+    constexpr auto MAX_KILL_GRACE = 600s;
+    constexpr auto LEGACY_ACCOUNT_KEY = "account";
     constexpr auto FIRST_PRINTABLE = '\x20';
     constexpr auto LAST_PRINTABLE = '\x7E';
     constexpr auto SECURE_SCHEME = "wss"sv;
@@ -187,16 +195,16 @@ namespace
         return scheme == "ws" || scheme == SECURE_SCHEME;
     }
 
-    void Validate(const Config_s& config)
+    void ValidateServer(const ServerSettings_s& server)
     {
-        const auto& server = config.server;
         Check(IsWebSocketUrl(server.url), "server.url", "must be a ws:// or wss:// URL");
         Check(server.origin.empty() || IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
         Check(!server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
+    }
 
-        const auto& account = config.account;
-        Check(IsCredential(account.username, MAX_USERNAME_LENGTH), "account.username", std::format("must be 1 to {} printable ASCII characters", MAX_USERNAME_LENGTH));
-        Check(IsCredential(account.password, MAX_PASSWORD_LENGTH), "account.password", std::format("must be 1 to {} printable ASCII characters", MAX_PASSWORD_LENGTH));
+    void Validate(const Config_s& config)
+    {
+        ValidateServer(config.server);
 
         const auto& login = config.login;
         const auto one = BigUInt::Parse("1");
@@ -206,6 +214,40 @@ namespace
 
         const auto& client = config.client;
         Check(client.idleSeconds >= MIN_IDLE_SECONDS && client.idleSeconds <= MAX_IDLE_SECONDS, "client.idleSeconds", std::format("must be from {} to {}", MIN_IDLE_SECONDS.count(), MAX_IDLE_SECONDS.count()));
+
+        const auto& scripting = config.scripting;
+        Check(!scripting.accountsDirectory.empty(), "scripting.accountsDirectory", "must be a folder path");
+        Check(!scripting.scriptsDirectory.empty(), "scripting.scriptsDirectory", "must be a folder path");
+        Check(scripting.callTimeoutMs >= MIN_CALL_TIMEOUT && scripting.callTimeoutMs <= MAX_CALL_TIMEOUT, "scripting.callTimeoutMs", std::format("must be from {} to {}", MIN_CALL_TIMEOUT.count(), MAX_CALL_TIMEOUT.count()));
+        Check(scripting.pollIntervalMs >= MIN_POLL_INTERVAL && scripting.pollIntervalMs <= MAX_POLL_INTERVAL, "scripting.pollIntervalMs", std::format("must be from {} to {}", MIN_POLL_INTERVAL.count(), MAX_POLL_INTERVAL.count()));
+        Check(scripting.loginIntervalSeconds >= 0s && scripting.loginIntervalSeconds <= MAX_LOGIN_INTERVAL, "scripting.loginIntervalSeconds", std::format("must be from 0 to {}", MAX_LOGIN_INTERVAL.count()));
+        Check(scripting.killGraceSeconds >= 0s && scripting.killGraceSeconds <= MAX_KILL_GRACE, "scripting.killGraceSeconds", std::format("must be from 0 to {}", MAX_KILL_GRACE.count()));
+    }
+
+    void ValidateAccount(const AccountConfig_s& account)
+    {
+        const auto& credentials = account.credentials;
+        Check(IsCredential(credentials.username, MAX_USERNAME_LENGTH), "username", std::format("must be 1 to {} printable ASCII characters", MAX_USERNAME_LENGTH));
+        Check(IsCredential(credentials.password, MAX_PASSWORD_LENGTH), "password", std::format("must be 1 to {} printable ASCII characters", MAX_PASSWORD_LENGTH));
+        if (account.server)
+        {
+            ValidateServer(*account.server);
+        }
+
+        if (account.script)
+        {
+            Check(!account.script->file.empty(), "script.file", "must name a script file in the scripts directory");
+        }
+    }
+
+    void WarnIfLegacyAccount(const nlohmann::json& root, Logger& logger)
+    {
+        if (!root.contains(LEGACY_ACCOUNT_KEY))
+        {
+            return;
+        }
+
+        logger.Warning("Config has an account section, which is no longer read; move it to its own file in scripting.accountsDirectory");
     }
 
     void WarnIfTlsVerificationDisabled(const Config_s& config, Logger& logger)
@@ -216,6 +258,17 @@ namespace
         }
 
         logger.Warning("Config disables TLS certificate verification (server.tlsCaFile is NONE)");
+    }
+
+    nlohmann::json ParseRootObject(std::string_view text)
+    {
+        auto root = ParseJson(text);
+        if (!root.is_object())
+        {
+            throw ConfigError{"the top level must be an object"};
+        }
+
+        return root;
     }
 
     std::string ReadFile(const std::filesystem::path& path)
@@ -309,6 +362,20 @@ namespace nlohmann
     };
 
     template <>
+    struct adl_serializer<std::chrono::milliseconds>
+    {
+        static void from_json(const json& value, std::chrono::milliseconds& result)
+        {
+            result = std::chrono::milliseconds{value.get<s64>()};
+        }
+
+        static void to_json(ordered_json& value, std::chrono::milliseconds source)
+        {
+            value = source.count();
+        }
+    };
+
+    template <>
     struct adl_serializer<std::array<s32, LoginSettings_s::CRC_COUNT>>
     {
         static void from_json(const json& value, std::array<s32, LoginSettings_s::CRC_COUNT>& result)
@@ -345,7 +412,55 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, t
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, account, login, client)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
+
+// Account files are only read, and a script's settings can be any object, so they convert by hand.
+void from_json(const nlohmann::json& value, ScriptConfig_s& script)
+{
+    script.file = value.value("file", std::string{});
+    const auto settings = value.find("settings");
+    if (settings == value.end())
+    {
+        return;
+    }
+
+    if (!settings->is_object())
+    {
+        throw nlohmann::json::type_error::create(TYPE_ERROR_ID, "must be an object", &*settings);
+    }
+
+    script.settings = settings->dump();
+}
+
+void from_json(const nlohmann::json& value, AccountConfig_s& account)
+{
+    value.get_to(account.credentials);
+    account.enabled = value.value("enabled", true);
+    const auto server = value.find("server");
+    if (server != value.end() && !server->is_null())
+    {
+        if (!server->is_object())
+        {
+            throw nlohmann::json::type_error::create(TYPE_ERROR_ID, "must be an object", &*server);
+        }
+
+        account.server = server->get<ServerSettings_s>();
+    }
+
+    const auto script = value.find("script");
+    if (script == value.end() || script->is_null())
+    {
+        return;
+    }
+
+    if (!script->is_object())
+    {
+        throw nlohmann::json::type_error::create(TYPE_ERROR_ID, "must be an object", &*script);
+    }
+
+    account.script = script->get<ScriptConfig_s>();
+}
 
 Config_s ConfigFile::Load(const std::filesystem::path& path, Logger& logger)
 {
@@ -368,12 +483,7 @@ Config_s ConfigFile::Load(const std::filesystem::path& path, Logger& logger)
 
 Config_s ConfigFile::Parse(std::string_view text, Logger& logger)
 {
-    const auto root = ParseJson(text);
-    if (!root.is_object())
-    {
-        throw ConfigError{"the top level must be an object"};
-    }
-
+    const auto root = ParseRootObject(text);
     auto config = Config_s{};
     try
     {
@@ -386,6 +496,7 @@ Config_s ConfigFile::Parse(std::string_view text, Logger& logger)
 
     Validate(config);
     WarnIfTlsVerificationDisabled(config, logger);
+    WarnIfLegacyAccount(root, logger);
     return config;
 }
 
@@ -394,4 +505,40 @@ std::string ConfigFile::Serialize(const Config_s& config)
     // Parentheses, not braces: a braced ordered_json is an array holding the config.
     const auto document = nlohmann::ordered_json(config);
     return document.dump(INDENT) + '\n';
+}
+
+AccountConfig_s ConfigFile::LoadAccount(const std::filesystem::path& path)
+{
+    if (!std::filesystem::exists(path))
+    {
+        throw ConfigError{std::format("{}: account file not found", path.string())};
+    }
+
+    const auto text = ReadFile(path);
+    try
+    {
+        return ParseAccount(text, path.stem().string());
+    }
+    catch (const ConfigError& e)
+    {
+        throw ConfigError{std::format("{}: {}", path.string(), e.what())};
+    }
+}
+
+AccountConfig_s ConfigFile::ParseAccount(std::string_view text, std::string name)
+{
+    const auto root = ParseRootObject(text);
+    auto account = AccountConfig_s{};
+    try
+    {
+        root.get_to(account);
+    }
+    catch (const nlohmann::json::exception& e)
+    {
+        throw ConfigError{DescribeConversionError(e)};
+    }
+
+    account.name = std::move(name);
+    ValidateAccount(account);
+    return account;
 }

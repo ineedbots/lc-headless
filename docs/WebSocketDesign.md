@@ -770,7 +770,8 @@ Each case uses a fresh client that has never connected.
 Fixtures:
 
 - `LoopbackServer` wraps `ix::WebSocketServer` and holds its own `NetSystem`.
-    - It tries ports 47000 to 47099 until `listen()` succeeds, and exposes `Url()`.
+    - It tries ports 47000 to 47099 until one is free and `listen()` succeeds, and exposes `Url()`. "Free" is checked first with `LoopbackPort::IsFree`, an exclusive bind on 127.0.0.1. IXWebSocket's server sets `SO_REUSEADDR`, which on Windows lets `listen()` succeed on a port another test server already holds, so `listen()` alone can't tell. That was why these tests failed under `ctest -j`.
+    - A refused connection uses a free port from 47900 to 47999, a range no test server listens on, so another test process can't start listening there mid-test.
     - It records each message it receives, the handshake's `openInfo` (headers and subprotocol), and whether the client's connection has closed.
     - It runs a per-test `onOpen` script on its connection thread, where delays are `std::this_thread::sleep_for`.
 - `SilentServer` is an `ix::SocketServer` subclass. It accepts TCP connections and never answers them. Clients connect to it with `handshakeTimeout = 1s` unless a row says otherwise, so a lost cancellation costs at most a second.

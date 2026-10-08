@@ -1,0 +1,6 @@
+{
+    "include": ["scripts"],
+    "exclude": ["scripts/typings"],
+    "stubPath": "scripts/typings",
+    "extraPaths": ["scripts", "scripts/lib"]
+}

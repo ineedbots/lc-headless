@@ -24,10 +24,6 @@ namespace
         "origin": "https://w1.rs2b2t.com",
         "tlsCaFile": "SYSTEM"
     },
-    "account": {
-        "username": "test",
-        "password": "test"
-    },
     "login": {
         "crcs": ["0x00000000", "0xde5b3345", "0x6026f8fe", "0x07550309", "0x9a13636e", "0xca2717bd", "0x368f1792", "0x1b1fb6b2", "0xa7129379"],
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
@@ -43,23 +39,28 @@ namespace
         "logoutComponent": 2458,
         "logLevel": "verbose",
         "idleSeconds": 5
+    },
+    "scripting": {
+        "accountsDirectory": "bots",
+        "scriptsDirectory": "my-scripts",
+        "callTimeoutMs": 500,
+        "pollIntervalMs": 20,
+        "loginIntervalSeconds": 5,
+        "killGraceSeconds": 60
     }
 }
 )json"sv;
 
     constexpr auto SAMPLE_HEADER =
         "// Sample config, written because none was found.\n"
-        "// Set server.url, the account, and the login CRCs and RSA key, then run again.\n"sv;
+        "// Set server.url and the login CRCs and RSA key, then run again.\n"
+        "// Each account goes in its own file in scripting.accountsDirectory.\n"sv;
 
     constexpr auto SAMPLE_BODY = R"json({
     "server": {
         "url": "",
         "origin": "",
         "tlsCaFile": "SYSTEM"
-    },
-    "account": {
-        "username": "",
-        "password": ""
     },
     "login": {
         "crcs": [
@@ -82,16 +83,34 @@ namespace
         "logoutComponent": 2458,
         "logLevel": "info",
         "idleSeconds": 5
+    },
+    "scripting": {
+        "accountsDirectory": "accounts",
+        "scriptsDirectory": "scripts",
+        "callTimeoutMs": 1000,
+        "pollIntervalMs": 10,
+        "loginIntervalSeconds": 2,
+        "killGraceSeconds": 30
     }
 }
 )json"sv;
 
     constexpr auto MINIMAL = R"json({
     "server": {"url": "ws://localhost:80"},
-    "account": {"username": "test", "password": "test"},
     "login": {
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
         "rsaExponent": "0x81f390b2cf8ca7039ee507975951d5a0b15a87bf8b3f99c966834118c50fd94d"
+    }
+})json"sv;
+
+    constexpr auto ACCOUNT_EXAMPLE = R"json({
+    // The account and what it runs.
+    "username": "bot1",
+    "password": "s3cret-pw",
+    "enabled": false,
+    "script": {
+        "file": "examples/chicken_killer.py",
+        "settings": {"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens"}
     }
 })json"sv;
 
@@ -128,8 +147,6 @@ namespace
 
     const auto MUST_SET_KEYS = std::vector<KeyPath_s>{
         {"server", "url"},
-        {"account", "username"},
-        {"account", "password"},
         {"login", "rsaModulus"},
         {"login", "rsaExponent"},
     };
@@ -143,6 +160,12 @@ namespace
         {"client", "logoutComponent"},
         {"client", "logLevel"},
         {"client", "idleSeconds"},
+        {"scripting", "accountsDirectory"},
+        {"scripting", "scriptsDirectory"},
+        {"scripting", "callTimeoutMs"},
+        {"scripting", "pollIntervalMs"},
+        {"scripting", "loginIntervalSeconds"},
+        {"scripting", "killGraceSeconds"},
     };
 
     s32 Crc(u32 value)
@@ -162,9 +185,7 @@ namespace
 
     nlohmann::json MakeBase()
     {
-        auto json = ParseJsonWithComments(EXAMPLE);
-        json["account"]["password"] = SECRET_PASSWORD;
-        return json;
+        return ParseJsonWithComments(EXAMPLE);
     }
 
     std::string EditBase(const std::function<void(nlohmann::json&)>& edit)
@@ -250,13 +271,11 @@ namespace
         }
     }
 
-    void CheckExampleMembers(const Config_s& config, std::string_view password)
+    void CheckExampleMembers(const Config_s& config)
     {
         CHECK(config.server.url == "ws://localhost:80");
         CHECK(config.server.origin == "https://w1.rs2b2t.com");
         CHECK(config.server.tlsCaFile == "SYSTEM");
-        CHECK(config.account.username == "test");
-        CHECK(config.account.password == password);
         CHECK(config.login.crcs == GetExampleCrcs());
         CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
         CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
@@ -265,6 +284,22 @@ namespace
         CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Verbose);
         CHECK(config.client.idleSeconds == 5s);
+        CHECK(config.scripting.accountsDirectory == "bots");
+        CHECK(config.scripting.scriptsDirectory == "my-scripts");
+        CHECK(config.scripting.callTimeoutMs == 500ms);
+        CHECK(config.scripting.pollIntervalMs == 20ms);
+        CHECK(config.scripting.loginIntervalSeconds == 5s);
+        CHECK(config.scripting.killGraceSeconds == 60s);
+    }
+
+    void CheckScriptingDefaults(const ScriptingSettings_s& scripting)
+    {
+        CHECK(scripting.accountsDirectory == "accounts");
+        CHECK(scripting.scriptsDirectory == "scripts");
+        CHECK(scripting.callTimeoutMs == 1000ms);
+        CHECK(scripting.pollIntervalMs == 10ms);
+        CHECK(scripting.loginIntervalSeconds == 2s);
+        CHECK(scripting.killGraceSeconds == 30s);
     }
 
     void CheckOptionalDefaults(const Config_s& config)
@@ -277,6 +312,36 @@ namespace
         CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.idleSeconds == 5s);
+        CheckScriptingDefaults(config.scripting);
+    }
+
+    std::string EditAccount(const std::function<void(nlohmann::json&)>& edit)
+    {
+        auto json = ParseJsonWithComments(ACCOUNT_EXAMPLE);
+        edit(json);
+        return json.dump();
+    }
+
+    std::string SetAccountKey(const std::string& key, nlohmann::json value)
+    {
+        return EditAccount([&](nlohmann::json& json)
+        {
+            json[key] = std::move(value);
+        });
+    }
+
+    std::string SetScriptKey(const std::string& key, nlohmann::json value)
+    {
+        return EditAccount([&](nlohmann::json& json)
+        {
+            json["script"][key] = std::move(value);
+        });
+    }
+
+    void CheckAccountRejected(std::string_view text, const std::string& path)
+    {
+        CHECK_THROWS_AS(ConfigFile::ParseAccount(text, "bot1"), ConfigError);
+        CHECK_THROWS_WITH(ConfigFile::ParseAccount(text, "bot1"), Catch::Matchers::ContainsSubstring(path) && !Catch::Matchers::ContainsSubstring(SECRET_PASSWORD));
     }
 
     void WriteFile(const std::filesystem::path& path, std::string_view text)
@@ -296,7 +361,7 @@ CATCH_REGISTER_ENUM(LogLevel_e, LogLevel_e::Verbose, LogLevel_e::Info, LogLevel_
 
 TEST_CASE("ConfigFile parses the complete example", "[ConfigFile]")
 {
-    CheckExampleMembers(ParseAccepted(EXAMPLE), "test");
+    CheckExampleMembers(ParseAccepted(EXAMPLE));
 }
 
 TEST_CASE("ConfigFile parses a file with only the keys that must be set", "[ConfigFile]")
@@ -304,8 +369,6 @@ TEST_CASE("ConfigFile parses a file with only the keys that must be set", "[Conf
     const auto config = ParseAccepted(MINIMAL);
 
     CHECK(config.server.url == "ws://localhost:80");
-    CHECK(config.account.username == "test");
-    CHECK(config.account.password == "test");
     CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
     CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
     CheckOptionalDefaults(config);
@@ -316,22 +379,22 @@ TEST_CASE("ConfigFile syntax", "[ConfigFile]")
     SECTION("comments on their own lines, after values, and across lines")
     {
         const auto text = ReplaceAll(std::string{EXAMPLE}, "\"tlsCaFile\": \"SYSTEM\"", "\"tlsCaFile\": \"SYSTEM\" // trailing comment\n        /* a comment\n           over two lines */");
-        CheckExampleMembers(ParseAccepted(text), "test");
+        CheckExampleMembers(ParseAccepted(text));
     }
 
     SECTION("a line comment at the end without a newline")
     {
-        CheckExampleMembers(ParseAccepted(std::string{EXAMPLE} + "// the end"), "test");
+        CheckExampleMembers(ParseAccepted(std::string{EXAMPLE} + "// the end"));
     }
 
     SECTION("a UTF-8 byte order mark")
     {
-        CheckExampleMembers(ParseAccepted(std::string{BOM} + std::string{EXAMPLE}), "test");
+        CheckExampleMembers(ParseAccepted(std::string{BOM} + std::string{EXAMPLE}));
     }
 
     SECTION("CRLF line endings")
     {
-        CheckExampleMembers(ParseAccepted(ReplaceAll(std::string{EXAMPLE}, "\n", "\r\n")), "test");
+        CheckExampleMembers(ParseAccepted(ReplaceAll(std::string{EXAMPLE}, "\n", "\r\n")));
     }
 
     SECTION("a # comment is an error")
@@ -412,6 +475,30 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.client.idleSeconds == 5s);
             }
+            else if (key.key == "accountsDirectory")
+            {
+                CHECK(config.scripting.accountsDirectory == "accounts");
+            }
+            else if (key.key == "scriptsDirectory")
+            {
+                CHECK(config.scripting.scriptsDirectory == "scripts");
+            }
+            else if (key.key == "callTimeoutMs")
+            {
+                CHECK(config.scripting.callTimeoutMs == 1000ms);
+            }
+            else if (key.key == "pollIntervalMs")
+            {
+                CHECK(config.scripting.pollIntervalMs == 10ms);
+            }
+            else if (key.key == "loginIntervalSeconds")
+            {
+                CHECK(config.scripting.loginIntervalSeconds == 2s);
+            }
+            else if (key.key == "killGraceSeconds")
+            {
+                CHECK(config.scripting.killGraceSeconds == 30s);
+            }
         }
     }
 
@@ -426,13 +513,14 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         };
 
         CheckRejected(removeSection("server"), "server.url");
-        CheckRejected(removeSection("account"), "account.username");
         CheckRejected(removeSection("login"), "login.rsaModulus");
 
         const auto config = ParseAccepted(removeSection("client"));
         CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.idleSeconds == 5s);
+
+        CheckScriptingDefaults(ParseAccepted(removeSection("scripting")).scripting);
     }
 
     SECTION("an empty object fails on server.url")
@@ -469,7 +557,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         {
             json["extra"] = {{"url", "x"}};
         }));
-        CheckExampleMembers(config, SECRET_PASSWORD);
+        CheckExampleMembers(config);
     }
 
     SECTION("a misspelled key is ignored, and its member keeps the default")
@@ -483,9 +571,9 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
 
         CheckRejected(EditBase([](nlohmann::json& json)
         {
-            json["account"].erase("username");
-            json["account"]["usrname"] = "test";
-        }), "account.username");
+            json["server"].erase("url");
+            json["server"]["uri"] = "ws://localhost:80";
+        }), "server.url");
     }
 
     SECTION("section names are case-sensitive")
@@ -555,17 +643,18 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         }
     }
 
-    SECTION("account")
+    SECTION("scripting")
     {
-        for (const auto& username : {std::string{"a"}, std::string(12, 'a'), std::string{"a b"}})
-        {
-            CHECK(ParseAccepted(SetKey({"account", "username"}, username)).account.username == username);
-        }
-
-        for (const auto& password : {std::string{"a"}, std::string(20, 'a')})
-        {
-            CHECK(ParseAccepted(SetKey({"account", "password"}, password)).account.password == password);
-        }
+        CHECK(ParseAccepted(SetKey({"scripting", "accountsDirectory"}, "C:/bots/accounts")).scripting.accountsDirectory == "C:/bots/accounts");
+        CHECK(ParseAccepted(SetKey({"scripting", "scriptsDirectory"}, "../scripts")).scripting.scriptsDirectory == "../scripts");
+        CHECK(ParseAccepted(SetKey({"scripting", "callTimeoutMs"}, 10)).scripting.callTimeoutMs == 10ms);
+        CHECK(ParseAccepted(SetKey({"scripting", "callTimeoutMs"}, 60000)).scripting.callTimeoutMs == 60000ms);
+        CHECK(ParseAccepted(SetKey({"scripting", "pollIntervalMs"}, 1)).scripting.pollIntervalMs == 1ms);
+        CHECK(ParseAccepted(SetKey({"scripting", "pollIntervalMs"}, 1000)).scripting.pollIntervalMs == 1000ms);
+        CHECK(ParseAccepted(SetKey({"scripting", "loginIntervalSeconds"}, 0)).scripting.loginIntervalSeconds == 0s);
+        CHECK(ParseAccepted(SetKey({"scripting", "loginIntervalSeconds"}, 60)).scripting.loginIntervalSeconds == 60s);
+        CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 0)).scripting.killGraceSeconds == 0s);
+        CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 600)).scripting.killGraceSeconds == 600s);
     }
 
     SECTION("login.crcs in any spelling")
@@ -631,16 +720,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"server", "origin"}, true},
         {{"server", "tlsCaFile"}, ""},
         {{"server", "tlsCaFile"}, 5},
-        {{"account", "username"}, ""},
-        {{"account", "username"}, std::string(13, 'a')},
-        {{"account", "username"}, "tab\there"},
-        {{"account", "username"}, UTF8_E_ACUTE},
-        {{"account", "username"}, 5},
-        {{"account", "password"}, ""},
-        {{"account", "password"}, std::string(21, 'a')},
-        {{"account", "password"}, std::string{"nul\0x", 5}},
-        {{"account", "password"}, UTF8_E_ACUTE},
-        {{"account", "password"}, 5},
         {{"login", "crcs"}, nlohmann::json::array({"0", "0", "0", "0", "0", "0", "0", "0"})},
         {{"login", "crcs"}, nlohmann::json::array({"0", "0", "0", "0", "0", "0", "0", "0", "0", "0"})},
         {{"login", "crcs"}, "0, 0, 0, 0, 0, 0, 0, 0, 0"},
@@ -670,6 +749,18 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"client", "idleSeconds"}, 301},
         {{"client", "idleSeconds"}, -5},
         {{"client", "idleSeconds"}, "5"},
+        {{"scripting", "accountsDirectory"}, ""},
+        {{"scripting", "accountsDirectory"}, 5},
+        {{"scripting", "scriptsDirectory"}, ""},
+        {{"scripting", "callTimeoutMs"}, 9},
+        {{"scripting", "callTimeoutMs"}, 60001},
+        {{"scripting", "callTimeoutMs"}, "1000"},
+        {{"scripting", "pollIntervalMs"}, 0},
+        {{"scripting", "pollIntervalMs"}, 1001},
+        {{"scripting", "loginIntervalSeconds"}, -1},
+        {{"scripting", "loginIntervalSeconds"}, 61},
+        {{"scripting", "killGraceSeconds"}, -1},
+        {{"scripting", "killGraceSeconds"}, 601},
     };
 
     for (const auto& rejection : rejections)
@@ -685,7 +776,122 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
     }
 }
 
-TEST_CASE("ConfigFile messages never contain credentials", "[ConfigFile]")
+TEST_CASE("ConfigFile warns about an account section left in the config", "[ConfigFile]")
+{
+    const auto text = EditBase([](nlohmann::json& json)
+    {
+        json["account"] = {{"username", "test"}, {"password", SECRET_PASSWORD}};
+    });
+
+    auto capture = LogCapture{};
+    const auto config = ConfigFile::Parse(text, *capture.GetLogger());
+    CheckExampleMembers(config);
+    const auto entries = capture.GetEntries();
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0].level == LogLevel_e::Warning);
+    CHECK_THAT(entries[0].message, Catch::Matchers::ContainsSubstring("scripting.accountsDirectory"));
+    CHECK_FALSE(HasSecret(capture));
+}
+
+TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
+{
+    const auto account = ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1");
+    CHECK(account.name == "bot1");
+    CHECK(account.credentials.username == "bot1");
+    CHECK(account.credentials.password == SECRET_PASSWORD);
+    CHECK_FALSE(account.enabled);
+    REQUIRE(account.script.has_value());
+    CHECK(account.script->file == "examples/chicken_killer.py");
+    CHECK(nlohmann::json::parse(account.script->settings) == nlohmann::json::parse(R"json({"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens"})json"));
+
+    SECTION("only the credentials are required")
+    {
+        const auto minimal = ConfigFile::ParseAccount(R"json({"username": "bot2", "password": "pw"})json", "bot2");
+        CHECK(minimal.enabled);
+        CHECK_FALSE(minimal.script.has_value());
+    }
+
+    SECTION("a null script means no script")
+    {
+        CHECK_FALSE(ConfigFile::ParseAccount(SetAccountKey("script", nullptr), "bot1").script.has_value());
+    }
+
+    SECTION("a script without settings gets an empty object")
+    {
+        const auto text = EditAccount([](nlohmann::json& json)
+        {
+            json["script"].erase("settings");
+        });
+        CHECK(ConfigFile::ParseAccount(text, "bot1").script->settings == "{}");
+    }
+
+    SECTION("usernames and passwords at their limits")
+    {
+        for (const auto& username : {std::string{"a"}, std::string(12, 'a'), std::string{"a b"}})
+        {
+            CHECK(ConfigFile::ParseAccount(SetAccountKey("username", username), "bot1").credentials.username == username);
+        }
+
+        for (const auto& password : {std::string{"a"}, std::string(20, 'a')})
+        {
+            CHECK(ConfigFile::ParseAccount(SetAccountKey("password", password), "bot1").credentials.password == password);
+        }
+    }
+}
+
+TEST_CASE("ConfigFile reads an account's own server", "[ConfigFile][AccountFile]")
+{
+    CHECK_FALSE(ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1").server.has_value());
+
+    const auto account = ConfigFile::ParseAccount(SetAccountKey("server", {{"url", "wss://w2.example.com:443"}, {"origin", "https://w2.example.com"}}), "bot1");
+    REQUIRE(account.server.has_value());
+    CHECK(account.server->url == "wss://w2.example.com:443");
+    CHECK(account.server->origin == "https://w2.example.com");
+    CHECK(account.server->tlsCaFile == "SYSTEM");
+
+    CheckAccountRejected(SetAccountKey("server", {{"url", "http://w2.example.com"}}), "server.url");
+    CheckAccountRejected(SetAccountKey("server", nlohmann::json::object()), "server.url");
+    CheckAccountRejected(SetAccountKey("server", "ws://w2.example.com"), "server");
+}
+
+TEST_CASE("ConfigFile rejects invalid account files", "[ConfigFile][AccountFile]")
+{
+    const auto rejections = std::vector<std::pair<std::string, nlohmann::json>>{
+        {"username", ""},
+        {"username", std::string(13, 'a')},
+        {"username", "tab\there"},
+        {"username", UTF8_E_ACUTE},
+        {"username", 5},
+        {"password", ""},
+        {"password", std::string(21, 'a')},
+        {"password", std::string{"nul\0x", 5}},
+        {"password", UTF8_E_ACUTE},
+        {"password", 5},
+        {"enabled", "yes"},
+        {"script", "examples/chicken_killer.py"},
+    };
+
+    for (const auto& [key, value] : rejections)
+    {
+        CAPTURE(key, value.dump());
+        CheckAccountRejected(SetAccountKey(key, value), key);
+    }
+
+    CheckAccountRejected(SetScriptKey("file", ""), "script.file");
+    CheckAccountRejected(SetScriptKey("file", 5), "script.file");
+    CheckAccountRejected(SetScriptKey("settings", nlohmann::json::array({41})), "script.settings");
+    CheckAccountRejected(EditAccount([](nlohmann::json& json)
+    {
+        json["script"].erase("file");
+    }), "script.file");
+    CheckAccountRejected(EditAccount([](nlohmann::json& json)
+    {
+        json.erase("password");
+    }), "password");
+    CHECK_THROWS_AS(ConfigFile::ParseAccount("[]", "bot1"), ConfigError);
+}
+
+TEST_CASE("ConfigFile messages never contain credentials", "[ConfigFile][AccountFile]")
 {
     SECTION("rejected usernames and passwords aren't quoted")
     {
@@ -693,22 +899,45 @@ TEST_CASE("ConfigFile messages never contain credentials", "[ConfigFile]")
         {
             for (const auto& value : {std::string(21, 'q'), std::string{"tab\there"}, std::string{UTF8_E_ACUTE}, std::string{"nul\0x", 5}})
             {
-                const auto text = SetKey({"account", key}, value);
-                auto capture = LogCapture{};
-                CHECK_THROWS_WITH(ConfigFile::Parse(text, *capture.GetLogger()), !Catch::Matchers::ContainsSubstring(value));
+                CHECK_THROWS_WITH(ConfigFile::ParseAccount(SetAccountKey(key, value), "bot1"), !Catch::Matchers::ContainsSubstring(value));
             }
         }
     }
 
     SECTION("a syntax error inside the password doesn't quote it")
     {
-        for (const auto* const text : {R"json({"account": {"password": "hunter\q2"}})json", R"json({"account": {"password": "hunter2)json"})
+        for (const auto* const text : {R"json({"username": "bot1", "password": "hunter\q2"})json", R"json({"username": "bot1", "password": "hunter2)json"})
         {
             CAPTURE(text);
-            auto capture = LogCapture{};
-            CHECK_THROWS_AS(ConfigFile::Parse(text, *capture.GetLogger()), ConfigError);
-            CHECK_THROWS_WITH(ConfigFile::Parse(text, *capture.GetLogger()), !Catch::Matchers::ContainsSubstring("hunter"));
+            CHECK_THROWS_AS(ConfigFile::ParseAccount(text, "bot1"), ConfigError);
+            CHECK_THROWS_WITH(ConfigFile::ParseAccount(text, "bot1"), !Catch::Matchers::ContainsSubstring("hunter"));
         }
+    }
+}
+
+TEST_CASE("ConfigFile::LoadAccount", "[ConfigFile][AccountFile]")
+{
+    const auto folder = TempFolder{"rs2004-config-tests"};
+    const auto path = folder.GetPath() / "bot1.jsonc";
+
+    SECTION("names the account after the file")
+    {
+        WriteFile(path, ACCOUNT_EXAMPLE);
+        const auto account = ConfigFile::LoadAccount(path);
+        CHECK(account.name == "bot1");
+        CHECK(account.credentials.username == "bot1");
+    }
+
+    SECTION("puts the file's path in front of the message")
+    {
+        WriteFile(path, SetAccountKey("username", ""));
+        CHECK_THROWS_WITH(ConfigFile::LoadAccount(path), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("username"));
+    }
+
+    SECTION("a missing file is an error, and no sample is written")
+    {
+        CHECK_THROWS_WITH(ConfigFile::LoadAccount(path), Catch::Matchers::ContainsSubstring(path.string()) && Catch::Matchers::ContainsSubstring("not found"));
+        CHECK_FALSE(std::filesystem::exists(path));
     }
 }
 
@@ -723,7 +952,7 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
     {
         const auto serialized = ConfigFile::Serialize(ParseAccepted(EXAMPLE));
         const auto reparsed = ParseAccepted(serialized);
-        CheckExampleMembers(reparsed, "test");
+        CheckExampleMembers(reparsed);
         CHECK(ConfigFile::Serialize(reparsed) == serialized);
     }
 
@@ -776,7 +1005,7 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
         auto upper = ReplaceAll(std::string{EXAMPLE}, "0xde5b3345", "0XDE5B3345");
         upper = ReplaceAll(upper, EXAMPLE_MODULUS, ToUpper(EXAMPLE_MODULUS));
         const auto config = ParseAccepted(upper);
-        CheckExampleMembers(config, "test");
+        CheckExampleMembers(config);
 
         const auto serialized = ConfigFile::Serialize(config);
         CHECK_THAT(serialized, Catch::Matchers::ContainsSubstring("\"0xde5b3345\""));
@@ -787,15 +1016,11 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
     {
         auto sample = ParseJsonWithComments(std::string{SAMPLE_HEADER} + std::string{SAMPLE_BODY});
         sample["server"]["url"] = "ws://localhost:80";
-        sample["account"]["username"] = "test";
-        sample["account"]["password"] = "test";
         sample["login"]["rsaModulus"] = "3233";
         sample["login"]["rsaExponent"] = "17";
 
         const auto config = ParseAccepted(sample.dump());
         CHECK(config.server.url == "ws://localhost:80");
-        CHECK(config.account.username == "test");
-        CHECK(config.account.password == "test");
         CHECK(config.login.rsaModulus == BigUInt::Parse("3233"));
         CHECK(config.login.rsaExponent == BigUInt::Parse("17"));
         CheckOptionalDefaults(config);
@@ -841,13 +1066,13 @@ TEST_CASE("ConfigFile::Load", "[ConfigFile]")
     SECTION("loads a file")
     {
         WriteFile(path, EXAMPLE);
-        CheckExampleMembers(ConfigFile::Load(path, logger), "test");
+        CheckExampleMembers(ConfigFile::Load(path, logger));
     }
 
     SECTION("loads a file with CRLF line endings and a byte order mark")
     {
         WriteFile(path, std::string{BOM} + ReplaceAll(std::string{EXAMPLE}, "\n", "\r\n"));
-        CheckExampleMembers(ConfigFile::Load(path, logger), "test");
+        CheckExampleMembers(ConfigFile::Load(path, logger));
     }
 
     SECTION("puts the file's path in front of the message")

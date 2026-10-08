@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "FakeGameServer.hpp"
+#include "../LoopbackPort.hpp"
 
 #include "Core/BigUInt.hpp"
 #include "Core/ConfigFile.hpp"
@@ -45,6 +46,11 @@ FakeGameServer::FakeGameServer(Script onLogin)
 {
     for (auto port = FIRST_PORT; port <= LAST_PORT; ++port)
     {
+        if (!LoopbackPort::IsFree(port))
+        {
+            continue;
+        }
+
         auto server = std::make_unique<ix::WebSocketServer>(port, LOOPBACK_HOST);
         server->disablePerMessageDeflate();
         server->setOnClientMessageCallback([this](std::shared_ptr<ix::ConnectionState>, ix::WebSocket& connection, const ix::WebSocketMessagePtr& message)
@@ -86,18 +92,33 @@ Config_s FakeGameServer::MakeConfig() const
 {
     auto config = Config_s{};
     config.server.url = Url();
-    config.account.username = USERNAME;
-    config.account.password = PASSWORD;
     config.login.rsaModulus = BigUInt::Parse("0x" + std::string(RSA_MODULUS_HEX_DIGITS, 'f'));
     config.login.rsaExponent = BigUInt::Parse("1");
     config.client.logoutComponent = LOGOUT_COMPONENT;
     return config;
 }
 
+AccountSettings_s FakeGameServer::MakeAccount()
+{
+    return {.username = USERNAME, .password = PASSWORD};
+}
+
 void FakeGameServer::SetLoginStatus(u8 status)
 {
     const auto lock = std::scoped_lock{m_mutex};
     m_loginStatus = status;
+}
+
+void FakeGameServer::SetStalled(bool stalled)
+{
+    const auto lock = std::scoped_lock{m_mutex};
+    m_stalled = stalled;
+}
+
+void FakeGameServer::SetIgnoreLogout(bool ignore)
+{
+    const auto lock = std::scoped_lock{m_mutex};
+    m_ignoreLogout = ignore;
 }
 
 void FakeGameServer::Send(ServerProt_e prot, std::span<const u8> payload)
@@ -229,6 +250,11 @@ void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<cons
     response.P8(SERVER_SEED);
     {
         const auto lock = std::scoped_lock{m_mutex};
+        if (m_stalled)
+        {
+            return;
+        }
+
         m_stage = Stage_e::Login;
     }
 
@@ -321,7 +347,7 @@ void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<cons
             packet.GData(payload);
 
             const auto prot = static_cast<ClientProt_e>(opcode);
-            loggedOut = loggedOut || (prot == ClientProt_e::IfButton && Packet{payload}.G2() == LOGOUT_COMPONENT);
+            loggedOut = loggedOut || (!m_ignoreLogout && prot == ClientProt_e::IfButton && Packet{payload}.G2() == LOGOUT_COMPONENT);
             m_packets.push_back({.prot = prot, .payload = std::move(payload)});
         }
 

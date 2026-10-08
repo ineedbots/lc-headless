@@ -385,6 +385,42 @@ TEST_CASE("Loggers are independent", "[Logger]")
     CHECK(errorCapture.GetLogger()->GetLevel() == LogLevel_e::Error);
 }
 
+TEST_CASE("A named logger tags its entries and goes through its parent", "[Logger]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    const auto parent = capture.GetLogger();
+    const auto named = Logger::CreateNamed(parent, "bot1");
+    CHECK(named->GetSource() == "bot1");
+
+    named->Info("from the account");
+    named->Verbose("below the parent's level");
+    parent->Info("from the parent");
+
+    auto entries = capture.GetEntries();
+    REQUIRE(entries.size() == 2);
+    CHECK(entries[0].message == "from the account");
+    CHECK(entries[0].source == "bot1");
+    CHECK(entries[1].message == "from the parent");
+    CHECK(entries[1].source.empty());
+
+    SECTION("the parent's level changes apply at once")
+    {
+        parent->SetLevel(LogLevel_e::Verbose);
+        CHECK(named->IsEnabled(LogLevel_e::Verbose));
+        named->Verbose("now visible");
+        CHECK(capture.GetEntries().back().message == "now visible");
+    }
+
+    SECTION("its own level can only narrow the parent's")
+    {
+        named->SetLevel(LogLevel_e::Error);
+        named->Warning("dropped");
+        named->Error("kept");
+        CHECK(capture.GetEntries().back().message == "kept");
+        CHECK(capture.GetEntries().size() == 3);
+    }
+}
+
 TEST_CASE("A logger outlives its LogCapture", "[Logger]")
 {
     auto logger = std::shared_ptr<Logger>{};
@@ -500,6 +536,10 @@ TEST_CASE("Logger::FormatLine", "[Logger]")
     const auto location = std::source_location::current();
     const auto expected = std::format("2026-10-05T18:34:12.345Z INFO    hello [LoggerTests.cpp:{}]", location.line());
     CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Info, time, location)) == expected);
+
+    auto named = MakeEntry(LogLevel_e::Warning, time);
+    named.source = "bot1";
+    CHECK(Logger::FormatLine(named) == "2026-10-05T18:34:12.345Z WARNING [bot1] hello");
 }
 
 TEST_CASE("Logger never interleaves writes from several threads", "[Logger][threads]")

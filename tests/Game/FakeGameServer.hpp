@@ -35,8 +35,13 @@ public:
 
     [[nodiscard]] std::string Url() const;
     [[nodiscard]] Config_s MakeConfig() const;
+    [[nodiscard]] static AccountSettings_s MakeAccount();
 
     void SetLoginStatus(u8 status);
+    // A stalled server accepts the connection but never answers the seed request.
+    void SetStalled(bool stalled);
+    // Clicks on the logout button are recorded but not answered, as during combat.
+    void SetIgnoreLogout(bool ignore);
     void Send(ServerProt_e prot, std::span<const u8> payload = {});
     void Close();
 
@@ -67,13 +72,17 @@ private:
     NetSystem m_netSystem;
     Script m_onLogin;
 
-    mutable std::mutex m_mutex;
-    std::condition_variable m_changed;
+    // Recursive because IXWebSocket can deliver a connection's Close on the thread that's sending to
+    // it, inside sendBinary, and SendLocked holds the lock to keep the connection alive while it sends.
+    mutable std::recursive_mutex m_mutex;
+    std::condition_variable_any m_changed;
     ix::WebSocket* m_connection = nullptr;
     Stage_e m_stage = Stage_e::SeedRequest;
     std::optional<Isaac> m_fromClient;
     std::optional<Isaac> m_toClient;
     u8 m_loginStatus = 2;
+    bool m_stalled = false;
+    bool m_ignoreLogout = false;
     std::vector<u8> m_loginOpcodes;
     std::vector<ReceivedPacket_s> m_packets;
     std::vector<std::string> m_errors;

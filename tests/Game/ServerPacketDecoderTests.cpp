@@ -497,3 +497,38 @@ TEST_CASE("ServerPacketDecoder rejects payloads that don't fit the layout", "[Se
     CHECK_THROWS_AS(fixture.Decode(ServerProt_e::UpdateStat, std::vector<u8>{1, 2}), ProtocolError);
     CHECK_THROWS_AS(fixture.Decode(ServerProt_e::UpdateInvFull, std::vector<u8>{0, 1, 0, 2, 0, 1}), ProtocolError);
 }
+
+TEST_CASE("ServerPacketDecoder ends a walk the server never starts", "[ServerPacketDecoder]")
+{
+    auto fixture = DecoderFixture{};
+    auto& state = fixture.state;
+    state.walkDestination = HomeOffset(5, 0);
+    state.walkRequestTick = state.tick;
+
+    auto standStill = BitWriter{};
+    standStill.Put(1, 0).Put(8, 0);
+    auto stepEast = BitWriter{};
+    stepEast.Put(1, 1).Put(2, 1).Put(3, 4).Put(1, 0).Put(8, 0);
+
+    SECTION("standing still for three ticks ends it")
+    {
+        fixture.Decode(ServerProt_e::PlayerInfo, standStill.GetBytes());
+        fixture.Decode(ServerProt_e::PlayerInfo, standStill.GetBytes());
+        CHECK(state.walkDestination.has_value());
+        fixture.Decode(ServerProt_e::PlayerInfo, standStill.GetBytes());
+        CHECK_FALSE(state.walkDestination.has_value());
+    }
+
+    SECTION("a walk that keeps moving goes on until it arrives")
+    {
+        for (auto step = 0; step < 4; ++step)
+        {
+            fixture.Decode(ServerProt_e::PlayerInfo, stepEast.GetBytes());
+        }
+
+        CHECK(state.localPlayer.tile == HomeOffset(4, 0));
+        CHECK(state.walkDestination.has_value());
+        fixture.Decode(ServerProt_e::PlayerInfo, stepEast.GetBytes());
+        CHECK_FALSE(state.walkDestination.has_value());
+    }
+}

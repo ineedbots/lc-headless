@@ -1,78 +1,74 @@
 #include "pch.hpp"
 #include "Application.hpp"
 
+#include "Accounts/AccountRunner.hpp"
+#include "Core/ConfigError.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Core/Logger.hpp"
-#include "Game/GameClient.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/State/Npc_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Script/ScriptRuntime.hpp"
 
 namespace
 {
-    using Clock = std::chrono::steady_clock;
-
-    constexpr auto PUMP_WAIT = 100ms;
-    constexpr auto SUMMARY_INTERVAL = 10s;
-    constexpr auto LOGOUT_TIMEOUT = 10s;
-    constexpr auto HITPOINTS_STAT = std::size_t{3};
-    constexpr auto NEAREST_NPC_COUNT = std::size_t{5};
-
-    std::atomic<bool> keepRunning{true};
+    std::atomic<u32> interruptCount{0};
 
     void SignalHandler(int signalNum)
     {
         if (signalNum == SIGINT)
         {
-            keepRunning = false;
+            ++interruptCount;
         }
     }
 
-    std::string DescribeNearestNpcs(const GameState_s& state)
+    std::vector<std::filesystem::path> FindAccountFiles(const std::filesystem::path& directory)
     {
-        auto npcs = std::vector<const Npc_s*>{};
-        for (const auto& npc : state.npcs)
+        if (!std::filesystem::is_directory(directory))
         {
-            npcs.push_back(&npc);
+            throw ConfigError{std::format("{}: no accounts folder; add one file per account (see accounts/example.jsonc.sample), or pass {} <file>", directory.string(), Application::ACCOUNT_OPTION)};
         }
 
-        const auto& here = state.localPlayer.tile;
-        std::ranges::sort(npcs, {}, [&here](const Npc_s* npc)
+        auto files = std::vector<std::filesystem::path>{};
+        for (const auto& entry : std::filesystem::directory_iterator{directory})
         {
-            return npc->tile.GetDistance(here);
+            if (entry.is_regular_file() && entry.path().extension() == ConfigFile::ACCOUNT_EXTENSION)
+            {
+                files.push_back(entry.path());
+            }
+        }
+
+        std::ranges::sort(files);
+        return files;
+    }
+
+    std::string ToLower(std::string_view text)
+    {
+        auto lower = std::string{text};
+        std::ranges::transform(lower, lower.begin(), [](char character)
+        {
+            return static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
         });
 
-        auto text = std::string{};
-        for (const auto* const npc : npcs | std::views::take(NEAREST_NPC_COUNT))
-        {
-            if (!text.empty())
-            {
-                text += ", ";
-            }
-
-            std::format_to(std::back_inserter(text), "#{} type {} at {} tiles", npc->index, npc->type, npc->tile.GetDistance(here));
-        }
-
-        return text.empty() ? "none" : text;
+        return lower;
     }
 
-    void LogSummary(Logger& logger, const GameState_s& state)
+    // The server lets a username log in once, so a second file for the same one would only be kicked.
+    void CheckUsernamesAreUnique(const std::vector<AccountConfig_s>& accounts)
     {
-        const auto& tile = state.localPlayer.tile;
-        const auto& hitpoints = state.stats[HITPOINTS_STAT];
-        logger.Info("Tick {}: player {} at ({}, {}, {}), hitpoints {}/{}, run energy {}%, weight {} kg",
-                    state.tick, state.pid, tile.x, tile.z, tile.level, hitpoints.level, hitpoints.baseLevel, state.runEnergy, state.runWeight);
-        logger.Info("In view: {} players, {} NPCs, {} ground items, {} changed locs; {} inventories, {} varps",
-                    state.players.size(), state.npcs.size(), state.groundItems.size(), state.locChanges.size(), state.inventories.size(), state.varps.size());
-        logger.Info("Nearest NPCs: {}", DescribeNearestNpcs(state));
-
-        const auto& interfaces = state.interfaces;
-        logger.Info("Interfaces: main {}, side {}, chat {}, overlay {}", interfaces.mainModal, interfaces.sideModal, interfaces.chatModal, interfaces.overlay);
+        for (std::size_t i = 0; i < accounts.size(); ++i)
+        {
+            for (std::size_t j = i + 1; j < accounts.size(); ++j)
+            {
+                if (ToLower(accounts[i].credentials.username) == ToLower(accounts[j].credentials.username))
+                {
+                    throw ConfigError{std::format("Accounts {} and {} have the same username", accounts[i].name, accounts[j].name)};
+                }
+            }
+        }
     }
 }
 
-Application::Application(const std::filesystem::path& configPath, std::shared_ptr<Logger> logger)
+Application::Application(const std::filesystem::path& configPath, std::optional<std::filesystem::path> accountPath, std::shared_ptr<Logger> logger)
     : m_logger{std::move(logger)}
+    , m_accountPath{std::move(accountPath)}
 {
     assert(m_logger && "Application needs a logger");
     m_config = std::make_shared<const Config_s>(ConfigFile::Load(configPath, *m_logger));
@@ -84,24 +80,41 @@ int Application::Run()
 {
     std::signal(SIGINT, SignalHandler);
 
-    auto client = GameClient{m_config, m_logger};
-    client.Login();
-
-    auto nextSummary = Clock::now() + SUMMARY_INTERVAL;
-    while (keepRunning.load() && client.IsInGame())
+    auto runtime = ScriptRuntime{};
+    auto runner = AccountRunner{m_config, LoadAccounts(), runtime, m_logger};
+    const auto succeeded = runner.Run([]
     {
-        client.Pump(PUMP_WAIT);
+        return interruptCount.load();
+    });
 
-        const auto now = Clock::now();
-        if (now < nextSummary || !client.IsInGame())
-        {
-            continue;
-        }
+    return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
+}
 
-        LogSummary(*m_logger, client.GetState());
-        nextSummary = now + SUMMARY_INTERVAL;
+std::vector<AccountConfig_s> Application::LoadAccounts() const
+{
+    if (m_accountPath)
+    {
+        auto accounts = std::vector<AccountConfig_s>{};
+        accounts.push_back(ConfigFile::LoadAccount(*m_accountPath));
+        return accounts;
     }
 
-    client.Logout(LOGOUT_TIMEOUT);
-    return client.GetStatus() == ClientStatus_e::LoggedOut ? EXIT_SUCCESS : EXIT_FAILURE;
+    const auto directory = std::filesystem::path{m_config->scripting.accountsDirectory};
+    auto enabled = std::vector<AccountConfig_s>{};
+    for (const auto& file : FindAccountFiles(directory))
+    {
+        auto account = ConfigFile::LoadAccount(file);
+        if (account.enabled)
+        {
+            enabled.push_back(std::move(account));
+        }
+    }
+
+    if (enabled.empty())
+    {
+        throw ConfigError{std::format("{}: no enabled account files", directory.string())};
+    }
+
+    CheckUsernamesAreUnique(enabled);
+    return enabled;
 }

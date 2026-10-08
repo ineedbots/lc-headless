@@ -14,6 +14,8 @@ struct LogEntry_s
     std::chrono::system_clock::time_point time;
     std::optional<std::source_location> location;
     std::string_view message;
+    // The name of the logger that wrote the entry, empty for an unnamed one.
+    std::string_view source;
 };
 
 template <typename... TArgs>
@@ -111,7 +113,11 @@ public:
     [[nodiscard]] bool IsEnabled(LogLevel_e level) const noexcept;
 
     Sink SetSink(Sink sink) noexcept;
+    [[nodiscard]] const std::string& GetSource() const noexcept;
 
+    // A logger whose entries carry `source` and go through `parent`: the parent's level and sink apply,
+    // and the named logger's own level can only narrow them.
+    [[nodiscard]] static std::shared_ptr<Logger> CreateNamed(std::shared_ptr<Logger> parent, std::string source);
     [[nodiscard]] static std::shared_ptr<Logger> GetDefault() noexcept;
     static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
 
@@ -120,8 +126,11 @@ public:
 
 private:
     void Write(LogLevel_e level, std::optional<std::source_location> location, std::string_view message);
+    void Deliver(LogLevel_e level, std::optional<std::source_location> location, std::string_view message, std::string_view source);
 
     std::atomic<LogLevel_e> m_level;
     std::mutex m_mutex;
     Sink m_sink;
+    std::shared_ptr<Logger> m_parent;
+    std::string m_source;
 };
