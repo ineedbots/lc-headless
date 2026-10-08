@@ -18,15 +18,19 @@ A headless game client for revision-289 (2004-era RuneScape) servers, such as th
 
 ## Requirements
 
-- Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC, CMake 3.25+ and Ninja all come with that workload.
+- One of these:
+  - Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC, CMake 3.25+ and Ninja all come with that workload.
+  - Linux, with clang, CMake 3.25+ and Ninja. The C++ standard library has to be libstdc++ 13+ or libc++ 17+, for `<format>`. The build is tested on Ubuntu 24.04 and Arch, and [Linux](#linux) lists the packages each one needs.
 - [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
 - A revision-289 server to connect to, plus its login CRCs and RSA public key (see [Configuration](#configuration)).
-
-The project is developed on Windows. `linux-clang` presets are also defined; `<format>` there needs libstdc++ 13+ or libc++ 17+.
 
 vcpkg installs the dependencies from `vcpkg.json`: Catch2, IXWebSocket (with OpenSSL, for `wss://`), nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
 
 ## Building
+
+The first configure builds every dependency through vcpkg, so it takes a while. Release builds treat warnings as errors (`/W4 /WX` with MSVC, `-Werror` with clang). Debug builds report warnings without failing.
+
+### Windows
 
 Run these from an **x64** developer prompt, such as *x64 Native Tools Command Prompt for VS 2022* or a prompt where `vcvars64.bat` has run:
 
@@ -37,17 +41,48 @@ cmake --build --preset windows-release      # or windows-debug
 
 The `windows-msvc` preset doesn't set up the compiler environment itself, so the prompt has to. The default *Developer Command Prompt* targets x86, which is the wrong architecture. Visual Studio 2022's Open Folder sets up the environment for you.
 
-The first configure builds every dependency through vcpkg, so it takes a while. The build writes these files to `build/windows-msvc/<Config>/`:
+The build writes these files to `build/windows-msvc/<Config>/`:
 
 - `Rs2004Headless.exe`: the client
 - `Rs2004HeadlessTests.exe`: the tests
 
-Release builds treat warnings as errors (`/W4 /WX`). Debug builds report warnings without failing.
+### Linux
+
+Install the compiler and the tools that vcpkg needs. On Ubuntu 24.04:
+
+```sh
+sudo apt install build-essential clang cmake ninja-build git curl zip unzip tar pkg-config perl
+```
+
+On Arch:
+
+```sh
+sudo pacman -S --needed base-devel clang cmake ninja git curl zip unzip tar perl
+```
+
+Ubuntu 22.04 and older ship libstdc++ 12 or earlier, which has no `<format>`.
+
+If you don't have vcpkg yet, clone it with its full history. `vcpkg.json` pins a baseline commit, and a `--depth 1` clone doesn't include it.
+
+```sh
+git clone https://github.com/microsoft/vcpkg ~/vcpkg
+~/vcpkg/bootstrap-vcpkg.sh
+export VCPKG_ROOT=~/vcpkg      # add this line to ~/.bashrc too
+```
+
+Then build from the repository root:
+
+```sh
+cmake --preset linux-clang
+cmake --build --preset linux-release      # or linux-debug
+```
+
+The build writes `Rs2004Headless` (the client) and `Rs2004HeadlessTests` (the tests) to `build/linux-clang/<Config>/`.
 
 ### Tests
 
 ```sh
-ctest --preset windows-debug
+ctest --preset windows-debug      # or linux-debug
 ```
 
 The Catch2 tests don't need a server. The network tests run against a fake game server on loopback ports. The tests also load the scripts in `scripts/examples/`, so an example that no longer loads fails them.
@@ -127,6 +162,12 @@ From the repository root:
 
 # One account, reloading its script on save
 .\build\windows-msvc\Release\Rs2004Headless.exe --account accounts\bot1.jsonc --watch
+```
+
+On Linux, the client is `build/linux-clang/Release/Rs2004Headless`:
+
+```sh
+./build/linux-clang/Release/Rs2004Headless --account accounts/bot1.jsonc --watch
 ```
 
 Every script loads before the first login, so a script that fails to load stops the run before any account logs in. pocketpy has 16 interpreter slots, so one process runs at most 16 scripted accounts. Start more processes to run more accounts. No two account files may share a username.
@@ -226,3 +267,4 @@ Code follows [CONVENTIONS.md](docs/CONVENTIONS.md) (C++20, Allman braces, `Pasca
 - LostCity - https://github.com/LostCityRS
 - Plutonium (OpenRSC) - https://gitlab.com/openrsc/plutonium
 - rs2b2t - https://github.com/rs2b2t/rs2b0t
+- Claude (yes this is slopped)
