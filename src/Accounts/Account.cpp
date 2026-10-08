@@ -7,13 +7,17 @@
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/Tile_s.hpp"
+#include "../Script/BotMessenger.hpp"
+#include "../Script/ProgressReport_s.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
+#include "ProgressReportFile.hpp"
 
 namespace
 {
     constexpr auto HITPOINTS_STAT = std::size_t{3};
     constexpr auto NEAREST_NPC_COUNT = std::size_t{5};
+    constexpr auto PROGRESS_EXTENSION = ".txt";
 
     std::string DescribeNearestNpcs(const GameState_s& state)
     {
@@ -70,27 +74,57 @@ namespace
     }
 }
 
-Account::Account(std::shared_ptr<const Config_s> config, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, GameClientOptions_s clientOptions)
+Account::Account(std::shared_ptr<const Config_s> config, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger)
     : m_config{WithServer(std::move(config), account.server)}
     , m_account{std::move(account)}
     , m_logger{Logger::CreateNamed(std::move(logger), m_account.name)}
-    , m_client{m_config, m_account.credentials, m_logger, clientOptions}
+    , m_options{options}
+    , m_messenger{messenger}
+    , m_client{m_config, m_account.credentials, m_logger, m_options.client}
+    , m_progressFile{std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION)}
 {
-    if (!m_account.script)
+    if (m_account.script)
+    {
+        const auto& scripting = m_config->scripting;
+        const auto& script = *m_account.script;
+        m_script.emplace(runtime, m_client,
+            ScriptHostOptions_s{
+                .scriptsDirectory = scripting.scriptsDirectory,
+                .file = script.file,
+                .settings = script.settings,
+                .callTimeout = scripting.callTimeoutMs,
+                .progressInterval = script.progressReportMinutes,
+                .onProgressReport = [this](const ProgressReport_s& report)
+                {
+                    WriteProgressReport(report);
+                },
+                .messenger = m_messenger,
+                .username = m_account.credentials.username,
+                .watchFiles = m_options.watchScripts,
+                .waitForDebugger = m_options.waitForDebugger,
+            },
+            m_logger);
+    }
+    else
     {
         m_logger->Info("No script; the account will idle");
-        return;
     }
 
-    const auto& scripting = m_config->scripting;
-    m_script.emplace(runtime, m_client,
-        ScriptHostOptions_s{
-            .scriptsDirectory = scripting.scriptsDirectory,
-            .file = m_account.script->file,
-            .settings = m_account.script->settings,
-            .callTimeout = scripting.callTimeoutMs,
-        },
-        m_logger);
+    if (m_messenger != nullptr)
+    {
+        m_messenger->Register(m_account.credentials.username, [this](BotMessage_s message)
+        {
+            return m_script && m_script->ReceiveBotMessage(std::move(message));
+        });
+    }
+}
+
+Account::~Account()
+{
+    if (m_messenger != nullptr)
+    {
+        m_messenger->Unregister(m_account.credentials.username);
+    }
 }
 
 void Account::Start()
@@ -267,6 +301,12 @@ void Account::StepScript(Clock::time_point now)
         LogOut("the script stopped the account");
         return;
     case ScriptStatus_e::Failed:
+        // While watching, the account waits logged in for the script to be fixed.
+        if (m_options.watchScripts)
+        {
+            return;
+        }
+
         m_failed = true;
         LogOut("the script failed");
         return;
@@ -282,6 +322,19 @@ void Account::StepIdle(Clock::time_point now)
 
     LogSummary(*m_logger, m_client.GetState());
     m_nextSummary = now + SUMMARY_INTERVAL;
+}
+
+void Account::WriteProgressReport(const ProgressReport_s& report)
+{
+    m_logger->Info("Progress: {}", ProgressReportFile::Summarize(report));
+    try
+    {
+        m_progressFile.Write(report, std::chrono::system_clock::now());
+    }
+    catch (const std::exception& e)
+    {
+        m_logger->Warning("The progress report wasn't saved: {}", e.what());
+    }
 }
 
 void Account::LogOut(std::string_view reason)

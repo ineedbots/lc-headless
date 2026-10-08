@@ -10,6 +10,7 @@
 #include "Core/Logger.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
+#include "Script/BotMessenger.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -23,7 +24,7 @@ namespace
     class AccountFixture
     {
     public:
-        explicit AccountFixture(std::optional<std::string_view> script, std::chrono::seconds killGrace = 30s)
+        explicit AccountFixture(std::optional<std::string_view> script, std::chrono::seconds killGrace = 30s, AccountOptions_s options = {}, BotMessenger* messenger = nullptr)
             : server{TestWorld::Send}
             , folder{"rs2004-account-tests"}
         {
@@ -38,7 +39,7 @@ namespace
                 settings.script = ScriptConfig_s{.file = "main.py"};
             }
 
-            account.emplace(std::make_shared<const Config_s>(config), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger());
+            account.emplace(std::make_shared<const Config_s>(config), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger(), options, messenger);
             account->Login();
         }
 
@@ -65,6 +66,14 @@ namespace
         [[nodiscard]] bool LoggedOutByButton() const
         {
             return server.GetPackets(ClientProt_e::IfButton).size() == 1;
+        }
+
+        [[nodiscard]] bool HasLine(std::string_view message) const
+        {
+            return std::ranges::any_of(capture.GetEntries(), [message](const CapturedLog_s& entry)
+            {
+                return entry.message == message;
+            });
         }
 
         LogCapture capture{LogLevel_e::Info};
@@ -179,4 +188,41 @@ TEST_CASE("An account whose login is refused fails without throwing", "[Account]
     {
         return entry.level == LogLevel_e::Error && entry.message.find("The account has stopped") != std::string::npos;
     }));
+}
+
+TEST_CASE("A watched account stays logged in while its script is broken", "[Account]")
+{
+    auto fixture = AccountFixture{"def loop():\n    raise ValueError('typo')\n", 30s, AccountOptions_s{.watchScripts = true}};
+    fixture.StepFor(300ms);
+    CHECK_FALSE(fixture.account->IsFinished());
+    CHECK(fixture.server.GetPackets(ClientProt_e::IfButton).empty());
+
+    fixture.folder.RewriteFile("main.py", "def loop():\n    log('fixed')\n    return 100\n");
+    fixture.StepFor(1500ms);
+    CHECK(fixture.HasLine("fixed"));
+
+    fixture.account->Interrupt();
+    REQUIRE(fixture.StepUntilFinished());
+    CHECK(fixture.account->Succeeded());
+}
+
+TEST_CASE("An account takes bot messages for its script under its username", "[Account]")
+{
+    auto messenger = BotMessenger{};
+
+    SECTION("a script that handles them gets them")
+    {
+        auto fixture = AccountFixture{"def on_bot_message(sender, message):\n    log('got', sender, message)\n\ndef loop():\n    return 100\n", 30s, {}, &messenger};
+        CHECK(messenger.Send(FakeGameServer::USERNAME, BotMessage_s{.sender = "mule", .json = "[1]"}) == std::optional{true});
+        fixture.StepFor(300ms);
+        CHECK(fixture.HasLine("got mule [1]"));
+    }
+
+    SECTION("an account without a script turns them down")
+    {
+        auto fixture = AccountFixture{std::nullopt, 30s, {}, &messenger};
+        CHECK(messenger.Send(FakeGameServer::USERNAME, BotMessage_s{.sender = "mule", .json = "[1]"}) == std::optional{false});
+    }
+
+    CHECK_FALSE(messenger.Send(FakeGameServer::USERNAME, BotMessage_s{.sender = "mule", .json = "[1]"}).has_value());
 }

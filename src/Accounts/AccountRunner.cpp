@@ -3,17 +3,17 @@
 
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
-#include "../Game/GameClient.hpp"
+#include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "Account.hpp"
 
-AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, GameClientOptions_s clientOptions)
+AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options)
     : m_config{std::move(config)}
     , m_logger{std::move(logger)}
 {
     for (auto& account : accounts)
     {
-        m_accounts.push_back(std::make_unique<Account>(m_config, std::move(account), runtime, m_logger, clientOptions));
+        m_accounts.push_back(std::make_unique<Account>(m_config, std::move(account), runtime, m_logger, options, &m_messenger));
     }
 }
 

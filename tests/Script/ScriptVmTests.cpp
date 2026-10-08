@@ -120,6 +120,16 @@ TEST_CASE("ScriptVm imports from the scripts folder, then its lib folder", "[Scr
     REQUIRE_FALSE(capture.GetEntries().empty());
     CHECK(capture.GetEntries().back().message == "hello from lib bot");
 
+    SECTION("it remembers every file it ran or imported")
+    {
+        const auto& root = folder.GetPath();
+        const auto expected = std::vector<std::filesystem::path>{root / "main.py", root / "helper.py", root / "lib/shared.py", root / "lib/tools/__init__.py", root / "lib/tools/walking.py"};
+        const auto& files = vm.GetFiles();
+        REQUIRE_FALSE(files.empty());
+        CHECK(files.front() == root / "main.py");
+        CHECK(std::ranges::is_permutation(files, expected));
+    }
+
     SECTION("a missing module raises ImportError")
     {
         CHECK_THROWS_WITH(vm.RunSource("import missing_module\n", "missing.py"), ContainsSubstring("ImportError") && ContainsSubstring("missing_module"));

@@ -13,6 +13,7 @@ namespace
     constexpr auto MAIN_MODULE = "__main__";
     constexpr auto BUILTINS_MODULE = "builtins";
     constexpr auto TIME_MODULE = "time";
+    constexpr auto JSON_MODULE = "json";
 
     using PyText = std::unique_ptr<char, decltype(&py_free)>;
 
@@ -95,6 +96,7 @@ void ScriptVm::RunFile(const std::filesystem::path& relativePath)
     }
 
     const auto path = m_options.scriptsDirectory / relativePath;
+    m_files.push_back(path);
     const auto source = ReadText(path);
     if (!source)
     {
@@ -124,8 +126,42 @@ bool ScriptVm::HasFunction(std::string_view name)
 
 py_GlobalRef ScriptVm::Call(std::string_view function, std::span<const py_Ref> args)
 {
+    return CallIn(GetMain(), function, args);
+}
+
+py_GlobalRef ScriptVm::CallBuiltin(std::string_view function, std::span<const py_Ref> args)
+{
+    return CallIn(GetBuiltins(), function, args);
+}
+
+py_GlobalRef ScriptVm::LoadJson(const std::string& json)
+{
     Activate();
-    const auto callable = py_getdict(GetMain(), py_namev(ToSv(function)));
+    if (py_import(JSON_MODULE) != 1)
+    {
+        ThrowPythonError(nullptr);
+    }
+
+    RunGuarded([&json]
+    {
+        return py_json_loads(json.c_str());
+    });
+
+    return py_retval();
+}
+
+void ScriptVm::WaitForDebugger()
+{
+    Activate();
+    m_logger->Info("Waiting for VS Code's pocketpy debugger to attach on {}:{}", DEBUGGER_HOST, DEBUGGER_PORT);
+    py_debugger_waitforattach(DEBUGGER_HOST, DEBUGGER_PORT);
+    m_logger->Info("Debugger attached");
+}
+
+py_GlobalRef ScriptVm::CallIn(py_GlobalRef module, std::string_view function, std::span<const py_Ref> args)
+{
+    Activate();
+    const auto callable = py_getdict(module, py_namev(ToSv(function)));
     if (callable == nullptr || !py_callable(callable))
     {
         throw ScriptError{std::format("The script has no function {}()", function)};
@@ -171,6 +207,11 @@ s32 ScriptVm::GetSlot() const
 Logger& ScriptVm::GetLogger() const
 {
     return *m_logger;
+}
+
+const std::vector<std::filesystem::path>& ScriptVm::GetFiles() const
+{
+    return m_files;
 }
 
 ScriptVm& ScriptVm::GetCurrent()
@@ -312,12 +353,14 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
     // Called from pocketpy's C code, so no exception may leave it; a file that can't be read is a missing module.
     try
     {
-        const auto file = GetCurrent().ResolveImport(path);
+        auto& vm = GetCurrent();
+        const auto file = vm.ResolveImport(path);
         if (!file)
         {
             return nullptr;
         }
 
+        vm.m_files.push_back(*file);
         const auto source = ReadText(*file);
         if (!source)
         {

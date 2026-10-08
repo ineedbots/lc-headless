@@ -21,9 +21,9 @@ namespace
     constexpr auto WAIT = 10s;
     constexpr auto LOOPER = "def loop():\n    log('loop')\n    return 100\n";
 
-    GameClientOptions_s FastOptions()
+    AccountOptions_s FastOptions()
     {
-        return {.retryDelay = 100ms, .loginTimeout = 5s, .keepaliveInterval = 50ms};
+        return {.client = {.retryDelay = 100ms, .loginTimeout = 5s, .keepaliveInterval = 50ms}};
     }
 
     AccountConfig_s MakeAccount(std::string name, const FakeGameServer* ownServer, std::optional<std::string> script)
@@ -280,4 +280,38 @@ TEST_CASE("AccountRunner spaces the logins out", "[AccountRunner]")
     REQUIRE(firstLogin.has_value());
     REQUIRE(secondLogin.has_value());
     CHECK(*secondLogin - *firstLogin >= 900ms);
+}
+
+TEST_CASE("AccountRunner passes bot messages between its accounts", "[AccountRunner]")
+{
+    auto fixture = RunnerFixture{};
+    auto third = FakeGameServer{TestWorld::Send};
+    fixture.folder.WriteFile("ping.py", R"python(
+def on_start():
+    log('sent', send_bot_message('BOT2', {'ping': 1}), send_bot_message('idler', 1))
+
+def on_bot_message(sender, message):
+    log('reply', sender, message['pong'])
+
+def loop():
+    return 100
+)python");
+    fixture.folder.WriteFile("pong.py", R"python(
+def on_bot_message(sender, message):
+    send_bot_message(sender, {'pong': message['ping'] + 1})
+
+def loop():
+    return 100
+)python");
+
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "ping.py"), MakeAccount("bot2", &fixture.second, "pong.py"), MakeAccount("idler", &third, std::nullopt)});
+    const auto succeeded = runner->Run([&fixture]
+    {
+        return CountLines(fixture.capture, "bot1", "reply bot2 2") >= 1 || fixture.TimedOut() ? 1u : 0u;
+    });
+    fixture.ReportProblems();
+
+    CHECK(succeeded);
+    CHECK(CountLines(fixture.capture, "bot1", "sent True False") == 1);
+    CHECK(CountLines(fixture.capture, "bot1", "reply bot2 2") == 1);
 }

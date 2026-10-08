@@ -74,11 +74,15 @@ rs2004-headless/
 │   │   ├── PyConvert.hpp/.cpp      static: C++ values to Python objects, and argument parsing
 │   │   ├── ScriptApi.hpp/.cpp      binding-neutral queries and actions over GameState_s and GameActions
 │   │   ├── ScriptBindings.hpp/.cpp static: the prelude, constants and functions in a VM's builtins
-│   │   └── ScriptHost.hpp/.cpp     one account's script: load, schedule loop(), dispatch events, handle errors
-│   ├── Core/ConfigFile.hpp/.cpp    also loads and validates accounts/*.jsonc
+│   │   ├── ScriptHost.hpp/.cpp     one account's script: load, schedule loop(), dispatch events, handle errors
+│   │   └── BotMessenger.hpp/.cpp   messages between the scripts in one process (§12)
+│   ├── Core/
+│   │   ├── ConfigFile.hpp/.cpp     also loads and validates accounts/*.jsonc
+│   │   └── FileWatcher.hpp/.cpp    notices when a script's files change, for --watch (§12)
 │   ├── Accounts/
 │   │   ├── Account.hpp/.cpp        GameClient + ScriptHost + named logger, and its lifecycle
-│   │   └── AccountRunner.hpp/.cpp  the main loop over every account, and Ctrl+C
+│   │   ├── AccountRunner.hpp/.cpp  the main loop over every account, and Ctrl+C
+│   │   └── ProgressReportFile.hpp/.cpp  writes progress reports (§12)
 │   └── Game/State/
 │       └── GameEvent_s.hpp         new: the event variant
 └── tests/
@@ -168,7 +172,8 @@ def on_server_message(msg):
 | `on_*` event hooks | After each pump, in event order, before `loop()` |
 | `on_disconnect()` / `on_reconnect()` | The connection dropped / a reconnect succeeded. `loop()` and the event hooks pause in between |
 | `on_kill_signal()` | Once, on the first Ctrl+C |
-| `on_progress_report()` | Every `script.progressReportMinutes`; returns a `dict` written as a table (Phase 5) |
+| `on_progress_report()` | Every `script.progressReportMinutes`; returns a `dict` written as a table (§12) |
+| `on_bot_message(sender, message)` | Another script in the process sent this one a message (§12) |
 
 Each account does this on every pass of the main loop:
 
@@ -280,7 +285,7 @@ The initial surface. Names follow plutonium wherever 2004 has the same concept; 
 | Use and cast | `use_item_on_npc / _player / _loc / _ground_item / _item(...)`, `cast_on_npc / _player / _loc / _ground_item / _item(spell_com, ...)` |
 | Interfaces | `click_button(com)`, `continue_dialogue()`, `answer_count(n)`, `close_interfaces()` |
 | Chat | `say(text)`, `send_pm(name, text)`, `command(text)`, `add_friend(name)`, `remove_friend(name)`, `add_ignore(name)`, `remove_ignore(name)` |
-| Control | `log(*args)`, `debug(*args)`, `stop_script()`, `stop_account()` |
+| Control | `log(*args)`, `debug(*args)`, `stop_script()`, `stop_account()`, `send_bot_message(username, message)` (§12) |
 
 The option numbers behind the conveniences and the component constants were checked against the engine in `289server/content`: `[opnpc2,_]` starts player combat, `[opobj3,...]` and `[opheld5,...]` handlers override take and drop, and `interface.pack` gives `inventory:inv` 3214, `wornitems:wear` 1688, `bank_main:inv` 5382, `bank_side:inv` 2006 and `controls:com_4`/`com_5` 152/153 for run off and on (varp 173 `option_run`). The engine's stat order is 0 to 17 as listed, then 20 for Runecraft.
 
@@ -310,7 +315,8 @@ The `account` section moves out. A new `scripting` section is added:
     "callTimeoutMs": 1000,
     "pollIntervalMs": 10,
     "loginIntervalSeconds": 2,
-    "killGraceSeconds": 30
+    "killGraceSeconds": 30,
+    "progressDirectory": "progress"
 }
 ```
 
@@ -341,7 +347,7 @@ The `account` section moves out. A new `scripting` section is added:
 
 ### Command line
 
-`rs2004-headless [client.jsonc] [--account accounts/test.jsonc]`. Without `--account`, every enabled file in `accountsDirectory` runs. Two files with the same username (ignoring case) are refused before any login, since the server would only kick one of them.
+`rs2004-headless [client.jsonc] [--account accounts/test.jsonc] [--watch] [--debugger]`. Without `--account`, every enabled file in `accountsDirectory` runs. `--watch` and `--debugger` are for working on scripts (§12). Two files with the same username (ignoring case) are refused before any login, since the server would only kick one of them.
 
 ### Another world
 
@@ -393,6 +399,14 @@ The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared
 | Tests | `TempFolder` and `TestWorld` became shared helpers; `LogCapture` records each entry's logger name | 1, 3 |
 | Tests | `LoopbackPort::IsFree` probes a port with an exclusive bind before a test server takes it. IXWebSocket's server sets `SO_REUSEADDR`, which on Windows let two test servers listen on one port, so a client could reach the wrong one. This was also why socket tests failed under `ctest -j`, which now passes | 4 |
 | Tests | `FakeGameServer` can stall a login (`SetStalled`) and ignore logout clicks (`SetIgnoreLogout`). Its mutex is recursive, because IXWebSocket can deliver a Close inside `sendBinary` on the sending thread; with a plain mutex that re-entry threw on an IXWebSocket thread and killed the test process about half the time in Release. `WebSocketClient` doesn't hold its lock while sending, so the client never had this problem | 4 |
+| `ConfigFile` | `scripting.progressDirectory` and an account file's `script.progressReportMinutes` | 5 |
+| `ScriptVm` | Records the files it runs and imports (`GetFiles`); `CallBuiltin` calls a prelude function, such as `_report_rows`, which turns a report into text; `LoadJson`; `WaitForDebugger` | 5 |
+| `ScriptHost` | Holds its VM in an `optional` so `--watch` can replace it; progress reports, bot messages and reloads (§12) | 5 |
+| `ScriptApi`, `ScriptBindings` | `SendBotMessage` and `send_bot_message` | 5 |
+| `Account`, `AccountRunner` | `AccountOptions_s` (the client options, `watchScripts`, `waitForDebugger`) replaces the `GameClientOptions_s` parameter. Accounts register with the runner's `BotMessenger` and write progress reports through `ProgressReportFile`. A failed script doesn't log a watched account out | 5 |
+| `Application`, `main` | `ParseCommandLine` reads `--watch` and `--debugger` into `CommandLine_s`; the Ctrl+C handler is installed after the scripts load, so Ctrl+C still works while waiting for the debugger | 5 |
+| `.gitignore` | `progress/` | 5 |
+| Tests | `TempFolder::RewriteFile` moves a file's modification time on, so watcher tests don't depend on the file system clock's resolution | 5 |
 
 ---
 
@@ -450,11 +464,85 @@ Unit tests run without a network. Anything that sends packets uses the existing 
     - two accounts on two fake servers;
     - a server that stalls the handshake doesn't delay the other account's `loop()`;
     - the second Ctrl+C logs everyone out.
+- **Extras:**
+    - `FileWatcher`: a change counts once it has held still for a check; a change undone in time doesn't count; deleting and creating files do count.
+    - `ProgressReportFile`: the table's exact text, the one-line summary, starting afresh then appending, creating the folder, and an unwritable path.
+    - `BotMessenger`: case-insensitive delivery, a receiver turning a message down, unknown and unregistered usernames.
+    - `ScriptHost`:
+        - reports at the interval, in the script's order;
+        - a report that isn't a dict is a script error;
+        - a warning when reports are asked for but the script has no hook;
+        - messages sent, received and copied as JSON;
+        - the size limit, the 100-message queue, and scripts that can't take messages;
+        - a reload after a change to the script or a module it imports;
+        - a change that can't load, and a script that failed, both waiting for the next change.
+    - `Account`: a watched account stays logged in while its script is broken, and takes bot messages under its username until it goes away.
+    - `AccountRunner`: two accounts exchange messages over real connections, and a message to an account without a script returns `False`.
+    - `Application::ParseCommandLine`: the flags, and the combinations it refuses.
 - **Smoke**, against the local engine: run the example scripts, including one that walks, attacks and picks up loot. Then run two accounts at once.
 
 ---
 
-## 12. Implementation order
+## 12. Extras
+
+Phase 5 adds four things, each independent of the others.
+
+### Progress reports
+
+plutonium's progress reports, kept in a file per account.
+
+- An account file's `script.progressReportMinutes` (1–1440; 0 or leaving it out turns reports off) sets how often the host calls `on_progress_report()`. The first call comes that long after `on_start`. A report that falls due while the account is reconnecting waits until the player is placed again.
+- The hook returns a `dict`. Each key and value goes through `str()`, and the rows keep the dict's order, so the script decides it. Returning anything else is a script error, as a bad return from `loop()` is.
+- `Account` appends the report to `<scripting.progressDirectory>/<account>.txt` (`progress` by default) as a table under a UTC timestamp and the time since `on_start`. The first report of a run starts the file afresh. The same rows go to the account's log as one line. A file that can't be written is a warning, not an error.
+- If `progressReportMinutes` is set but the script has no `on_progress_report`, loading warns.
+
+```
+Progress at 2026-10-08T14:20:00Z, 1h 20m after the script started
++-------+-------+
+| Name  | Value |
++-------+-------+
+| Kills | 10    |
+| Bones | 42    |
++-------+-------+
+```
+
+### Bot messages
+
+Scripts in one process can send each other messages, as plutonium's can.
+
+- `send_bot_message(username, message)` queues `message` for the script of the account with that username, ignoring case, and returns `True`. It returns `False` when that account's script isn't running, doesn't define `on_bot_message`, or already has 100 messages waiting. A username that no account in the process has raises `ValueError`, because that's a mistake in the script or its settings rather than a passing state.
+- The receiver's `on_bot_message(sender, message)` gets the sender's username and a copy of the message. Each VM has its own heap, so messages travel as JSON: a message is anything `json.dumps` accepts (dicts with string keys, lists, tuples, which arrive as lists, strings, numbers, booleans and `None`), up to 64 KiB of JSON. Anything else raises `TypeError` in the sender.
+- Messages arrive on the receiver's next step, in the order sent, after game events and chat and before `on_server_tick` and `loop()`. Like other hooks, they wait while the receiver logs in or reconnects. A message sent while handling one is delivered on the receiver's next step, so two scripts can't keep each other busy within one pass.
+- pocketpy's registers (`py_r0()` and the rest) belong to the current VM. The host therefore names a register only after switching to the receiver's VM; naming one first put a message into the sender's register, which only the runner test, with two VMs, caught.
+- `BotMessenger` maps each username to a receiver function. `AccountRunner` owns it, and every `Account` registers itself, with or without a script, so an account without one is known but never takes a message. `ScriptApi::SendBotMessage` sends through it under the account's own username.
+
+### Reloading on change
+
+`--watch` reloads an account's script when its files change, for working on a script against a live account.
+
+- `ScriptVm` records every file it loads: the script, and each module it imports from `scripts/` or `scripts/lib/`. Every 500 ms the host compares their modification times with those at load. Once a change has held still for one check, the host reloads, so an editor that saves in several writes causes one reload.
+- A reload throws the VM away and loads the script into a fresh one with the same settings. The new script starts as any script does: `on_start` runs on the next step if the player is placed, and `loop()` right after. Events, chat and ticks from before the reload are skipped; bot messages already queued are kept. The account stays logged in throughout.
+- While watching, a script that fails, whether a reload can't load it or it fails later, leaves the account logged in and idle until its files change again, instead of logging it out, so fixing a typo doesn't cost a login. A script that can't load at startup still stops the run before any login. `stop_account()` still logs out, and after `stop_script()` the account idles until the next change.
+- Only the script's files are watched. A change to the account file, such as new settings, needs a restart.
+
+### Debugger
+
+`--debugger` lets VS Code's pocketpy extension debug one account's script, with breakpoints, stepping, the call stack and variables.
+
+- It needs `--account`, naming an account with a script. Before running the script, the host calls `py_debugger_waitforattach("127.0.0.1", 6110)`, which waits for VS Code to attach. `Application` installs its Ctrl+C handler only after the scripts have loaded, so Ctrl+C still ends the process during the wait.
+- The attach configuration's `sourceFolder` is the scripts folder. The extension sends breakpoint paths relative to it, and pocketpy matches them against the script's file name, which is relative to the scripts folder too.
+- pocketpy's debugger belongs to the whole process, which brings limits that `ScriptingApi.md` lists:
+    - A paused script pauses the process. The server hears nothing from the client meanwhile, so a long pause may end in a reconnect.
+    - pocketpy turns the watchdog off while a debugger is attached.
+    - An uncaught exception stops in the debugger and stays stopped, because pocketpy never returns from it.
+    - Ending the debug session ends the process at once (pocketpy calls `exit`), without logging out.
+    - A module imported from `scripts/lib/` carries its import name as its file name, so breakpoints in it aren't hit.
+- `--watch` and `--debugger` can't be combined, because a reload would replace the VM the debugger traces.
+- There's no automated test. Once a debugger attaches, pocketpy treats the whole process as debugged for good, which would turn off the watchdog and stop on the exceptions in every later test. It was checked by hand with a small DAP client instead.
+
+---
+
+## 13. Implementation order
 
 1. **pocketpy and the runtime.**
     - Work: the overlay port, `vcpkg-configuration.json`, `ScriptRuntime`, `ScriptVm`, `ScriptError`, and the Phase 1 checks listed in §3.
@@ -468,8 +556,6 @@ Unit tests run without a network. Anything that sends packets uses the existing 
 4. **Many accounts.**
     - Work: `AccountRunner`, the non-blocking `GameClient` (§8), and Ctrl+C with `on_kill_signal`.
     - Done when: the runner tests pass, and two accounts run their scripts side by side on the local engine. Restarting the server makes both reconnect without blocking each other.
-5. **Extras, each optional.**
-    - progress reports to `logs/progress_reports/<account>.txt`;
-    - `send_bot_message` / `on_bot_message` between accounts in the process;
-    - reloading a script when its file changes;
-    - attaching pocketpy's VS Code debugger to one account (`py_debugger_waitforattach`).
+5. **Extras** (§12).
+    - Work: progress reports to `progress/<account>.txt`; `send_bot_message` and `on_bot_message` between the accounts in the process; `--watch`, which reloads a script when its files change; `--debugger`, which attaches pocketpy's VS Code debugger to one account.
+    - Done when: each has tests, except the debugger (§12). Messages between accounts are tested through `AccountRunner` over real connections, since the server plays no part in them. Against the local engine, a `--watch` run writes a progress report and reloads an edited script without logging out, including after a syntax error, and a `--debugger` run stops at a breakpoint in `loop()` for a DAP client that attaches as VS Code's extension does, then logs out cleanly on Ctrl+C.

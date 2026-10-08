@@ -29,6 +29,7 @@ namespace
     constexpr auto MAX_POLL_INTERVAL = 1000ms;
     constexpr auto MAX_LOGIN_INTERVAL = 60s;
     constexpr auto MAX_KILL_GRACE = 600s;
+    constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto LEGACY_ACCOUNT_KEY = "account";
     constexpr auto FIRST_PRINTABLE = '\x20';
     constexpr auto LAST_PRINTABLE = '\x7E';
@@ -222,6 +223,7 @@ namespace
         Check(scripting.pollIntervalMs >= MIN_POLL_INTERVAL && scripting.pollIntervalMs <= MAX_POLL_INTERVAL, "scripting.pollIntervalMs", std::format("must be from {} to {}", MIN_POLL_INTERVAL.count(), MAX_POLL_INTERVAL.count()));
         Check(scripting.loginIntervalSeconds >= 0s && scripting.loginIntervalSeconds <= MAX_LOGIN_INTERVAL, "scripting.loginIntervalSeconds", std::format("must be from 0 to {}", MAX_LOGIN_INTERVAL.count()));
         Check(scripting.killGraceSeconds >= 0s && scripting.killGraceSeconds <= MAX_KILL_GRACE, "scripting.killGraceSeconds", std::format("must be from 0 to {}", MAX_KILL_GRACE.count()));
+        Check(!scripting.progressDirectory.empty(), "scripting.progressDirectory", "must be a folder path");
     }
 
     void ValidateAccount(const AccountConfig_s& account)
@@ -236,7 +238,10 @@ namespace
 
         if (account.script)
         {
-            Check(!account.script->file.empty(), "script.file", "must name a script file in the scripts directory");
+            const auto& script = *account.script;
+            Check(!script.file.empty(), "script.file", "must name a script file in the scripts directory");
+            Check(script.progressReportMinutes >= std::chrono::minutes{0} && script.progressReportMinutes <= MAX_PROGRESS_REPORT_INTERVAL, "script.progressReportMinutes",
+                  std::format("must be from 0 (no reports) to {}", MAX_PROGRESS_REPORT_INTERVAL.count()));
         }
     }
 
@@ -412,13 +417,14 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, t
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
 
 // Account files are only read, and a script's settings can be any object, so they convert by hand.
 void from_json(const nlohmann::json& value, ScriptConfig_s& script)
 {
     script.file = value.value("file", std::string{});
+    script.progressReportMinutes = std::chrono::minutes{value.value("progressReportMinutes", s64{0})};
     const auto settings = value.find("settings");
     if (settings == value.end())
     {

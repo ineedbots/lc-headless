@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "Application.hpp"
 
+#include "Accounts/Account.hpp"
 #include "Accounts/AccountRunner.hpp"
 #include "Core/ConfigError.hpp"
 #include "Core/ConfigFile.hpp"
@@ -66,22 +67,74 @@ namespace
     }
 }
 
-Application::Application(const std::filesystem::path& configPath, std::optional<std::filesystem::path> accountPath, std::shared_ptr<Logger> logger)
+CommandLine_s Application::ParseCommandLine(std::span<char* const> args)
+{
+    auto commandLine = CommandLine_s{};
+    for (std::size_t i = 0; i < args.size(); ++i)
+    {
+        const auto arg = std::string_view{args[i]};
+        if (arg == ACCOUNT_OPTION)
+        {
+            if (i + 1 >= args.size())
+            {
+                throw std::invalid_argument{std::format("{} needs an account file path", ACCOUNT_OPTION)};
+            }
+
+            commandLine.accountPath = args[++i];
+        }
+        else if (arg == WATCH_OPTION)
+        {
+            commandLine.watch = true;
+        }
+        else if (arg == DEBUGGER_OPTION)
+        {
+            commandLine.debugger = true;
+        }
+        else if (arg.starts_with("--"))
+        {
+            throw std::invalid_argument{std::format("Unknown option {}; {}", arg, USAGE)};
+        }
+        else
+        {
+            commandLine.configPath = arg;
+        }
+    }
+
+    if (commandLine.watch && commandLine.debugger)
+    {
+        throw std::invalid_argument{std::format("{} and {} can't be combined: a reload would replace the script the debugger is attached to", WATCH_OPTION, DEBUGGER_OPTION)};
+    }
+
+    if (commandLine.debugger && !commandLine.accountPath)
+    {
+        throw std::invalid_argument{std::format("{} needs {}: a script paused in the debugger pauses every account in the process", DEBUGGER_OPTION, ACCOUNT_OPTION)};
+    }
+
+    return commandLine;
+}
+
+Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
     : m_logger{std::move(logger)}
-    , m_accountPath{std::move(accountPath)}
+    , m_commandLine{std::move(commandLine)}
 {
     assert(m_logger && "Application needs a logger");
-    m_config = std::make_shared<const Config_s>(ConfigFile::Load(configPath, *m_logger));
+    m_config = std::make_shared<const Config_s>(ConfigFile::Load(m_commandLine.configPath, *m_logger));
     m_logger->SetLevel(m_config->client.logLevel);
-    m_logger->Info("Config loaded from {}", configPath.string());
+    m_logger->Info("Config loaded from {}", m_commandLine.configPath.string());
 }
 
 int Application::Run()
 {
-    std::signal(SIGINT, SignalHandler);
-
     auto runtime = ScriptRuntime{};
-    auto runner = AccountRunner{m_config, LoadAccounts(), runtime, m_logger};
+    const auto options = AccountOptions_s{.watchScripts = m_commandLine.watch, .waitForDebugger = m_commandLine.debugger};
+    auto runner = AccountRunner{m_config, LoadAccounts(), runtime, m_logger, options};
+    if (m_commandLine.watch)
+    {
+        m_logger->Info("Watching the scripts: each reloads when its files change, and one that fails waits for a fix");
+    }
+
+    // Installed only once the scripts have loaded, so Ctrl+C still ends the process while it waits for the debugger.
+    std::signal(SIGINT, SignalHandler);
     const auto succeeded = runner.Run([]
     {
         return interruptCount.load();
@@ -92,10 +145,15 @@ int Application::Run()
 
 std::vector<AccountConfig_s> Application::LoadAccounts() const
 {
-    if (m_accountPath)
+    if (m_commandLine.accountPath)
     {
         auto accounts = std::vector<AccountConfig_s>{};
-        accounts.push_back(ConfigFile::LoadAccount(*m_accountPath));
+        accounts.push_back(ConfigFile::LoadAccount(*m_commandLine.accountPath));
+        if (m_commandLine.debugger && !accounts.front().script)
+        {
+            throw ConfigError{std::format("{}: {} needs an account with a script", m_commandLine.accountPath->string(), DEBUGGER_OPTION)};
+        }
+
         return accounts;
     }
 

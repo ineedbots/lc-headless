@@ -10,6 +10,7 @@
 #include "../Game/State/Stat_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
+#include "BotMessenger.hpp"
 
 namespace
 {
@@ -35,9 +36,11 @@ namespace
     }
 }
 
-ScriptApi::ScriptApi(const GameState_s& state, GameActions& actions)
+ScriptApi::ScriptApi(const GameState_s& state, GameActions& actions, BotMessenger* messenger, std::string username)
     : m_state{state}
     , m_actions{actions}
+    , m_messenger{messenger}
+    , m_username{std::move(username)}
 {
 }
 
@@ -512,6 +515,21 @@ void ScriptApi::AddIgnore(std::string_view name)
 void ScriptApi::RemoveIgnore(std::string_view name)
 {
     m_actions.RemoveIgnore(name);
+}
+
+std::optional<bool> ScriptApi::SendBotMessage(std::string_view username, std::string json)
+{
+    if (json.size() > BotMessenger::MAX_MESSAGE_SIZE)
+    {
+        throw std::invalid_argument{std::format("The message is {} bytes as JSON, over the limit of {}", json.size(), BotMessenger::MAX_MESSAGE_SIZE)};
+    }
+
+    if (m_messenger == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    return m_messenger->Send(username, BotMessage_s{.sender = m_username, .json = std::move(json)});
 }
 
 void ScriptApi::RequestStop(StopRequest_e request)

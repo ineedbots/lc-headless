@@ -70,6 +70,12 @@ class Settings:
 def _load_settings(text):
     import json
     return Settings(json.loads(text))
+
+
+def _report_rows(report):
+    if not isinstance(report, dict):
+        raise TypeError(f'on_progress_report() must return a dict, not {type(report).__name__}')
+    return [[str(name), str(value)] for name, value in report.items()]
 )python"sv;
 
     constexpr auto LOAD_SETTINGS = "settings = _load_settings(_settings_json)\ndel _settings_json\n"sv;
@@ -905,6 +911,26 @@ def _load_settings(text):
         });
     }
 
+    bool SendBotMessage(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto username = PyConvert::ToString(py_arg(0), "username");
+            if (!py_json_dumps(py_arg(1), 0))
+            {
+                return false;
+            }
+
+            const auto sent = GetApi().SendBotMessage(username, PyConvert::ToString(py_retval(), "message"));
+            if (!sent)
+            {
+                throw std::invalid_argument{std::format("No account in this process has the username {}", username)};
+            }
+
+            return ReturnBool(*sent);
+        });
+    }
+
     template <void (ScriptApi::*TCall)(std::string_view)>
     bool CallWithName(int, py_StackRef argv) noexcept
     {
@@ -927,6 +953,7 @@ def _load_settings(text):
             {"get_tick()", GetTick},
             {"stop_script()", StopScript},
             {"stop_account()", StopAccount},
+            {"send_bot_message(username, message)", SendBotMessage},
             {"get_x()", GetX},
             {"get_z()", GetZ},
             {"get_level()", GetLevel},

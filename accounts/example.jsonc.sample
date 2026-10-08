@@ -15,6 +15,10 @@
         // Relative to scripting.scriptsDirectory in client.jsonc.
         "file": "examples/chicken_killer.py",
 
+        // Minutes between calls to the script's on_progress_report(), written to progress/<name>.txt.
+        // 0 or leaving it out means no reports.
+        "progressReportMinutes": 20,
+
         // Anything here reaches the script as its settings object: settings.loot_goal,
         // settings.get("teleport"), and so on. Keys are used as written.
         "settings": {

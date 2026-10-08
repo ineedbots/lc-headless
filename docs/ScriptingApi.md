@@ -38,19 +38,22 @@ def on_server_message(msg):
         stop_account()
 ```
 
-`scripts/examples/` has complete scripts: `chicken_killer.py` fights, loots and logs out, and `walker.py` walks a loop of tiles, optionally for a set number of laps.
+`scripts/examples/` has complete scripts: `chicken_killer.py` fights, loots and logs out, and `walker.py` walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Both make progress reports.
+
+For working on a script, `--watch` reloads it whenever you save it, and `--debugger` lets VS Code debug it (see [Working on a script](#working-on-a-script)).
 
 ## How scripts run
 
 - The module body runs once, before login. Use it for constants and settings. Game functions return empty values at that point, and actions fail, since there's no session yet.
 - `on_start()` runs once the player is first placed in the world. After that, on every pass of the main loop the client:
-  1. calls the hooks for everything that arrived since the last pass (events first, then chat messages);
+  1. calls the hooks for everything that arrived since the last pass (events first, then chat messages, then messages from other scripts);
   2. calls `on_server_tick` if a tick passed;
-  3. calls `loop()` if its delay is up.
+  3. calls `on_progress_report` if a report is due;
+  4. calls `loop()` if its delay is up.
 
   A game tick is 600 ms, so delays of 600 or more are typical; 0 means "as soon as possible".
 - Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. `time.sleep()` raises an error: return a delay from `loop()` instead.
-- An uncaught exception, or a `loop()` that returns anything but an int of 0 or more, stops the script. The client logs the traceback and logs the account out.
+- An uncaught exception, or a `loop()` that returns anything but an int of 0 or more, stops the script. The client logs the traceback and logs the account out, unless it's running with `--watch`.
 - Objects such as `Npc` are snapshots taken when the function returned. Keep the `index` to look one up again later with `get_npc(index)`.
 - Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view return `False`. A wrong argument type raises `TypeError`, and a value out of range (an option outside 1 to 5, say) raises `ValueError`.
 - `log(*args)` writes at Info level and `debug(*args)` at Verbose level; `print()` also goes to the log. Each line carries the account's name.
@@ -165,6 +168,7 @@ Distances count tiles in the larger of the two directions.
 | `add_friend(name)`, `remove_friend(name)`, `add_ignore(name)`, `remove_ignore(name)` | Friends and ignore lists |
 | `stop_script()` | Stops calling the script; the account stays logged in and idles |
 | `stop_account()` | Stops the script and logs the account out |
+| `send_bot_message(username, message)` | Sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)) |
 
 ## Hooks
 
@@ -188,8 +192,95 @@ Define any of these to be told when something happens. Hooks that aren't defined
 | `on_system_update(seconds)` | The server announced a restart |
 | `on_disconnect()`, `on_reconnect()` | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login |
 | `on_kill_signal()` | Ctrl+C was pressed. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
+| `on_progress_report()` | A progress report is due; return a `dict` (see [Progress reports](#progress-reports)) |
+| `on_bot_message(sender, message)` | Another script in this process sent this one a message (see [Messages between scripts](#messages-between-scripts)) |
 
 Hooks only report what the server said. When the map rebuilds, or an area falls out of view, things vanish from the state without a despawn hook, so check what's in view rather than keeping your own copy.
+
+## Progress reports
+
+Set `script.progressReportMinutes` in the account file (1 to 1440) and define `on_progress_report()`, returning a `dict`:
+
+```python
+def on_progress_report():
+    return {'Kills': kills, 'Bones': get_inventory_count_by_id(526)}
+```
+
+That many minutes after `on_start`, and every that many minutes after that, the client calls it, appends the result as a table to `progress/<account>.txt`, and logs it on one line. The folder is `scripting.progressDirectory` in `client.jsonc`, and each run starts the file afresh.
+
+```
+Progress at 2026-10-08T14:20:00Z, 1h 20m after the script started
++-------+-------+
+| Name  | Value |
++-------+-------+
+| Kills | 10    |
+| Bones | 42    |
++-------+-------+
+```
+
+Names and values are shown with `str()`, in the dict's order. Returning anything but a `dict` is a script error. A report that falls due while the account is reconnecting waits until it's back.
+
+## Messages between scripts
+
+`send_bot_message(username, message)` sends `message` to the script of another account in the same process, named by the username in its account file, in any case. That script's `on_bot_message(sender, message)` receives it with the sender's username:
+
+```python
+# The worker's script
+send_bot_message(settings.mule, {'want': 'trade', 'items': [[995, 1000]]})
+
+# The mule's script
+def on_bot_message(sender, message):
+    if message['want'] == 'trade':
+        log(sender, 'wants to trade')
+```
+
+- The message is copied as JSON, so it can be a dict with string keys, a list, a string, a number, a bool or `None`, nested as deep as you like, up to 64 KiB. Tuples arrive as lists. Anything else raises `TypeError`.
+- It returns `True` once the message is queued. `False` means the receiver can't take it now: its script has stopped or doesn't define `on_bot_message`, or 100 of its messages are already waiting. A username that no account in the process has raises `ValueError`.
+- Messages arrive in the order sent, on the receiver's next pass, and wait while it logs in or reconnects. A script can message itself; a message sent while handling one arrives on the next pass.
+
+## Working on a script
+
+### Reloading on save
+
+`--watch` reloads a script whenever you save it, or a module it imports, without logging out:
+
+```
+rs2004-headless client.jsonc --account accounts/<name>.jsonc --watch
+```
+
+- The new code starts fresh: its globals are new, `on_start()` runs again, and events from before the save are skipped. Messages already queued for it are kept.
+- If a save breaks the script, or the script fails later, the account stays logged in and idle until the next save, so a typo doesn't cost a login. The traceback is logged as usual. A script that can't load at startup still stops the run before any login.
+- A change to the account file, such as new settings, needs a restart.
+
+### Debugging in VS Code
+
+`--debugger` lets VS Code debug one account's script, with breakpoints, stepping, the call stack, variables, and a debug console that can call the API (`get_x()`, say).
+
+1. Install VS Code's pocketpy extension (`pocketpy.pocketpy`).
+2. Add an attach configuration to `.vscode/launch.json`. `sourceFolder` must be the scripts folder, or breakpoints aren't hit:
+
+   ```json
+   {
+       "type": "pocketpy",
+       "request": "attach",
+       "name": "Attach to rs2004-headless",
+       "host": "127.0.0.1",
+       "port": 6110,
+       "sourceFolder": "${workspaceFolder}/scripts"
+   }
+   ```
+
+3. Run `rs2004-headless client.jsonc --account accounts/<name>.jsonc --debugger`. It loads the script, then waits with "Waiting for VS Code's pocketpy debugger to attach on 127.0.0.1:6110".
+4. Start that configuration in VS Code. The account logs in once the debugger has attached.
+
+pocketpy's debugger brings some limits:
+
+- While the script is paused, the whole process is paused, and the server hears nothing from the client. A long pause may end in a reconnect.
+- `scripting.callTimeoutMs` doesn't apply while the debugger is attached.
+- An uncaught exception stops in the debugger and stays there.
+- Stopping the debug session ends the process at once, without logging out. To log out cleanly, press Ctrl+C in the client first.
+- Breakpoints work in the script and in modules beside it in `scripts/`, but not in modules imported from `scripts/lib/`.
+- `--debugger` needs `--account`, and can't be combined with `--watch`.
 
 ## Constants
 
@@ -213,6 +304,7 @@ The client only knows what the server sends, with no game cache behind it, so:
 ## Porting from plutonium
 
 - `loop`, `settings`, `log` and the `on_*` hooks work the same way.
+- `on_progress_report` and `send_bot_message` work as in plutonium, with two differences. A message is copied as JSON, so it can't carry objects. A full queue makes `send_bot_message` return `False` instead of raising.
 - `at_object(obj)` becomes `interact_loc(id, x, z, 1)`, with the id and tile written into the script.
 - `walk_path_to`, `is_reachable` and `calculate_path_to` have no equivalent yet.
 - Fatigue, sleeping, the option menu and other RSC-only calls don't exist.

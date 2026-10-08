@@ -120,7 +120,8 @@ rs2004-headless/
         "callTimeoutMs": 1000,
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
-        "killGraceSeconds": 30
+        "killGraceSeconds": 30,
+        "progressDirectory": "progress"
     }
 }
 ```
@@ -169,7 +170,8 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
         "callTimeoutMs": 1000,
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
-        "killGraceSeconds": 30
+        "killGraceSeconds": 30,
+        "progressDirectory": "progress"
     }
 }
 ```
@@ -198,6 +200,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `scripting.pollIntervalMs` | integer | `10` | 1 to 1000. The longest the main loop waits between passes |
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
+| `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
 
 - **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
 - **`login.crcs`** defaults to nine zeros, which are valid numbers, so a file without it loads. A server that checks CRCs then rejects the login, and the login code reports that.
@@ -228,6 +231,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `ConfigF
     "enabled": true,
     "script": {
         "file": "examples/chicken_killer.py",
+        "progressReportMinutes": 20,
         "settings": {"npc_ids": [41], "loot_goal": 3}
     }
 }
@@ -241,6 +245,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `ConfigF
 | `server` | object or `null` | none: `client.jsonc`'s | The same keys and rules as `client.jsonc`'s `server` section, with `url` required. Logs this account into another world |
 | `script` | object or `null` | none: the account idles | |
 | `script.file` | string | none | Not empty. Relative to `scripting.scriptsDirectory` |
+| `script.progressReportMinutes` | integer | `0`: no reports | 0 to 1440. How often the script's `on_progress_report()` is called ([ScriptingDesign.md](ScriptingDesign.md) §12). Stored as `std::chrono::minutes` |
 | `script.settings` | object | `{}` | Any object. It's kept as JSON text and becomes the script's `settings` ([ScriptingDesign.md](ScriptingDesign.md) §7) |
 
 ---
@@ -295,6 +300,7 @@ struct ScriptingSettings_s
     std::chrono::milliseconds pollIntervalMs = 10ms;
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
+    std::string progressDirectory = "progress";
 };
 
 struct Config_s
@@ -310,6 +316,8 @@ struct ScriptConfig_s
     std::string file;
     // The settings object as JSON text; the script reads it as its settings global.
     std::string settings = "{}";
+    // How often on_progress_report is called; zero turns reports off.
+    std::chrono::minutes progressReportMinutes{0};
 };
 
 // One account file. Without a script, the account logs in and idles.
@@ -533,7 +541,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
 
@@ -651,7 +659,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 
 ## 6. Test plan
 
-The plan below was written while `client.jsonc` held the account. Since the account moved to its own file ([ScriptingDesign.md](ScriptingDesign.md) Phase 3), its cases have moved with it. The username and password rules, and the checks that no message quotes a credential, now run against `ConfigFile::ParseAccount`, in the `[AccountFile]` cases of `ConfigFileTests.cpp`. Those cases also cover `enabled`, `script`, `script.file`, `script.settings` and `LoadAccount`. The config file's cases cover the `scripting` section's defaults, limits and wrong types instead, and a leftover `account` section's warning. Where the plan below mentions `account.*`, read it as the account file.
+The plan below was written while `client.jsonc` held the account. Since the account moved to its own file ([ScriptingDesign.md](ScriptingDesign.md) Phase 3), its cases have moved with it. The username and password rules, and the checks that no message quotes a credential, now run against `ConfigFile::ParseAccount`, in the `[AccountFile]` cases of `ConfigFileTests.cpp`. Those cases also cover `enabled`, `script`, `script.file`, `script.settings`, `script.progressReportMinutes` and `LoadAccount`. The config file's cases cover the `scripting` section's defaults, limits and wrong types instead, and a leftover `account` section's warning. Where the plan below mentions `account.*`, read it as the account file.
 
 ### 6.1 Strategy
 

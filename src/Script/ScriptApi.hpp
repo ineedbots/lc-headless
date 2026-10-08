@@ -9,6 +9,7 @@
 #include "../Game/State/Stat_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
+#include "BotMessenger.hpp"
 
 struct InventoryItem_s
 {
@@ -35,6 +36,7 @@ enum class StopRequest_e : u8
 // What a script can see and do, in plain C++ over the tracked state and GameActions, so a binding only
 // converts arguments and results. Tiles given as x and z are on the local player's level. Actions on a
 // target that's no longer tracked return false; arguments out of range throw std::invalid_argument.
+// Bot messages go through the messenger, if there is one, under the account's username.
 class ScriptApi
 {
 public:
@@ -52,7 +54,7 @@ public:
     static constexpr u8 OP_TAKE = 3;
     static constexpr u8 OP_DROP = 5;
 
-    ScriptApi(const GameState_s& state, GameActions& actions);
+    ScriptApi(const GameState_s& state, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {});
 
     [[nodiscard]] const GameState_s& GetState() const;
     [[nodiscard]] const Player_s& GetLocalPlayer() const;
@@ -112,6 +114,9 @@ public:
     void AddIgnore(std::string_view name);
     void RemoveIgnore(std::string_view name);
 
+    // Empty when no account in the process has that username; otherwise whether its script took the message.
+    [[nodiscard]] std::optional<bool> SendBotMessage(std::string_view username, std::string json);
+
     void RequestStop(StopRequest_e request);
     [[nodiscard]] StopRequest_e TakeStopRequest();
 
@@ -126,5 +131,7 @@ private:
 
     const GameState_s& m_state;
     GameActions& m_actions;
+    BotMessenger* m_messenger;
+    std::string m_username;
     StopRequest_e m_stopRequest = StopRequest_e::None;
 };

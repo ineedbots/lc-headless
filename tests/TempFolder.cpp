@@ -30,3 +30,11 @@ void TempFolder::WriteFile(const std::filesystem::path& relativePath, std::strin
 
     file << text;
 }
+
+void TempFolder::RewriteFile(const std::filesystem::path& relativePath, std::string_view text) const
+{
+    const auto path = m_path / relativePath;
+    const auto before = std::filesystem::last_write_time(path);
+    WriteFile(relativePath, text);
+    std::filesystem::last_write_time(path, before + 1s);
+}

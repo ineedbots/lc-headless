@@ -46,7 +46,8 @@ namespace
         "callTimeoutMs": 500,
         "pollIntervalMs": 20,
         "loginIntervalSeconds": 5,
-        "killGraceSeconds": 60
+        "killGraceSeconds": 60,
+        "progressDirectory": "reports"
     }
 }
 )json"sv;
@@ -90,7 +91,8 @@ namespace
         "callTimeoutMs": 1000,
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
-        "killGraceSeconds": 30
+        "killGraceSeconds": 30,
+        "progressDirectory": "progress"
     }
 }
 )json"sv;
@@ -110,6 +112,7 @@ namespace
     "enabled": false,
     "script": {
         "file": "examples/chicken_killer.py",
+        "progressReportMinutes": 20,
         "settings": {"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens"}
     }
 })json"sv;
@@ -166,6 +169,7 @@ namespace
         {"scripting", "pollIntervalMs"},
         {"scripting", "loginIntervalSeconds"},
         {"scripting", "killGraceSeconds"},
+        {"scripting", "progressDirectory"},
     };
 
     s32 Crc(u32 value)
@@ -290,6 +294,7 @@ namespace
         CHECK(config.scripting.pollIntervalMs == 20ms);
         CHECK(config.scripting.loginIntervalSeconds == 5s);
         CHECK(config.scripting.killGraceSeconds == 60s);
+        CHECK(config.scripting.progressDirectory == "reports");
     }
 
     void CheckScriptingDefaults(const ScriptingSettings_s& scripting)
@@ -300,6 +305,7 @@ namespace
         CHECK(scripting.pollIntervalMs == 10ms);
         CHECK(scripting.loginIntervalSeconds == 2s);
         CHECK(scripting.killGraceSeconds == 30s);
+        CHECK(scripting.progressDirectory == "progress");
     }
 
     void CheckOptionalDefaults(const Config_s& config)
@@ -499,6 +505,10 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.scripting.killGraceSeconds == 30s);
             }
+            else if (key.key == "progressDirectory")
+            {
+                CHECK(config.scripting.progressDirectory == "progress");
+            }
         }
     }
 
@@ -655,6 +665,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "loginIntervalSeconds"}, 60)).scripting.loginIntervalSeconds == 60s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 0)).scripting.killGraceSeconds == 0s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 600)).scripting.killGraceSeconds == 600s);
+        CHECK(ParseAccepted(SetKey({"scripting", "progressDirectory"}, "logs/progress")).scripting.progressDirectory == "logs/progress");
     }
 
     SECTION("login.crcs in any spelling")
@@ -761,6 +772,8 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "loginIntervalSeconds"}, 61},
         {{"scripting", "killGraceSeconds"}, -1},
         {{"scripting", "killGraceSeconds"}, 601},
+        {{"scripting", "progressDirectory"}, ""},
+        {{"scripting", "progressDirectory"}, 5},
     };
 
     for (const auto& rejection : rejections)
@@ -802,6 +815,7 @@ TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
     CHECK_FALSE(account.enabled);
     REQUIRE(account.script.has_value());
     CHECK(account.script->file == "examples/chicken_killer.py");
+    CHECK(account.script->progressReportMinutes == std::chrono::minutes{20});
     CHECK(nlohmann::json::parse(account.script->settings) == nlohmann::json::parse(R"json({"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens"})json"));
 
     SECTION("only the credentials are required")
@@ -823,6 +837,17 @@ TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
             json["script"].erase("settings");
         });
         CHECK(ConfigFile::ParseAccount(text, "bot1").script->settings == "{}");
+    }
+
+    SECTION("progress reports are off unless asked for, and allowed up to a day apart")
+    {
+        const auto text = EditAccount([](nlohmann::json& json)
+        {
+            json["script"].erase("progressReportMinutes");
+        });
+        CHECK(ConfigFile::ParseAccount(text, "bot1").script->progressReportMinutes == std::chrono::minutes{0});
+        CHECK(ConfigFile::ParseAccount(SetScriptKey("progressReportMinutes", 1), "bot1").script->progressReportMinutes == std::chrono::minutes{1});
+        CHECK(ConfigFile::ParseAccount(SetScriptKey("progressReportMinutes", 1440), "bot1").script->progressReportMinutes == std::chrono::minutes{1440});
     }
 
     SECTION("usernames and passwords at their limits")
@@ -880,6 +905,9 @@ TEST_CASE("ConfigFile rejects invalid account files", "[ConfigFile][AccountFile]
     CheckAccountRejected(SetScriptKey("file", ""), "script.file");
     CheckAccountRejected(SetScriptKey("file", 5), "script.file");
     CheckAccountRejected(SetScriptKey("settings", nlohmann::json::array({41})), "script.settings");
+    CheckAccountRejected(SetScriptKey("progressReportMinutes", -1), "script.progressReportMinutes");
+    CheckAccountRejected(SetScriptKey("progressReportMinutes", 1441), "script.progressReportMinutes");
+    CheckAccountRejected(SetScriptKey("progressReportMinutes", "20"), "script.progressReportMinutes");
     CheckAccountRejected(EditAccount([](nlohmann::json& json)
     {
         json["script"].erase("file");

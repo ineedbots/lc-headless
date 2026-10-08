@@ -43,6 +43,7 @@ struct ScriptingSettings_s
     std::chrono::milliseconds pollIntervalMs = 10ms;
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
+    std::string progressDirectory = "progress";
 };
 
 struct Config_s
@@ -58,6 +59,8 @@ struct ScriptConfig_s
     std::string file;
     // The settings object as JSON text; the script reads it as its settings global.
     std::string settings = "{}";
+    // How often on_progress_report is called; zero turns reports off.
+    std::chrono::minutes progressReportMinutes{0};
 };
 
 // One account file. Without a script, the account logs in and idles. A server section replaces

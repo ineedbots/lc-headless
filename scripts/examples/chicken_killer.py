@@ -38,6 +38,10 @@ def on_start():
         command('tele ' + TELEPORT)
 
 
+def on_progress_report():
+    return {'Kills': kills, 'Loot held': count_loot(), 'Loot goal': LOOT_GOAL}
+
+
 def on_npc_despawned(npc):
     global target, kills
     if npc.index == target and npc.hp == 0:

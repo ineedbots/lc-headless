@@ -1,11 +1,14 @@
 #include "pch.hpp"
 #include "ScriptHost.hpp"
 
+#include "../Core/FileWatcher.hpp"
 #include "../Core/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Game/State/GameEvent_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Social_s.hpp"
+#include "BotMessenger.hpp"
+#include "ProgressReport_s.hpp"
 #include "PyConvert.hpp"
 #include "ScriptApi.hpp"
 #include "ScriptBindings.hpp"
@@ -18,6 +21,10 @@
 namespace
 {
     constexpr auto LOOP = "loop"sv;
+    constexpr auto START = "on_start"sv;
+    constexpr auto PROGRESS_REPORT = "on_progress_report"sv;
+    constexpr auto BOT_MESSAGE = "on_bot_message"sv;
+    constexpr auto REPORT_ROWS = "_report_rows"sv;
     constexpr auto HOOK_PREFIX = "on_"sv;
     constexpr auto MILLISECONDS_PER_TICK = 600;
     constexpr auto MILLISECONDS_PER_SECOND = 1000;
@@ -41,41 +48,35 @@ namespace
 }
 
 ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOptions_s options, std::shared_ptr<Logger> logger)
-    : m_client{client}
+    : m_runtime{runtime}
+    , m_client{client}
     , m_actions{client}
-    , m_api{client.GetState(), m_actions}
+    , m_api{client.GetState(), m_actions, options.messenger, options.username}
     , m_logger{std::move(logger)}
-    , m_vm{runtime, {.scriptsDirectory = options.scriptsDirectory, .callTimeout = options.callTimeout}, m_logger}
-    , m_file{options.file}
+    , m_options{std::move(options)}
 {
-    ScriptBindings::Bind(m_vm, m_api);
-    try
+    Load();
+    if (m_options.progressInterval > std::chrono::minutes::zero() && !HasHook(PROGRESS_REPORT))
     {
-        ScriptBindings::SetSettings(m_vm, options.settings);
-        m_vm.RunFile(m_file);
-        if (!m_vm.HasFunction(LOOP))
-        {
-            throw ScriptError{std::format("{} has no loop() function", m_file.generic_string())};
-        }
-
-        FindHooks();
-    }
-    catch (const std::exception&)
-    {
-        ScriptBindings::Unbind(m_vm);
-        throw;
+        m_logger->Warning("{} has no on_progress_report(), so progressReportMinutes has no effect", m_options.file.generic_string());
     }
 
-    m_logger->Info("Loaded script {}", m_file.generic_string());
+    if (m_options.watchFiles)
+    {
+        m_watcher.emplace(m_vm->GetFiles());
+    }
+
+    m_logger->Info("Loaded script {}", m_options.file.generic_string());
 }
 
 ScriptHost::~ScriptHost()
 {
-    ScriptBindings::Unbind(m_vm);
+    Unload();
 }
 
 void ScriptHost::Step(Clock::time_point now)
 {
+    CheckForChanges(now);
     if (m_status != ScriptStatus_e::Running)
     {
         return;
@@ -101,9 +102,7 @@ void ScriptHost::Step(Clock::time_point now)
 
     if (!m_started)
     {
-        m_started = true;
-        m_nextLoop = now;
-        CallHook("on_start");
+        Start(now);
     }
 
     if (m_reconnectPending)
@@ -114,15 +113,22 @@ void ScriptHost::Step(Clock::time_point now)
 
     DispatchEvents(state);
     DispatchMessages(state);
+    DispatchBotMessages();
     if (state.tick != m_lastTick)
     {
         m_lastTick = state.tick;
         if (HasHook("on_server_tick"))
         {
-            m_vm.Activate();
+            m_vm->Activate();
             py_newint(py_r0(), static_cast<s64>(state.tick));
             CallHook("on_server_tick", std::array{py_r0()});
         }
+    }
+
+    if (m_nextReport && now >= *m_nextReport)
+    {
+        m_nextReport = now + m_options.progressInterval;
+        RunProgressReport(now);
     }
 
     if (now >= m_nextLoop)
@@ -141,6 +147,17 @@ void ScriptHost::SignalKill()
     CallHook("on_kill_signal");
 }
 
+bool ScriptHost::ReceiveBotMessage(BotMessage_s message)
+{
+    if (m_status != ScriptStatus_e::Running || !HasHook(BOT_MESSAGE) || m_botMessages.size() >= MAX_BOT_MESSAGES)
+    {
+        return false;
+    }
+
+    m_botMessages.push_back(std::move(message));
+    return true;
+}
+
 ScriptStatus_e ScriptHost::GetStatus() const
 {
     return m_status;
@@ -156,16 +173,107 @@ std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
     return m_nextLoop;
 }
 
+void ScriptHost::Load()
+{
+    m_vm.emplace(m_runtime, ScriptVmOptions_s{.scriptsDirectory = m_options.scriptsDirectory, .callTimeout = m_options.callTimeout}, m_logger);
+    ScriptBindings::Bind(*m_vm, m_api);
+    try
+    {
+        ScriptBindings::SetSettings(*m_vm, m_options.settings);
+        if (m_options.waitForDebugger)
+        {
+            m_vm->WaitForDebugger();
+        }
+
+        m_vm->RunFile(m_options.file);
+        if (!m_vm->HasFunction(LOOP))
+        {
+            throw ScriptError{std::format("{} has no loop() function", m_options.file.generic_string())};
+        }
+
+        FindHooks();
+    }
+    catch (const std::exception&)
+    {
+        ScriptBindings::Unbind(*m_vm);
+        throw;
+    }
+}
+
+void ScriptHost::Unload()
+{
+    m_hooks.clear();
+    if (!m_vm)
+    {
+        return;
+    }
+
+    ScriptBindings::Unbind(*m_vm);
+    m_vm.reset();
+}
+
+void ScriptHost::Reload()
+{
+    m_logger->Info("The script's files changed; reloading {}", m_options.file.generic_string());
+    Unload();
+    SkipToPresent();
+    m_status = ScriptStatus_e::Running;
+    m_started = false;
+    static_cast<void>(m_api.TakeStopRequest());
+
+    auto files = std::vector<std::filesystem::path>{};
+    try
+    {
+        Load();
+        files = m_vm->GetFiles();
+    }
+    catch (const std::exception& e)
+    {
+        files = m_vm ? m_vm->GetFiles() : std::vector{m_options.scriptsDirectory / m_options.file};
+        Unload();
+        m_status = ScriptStatus_e::Failed;
+        m_logger->Error("The changed script can't run, so it waits for its files to change again:\n{}", e.what());
+    }
+
+    m_watcher.emplace(std::move(files));
+}
+
+void ScriptHost::CheckForChanges(Clock::time_point now)
+{
+    if (!m_watcher || now < m_nextWatch)
+    {
+        return;
+    }
+
+    m_nextWatch = now + WATCH_INTERVAL;
+    if (m_watcher->Check())
+    {
+        Reload();
+    }
+}
+
+// A reloaded script starts from now: what happened before it loaded isn't passed to it.
+void ScriptHost::SkipToPresent()
+{
+    const auto& state = m_client.GetState();
+    m_lastEvent = state.eventCount;
+    m_lastMessage = state.messageCount;
+    m_lastTick = state.tick;
+    m_loginCount = m_client.GetLoginCount();
+    m_connected = false;
+    m_reconnectPending = false;
+}
+
 void ScriptHost::FindHooks()
 {
     auto defined = std::vector<std::string>{};
-    py_applydict(m_vm.GetMain(), CollectHookName, &defined);
+    py_applydict(m_vm->GetMain(), CollectHookName, &defined);
     for (const auto& name : defined)
     {
         const auto hook = std::ranges::find(HOOKS, std::string_view{name});
         if (hook == HOOKS.end())
         {
-            m_logger->Warning("{} defines {}(), which isn't a hook the client calls", m_file.generic_string(), name);
+            m_logger->Warning("{} defines {}(), which isn't a hook the client calls", m_options.file.generic_string(), name);
             continue;
         }
 
@@ -198,6 +306,22 @@ void ScriptHost::SyncLogin(const GameState_s& state)
     m_reconnectPending = reconnected && m_started;
 }
 
+void ScriptHost::Start(Clock::time_point now)
+{
+    m_started = true;
+    m_nextLoop = now;
+    if (!m_startTime)
+    {
+        m_startTime = now;
+        if (m_options.progressInterval > std::chrono::minutes::zero())
+        {
+            m_nextReport = now + m_options.progressInterval;
+        }
+    }
+
+    CallHook(START);
+}
+
 void ScriptHost::DispatchEvents(const GameState_s& state)
 {
     const auto events = state.GetEventsAfter(m_lastEvent);
@@ -220,7 +344,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
 {
     const auto& data = event.data;
     const auto tick = state.tick;
-    m_vm.Activate();
+    m_vm->Activate();
     const auto one = std::array{py_r0()};
     const auto two = std::array{py_r0(), py_r1()};
 
@@ -339,7 +463,7 @@ void ScriptHost::DispatchMessages(const GameState_s& state)
             continue;
         }
 
-        m_vm.Activate();
+        m_vm->Activate();
         PyConvert::FromString(py_r0(), message->text);
         PyConvert::FromString(py_r1(), message->sender);
         switch (message->type)
@@ -362,6 +486,73 @@ void ScriptHost::DispatchMessages(const GameState_s& state)
         case MessageType_e::Say:
             break;
         }
+    }
+}
+
+// Messages that arrive while these are handled, including any the script sends itself, wait for the next Step.
+void ScriptHost::DispatchBotMessages()
+{
+    const auto messages = std::exchange(m_botMessages, {});
+    for (const auto& message : messages)
+    {
+        if (m_status != ScriptStatus_e::Running || !HasHook(BOT_MESSAGE))
+        {
+            return;
+        }
+
+        // Registers belong to the current VM, so they're named only once LoadJson has switched to this one.
+        auto value = py_GlobalRef{};
+        try
+        {
+            value = m_vm->LoadJson(message.json);
+        }
+        catch (const ScriptError& e)
+        {
+            m_logger->Warning("Dropped a bot message from {} that couldn't be read:\n{}", message.sender, e.what());
+            continue;
+        }
+
+        py_assign(py_r1(), value);
+        PyConvert::FromString(py_r0(), message.sender);
+        CallHook(BOT_MESSAGE, std::array{py_r0(), py_r1()});
+    }
+}
+
+void ScriptHost::RunProgressReport(Clock::time_point now)
+{
+    if (m_status != ScriptStatus_e::Running || !HasHook(PROGRESS_REPORT))
+    {
+        return;
+    }
+
+    const auto result = Invoke(PROGRESS_REPORT);
+    if (!result)
+    {
+        return;
+    }
+
+    auto report = ProgressReport_s{.runTime = std::chrono::floor<std::chrono::seconds>(now - *m_startTime)};
+    try
+    {
+        // The prelude checks the result and turns it into text, so a failing __str__ has a traceback.
+        m_vm->Activate();
+        py_assign(py_r0(), *result);
+        const auto rows = m_vm->CallBuiltin(REPORT_ROWS, std::array{py_r0()});
+        for (auto i = 0; i < py_list_len(rows); ++i)
+        {
+            const auto row = py_list_getitem(rows, i);
+            report.rows.emplace_back(PyConvert::ToString(py_list_getitem(row, 0), "name"), PyConvert::ToString(py_list_getitem(row, 1), "value"));
+        }
+    }
+    catch (const ScriptError& e)
+    {
+        Fail(PROGRESS_REPORT, e.what());
+        return;
+    }
+
+    if (m_options.onProgressReport)
+    {
+        m_options.onProgressReport(report);
     }
 }
 
@@ -413,7 +604,7 @@ std::optional<py_GlobalRef> ScriptHost::Invoke(std::string_view name, std::span<
 {
     try
     {
-        const auto result = m_vm.Call(name, args);
+        const auto result = m_vm->Call(name, args);
         ApplyStopRequest();
         return result;
     }
@@ -427,6 +618,12 @@ std::optional<py_GlobalRef> ScriptHost::Invoke(std::string_view name, std::span<
 void ScriptHost::Fail(std::string_view function, std::string_view message)
 {
     m_status = ScriptStatus_e::Failed;
+    if (m_watcher)
+    {
+        m_logger->Error("Script error in {}(), so the script has stopped until its files change:\n{}", function, message);
+        return;
+    }
+
     m_logger->Error("Script error in {}(), so the script has stopped:\n{}", function, message);
 }
 

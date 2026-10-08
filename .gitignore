@@ -2,3 +2,4 @@ build/
 client*.jsonc
 .vscode/
 accounts/*.jsonc
+progress/
