@@ -1,6 +1,6 @@
 # Packet I/O Design
 
-Design and test plan for the C++ port of the 289 webclient's packet buffer, ISAAC cipher, and the big-integer support behind RSA. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). None of these classes log: their callers log the failures they handle, through `Logger` from [LoggerDesign.md](LoggerDesign.md).
+Design and test plan for the C++ port of the 289 webclient's packet buffer, ISAAC cipher, and the big-integer support behind RSA. Code style follows [CONVENTIONS.md](CONVENTIONS.md). None of these classes log: their callers log the failures they handle, through `Logger` from [LoggerDesign.md](LoggerDesign.md).
 
 Reference sources:
 

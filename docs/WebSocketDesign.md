@@ -1,6 +1,6 @@
 # WebSocket Transport Design
 
-Design and test plan for `WebSocketClient`, the binary WebSocket transport under the client's packet I/O. It is non-blocking at its core, with blocking helpers that pump it until a condition holds. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8: the static library, Catch2, and the test presets. It logs through `Logger` from [LoggerDesign.md](LoggerDesign.md).
+Design and test plan for `WebSocketClient`, the binary WebSocket transport under the client's packet I/O. It is non-blocking at its core, with blocking helpers that pump it until a condition holds. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8: the static library, Catch2, and the test presets. It logs through `Logger` from [LoggerDesign.md](LoggerDesign.md).
 
 Reference sources:
 

@@ -215,11 +215,11 @@ Everything in `src/` except `main.cpp` builds into a static library. The client 
 | [WebSocketDesign.md](docs/WebSocketDesign.md) | The non-blocking WebSocket transport |
 | [PacketDesign.md](docs/PacketDesign.md) | The packet buffer, the ISAAC cipher and `BigUInt` |
 | [LoggerDesign.md](docs/LoggerDesign.md) | The logger |
-| [CONVENTIONS.md](CONVENTIONS.md) | C++ code style and project setup |
+| [CONVENTIONS.md](docs/CONVENTIONS.md) | C++ code style and project setup |
 
 ## Contributing
 
-Code follows [CONVENTIONS.md](CONVENTIONS.md) (C++20, Allman braces, `PascalCase_s` structs, exceptions for errors) and `.clang-format`. Files use LF line endings, which `.gitattributes` enforces. The build finds `.cpp` and `.hpp` files under `src/` and `tests/` on its own, so a new file doesn't need to be added to `CMakeLists.txt`.
+Code follows [CONVENTIONS.md](docs/CONVENTIONS.md) (C++20, Allman braces, `PascalCase_s` structs, exceptions for errors) and `.clang-format`. Files use LF line endings, which `.gitattributes` enforces. The build finds `.cpp` and `.hpp` files under `src/` and `tests/` on its own, so a new file doesn't need to be added to `CMakeLists.txt`.
 
 ## Credits
 
