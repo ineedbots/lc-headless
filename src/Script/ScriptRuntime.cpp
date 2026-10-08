@@ -7,7 +7,7 @@
 
 namespace
 {
-    bool runtimeCreated = false;
+    [[maybe_unused]] bool runtimeCreated = false;
 }
 
 ScriptRuntime::ScriptRuntime()

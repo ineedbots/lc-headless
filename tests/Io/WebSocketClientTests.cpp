@@ -50,7 +50,7 @@ namespace
         return std::make_shared<Logger>(LogLevel_e::Info);
     }
 
-    std::string ToText(std::span<const u8> bytes)
+    [[maybe_unused]] std::string ToText(std::span<const u8> bytes)
     {
         return std::string{reinterpret_cast<const char*>(bytes.data()), bytes.size()};
     }
