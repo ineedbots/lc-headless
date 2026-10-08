@@ -5,8 +5,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 find_package(Catch2 3 CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 find_package(ixwebsocket CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pocketpy CONFIG REQUIRED)
@@ -33,6 +35,7 @@ function(configure_project_target target)
     else()
         target_compile_options(${target} PRIVATE
             -Wall -Wextra -Wpedantic -Wshadow
+            -Wno-missing-field-initializers
             "$<$<NOT:$<CONFIG:Debug>>:-Werror>")
     endif()
 endfunction()
