@@ -24,11 +24,46 @@ namespace
     constexpr auto GROUND_DECOR = u8{22};
     constexpr auto BLOCK = u8{0x1};
     constexpr auto IF_LAYER = u8{0};
+    constexpr auto IF_INV = u8{2};
     constexpr auto IF_TEXT = u8{4};
+    constexpr auto IF_GRAPHIC = u8{5};
     constexpr auto BUTTON_OK = u8{1};
+    constexpr auto BUTTON_SELECT = u8{5};
+    constexpr auto EQUALS = u8{1};
+    constexpr auto PUSH_VARP = u16{5};
+    constexpr auto END_SCRIPT = u16{0};
     constexpr auto LOGOUT_CLIENT_CODE = u16{205};
+    constexpr auto BANK_CLIENT_CODE = u16{206};
+    constexpr auto VARP_SCOPE = u8{1};
+    constexpr auto VARP_CLIENT_CODE = u8{5};
+    constexpr auto VARP_STRING = u8{10};
+    constexpr auto RUN_CLIENT_CODE = u8{7};
+    constexpr auto BRIGHTNESS_CLIENT_CODE = u8{1};
+    constexpr auto BRIGHTNESS_VARP = u16{0};
+    constexpr auto RUN_VARP = u16{2};
     constexpr auto LOGOUT_LAYER = u16{20};
     constexpr auto LOGOUT_BUTTON = u16{21};
+    constexpr auto BANK = u16{30};
+    constexpr auto BANK_INVENTORY = u16{31};
+    constexpr auto INVENTORY = u16{32};
+    constexpr auto EQUIPMENT = u16{33};
+    constexpr auto BRIGHTNESS_BUTTON = u16{40};
+    constexpr auto RUN_OFF_BUTTON = u16{41};
+    constexpr auto RUN_ON_BUTTON = u16{42};
+
+    // A select button as the webclient reads one: its first script pushes the varp, and its first
+    // condition's operand is the value a click sets.
+    InterfaceComponent_s MakeVarpButton(u16 id, u16 varp, u16 value)
+    {
+        return {.id = id, .type = IF_GRAPHIC, .buttonType = BUTTON_SELECT, .conditions = {{EQUALS, value}}, .scripts = {{PUSH_VARP, varp, END_SCRIPT}}};
+    }
+
+    InterfaceComponent_s& FindComponent(StoreContents_s& contents, u16 id)
+    {
+        const auto found = std::ranges::find(contents.interfaces, id, &InterfaceComponent_s::id);
+        REQUIRE(found != contents.interfaces.end());
+        return *found;
+    }
 
     StoreContents_s MakeContents()
     {
@@ -49,9 +84,22 @@ namespace
             CacheWriter::MakeDefinition("", {}, std::vector<u8>{97, 0, 0, 98, 0, 5}),
         };
 
+        contents.varps = {
+            CacheWriter::MakeDefinition("", {}, std::vector<u8>{VARP_SCOPE, 1, VARP_CLIENT_CODE, 0, BRIGHTNESS_CLIENT_CODE}),
+            CacheWriter::MakeDefinition("", {}, std::vector<u8>{VARP_STRING, 'x', '\n'}),
+            CacheWriter::MakeDefinition("", {}, std::vector<u8>{VARP_CLIENT_CODE, 0, RUN_CLIENT_CODE}),
+        };
+
         contents.interfaces = {
             {.id = LOGOUT_LAYER, .layer = LOGOUT_LAYER, .type = IF_LAYER, .children = {LOGOUT_BUTTON}},
             {.id = LOGOUT_BUTTON, .type = IF_TEXT, .buttonType = BUTTON_OK, .clientCode = LOGOUT_CLIENT_CODE},
+            {.id = BANK, .layer = BANK, .type = IF_INV, .clientCode = BANK_CLIENT_CODE, .width = 8, .height = 36, .options = {"Withdraw 1"}},
+            {.id = BANK_INVENTORY, .layer = BANK_INVENTORY, .type = IF_INV, .width = 4, .height = 7, .options = {"Deposit 1", "Deposit 5"}},
+            {.id = INVENTORY, .layer = INVENTORY, .type = IF_INV, .width = 4, .height = 7, .objUse = true},
+            {.id = EQUIPMENT, .layer = EQUIPMENT, .type = IF_INV, .width = 3, .height = 5, .slotBackground = true, .options = {"Remove"}},
+            MakeVarpButton(BRIGHTNESS_BUTTON, BRIGHTNESS_VARP, 0),
+            MakeVarpButton(RUN_OFF_BUTTON, RUN_VARP, 0),
+            MakeVarpButton(RUN_ON_BUTTON, RUN_VARP, 1),
         };
 
         contents.squares = {{
@@ -124,6 +172,14 @@ TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
     }
 
     CHECK(cache.logoutComponent == LOGOUT_BUTTON);
+    CHECK(cache.bankComponent == BANK);
+    CHECK(cache.bankInventoryComponent == BANK_INVENTORY);
+    CHECK(cache.inventoryComponent == INVENTORY);
+    CHECK(cache.inventorySize == 28);
+    CHECK(cache.equipmentComponent == EQUIPMENT);
+    CHECK(cache.runVarp == RUN_VARP);
+    CHECK(cache.runOffButton == RUN_OFF_BUTTON);
+    CHECK(cache.runOnButton == RUN_ON_BUTTON);
 
     REQUIRE(cache.locs.size() == 3);
     const auto* const tree = cache.FindLoc(2);
@@ -194,6 +250,22 @@ TEST_CASE("CacheLoader names the folder and file that failed", "[CacheLoader]")
         CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 2 (config): obj 1: unknown opcode 200");
     }
 
+    SECTION("a varp that doesn't decode")
+    {
+        auto contents = MakeContents();
+        contents.varps[1] = {9, 0};
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 2 (config): varp 1: unknown opcode 9");
+    }
+
+    SECTION("no run varp")
+    {
+        auto contents = MakeContents();
+        contents.varps.pop_back();
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 2 (config): no varp has client code 7, which marks the run varp");
+    }
+
     SECTION("a missing interface archive")
     {
         fixture.writer.Put(CacheStore::ARCHIVES, 3, {});
@@ -209,9 +281,57 @@ TEST_CASE("CacheLoader names the folder and file that failed", "[CacheLoader]")
     SECTION("no logout button")
     {
         auto contents = MakeContents();
-        contents.interfaces[1].clientCode = 0;
+        FindComponent(contents, LOGOUT_BUTTON).clientCode = 0;
         fixture.writer = CacheWriter::MakeStore(contents);
         CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no component has client code 205, which marks the logout button");
+    }
+
+    SECTION("no bank")
+    {
+        auto contents = MakeContents();
+        FindComponent(contents, BANK).clientCode = 0;
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no component has client code 206, which marks the bank");
+    }
+
+    SECTION("no backpack")
+    {
+        auto contents = MakeContents();
+        FindComponent(contents, INVENTORY).objUse = false;
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no inventory lets its items be used, which marks the backpack");
+    }
+
+    SECTION("no worn equipment")
+    {
+        auto contents = MakeContents();
+        FindComponent(contents, EQUIPMENT).slotBackground = false;
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no inventory has slot backgrounds, which marks the worn equipment");
+    }
+
+    SECTION("no backpack beside the bank")
+    {
+        auto contents = MakeContents();
+        FindComponent(contents, BANK_INVENTORY).options = {"Store 1"};
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no inventory has a Deposit option, which marks the backpack beside the bank");
+    }
+
+    SECTION("no run off button")
+    {
+        auto contents = MakeContents();
+        FindComponent(contents, RUN_OFF_BUTTON).scripts = {{PUSH_VARP, RUN_VARP + 1, END_SCRIPT}};
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no select button sets varp 2 to 0, which marks the run off button");
+    }
+
+    SECTION("no run on button")
+    {
+        auto contents = MakeContents();
+        FindComponent(contents, RUN_ON_BUTTON).buttonType = BUTTON_OK;
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no select button sets varp 2 to 1, which marks the run on button");
     }
 
     SECTION("a component that doesn't decode")

@@ -7,6 +7,7 @@
 #include "NpcType_s.hpp"
 #include "ObjType_s.hpp"
 #include "TextPool.hpp"
+#include "VarpType_s.hpp"
 
 namespace
 {
@@ -49,6 +50,9 @@ namespace
     constexpr auto OBJ_LAST_INVENTORY_OP = u8{39};
     constexpr auto OBJ_CERTLINK = u8{97};
     constexpr auto OBJ_CERTTEMPLATE = u8{98};
+
+    constexpr auto VARP_CLIENT_CODE = u8{5};
+    constexpr auto VARP_STRING = u8{10};
 
     // Opcodes first to last whose values are read and dropped: size bytes each, or with counted, a u8
     // count and then that many items of size bytes.
@@ -104,6 +108,17 @@ namespace
         {25, 25, 3},
         {100, 109, 4},
         {40, 40, 4, true},
+    });
+
+    constexpr auto VARP_DROPPED = std::to_array<DroppedOpcodes_s>({
+        {3, 4, 0},
+        {6, 6, 0},
+        {8, 8, 0},
+        {11, 11, 0},
+        {13, 13, 0},
+        {1, 2, 1},
+        {7, 7, 4},
+        {12, 12, 4},
     });
 
     // What a loc's model opcodes said, which decides whether it's active when opcode 19 doesn't.
@@ -406,6 +421,35 @@ namespace
         }
     }
 
+    void DecodeVarp(Packet& packet, VarpType_s& type)
+    {
+        while (true)
+        {
+            const auto opcode = packet.G1();
+            if (opcode == END_OPCODE)
+            {
+                break;
+            }
+
+            if (SkipDropped(packet, opcode, VARP_DROPPED))
+            {
+                continue;
+            }
+
+            switch (opcode)
+            {
+            case VARP_CLIENT_CODE:
+                type.clientCode = packet.G2();
+                break;
+            case VARP_STRING:
+                static_cast<void>(ReadString(packet));
+                break;
+            default:
+                throw CacheError{std::format("unknown opcode {}", opcode)};
+            }
+        }
+    }
+
     std::string_view GetArticle(std::string_view name)
     {
         if (name.empty())
@@ -535,4 +579,12 @@ std::vector<ObjType_s> TypeDecoder::DecodeObjs(std::span<const u8> dat, std::spa
 
     MakeNotes(objs, certs, text);
     return objs;
+}
+
+std::vector<VarpType_s> TypeDecoder::DecodeVarps(std::span<const u8> dat, std::span<const u8> idx)
+{
+    return DecodeTypes<VarpType_s>("varp", dat, idx, [](Packet& packet, VarpType_s& type)
+    {
+        DecodeVarp(packet, type);
+    });
 }

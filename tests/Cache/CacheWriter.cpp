@@ -46,9 +46,10 @@ namespace
     constexpr auto BUTTON_SELECT = 5;
     constexpr auto BUTTON_CONTINUE = 6;
     constexpr auto UNUSED_TYPE_SIZE = std::size_t{3};
-    constexpr auto INV_FLAG_COUNT = 6;
+    constexpr auto OBJ_SWAP_OPS_COUNT = 2;
+    constexpr auto OBJ_REPLACE_MARGINS_COUNT = 3;
     constexpr auto INV_BACKGROUND_COUNT = 20;
-    constexpr auto INV_OPTION_COUNT = 5;
+    constexpr auto INV_OPTION_COUNT = std::size_t{5};
     constexpr auto RECT_TEXT_COLOUR_COUNT = 4;
     constexpr auto MODEL_VIEW_COUNT = 3;
     constexpr auto SAMPLE_SIZE = 32;
@@ -99,12 +100,19 @@ namespace
         }
     }
 
-    void PutOptions(Packet& packet)
+    void PutOptions(Packet& packet, const std::vector<std::string>& options)
     {
-        packet.PJStr("Use");
-        for (auto i = 1; i < INV_OPTION_COUNT; ++i)
+        for (std::size_t i = 0; i < INV_OPTION_COUNT; ++i)
         {
-            packet.PJStr("");
+            packet.PJStr(i < options.size() ? options[i] : "");
+        }
+    }
+
+    void PutFlags(Packet& packet, s32 count)
+    {
+        for (auto i = 0; i < count; ++i)
+        {
+            packet.P1(1);
         }
     }
 
@@ -121,24 +129,27 @@ namespace
         }
     }
 
-    // Only the first slot has a background graphic, so both forms of slot are written.
-    void PutInv(Packet& packet)
+    // Only the first slot can have a background graphic, so with one, both forms of slot are written.
+    void PutInv(Packet& packet, const InterfaceComponent_s& component)
     {
-        for (auto i = 0; i < INV_FLAG_COUNT; ++i)
+        PutFlags(packet, OBJ_SWAP_OPS_COUNT);
+        packet.P1(component.objUse ? 1 : 0);
+        PutFlags(packet, OBJ_REPLACE_MARGINS_COUNT);
+        for (auto slot = 0; slot < INV_BACKGROUND_COUNT; ++slot)
         {
+            if (slot > 0 || !component.slotBackground)
+            {
+                packet.P1(0);
+                continue;
+            }
+
             packet.P1(1);
+            packet.P2(SAMPLE_OFFSET);
+            packet.P2(SAMPLE_SIZE);
+            packet.PJStr(SAMPLE_GRAPHIC);
         }
 
-        packet.P1(1);
-        packet.P2(SAMPLE_OFFSET);
-        packet.P2(SAMPLE_SIZE);
-        packet.PJStr(SAMPLE_GRAPHIC);
-        for (auto slot = 1; slot < INV_BACKGROUND_COUNT; ++slot)
-        {
-            packet.P1(0);
-        }
-
-        PutOptions(packet);
+        PutOptions(packet, component.options);
     }
 
     // A model and an animation, each without an active one, so both forms of id are written.
@@ -167,7 +178,7 @@ namespace
             PutColours(packet, 1);
             return;
         case IF_INV:
-            PutInv(packet);
+            PutInv(packet, component);
             return;
         case IF_RECT:
             packet.P1(1);
@@ -192,7 +203,7 @@ namespace
             packet.P2(SAMPLE_OFFSET);
             packet.P2(SAMPLE_OFFSET);
             packet.P1(1);
-            PutOptions(packet);
+            PutOptions(packet, component.options);
             return;
         default:
             return;
@@ -247,8 +258,8 @@ namespace
         packet.P1(component.type);
         packet.P1(component.buttonType);
         packet.P2(component.clientCode);
-        packet.P2(SAMPLE_SIZE);
-        packet.P2(SAMPLE_SIZE);
+        packet.P2(component.width);
+        packet.P2(component.height);
         packet.P1(0);
         PutOptionalId(packet, component.hoverLayer);
         PutScripts(packet, component);
@@ -556,6 +567,7 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
     const auto locs = MakeTypeFiles(contents.locs);
     const auto npcs = MakeTypeFiles(contents.npcs);
     const auto objs = MakeTypeFiles(contents.objs);
+    const auto varps = MakeTypeFiles(contents.varps);
     writer.Put(CacheStore::ARCHIVES, 2, MakeArchive({
         {.name = "loc.dat", .data = locs.dat},
         {.name = "loc.idx", .data = locs.idx},
@@ -563,6 +575,8 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
         {.name = "npc.idx", .data = npcs.idx},
         {.name = "obj.dat", .data = objs.dat},
         {.name = "obj.idx", .data = objs.idx},
+        {.name = "varp.dat", .data = varps.dat},
+        {.name = "varp.idx", .data = varps.idx},
     }, false));
 
     writer.Put(CacheStore::ARCHIVES, INTERFACE_ARCHIVE, MakeArchive({{.name = "data", .data = MakeInterfaces(contents.interfaces)}}, false));

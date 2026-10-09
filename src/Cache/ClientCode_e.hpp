@@ -1,0 +1,82 @@
+#pragma once
+
+// The webclient's ClientCode: a component's client code, which tells the client what to do with it.
+enum class ClientCode_e : u16
+{
+    None = 0,
+
+    FriendsStart = 1,
+    FriendsEnd = 100,
+    FriendsUpdateStart = 101,
+    FriendsUpdateEnd = 200,
+    AddFriend = 201,
+    DelFriend = 202,
+    FriendsSize = 203,
+    Friends2Start = 701,
+    Friends2End = 800,
+    Friends2UpdateStart = 801,
+    Friends2UpdateEnd = 900,
+
+    Logout = 205,
+
+    BankMode = 206,
+
+    ChangeHeadL = 300,
+    ChangeHeadR = 301,
+    ChangeJawL = 302,
+    ChangeJawR = 303,
+    ChangeTorsoL = 304,
+    ChangeTorsoR = 305,
+    ChangeArmsL = 306,
+    ChangeArmsR = 307,
+    ChangeHandsL = 308,
+    ChangeHandsR = 309,
+    ChangeLegsL = 310,
+    ChangeLegsR = 311,
+    ChangeFeetL = 312,
+    ChangeFeetR = 313,
+    RecolourHairL = 314,
+    RecolourHairR = 315,
+    RecolourTorsoL = 316,
+    RecolourTorsoR = 317,
+    RecolourLegsL = 318,
+    RecolourLegsR = 319,
+    RecolourFeetL = 320,
+    RecolourFeetR = 321,
+    RecolourSkinL = 322,
+    RecolourSkinR = 323,
+    SwitchToMale = 324,
+    SwitchToFemale = 325,
+    AcceptDesign = 326,
+    DesignPreview = 327,
+
+    IgnoresStart = 401,
+    IgnoresEnd = 500,
+    AddIgnore = 501,
+    DelIgnore = 502,
+    IgnoresSize = 503,
+
+    ReportInput = 600,
+    ReportRule1 = 601,
+    ReportRule2 = 602,
+    ReportRule3 = 603,
+    ReportRule4 = 604,
+    ReportRule5 = 605,
+    ReportRule6 = 606,
+    ReportRule7 = 607,
+    ReportRule8 = 608,
+    ReportRule9 = 609,
+    ReportRule10 = 610,
+    ReportRule11 = 611,
+    ReportRule12 = 612,
+    ModMute = 613,
+
+    // With recovery questions.
+    LastLoginInfo = 650,
+    UnreadMessages = 651,
+    Recovery1 = 652,
+    Recovery2 = 653,
+    Recovery3 = 654,
+    // Without recovery questions.
+    LastLoginInfo2 = 655,
+};

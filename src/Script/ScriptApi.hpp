@@ -46,14 +46,6 @@ enum class StopRequest_e : u8
 class ScriptApi
 {
 public:
-    static constexpr u16 INVENTORY = 3214;
-    static constexpr u16 EQUIPMENT = 1688;
-    static constexpr u16 BANK = 5382;
-    static constexpr u16 BANK_INVENTORY = 2006;
-    static constexpr u16 RUN_OFF_BUTTON = 152;
-    static constexpr u16 RUN_ON_BUTTON = 153;
-    static constexpr u16 RUN_VARP = 173;
-    static constexpr s32 INVENTORY_SIZE = 28;
     static constexpr u64 COMBAT_TICKS = 8;
     static constexpr u8 OP_TALK = 1;
     static constexpr u8 OP_ATTACK = 2;

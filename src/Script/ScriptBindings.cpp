@@ -109,11 +109,6 @@ def _report_rows(report):
 
     constexpr auto CONSTANTS = std::to_array<Constant_s>({
         {"COMBAT_TICKS", static_cast<s64>(ScriptApi::COMBAT_TICKS)},
-        {"INVENTORY", ScriptApi::INVENTORY},
-        {"EQUIPMENT", ScriptApi::EQUIPMENT},
-        {"BANK", ScriptApi::BANK},
-        {"BANK_INVENTORY", ScriptApi::BANK_INVENTORY},
-        {"INVENTORY_SIZE", ScriptApi::INVENTORY_SIZE},
         {"ATTACK", 0},
         {"DEFENCE", 1},
         {"STRENGTH", 2},
@@ -138,6 +133,24 @@ def _report_rows(report):
         {"LAYER_GROUND", static_cast<s64>(LocLayer_e::Ground)},
         {"LAYER_GROUND_DECOR", static_cast<s64>(LocLayer_e::GroundDecor)},
     });
+
+    std::array<Constant_s, 5> GetCacheConstants(const GameCache_s& cache)
+    {
+        return {{
+            {"INVENTORY", cache.inventoryComponent},
+            {"EQUIPMENT", cache.equipmentComponent},
+            {"BANK", cache.bankComponent},
+            {"BANK_INVENTORY", cache.bankInventoryComponent},
+            {"INVENTORY_SIZE", cache.inventorySize},
+        }};
+    }
+
+    void SetConstant(py_Ref builtins, const Constant_s& constant)
+    {
+        auto value = py_TValue{};
+        py_newint(&value, constant.value);
+        py_setdict(builtins, py_name(constant.name), &value);
+    }
 
     std::array<ScriptApi*, ScriptRuntime::MAX_VMS> boundApis{};
 
@@ -699,7 +712,7 @@ def _report_rows(report):
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetInventory(ScriptApi::EQUIPMENT), FromItem);
+            PyConvert::FromList(py_retval(), GetApi().GetInventory(GetApi().GetCache().equipmentComponent), FromItem);
             return true;
         });
     }
@@ -1205,7 +1218,7 @@ def _report_rows(report):
         py_CFunction function;
     };
 
-    std::vector<Function_s> GetFunctions()
+    std::vector<Function_s> GetFunctions(const GameCache_s& cache)
     {
         return {
             {"get_tick()", GetTick},
@@ -1253,12 +1266,12 @@ def _report_rows(report):
             {"get_npc_type(id)", GetNpcType},
             {"get_item_type(id)", GetItemType},
             {"get_loc_type(id)", GetLocType},
-            {std::format("get_inventory(com={})", ScriptApi::INVENTORY), GetInventory},
+            {std::format("get_inventory(com={})", cache.inventoryComponent), GetInventory},
             {"get_equipment()", GetEquipment},
-            {std::format("get_inventory_count_by_id(ids=None, com={})", ScriptApi::INVENTORY), GetInventoryCountById},
-            {std::format("get_inventory_item_by_id(ids=None, com={})", ScriptApi::INVENTORY), GetInventoryItemById},
-            {std::format("get_inventory_count_by_name(names, com={})", ScriptApi::INVENTORY), GetInventoryCountByName},
-            {std::format("get_inventory_item_by_name(names, com={})", ScriptApi::INVENTORY), GetInventoryItemByName},
+            {std::format("get_inventory_count_by_id(ids=None, com={})", cache.inventoryComponent), GetInventoryCountById},
+            {std::format("get_inventory_item_by_id(ids=None, com={})", cache.inventoryComponent), GetInventoryItemById},
+            {std::format("get_inventory_count_by_name(names, com={})", cache.inventoryComponent), GetInventoryCountByName},
+            {std::format("get_inventory_item_by_name(names, com={})", cache.inventoryComponent), GetInventoryItemByName},
             {"get_empty_slots()", GetEmptySlots},
             {"is_inventory_full()", IsInventoryFull},
             {"get_main_modal()", GetMainModal},
@@ -1321,14 +1334,18 @@ void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
     try
     {
         const auto builtins = vm.GetBuiltins();
+        const auto& cache = api.GetCache();
         for (const auto& constant : CONSTANTS)
         {
-            auto value = py_TValue{};
-            py_newint(&value, constant.value);
-            py_setdict(builtins, py_name(constant.name), &value);
+            SetConstant(builtins, constant);
         }
 
-        for (const auto& function : GetFunctions())
+        for (const auto& constant : GetCacheConstants(cache))
+        {
+            SetConstant(builtins, constant);
+        }
+
+        for (const auto& function : GetFunctions(cache))
         {
             py_bind(builtins, function.signature.c_str(), function.function);
         }

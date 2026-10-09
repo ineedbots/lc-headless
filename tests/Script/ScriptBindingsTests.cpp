@@ -36,6 +36,7 @@ namespace
     std::shared_ptr<const GameCache_s> MakeCache()
     {
         auto cache = GameCache_s{};
+        TestCache::SetComponents(cache);
         TestCache::AddNpc(cache, 41, "Chicken", {"", "Attack"}).combatLevel = 1;
         TestCache::AddNpc(cache, 81, "Cow", {"", "Attack"});
         TestCache::AddObj(cache, 526, "Bones", {}, {"Bury"});
@@ -113,7 +114,7 @@ namespace
             state.groundItems = {{.tile = Offset(3, 3), .id = 526, .count = 1}};
             state.locChanges = {{.tile = Offset(1, 0), .layer = LocLayer_e::Wall, .id = 1530, .shape = 0, .angle = 2}};
             ++state.sceneChangeCount;
-            state.inventories[ScriptApi::INVENTORY] = Inventory_s{.com = ScriptApi::INVENTORY, .slots = {{.id = 995, .count = 250}, {}, {.id = 526, .count = 1}}};
+            state.inventories[TestCache::INVENTORY] = Inventory_s{.com = TestCache::INVENTORY, .slots = {{.id = 995, .count = 250}, {}, {.id = 526, .count = 1}}};
             state.stats[3] = Stat_s{.xp = 1154, .level = 5, .baseLevel = 10};
             state.varps[173] = 1;
             state.interfaces.mainModal = 5292;

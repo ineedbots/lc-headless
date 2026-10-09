@@ -87,9 +87,18 @@ TEST_CASE("The real cache gives the server's CRCs", "[RealCache]")
     }
 }
 
-TEST_CASE("The real cache gives the server's logout button", "[RealCache]")
+TEST_CASE("The real cache gives the server's components and run varp", "[RealCache]")
 {
-    CHECK(RequireRealCache().logoutComponent == 2458);
+    const auto& cache = RequireRealCache();
+    CHECK(cache.logoutComponent == 2458);
+    CHECK(cache.inventoryComponent == 3214);
+    CHECK(cache.inventorySize == 28);
+    CHECK(cache.equipmentComponent == 1688);
+    CHECK(cache.bankComponent == 5382);
+    CHECK(cache.bankInventoryComponent == 2006);
+    CHECK(cache.runOffButton == 152);
+    CHECK(cache.runOnButton == 153);
+    CHECK(cache.runVarp == 173);
 }
 
 TEST_CASE("The real cache has every type and square", "[RealCache]")

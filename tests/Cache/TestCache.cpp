@@ -67,6 +67,18 @@ LocType_s& TestCache::AddLoc(GameCache_s& cache, u16 id, std::string_view name, 
     return type;
 }
 
+void TestCache::SetComponents(GameCache_s& cache)
+{
+    cache.inventoryComponent = INVENTORY;
+    cache.inventorySize = INVENTORY_SIZE;
+    cache.equipmentComponent = EQUIPMENT;
+    cache.bankComponent = BANK;
+    cache.bankInventoryComponent = BANK_INVENTORY;
+    cache.runOffButton = RUN_OFF_BUTTON;
+    cache.runOnButton = RUN_ON_BUTTON;
+    cache.runVarp = RUN_VARP;
+}
+
 void TestCache::SetMap(GameCache_s& cache, std::span<const TestLoc_s> locs, std::span<const Tile_s> blocked)
 {
     auto squares = std::map<u16, SquareContents_s>{};

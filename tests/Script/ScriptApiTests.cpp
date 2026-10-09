@@ -52,6 +52,7 @@ namespace
     std::shared_ptr<const GameCache_s> MakeCache()
     {
         auto cache = GameCache_s{};
+        TestCache::SetComponents(cache);
         TestCache::AddNpc(cache, CHICKEN, "Chicken", {"", "Attack"});
         TestCache::AddNpc(cache, COW, "Cow", {"", "Attack"});
         TestCache::AddObj(cache, BONES, "Bones", {}, {"Bury"});
@@ -116,8 +117,8 @@ namespace
                 {.tile = Offset(0, 1), .id = COINS, .count = 25},
             };
 
-            state.inventories[ScriptApi::INVENTORY] = Inventory_s{
-                .com = ScriptApi::INVENTORY,
+            state.inventories[TestCache::INVENTORY] = Inventory_s{
+                .com = TestCache::INVENTORY,
                 .slots = {{.id = COINS, .count = 100}, {}, {.id = BONES, .count = 1}, {.id = BONES, .count = 1}},
             };
 
@@ -183,16 +184,16 @@ TEST_CASE("ScriptApi reads ground items and inventories", "[ScriptApi]")
     CHECK(api.GetNearestGroundItem({.ids = {BONES}})->tile == Offset(2, 2));
     CHECK_FALSE(api.GetNearestGroundItem({.ids = {BONES}, .radius = 1}).has_value());
 
-    const auto items = api.GetInventory(ScriptApi::INVENTORY);
+    const auto items = api.GetInventory(TestCache::INVENTORY);
     REQUIRE(items.size() == 3);
     CHECK(items[1].slot == 2);
-    CHECK(api.CountItems({.ids = {BONES}}, ScriptApi::INVENTORY) == 2);
-    CHECK(api.CountItems({.ids = {BONES, COINS}}, ScriptApi::INVENTORY) == 102);
-    CHECK(api.CountItems({}, ScriptApi::INVENTORY) == 102);
-    CHECK(api.FindItem({.ids = {BONES}}, ScriptApi::INVENTORY)->slot == 2);
-    CHECK_FALSE(api.FindItem({.ids = {1}}, ScriptApi::INVENTORY).has_value());
-    CHECK(api.GetEmptySlots() == ScriptApi::INVENTORY_SIZE - 3);
-    CHECK(api.GetInventory(ScriptApi::EQUIPMENT).empty());
+    CHECK(api.CountItems({.ids = {BONES}}, TestCache::INVENTORY) == 2);
+    CHECK(api.CountItems({.ids = {BONES, COINS}}, TestCache::INVENTORY) == 102);
+    CHECK(api.CountItems({}, TestCache::INVENTORY) == 102);
+    CHECK(api.FindItem({.ids = {BONES}}, TestCache::INVENTORY)->slot == 2);
+    CHECK_FALSE(api.FindItem({.ids = {1}}, TestCache::INVENTORY).has_value());
+    CHECK(api.GetEmptySlots() == TestCache::INVENTORY_SIZE - 3);
+    CHECK(api.GetInventory(TestCache::EQUIPMENT).empty());
 }
 
 TEST_CASE("ScriptApi reads stats, modals and run mode", "[ScriptApi]")
@@ -211,7 +212,7 @@ TEST_CASE("ScriptApi reads stats, modals and run mode", "[ScriptApi]")
     CHECK_FALSE(api.IsInterfaceOpen(-1));
 
     CHECK_FALSE(api.IsRunning());
-    state.varps[ScriptApi::RUN_VARP] = 1;
+    state.varps[TestCache::RUN_VARP] = 1;
     CHECK(api.IsRunning());
 }
 
@@ -219,13 +220,13 @@ TEST_CASE("ScriptApi actions report targets that are gone", "[ScriptApi]")
 {
     auto fixture = ApiFixture{};
     auto& api = fixture.api;
-    const auto bones = InventoryItem_s{.com = ScriptApi::INVENTORY, .slot = 2, .id = BONES, .count = 1};
+    const auto bones = InventoryItem_s{.com = TestCache::INVENTORY, .slot = 2, .id = BONES, .count = 1};
 
     CHECK_FALSE(api.InteractNpc(99, ScriptApi::OP_ATTACK));
     CHECK_FALSE(api.InteractPlayer(99, 1));
     CHECK_FALSE(api.InteractGroundItem(BONES, Fixtures::HOME, Fixtures::HOME, ScriptApi::OP_TAKE));
-    CHECK_FALSE(api.ItemOp({.com = ScriptApi::INVENTORY, .slot = 1, .id = BONES}, ScriptApi::OP_DROP));
-    CHECK_FALSE(api.ItemOp({.com = ScriptApi::INVENTORY, .slot = 40, .id = BONES}, ScriptApi::OP_DROP));
+    CHECK_FALSE(api.ItemOp({.com = TestCache::INVENTORY, .slot = 1, .id = BONES}, ScriptApi::OP_DROP));
+    CHECK_FALSE(api.ItemOp({.com = TestCache::INVENTORY, .slot = 40, .id = BONES}, ScriptApi::OP_DROP));
     CHECK_FALSE(api.UseItemOnNpc(bones, 99));
 
     // The targets exist, so these get as far as sending, which needs a session.
@@ -257,8 +258,8 @@ TEST_CASE("ScriptApi finds NPCs and items by name", "[ScriptApi]")
     CHECK(api.GetNearestNpc({.names = {"Cow"}}, std::nullopt)->index == 11);
     CHECK(api.GetNearestGroundItem({.names = {"bones"}})->id == BONES);
     CHECK_FALSE(api.GetNearestGroundItem({.names = {"Logs"}}).has_value());
-    CHECK(api.CountItems({.names = {"Bones"}}, ScriptApi::INVENTORY) == 2);
-    CHECK(api.FindItem({.names = {"coins"}}, ScriptApi::INVENTORY)->slot == 0);
+    CHECK(api.CountItems({.names = {"Bones"}}, TestCache::INVENTORY) == 2);
+    CHECK(api.FindItem({.names = {"coins"}}, TestCache::INVENTORY)->slot == 0);
 }
 
 TEST_CASE("ScriptApi chooses options by their text", "[ScriptApi]")

@@ -5,6 +5,7 @@
 #include "../Io/Packet.hpp"
 #include "CacheError.hpp"
 #include "CacheStore.hpp"
+#include "ClientCode_e.hpp"
 #include "Compression.hpp"
 #include "GameCache_s.hpp"
 #include "InterfaceDecoder.hpp"
@@ -12,11 +13,20 @@
 #include "MapDecoder.hpp"
 #include "MapSquare.hpp"
 #include "TypeDecoder.hpp"
+#include "VarpType_s.hpp"
 
 namespace
 {
     constexpr auto MAP_VERSION_SIZE = std::size_t{2};
     constexpr auto MISSING_STORE_HINT = "set client.cacheDirectory to the folder that holds the server's cache"sv;
+    // The engine's VarpType clientcode for running. The webclient does nothing with it, but the server
+    // finds its run varp by it too.
+    constexpr auto RUN_VARP_CLIENT_CODE = u16{7};
+    // IfType's script opcode that pushes a varp, whose id follows it.
+    constexpr auto PUSH_VARP = u16{5};
+    constexpr auto RUN_OFF = u16{0};
+    constexpr auto RUN_ON = u16{1};
+    constexpr auto DEPOSIT_OPTION = "Deposit"sv;
 
     template <typename TBody>
     auto WithContext(std::string_view context, TBody body)
@@ -71,7 +81,18 @@ namespace
         return crcs;
     }
 
-    void DecodeTypes(CacheStore& store, GameCache_s& cache)
+    u16 FindRunVarp(std::span<const VarpType_s> varps)
+    {
+        const auto found = std::ranges::find(varps, RUN_VARP_CLIENT_CODE, &VarpType_s::clientCode);
+        if (found == varps.end())
+        {
+            throw CacheError{std::format("no varp has client code {}, which marks the run varp", RUN_VARP_CLIENT_CODE)};
+        }
+
+        return found->id;
+    }
+
+    void DecodeConfig(CacheStore& store, GameCache_s& cache)
     {
         auto data = ReadArchive(store, CacheLoader::CONFIG_ARCHIVE, "config");
         WithContext(DescribeFile(CacheStore::ARCHIVES, CacheLoader::CONFIG_ARCHIVE, "config"), [&data, &cache]
@@ -86,22 +107,83 @@ namespace
             const auto objDat = ReadEntry(config, "obj.dat");
             const auto objIdx = ReadEntry(config, "obj.idx");
             cache.objs = TypeDecoder::DecodeObjs(objDat, objIdx, cache.text);
+            const auto varpDat = ReadEntry(config, "varp.dat");
+            const auto varpIdx = ReadEntry(config, "varp.idx");
+            cache.runVarp = FindRunVarp(TypeDecoder::DecodeVarps(varpDat, varpIdx));
         });
     }
 
-    u16 FindLogoutComponent(CacheStore& store)
+    template <typename TPredicate>
+    const IfComponent_s& FindComponent(std::span<const IfComponent_s> components, TPredicate matches, std::string_view missing)
     {
-        auto data = ReadArchive(store, CacheLoader::INTERFACE_ARCHIVE, "interface");
-        return WithContext(DescribeFile(CacheStore::ARCHIVES, CacheLoader::INTERFACE_ARCHIVE, "interface"), [&data]
+        const auto found = std::ranges::find_if(components, matches);
+        if (found == components.end())
         {
-            const auto interfaces = JagArchive{std::move(data)};
-            const auto button = InterfaceDecoder::FindClientCode(ReadEntry(interfaces, "data"), CacheLoader::LOGOUT_CLIENT_CODE);
-            if (!button)
+            throw CacheError{std::string{missing}};
+        }
+
+        return *found;
+    }
+
+    const IfComponent_s& FindClientCode(std::span<const IfComponent_s> components, ClientCode_e code, std::string_view marks)
+    {
+        const auto missing = std::format("no component has client code {}, which marks {}", static_cast<u16>(code), marks);
+        return FindComponent(components, [code](const IfComponent_s& component)
+        {
+            return component.clientCode == code;
+        }, missing);
+    }
+
+    // As the webclient's select buttons work: the first script pushes the varp, and the first
+    // condition's operand is the value a click sets it to.
+    const IfComponent_s& FindVarpButton(std::span<const IfComponent_s> components, u16 varp, u16 value, std::string_view marks)
+    {
+        const auto missing = std::format("no select button sets varp {} to {}, which marks {}", varp, value, marks);
+        return FindComponent(components, [varp, value](const IfComponent_s& component)
+        {
+            if (component.buttonType != ButtonType_e::Select || component.scripts.empty() || component.operands.empty())
             {
-                throw CacheError{std::format("no component has client code {}, which marks the logout button", CacheLoader::LOGOUT_CLIENT_CODE)};
+                return false;
             }
 
-            return *button;
+            const auto& script = component.scripts.front();
+            return script.size() > 1 && script[0] == PUSH_VARP && script[1] == varp && component.operands.front() == value;
+        }, missing);
+    }
+
+    bool IsBackpack(const IfComponent_s& component)
+    {
+        return component.type == ComponentType_e::Inv && component.objUse;
+    }
+
+    bool IsEquipment(const IfComponent_s& component)
+    {
+        return component.type == ComponentType_e::Inv && component.hasSlotBackgrounds;
+    }
+
+    bool IsBankBackpack(const IfComponent_s& component)
+    {
+        return component.type == ComponentType_e::Inv && component.options.front().starts_with(DEPOSIT_OPTION);
+    }
+
+    void FindComponents(CacheStore& store, GameCache_s& cache)
+    {
+        auto data = ReadArchive(store, CacheLoader::INTERFACE_ARCHIVE, "interface");
+        WithContext(DescribeFile(CacheStore::ARCHIVES, CacheLoader::INTERFACE_ARCHIVE, "interface"), [&data, &cache]
+        {
+            const auto interfaces = JagArchive{std::move(data)};
+            const auto components = InterfaceDecoder::Decode(ReadEntry(interfaces, "data"));
+            cache.logoutComponent = FindClientCode(components, ClientCode_e::Logout, "the logout button").id;
+            cache.bankComponent = FindClientCode(components, ClientCode_e::BankMode, "the bank").id;
+
+            const auto& inventory = FindComponent(components, IsBackpack, "no inventory lets its items be used, which marks the backpack");
+            cache.inventoryComponent = inventory.id;
+            cache.inventorySize = inventory.width * inventory.height;
+            cache.equipmentComponent = FindComponent(components, IsEquipment, "no inventory has slot backgrounds, which marks the worn equipment").id;
+            cache.bankInventoryComponent = FindComponent(components, IsBankBackpack, "no inventory has a Deposit option, which marks the backpack beside the bank").id;
+
+            cache.runOffButton = FindVarpButton(components, cache.runVarp, RUN_OFF, "the run off button").id;
+            cache.runOnButton = FindVarpButton(components, cache.runVarp, RUN_ON, "the run on button").id;
         });
     }
 
@@ -177,8 +259,8 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Logger& lo
         auto store = CacheStore{directory};
         auto cache = GameCache_s{};
         cache.crcs = ReadCrcs(store);
-        DecodeTypes(store, cache);
-        cache.logoutComponent = FindLogoutComponent(store);
+        DecodeConfig(store, cache);
+        FindComponents(store, cache);
         const auto skipped = DecodeMaps(store, cache);
         cache.text.FinishInterning();
 

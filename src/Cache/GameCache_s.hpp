@@ -13,8 +13,18 @@ struct GameCache_s
     static constexpr std::size_t CRC_COUNT = 9;
 
     std::array<s32, CRC_COUNT> crcs{};
-    // The logout tab's button, which the client clicks to log out.
+    // Components and a varp the client uses. The server's content pack numbers them when it builds the
+    // cache, so CacheLoader finds them by what the cache says about them.
     u16 logoutComponent = 0;
+    u16 inventoryComponent = 0;
+    s32 inventorySize = 0;
+    u16 equipmentComponent = 0;
+    u16 bankComponent = 0;
+    // The backpack beside the bank, which replaces the inventory tab while the bank is open.
+    u16 bankInventoryComponent = 0;
+    u16 runOffButton = 0;
+    u16 runOnButton = 0;
+    u16 runVarp = 0;
     TextPool text;
     // Index i holds the type whose id is i.
     std::vector<LocType_s> locs;

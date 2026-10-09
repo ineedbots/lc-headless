@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "FakeGameServer.hpp"
+#include "../Cache/TestCache.hpp"
 #include "../LoopbackPort.hpp"
 
 #include "Cache/GameCache_s.hpp"
@@ -106,6 +107,7 @@ AccountSettings_s FakeGameServer::MakeAccount()
 std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
 {
     auto cache = GameCache_s{};
+    TestCache::SetComponents(cache);
     cache.logoutComponent = LOGOUT_COMPONENT;
     return std::make_shared<const GameCache_s>(std::move(cache));
 }

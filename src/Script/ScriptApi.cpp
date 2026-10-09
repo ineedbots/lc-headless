@@ -199,7 +199,7 @@ bool ScriptApi::InCombat() const
 
 bool ScriptApi::IsRunning() const
 {
-    return m_state.GetVarp(RUN_VARP) == 1;
+    return m_state.GetVarp(GetCache().runVarp) == 1;
 }
 
 const Stat_s& ScriptApi::GetStat(s32 stat) const
@@ -448,7 +448,8 @@ std::optional<InventoryItem_s> ScriptApi::FindItem(const SearchFilter_s& filter,
 
 s32 ScriptApi::GetEmptySlots() const
 {
-    return INVENTORY_SIZE - static_cast<s32>(GetInventory(INVENTORY).size());
+    const auto& cache = GetCache();
+    return cache.inventorySize - static_cast<s32>(GetInventory(cache.inventoryComponent).size());
 }
 
 std::optional<u8> ScriptApi::FindNpcOp(u16 index, std::string_view text) const
@@ -727,7 +728,8 @@ void ScriptApi::CloseInterfaces()
 
 void ScriptApi::SetRun(bool run)
 {
-    m_actions.ClickButton(run ? RUN_ON_BUTTON : RUN_OFF_BUTTON);
+    const auto& cache = GetCache();
+    m_actions.ClickButton(run ? cache.runOnButton : cache.runOffButton);
 }
 
 void ScriptApi::Say(std::string_view text)

@@ -56,12 +56,19 @@ struct InterfaceComponent_s
     u8 type = 0;
     u8 buttonType = 0;
     u16 clientCode = 0;
+    u16 width = 32;
+    u16 height = 32;
     std::optional<u16> hoverLayer{};
     // Each a comparator and its operand.
     std::vector<std::pair<u8, u16>> conditions{};
     std::vector<std::vector<u16>> scripts{};
     // A layer's children.
     std::vector<u16> children{};
+    // An inventory's: whether its items can be used, whether its first slot has a background, and its
+    // options, with the slots past them empty.
+    bool objUse = false;
+    bool slotBackground = false;
+    std::vector<std::string> options{};
 };
 
 // Each definition is a type's bytes, opcodes through the closing 0, in id order.
@@ -70,6 +77,7 @@ struct StoreContents_s
     std::vector<std::vector<u8>> locs;
     std::vector<std::vector<u8>> npcs;
     std::vector<std::vector<u8>> objs;
+    std::vector<std::vector<u8>> varps;
     std::vector<InterfaceComponent_s> interfaces;
     std::vector<SquareFiles_s> squares;
     // Listed in map_index, but with no files in store 4.
