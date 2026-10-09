@@ -1,6 +1,8 @@
-# rs2004-headless
+# LostCity Headless
 
-A headless game client for revision-289 (2004-era RuneScape) servers, such as the 289server engine. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics, reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process.
+![HEADLESS](assets/anim.gif)
+
+A headless (shell) game client for revision-289 (2004-era RuneScape) servers, such as the 289 server engine. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics, reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process.
 
 ## Features
 
@@ -16,6 +18,8 @@ A headless game client for revision-289 (2004-era RuneScape) servers, such as th
   - reloading a script when it's saved (`--watch`)
   - a VS Code debugger (`--debugger`)
   - type stubs for Pylance and Pyright
+
+![SCRIPT DEBUGGER](assets/debug.jpg)
 
 ## Requirements
 
