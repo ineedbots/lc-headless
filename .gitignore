@@ -3,4 +3,3 @@ client*.jsonc
 .vscode/
 accounts/*.jsonc
 /progress/
-/cache/
