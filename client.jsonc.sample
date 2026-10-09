@@ -1,0 +1,31 @@
+// Sample config, written because none was found.
+// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.
+// Each account goes in its own file in scripting.accountsDirectory.
+{
+    "server": {
+        "url": "ws://localhost:80",
+        "origin": "http://localhost",
+        "tlsCaFile": "SYSTEM"
+    },
+    "login": {
+        "rsaModulus": "0x0",
+        "rsaExponent": "0x0",
+        "lowMemory": false,
+        "revision": 289
+    },
+    "client": {
+        "logoutComponent": 2458,
+        "logLevel": "info",
+        "idleSeconds": 5,
+        "cacheDirectory": "cache"
+    },
+    "scripting": {
+        "accountsDirectory": "accounts",
+        "scriptsDirectory": "scripts",
+        "callTimeoutMs": 1000,
+        "pollIntervalMs": 10,
+        "loginIntervalSeconds": 2,
+        "killGraceSeconds": 30,
+        "progressDirectory": "progress"
+    }
+}
