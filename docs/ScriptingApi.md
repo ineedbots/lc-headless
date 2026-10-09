@@ -53,7 +53,25 @@ For working on a script, `--watch` reloads it whenever you save it, and `--debug
 
   A game tick is 600 ms, so delays of 600 or more are typical; 0 means "as soon as possible".
 - Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. `time.sleep()` raises an error: return a delay from `loop()` instead.
-- An uncaught exception, or a `loop()` that returns anything but an int of 0 or more, stops the script. The client logs the traceback and logs the account out, unless it's running with `--watch`.
+- `loop()` can be a generator instead, for a task that takes several steps. Each `yield` is a delay, as a return would be, and the generator carries on from there once it's up; `return 600` ends it and waits that long before `loop()` is called again, even before the first `yield`, and a bare `return` or reaching the end calls it again on the next pass. Hooks run as usual while it waits:
+
+  ```python
+  def loop():
+      if in_combat():
+          return 600
+      walk_to(3222, 3218)
+      yield 3000
+      chicken = get_nearest_npc_by_id(CHICKEN, radius=8, in_combat=False)
+      if chicken is not None:
+          attack_npc(chicken)
+          yield 1200
+      while in_combat():
+          yield 600
+      return 1200
+  ```
+
+  Each resume is a separate call, so `scripting.callTimeoutMs` applies to each stretch between yields, not the whole generator. A reload with `--watch` starts it over.
+- An uncaught exception, or a `loop()` that returns or yields anything but an int of 0 or more, stops the script. The client logs the traceback and logs the account out, unless it's running with `--watch`.
 - Objects such as `Npc` are snapshots taken when the function returned. Keep the `index` to look one up again later with `get_npc(index)`.
 - Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view return `False`. A wrong argument type raises `TypeError`, and a value out of range (an option outside 1 to 5, say) raises `ValueError`.
 - Names, options and scenery come from the server's cache, which the client loads at startup from `client.cacheDirectory`. They're exactly as the cache has them, case included.

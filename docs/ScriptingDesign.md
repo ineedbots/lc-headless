@@ -168,7 +168,7 @@ def on_server_message(msg):
 |---|---|
 | module body | Once, at load, before login. Use it only for definitions and constants: the API can't be called yet |
 | `on_start()` | Once, after the first placement (the first `PLAYER_INFO` after login) |
-| `loop()` | Whenever its delay has passed, while in game and placed. It must return an `int` of milliseconds (≥ 0) |
+| `loop()` | Whenever its delay has passed, while in game and placed. It must return an `int` of milliseconds (≥ 0), or be a generator that yields them and may return the last one; one that returns nothing means `loop()` is called again on the next pass |
 | `on_*` event hooks | After each pump, in event order, before `loop()` |
 | `on_disconnect()` / `on_reconnect()` | The connection dropped / a reconnect succeeded. `loop()` and the event hooks pause in between |
 | `on_kill_signal()` | Once, on the first Ctrl+C |

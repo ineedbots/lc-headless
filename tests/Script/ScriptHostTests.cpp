@@ -209,6 +209,107 @@ TEST_CASE("ScriptHost stops a script that fails", "[ScriptHost]")
         fixture.host->Step(Clock::now());
         CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
     }
+
+    SECTION("a generator loop yielding something other than an int")
+    {
+        auto fixture = HostFixture{"def loop():\n    yield 'soon'\n"};
+        fixture.host->Step(Clock::now());
+        CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
+        CHECK(fixture.HasLog(LogLevel_e::Error, "loop() must yield how many milliseconds to wait, as an int, not str"));
+    }
+
+    SECTION("a generator loop returning a negative delay")
+    {
+        auto fixture = HostFixture{"def loop():\n    yield 0\n    return -1\n"};
+        const auto start = Clock::now();
+        fixture.host->Step(start);
+        fixture.host->Step(start + 10ms);
+        CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
+        CHECK(fixture.HasLog(LogLevel_e::Error, "loop() returned -1"));
+    }
+
+    SECTION("an exception in a generator loop after it yielded")
+    {
+        auto fixture = HostFixture{"def loop():\n    yield 600\n    raise ValueError('no chickens')\n"};
+        const auto start = Clock::now();
+        fixture.host->Step(start);
+        CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
+
+        fixture.host->Step(start + 600ms);
+        CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
+        CHECK(fixture.HasLog(LogLevel_e::Error, "ValueError: no chickens"));
+    }
+}
+
+TEST_CASE("ScriptHost resumes a generator loop after each delay it yields", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+def loop():
+    log('>', 'walk')
+    yield 600
+    log('>', 'bank')
+    yield 1200
+    log('>', 'done')
+)python"};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk"});
+    REQUIRE(fixture.host->GetNextLoop().has_value());
+    CHECK(*fixture.host->GetNextLoop() == start + 600ms);
+
+    fixture.host->Step(start + 599ms);
+    CHECK(fixture.GetScriptLines().size() == 1);
+
+    fixture.host->Step(start + 600ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank"});
+    CHECK(*fixture.host->GetNextLoop() == start + 1800ms);
+
+    // Finishing runs the rest of the generator, and loop() starts over on the next pass.
+    fixture.host->Step(start + 1800ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank", "done"});
+    CHECK(*fixture.host->GetNextLoop() == start + 1800ms);
+
+    fixture.host->Step(start + 1810ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank", "done", "walk"});
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
+}
+
+TEST_CASE("ScriptHost waits for the delay a generator loop returns", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+fighting = True
+
+def loop():
+    global fighting
+    if fighting:
+        fighting = False
+        log('>', 'fighting')
+        return 600
+    log('>', 'walk')
+    yield 600
+    log('>', 'bank')
+    return 1200
+)python"};
+    const auto start = Clock::now();
+
+    // A return before any yield is still a delay, not a call on the next pass.
+    fixture.host->Step(start);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting"});
+    REQUIRE(fixture.host->GetNextLoop().has_value());
+    CHECK(*fixture.host->GetNextLoop() == start + 600ms);
+
+    fixture.host->Step(start + 600ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting", "walk"});
+
+    fixture.host->Step(start + 1200ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting", "walk", "bank"});
+    CHECK(*fixture.host->GetNextLoop() == start + 2400ms);
+
+    fixture.host->Step(start + 2399ms);
+    CHECK(fixture.GetScriptLines().size() == 3);
+
+    fixture.host->Step(start + 2400ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting", "walk", "bank", "walk"});
 }
 
 TEST_CASE("ScriptHost stops when the script asks", "[ScriptHost]")

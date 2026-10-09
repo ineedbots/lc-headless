@@ -93,6 +93,13 @@ def _report_rows(report):
     if not isinstance(report, dict):
         raise TypeError(f'on_progress_report() must return a dict, not {type(report).__name__}')
     return [[str(name), str(value)] for name, value in report.items()]
+
+
+def _resume_loop(generator):
+    try:
+        return False, next(generator)
+    except StopIteration as e:
+        return True, e.value
 )python"sv;
 
     constexpr auto LOAD_SETTINGS = "settings = _load_settings(_settings_json)\ndel _settings_json\n"sv;

@@ -23,6 +23,8 @@
 namespace
 {
     constexpr auto LOOP = "loop"sv;
+    constexpr auto LOOP_GENERATOR = "_loop_generator";
+    constexpr auto RESUME_LOOP = "_resume_loop"sv;
     constexpr auto START = "on_start"sv;
     constexpr auto PROGRESS_REPORT = "on_progress_report"sv;
     constexpr auto BOT_MESSAGE = "on_bot_message"sv;
@@ -561,6 +563,9 @@ void ScriptHost::RunProgressReport(Clock::time_point now)
     }
 }
 
+// loop() may be a generator instead: each value it yields is the next delay, and what it returns when it
+// finishes is the last one, with none meaning the next pass. It's kept in builtins in between, where the
+// collector can see it.
 void ScriptHost::RunLoop(Clock::time_point now)
 {
     if (m_status != ScriptStatus_e::Running)
@@ -568,26 +573,79 @@ void ScriptHost::RunLoop(Clock::time_point now)
         return;
     }
 
-    const auto result = Invoke(LOOP);
-    if (!result || m_status != ScriptStatus_e::Running)
+    const auto builtins = m_vm->GetBuiltins();
+    const auto generatorName = py_name(LOOP_GENERATOR);
+    if (py_getdict(builtins, generatorName) == nullptr)
+    {
+        const auto result = Invoke(LOOP);
+        if (!result || m_status != ScriptStatus_e::Running)
+        {
+            return;
+        }
+
+        if (!py_istype(*result, tp_generator))
+        {
+            ScheduleLoop(now, *result, false);
+            return;
+        }
+
+        py_setdict(builtins, generatorName, *result);
+    }
+
+    // The prelude catches StopIteration, which is the only way to read what the generator returned.
+    py_assign(py_r0(), py_getdict(builtins, generatorName));
+    auto result = py_GlobalRef{};
+    try
+    {
+        result = m_vm->CallBuiltin(RESUME_LOOP, std::array{py_r0()});
+        ApplyStopRequest();
+    }
+    catch (const ScriptError& e)
+    {
+        Fail(LOOP, e.what());
+        return;
+    }
+
+    if (m_status != ScriptStatus_e::Running)
     {
         return;
     }
 
-    if (!py_isint(*result))
+    const auto finished = py_tobool(py_tuple_getitem(result, 0));
+    py_assign(py_r0(), py_tuple_getitem(result, 1));
+    if (!finished)
     {
-        Fail(LOOP, std::format("loop() must return how many milliseconds to wait, as an int, not {}", GetTypeName(*result)));
+        ScheduleLoop(now, py_r0(), true);
         return;
     }
 
-    const auto delay = py_toint(*result);
-    if (delay < 0)
+    static_cast<void>(py_deldict(builtins, generatorName));
+    if (py_isnone(py_r0()))
     {
-        Fail(LOOP, std::format("loop() returned {}; return 0 or more milliseconds", delay));
+        m_nextLoop = now;
         return;
     }
 
-    m_nextLoop = now + std::chrono::milliseconds{delay};
+    ScheduleLoop(now, py_r0(), false);
+}
+
+void ScriptHost::ScheduleLoop(Clock::time_point now, py_Ref delay, bool yielded)
+{
+    const auto verb = yielded ? "yield"sv : "return"sv;
+    if (!py_isint(delay))
+    {
+        Fail(LOOP, std::format("loop() must {} how many milliseconds to wait, as an int, not {}", verb, GetTypeName(delay)));
+        return;
+    }
+
+    const auto milliseconds = py_toint(delay);
+    if (milliseconds < 0)
+    {
+        Fail(LOOP, std::format("loop() {}ed {}; {} 0 or more milliseconds", verb, milliseconds, verb));
+        return;
+    }
+
+    m_nextLoop = now + std::chrono::milliseconds{milliseconds};
 }
 
 bool ScriptHost::HasHook(std::string_view name) const

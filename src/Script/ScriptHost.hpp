@@ -46,7 +46,7 @@ struct ScriptHostOptions_s
 // Runs one account's script against its client, on the caller's thread between pumps. The script is
 // loaded on construction, so a broken script fails before login. Once the local player is placed it
 // calls on_start, then on every Step passes new events, messages and bot messages to the script's hooks
-// and calls loop() whenever the delay it last returned has passed.
+// and calls loop() whenever the delay it last returned, or yielded as a generator, has passed.
 class ScriptHost
 {
 public:
@@ -116,6 +116,7 @@ private:
     void DispatchBotMessages();
     void RunProgressReport(Clock::time_point now);
     void RunLoop(Clock::time_point now);
+    void ScheduleLoop(Clock::time_point now, py_Ref delay, bool yielded);
     [[nodiscard]] bool HasHook(std::string_view name) const;
     void CallHook(std::string_view name, std::span<const py_Ref> args = {});
     std::optional<py_GlobalRef> Invoke(std::string_view name, std::span<const py_Ref> args = {});
