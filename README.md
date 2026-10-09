@@ -16,7 +16,7 @@ A headless (shell) game client for revision-289 (2004-era RuneScape) servers, su
   - progress reports written to a file
   - messages between scripts
   - reloading a script when it's saved (`--watch`)
-  - a VS Code debugger (`--debugger`)
+  - a [VS Code debugger](https://pocketpy.github.io/features/debugging/#attach-to-an-embedded-application) (`--debugger`)
   - type stubs for Pylance and Pyright
 
 ![SCRIPT DEBUGGER](assets/debug.jpg)
