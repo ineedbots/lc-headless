@@ -18,10 +18,8 @@ struct AccountSettings_s
 
 struct LoginSettings_s
 {
-    static constexpr std::size_t CRC_COUNT = 9;
     static constexpr u16 SUPPORTED_REVISION = 289;
 
-    std::array<s32, CRC_COUNT> crcs{};
     BigUInt rsaModulus;
     BigUInt rsaExponent;
     bool lowMemory = false;
@@ -33,6 +31,7 @@ struct ClientSettings_s
     u16 logoutComponent = 2458;
     LogLevel_e logLevel = LogLevel_e::Info;
     std::chrono::seconds idleSeconds = 5s;
+    std::string cacheDirectory = "cache";
 };
 
 struct ScriptingSettings_s

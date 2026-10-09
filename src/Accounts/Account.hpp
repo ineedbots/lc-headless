@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Cache/GameCache_s.hpp"
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
 #include "../Game/GameClient.hpp"
@@ -32,7 +33,7 @@ public:
     // Long enough to outlast the server's refusal to log out during combat and for 10 seconds after.
     static constexpr auto LOGOUT_TIMEOUT = 30s;
 
-    Account(std::shared_ptr<const Config_s> config, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {}, BotMessenger* messenger = nullptr);
+    Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {}, BotMessenger* messenger = nullptr);
     ~Account();
 
     Account(const Account&) = delete;

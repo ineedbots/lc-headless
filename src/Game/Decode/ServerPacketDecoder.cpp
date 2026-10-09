@@ -361,6 +361,7 @@ namespace
         // The server resends every zone in view after a rebuild.
         state.groundItems.clear();
         state.locChanges.clear();
+        ++state.sceneChangeCount;
     }
 
     void DecodeLastLogin(Packet& packet, GameState_s& state)

@@ -1,11 +1,14 @@
 #include "pch.hpp"
+#include "../Cache/TestCache.hpp"
 #include "../Game/FakeGameServer.hpp"
 #include "../Game/Fixtures.hpp"
 #include "../LogCapture.hpp"
 
+#include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
+#include "Game/Map/WorldMap.hpp"
 #include "Game/State/Entity_s.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Game/State/Npc_s.hpp"
@@ -14,13 +17,21 @@
 #include "Script/ScriptApi.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+
+using Catch::Matchers::ContainsSubstring;
 
 namespace
 {
     constexpr auto CHICKEN = u16{41};
     constexpr auto COW = u16{81};
+    constexpr auto UNKNOWN_NPC = u16{900};
     constexpr auto BONES = 526;
     constexpr auto COINS = 995;
+    constexpr auto DOOR = u16{1530};
+    constexpr auto TREE = u16{1276};
+    constexpr auto WALL = u8{0};
+    constexpr auto CENTREPIECE = u8{10};
 
     Tile_s Offset(s32 dx, s32 dz, s32 level = 0)
     {
@@ -36,6 +47,40 @@ namespace
         return npc;
     }
 
+    // Chicken 10 is penned in by blocked tiles, a door and a tree stand nearby, and the server has
+    // removed a second tree.
+    std::shared_ptr<const GameCache_s> MakeCache()
+    {
+        auto cache = GameCache_s{};
+        TestCache::AddNpc(cache, CHICKEN, "Chicken", {"", "Attack"});
+        TestCache::AddNpc(cache, COW, "Cow", {"", "Attack"});
+        TestCache::AddObj(cache, BONES, "Bones", {}, {"Bury"});
+        TestCache::AddObj(cache, COINS, "Coins");
+        TestCache::AddLoc(cache, DOOR, "Door", {"Open"});
+        TestCache::AddLoc(cache, TREE, "Tree", {"Chop down"});
+
+        auto pen = std::vector<Tile_s>{};
+        for (auto dx = 2; dx <= 4; ++dx)
+        {
+            for (auto dz = -1; dz <= 1; ++dz)
+            {
+                if (dx != 3 || dz != 0)
+                {
+                    pen.push_back(Offset(dx, dz));
+                }
+            }
+        }
+
+        const auto locs = std::to_array<TestLoc_s>({
+            {.id = DOOR, .tile = Offset(1, -2), .shape = WALL},
+            {.id = TREE, .tile = Offset(-3, -3), .shape = CENTREPIECE},
+            {.id = TREE, .tile = Offset(8, 8), .shape = CENTREPIECE},
+        });
+
+        TestCache::SetMap(cache, locs, pen);
+        return std::make_shared<const GameCache_s>(std::move(cache));
+    }
+
     std::vector<u16> GetIndices(const std::vector<Npc_s>& npcs)
     {
         auto indices = std::vector<u16>{};
@@ -47,15 +92,16 @@ namespace
         return indices;
     }
 
-    // A client that never logs in: queries read the fixture state, and actions only get as far as
-    // checking their targets, since sending throws without a session.
+    // A client that never logs in: queries read the fixture state and map, and actions only get as far
+    // as checking their targets, since sending throws without a session.
     class ApiFixture
     {
     public:
         ApiFixture()
-            : client{std::make_shared<const Config_s>(), FakeGameServer::MakeAccount(), capture.GetLogger()}
+            : map{cache}
+            , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
-            , api{state, actions}
+            , api{state, map, actions}
         {
             state.tick = 100;
             state.npcs = {
@@ -74,10 +120,17 @@ namespace
                 .com = ScriptApi::INVENTORY,
                 .slots = {{.id = COINS, .count = 100}, {}, {.id = BONES, .count = 1}, {.id = BONES, .count = 1}},
             };
+
+            state.locChanges = {{.tile = Offset(8, 8), .layer = LocLayer_e::Ground, .id = -1, .shape = CENTREPIECE}};
+            state.playerOps[1] = PlayerOp_s{.text = "Follow"};
+            ++state.sceneChangeCount;
+            map.Update(state);
         }
 
         LogCapture capture;
+        std::shared_ptr<const GameCache_s> cache = MakeCache();
         GameState_s state = Fixtures::PlacedState();
+        WorldMap map;
         GameClient client;
         GameActions actions;
         ScriptApi api;
@@ -133,11 +186,11 @@ TEST_CASE("ScriptApi reads ground items and inventories", "[ScriptApi]")
     const auto items = api.GetInventory(ScriptApi::INVENTORY);
     REQUIRE(items.size() == 3);
     CHECK(items[1].slot == 2);
-    CHECK(api.CountItems(std::vector<s32>{BONES}, ScriptApi::INVENTORY) == 2);
-    CHECK(api.CountItems(std::vector<s32>{BONES, COINS}, ScriptApi::INVENTORY) == 102);
+    CHECK(api.CountItems({.ids = {BONES}}, ScriptApi::INVENTORY) == 2);
+    CHECK(api.CountItems({.ids = {BONES, COINS}}, ScriptApi::INVENTORY) == 102);
     CHECK(api.CountItems({}, ScriptApi::INVENTORY) == 102);
-    CHECK(api.FindItem(std::vector<s32>{BONES}, ScriptApi::INVENTORY)->slot == 2);
-    CHECK_FALSE(api.FindItem(std::vector<s32>{1}, ScriptApi::INVENTORY).has_value());
+    CHECK(api.FindItem({.ids = {BONES}}, ScriptApi::INVENTORY)->slot == 2);
+    CHECK_FALSE(api.FindItem({.ids = {1}}, ScriptApi::INVENTORY).has_value());
     CHECK(api.GetEmptySlots() == ScriptApi::INVENTORY_SIZE - 3);
     CHECK(api.GetInventory(ScriptApi::EQUIPMENT).empty());
 }
@@ -190,4 +243,87 @@ TEST_CASE("ScriptApi keeps the strongest stop request until it's taken", "[Scrip
     api.RequestStop(StopRequest_e::Script);
     CHECK(api.TakeStopRequest() == StopRequest_e::Account);
     CHECK(api.TakeStopRequest() == StopRequest_e::None);
+}
+
+TEST_CASE("ScriptApi finds NPCs and items by name", "[ScriptApi]")
+{
+    auto fixture = ApiFixture{};
+    auto& api = fixture.api;
+    fixture.state.npcs.push_back(MakeNpc(14, UNKNOWN_NPC, Offset(1, 0)));
+
+    CHECK(GetIndices(api.GetNpcs({.names = {"chicken"}})) == std::vector<u16>{10, 12, 13});
+    CHECK(GetIndices(api.GetNpcs({.names = {"Cow", "CHICKEN"}, .radius = 3})) == std::vector<u16>{10, 11, 12});
+    CHECK(api.GetNpcs({.names = {""}}).empty());
+    CHECK(api.GetNearestNpc({.names = {"Cow"}}, std::nullopt)->index == 11);
+    CHECK(api.GetNearestGroundItem({.names = {"bones"}})->id == BONES);
+    CHECK_FALSE(api.GetNearestGroundItem({.names = {"Logs"}}).has_value());
+    CHECK(api.CountItems({.names = {"Bones"}}, ScriptApi::INVENTORY) == 2);
+    CHECK(api.FindItem({.names = {"coins"}}, ScriptApi::INVENTORY)->slot == 0);
+}
+
+TEST_CASE("ScriptApi chooses options by their text", "[ScriptApi]")
+{
+    auto fixture = ApiFixture{};
+    const auto& api = fixture.api;
+    fixture.state.npcs.push_back(MakeNpc(14, UNKNOWN_NPC, Offset(1, 0)));
+
+    CHECK(api.FindNpcOp(10, "attack") == std::optional<u8>{2});
+    CHECK_FALSE(api.FindNpcOp(99, "Attack").has_value());
+    CHECK_THROWS_WITH(api.FindNpcOp(10, "Pickpocket"), "Chicken (NPC 41) has no option 'Pickpocket'; its options are Attack (2)");
+    CHECK_THROWS_WITH(api.FindNpcOp(14, "Attack"), ContainsSubstring("NPC 900 isn't in the cache"));
+    CHECK(api.FindLocOp(DOOR, "OPEN") == 1);
+    CHECK_THROWS_AS(api.FindLocOp(DOOR, "Close"), std::invalid_argument);
+    CHECK(api.FindPlayerOp("follow") == 2);
+    CHECK_THROWS_WITH(api.FindPlayerOp("Trade"), "a player has no option 'Trade'; its options are Follow (2)");
+
+    SECTION("ground items offer Take, and inventory items Drop, where their type has no option")
+    {
+        CHECK(api.FindGroundItemOp(BONES, "take") == ScriptApi::OP_TAKE);
+        CHECK(api.FindItemOp(BONES, "Bury") == 1);
+        CHECK(api.FindItemOp(BONES, "drop") == ScriptApi::OP_DROP);
+        CHECK_THROWS_WITH(api.FindItemOp(COINS, "Bury"), "Coins (item 995) has no option 'Bury'; its options are Drop (5)");
+    }
+}
+
+TEST_CASE("ScriptApi sees the cache's scenery and the server's changes", "[ScriptApi]")
+{
+    auto fixture = ApiFixture{};
+    const auto& api = fixture.api;
+
+    const auto door = api.GetLocAt(Fixtures::HOME + 1, Fixtures::HOME - 2, std::nullopt);
+    REQUIRE(door.has_value());
+    CHECK(door->id == DOOR);
+    CHECK(door->layer == LocLayer_e::Wall);
+    CHECK_FALSE(door->changed);
+    CHECK_FALSE(api.GetLocAt(Fixtures::HOME + 1, Fixtures::HOME - 2, LocLayer_e::Ground).has_value());
+
+    const auto removed = api.GetLocAt(Fixtures::HOME + 8, Fixtures::HOME + 8, std::nullopt);
+    REQUIRE(removed.has_value());
+    CHECK(removed->id == -1);
+    CHECK(removed->changed);
+
+    const auto locs = api.GetLocs({}, std::nullopt);
+    REQUIRE(locs.size() == 2);
+    CHECK(locs[0].id == DOOR);
+    CHECK(locs[1].id == TREE);
+    CHECK(api.GetLocs({.ids = {TREE}, .radius = 2}, std::nullopt).empty());
+    CHECK(api.GetLocs({}, LocLayer_e::Ground).size() == 1);
+    CHECK(api.GetNearestLoc({.names = {"tree"}}, std::nullopt)->tile == Offset(-3, -3));
+    CHECK_FALSE(api.GetNearestLoc({.names = {"Bank booth"}}, std::nullopt).has_value());
+}
+
+TEST_CASE("ScriptApi finds routes and skips what can't be reached", "[ScriptApi]")
+{
+    auto fixture = ApiFixture{};
+    const auto& api = fixture.api;
+
+    CHECK(api.IsReachable(Fixtures::HOME, Fixtures::HOME + 5));
+    CHECK_FALSE(api.IsReachable(Fixtures::HOME + 3, Fixtures::HOME));
+    CHECK(api.FindPath(Fixtures::HOME, Fixtures::HOME + 5) == std::vector<Tile_s>{Offset(0, 5)});
+    CHECK_FALSE(api.FindPath(Fixtures::HOME + 3, Fixtures::HOME).has_value());
+
+    CHECK(api.GetNearestNpc({.ids = {CHICKEN}}, std::nullopt)->index == 10);
+    CHECK(api.GetNearestNpc({.ids = {CHICKEN}}, std::nullopt, true)->index == 12);
+    CHECK(api.GetNearestLoc({.ids = {DOOR}}, std::nullopt, true)->id == DOOR);
+    CHECK(api.GetNearestGroundItem({.ids = {BONES}}, true)->id == BONES);
 }

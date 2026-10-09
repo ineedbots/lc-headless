@@ -15,7 +15,7 @@ namespace
         {3, "invalid username or password", false},
         {4, "account disabled", false},
         {5, "account already logged in, or its last logout is still pending", true},
-        {6, "revision, cache CRC or RSA key mismatch", false},
+        {6, "revision, cache CRC or RSA key mismatch; is client.cacheDirectory this server's cache?", false},
         {7, "world full or connection limit reached", true},
         {8, "login service unavailable", true},
         {9, "login limit exceeded", true},

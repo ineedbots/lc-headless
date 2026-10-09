@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "LoginHandshake.hpp"
 
+#include "../../Cache/GameCache_s.hpp"
 #include "../../Core/ConfigFile.hpp"
 #include "../../Io/Packet.hpp"
 #include "../../Io/WebSocketClient.hpp"
@@ -27,9 +28,10 @@ namespace
     }
 }
 
-LoginHandshake::LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, bool reconnect)
+LoginHandshake::LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect)
     : m_account{account}
     , m_login{login}
+    , m_crcs{crcs}
     , m_reconnect{reconnect}
 {
 }
@@ -69,7 +71,7 @@ std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
             }
 
             m_result.seed = MakeSeed(Packet{*serverSeed}.G8());
-            socket.Send(BuildLoginRequest(m_account, m_login, m_result.seed, m_reconnect));
+            socket.Send(BuildLoginRequest(m_account, m_login, m_crcs, m_result.seed, m_reconnect));
             m_stage = Stage_e::LoginResponse;
             break;
         }
@@ -165,7 +167,7 @@ std::vector<u8> LoginHandshake::BuildSeedRequest(std::string_view username)
     return ToVector(packet.GetData());
 }
 
-std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect)
+std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect)
 {
     auto block = Packet{};
     block.P1(RSA_MARKER);
@@ -186,7 +188,7 @@ std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& accou
     packet.P1(REVISION_MARKER);
     packet.P2(login.revision);
     packet.P1(login.lowMemory ? 1 : 0);
-    for (const auto crc : login.crcs)
+    for (const auto crc : crcs)
     {
         packet.P4(crc);
     }

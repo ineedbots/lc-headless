@@ -25,7 +25,6 @@ namespace
         "tlsCaFile": "SYSTEM"
     },
     "login": {
-        "crcs": ["0x00000000", "0xde5b3345", "0x6026f8fe", "0x07550309", "0x9a13636e", "0xca2717bd", "0x368f1792", "0x1b1fb6b2", "0xa7129379"],
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
         "rsaExponent": "0x81f390b2cf8ca7039ee507975951d5a0b15a87bf8b3f99c966834118c50fd94d",
         /*
@@ -38,7 +37,8 @@ namespace
     "client": {
         "logoutComponent": 2458,
         "logLevel": "verbose",
-        "idleSeconds": 5
+        "idleSeconds": 5,
+        "cacheDirectory": "../289server/engine/data/pack"
     },
     "scripting": {
         "accountsDirectory": "bots",
@@ -54,7 +54,7 @@ namespace
 
     constexpr auto SAMPLE_HEADER =
         "// Sample config, written because none was found.\n"
-        "// Set server.url and the login CRCs and RSA key, then run again.\n"
+        "// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.\n"
         "// Each account goes in its own file in scripting.accountsDirectory.\n"sv;
 
     constexpr auto SAMPLE_BODY = R"json({
@@ -64,17 +64,6 @@ namespace
         "tlsCaFile": "SYSTEM"
     },
     "login": {
-        "crcs": [
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000"
-        ],
         "rsaModulus": "0x0",
         "rsaExponent": "0x0",
         "lowMemory": false,
@@ -83,7 +72,8 @@ namespace
     "client": {
         "logoutComponent": 2458,
         "logLevel": "info",
-        "idleSeconds": 5
+        "idleSeconds": 5,
+        "cacheDirectory": "cache"
     },
     "scripting": {
         "accountsDirectory": "accounts",
@@ -157,12 +147,12 @@ namespace
     const auto OPTIONAL_KEYS = std::vector<KeyPath_s>{
         {"server", "origin"},
         {"server", "tlsCaFile"},
-        {"login", "crcs"},
         {"login", "lowMemory"},
         {"login", "revision"},
         {"client", "logoutComponent"},
         {"client", "logLevel"},
         {"client", "idleSeconds"},
+        {"client", "cacheDirectory"},
         {"scripting", "accountsDirectory"},
         {"scripting", "scriptsDirectory"},
         {"scripting", "callTimeoutMs"},
@@ -171,16 +161,6 @@ namespace
         {"scripting", "killGraceSeconds"},
         {"scripting", "progressDirectory"},
     };
-
-    s32 Crc(u32 value)
-    {
-        return std::bit_cast<s32>(value);
-    }
-
-    std::array<s32, LoginSettings_s::CRC_COUNT> GetExampleCrcs()
-    {
-        return {0, Crc(0xde5b3345), Crc(0x6026f8fe), Crc(0x07550309), Crc(0x9a13636e), Crc(0xca2717bd), Crc(0x368f1792), Crc(0x1b1fb6b2), Crc(0xa7129379)};
-    }
 
     nlohmann::json ParseJsonWithComments(std::string_view text)
     {
@@ -280,7 +260,6 @@ namespace
         CHECK(config.server.url == "ws://localhost:80");
         CHECK(config.server.origin == "https://w1.rs2b2t.com");
         CHECK(config.server.tlsCaFile == "SYSTEM");
-        CHECK(config.login.crcs == GetExampleCrcs());
         CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
         CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
         CHECK_FALSE(config.login.lowMemory);
@@ -288,6 +267,7 @@ namespace
         CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Verbose);
         CHECK(config.client.idleSeconds == 5s);
+        CHECK(config.client.cacheDirectory == "../289server/engine/data/pack");
         CHECK(config.scripting.accountsDirectory == "bots");
         CHECK(config.scripting.scriptsDirectory == "my-scripts");
         CHECK(config.scripting.callTimeoutMs == 500ms);
@@ -312,12 +292,12 @@ namespace
     {
         CHECK(config.server.origin.empty());
         CHECK(config.server.tlsCaFile == "SYSTEM");
-        CHECK(config.login.crcs == std::array<s32, LoginSettings_s::CRC_COUNT>{});
         CHECK_FALSE(config.login.lowMemory);
         CHECK(config.login.revision == 289);
         CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.idleSeconds == 5s);
+        CHECK(config.client.cacheDirectory == "cache");
         CheckScriptingDefaults(config.scripting);
     }
 
@@ -457,10 +437,6 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.server.tlsCaFile == "SYSTEM");
             }
-            else if (key.key == "crcs")
-            {
-                CHECK(config.login.crcs == std::array<s32, LoginSettings_s::CRC_COUNT>{});
-            }
             else if (key.key == "lowMemory")
             {
                 CHECK_FALSE(config.login.lowMemory);
@@ -480,6 +456,10 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             else if (key.key == "idleSeconds")
             {
                 CHECK(config.client.idleSeconds == 5s);
+            }
+            else if (key.key == "cacheDirectory")
+            {
+                CHECK(config.client.cacheDirectory == "cache");
             }
             else if (key.key == "accountsDirectory")
             {
@@ -529,6 +509,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.idleSeconds == 5s);
+        CHECK(config.client.cacheDirectory == "cache");
 
         CheckScriptingDefaults(ParseAccepted(removeSection("scripting")).scripting);
     }
@@ -668,13 +649,6 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "progressDirectory"}, "logs/progress")).scripting.progressDirectory == "logs/progress");
     }
 
-    SECTION("login.crcs in any spelling")
-    {
-        const auto crcs = nlohmann::json::array({"0", "0xde5b3345", "0xDE5B3345", "0Xde5b3345", "0xDe5B3345", "4294967295", "1", "2", "3"});
-        const auto config = ParseAccepted(SetKey({"login", "crcs"}, crcs));
-        CHECK(config.login.crcs == std::array<s32, LoginSettings_s::CRC_COUNT>{0, Crc(0xde5b3345), Crc(0xde5b3345), Crc(0xde5b3345), Crc(0xde5b3345), -1, 1, 2, 3});
-    }
-
     SECTION("login RSA values")
     {
         for (const auto* const modulus : {"3233", "0xca1", "0xCA1", "0XcA1"})
@@ -709,18 +683,13 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
 
         CHECK(ParseAccepted(SetKey({"client", "idleSeconds"}, 1)).client.idleSeconds == 1s);
         CHECK(ParseAccepted(SetKey({"client", "idleSeconds"}, 300)).client.idleSeconds == 300s);
+
+        CHECK(ParseAccepted(SetKey({"client", "cacheDirectory"}, "C:/rs/pack")).client.cacheDirectory == "C:/rs/pack");
     }
 }
 
 TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
 {
-    const auto crcsWithItem = [](nlohmann::json item)
-    {
-        auto crcs = nlohmann::json::array({"0", "0", "0", "0", "0", "0", "0", "0", "0"});
-        crcs[3] = std::move(item);
-        return crcs;
-    };
-
     const auto rejections = std::vector<Rejection_s>{
         {{"server", "url"}, "http://localhost:80"},
         {{"server", "url"}, "localhost:80"},
@@ -731,9 +700,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"server", "origin"}, true},
         {{"server", "tlsCaFile"}, ""},
         {{"server", "tlsCaFile"}, 5},
-        {{"login", "crcs"}, nlohmann::json::array({"0", "0", "0", "0", "0", "0", "0", "0"})},
-        {{"login", "crcs"}, nlohmann::json::array({"0", "0", "0", "0", "0", "0", "0", "0", "0", "0"})},
-        {{"login", "crcs"}, "0, 0, 0, 0, 0, 0, 0, 0, 0"},
         {{"login", "rsaModulus"}, "0"},
         {{"login", "rsaModulus"}, "1"},
         {{"login", "rsaModulus"}, ""},
@@ -760,6 +726,8 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"client", "idleSeconds"}, 301},
         {{"client", "idleSeconds"}, -5},
         {{"client", "idleSeconds"}, "5"},
+        {{"client", "cacheDirectory"}, ""},
+        {{"client", "cacheDirectory"}, 5},
         {{"scripting", "accountsDirectory"}, ""},
         {{"scripting", "accountsDirectory"}, 5},
         {{"scripting", "scriptsDirectory"}, ""},
@@ -781,12 +749,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         CAPTURE(rejection.key.GetPath(), rejection.value.dump());
         CheckRejected(SetKey(rejection.key, rejection.value), rejection.key.GetPath());
     }
-
-    for (const auto& item : {nlohmann::json("0x100000000"), nlohmann::json("4294967296"), nlohmann::json("-1"), nlohmann::json("+1"), nlohmann::json(" 1"), nlohmann::json("0x"), nlohmann::json(""), nlohmann::json("0x0x1"), nlohmann::json("1.5"), nlohmann::json(5)})
-    {
-        CAPTURE(item.dump());
-        CheckRejected(SetKey({"login", "crcs"}, crcsWithItem(item)), "login.crcs.3");
-    }
 }
 
 TEST_CASE("ConfigFile warns about an account section left in the config", "[ConfigFile]")
@@ -804,6 +766,19 @@ TEST_CASE("ConfigFile warns about an account section left in the config", "[Conf
     CHECK(entries[0].level == LogLevel_e::Warning);
     CHECK_THAT(entries[0].message, Catch::Matchers::ContainsSubstring("scripting.accountsDirectory"));
     CHECK_FALSE(HasSecret(capture));
+}
+
+TEST_CASE("ConfigFile warns about login.crcs left in the config", "[ConfigFile]")
+{
+    const auto text = SetKey({"login", "crcs"}, nlohmann::json::array({"0x00000000", "0xde5b3345"}));
+
+    auto capture = LogCapture{};
+    const auto config = ConfigFile::Parse(text, *capture.GetLogger());
+    CheckExampleMembers(config);
+    const auto entries = capture.GetEntries();
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0].level == LogLevel_e::Warning);
+    CHECK(entries[0].message == "Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory");
 }
 
 TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
@@ -992,9 +967,6 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
             {"no leading zeros", [](Config_s& config) { config.login.rsaModulus = BigUInt::Parse("0x0000ff"); }, "/login/rsaModulus", "0xff"},
             {"no sign padding", [](Config_s& config) { config.login.rsaModulus = BigUInt::Parse("0x80"); }, "/login/rsaModulus", "0x80"},
             {"example modulus", [](Config_s& config) { config.login.rsaModulus = BigUInt::Parse(EXAMPLE_MODULUS); }, "/login/rsaModulus", EXAMPLE_MODULUS},
-            {"crc 0", [](Config_s& config) { config.login.crcs[0] = 0; }, "/login/crcs/0", "0x00000000"},
-            {"crc -1", [](Config_s& config) { config.login.crcs[0] = -1; }, "/login/crcs/0", "0xffffffff"},
-            {"crc 0xde5b3345", [](Config_s& config) { config.login.crcs[0] = Crc(0xde5b3345); }, "/login/crcs/0", "0xde5b3345"},
             {"verbose", [](Config_s& config) { config.client.logLevel = LogLevel_e::Verbose; }, "/client/logLevel", "verbose"},
             {"info", [](Config_s& config) { config.client.logLevel = LogLevel_e::Info; }, "/client/logLevel", "info"},
             {"warning", [](Config_s& config) { config.client.logLevel = LogLevel_e::Warning; }, "/client/logLevel", "warning"},
@@ -1017,7 +989,6 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
             }
 
             const auto reparsed = ParseAccepted(serialized);
-            CHECK(reparsed.login.crcs == config.login.crcs);
             CHECK(reparsed.client.logLevel == config.client.logLevel);
         }
 
@@ -1030,13 +1001,11 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
 
     SECTION("hex is read in any case and written in lower case")
     {
-        auto upper = ReplaceAll(std::string{EXAMPLE}, "0xde5b3345", "0XDE5B3345");
-        upper = ReplaceAll(upper, EXAMPLE_MODULUS, ToUpper(EXAMPLE_MODULUS));
+        const auto upper = ReplaceAll(std::string{EXAMPLE}, EXAMPLE_MODULUS, ToUpper(EXAMPLE_MODULUS));
         const auto config = ParseAccepted(upper);
         CheckExampleMembers(config);
 
         const auto serialized = ConfigFile::Serialize(config);
-        CHECK_THAT(serialized, Catch::Matchers::ContainsSubstring("\"0xde5b3345\""));
         CHECK_THAT(serialized, Catch::Matchers::ContainsSubstring(std::format("\"{}\"", EXAMPLE_MODULUS)));
     }
 
@@ -1106,11 +1075,11 @@ TEST_CASE("ConfigFile::Load", "[ConfigFile]")
     SECTION("puts the file's path in front of the message")
     {
         auto json = ParseJsonWithComments(EXAMPLE);
-        json["login"]["crcs"].erase(0);
+        json["client"]["idleSeconds"] = 0;
         WriteFile(path, json.dump());
 
         CHECK_THROWS_AS(ConfigFile::Load(path, logger), ConfigError);
-        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("login.crcs"));
+        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("client.idleSeconds"));
     }
 
     SECTION("writes a sample on the first run")

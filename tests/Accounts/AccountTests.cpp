@@ -6,6 +6,7 @@
 #include "../TempFolder.hpp"
 
 #include "Accounts/Account.hpp"
+#include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Core/Logger.hpp"
 #include "Game/GameClient.hpp"
@@ -39,7 +40,7 @@ namespace
                 settings.script = ScriptConfig_s{.file = "main.py"};
             }
 
-            account.emplace(std::make_shared<const Config_s>(config), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger(), options, messenger);
+            account.emplace(std::make_shared<const Config_s>(config), std::make_shared<const GameCache_s>(), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger(), options, messenger);
             account->Login();
         }
 
@@ -172,7 +173,7 @@ TEST_CASE("An account whose login is refused fails without throwing", "[Account]
     auto server = FakeGameServer{};
     server.SetLoginStatus(3);
     const auto config = std::make_shared<const Config_s>(server.MakeConfig());
-    auto account = Account{config, AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), capture.GetLogger()};
+    auto account = Account{config, std::make_shared<const GameCache_s>(), AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), capture.GetLogger()};
 
     account.Start();
     const auto deadline = Clock::now() + WAIT;

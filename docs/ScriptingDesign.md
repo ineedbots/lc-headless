@@ -296,8 +296,9 @@ The option numbers behind the conveniences and the component constants were chec
 ### Porting from plutonium
 
 - `loop`, `settings`, `log` and the `on_*` hooks behave the same.
-- `at_object(obj)` becomes `interact_loc(id, x, z, 1)`. Scenery the server never changed isn't known, so the script supplies the ID and the tile.
-- `walk_path_to`, `is_reachable` and `calculate_path_to` need a collision map, which doesn't exist yet. Use `walk_to` with waypoints.
+- `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists. Routes come from the game cache's collision ([CacheDesign.md](CacheDesign.md) §11).
+- `get_item_name(id)` becomes `get_item_type(id).name`.
+- `get_nearest_object_by_id` becomes `get_nearest_loc_by_id`, and `at_object(obj)` becomes `interact_loc(loc, 1)`.
 - Fatigue, sleeping and the option menu are RSC-only and have no equivalent.
 
 ---
@@ -412,7 +413,7 @@ The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared
 
 ## 10. Limits
 
-- **Packet-only world.** There's no collision map, so no pathfinding or reachability checks. Static scenery (doors, trees, bank booths) is only known once the server changes it, so scripts supply loc IDs and tiles. NPCs and items are numeric IDs with no names or option text. A cache-backed provider would lift all of this, and it's a separate plan.
+- **What the cache doesn't give.** The game cache ([CacheDesign.md](CacheDesign.md)) supplies names, options, scenery and collision, but its interface definitions aren't decoded, so component IDs stay constants in scripts. The `get_nearest_*` functions measure in tiles, not steps.
 - **16 accounts per process**, from pocketpy's VM slots.
 - **pocketpy is a subset of Python.** The gaps script authors will hit:
     - no `finally` or `else` on `try`;

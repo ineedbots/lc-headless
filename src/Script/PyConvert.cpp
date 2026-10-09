@@ -1,6 +1,12 @@
 #include "pch.hpp"
 #include "PyConvert.hpp"
 
+#include "../Cache/GameCache_s.hpp"
+#include "../Cache/LocType_s.hpp"
+#include "../Cache/NpcType_s.hpp"
+#include "../Cache/ObjType_s.hpp"
+#include "../Cache/TextPool.hpp"
+#include "../Game/Map/WorldMap.hpp"
 #include "../Game/State/Entity_s.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/State/Player_s.hpp"
@@ -19,11 +25,31 @@ namespace
     constexpr auto PLAYER_TARGET = "player"sv;
 }
 
-void PyConvert::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick)
+void PyConvert::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCache_s& cache)
 {
     const auto object = NewInstance(out, NPC_CLASS);
     SetInt(object, "id", npc.type);
     SetEntity(object, npc, tick);
+    const auto* const type = cache.FindNpc(npc.type);
+    if (type == nullptr)
+    {
+        SetNone(object, "name");
+        SetNone(object, "combat_level");
+        SetInt(object, "size", 1);
+        return;
+    }
+
+    SetOptionalString(object, "name", type->name);
+    if (type->combatLevel)
+    {
+        SetInt(object, "combat_level", *type->combatLevel);
+    }
+    else
+    {
+        SetNone(object, "combat_level");
+    }
+
+    SetInt(object, "size", type->size);
 }
 
 void PyConvert::FromPlayer(py_OutRef out, const Player_s& player, u64 tick)
@@ -41,20 +67,25 @@ void PyConvert::FromPlayer(py_OutRef out, const Player_s& player, u64 tick)
     SetInt(object, "combat_level", player.appearance->combatLevel);
 }
 
-void PyConvert::FromGroundItem(py_OutRef out, const GroundItem_s& item)
+void PyConvert::FromGroundItem(py_OutRef out, const GroundItem_s& item, const GameCache_s& cache)
 {
     const auto object = NewInstance(out, GROUND_ITEM_CLASS);
     SetInt(object, "id", item.id);
+    const auto* const type = cache.FindObj(item.id);
+    SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetInt(object, "count", item.count);
     SetInt(object, "x", item.tile.x);
     SetInt(object, "z", item.tile.z);
     SetInt(object, "level", item.tile.level);
 }
 
-void PyConvert::FromLoc(py_OutRef out, const LocChange_s& loc)
+void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s& cache)
 {
     const auto object = NewInstance(out, LOC_CLASS);
     SetInt(object, "id", loc.id);
+    const auto* const type = cache.FindLoc(loc.id);
+    SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
+    SetBool(object, "changed", loc.changed);
     SetInt(object, "x", loc.tile.x);
     SetInt(object, "z", loc.tile.z);
     SetInt(object, "level", loc.tile.level);
@@ -63,13 +94,65 @@ void PyConvert::FromLoc(py_OutRef out, const LocChange_s& loc)
     SetInt(object, "layer", static_cast<s64>(loc.layer));
 }
 
-void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item)
+void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameCache_s& cache)
 {
     const auto object = NewInstance(out, ITEM_CLASS);
     SetInt(object, "id", item.id);
+    const auto* const type = cache.FindObj(item.id);
+    SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetInt(object, "count", item.count);
     SetInt(object, "slot", item.slot);
     SetInt(object, "com", item.com);
+}
+
+void PyConvert::FromNpcType(py_OutRef out, const NpcType_s& type, const GameCache_s& cache)
+{
+    const auto object = NewInstance(out, NPC_TYPE_CLASS);
+    SetInt(object, "id", type.id);
+    SetOptionalString(object, "name", type.name);
+    SetOptionalString(object, "examine", type.examine);
+    SetOptions(object, "ops", type.ops, cache);
+    SetInt(object, "size", type.size);
+    if (type.combatLevel)
+    {
+        SetInt(object, "combat_level", *type.combatLevel);
+        return;
+    }
+
+    SetNone(object, "combat_level");
+}
+
+void PyConvert::FromItemType(py_OutRef out, const ObjType_s& type, const GameCache_s& cache)
+{
+    const auto object = NewInstance(out, ITEM_TYPE_CLASS);
+    SetInt(object, "id", type.id);
+    SetOptionalString(object, "name", type.name);
+    SetOptionalString(object, "examine", type.examine);
+    SetOptions(object, "ops", type.ops, cache);
+    SetOptions(object, "inventory_ops", type.inventoryOps, cache);
+    SetBool(object, "stackable", type.stackable);
+    SetBool(object, "members", type.members);
+    SetInt(object, "value", type.cost);
+    if (type.noteOf)
+    {
+        SetInt(object, "note_of", *type.noteOf);
+        return;
+    }
+
+    SetNone(object, "note_of");
+}
+
+void PyConvert::FromLocType(py_OutRef out, const LocType_s& type, const GameCache_s& cache)
+{
+    const auto object = NewInstance(out, LOC_TYPE_CLASS);
+    SetInt(object, "id", type.id);
+    SetOptionalString(object, "name", type.name);
+    SetOptionalString(object, "examine", type.examine);
+    SetOptions(object, "ops", type.ops, cache);
+    SetInt(object, "width", type.width);
+    SetInt(object, "length", type.length);
+    SetBool(object, "blocks_walk", type.blockWalk);
+    SetBool(object, "blocks_projectiles", type.blockRange);
 }
 
 void PyConvert::FromString(py_OutRef out, std::string_view text)
@@ -157,6 +240,21 @@ u8 PyConvert::ToOp(py_Ref value)
     return static_cast<u8>(ToInt(value, "op", MIN_OP, MAX_OP));
 }
 
+OpChoice PyConvert::ToOpChoice(py_Ref value)
+{
+    if (py_isstr(value))
+    {
+        return ToString(value, "op");
+    }
+
+    if (!py_isint(value))
+    {
+        throw ScriptTypeError{std::format("op must be an int or a str, not {}", GetTypeName(value))};
+    }
+
+    return ToOp(value);
+}
+
 std::vector<s32> PyConvert::ToIds(py_Ref value, std::string_view name)
 {
     if (py_isnone(value))
@@ -184,6 +282,34 @@ std::vector<s32> PyConvert::ToIds(py_Ref value, std::string_view name)
     }
 
     return ids;
+}
+
+std::vector<std::string> PyConvert::ToNames(py_Ref value, std::string_view name)
+{
+    if (py_isstr(value))
+    {
+        return {ToString(value, name)};
+    }
+
+    if (!py_islist(value) && !py_istuple(value))
+    {
+        throw ScriptTypeError{std::format("{} must be a str or a list of str, not {}", name, GetTypeName(value))};
+    }
+
+    const auto isList = py_islist(value);
+    const auto count = isList ? py_list_len(value) : py_tuple_len(value);
+    auto names = std::vector<std::string>{};
+    for (auto i = 0; i < count; ++i)
+    {
+        names.push_back(ToString(isList ? py_list_getitem(value, i) : py_tuple_getitem(value, i), name));
+    }
+
+    if (names.empty())
+    {
+        throw std::invalid_argument{std::format("{} must have at least one name", name)};
+    }
+
+    return names;
 }
 
 u16 PyConvert::ToIndex(py_Ref value, std::string_view name, std::string_view className)
@@ -221,6 +347,25 @@ GroundItemRef_s PyConvert::ToGroundItem(py_Ref value, std::string_view name)
     if (!IsInstance(value, GROUND_ITEM_CLASS))
     {
         throw ScriptTypeError{std::format("{} must be a GroundItem, not {}", name, GetTypeName(value))};
+    }
+
+    return {
+        .id = ToU16(GetField(value, "id"), name),
+        .x = static_cast<s32>(ToInt(GetField(value, "x"), name)),
+        .z = static_cast<s32>(ToInt(GetField(value, "z"), name)),
+    };
+}
+
+bool PyConvert::IsLoc(py_Ref value)
+{
+    return IsInstance(value, LOC_CLASS);
+}
+
+LocRef_s PyConvert::ToLoc(py_Ref value, std::string_view name)
+{
+    if (!IsLoc(value))
+    {
+        throw ScriptTypeError{std::format("{} must be a Loc, not {}", name, GetTypeName(value))};
     }
 
     return {
@@ -290,6 +435,37 @@ void PyConvert::SetString(py_Ref object, const char* name, std::string_view text
     const auto field = py_pushtmp();
     FromString(field, text);
     py_setdict(object, py_name(name), field);
+    py_pop();
+}
+
+void PyConvert::SetOptionalString(py_Ref object, const char* name, std::string_view text)
+{
+    if (text.empty())
+    {
+        SetNone(object, name);
+        return;
+    }
+
+    SetString(object, name, text);
+}
+
+void PyConvert::SetOptions(py_Ref object, const char* name, std::span<const u16> ops, const GameCache_s& cache)
+{
+    // The list lives on the value stack until the object holds it, and each item is None until its str
+    // is made, so a collection never sees an uninitialized value.
+    const auto list = py_pushtmp();
+    py_newlist(list);
+    for (const auto op : ops)
+    {
+        const auto item = py_list_emplace(list);
+        py_newnone(item);
+        if (op != TextPool::NO_OPTION)
+        {
+            FromString(item, cache.GetOption(op));
+        }
+    }
+
+    py_setdict(object, py_name(name), list);
     py_pop();
 }
 

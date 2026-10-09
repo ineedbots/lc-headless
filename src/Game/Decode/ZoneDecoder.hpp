@@ -16,7 +16,6 @@ public:
     void DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state) const;
     void DecodeEnclosed(Packet& packet, GameState_s& state) const;
 
-    [[nodiscard]] static LocLayer_e GetLayer(u8 shape);
     [[nodiscard]] static bool IsActive(const GameState_s& state, const Tile_s& tile);
     static void PruneInactive(GameState_s& state);
 

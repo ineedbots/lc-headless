@@ -7,11 +7,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+find_package(BZip2 REQUIRED)
 find_package(Catch2 3 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(ixwebsocket CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(pocketpy CONFIG REQUIRED)
+find_package(ZLIB REQUIRED)
 
 file(GLOB_RECURSE LIBRARY_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -48,7 +50,7 @@ configure_project_target(${PROJECT_NAME}Lib)
 target_compile_definitions(${PROJECT_NAME}Lib PRIVATE JSON_DIAGNOSTICS=1)
 target_link_libraries(${PROJECT_NAME}Lib
     PUBLIC ixwebsocket::ixwebsocket pocketpy::pocketpy
-    PRIVATE nlohmann_json::nlohmann_json)
+    PRIVATE nlohmann_json::nlohmann_json BZip2::BZip2 ZLIB::ZLIB)
 
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE src/main.cpp)
@@ -62,9 +64,12 @@ target_sources(${PROJECT_NAME}Tests PRIVATE ${TEST_SOURCES})
 configure_project_target(${PROJECT_NAME}Tests)
 # The example script tests load the repository's scripts folder.
 target_compile_definitions(${PROJECT_NAME}Tests PRIVATE RS2004_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+# CacheWriter compresses its fixtures with the libraries the cache reader uses.
 target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     ${PROJECT_NAME}Lib
     nlohmann_json::nlohmann_json
+    BZip2::BZip2
+    ZLIB::ZLIB
     Catch2::Catch2WithMain)
 
 include(Catch)

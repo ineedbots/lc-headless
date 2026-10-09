@@ -16,9 +16,8 @@ namespace
     constexpr auto TYPE_ERROR_ID = 302;
     constexpr auto SAMPLE_HEADER =
         "// Sample config, written because none was found.\n"
-        "// Set server.url and the login CRCs and RSA key, then run again.\n"
+        "// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.\n"
         "// Each account goes in its own file in scripting.accountsDirectory.\n"sv;
-    constexpr auto HEX_PREFIX_LENGTH = std::size_t{2};
     constexpr auto MAX_USERNAME_LENGTH = std::size_t{12};
     constexpr auto MAX_PASSWORD_LENGTH = std::size_t{20};
     constexpr auto MIN_IDLE_SECONDS = 1s;
@@ -31,6 +30,8 @@ namespace
     constexpr auto MAX_KILL_GRACE = 600s;
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto LEGACY_ACCOUNT_KEY = "account";
+    constexpr auto LOGIN_KEY = "login";
+    constexpr auto LEGACY_CRCS_KEY = "crcs";
     constexpr auto FIRST_PRINTABLE = '\x20';
     constexpr auto LAST_PRINTABLE = '\x7E';
     constexpr auto SECURE_SCHEME = "wss"sv;
@@ -55,26 +56,6 @@ namespace
         std::size_t column;
     };
 
-    std::optional<u32> ParseU32(std::string_view text)
-    {
-        auto base = 10;
-        if (text.size() >= HEX_PREFIX_LENGTH && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
-        {
-            text.remove_prefix(HEX_PREFIX_LENGTH);
-            base = 16;
-        }
-
-        auto value = u32{0};
-        const auto* const end = text.data() + text.size();
-        const auto [parsedEnd, error] = std::from_chars(text.data(), end, value, base);
-        if (error != std::errc{} || parsedEnd != end)
-        {
-            return std::nullopt;
-        }
-
-        return value;
-    }
-
     std::string FormatHex(const BigUInt& value)
     {
         const auto bytes = value.ToBytesBigEndian();
@@ -95,11 +76,6 @@ namespace
         }
 
         return text;
-    }
-
-    std::string FormatCrc(s32 crc)
-    {
-        return std::format("0x{:08x}", std::bit_cast<u32>(crc));
     }
 
     TextPosition_s GetTextPosition(std::string_view text, std::size_t byte)
@@ -215,6 +191,7 @@ namespace
 
         const auto& client = config.client;
         Check(client.idleSeconds >= MIN_IDLE_SECONDS && client.idleSeconds <= MAX_IDLE_SECONDS, "client.idleSeconds", std::format("must be from {} to {}", MIN_IDLE_SECONDS.count(), MAX_IDLE_SECONDS.count()));
+        Check(!client.cacheDirectory.empty(), "client.cacheDirectory", "must not be empty");
 
         const auto& scripting = config.scripting;
         Check(!scripting.accountsDirectory.empty(), "scripting.accountsDirectory", "must be a folder path");
@@ -253,6 +230,17 @@ namespace
         }
 
         logger.Warning("Config has an account section, which is no longer read; move it to its own file in scripting.accountsDirectory");
+    }
+
+    void WarnIfLegacyCrcs(const nlohmann::json& root, Logger& logger)
+    {
+        const auto login = root.find(LOGIN_KEY);
+        if (login == root.end() || !login->is_object() || !login->contains(LEGACY_CRCS_KEY))
+        {
+            return;
+        }
+
+        logger.Warning("Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory");
     }
 
     void WarnIfTlsVerificationDisabled(const Config_s& config, Logger& logger)
@@ -379,44 +367,12 @@ namespace nlohmann
             value = source.count();
         }
     };
-
-    template <>
-    struct adl_serializer<std::array<s32, LoginSettings_s::CRC_COUNT>>
-    {
-        static void from_json(const json& value, std::array<s32, LoginSettings_s::CRC_COUNT>& result)
-        {
-            if (!value.is_array() || value.size() != result.size())
-            {
-                throw json::type_error::create(TYPE_ERROR_ID, std::format("must be an array of {} strings", result.size()), &value);
-            }
-
-            for (std::size_t i = 0; i < result.size(); ++i)
-            {
-                const auto crc = ParseU32(value[i].get<std::string>());
-                if (!crc)
-                {
-                    throw json::type_error::create(TYPE_ERROR_ID, "must be a decimal or 0x-hex number from 0 to 0xffffffff", &value[i]);
-                }
-
-                result[i] = std::bit_cast<s32>(*crc);
-            }
-        }
-
-        static void to_json(ordered_json& value, const std::array<s32, LoginSettings_s::CRC_COUNT>& source)
-        {
-            value = ordered_json::array();
-            for (const auto crc : source)
-            {
-                value.push_back(FormatCrc(crc));
-            }
-        }
-    };
 }
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds, cacheDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
 
@@ -503,6 +459,7 @@ Config_s ConfigFile::Parse(std::string_view text, Logger& logger)
     Validate(config);
     WarnIfTlsVerificationDisabled(config, logger);
     WarnIfLegacyAccount(root, logger);
+    WarnIfLegacyCrcs(root, logger);
     return config;
 }
 

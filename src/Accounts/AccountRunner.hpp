@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Cache/GameCache_s.hpp"
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
 #include "../Script/BotMessenger.hpp"
@@ -17,7 +18,7 @@ public:
     // How many interrupts (Ctrl+C presses) there have been so far; each new one interrupts every account.
     using InterruptCount = std::function<u32()>;
 
-    AccountRunner(std::shared_ptr<const Config_s> config, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {});
+    AccountRunner(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {});
 
     AccountRunner(const AccountRunner&) = delete;
     AccountRunner& operator=(const AccountRunner&) = delete;
@@ -34,6 +35,7 @@ private:
     [[nodiscard]] bool LogOutcomes() const;
 
     std::shared_ptr<const Config_s> m_config;
+    std::shared_ptr<const GameCache_s> m_cache;
     std::shared_ptr<Logger> m_logger;
     // Declared before the accounts, which unregister from it as they go.
     BotMessenger m_messenger;

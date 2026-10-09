@@ -2,6 +2,7 @@
 #include "ZoneDecoder.hpp"
 
 #include "../../Io/Packet.hpp"
+#include "../Map/LocShape.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../ProtocolError.hpp"
 #include "../State/Entity_s.hpp"
@@ -19,10 +20,6 @@ namespace
     constexpr auto ANGLE_MASK = 0x3;
     constexpr auto OBJ_ID_MASK = 0x7FFF;
     constexpr auto ZONE_SHIFT = 3;
-    constexpr auto LAST_WALL_SHAPE = 3;
-    constexpr auto LAST_WALL_DECOR_SHAPE = 8;
-    constexpr auto LAST_GROUND_SHAPE = 21;
-    constexpr auto GROUND_DECOR_SHAPE = 22;
 
     struct ZoneTile_s
     {
@@ -75,10 +72,15 @@ void ZoneDecoder::ResetZone(GameState_s& state) const
         return zone.Contains(item.tile);
     });
 
-    std::erase_if(state.locChanges, [&zone](const LocChange_s& change)
+    const auto erased = std::erase_if(state.locChanges, [&zone](const LocChange_s& change)
     {
         return zone.Contains(change.tile);
     });
+
+    if (erased > 0)
+    {
+        ++state.sceneChangeCount;
+    }
 }
 
 void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state) const
@@ -121,7 +123,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         if (inBuildArea)
         {
             const auto shape = GetShape(info);
-            StateLog::Push(state.locAnims, LocAnim_s{.tile = tile, .layer = GetLayer(shape), .shape = shape, .angle = GetAngle(info), .seq = seq, .tick = state.tick});
+            StateLog::Push(state.locAnims, LocAnim_s{.tile = tile, .layer = LocShape::GetLayer(shape), .shape = shape, .angle = GetAngle(info), .seq = seq, .tick = state.tick});
         }
         return;
     }
@@ -236,31 +238,6 @@ void ZoneDecoder::DecodeEnclosed(Packet& packet, GameState_s& state) const
     }
 }
 
-LocLayer_e ZoneDecoder::GetLayer(u8 shape)
-{
-    if (shape <= LAST_WALL_SHAPE)
-    {
-        return LocLayer_e::Wall;
-    }
-
-    if (shape <= LAST_WALL_DECOR_SHAPE)
-    {
-        return LocLayer_e::WallDecor;
-    }
-
-    if (shape <= LAST_GROUND_SHAPE)
-    {
-        return LocLayer_e::Ground;
-    }
-
-    if (shape == GROUND_DECOR_SHAPE)
-    {
-        return LocLayer_e::GroundDecor;
-    }
-
-    throw ProtocolError{std::format("Loc shape {} is not 0 to {}", shape, GROUND_DECOR_SHAPE)};
-}
-
 bool ZoneDecoder::IsActive(const GameState_s& state, const Tile_s& tile)
 {
     const auto& local = state.localPlayer.tile;
@@ -293,10 +270,15 @@ void ZoneDecoder::PruneInactive(GameState_s& state)
         return !IsActive(state, item.tile);
     });
 
-    std::erase_if(state.locChanges, [&state](const LocChange_s& change)
+    const auto erased = std::erase_if(state.locChanges, [&state](const LocChange_s& change)
     {
         return !IsActive(state, change.tile);
     });
+
+    if (erased > 0)
+    {
+        ++state.sceneChangeCount;
+    }
 }
 
 Zone_s ZoneDecoder::GetZone(const GameState_s& state) const
@@ -311,7 +293,7 @@ Zone_s ZoneDecoder::GetZone(const GameState_s& state) const
 void ZoneDecoder::SetLoc(GameState_s& state, const Tile_s& tile, u8 info, s32 id)
 {
     const auto shape = GetShape(info);
-    const auto layer = GetLayer(shape);
+    const auto layer = LocShape::GetLayer(shape);
     const auto change = LocChange_s{.tile = tile, .layer = layer, .id = id, .shape = shape, .angle = GetAngle(info), .tick = state.tick};
 
     const auto existing = std::ranges::find_if(state.locChanges, [&tile, layer](const LocChange_s& other)
@@ -328,6 +310,7 @@ void ZoneDecoder::SetLoc(GameState_s& state, const Tile_s& tile, u8 info, s32 id
         *existing = change;
     }
 
+    ++state.sceneChangeCount;
     StateLog::AddEvent(state, LocChanged_s{.change = change});
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Core/Logger.hpp"
 
@@ -35,4 +36,5 @@ private:
     std::shared_ptr<Logger> m_logger;
     CommandLine_s m_commandLine;
     std::shared_ptr<const Config_s> m_config;
+    std::shared_ptr<const GameCache_s> m_cache;
 };

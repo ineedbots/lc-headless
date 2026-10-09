@@ -56,6 +56,7 @@ For working on a script, `--watch` reloads it whenever you save it, and `--debug
 - An uncaught exception, or a `loop()` that returns anything but an int of 0 or more, stops the script. The client logs the traceback and logs the account out, unless it's running with `--watch`.
 - Objects such as `Npc` are snapshots taken when the function returned. Keep the `index` to look one up again later with `get_npc(index)`.
 - Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view return `False`. A wrong argument type raises `TypeError`, and a value out of range (an option outside 1 to 5, say) raises `ValueError`.
+- Names, options and scenery come from the server's cache, which the client loads at startup from `client.cacheDirectory`. They're exactly as the cache has them, case included.
 - `log(*args)` writes at Info level and `debug(*args)` at Verbose level; `print()` also goes to the log. Each line carries the account's name.
 
 ### Settings
@@ -81,11 +82,14 @@ Scripts run on pocketpy 2.2, a subset of Python 3. The differences you're likely
 
 | Class | Attributes |
 |---|---|
-| `Npc` | `index`, `id` (NPC type), `x`, `z`, `level`, `animation` (-1 for none), `hp` and `max_hp` (`None` until a hit reveals them), `last_hit_tick`, `target` (`('npc' or 'player', index)` or `None`); methods `is_moving()` and `in_combat()` |
+| `Npc` | `index`, `id` (NPC type), `name` (`None` when the type has none or isn't in the cache), `combat_level` (`None` when the menu shows none), `size`, `x`, `z`, `level`, `animation` (-1 for none), `hp` and `max_hp` (`None` until a hit reveals them), `last_hit_tick`, `target` (`('npc' or 'player', index)` or `None`); methods `is_moving()` and `in_combat()` |
 | `Player` | `index`, `name` (`None` until its appearance arrives), `combat_level`, then the same position, health, target and methods as `Npc` |
-| `GroundItem` | `id`, `count`, `x`, `z`, `level` |
-| `Loc` | `id` (-1 when the server removed the scenery), `x`, `z`, `level`, `shape`, `angle`, `layer` (a `LAYER_*` constant) |
-| `Item` | `id`, `count`, `slot`, `com` (the inventory component, such as `INVENTORY`) |
+| `GroundItem` | `id`, `name`, `count`, `x`, `z`, `level` |
+| `Loc` | `id` (-1 when the server removed the scenery), `name`, `x`, `z`, `level`, `shape`, `angle`, `layer` (a `LAYER_*` constant), `changed` (`False` for scenery as the cache has it, `True` for the server's changes) |
+| `Item` | `id`, `name`, `count`, `slot`, `com` (the inventory component, such as `INVENTORY`) |
+| `NpcType` | `id`, `name`, `examine`, `ops` (five strings, `None` where the menu has nothing), `size`, `combat_level` |
+| `ItemType` | `id`, `name`, `examine`, `ops` (on the ground), `inventory_ops`, `stackable`, `members`, `value`, `note_of` (`None`, or the id of the item a banknote is a note of) |
+| `LocType` | `id`, `name`, `examine`, `ops`, `width`, `length`, `blocks_walk`, `blocks_projectiles` |
 
 `in_combat()`, for an entity or for yourself, means it was hit within the last `COMBAT_TICKS` (8) ticks. 2004 has no combat-state packet, so this is an approximation; `last_hit_tick` is there for a different window. Positions are absolute tile coordinates. Functions that take `x, z` use your current level.
 
@@ -117,18 +121,28 @@ Distances count tiles in the larger of the two directions.
 | `in_rect(x, z, width, height)` | Whether you're in the rectangle whose south-west corner is `(x, z)` |
 | `at(x, z)` | Whether you're on the tile |
 
-### NPCs, players and the ground
+### NPCs, players, the ground and scenery
 
-`ids` takes one id, a list of ids, or `None` for any. `radius` limits the search to that many tiles from you, on your level.
+`ids` takes one id, a list of ids, or `None` for any. `names` takes one name or a list, matched without regard to case; a type with no name never matches. `radius` limits the search to that many tiles from you, on your level. "Nearest" counts tiles, not steps, and ties go to the first in the server's order. `reachable=True` skips targets the client can't find a route to, by the same rule the matching interaction walks by.
 
 | Function | Returns |
 |---|---|
 | `get_npcs(ids=None, radius=None)` | Every matching `Npc` in view, in the server's order |
-| `get_nearest_npc_by_id(ids=None, radius=None, in_combat=None)` | The nearest matching `Npc` or `None`; `in_combat=False` skips NPCs being fought |
+| `get_nearest_npc_by_id(ids=None, radius=None, in_combat=None, reachable=False)` | The nearest matching `Npc` or `None`; `in_combat=False` skips NPCs being fought |
+| `get_nearest_npc_by_name(names, radius=None, in_combat=None, reachable=False)` | The same, matching names |
 | `get_npc(index)` | The `Npc` with that index, if it's still in view |
 | `get_players(radius=None)`, `get_player_by_name(name)` | Other players in view; one by name, or `None` |
-| `get_ground_items(ids=None, radius=None)`, `get_nearest_ground_item_by_id(ids=None, radius=None)` | `GroundItem`s you can see |
-| `get_loc_at(x, z, layer=None)` | The scenery at the tile, if the server has changed it (see Limits) |
+| `get_ground_items(ids=None, radius=None)` | `GroundItem`s you can see |
+| `get_nearest_ground_item_by_id(ids=None, radius=None, reachable=False)`, `get_nearest_ground_item_by_name(names, radius=None, reachable=False)` | The nearest matching `GroundItem` or `None` |
+| `get_loc_at(x, z, layer=None)` | The scenery on the tile now: the server's change, or else the cache's. Without a layer, the first in layer order, preferring scenery that's there to a removed one. Decoration with no name, no option and nothing to walk into isn't kept |
+| `get_locs(ids=None, radius=None, layer=None)` | Every `Loc` on your level in the area the server has loaded, nearest first, leaving out removed ones |
+| `get_nearest_loc_by_id(ids=None, radius=None, layer=None, reachable=False)`, `get_nearest_loc_by_name(names, radius=None, layer=None, reachable=False)` | The nearest matching `Loc`, or `None` |
+
+### Types
+
+| Function | Returns |
+|---|---|
+| `get_npc_type(id)`, `get_item_type(id)`, `get_loc_type(id)` | The `NpcType`, `ItemType` or `LocType`, or `None` for an id the cache doesn't have |
 
 ### Inventories and interfaces
 
@@ -136,8 +150,8 @@ Distances count tiles in the larger of the two directions.
 |---|---|
 | `get_inventory(com=INVENTORY)` | The `Item`s in an inventory's occupied slots; `BANK` and `EQUIPMENT` work too while the server sends them |
 | `get_equipment()` | Your worn `Item`s |
-| `get_inventory_count_by_id(ids, com=INVENTORY)` | The total count of matching items |
-| `get_inventory_item_by_id(ids, com=INVENTORY)` | The first matching `Item`, or `None` |
+| `get_inventory_count_by_id(ids, com=INVENTORY)`, `get_inventory_count_by_name(names, com=INVENTORY)` | The total count of matching items |
+| `get_inventory_item_by_id(ids, com=INVENTORY)`, `get_inventory_item_by_name(names, com=INVENTORY)` | The first matching `Item`, or `None` |
 | `get_empty_slots()`, `is_inventory_full()` | Free backpack slots out of `INVENTORY_SIZE` (28) |
 | `get_main_modal()`, `get_side_modal()`, `get_chat_modal()` | The open interface ids, -1 for none; the bank is main modal 5292 |
 | `is_interface_open(id)`, `is_count_dialog_open()` | Whether an interface or the "enter amount" dialog is open |
@@ -147,18 +161,23 @@ Distances count tiles in the larger of the two directions.
 
 ### Actions
 
-`op` is the option number, 1 to 5, in the order the right-click menu lists them.
+`op` is the option number, 1 to 5, in the order the right-click menu lists them, or the option's text, matched without regard to case: `interact_npc(npc, 'Pickpocket')`. Ground items also offer "Take" as op 3, and inventory items "Drop" as op 5, where their type has nothing there, as the menu does. Text that matches no option raises `ValueError`, listing the options there are.
+
+The server walks each waypoint in a straight line, so walks and interactions find a route around walls and scenery first, as the webclient does, and send its turning points. An interaction with no route still sends its option, and the server walks as far as it can.
 
 | Function | Does |
 |---|---|
-| `walk_to(x, z, run=False)` | Walks to the tile in a straight line |
-| `walk_path(points, run=False)` | Walks through up to 25 `(x, z)` waypoints, each leg in a straight line |
+| `walk_to(x, z, run=False)` | Walks a route to the tile, or to the reachable tile beside it with the fewest steps. Returns `False`, and doesn't walk, when the tile is in view but can't be reached. A tile beyond the loaded area is walked to in a straight line |
+| `walk_path(points, run=False)` | Walks through up to 25 `(x, z)` waypoints, each leg in a straight line, without routing |
+| `is_reachable(x, z)` | Whether a walk can end on the tile |
+| `find_path(x, z)` | The `(x, z)` waypoints `walk_to` would send, or `None` without a route |
 | `interact_npc(npc, op)`, `talk_to_npc(npc)`, `attack_npc(npc)` | Walks to the NPC and uses an option: talk-to is 1, attack is 2. `npc` is an `Npc` or its index |
-| `interact_player(player, op)` | The same, for a player |
-| `interact_loc(id, x, z, op)`, `interact_loc_via(points, id, x, z, op)` | Uses an option on scenery; `_via` walks waypoints there first |
+| `interact_player(player, op)` | The same, for a player; text matches the options the server set, such as "Follow" |
+| `interact_loc(loc, op)`, `interact_loc(id, x, z, op)` | Walks to the scenery and uses an option; a `Loc` stands in for `id, x, z` |
+| `interact_loc_via(points, id, x, z, op)` | The same, walking your waypoints instead of a route |
 | `interact_ground_item(item, op)`, `take_ground_item(item)` | Uses an option on a `GroundItem`; take is 3 |
 | `item_op(item, op)`, `drop_item(item)` | Uses an option on an inventory `Item`; drop is 5 |
-| `inv_button(item, op)` | Clicks an option on an item in an interface inventory, such as the bank's withdraw options |
+| `inv_button(item, op)` | Clicks an option on an item in an interface inventory, such as the bank's withdraw options. Its options come from the interface, which the client doesn't decode, so `op` is a number |
 | `move_item(com, from_slot, to_slot)` | Swaps two slots |
 | `use_item_on_npc / _player / _loc / _ground_item / _item(item, target)` | Uses an `Item` on something; `_loc` takes `id, x, z` |
 | `cast_on_npc / _player / _loc / _ground_item / _item(spell, target)` | Casts the spell whose spellbook button component is `spell` |
@@ -291,11 +310,8 @@ pocketpy's debugger brings some limits:
 
 ## Limits
 
-The client only knows what the server sends, with no game cache behind it, so:
-
-- **No pathfinding.** The server walks each waypoint in a straight line and stops at the first obstacle. Interactions walk toward their target the same way, so an item behind a fence can't be taken. Pass waypoints around obstacles with `walk_path` or `interact_loc_via`, and give up on targets that don't respond (`chicken_killer.py` shows one way).
-- **Scenery the server never changed is unknown.** Doors, trees and bank booths in their original state aren't in the state, so scripts supply the loc id and tile, for example `interact_loc(1530, 3218, 3218, 1)`.
-- **Ids only.** NPCs and items have numbers, not names or option text. The engine's content (or a cache viewer) gives the ids.
+- **Interfaces are numbers.** The cache's interface definitions aren't decoded, so component ids, such as the bank's, stay constants in scripts, and `inv_button` takes option numbers.
+- **"Nearest" counts tiles.** The `get_nearest_*` functions measure in tiles, not steps, so with `reachable=True` the nearest target that can be reached may still be a long walk round.
 
 ## Editor support
 
@@ -305,6 +321,7 @@ The client only knows what the server sends, with no game cache behind it, so:
 
 - `loop`, `settings`, `log` and the `on_*` hooks work the same way.
 - `on_progress_report` and `send_bot_message` work as in plutonium, with two differences. A message is copied as JSON, so it can't carry objects. A full queue makes `send_bot_message` return `False` instead of raising.
-- `at_object(obj)` becomes `interact_loc(id, x, z, 1)`, with the id and tile written into the script.
-- `walk_path_to`, `is_reachable` and `calculate_path_to` have no equivalent yet.
+- `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists.
+- `get_item_name(id)` becomes `get_item_type(id).name`.
+- `get_nearest_object_by_id` becomes `get_nearest_loc_by_id`, and `at_object(obj)` becomes `interact_loc(loc, 1)`.
 - Fatigue, sleeping, the option menu and other RSC-only calls don't exist.

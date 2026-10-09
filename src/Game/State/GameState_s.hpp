@@ -112,6 +112,8 @@ struct GameState_s
 
     std::vector<GroundItem_s> groundItems;
     std::vector<LocChange_s> locChanges;
+    // Goes up with every change to buildArea or locChanges, so a reader can tell when the scene moved on.
+    u64 sceneChangeCount = 0;
     // Where the client last asked to walk, until the walk ends, and the tick it asked on.
     std::optional<Tile_s> walkDestination;
     u64 walkRequestTick = 0;

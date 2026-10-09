@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "ScriptBindings.hpp"
 
+#include "../Cache/GameCache_s.hpp"
+#include "../Game/Map/WorldMap.hpp"
 #include "../Game/Protocol/Base37.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
@@ -28,7 +30,7 @@ class _Entity:
 
 class Npc(_Entity):
     def __repr__(self):
-        return f'Npc(index={self.index}, id={self.id}, x={self.x}, z={self.z})'
+        return f'Npc(index={self.index}, id={self.id}, name={self.name}, x={self.x}, z={self.z})'
 
 
 class Player(_Entity):
@@ -38,17 +40,32 @@ class Player(_Entity):
 
 class GroundItem:
     def __repr__(self):
-        return f'GroundItem(id={self.id}, count={self.count}, x={self.x}, z={self.z})'
+        return f'GroundItem(id={self.id}, name={self.name}, count={self.count}, x={self.x}, z={self.z})'
 
 
 class Loc:
     def __repr__(self):
-        return f'Loc(id={self.id}, x={self.x}, z={self.z}, layer={self.layer})'
+        return f'Loc(id={self.id}, name={self.name}, x={self.x}, z={self.z}, layer={self.layer})'
 
 
 class Item:
     def __repr__(self):
-        return f'Item(id={self.id}, count={self.count}, slot={self.slot})'
+        return f'Item(id={self.id}, name={self.name}, count={self.count}, slot={self.slot})'
+
+
+class NpcType:
+    def __repr__(self):
+        return f'NpcType(id={self.id}, name={self.name})'
+
+
+class ItemType:
+    def __repr__(self):
+        return f'ItemType(id={self.id}, name={self.name})'
+
+
+class LocType:
+    def __repr__(self):
+        return f'LocType(id={self.id}, name={self.name})'
 
 
 class Settings:
@@ -202,9 +219,58 @@ def _report_rows(report):
         return {.ids = PyConvert::ToIds(ids, "ids"), .radius = ToRadius(radius)};
     }
 
+    SearchFilter_s ToNameFilter(py_Ref names, py_Ref radius)
+    {
+        return {.names = PyConvert::ToNames(names, "names"), .radius = ToRadius(radius)};
+    }
+
+    std::optional<LocLayer_e> ToLayer(py_Ref value)
+    {
+        if (py_isnone(value))
+        {
+            return std::nullopt;
+        }
+
+        return static_cast<LocLayer_e>(PyConvert::ToInt(value, "layer", 0, static_cast<s64>(LocLayer_e::GroundDecor)));
+    }
+
+    // A number is used as it is, and text is looked up in the target's menu by find.
+    template <typename TFind>
+    auto ResolveOp(py_Ref value, TFind find) -> decltype(find(std::string_view{}))
+    {
+        const auto choice = PyConvert::ToOpChoice(value);
+        if (const auto* const number = std::get_if<u8>(&choice))
+        {
+            return *number;
+        }
+
+        return find(std::get<std::string>(choice));
+    }
+
     void FromNpc(py_OutRef out, const Npc_s& npc)
     {
-        PyConvert::FromNpc(out, npc, GetApi().GetState().tick);
+        const auto& api = GetApi();
+        PyConvert::FromNpc(out, npc, api.GetState().tick, api.GetCache());
+    }
+
+    void FromGroundItem(py_OutRef out, const GroundItem_s& item)
+    {
+        PyConvert::FromGroundItem(out, item, GetApi().GetCache());
+    }
+
+    void FromItem(py_OutRef out, const InventoryItem_s& item)
+    {
+        PyConvert::FromItem(out, item, GetApi().GetCache());
+    }
+
+    void FromLoc(py_OutRef out, const SceneLoc_s& loc)
+    {
+        PyConvert::FromLoc(out, loc, GetApi().GetCache());
+    }
+
+    void FromTile(py_OutRef out, const Tile_s& tile)
+    {
+        PyConvert::FromPoint(out, tile.x, tile.z);
     }
 
     void FromPlayer(py_OutRef out, const Player_s& player)
@@ -454,7 +520,19 @@ def _report_rows(report):
         return Guard([argv]
         {
             const auto inCombat = PyConvert::ToOptionalBool(py_arg(2), "in_combat");
-            PyConvert::FromOptional(py_retval(), GetApi().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat), FromNpc);
+            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
+            PyConvert::FromOptional(py_retval(), GetApi().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
+            return true;
+        });
+    }
+
+    bool GetNearestNpcByName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto inCombat = PyConvert::ToOptionalBool(py_arg(2), "in_combat");
+            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
+            PyConvert::FromOptional(py_retval(), GetApi().GetNearestNpc(ToNameFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
             return true;
         });
     }
@@ -490,7 +568,7 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetGroundItems(ToFilter(py_arg(0), py_arg(1))), PyConvert::FromGroundItem);
+            PyConvert::FromList(py_retval(), GetApi().GetGroundItems(ToFilter(py_arg(0), py_arg(1))), FromGroundItem);
             return true;
         });
     }
@@ -499,7 +577,18 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            PyConvert::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1))), PyConvert::FromGroundItem);
+            const auto reachable = PyConvert::ToBool(py_arg(2), "reachable");
+            PyConvert::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
+            return true;
+        });
+    }
+
+    bool GetNearestGroundItemByName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto reachable = PyConvert::ToBool(py_arg(2), "reachable");
+            PyConvert::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToNameFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
             return true;
         });
     }
@@ -508,14 +597,89 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            auto layer = std::optional<LocLayer_e>{};
-            if (!py_isnone(py_arg(2)))
+            const auto loc = GetApi().GetLocAt(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), ToLayer(py_arg(2)));
+            PyConvert::FromOptional(py_retval(), loc, FromLoc);
+            return true;
+        });
+    }
+
+    bool GetLocs(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetLocs(ToFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2))), FromLoc);
+            return true;
+        });
+    }
+
+    bool GetNearestLocById(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
+            const auto loc = GetApi().GetNearestLoc(ToFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
+            PyConvert::FromOptional(py_retval(), loc, FromLoc);
+            return true;
+        });
+    }
+
+    bool GetNearestLocByName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
+            const auto loc = GetApi().GetNearestLoc(ToNameFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
+            PyConvert::FromOptional(py_retval(), loc, FromLoc);
+            return true;
+        });
+    }
+
+    // Types
+
+    bool GetNpcType(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& cache = GetApi().GetCache();
+            const auto* const type = cache.FindNpc(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            if (type == nullptr)
             {
-                layer = static_cast<LocLayer_e>(PyConvert::ToInt(py_arg(2), "layer", 0, static_cast<s64>(LocLayer_e::GroundDecor)));
+                return ReturnNone();
             }
 
-            const auto loc = GetApi().GetLocAt(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), layer);
-            PyConvert::FromOptional(py_retval(), loc, PyConvert::FromLoc);
+            PyConvert::FromNpcType(py_retval(), *type, cache);
+            return true;
+        });
+    }
+
+    bool GetItemType(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& cache = GetApi().GetCache();
+            const auto* const type = cache.FindObj(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            if (type == nullptr)
+            {
+                return ReturnNone();
+            }
+
+            PyConvert::FromItemType(py_retval(), *type, cache);
+            return true;
+        });
+    }
+
+    bool GetLocType(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& cache = GetApi().GetCache();
+            const auto* const type = cache.FindLoc(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            if (type == nullptr)
+            {
+                return ReturnNone();
+            }
+
+            PyConvert::FromLocType(py_retval(), *type, cache);
             return true;
         });
     }
@@ -526,7 +690,7 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetInventory(PyConvert::ToU16(py_arg(0), "com")), PyConvert::FromItem);
+            PyConvert::FromList(py_retval(), GetApi().GetInventory(PyConvert::ToU16(py_arg(0), "com")), FromItem);
             return true;
         });
     }
@@ -535,7 +699,7 @@ def _report_rows(report):
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetInventory(ScriptApi::EQUIPMENT), PyConvert::FromItem);
+            PyConvert::FromList(py_retval(), GetApi().GetInventory(ScriptApi::EQUIPMENT), FromItem);
             return true;
         });
     }
@@ -544,8 +708,8 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            const auto ids = PyConvert::ToIds(py_arg(0), "ids");
-            return ReturnInt(GetApi().CountItems(ids, PyConvert::ToU16(py_arg(1), "com")));
+            const auto filter = SearchFilter_s{.ids = PyConvert::ToIds(py_arg(0), "ids")};
+            return ReturnInt(GetApi().CountItems(filter, PyConvert::ToU16(py_arg(1), "com")));
         });
     }
 
@@ -553,8 +717,27 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            const auto ids = PyConvert::ToIds(py_arg(0), "ids");
-            PyConvert::FromOptional(py_retval(), GetApi().FindItem(ids, PyConvert::ToU16(py_arg(1), "com")), PyConvert::FromItem);
+            const auto filter = SearchFilter_s{.ids = PyConvert::ToIds(py_arg(0), "ids")};
+            PyConvert::FromOptional(py_retval(), GetApi().FindItem(filter, PyConvert::ToU16(py_arg(1), "com")), FromItem);
+            return true;
+        });
+    }
+
+    bool GetInventoryCountByName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto filter = SearchFilter_s{.names = PyConvert::ToNames(py_arg(0), "names")};
+            return ReturnInt(GetApi().CountItems(filter, PyConvert::ToU16(py_arg(1), "com")));
+        });
+    }
+
+    bool GetInventoryItemByName(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto filter = SearchFilter_s{.names = PyConvert::ToNames(py_arg(0), "names")};
+            PyConvert::FromOptional(py_retval(), GetApi().FindItem(filter, PyConvert::ToU16(py_arg(1), "com")), FromItem);
             return true;
         });
     }
@@ -634,8 +817,25 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
-            GetApi().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyConvert::ToBool(py_arg(2), "run"));
-            return ReturnNone();
+            return ReturnBool(GetApi().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyConvert::ToBool(py_arg(2), "run")));
+        });
+    }
+
+    bool IsReachable(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().IsReachable(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))); });
+    }
+
+    bool FindPath(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto path = GetApi().FindPath(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
+            PyConvert::FromOptional(py_retval(), path, [](py_OutRef out, const std::vector<Tile_s>& waypoints)
+            {
+                PyConvert::FromList(out, waypoints, FromTile);
+            });
+            return true;
         });
     }
 
@@ -654,8 +854,14 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
+            auto& api = GetApi();
             const auto index = PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS);
-            return ReturnBool(GetApi().InteractNpc(index, PyConvert::ToOp(py_arg(1))));
+            const auto op = ResolveOp(py_arg(1), [&api, index](std::string_view text)
+            {
+                return api.FindNpcOp(index, text);
+            });
+
+            return ReturnBool(op && api.InteractNpc(index, *op));
         });
     }
 
@@ -673,16 +879,46 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
+            auto& api = GetApi();
             const auto index = PyConvert::ToIndex(py_arg(0), "player", PyConvert::PLAYER_CLASS);
-            return ReturnBool(GetApi().InteractPlayer(index, PyConvert::ToOp(py_arg(1))));
+            const auto op = ResolveOp(py_arg(1), [&api](std::string_view text)
+            {
+                return api.FindPlayerOp(text);
+            });
+
+            return ReturnBool(api.InteractPlayer(index, op));
         });
     }
 
+    // interact_loc(loc, op) or interact_loc(id, x, z, op); a Loc stands in for the first three.
     bool InteractLoc(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
         {
-            GetApi().InteractLoc(PyConvert::ToU16(py_arg(0), "id"), ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z"), PyConvert::ToOp(py_arg(3)));
+            auto& api = GetApi();
+            auto loc = LocRef_s{};
+            auto opArgument = py_arg(3);
+            if (PyConvert::IsLoc(py_arg(0)))
+            {
+                if (!py_isnone(py_arg(2)) || (!py_isnone(py_arg(1)) && !py_isnone(py_arg(3))))
+                {
+                    throw ScriptTypeError{"interact_loc takes a Loc and an op, or id, x, z and op"};
+                }
+
+                loc = PyConvert::ToLoc(py_arg(0), "loc");
+                opArgument = py_isnone(py_arg(3)) ? py_arg(1) : py_arg(3);
+            }
+            else
+            {
+                loc = LocRef_s{.id = PyConvert::ToU16(py_arg(0), "id"), .x = ToCoord(py_arg(1), "x"), .z = ToCoord(py_arg(2), "z")};
+            }
+
+            const auto op = ResolveOp(opArgument, [&api, &loc](std::string_view text)
+            {
+                return api.FindLocOp(loc.id, text);
+            });
+
+            api.InteractLoc(loc.id, loc.x, loc.z, op);
             return ReturnNone();
         });
     }
@@ -693,7 +929,13 @@ def _report_rows(report):
         {
             auto& api = GetApi();
             const auto points = PyConvert::ToPoints(py_arg(0), api.GetPosition().level, "points");
-            api.InteractLocVia(points, PyConvert::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"), PyConvert::ToOp(py_arg(4)));
+            const auto id = PyConvert::ToU16(py_arg(1), "id");
+            const auto op = ResolveOp(py_arg(4), [&api, id](std::string_view text)
+            {
+                return api.FindLocOp(id, text);
+            });
+
+            api.InteractLocVia(points, id, ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"), op);
             return ReturnNone();
         });
     }
@@ -702,8 +944,14 @@ def _report_rows(report):
     {
         return Guard([argv]
         {
+            auto& api = GetApi();
             const auto item = PyConvert::ToGroundItem(py_arg(0), "item");
-            return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, PyConvert::ToOp(py_arg(1))));
+            const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
+            {
+                return api.FindGroundItemOp(item.id, text);
+            });
+
+            return ReturnBool(api.InteractGroundItem(item.id, item.x, item.z, op));
         });
     }
 
@@ -720,7 +968,17 @@ def _report_rows(report):
 
     bool ItemOp(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), PyConvert::ToOp(py_arg(1)))); });
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
+            {
+                return api.FindItemOp(item.id, text);
+            });
+
+            return ReturnBool(api.ItemOp(item, op));
+        });
     }
 
     bool InvButton(int, py_StackRef argv) noexcept
@@ -980,17 +1238,27 @@ def _report_rows(report):
             {"in_rect(x, z, width, height)", InRect},
             {"at(x, z)", At},
             {"get_npcs(ids=None, radius=None)", GetNpcs},
-            {"get_nearest_npc_by_id(ids=None, radius=None, in_combat=None)", GetNearestNpcById},
+            {"get_nearest_npc_by_id(ids=None, radius=None, in_combat=None, reachable=False)", GetNearestNpcById},
+            {"get_nearest_npc_by_name(names, radius=None, in_combat=None, reachable=False)", GetNearestNpcByName},
             {"get_npc(index)", GetNpc},
             {"get_players(radius=None)", GetPlayers},
             {"get_player_by_name(name)", GetPlayerByName},
             {"get_ground_items(ids=None, radius=None)", GetGroundItems},
-            {"get_nearest_ground_item_by_id(ids=None, radius=None)", GetNearestGroundItemById},
+            {"get_nearest_ground_item_by_id(ids=None, radius=None, reachable=False)", GetNearestGroundItemById},
+            {"get_nearest_ground_item_by_name(names, radius=None, reachable=False)", GetNearestGroundItemByName},
             {"get_loc_at(x, z, layer=None)", GetLocAt},
+            {"get_locs(ids=None, radius=None, layer=None)", GetLocs},
+            {"get_nearest_loc_by_id(ids=None, radius=None, layer=None, reachable=False)", GetNearestLocById},
+            {"get_nearest_loc_by_name(names, radius=None, layer=None, reachable=False)", GetNearestLocByName},
+            {"get_npc_type(id)", GetNpcType},
+            {"get_item_type(id)", GetItemType},
+            {"get_loc_type(id)", GetLocType},
             {std::format("get_inventory(com={})", ScriptApi::INVENTORY), GetInventory},
             {"get_equipment()", GetEquipment},
             {std::format("get_inventory_count_by_id(ids=None, com={})", ScriptApi::INVENTORY), GetInventoryCountById},
             {std::format("get_inventory_item_by_id(ids=None, com={})", ScriptApi::INVENTORY), GetInventoryItemById},
+            {std::format("get_inventory_count_by_name(names, com={})", ScriptApi::INVENTORY), GetInventoryCountByName},
+            {std::format("get_inventory_item_by_name(names, com={})", ScriptApi::INVENTORY), GetInventoryItemByName},
             {"get_empty_slots()", GetEmptySlots},
             {"is_inventory_full()", IsInventoryFull},
             {"get_main_modal()", GetMainModal},
@@ -1003,12 +1271,14 @@ def _report_rows(report):
             {"get_friends()", GetFriends},
             {"get_ignores()", GetIgnores},
             {"walk_to(x, z, run=False)", WalkTo},
+            {"is_reachable(x, z)", IsReachable},
+            {"find_path(x, z)", FindPath},
             {"walk_path(points, run=False)", WalkPath},
             {"interact_npc(npc, op)", InteractNpc},
             {"talk_to_npc(npc)", TalkToNpc},
             {"attack_npc(npc)", AttackNpc},
             {"interact_player(player, op)", InteractPlayer},
-            {"interact_loc(id, x, z, op)", InteractLoc},
+            {"interact_loc(target, x=None, z=None, op=None)", InteractLoc},
             {"interact_loc_via(points, id, x, z, op)", InteractLocVia},
             {"interact_ground_item(item, op)", InteractGroundItem},
             {"take_ground_item(item)", TakeGroundItem},

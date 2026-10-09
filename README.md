@@ -1,11 +1,12 @@
 # rs2004-headless
 
-A headless game client for revision-289 (2004-era RuneScape) servers, such as the 289server engine. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics and no game cache, and one process runs up to 16 scripted accounts.
+A headless game client for revision-289 (2004-era RuneScape) servers, such as the 289server engine. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics, reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process.
 
 ## Features
 
 - **The 289 protocol.** It does the RSA and ISAAC login handshake and decodes every server packet into state: players, NPCs, ground items, scenery changes, inventories, stats, interfaces and chat. It can also build every request the webclient sends.
-- **Python scripting** on an embedded [pocketpy](https://github.com/pocketpy/pocketpy) interpreter. A script defines `loop()` and the `on_*` hooks it needs, and calls a flat API such as `get_nearest_npc_by_id(41)`, `attack_npc(npc)` and `walk_to(x, z)`.
+- **The game cache.** It loads the server's cache once per process and shares it with every account. The login CRCs are computed from it, scripts get the names and options of NPCs, items and scenery, scenery the server never changed is known, and walks and interactions route around walls as the webclient does.
+- **Python scripting** on an embedded [pocketpy](https://github.com/pocketpy/pocketpy) interpreter. A script defines `loop()` and the `on_*` hooks it needs, and calls a flat API such as `get_nearest_npc_by_name('Chicken')`, `interact_npc(npc, 'Attack')` and `walk_to(x, z)`.
 - **Several accounts per process.** Each account has its own interpreter and its own log name, and logins are spaced a few seconds apart. An account can log into a different world from the others.
 - **Survives server restarts.** A dropped connection reconnects on its own, with up to 10 attempts over about four minutes. The other accounts keep playing in the meantime.
 - **Clean shutdown.** Ctrl+C gives each script time to finish what it's doing, then logs every account out.
@@ -22,9 +23,9 @@ A headless game client for revision-289 (2004-era RuneScape) servers, such as th
   - Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC, CMake 3.25+ and Ninja all come with that workload.
   - Linux, with clang, CMake 3.25+ and Ninja. The C++ standard library has to be libstdc++ 13+ or libc++ 17+, for `<format>`. The build is tested on Ubuntu 24.04 and Arch, and [Linux](#linux) lists the packages each one needs.
 - [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
-- A revision-289 server to connect to, plus its login CRCs and RSA public key (see [Configuration](#configuration)).
+- A revision-289 server to connect to, plus its RSA public key and a copy of its game cache (see [Configuration](#configuration)).
 
-vcpkg installs the dependencies from `vcpkg.json`: Catch2, IXWebSocket (with OpenSSL, for `wss://`), nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
+vcpkg installs the dependencies from `vcpkg.json`: bzip2 and zlib (for the cache's archives and maps), Catch2, IXWebSocket (with OpenSSL, for `wss://`), nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
 
 ## Building
 
@@ -99,10 +100,10 @@ If `client.jsonc` doesn't exist, the client writes a sample there and exits. In 
 |---|---|
 | `server.url` | The server's WebSocket URL, `ws://` or `wss://`. For a local engine on Windows, it's `ws://localhost:80` |
 | `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header |
-| `login.crcs` | The nine cache CRCs that the server checks, as `"0x..."` strings |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
+| `client.cacheDirectory` | The folder that holds the server's cache: `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as the 289 engine keeps them in `engine/data/pack`. The default is `cache`, which git ignores |
 
-The CRCs and the RSA key come from the server's deployment and cache, not from the protocol, so take them from the server you're connecting to. Its webclient uses the same values. If they're wrong, the server rejects the login with status 6.
+The RSA key comes from the server's deployment, not from the protocol, so take it from the server you're connecting to; its webclient uses the same values. The login CRCs are computed from the cache, so the cache must be the server's own. If either is wrong, the server rejects the login with status 6. The client loads the cache once at startup, in well under a second, and a missing or damaged cache stops it before any login, naming the file.
 
 Every other key has a default. These are the ones you're most likely to change:
 
@@ -215,10 +216,8 @@ Before you write one, know these limits:
 
 - **Scripts run on pocketpy, not CPython.** pocketpy implements a subset of Python 3: there's no `finally`, no generator expressions, no `re` module and no pip packages. [ScriptingApi.md](docs/ScriptingApi.md#python-dialect) lists all the differences.
 - **One thread runs every script.** A call that runs longer than `callTimeoutMs` raises `TimeoutError`, and `time.sleep()` raises an error immediately. To wait, return a delay from `loop()`.
-- **The client knows only what the server sends.** Without the game cache:
-  - There's no pathfinding. Walks go in straight lines and stop at the first obstacle.
-  - Scenery that the server never changed is unknown, so scripts supply the loc id and tile.
-  - NPCs and items have ids but no names.
+- **Interfaces are numbers.** The cache's interface definitions aren't decoded, so component ids, such as the bank's, are constants in scripts.
+- **"Nearest" counts tiles, not steps.** `reachable=True` skips targets that can't be reached at all, but the nearest one left may still be a long walk round.
 - **Scripts aren't sandboxed.** Run only scripts you trust.
 
 ## Project layout
@@ -228,8 +227,10 @@ src/
 ├── main.cpp, Application     command line, config loading, Ctrl+C
 ├── Accounts/                 each account's lifecycle, the main loop over all accounts, progress report files
 ├── Script/                   pocketpy runtime and interpreters, the Python API and its bindings, messages between scripts
+├── Cache/                    reading the server's cache: the store, archives, definitions, map squares, login CRCs
 ├── Game/
 │   ├── GameClient            login, reconnects, logout, polling the connection
+│   ├── Map/                  each account's collision map and scenery, and the route search
 │   ├── Net/                  login handshake, reading and writing packets
 │   ├── Protocol/             opcodes, client packet builders, text encodings
 │   ├── Decode/               turns server packets (including player, NPC and zone updates) into game state
@@ -253,6 +254,7 @@ Everything in `src/` except `main.cpp` builds into a static library. The client 
 | [ScriptingDesign.md](docs/ScriptingDesign.md) | How scripting works inside: the runtime, events, the main loop and accounts |
 | [tcp-protocol-289.md](docs/tcp-protocol-289.md) | The revision-289 wire protocol: login, framing and the payload of every opcode |
 | [ConfigDesign.md](docs/ConfigDesign.md) | The formats of the config and account files, with every key and rule |
+| [CacheDesign.md](docs/CacheDesign.md) | Loading the game cache, the collision map and the route search |
 | [WebSocketDesign.md](docs/WebSocketDesign.md) | The non-blocking WebSocket transport |
 | [PacketDesign.md](docs/PacketDesign.md) | The packet buffer, the ISAAC cipher and `BigUInt` |
 | [LoggerDesign.md](docs/LoggerDesign.md) | The logger |

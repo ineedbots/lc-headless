@@ -1,0 +1,95 @@
+#pragma once
+
+#include "Cache/CacheStore.hpp"
+
+struct WrittenStore_s
+{
+    std::vector<u8> dat;
+    std::array<std::vector<u8>, CacheStore::STORE_COUNT> indexes;
+};
+
+struct ArchiveEntry_s
+{
+    std::string name;
+    std::vector<u8> data;
+};
+
+struct TypeFiles_s
+{
+    std::vector<u8> dat;
+    std::vector<u8> idx;
+};
+
+struct LandFlags_s
+{
+    s32 level = 0;
+    s32 x = 0;
+    s32 z = 0;
+    u8 flags = 0;
+};
+
+struct LocPlacement_s
+{
+    u16 id = 0;
+    s32 level = 0;
+    s32 x = 0;
+    s32 z = 0;
+    u8 shape = 0;
+    u8 angle = 0;
+};
+
+// A square's map files, unpacked.
+struct SquareFiles_s
+{
+    u16 square = 0;
+    std::vector<u8> land;
+    std::vector<u8> locs;
+};
+
+// Each definition is a type's bytes, opcodes through the closing 0, in id order.
+struct StoreContents_s
+{
+    std::vector<std::vector<u8>> locs;
+    std::vector<std::vector<u8>> npcs;
+    std::vector<std::vector<u8>> objs;
+    std::vector<SquareFiles_s> squares;
+    // Listed in map_index, but with no files in store 4.
+    std::vector<u16> squaresWithoutFiles;
+};
+
+// Writes caches for the tests in the formats the engine's FileStream and the webclient read, on its own
+// rather than through the reader, so a mistake in one shows up as a failure instead of hiding in both.
+class CacheWriter
+{
+public:
+    static constexpr u16 MAP_VERSION = 1;
+
+    void Put(u32 store, u32 file, std::vector<u8> bytes);
+    [[nodiscard]] const std::vector<u8>& Get(u32 store, u32 file) const;
+    // Each file's sectors follow one another from sector 1, and each index lists every file up to its
+    // last, with absent ones as size 0. Returns what it wrote, so a test can damage it and write it again.
+    WrittenStore_s Write(const std::filesystem::path& directory) const;
+    [[nodiscard]] WrittenStore_s Build() const;
+
+    static void WriteStore(const std::filesystem::path& directory, const WrittenStore_s& store);
+
+    [[nodiscard]] static std::vector<u8> Bzip2Headerless(std::span<const u8> data);
+    [[nodiscard]] static std::vector<u8> Gzip(std::span<const u8> data, u16 version = MAP_VERSION);
+    [[nodiscard]] static std::vector<u8> MakeArchive(const std::vector<ArchiveEntry_s>& entries, bool compressWhole);
+    [[nodiscard]] static TypeFiles_s MakeTypeFiles(const std::vector<std::vector<u8>>& definitions);
+    // A definition with a name (opcode 2) unless it's empty, op i for each non-empty ops[i] (opcode 30 + i),
+    // then the other opcodes' bytes as given, and the closing 0.
+    [[nodiscard]] static std::vector<u8> MakeDefinition(std::string_view name, const std::vector<std::string_view>& ops = {}, std::span<const u8> otherOpcodes = {});
+    [[nodiscard]] static std::vector<u8> MakeLand(std::span<const LandFlags_s> flags = {});
+    [[nodiscard]] static std::vector<u8> MakeLocFile(std::span<const LocPlacement_s> locs);
+    [[nodiscard]] static std::vector<u8> MakeMapIndex(std::span<const u16> squares);
+    // Archives 1 to 8, with filler where nothing is decoded, and the squares' files in store 4. Square
+    // i in map_index has land file 2i and loc file 2i + 1.
+    [[nodiscard]] static CacheWriter MakeStore(const StoreContents_s& contents);
+
+    static void PutSmart(std::vector<u8>& bytes, s32 value);
+    static void WriteFile(const std::filesystem::path& path, std::span<const u8> bytes);
+
+private:
+    std::map<std::pair<u32, u32>, std::vector<u8>> m_files;
+};

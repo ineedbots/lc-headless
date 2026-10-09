@@ -20,17 +20,17 @@ Reference sources:
 | Sample | When the file doesn't exist, `Load` writes a sample there and throws a `ConfigError` asking for it to be filled in. The sample is `Config_s{}` serialized, so it always has exactly the keys and defaults the structs have |
 | Shape | `ConfigFile` is a non-instantiable class with static `Load`, `Parse` and `Serialize`, like `StringUtils` in CONVENTIONS §5. `Load` and `Parse` return a `Config_s`: plain data, one struct per section. Values come out already converted to the types the client uses (`BigUInt`, `LogLevel_e`, `std::chrono::seconds`), so no code downstream parses or validates anything |
 | Ownership | `Application` holds the loaded config in a `std::shared_ptr<const Config_s>` and passes it to any class that needs it. A class that keeps it stores its own copy of the pointer, so ownership is genuinely shared (CONVENTIONS §8) and no class can outlive the config it reads. The `const` keeps the settings read-only after loading, for every holder |
-| Conversion | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` generates `from_json` and `to_json` for `Config_s` and the four section structs. Each type nlohmann can't convert by itself (`BigUInt`, `LogLevel_e`, `std::chrono::seconds` and the CRC array) gets an `nlohmann::adl_serializer` specialization with both directions. All of it lives in `ConfigFile.cpp` |
+| Conversion | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` generates `from_json` and `to_json` for `Config_s` and the four section structs. Each type nlohmann can't convert by itself (`BigUInt`, `LogLevel_e` and `std::chrono::seconds`) gets an `nlohmann::adl_serializer` specialization with both directions. All of it lives in `ConfigFile.cpp` |
 | Macros | A deliberate exception to CONVENTIONS §6. The macros generate a `from_json` and a `to_json` per struct that would otherwise have to be written, and kept in step with the struct, by hand |
 | Keys | The JSON keys are the C++ member names, because the macro uses each member's name as its key. They are camelCase (CONVENTIONS §6), and a key's path in the file is its path in code: `login.rsaModulus` in the file is `config.login.rsaModulus` |
 | Key order | Reading uses `nlohmann::json`. Writing uses `nlohmann::ordered_json`, so a written file lists sections and keys in declaration order, the order of §3, instead of alphabetically |
-| Defaults | Every key is optional. The macro reads each member with `value(name, default)`, so a missing key keeps the member's initializer. Five initializers break their own key's rule: the empty `url`, `username` and `password`, and the zero RSA modulus and exponent. Leaving out one of those keys fails in `Validate`, which names it. A missing `crcs` loads as nine zeros, which pass, and fails later, when a server that checks CRCs rejects the login |
+| Defaults | Every key is optional. The macro reads each member with `value(name, default)`, so a missing key keeps the member's initializer. Five initializers break their own key's rule: the empty `url`, `username` and `password`, and the zero RSA modulus and exponent. Leaving out one of those keys fails in `Validate`, which names it |
 | Rules | Rules that a type doesn't carry, such as the username's length or the range of the idle time, are checked by `Validate` after conversion |
-| Numbers | Counts and IDs are JSON integers. CRCs and RSA values are strings holding a decimal or `0x`-hex number, because JSON has no hex literals and a 512-bit modulus doesn't fit in a JSON number. Hex is case-insensitive when read, so `0xDE5B3345` and `0xde5b3345` are the same value. `Serialize` writes lowercase |
+| Numbers | Counts and IDs are JSON integers. RSA values are strings holding a decimal or `0x`-hex number, because JSON has no hex literals and a 512-bit modulus doesn't fit in a JSON number. Hex is case-insensitive when read, so `0xCA1` and `0xca1` are the same value. `Serialize` writes lowercase |
 | Strictness | `Validate` is the only check beyond what conversion does: a wrong type, or a value that breaks its rule, is an error. Unknown sections and keys are ignored without a warning, and a repeated key takes its last value, as nlohmann does by default |
-| Errors | Everything `ConfigFile` throws for a missing, unreadable or invalid file is a `ConfigError`, the type in CONVENTIONS §8. Messages start with the dotted path of the key (`login.crcs: ...`), and `Load` puts the file path in front. `JSON_DIAGNOSTICS` makes nlohmann's own conversion errors carry the path |
+| Errors | Everything `ConfigFile` throws for a missing, unreadable or invalid file is a `ConfigError`, the type in CONVENTIONS §8. Messages start with the dotted path of the key (`client.idleSeconds: ...`), and `Load` puts the file path in front. `JSON_DIAGNOSTICS` makes nlohmann's own conversion errors carry the path |
 | Secrets | No message or log line contains a value from the file. Syntax errors give a line and a column, but no excerpt. nlohmann's conversion errors name types and keys, never values |
-| Logging | One warning, when TLS verification is turned off, logged through the `Logger&` that `Load` and `Parse` take. Loading logs nothing else |
+| Logging | A warning when TLS verification is turned off, and one for each key that's no longer read (a leftover `account` section or `login.crcs`), logged through the `Logger&` that `Load` and `Parse` take. Loading logs nothing else |
 | Dependency | nlohmann/json is used only in `ConfigFile.cpp`. No header exposes it |
 | Threading | `ConfigFile` has no state. A loaded `Config_s` is `const` behind its `shared_ptr`, so any thread can read it, and copying or releasing the pointer is thread-safe |
 
@@ -43,7 +43,7 @@ Rejected:
 - **`NLOHMANN_JSON_SERIALIZE_ENUM` for `LogLevel_e`.** An unknown string silently becomes the first enumerator, `Verbose`.
 - **A hand-written sample text with a comment on each key.** It would explain more, but it would drift from the structs, and nlohmann can't write comments, so it couldn't be generated. The serialized sample can't drift, and §3's table explains the keys.
 - **Passing nlohmann's syntax error message through.** Lexer errors quote the text they stopped in, as in `last read: '"hunter\q'`. A password with a stray backslash or quote would end up in the log.
-- **CRCs as JSON numbers.** They could only be written in decimal, but CRCs are written and compared in hex.
+- **Keeping `login.crcs`.** The nine CRCs the login sends were once set here, copied from the server by hand. They come from the server's cache in `client.cacheDirectory` now ([CacheDesign.md](CacheDesign.md) §5, §9), so they can't fall out of step with it.
 
 ---
 
@@ -77,7 +77,7 @@ rs2004-headless/
 - CMake:
     - `find_package(nlohmann_json CONFIG REQUIRED)`. The library target links `nlohmann_json::nlohmann_json` privately, because no public header includes it. The test executable links it too, because the tests build their inputs with it (§6.1).
     - The library target gets `JSON_DIAGNOSTICS=1` as a private compile definition, so nlohmann's exceptions name the path of the value that failed. Since nlohmann 3.11 the setting is part of its ABI namespace, so the test executable, which doesn't set it, can't clash with the library.
-- `pch.hpp` gains `<charconv>` for parsing CRCs and `<iterator>` for reading the file.
+- `pch.hpp` gains `<iterator>` for reading the file.
 - `.gitignore` gains `client.jsonc`. No example file is committed: the first run writes one (§3).
 
 ---
@@ -99,7 +99,6 @@ rs2004-headless/
         "tlsCaFile": "SYSTEM"
     },
     "login": {
-        "crcs": ["0x00000000", "0xde5b3345", "0x6026f8fe", "0x07550309", "0x9a13636e", "0xca2717bd", "0x368f1792", "0x1b1fb6b2", "0xa7129379"],
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
         "rsaExponent": "0x81f390b2cf8ca7039ee507975951d5a0b15a87bf8b3f99c966834118c50fd94d",
         /*
@@ -112,7 +111,8 @@ rs2004-headless/
     "client": {
         "logoutComponent": 2458,
         "logLevel": "verbose",
-        "idleSeconds": 5
+        "idleSeconds": 5,
+        "cacheDirectory": "../289server/engine/data/pack"
     },
     "scripting": {
         "accountsDirectory": "accounts",
@@ -126,7 +126,7 @@ rs2004-headless/
 }
 ```
 
-`tlsCaFile`, `lowMemory`, `revision`, `logoutComponent`, `idleSeconds` and the whole `scripting` section hold their defaults here, so this file could leave them out and load the same. The account that `client.ini` held now goes in its own file (see Account files, below).
+`tlsCaFile`, `lowMemory`, `revision`, `logoutComponent`, `idleSeconds` and the whole `scripting` section hold their defaults here, so this file could leave them out and load the same. The account that `client.ini` held now goes in its own file (see Account files, below), and the CRCs it held now come from the server's cache, which `cacheDirectory` points at ([CacheDesign.md](CacheDesign.md)).
 
 ### Generated sample
 
@@ -134,7 +134,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 
 ```jsonc
 // Sample config, written because none was found.
-// Set server.url and the login CRCs and RSA key, then run again.
+// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.
 // Each account goes in its own file in scripting.accountsDirectory.
 {
     "server": {
@@ -143,17 +143,6 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
         "tlsCaFile": "SYSTEM"
     },
     "login": {
-        "crcs": [
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000",
-            "0x00000000"
-        ],
         "rsaModulus": "0x0",
         "rsaExponent": "0x0",
         "lowMemory": false,
@@ -162,7 +151,8 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
     "client": {
         "logoutComponent": 2458,
         "logLevel": "info",
-        "idleSeconds": 5
+        "idleSeconds": 5,
+        "cacheDirectory": "cache"
     },
     "scripting": {
         "accountsDirectory": "accounts",
@@ -186,7 +176,6 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `server.url` | string | `""` | A URL that `ix::UrlParser` accepts, with the scheme `ws` or `wss`: the check `WebSocketClient::Connect` makes ([WebSocketDesign.md](WebSocketDesign.md) §3, step 1) |
 | `server.origin` | string | `""`: no `Origin` header | Empty, or printable ASCII |
 | `server.tlsCaFile` | string | `"SYSTEM"` | Not empty: a PEM CA bundle path, `SYSTEM` for the platform trust store, or `NONE` for no verification. Only used for `wss` |
-| `login.crcs` | array | Nine `"0x00000000"` | Exactly 9 strings, each a number from 0 to `0xFFFFFFFF`. Stored as `s32` with the same 32 bits, the type `Packet::P4` and `Packet::GetCrc` use |
 | `login.rsaModulus` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 1 |
 | `login.rsaExponent` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 0 |
 | `login.lowMemory` | boolean | `false` | |
@@ -194,6 +183,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `client.logoutComponent` | integer | `2458` | 0 to 65535 |
 | `client.logLevel` | string | `"info"` | `verbose`, `info`, `warning` or `error` |
 | `client.idleSeconds` | integer | `5` | 1 to 300. Stored as `std::chrono::seconds` |
+| `client.cacheDirectory` | string | `"cache"` | Not empty. The folder that holds the server's cache, `main_file_cache.dat` and its index files, relative to the working directory. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
 | `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
 | `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run. Stored as `std::chrono::milliseconds` |
@@ -203,11 +193,11 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
 
 - **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
-- **`login.crcs`** defaults to nine zeros, which are valid numbers, so a file without it loads. A server that checks CRCs then rejects the login, and the login code reports that.
+- **`login.crcs`**, which files from before the cache have, isn't read: the CRCs come from the cache ([CacheDesign.md](CacheDesign.md) §5). A file that still has it loads, with a warning.
 
 ### Rules
 
-- **Structure.** The top level is an object, and each section present is an object. Any section or key can be left out, and takes its default. Unknown sections and keys are ignored without a warning, so a misspelled key is ignored too, and its member keeps the default. The one exception is a leftover `account` section: it isn't read, and a warning says it belongs in an account file now.
+- **Structure.** The top level is an object, and each section present is an object. Any section or key can be left out, and takes its default. Unknown sections and keys are ignored without a warning, so a misspelled key is ignored too, and its member keeps the default. The exceptions are a leftover `account` section and a leftover `login.crcs`: neither is read, and a warning says where each belongs now.
 - **Repeated keys.** A key set twice in the same object takes its last value. With alternatives kept as comments, as in the example, forgetting to comment one out means the later line wins.
 - **Types.** Strings, booleans and arrays must have their JSON type, and a key set to `null` is a wrong type. To get a key's default, leave it out.
 - **Integers.** nlohmann converts any JSON number, and a boolean, to an integer member with a `static_cast`:
@@ -216,7 +206,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
     - A boolean reads as 0 or 1.
 
     `Validate` then checks the converted value against the key's rule, where it has one. So `"idleSeconds": -5` still fails, but `"logoutComponent": -1` loads as 65535.
-- **Numbers in strings** are decimal digits, or `0x` or `0X` followed by hex digits in either case. `"0xde5b3345"`, `"0XDE5B3345"` and `"0xDe5B3345"` are the same number. There's no sign, no whitespace and nothing after the digits. This is the rule `BigUInt::Parse` already uses.
+- **Numbers in strings** are decimal digits, or `0x` or `0X` followed by hex digits in either case. `"0xca1"`, `"0XCA1"` and `"0xcA1"` are the same number. There's no sign, no whitespace and nothing after the digits. This is the rule `BigUInt::Parse` already uses.
 - **Printable ASCII** is `0x20` to `0x7E`, so a username can contain spaces.
 - **Case.** Section names, keys and other string values, such as `"info"` and `"SYSTEM"`, are case-sensitive. Hex numbers are the one exception (above).
 
@@ -275,10 +265,8 @@ struct AccountSettings_s
 
 struct LoginSettings_s
 {
-    static constexpr std::size_t CRC_COUNT = 9;
     static constexpr u16 SUPPORTED_REVISION = 289;
 
-    std::array<s32, CRC_COUNT> crcs{};
     BigUInt rsaModulus;
     BigUInt rsaExponent;
     bool lowMemory = false;
@@ -290,6 +278,7 @@ struct ClientSettings_s
     u16 logoutComponent = 2458;
     LogLevel_e logLevel = LogLevel_e::Info;
     std::chrono::seconds idleSeconds = 5s;
+    std::string cacheDirectory = "cache";
 };
 
 struct ScriptingSettings_s
@@ -354,10 +343,10 @@ public:
 - `ServerSettings_s` uses the member names and the `tlsCaFile` default of `WebSocketOptions_s`, so building the options is a member-by-member copy (see Usage).
 - **The member initializers are the defaults.**
     - A key missing from the file keeps its member's initializer, and the generated sample is made of them.
-    - Values that differ for each server or account are left empty or zero: `url`, the credentials, the CRCs and the RSA key. All of them but the CRCs fail `Validate` until the file sets them.
+    - Values that differ for each server or account are left empty or zero: `url`, the credentials and the RSA key. All of them fail `Validate` until the file sets them.
     - Code that builds a struct in place starts from the same values.
 - `Load` reads a file and calls `Parse`, or writes the sample when there's no file. `Parse` and `Serialize` work on text, which is what the tests call.
-- `Load` and `Parse` take the `Logger&` their one warning goes through, and default to the default logger when it is left out. They log only during the call and don't keep the logger, so a reference is enough, as with a function that only reads the config ([LoggerDesign.md](LoggerDesign.md) §3 Usage). `Serialize` doesn't log, so it takes none.
+- `Load` and `Parse` take the `Logger&` their warnings go through, and default to the default logger when it is left out. They log only during the call and don't keep the logger, so a reference is enough, as with a function that only reads the config ([LoggerDesign.md](LoggerDesign.md) §3 Usage). `Serialize` doesn't log, so it takes none.
 - `Serialize` is the inverse of `Parse`: for a valid `Config_s`, `Parse(Serialize(config))` gives the same members back.
 - All the structs follow the rule of zero, so a `Config_s` moves cheaply out of `Load` and into its `shared_ptr`.
 - `Load` and `Parse` return a plain `Config_s`, not a `shared_ptr`. The caller decides how to store it, and the tests compare members without dereferencing anything.
@@ -386,7 +375,7 @@ Application::Application(const std::filesystem::path& configPath, std::shared_pt
 
 ```
 Fatal error: client.jsonc: not found, so a sample was written there; fill it in and run again
-Fatal error: client.jsonc: login.crcs: must be an array of 9 strings
+Fatal error: client.jsonc: client.idleSeconds: must be from 1 to 300
 ```
 
 ```cpp
@@ -533,14 +522,13 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
             }
         };
 
-        // adl_serializer<LogLevel_e>, adl_serializer<std::chrono::seconds> and
-        // adl_serializer<std::array<s32, LoginSettings_s::CRC_COUNT>> follow the same pattern.
+        // adl_serializer<LogLevel_e> and adl_serializer<std::chrono::seconds> follow the same pattern.
     }
 
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, crcs, rsaModulus, rsaExponent, lowMemory, revision)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds, cacheDirectory)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
@@ -567,16 +555,9 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
         | `BigUInt` | As shown. `Validate` checks the lower bounds, because they differ between the modulus and the exponent | `FormatHex`: `0x` and lowercase hex digits without leading zeros, `0x0` for zero. Built from `ToBytesBigEndian()`, so `BigUInt` itself doesn't change |
         | `LogLevel_e` | `verbose`, `info`, `warning` or `error`. Anything else throws `must be verbose, info, warning or error` | The same names |
         | `std::chrono::seconds` | `std::chrono::seconds{value.get<s64>()}`. `Validate` checks the range | `count()` |
-        | `std::array<s32, CRC_COUNT>` | See below | Each item as `std::format("0x{:08x}", std::bit_cast<u32>(crc))`: `0x00000000`, `0xde5b3345` |
 
         - `LogLevel_e`'s names come from one `constexpr` table in the anonymous namespace, which both directions use.
-        - Reading the CRC array:
-            - The value must be an array of exactly `CRC_COUNT` items, or it throws `must be an array of 9 strings`.
-            - Each item is read with `get<std::string>()` and parsed by `ParseU32`. That uses `std::from_chars`, with base 16 after a `0x` or `0X` prefix and base 10 otherwise, and requires a digit first and every character consumed. Base 16 accepts `a` to `f` and `A` to `F`, so case needs no handling of its own.
-            - A bad item throws with `&value[i]` as the context, so its path ends with the index: `login.crcs.3`.
-            - Each result is stored with `std::bit_cast<s32>`.
-        - The array specialization applies to that exact array type, which only `LoginSettings_s` uses.
-        - Every written value reads back to the same value: `FormatHex` and the CRC format are both forms `ParseU32` and `BigUInt::Parse` accept.
+        - Every written value reads back to the same value: `FormatHex` writes a form `BigUInt::Parse` accepts.
 - **Conversion errors.** `DescribeConversionError` turns a nlohmann exception into the `{path}: {problem}` form the rest of `ConfigFile` uses:
     - It drops the `[json.exception.type_error.302] ` prefix up to the first `] `.
     - With `JSON_DIAGNOSTICS`, what remains starts with the JSON pointer in parentheses, `(/client/logLevel) type must be string, but is number`. That becomes `client.logLevel: type must be string, but is number`.
@@ -600,15 +581,15 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     - `Validate` is also where a key that can't do without a value fails when it's missing: its default breaks the rule. It can't tell a missing key from one set to the same value, so the message gives the rule, not "missing".
     - `IsWebSocketUrl` calls `ix::UrlParser::parse` and requires the protocol it returns to be `ws` or `wss`.
     - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_IDLE_SECONDS`, `MAX_IDLE_SECONDS`, ...). The revision check uses `LoginSettings_s::SUPPORTED_REVISION`.
-    - `logoutComponent`, `lowMemory` and `crcs` have no rule beyond their type.
+    - `logoutComponent` and `lowMemory` have no rule beyond their type.
     - The paths in `Validate` are written out by hand. A test for each rule (§6.5) catches a path that no longer matches its member after a rename.
 - **TLS.** `tlsCaFile` matters only for `wss`. With a `ws` URL it's stored as written and unused, without a warning, so switching `url` between a local `ws` server and a remote `wss` one stays a one-line edit, as in `client.ini`. With a `wss` URL and `NONE`, `Parse` logs `Warning` through the logger it was given: `Config disables TLS certificate verification (server.tlsCaFile is NONE)`.
 - **Error messages.**
     - Every message from `Parse` but a syntax error reads `{path}: {problem}`, such as `client.idleSeconds: must be from 1 to 300`.
     - Messages never contain a value from the file.
-    - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: login.crcs: must be an array of 9 strings` reads as one line.
+    - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: client.idleSeconds: must be from 1 to 300` reads as one line.
 - **Logging.**
-    - The TLS warning is logged while the file loads, before `Application` calls `SetLevel` with `logLevel`. It therefore shows at the threshold the logger was created with, `Info` from `main`, even when the file sets `"error"`. That is deliberate: a problem in the file that sets the level should still be visible.
+    - The warnings are logged while the file loads, before `Application` calls `SetLevel` with `logLevel`. It therefore shows at the threshold the logger was created with, `Info` from `main`, even when the file sets `"error"`. That is deliberate: a problem in the file that sets the level should still be visible.
     - Writing the sample isn't logged separately. The `ConfigError` that follows says what happened, and `main` logs it once ([LoggerDesign.md](LoggerDesign.md) §4).
 - **Adding a setting.**
     1. Add the member, with its default as the initializer, to its section struct, and its name to that struct's macro, in the same position.
@@ -633,21 +614,21 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 | Reference | Here | Why |
 |---|---|---|
 | INI, parsed with SimpleIni | JSON with comments, parsed with nlohmann/json | Nested sections map directly onto JSON objects, and nlohmann already handles the syntax |
-| A field table with a hand-written reader per key | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, four `adl_serializer` specializations, and `Validate` | The macros generate the reading and the writing |
+| A field table with a hand-written reader per key | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, three `adl_serializer` specializations, and `Validate` | The macros generate the reading and the writing |
 | A missing file is an error; `client.ini.example` is committed by hand | A missing file is replaced by a generated sample, then an error | The sample can't drift from the structs |
 | snake_case keys: `connect`, `ws_origin`, `tls_ca_file`, `rsa_modulus`, `log_level`, ... | The member names: `url`, `origin`, `tlsCaFile`, `rsaModulus`, `logLevel`, ... | The macro uses each member's name as its key |
-| Keys marked required in the field table, including `crcs` | Every key optional. A key whose default breaks its rule fails in `Validate`; a missing `crcs` loads as zeros and fails at login | The macro has no notion of required, and the defaults already show which keys can't be left out |
+| Keys marked required in the field table, including `crcs` | Every key optional. A key whose default breaks its rule fails in `Validate` | The macro has no notion of required, and the defaults already show which keys can't be left out |
 | Every missing required key reported together | One at a time | `Validate` stops at the first broken rule |
 | `[section] key` in messages | `section.key: ...` | A key's path in the file is its path in code |
 | Unknown sections and keys are errors | Ignored, without a warning | The macros never read a key the structs don't have |
 | Duplicate keys are errors | The last value is used, without a warning | nlohmann's default behaviour |
-| Every number in decimal or `0x` hex | Integers are JSON numbers; CRCs and RSA values are strings in decimal or `0x` hex | JSON has no hex literals |
+| Every number in decimal or `0x` hex | Integers are JSON numbers; RSA values are strings in decimal or `0x` hex | JSON has no hex literals |
 | `low_memory`: `0`, `1`, `true` or `false` | A JSON boolean | JSON has a boolean type |
 | Integers range-checked as they're parsed | Converted by nlohmann, then checked against each key's rule by `Validate`. Fractions truncate and 16-bit keys can wrap (§3) | The cost of nlohmann's integer conversion |
 | `parse` returns warnings in an out-parameter for `main` to log | `Parse` logs its one warning itself, through the `Logger&` it takes | `Logger` exists now, and [LoggerDesign.md](LoggerDesign.md) §4 has warnings logged by the code that noticed the problem |
 | An `Endpoint` struct, a hand-written URL parser, and an explicit port required | The URL as a string, checked with `ix::UrlParser` | One parser: a URL that loads always passes `WebSocketClient::Connect`'s check |
 | `tls_ca_file` with a `ws` URL: a warning, and the value reset to `SYSTEM` | Kept, unused, no warning | Switching between `ws` and `wss` stays a one-line edit |
-| CRCs as `std::array<u32, 9>` | `std::array<s32, 9>`, the same bits | `Packet::P4` and `Packet::GetCrc` use `s32` |
+| `crcs`, nine CRCs copied from the server by hand | No CRCs in the file. They're computed from the server's cache in `client.cacheDirectory` | They can't fall out of step with the cache ([CacheDesign.md](CacheDesign.md) §5) |
 | `parse_u32`, `parse_u16`, `parse_bool`, `parse_u32_list` and `trim`: public, returning `bool` | Helpers in the anonymous namespace, and serializers that throw | Only `ConfigFile` uses them, and CONVENTIONS §8 reports failures by throwing |
 | `log_level`: `error`, `warn`, `info` or `verbose` | `logLevel`: `verbose`, `info`, `warning` or `error` | The names of `LogLevel_e`. The `warn` alias from [LoggerDesign.md](LoggerDesign.md) §5 isn't needed: every file is rewritten for the new keys anyway |
 | `std::runtime_error` | `ConfigError` | Callers can catch config failures specifically, and the tests can require that type |
@@ -661,10 +642,12 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 
 The plan below was written while `client.jsonc` held the account. Since the account moved to its own file ([ScriptingDesign.md](ScriptingDesign.md) Phase 3), its cases have moved with it. The username and password rules, and the checks that no message quotes a credential, now run against `ConfigFile::ParseAccount`, in the `[AccountFile]` cases of `ConfigFileTests.cpp`. Those cases also cover `enabled`, `script`, `script.file`, `script.settings`, `script.progressReportMinutes` and `LoadAccount`. The config file's cases cover the `scripting` section's defaults, limits and wrong types instead, and a leftover `account` section's warning. Where the plan below mentions `account.*`, read it as the account file.
 
+Since the CRCs moved to the cache ([CacheDesign.md](CacheDesign.md) §9), `login.crcs` has no cases of its own: the key isn't read, and a leftover one only logs a warning. `client.cacheDirectory` has the default, rejection and round-trip cases of the other string keys.
+
 ### 6.1 Strategy
 
 - **Inputs.**
-    - Most cases change one key of the §3 example and leave the rest valid. The test parses the example with nlohmann (`nlohmann::json::parse(EXAMPLE, nullptr, true, true)`), edits it (`json["login"]["crcs"].erase(0)`, `json["account"].erase("password")`), and passes `json.dump()` to `ConfigFile::Parse`.
+    - Most cases change one key of the §3 example and leave the rest valid. The test parses the example with nlohmann (`nlohmann::json::parse(EXAMPLE, nullptr, true, true)`), edits it (`json["client"]["idleSeconds"] = 0`, `json["account"].erase("password")`), and passes `json.dump()` to `ConfigFile::Parse`.
     - Cases that need exact text, such as syntax errors and duplicate keys, are raw string literals with a delimiter that JSON can't end early: `R"json(...)json"`.
 - **Logging.** Every test holds a `LogCapture` ([LoggerDesign.md](LoggerDesign.md) §6.1) and passes `*capture.GetLogger()` to `Parse` and `Load`, so warnings never reach the console. The tables write `Parse(text)` and `Load(path)` and leave that argument out. Where a row says "no log entries" or names a warning, the test checks the capture.
 - **Failures.** A failure must be a `ConfigError` (`REQUIRE_THROWS_AS`), and its message must contain the key's dotted path (`REQUIRE_THROWS_WITH` with `ContainsSubstring`). The rest of the message isn't checked, except for §6.3's line and column, §6.6's secrets and §6.8's first-run message.
@@ -676,7 +659,6 @@ Out of scope:
 - How nlohmann converts numbers to integer members (§3 Rules), beyond the cases `Validate` rejects. That's nlohmann's behaviour, not a rule of the format.
 - What the macro does with a section set to `null`.
 - A filesystem error from `std::filesystem::exists`. It can't be caused reliably from a test.
-- What a server does with zero CRCs. That belongs to the login code's tests.
 - Running the client against a server with the loaded settings.
 
 ### 6.2 Complete and minimal files
@@ -689,15 +671,15 @@ The §3 example parses with no log entries, and every member holds:
 | `server.origin` | `"https://w1.rs2b2t.com"` |
 | `server.tlsCaFile` | `"SYSTEM"` |
 | `account.username`, `account.password` | `"test"`, `"test"` |
-| `login.crcs` | `0`, then `std::bit_cast<s32>(0xde5b3345u)` and so on for the eight hex values in order |
 | `login.rsaModulus`, `login.rsaExponent` | `BigUInt::Parse` of the §3 strings |
 | `login.lowMemory` | `false` |
 | `login.revision` | `289` |
 | `client.logoutComponent` | `2458` |
 | `client.logLevel` | `LogLevel_e::Verbose` |
 | `client.idleSeconds` | `5s` |
+| `client.cacheDirectory` | `"../289server/engine/data/pack"` |
 
-A file with only the five keys that must be set (`server.url`, `account.username`, `account.password`, `login.rsaModulus` and `login.rsaExponent`) parses with no log entries. Every other member holds its §3 default, and `login.crcs` is nine zeros.
+A file with only the five keys that must be set (`server.url`, `account.username`, `account.password`, `login.rsaModulus` and `login.rsaExponent`) parses with no log entries. Every other member holds its §3 default.
 
 ### 6.3 Syntax
 
@@ -720,7 +702,7 @@ A file with only the five keys that must be set (`server.url`, `account.username
 | Change to the §3 example | Result |
 |---|---|
 | Each of `server.url`, `account.username`, `account.password`, `login.rsaModulus` and `login.rsaExponent` removed on its own | `ConfigError` containing its path, from `Validate` |
-| Each of the other eight keys removed on its own | Parses with no log entries; that member holds its §3 default (`login.crcs`: nine zeros) |
+| Each of the other keys removed on its own | Parses with no log entries; that member holds its §3 default |
 | `server`, `account` or `login` removed | `ConfigError` containing `server.url`, `account.username` or `login.rsaModulus`, the first rule each one's defaults break |
 | `client` removed | Parses with no log entries; `client` holds its defaults |
 | `{}` instead of the whole file | `ConfigError` containing `server.url` |
@@ -734,10 +716,11 @@ A file with only the five keys that must be set (`server.url`, `account.username
 | A `wss://` URL with `tlsCaFile` `"NONE"` | Parses; one `Warning`, containing `server.tlsCaFile` |
 | A `wss://` URL with `tlsCaFile` `"SYSTEM"` | Parses with no log entries |
 | A `ws://` URL with `tlsCaFile` `"NONE"` or `"certs/ca.pem"` | Parses with no log entries; stored as written |
+| A leftover `login.crcs` | Parses; one `Warning`: `Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory` |
 
 ### 6.5 Values
 
-Each rejection is a `ConfigError` containing the key's path. A CRC item's path ends with its index, as in `login.crcs.3`.
+Each rejection is a `ConfigError` containing the key's path.
 
 | Key | Accepted | Rejected |
 |---|---|---|
@@ -746,7 +729,6 @@ Each rejection is a `ConfigError` containing the key's path. A CRC item's path e
 | `server.tlsCaFile` | `"SYSTEM"`, `"NONE"`, `"certs/ca.pem"` | `""`, `5` |
 | `account.username` | 1 and 12 characters, `"a b"` | `""`, 13 characters, `"tab\there"`, `"é"`, `5` |
 | `account.password` | 1 and 20 characters | `""`, 21 characters, `"nul\u0000x"`, `"é"`, `5` |
-| `login.crcs` | 9 items mixing `"0"`, `"0xde5b3345"`, `"0xDE5B3345"`, `"0Xde5b3345"`, `"0xDe5B3345"` and `"4294967295"`. The four spellings of `0xde5b3345` give the same value, and `"4294967295"` is stored as `-1` | 8 or 10 items; one string `"0, 0, 0, ..."`; an item `"0x100000000"`, `"4294967296"`, `"-1"`, `"+1"`, `" 1"`, `"0x"`, `""`, `"0x0x1"`, `"1.5"` or `5` |
 | `login.rsaModulus` | `"3233"`, `"0xca1"`, `"0xCA1"` and `"0XcA1"`, all equal to `BigUInt::Parse("3233")` | `"0"`, `"1"`, `""`, `"0xzz"`, `3233` |
 | `login.rsaExponent` | `"1"`, `"0x10001"` | `"0"`, `""`, `65537` |
 | `login.lowMemory` | `true`, `false` | `0`, `1`, `"true"` |
@@ -754,6 +736,7 @@ Each rejection is a `ConfigError` containing the key's path. A CRC item's path e
 | `client.logoutComponent` | `0`, `65535` | `"2458"`, `null` |
 | `client.logLevel` | `"verbose"`, `"info"`, `"warning"` and `"error"` give the four levels | `"warn"`, `"Info"`, `"debug"`, `""`, `2` |
 | `client.idleSeconds` | `1` gives `1s`, `300` gives `300s` | `0`, `301`, `-5`, `"5"` |
+| `client.cacheDirectory` | `"C:/rs/pack"`, stored as written | `""`, `5` |
 
 ### 6.6 Secrets
 
@@ -775,13 +758,10 @@ Each rejection is a `ConfigError` containing the key's path. A CRC item's path e
 | `login.rsaModulus` | `BigUInt::Parse("0x0000ff")` | `"0xff"`: no leading zeros |
 | `login.rsaModulus` | `BigUInt::Parse("0x80")` | `"0x80"`: the sign-padding byte from `ToBytesBigEndian` isn't written |
 | `login.rsaModulus` | The §3 modulus | Its §3 string |
-| `login.crcs[0]` | `0` | `"0x00000000"` |
-| `login.crcs[0]` | `-1` | `"0xffffffff"` |
-| `login.crcs[0]` | `std::bit_cast<s32>(0xde5b3345u)` | `"0xde5b3345"` |
 | `client.logLevel` | Each of the four levels | `"verbose"`, `"info"`, `"warning"`, `"error"` |
 | `client.idleSeconds` | `300s` | `300` |
 
-- **Case on the way back.** A file whose CRCs and RSA values are written in upper case parses, and `Serialize` writes them back in lower case: `"0XDE5B3345"` comes back as `"0xde5b3345"`. Both are the same value.
+- **Case on the way back.** A file whose RSA values are written in upper case parses, and `Serialize` writes them back in lower case. Both are the same value.
 - **Filling in the sample.** The test parses the generated sample with nlohmann and sets `server.url`, `account.username`, `account.password`, `login.rsaModulus` (`"3233"`) and `login.rsaExponent` (`"17"`). `Parse` then succeeds with no log entries, and gives the same members as the minimal file in §6.2 with the same five values.
 
 ### 6.8 Load
@@ -790,7 +770,7 @@ The tests work in a fresh folder under `std::filesystem::temp_directory_path()`,
 
 - The §3 example, written to a file: `Load` returns the same members as §6.2.
 - The same file with CRLF line endings and a BOM: loads.
-- A file whose `login.crcs` has 8 items: `ConfigError` whose message starts with the path and `: `, and contains `login.crcs`.
+- A file whose `client.idleSeconds` is 0: `ConfigError` whose message starts with the path and `: `, and contains `client.idleSeconds`.
 - **First run.**
     - A path that doesn't exist throws a `ConfigError` whose message contains the path and `sample`.
     - The file now exists, and its bytes are exactly the §3 generated sample.
@@ -818,7 +798,7 @@ This comes after `BigUInt` ([PacketDesign.md](PacketDesign.md) §8 step 3) and t
 1. **Dependencies:**
     - Add `nlohmann-json` to `vcpkg.json` and `find_package` it.
     - Link it privately to the library and to the test executable, and give the library `JSON_DIAGNOSTICS=1`.
-    - Add `<charconv>` and `<iterator>` to `pch.hpp`.
+    - Add `<iterator>` to `pch.hpp`.
 2. **Syntax first:** `ConfigError`, and `ParseJson` with comments and the line and column message, plus the §6.3 tests. This checks nlohmann's comment handling on every preset before anything depends on it.
 3. **Conversion:** the settings structs, the `adl_serializer` specializations in both directions, the macros, `DescribeConversionError` and `Serialize`, plus the §6.2, §6.4 and §6.7 tests. The first build on each preset confirms three things:
     - The macro-generated functions work with both `json` and `ordered_json`, and `value()` reaches the custom serializers.

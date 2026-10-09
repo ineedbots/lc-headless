@@ -1,12 +1,14 @@
 #include "pch.hpp"
 #include "GameClient.hpp"
 
+#include "../Cache/GameCache_s.hpp"
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
 #include "../Io/WebSocketClient.hpp"
 #include "../Io/WebSocketError.hpp"
 #include "ConnectionLostError.hpp"
 #include "Decode/ServerPacketDecoder.hpp"
+#include "Map/WorldMap.hpp"
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/LoginError.hpp"
 #include "Net/LoginHandshake.hpp"
@@ -80,15 +82,18 @@ namespace
     }
 }
 
-GameClient::GameClient(std::shared_ptr<const Config_s> config, AccountSettings_s account, std::shared_ptr<Logger> logger, GameClientOptions_s options)
+GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger, GameClientOptions_s options)
     : m_config{std::move(config)}
+    , m_cache{std::move(cache)}
     , m_account{std::move(account)}
     , m_logger{std::move(logger)}
     , m_options{options}
     , m_socket{std::make_unique<WebSocketClient>(m_logger)}
     , m_decoder{m_logger}
+    , m_map{m_cache}
 {
     assert(m_config && "GameClient needs a config");
+    assert(m_cache && "GameClient needs a cache");
     assert(m_logger && "GameClient needs a logger");
 }
 
@@ -126,15 +131,17 @@ void GameClient::Pump(std::chrono::milliseconds maxWait)
     {
     case ClientStatus_e::Connecting:
         PumpConnecting(maxWait);
-        return;
+        break;
     case ClientStatus_e::InGame:
     case ClientStatus_e::LoggingOut:
         PumpSession(maxWait);
-        return;
+        break;
     case ClientStatus_e::Disconnected:
     case ClientStatus_e::LoggedOut:
-        return;
+        break;
     }
+
+    m_map.Update(m_state);
 }
 
 void GameClient::RequestLogout(std::chrono::milliseconds timeout)
@@ -206,6 +213,21 @@ const GameState_s& GameClient::GetState() const
 GameState_s GameClient::TakeSnapshot() const
 {
     return m_state;
+}
+
+const GameCache_s& GameClient::GetCache() const
+{
+    return *m_cache;
+}
+
+const WorldMap& GameClient::GetMap() const
+{
+    return m_map;
+}
+
+Logger& GameClient::GetLogger() const
+{
+    return *m_logger;
 }
 
 void GameClient::Send(ClientPacket_s packet)
@@ -353,7 +375,7 @@ void GameClient::StartAttempt()
     m_writer.reset();
     m_outgoing.clear();
     m_socket->Connect({.url = server.url, .origin = server.origin, .tlsCaFile = server.tlsCaFile});
-    m_handshake.emplace(m_account, m_config->login, m_reconnecting);
+    m_handshake.emplace(m_account, m_config->login, m_cache->crcs, m_reconnecting);
     m_attemptDeadline = Clock::now() + m_options.loginTimeout;
 }
 
@@ -430,7 +452,10 @@ void GameClient::FinishLogin(const LoginResult_s& result)
 {
     if (!result.reconnected)
     {
+        // The fresh state's scene count starts over, so the map forgets the old one rather than risk
+        // the count coming round to where it was built.
         m_state = GameState_s{};
+        m_map.Clear();
         m_decoder.Reset();
         m_loggedMessageCount = 0;
         m_state.staffLevel = result.staffLevel;

@@ -1,9 +1,11 @@
 #include "pch.hpp"
 #include "ScriptHost.hpp"
 
+#include "../Cache/GameCache_s.hpp"
 #include "../Core/FileWatcher.hpp"
 #include "../Core/Logger.hpp"
 #include "../Game/GameClient.hpp"
+#include "../Game/Map/WorldMap.hpp"
 #include "../Game/State/GameEvent_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Social_s.hpp"
@@ -51,7 +53,7 @@ ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOpt
     : m_runtime{runtime}
     , m_client{client}
     , m_actions{client}
-    , m_api{client.GetState(), m_actions, options.messenger, options.username}
+    , m_api{client.GetState(), client.GetMap(), m_actions, options.messenger, options.username}
     , m_logger{std::move(logger)}
     , m_options{std::move(options)}
 {
@@ -344,6 +346,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
 {
     const auto& data = event.data;
     const auto tick = state.tick;
+    const auto& cache = m_client.GetCache();
     m_vm->Activate();
     const auto one = std::array{py_r0()};
     const auto two = std::array{py_r0(), py_r1()};
@@ -351,12 +354,12 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     if (const auto* added = std::get_if<NpcAdded_s>(&data); added && HasHook("on_npc_spawned"))
     {
         const auto* current = state.FindNpc(added->npc.index);
-        PyConvert::FromNpc(py_r0(), current ? *current : added->npc, tick);
+        PyConvert::FromNpc(py_r0(), current ? *current : added->npc, tick, cache);
         CallHook("on_npc_spawned", one);
     }
     else if (const auto* removed = std::get_if<NpcRemoved_s>(&data); removed && HasHook("on_npc_despawned"))
     {
-        PyConvert::FromNpc(py_r0(), removed->npc, tick);
+        PyConvert::FromNpc(py_r0(), removed->npc, tick, cache);
         CallHook("on_npc_despawned", one);
     }
     else if (const auto* npcHit = std::get_if<NpcHit_s>(&data); npcHit && HasHook("on_npc_damaged"))
@@ -368,7 +371,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
         }
         else
         {
-            PyConvert::FromNpc(py_r0(), *npc, tick);
+            PyConvert::FromNpc(py_r0(), *npc, tick, cache);
         }
 
         py_newint(py_r1(), npcHit->hit.damage);
@@ -407,23 +410,25 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     }
     else if (const auto* itemAdded = std::get_if<GroundItemAdded_s>(&data); itemAdded && HasHook("on_ground_item_spawned"))
     {
-        PyConvert::FromGroundItem(py_r0(), itemAdded->item);
+        PyConvert::FromGroundItem(py_r0(), itemAdded->item, cache);
         CallHook("on_ground_item_spawned", one);
     }
     else if (const auto* itemRemoved = std::get_if<GroundItemRemoved_s>(&data); itemRemoved && HasHook("on_ground_item_despawned"))
     {
-        PyConvert::FromGroundItem(py_r0(), itemRemoved->item);
+        PyConvert::FromGroundItem(py_r0(), itemRemoved->item, cache);
         CallHook("on_ground_item_despawned", one);
     }
     else if (const auto* itemCount = std::get_if<GroundItemCountChanged_s>(&data); itemCount && HasHook("on_ground_item_changed"))
     {
-        PyConvert::FromGroundItem(py_r0(), itemCount->item);
+        PyConvert::FromGroundItem(py_r0(), itemCount->item, cache);
         py_newint(py_r1(), itemCount->previousCount);
         CallHook("on_ground_item_changed", two);
     }
     else if (const auto* loc = std::get_if<LocChanged_s>(&data); loc && HasHook("on_loc_changed"))
     {
-        PyConvert::FromLoc(py_r0(), loc->change);
+        const auto& change = loc->change;
+        const auto scene = SceneLoc_s{.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true};
+        PyConvert::FromLoc(py_r0(), scene, cache);
         CallHook("on_loc_changed", one);
     }
     else if (const auto* inventory = std::get_if<InventoryChanged_s>(&data); inventory && HasHook("on_inventory_changed"))

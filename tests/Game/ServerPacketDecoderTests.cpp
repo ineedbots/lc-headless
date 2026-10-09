@@ -451,6 +451,39 @@ TEST_CASE("ServerPacketDecoder applies zone updates", "[ServerPacketDecoder]")
     }
 }
 
+TEST_CASE("ServerPacketDecoder counts changes to the build area and loc changes", "[ServerPacketDecoder]")
+{
+    auto fixture = DecoderFixture{};
+    auto& state = fixture.state;
+    const auto zone = Fixtures::Zone(HOME_ZONE_LOCAL, HOME_ZONE_LOCAL);
+    const auto before = state.sceneChangeCount;
+
+    fixture.Decode(ServerProt_e::UpdateZonePartialFollows, zone);
+    fixture.Decode(ServerProt_e::ObjAdd, Fixtures::ObjAdd(ToPos(2, 3), 995, 50));
+    fixture.Decode(ServerProt_e::UpdateZoneFullFollows, zone);
+    CHECK(state.sceneChangeCount == before);
+
+    auto add = Packet{};
+    add.P1(ToPos(1, 1));
+    add.P1((10 << 2) | 1);
+    add.P2(1276);
+    fixture.Decode(ServerProt_e::LocAddChange, add);
+    CHECK(state.sceneChangeCount == before + 1);
+
+    auto del = Packet{};
+    del.P1(ToPos(1, 1));
+    del.P1((10 << 2) | 1);
+    fixture.Decode(ServerProt_e::LocDel, del);
+    CHECK(state.sceneChangeCount == before + 2);
+
+    fixture.Decode(ServerProt_e::UpdateZoneFullFollows, zone);
+    CHECK(state.locChanges.empty());
+    CHECK(state.sceneChangeCount == before + 3);
+
+    fixture.Decode(ServerProt_e::RebuildNormal, Fixtures::Rebuild());
+    CHECK(state.sceneChangeCount == before + 4);
+}
+
 TEST_CASE("ServerPacketDecoder tracks hints, options and the map flag", "[ServerPacketDecoder]")
 {
     auto fixture = DecoderFixture{};

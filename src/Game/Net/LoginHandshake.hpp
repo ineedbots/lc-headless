@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../Cache/GameCache_s.hpp"
 #include "../../Core/ConfigFile.hpp"
 #include "../../Io/WebSocketClient.hpp"
 
@@ -15,8 +16,8 @@ struct LoginResult_s
 
 // The login exchange on an open socket, one step at a time. Advance sends each request when its turn
 // comes and reads each response once all of it has arrived, so it never waits; the caller owns the
-// timeout. Bytes after the login response stay in the socket. The account and login settings must
-// outlive the handshake.
+// timeout. Bytes after the login response stay in the socket. The account, the login settings and the
+// CRCs must outlive the handshake.
 class LoginHandshake
 {
 public:
@@ -29,7 +30,7 @@ public:
     static constexpr u8 STATUS_HOP_TIMER = 21;
     static constexpr u32 SERVER_SEED_OFFSET = 50;
 
-    LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, bool reconnect);
+    LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect);
 
     // The result once the server has accepted the login, or nullopt while a response is still on its
     // way. Throws LoginError when the server refuses.
@@ -37,7 +38,7 @@ public:
     [[nodiscard]] std::string_view GetWaitingFor() const;
 
     [[nodiscard]] static std::vector<u8> BuildSeedRequest(std::string_view username);
-    [[nodiscard]] static std::vector<u8> BuildLoginRequest(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect);
+    [[nodiscard]] static std::vector<u8> BuildLoginRequest(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect);
     [[nodiscard]] static std::array<s32, LoginResult_s::SEED_SIZE> MakeSeed(s64 serverSeed);
     // The server-to-client cipher's seed: each word of the login seed plus 50.
     [[nodiscard]] static std::array<s32, LoginResult_s::SEED_SIZE> GetInboundSeed(std::span<const s32, LoginResult_s::SEED_SIZE> seed);
@@ -58,6 +59,7 @@ private:
 
     const AccountSettings_s& m_account;
     const LoginSettings_s& m_login;
+    std::span<const s32, GameCache_s::CRC_COUNT> m_crcs;
     bool m_reconnect;
     Stage_e m_stage = Stage_e::SendSeedRequest;
     LoginResult_s m_result;

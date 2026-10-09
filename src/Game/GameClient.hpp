@@ -1,9 +1,11 @@
 #pragma once
 
+#include "../Cache/GameCache_s.hpp"
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
 #include "../Io/WebSocketClient.hpp"
 #include "Decode/ServerPacketDecoder.hpp"
+#include "Map/WorldMap.hpp"
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/LoginHandshake.hpp"
 #include "Net/ServerPacketReader.hpp"
@@ -37,13 +39,14 @@ struct GameClientOptions_s
 };
 
 // A single-threaded game session that only waits when told to. The caller's loop drives it with Pump(),
-// which advances a login or reconnect in progress, applies what the server sent, and sends the queued
-// packets, waiting for data at most maxWait. State reads and sends happen on that same thread. Login()
-// and Logout() are blocking conveniences over BeginLogin() and RequestLogout().
+// which advances a login or reconnect in progress, applies what the server sent, brings the map up to
+// date with it, and sends the queued packets, waiting for data at most maxWait. State reads and sends
+// happen on that same thread. Login() and Logout() are blocking conveniences over BeginLogin() and
+// RequestLogout().
 class GameClient
 {
 public:
-    GameClient(std::shared_ptr<const Config_s> config, AccountSettings_s account, std::shared_ptr<Logger> logger = Logger::GetDefault(), GameClientOptions_s options = {});
+    GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger = Logger::GetDefault(), GameClientOptions_s options = {});
 
     GameClient(const GameClient&) = delete;
     GameClient& operator=(const GameClient&) = delete;
@@ -65,6 +68,9 @@ public:
     [[nodiscard]] u32 GetLoginCount() const;
     [[nodiscard]] const GameState_s& GetState() const;
     [[nodiscard]] GameState_s TakeSnapshot() const;
+    [[nodiscard]] const GameCache_s& GetCache() const;
+    [[nodiscard]] const WorldMap& GetMap() const;
+    [[nodiscard]] Logger& GetLogger() const;
 
     void Send(ClientPacket_s packet);
     void SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run);
@@ -88,6 +94,7 @@ private:
     void LogNewMessages();
 
     std::shared_ptr<const Config_s> m_config;
+    std::shared_ptr<const GameCache_s> m_cache;
     AccountSettings_s m_account;
     std::shared_ptr<Logger> m_logger;
     GameClientOptions_s m_options;
@@ -101,6 +108,7 @@ private:
     ServerPacketDecoder m_decoder;
 
     GameState_s m_state;
+    WorldMap m_map;
     std::vector<ClientPacket_s> m_outgoing;
     ClientStatus_e m_status = ClientStatus_e::Disconnected;
     Clock::time_point m_lastReceive;

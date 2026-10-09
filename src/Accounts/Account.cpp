@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "Account.hpp"
 
+#include "../Cache/GameCache_s.hpp"
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
 #include "../Game/GameClient.hpp"
@@ -74,13 +75,13 @@ namespace
     }
 }
 
-Account::Account(std::shared_ptr<const Config_s> config, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger)
+Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger)
     : m_config{WithServer(std::move(config), account.server)}
     , m_account{std::move(account)}
     , m_logger{Logger::CreateNamed(std::move(logger), m_account.name)}
     , m_options{options}
     , m_messenger{messenger}
-    , m_client{m_config, m_account.credentials, m_logger, m_options.client}
+    , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client}
     , m_progressFile{std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION)}
 {
     if (m_account.script)

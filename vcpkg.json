@@ -3,6 +3,7 @@
     "name": "rs2004-headless",
     "version": "0.1.0",
     "dependencies": [
+        "bzip2",
         "catch2",
         {
             "name": "ixwebsocket",
@@ -10,7 +11,8 @@
             "features": ["openssl"]
         },
         "nlohmann-json",
-        "pocketpy"
+        "pocketpy",
+        "zlib"
     ],
     "builtin-baseline": "3cbc1db4d867ec83c89fba4c461321c11f78b5e3"
 }

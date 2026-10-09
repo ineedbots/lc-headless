@@ -1,12 +1,15 @@
 #include "pch.hpp"
+#include "../Cache/TestCache.hpp"
 #include "../Game/FakeGameServer.hpp"
 #include "../Game/Fixtures.hpp"
 #include "../LogCapture.hpp"
 #include "ScriptTestRuntime.hpp"
 
+#include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
+#include "Game/Map/WorldMap.hpp"
 #include "Game/Protocol/Base37.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Game/State/Npc_s.hpp"
@@ -30,17 +33,33 @@ namespace
         return {.x = Fixtures::HOME + dx, .z = Fixtures::HOME + dz, .level = 0};
     }
 
+    std::shared_ptr<const GameCache_s> MakeCache()
+    {
+        auto cache = GameCache_s{};
+        TestCache::AddNpc(cache, 41, "Chicken", {"", "Attack"}).combatLevel = 1;
+        TestCache::AddNpc(cache, 81, "Cow", {"", "Attack"});
+        TestCache::AddObj(cache, 526, "Bones", {}, {"Bury"});
+        TestCache::AddObj(cache, 995, "Coins").stackable = true;
+        TestCache::AddLoc(cache, 1530, "Door", {"Open"});
+        TestCache::AddLoc(cache, 1276, "Tree", {"Chop down"});
+        const auto locs = std::to_array<TestLoc_s>({{.id = 1276, .tile = Offset(-2, 3), .shape = 10}});
+        TestCache::SetMap(cache, locs);
+        return std::make_shared<const GameCache_s>(std::move(cache));
+    }
+
     // Python asserts check the values, so a failure's traceback names the line that failed.
     class BindingFixture
     {
     public:
         BindingFixture()
-            : client{std::make_shared<const Config_s>(), FakeGameServer::MakeAccount(), capture.GetLogger()}
+            : map{cache}
+            , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
-            , api{state, actions}
+            , api{state, map, actions}
             , vm{ScriptTestRuntime::Get(), {}, capture.GetLogger()}
         {
             BuildState();
+            map.Update(state);
             ScriptBindings::Bind(vm, api);
         }
 
@@ -58,7 +77,9 @@ namespace
         }
 
         LogCapture capture;
+        std::shared_ptr<const GameCache_s> cache = MakeCache();
         GameState_s state = Fixtures::PlacedState();
+        WorldMap map;
         GameClient client;
         GameActions actions;
         ScriptApi api;
@@ -91,6 +112,7 @@ namespace
 
             state.groundItems = {{.tile = Offset(3, 3), .id = 526, .count = 1}};
             state.locChanges = {{.tile = Offset(1, 0), .layer = LocLayer_e::Wall, .id = 1530, .shape = 0, .angle = 2}};
+            ++state.sceneChangeCount;
             state.inventories[ScriptApi::INVENTORY] = Inventory_s{.com = ScriptApi::INVENTORY, .slots = {{.id = 995, .count = 250}, {}, {.id = 526, .count = 1}}};
             state.stats[3] = Stat_s{.xp = 1154, .level = 5, .baseLevel = 10};
             state.varps[173] = 1;
@@ -154,6 +176,84 @@ door = get_loc_at(get_x() + 1, get_z())
 assert door.id == 1530 and door.layer == LAYER_WALL and door.angle == 2
 assert get_loc_at(get_x() + 1, get_z(), LAYER_GROUND) is None
 )python");
+}
+
+TEST_CASE("Script bindings give names and types from the cache", "[ScriptBindings]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run(R"python(
+chicken = get_nearest_npc_by_name('chicken')
+assert chicken.index == 7 and chicken.name == 'Chicken' and chicken.combat_level == 1 and chicken.size == 1
+assert 'name=Chicken' in repr(chicken)
+cow = get_npc(8)
+assert cow.name == 'Cow' and cow.combat_level is None
+assert get_nearest_npc_by_name(['Goblin', 'Cow']).index == 8
+assert get_nearest_npc_by_name('Goblin') is None
+
+npc_type = get_npc_type(41)
+assert isinstance(npc_type, NpcType) and npc_type.id == 41 and npc_type.name == 'Chicken'
+assert npc_type.ops == [None, 'Attack', None, None, None]
+assert npc_type.examine is None and npc_type.size == 1 and npc_type.combat_level == 1
+assert get_npc_type(5000) is None and get_npc_type(-1) is None
+
+bones = get_item_type(526)
+assert isinstance(bones, ItemType) and bones.inventory_ops[0] == 'Bury' and bones.ops == [None] * 5
+assert not bones.stackable and not bones.members and bones.value == 1 and bones.note_of is None
+assert get_item_type(995).stackable
+
+tree = get_loc_type(1276)
+assert isinstance(tree, LocType) and tree.name == 'Tree' and tree.ops[0] == 'Chop down'
+assert tree.width == 1 and tree.length == 1 and tree.blocks_walk and tree.blocks_projectiles
+
+assert get_nearest_ground_item_by_name('bones').name == 'Bones'
+assert get_inventory()[0].name == 'Coins'
+assert get_inventory_count_by_name(['Coins', 'Bones']) == 251 and get_inventory_count_by_name('logs') == 0
+assert get_inventory_item_by_name('BONES').slot == 2 and get_inventory_item_by_name('logs') is None
+)python");
+
+    CHECK_THROWS_WITH(fixture.Run("get_nearest_npc_by_name([])\n"), ContainsSubstring("ValueError") && ContainsSubstring("at least one name"));
+    CHECK_THROWS_WITH(fixture.Run("get_nearest_npc_by_name(41)\n"), ContainsSubstring("TypeError") && ContainsSubstring("names must be a str or a list of str"));
+}
+
+TEST_CASE("Script bindings see scenery and routes", "[ScriptBindings]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run(R"python(
+door = get_loc_at(get_x() + 1, get_z())
+assert door.name == 'Door' and door.changed and door.id == 1530
+tree = get_nearest_loc_by_name('tree')
+assert tree.id == 1276 and not tree.changed and tree.x == get_x() - 2 and tree.layer == LAYER_GROUND
+assert get_loc_at(get_x() - 2, get_z() + 3).id == 1276
+assert [loc.id for loc in get_locs()] == [1530, 1276]
+assert get_locs(ids=1276, layer=LAYER_WALL) == [] and get_locs(radius=1)[0].id == 1530
+assert get_nearest_loc_by_id(1530, reachable=True).id == 1530
+assert get_nearest_loc_by_id(9) is None
+
+assert is_reachable(get_x(), get_z() + 1)
+assert find_path(get_x(), get_z() + 3) == [(get_x(), get_z() + 3)]
+assert find_path(get_x() + 500, get_z()) is None
+)python");
+}
+
+TEST_CASE("Script bindings take options by their text", "[ScriptBindings]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run(R"python(
+assert interact_npc(99, 'Attack') is False
+door = get_loc_at(get_x() + 1, get_z())
+)python");
+
+    CHECK_THROWS_WITH(fixture.Run("interact_npc(7, 'Pickpocket')\n"), ContainsSubstring("ValueError") && ContainsSubstring("Chicken (NPC 41) has no option 'Pickpocket'; its options are Attack (2)"));
+    CHECK_THROWS_WITH(fixture.Run("interact_npc(7, 2.5)\n"), ContainsSubstring("TypeError") && ContainsSubstring("op must be an int or a str"));
+    CHECK_THROWS_WITH(fixture.Run("interact_loc(1530, get_x() + 1, get_z(), 'Close')\n"), ContainsSubstring("ValueError") && ContainsSubstring("Door (loc 1530) has no option 'Close'"));
+    CHECK_THROWS_WITH(fixture.Run("interact_loc(door, 1, 2)\n"), ContainsSubstring("TypeError") && ContainsSubstring("a Loc and an op"));
+    CHECK_THROWS_WITH(fixture.Run("interact_ground_item(get_nearest_ground_item_by_id(526), 'Eat')\n"), ContainsSubstring("ValueError") && ContainsSubstring("Take (3)"));
+
+    // These choose their option, so they get as far as sending, which needs a session.
+    CHECK_THROWS_WITH(fixture.Run("interact_loc(door, 'open')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(fixture.Run("interact_loc(door, op='Open')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(fixture.Run("item_op(get_inventory()[1], 'Bury')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(fixture.Run("take_ground_item(get_nearest_ground_item_by_name('Bones'))\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
 }
 
 TEST_CASE("Script bindings read inventories, interfaces, varps and social lists", "[ScriptBindings]")

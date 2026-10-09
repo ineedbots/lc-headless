@@ -3,6 +3,8 @@
 
 #include "Accounts/Account.hpp"
 #include "Accounts/AccountRunner.hpp"
+#include "Cache/CacheLoader.hpp"
+#include "Cache/GameCache_s.hpp"
 #include "Core/ConfigError.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Core/Logger.hpp"
@@ -121,13 +123,14 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
     m_config = std::make_shared<const Config_s>(ConfigFile::Load(m_commandLine.configPath, *m_logger));
     m_logger->SetLevel(m_config->client.logLevel);
     m_logger->Info("Config loaded from {}", m_commandLine.configPath.string());
+    m_cache = std::make_shared<const GameCache_s>(CacheLoader::Load(m_config->client.cacheDirectory, *m_logger));
 }
 
 int Application::Run()
 {
     auto runtime = ScriptRuntime{};
     const auto options = AccountOptions_s{.watchScripts = m_commandLine.watch, .waitForDebugger = m_commandLine.debugger};
-    auto runner = AccountRunner{m_config, LoadAccounts(), runtime, m_logger, options};
+    auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options};
     if (m_commandLine.watch)
     {
         m_logger->Info("Watching the scripts: each reloads when its files change, and one that fails waits for a fix");

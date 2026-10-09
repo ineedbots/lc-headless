@@ -1,5 +1,6 @@
 #include "pch.hpp"
 
+#include "Cache/GameCache_s.hpp"
 #include "Core/BigUInt.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Game/Net/ClientPacketWriter.hpp"
@@ -19,6 +20,7 @@
 namespace
 {
     constexpr auto SEED = std::array<s32, 4>{1, 2, 3, 4};
+    constexpr auto CRCS = std::array<s32, GameCache_s::CRC_COUNT>{1, 2, 3, 4, 5, 6, 7, 8, 9};
 
     // Frames server packets the way the engine does: ISAAC on the opcode, then any length prefix.
     class ServerFramer
@@ -74,11 +76,6 @@ namespace
         auto login = LoginSettings_s{};
         login.rsaModulus = BigUInt::Parse("0x" + std::string(128, 'f'));
         login.rsaExponent = BigUInt::Parse("1");
-        for (std::size_t i = 0; i < login.crcs.size(); ++i)
-        {
-            login.crcs[i] = static_cast<s32>(i + 1);
-        }
-
         return login;
     }
 }
@@ -176,7 +173,7 @@ TEST_CASE("LoginHandshake builds the login request", "[LoginHandshake]")
 {
     const auto account = AccountSettings_s{.username = "bot", .password = "pw"};
     const auto login = MakeLoginSettings();
-    const auto request = LoginHandshake::BuildLoginRequest(account, login, SEED, false);
+    const auto request = LoginHandshake::BuildLoginRequest(account, login, CRCS, SEED, false);
 
     const auto block = std::vector<u8>{
         10, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0x05, 0x39, 'b', 'o', 't', '\n', 'p', 'w', '\n',
@@ -195,7 +192,7 @@ TEST_CASE("LoginHandshake builds the login request", "[LoginHandshake]")
 
     SECTION("a reconnect uses opcode 18")
     {
-        CHECK(LoginHandshake::BuildLoginRequest(account, login, SEED, true).front() == LoginHandshake::RECONNECT_LOGIN);
+        CHECK(LoginHandshake::BuildLoginRequest(account, login, CRCS, SEED, true).front() == LoginHandshake::RECONNECT_LOGIN);
     }
 }
 
@@ -222,4 +219,5 @@ TEST_CASE("LoginError describes the status", "[LoginError]")
 
     CHECK(LoginError{16}.IsRetryable());
     CHECK(LoginError::Describe(99) == "unexpected response");
+    CHECK(LoginError::Describe(6) == "revision, cache CRC or RSA key mismatch; is client.cacheDirectory this server's cache?");
 }

@@ -1,21 +1,87 @@
 #include "pch.hpp"
 #include "GameActions.hpp"
 
+#include "../Cache/GameCache_s.hpp"
+#include "../Cache/LocType_s.hpp"
+#include "../Core/Logger.hpp"
 #include "GameClient.hpp"
+#include "Map/LocShape.hpp"
+#include "Map/PathFinder.hpp"
+#include "Map/WorldMap.hpp"
 #include "Protocol/Base37.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
 #include "State/GameState_s.hpp"
+#include "State/Zone_s.hpp"
 #include "Tile_s.hpp"
+
+namespace
+{
+    constexpr auto ANGLE_NORTH = u8{1};
+    constexpr auto ANGLE_SOUTH = u8{3};
+    constexpr auto SIDE_COUNT = 4;
+    constexpr auto SIDE_MASK = 0xF;
+    constexpr auto LAYERS = std::to_array<LocLayer_e>({LocLayer_e::Wall, LocLayer_e::WallDecor, LocLayer_e::Ground, LocLayer_e::GroundDecor});
+
+    RouteTarget_s MakeAreaTarget(const Tile_s& tile, u8 width = 1, u8 length = 1, u8 forceApproach = 0)
+    {
+        return {.kind = RouteKind_e::Area, .tile = tile, .width = width, .length = length, .forceApproach = forceApproach};
+    }
+
+    // interactWithLoc turns the sides a loc forbids with the loc.
+    u8 TurnForceApproach(u8 forceApproach, u8 angle)
+    {
+        if (angle == 0)
+        {
+            return forceApproach;
+        }
+
+        return static_cast<u8>(((forceApproach << angle) & SIDE_MASK) + (forceApproach >> (SIDE_COUNT - angle)));
+    }
+
+    // Centrepieces and ground decor are reached as an area of the type's size, and everything else as a wall.
+    RouteTarget_s MakeLocTarget(const SceneLoc_s& loc, const LocType_s* type)
+    {
+        const auto isArea = loc.shape == LocShape::CENTREPIECE_STRAIGHT || loc.shape == LocShape::CENTREPIECE_DIAGONAL || loc.shape == LocShape::GROUND_DECOR;
+        if (!isArea)
+        {
+            return {.kind = RouteKind_e::Wall, .tile = loc.tile, .shape = loc.shape, .angle = loc.angle};
+        }
+
+        if (type == nullptr)
+        {
+            return MakeAreaTarget(loc.tile);
+        }
+
+        const auto turned = loc.angle == ANGLE_NORTH || loc.angle == ANGLE_SOUTH;
+        const auto width = turned ? type->length : type->width;
+        const auto length = turned ? type->width : type->length;
+        return MakeAreaTarget(loc.tile, width, length, TurnForceApproach(type->forceApproach, loc.angle));
+    }
+}
 
 GameActions::GameActions(GameClient& client)
     : m_client{client}
 {
 }
 
-void GameActions::WalkTo(const Tile_s& destination, bool run)
+bool GameActions::WalkTo(const Tile_s& destination, bool run)
 {
+    if (const auto route = FindWalkRoute(GetMap(), GetStart(), destination))
+    {
+        m_client.SendMove(MoveKind_e::GameClick, *route, run);
+        return true;
+    }
+
+    if (GetMap().Contains(destination))
+    {
+        LogNoRoute(destination, "not walking");
+        return false;
+    }
+
+    LogNoRoute(destination, "walking in a straight line");
     WalkPath(std::span{&destination, 1}, run);
+    return true;
 }
 
 void GameActions::WalkPath(std::span<const Tile_s> waypoints, bool run)
@@ -26,55 +92,55 @@ void GameActions::WalkPath(std::span<const Tile_s> waypoints, bool run)
 void GameActions::InteractNpc(u16 npcIndex, u8 op)
 {
     const auto tile = GetNpcTile(npcIndex);
-    Approach(std::span{&tile, 1}, ClientPackets::OpNpc(op, npcIndex));
+    Approach(FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpNpc(op, npcIndex));
 }
 
 void GameActions::InteractPlayer(u16 playerIndex, u8 op)
 {
     const auto tile = GetPlayerTile(playerIndex);
-    Approach(std::span{&tile, 1}, ClientPackets::OpPlayer(op, playerIndex));
+    Approach(FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpPlayer(op, playerIndex));
 }
 
 void GameActions::InteractLoc(const Tile_s& tile, u16 loc, u8 op)
 {
-    InteractLocVia(std::span{&tile, 1}, tile, loc, op);
+    ApproachLoc(tile, loc, ClientPackets::OpLoc(op, tile, loc));
 }
 
 void GameActions::InteractLocVia(std::span<const Tile_s> waypoints, const Tile_s& tile, u16 loc, u8 op)
 {
-    Approach(waypoints, ClientPackets::OpLoc(op, tile, loc));
+    ApproachVia(waypoints, ClientPackets::OpLoc(op, tile, loc));
 }
 
 void GameActions::InteractGroundItem(const Tile_s& tile, u16 obj, u8 op)
 {
-    InteractGroundItemVia(std::span{&tile, 1}, tile, obj, op);
+    Approach(FindGroundItemRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpObj(op, tile, obj));
 }
 
 void GameActions::InteractGroundItemVia(std::span<const Tile_s> waypoints, const Tile_s& tile, u16 obj, u8 op)
 {
-    Approach(waypoints, ClientPackets::OpObj(op, tile, obj));
+    ApproachVia(waypoints, ClientPackets::OpObj(op, tile, obj));
 }
 
 void GameActions::UseItemOnNpc(const ItemRef_s& item, u16 npcIndex)
 {
     const auto tile = GetNpcTile(npcIndex);
-    Approach(std::span{&tile, 1}, ClientPackets::OpNpcU(npcIndex, item));
+    Approach(FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpNpcU(npcIndex, item));
 }
 
 void GameActions::UseItemOnPlayer(const ItemRef_s& item, u16 playerIndex)
 {
     const auto tile = GetPlayerTile(playerIndex);
-    Approach(std::span{&tile, 1}, ClientPackets::OpPlayerU(playerIndex, item));
+    Approach(FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpPlayerU(playerIndex, item));
 }
 
 void GameActions::UseItemOnLoc(const ItemRef_s& item, const Tile_s& tile, u16 loc)
 {
-    Approach(std::span{&tile, 1}, ClientPackets::OpLocU(tile, loc, item));
+    ApproachLoc(tile, loc, ClientPackets::OpLocU(tile, loc, item));
 }
 
 void GameActions::UseItemOnGroundItem(const ItemRef_s& item, const Tile_s& tile, u16 obj)
 {
-    Approach(std::span{&tile, 1}, ClientPackets::OpObjU(tile, obj, item));
+    Approach(FindGroundItemRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpObjU(tile, obj, item));
 }
 
 void GameActions::UseItemOnItem(const ItemRef_s& item, const ItemRef_s& target)
@@ -85,23 +151,23 @@ void GameActions::UseItemOnItem(const ItemRef_s& item, const ItemRef_s& target)
 void GameActions::CastOnNpc(u16 spellCom, u16 npcIndex)
 {
     const auto tile = GetNpcTile(npcIndex);
-    Approach(std::span{&tile, 1}, ClientPackets::OpNpcT(npcIndex, spellCom));
+    Approach(FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpNpcT(npcIndex, spellCom));
 }
 
 void GameActions::CastOnPlayer(u16 spellCom, u16 playerIndex)
 {
     const auto tile = GetPlayerTile(playerIndex);
-    Approach(std::span{&tile, 1}, ClientPackets::OpPlayerT(playerIndex, spellCom));
+    Approach(FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpPlayerT(playerIndex, spellCom));
 }
 
 void GameActions::CastOnLoc(u16 spellCom, const Tile_s& tile, u16 loc)
 {
-    Approach(std::span{&tile, 1}, ClientPackets::OpLocT(tile, loc, spellCom));
+    ApproachLoc(tile, loc, ClientPackets::OpLocT(tile, loc, spellCom));
 }
 
 void GameActions::CastOnGroundItem(u16 spellCom, const Tile_s& tile, u16 obj)
 {
-    Approach(std::span{&tile, 1}, ClientPackets::OpObjT(tile, obj, spellCom));
+    Approach(FindGroundItemRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpObjT(tile, obj, spellCom));
 }
 
 void GameActions::CastOnItem(u16 spellCom, const ItemRef_s& item)
@@ -199,10 +265,108 @@ std::optional<ItemRef_s> GameActions::FindItem(u16 com, u16 obj) const
     return ItemRef_s{.obj = obj, .slot = static_cast<u16>(found - slots.begin()), .com = com};
 }
 
-void GameActions::Approach(std::span<const Tile_s> waypoints, ClientPacket_s action)
+std::optional<std::vector<Tile_s>> GameActions::FindWalkRoute(const WorldMap& map, const Tile_s& start, const Tile_s& destination)
+{
+    return FindRoute(map, start, {{.kind = RouteKind_e::Tile, .tile = destination, .tryNearest = true}});
+}
+
+// The webclient reaches an NPC of any size, or a player, as the 1x1 area on its tile.
+std::optional<std::vector<Tile_s>> GameActions::FindEntityRoute(const WorldMap& map, const Tile_s& start, const Tile_s& tile)
+{
+    return FindRoute(map, start, {MakeAreaTarget(tile)});
+}
+
+std::optional<std::vector<Tile_s>> GameActions::FindGroundItemRoute(const WorldMap& map, const Tile_s& start, const Tile_s& tile)
+{
+    return FindRoute(map, start, {{.kind = RouteKind_e::Tile, .tile = tile}, MakeAreaTarget(tile)});
+}
+
+std::optional<std::vector<Tile_s>> GameActions::FindLocRoute(const WorldMap& map, const Tile_s& start, const Tile_s& tile, u16 loc)
+{
+    const auto target = GetLocTarget(map, tile, loc);
+    if (!target)
+    {
+        return std::nullopt;
+    }
+
+    return FindRoute(map, start, {*target});
+}
+
+void GameActions::Approach(const std::optional<std::vector<Tile_s>>& route, const Tile_s& destination, ClientPacket_s action)
+{
+    if (route)
+    {
+        m_client.SendMove(MoveKind_e::OpClick, *route, false);
+    }
+    else
+    {
+        // The webclient sends the op when tryMove finds nothing, and the server walks as far as it can.
+        LogNoRoute(destination, "sending the op alone");
+    }
+
+    m_client.Send(std::move(action));
+}
+
+void GameActions::ApproachVia(std::span<const Tile_s> waypoints, ClientPacket_s action)
 {
     m_client.SendMove(MoveKind_e::OpClick, waypoints, false);
     m_client.Send(std::move(action));
+}
+
+// Without the loc in the map, the walk goes straight to its tile, as it did before there was a map.
+void GameActions::ApproachLoc(const Tile_s& tile, u16 loc, ClientPacket_s action)
+{
+    const auto target = GetLocTarget(GetMap(), tile, loc);
+    if (!target)
+    {
+        ApproachVia(std::span{&tile, 1}, std::move(action));
+        return;
+    }
+
+    Approach(FindRoute(GetMap(), GetStart(), {*target}), tile, std::move(action));
+}
+
+const WorldMap& GameActions::GetMap() const
+{
+    return m_client.GetMap();
+}
+
+const Tile_s& GameActions::GetStart() const
+{
+    return m_client.GetState().localPlayer.tile;
+}
+
+std::optional<std::vector<Tile_s>> GameActions::FindRoute(const WorldMap& map, const Tile_s& start, std::initializer_list<RouteTarget_s> targets)
+{
+    for (const auto& target : targets)
+    {
+        if (auto route = PathFinder::FindPath(map, start, target))
+        {
+            return route;
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<RouteTarget_s> GameActions::GetLocTarget(const WorldMap& map, const Tile_s& tile, u16 loc)
+{
+    for (const auto layer : LAYERS)
+    {
+        const auto scene = map.GetLoc(tile, layer);
+        if (scene && scene->id == loc)
+        {
+            return MakeLocTarget(*scene, map.GetCache().FindLoc(loc));
+        }
+    }
+
+    return std::nullopt;
+}
+
+void GameActions::LogNoRoute(const Tile_s& destination, std::string_view instead) const
+{
+    const auto& start = GetStart();
+    m_client.GetLogger().Verbose("No route from ({}, {}, {}) to ({}, {}, {}); {}", start.x, start.z, start.level, destination.x, destination.z, destination.level, instead);
 }
 
 Tile_s GameActions::GetNpcTile(u16 npcIndex) const
