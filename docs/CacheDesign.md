@@ -26,7 +26,7 @@ Reference sources, in `289server/` beside this repository:
 | When | Once, at startup, in `Application`, right after the config and before any script loads. A missing or damaged cache stops the process before any login, and the message names the file |
 | Sharing | `CacheLoader::Load` returns a `GameCache_s`. `Application` holds it in a `std::shared_ptr<const GameCache_s>` and passes it down to each account's `GameClient`, as it does the config (ConfigDesign §1, Ownership). Nothing modifies it after loading, so every account reads the same copy without locks |
 | Shape | `GameCache_s` is plain data with lookups (`FindLoc`, `FindNpc`, `FindObj`, `GetOption`, `FindSquare`), like `GameState_s`. `CacheLoader` is a non-instantiable class, like `ConfigFile`. Tests build a `GameCache_s` in place, without files. It can be moved but not copied, because the types' text points into its own `TextPool` |
-| Decoded | The nine CRCs. From the `config` archive, the loc, NPC and obj definitions, with only the fields a headless client uses. From `versionlist`, `map_index`. From store 4, each map square's blocked tiles and scenery. Models, animations, MIDIs, textures, sounds, media, the title screen, interfaces and wordenc only count toward the CRCs |
+| Decoded | The nine CRCs. From the `config` archive, the loc, NPC and obj definitions, with only the fields a headless client uses. From `interface`, the logout button's component id (§6). From `versionlist`, `map_index`. From store 4, each map square's blocked tiles and scenery. Models, animations, MIDIs, textures, sounds, media, the title screen, the rest of the interfaces and wordenc only count toward the CRCs |
 | Decoding | Everything is decoded at load, and nothing is read from disk afterward. The store's files are closed when `Load` returns |
 | Maps | Per square: a bitset of the tiles that block walking, and the locs a bot can use, as 6-byte records sorted by tile. A loc is kept when its type has a name or an option, or when it adds collision. The other 39% are decoration, dropped at load (§7.4). Bridges are resolved at load too, so each loc and blocked tile is stored on the level the player sees it on |
 | Text | Names and examine text are `std::string_view`s into a `TextPool` that stores each distinct string once. Options are `u16` ids into one table of the distinct option strings (219 in the 289 cache), because most of a type's five option slots are empty. The definitions take under 1 MB |
@@ -78,6 +78,7 @@ rs2004-headless/
 │   │   ├── JagArchive.hpp/.cpp         the named entries of a JAG archive
 │   │   ├── TypeDecoder.hpp/.cpp        static: loc, NPC and obj definitions
 │   │   ├── MapDecoder.hpp/.cpp         static: map_index, land files, loc files
+│   │   ├── InterfaceDecoder.hpp/.cpp   static: finds a component by its client code
 │   │   ├── CacheLoader.hpp/.cpp        static: Load(directory, logger) -> GameCache_s
 │   │   ├── GameCache_s.hpp/.cpp        the loaded cache and its lookups
 │   │   ├── TextPool.hpp/.cpp           interned names, examine text and options
@@ -121,7 +122,7 @@ rs2004-headless/
 
 | Store | Holds | Read |
 |---|---|---|
-| 0 | Nine JAG archives: 0 unused, 1 `title`, 2 `config`, 3 `interface`, 4 `media`, 5 `versionlist`, 6 `textures`, 7 `wordenc`, 8 `sounds` | All nine, for the CRCs. `config` and `versionlist` are decoded |
+| 0 | Nine JAG archives: 0 unused, 1 `title`, 2 `config`, 3 `interface`, 4 `media`, 5 `versionlist`, 6 `textures`, 7 `wordenc`, 8 `sounds` | All nine, for the CRCs. `config` and `versionlist` are decoded, and `interface` as far as the logout button |
 | 1 | Models | No |
 | 2 | Animations | No |
 | 3 | MIDI songs and jingles | No |
@@ -454,6 +455,34 @@ public:
 - Reading goes through `Packet`. Its reads throw `std::out_of_range` at the end of the data, and the decoders turn that into a `CacheError` naming the type and id.
 - The opcode loops are functions in the anonymous namespace, one per type, with a shared helper for the option strings.
 
+### The logout button
+
+A player logs out by clicking the logout tab's button, which sends `IF_BUTTON` with the button's component id. The server's content pack numbers the components when it builds the cache, so the id belongs to the cache, not the protocol: 2458 in the 289 cache, from `content/pack/interface.pack`'s `2458=logout:try_logout`. It used to be `client.logoutComponent` in the config.
+
+`interface` (archive 3) has one entry, `data`: a `u16` count, then every component in turn. Each starts with its id, after `0xFFFF` and its layer's id when it opens a run of that layer's components, then `u8 type`, `u8 buttonType` and `u16 clientCode`. The fields after that depend on the type and button type, and nothing records a component's length, so finding one means reading past every component before it, as the webclient's `IfType.init` does.
+
+The logout button is the component whose client code is the webclient's `ClientCode.CC_LOGOUT`, 205. The webclient starts its logout timer for that code and still sends the click, and the server's `[if_button,logout:try_logout]` script logs the player out. In the 289 content, `logout.if`'s `try_logout` is the only component with that code.
+
+```cpp
+// src/Cache/InterfaceDecoder.hpp
+#pragma once
+
+class InterfaceDecoder
+{
+public:
+    InterfaceDecoder() = delete;
+
+    // Takes the interface archive's data entry and returns the id of the first component with the
+    // client code, or nothing when none has it. Throws CacheError, naming the component, for data that
+    // doesn't decode before the component is found.
+    [[nodiscard]] static std::optional<u16> FindClientCode(std::span<const u8> data, u16 clientCode);
+};
+```
+
+- It keeps only the type, button type and client code, and skips every other field by the sizes `IfType.init` reads. A type above 7, which the webclient would read nothing more for, throws, as an unknown opcode does: `component 11: unknown type 8`.
+- It stops at the first match, so damage after the logout button goes unnoticed. Nothing else in the archive is used.
+- Data that ends inside a component's id names the component before it: `data ends inside the id of the component after 4`.
+
 ---
 
 ## 7. Maps
@@ -617,6 +646,8 @@ struct GameCache_s
     static constexpr std::size_t CRC_COUNT = 9;
 
     std::array<s32, CRC_COUNT> crcs{};
+    // The logout tab's button, which the client clicks to log out.
+    u16 logoutComponent = 0;
     TextPool text;
     // Index i holds the type whose id is i.
     std::vector<LocType_s> locs;
@@ -645,7 +676,10 @@ class CacheLoader
 {
 public:
     static constexpr u32 CONFIG_ARCHIVE = 2;
+    static constexpr u32 INTERFACE_ARCHIVE = 3;
     static constexpr u32 VERSIONLIST_ARCHIVE = 5;
+    // The webclient's ClientCode.CC_LOGOUT, which marks the logout button.
+    static constexpr u16 LOGOUT_CLIENT_CODE = 205;
 
     CacheLoader() = delete;
 
@@ -655,15 +689,16 @@ public:
 ```
 
 - The `Find` functions return `nullptr` for an id that's negative or past the end, so callers can handle ids the server sends that the cache doesn't have. `FindSquare` returns `nullptr` for a square that isn't in the cache.
-- A default `GameCache_s{}` is a valid, empty cache: nine zero CRCs, no types, no options but `NO_OPTION`, and no squares. Tests of code that needs a cache but not its contents pass `std::make_shared<const GameCache_s>()`.
+- A default `GameCache_s{}` is a valid, empty cache: nine zero CRCs, logout component 0, no types, no options but `NO_OPTION`, and no squares. Tests of code that needs a cache but not its contents pass `std::make_shared<const GameCache_s>()`. Tests that log out through `FakeGameServer` pass `FakeGameServer::MakeCache()`, which is empty but for the button that server answers.
 ### Behaviour
 
 1. If `directory / "main_file_cache.dat"` doesn't exist, throw `CacheError{"{dir}: main_file_cache.dat not found; set client.cacheDirectory to the folder that holds the server's cache"}`.
 2. Open a `CacheStore` and compute the CRCs (§5).
 3. Read archive 2 into a `JagArchive`, and decode `loc`, `npc` and `obj` from it into the cache's `TextPool` (§6). A missing archive or entry throws.
-4. Read archive 5, decode `map_index`, and then each square's two files, using the loc types to drop decoration (§7). A square whose files aren't in store 4 is skipped and counted. The webclient builds such a square as open ground, and `WorldMap` does the same for a square that isn't in the cache.
-5. Call `text.FinishInterning()`.
-6. Log one line at Info, such as `Cache loaded from cache in 240 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs`. If squares were skipped, log a Warning: `3 map squares in map_index have no files; they load as open ground`.
+4. Read archive 3, and find the logout button in its `data` entry (§6, The logout button). A missing archive or entry throws, and so does an archive without the button: `store 0 file 3 (interface): no component has client code 205, which marks the logout button`.
+5. Read archive 5, decode `map_index`, and then each square's two files, using the loc types to drop decoration (§7). A square whose files aren't in store 4 is skipped and counted. The webclient builds such a square as open ground, and `WorldMap` does the same for a square that isn't in the cache.
+6. Call `text.FinishInterning()`.
+7. Log one line at Info, such as `Cache loaded from cache in 240 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs`. If squares were skipped, log a Warning: `3 map squares in map_index have no files; they load as open ground`.
 
 - **Errors.** Each step catches `CacheError` and throws a new one with its context in front, as `ConfigFile::Load` adds the path (CONVENTIONS §8, adding context). The folder comes first, then the file: `cache: store 4 file 1234 (square 50_50 locs): gzip data is damaged`.
 - `Load` returns the `GameCache_s` by value, and `Application` moves it into its `shared_ptr` without a copy.
@@ -697,11 +732,11 @@ Fatal error: cache: store 0 file 2 (config): obj 1512: unknown opcode 200
 
 | Change | Detail |
 |---|---|
-| Removed | `LoginSettings_s::crcs` and `CRC_COUNT`, the CRC array's `adl_serializer`, `FormatCrc`, and `crcs` in `LoginSettings_s`'s macro |
+| Removed | `LoginSettings_s::crcs` and `CRC_COUNT`, the CRC array's `adl_serializer`, `FormatCrc`, and `crcs` in `LoginSettings_s`'s macro. Later, `ClientSettings_s::logoutComponent`, when the logout button moved to the cache (§6) |
 | Added | `ClientSettings_s::cacheDirectory`, a `std::string` defaulting to `"cache"`, after `idleSeconds`. Its rule is that it's not empty: `client.cacheDirectory: must not be empty` |
-| Leftover key | If the `login` section has `crcs`, `Parse` logs a Warning, as it does for a leftover `account` section: `Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory` |
+| Leftover keys | If the `login` section has `crcs`, or the `client` section has `logoutComponent`, `Parse` logs a Warning, as it does for a leftover `account` section: `Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory`, and `Config has client.logoutComponent, which is no longer read; the logout button comes from the cache in client.cacheDirectory`. The keys are a table, `LEGACY_KEYS`, in `ConfigFile.cpp`'s anonymous namespace |
 | Sample header | `// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.` |
-| Sample | Loses the `crcs` array, and gains `"cacheDirectory": "cache"` in `client` |
+| Sample | Loses the `crcs` array and `logoutComponent`, and gains `"cacheDirectory": "cache"` in `client` |
 | `LoginHandshake` | Takes the CRCs as `std::span<const s32, GameCache_s::CRC_COUNT>`, after the account and login settings. `BuildLoginRequest` takes them the same way. `GameClient` passes its cache's CRCs, and the cache outlives the handshake as the settings do |
 | `LoginError` | Status 6 reads `revision, cache CRC or RSA key mismatch; is client.cacheDirectory this server's cache?` |
 
@@ -961,7 +996,7 @@ Names are exactly as the cache has them, case included.
 | `get_nearest_npc_by_name(names, radius=None, in_combat=None)` | 2 | Like `get_nearest_npc_by_id`, matching names instead of ids |
 | `get_nearest_ground_item_by_name(names, radius=None)` | 2 | Likewise for ground items |
 | `get_inventory_item_by_name(names, com=INVENTORY)`, `get_inventory_count_by_name(names, com=INVENTORY)` | 2 | Likewise for inventories |
-| `op` as text | 2 | Every action that takes `op` also takes the option's text, matched without regard to case, as in `interact_npc(npc, 'Pickpocket')`. Ground items also offer "Take" for op 3 and inventory items "Drop" for op 5, as the menu does. Text that matches no option raises `ValueError`, listing the options there are. `inv_button` keeps taking numbers, because its options come from the interface, which isn't decoded |
+| `op` as text | 2 | Every action that takes `op` also takes the option's text, matched without regard to case, as in `interact_npc(npc, 'Pickpocket')`. Ground items also offer "Take" for op 3 and inventory items "Drop" for op 5, as the menu does. Text that matches no option raises `ValueError`, listing the options there are. `inv_button` keeps taking numbers, because its options come from the interface, which is decoded only as far as the logout button |
 | `get_loc_at(x, z, layer=None)` | 3 | The scenery on the tile now: the server's change, or else the cache's, apart from decoration with no name, no option and no collision (§7.4). Before this, only changes |
 | `get_locs(ids=None, radius=None, layer=None)` | 3 | Every `Loc` on your level in the build area, nearest first |
 | `get_nearest_loc_by_id(ids=None, radius=None, layer=None)`, `get_nearest_loc_by_name(names, radius=None, layer=None)` | 3 | The nearest matching `Loc`, or `None` |
@@ -991,7 +1026,7 @@ The porting lists in ScriptingDesign §6 and ScriptingApi.md change:
 - `get_item_name(id)` becomes `get_item_type(id).name`.
 - `get_nearest_object_by_id` becomes `get_nearest_loc_by_id`, and `at_object(obj)` becomes `interact_loc(loc, 1)`.
 
-ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, and README's list of limits are replaced with what's still missing: interface definitions (component ids stay constants), and that `get_nearest_*` measures in tiles, not steps.
+ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, and README's list of limits are replaced with what's still missing: interface definitions, beyond finding the logout button (component ids stay constants), and that `get_nearest_*` measures in tiles, not steps.
 
 ---
 
@@ -1004,7 +1039,7 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 | `ConfigFile` | §9 | 1 |
 | `Application` | Loads the cache and passes it on (§8) | 1 |
 | `AccountRunner`, `Account` | Take the cache after the config, and pass it to `GameClient` | 1 |
-| `GameClient` | Takes the cache, adds `GetCache()`, and gives `LoginHandshake` the CRCs. In phase 3 it owns a `WorldMap`, updates it in `Pump`, clears it on a fresh login, and adds `GetMap()` | 1, 3 |
+| `GameClient` | Takes the cache, adds `GetCache()`, and gives `LoginHandshake` the CRCs. In phase 3 it owns a `WorldMap`, updates it in `Pump`, clears it on a fresh login, and adds `GetMap()`. Its logout clicks use the cache's `logoutComponent` | 1, 3 |
 | `LoginHandshake`, `LoginError` | §9 | 1 |
 | `ScriptApi`, `ScriptBindings`, `PyConvert`, the prelude, `__builtins__.pyi`, `ScriptHost` | §12 | 2–4 |
 | `pch.hpp` | `<unordered_set>` (2) and `<bitset>` (3) | 2, 3 |
@@ -1059,7 +1094,8 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 - `MakeArchive(entries, compressWhole)` builds a JAG archive either way.
 - `MakeTypeFiles(definitions)` builds a `.dat` and `.idx` pair from each definition's bytes. Tests write definitions opcode by opcode with `Packet`.
 - `MakeLand(flags)` and `MakeLocFile(locs)` build map files, with `smart` values on both sides of 128.
-- `MakeStore(contents)` builds a whole store: archives 1 to 8 (filler bytes where nothing is decoded), a `config` with the given types, a `versionlist` with a `map_index`, and the squares' files.
+- `MakeInterfaces(components)` builds the `interface` archive's `data` entry. Each component's type and button type fields get sample values, in `IfType.init`'s order, with both forms of every variable-size field: a model and an animation with and without their second byte, and an inventory slot with and without a background.
+- `MakeStore(contents)` builds a whole store: archives 1 to 8 (filler bytes where nothing is decoded), a `config` with the given types, an `interface` with the given components, a `versionlist` with a `map_index`, and the squares' files.
 
 ### 15.3 Store, compression and archives
 
@@ -1076,6 +1112,7 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 - Opcode 74 clears `blockWalk` and `blockRange`.
 - Notes: name, members and cost from the link; the examine text with "a" and with "an"; `noteOf`; a missing link throws.
 - Errors: an unknown opcode (the message has the type, id and opcode), a definition shorter or longer than its size, a count mismatch, and a string without its `\n`.
+- **InterfaceDecoder:** every type and button type, with layers, a hover layer, conditions and scripts, comes before the component it finds. A code no component has gives `nullopt`, and so does a file with no components. It returns the first of two matches without reading the damaged component after them. Errors name the component: an unknown type, fields that run past the end, a string without its `\n`, and an id cut short.
 
 ### 15.5 Maps
 
@@ -1088,9 +1125,10 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 ### 15.6 CacheLoader and config
 
 - A whole synthetic store loads. The CRCs equal `Packet::GetCrc` of each archive's bytes, a missing archive gives 0, and the types and squares are there.
-- A missing folder or `.dat` gives the message in §8. A missing `config` archive, a missing entry and a damaged map file each throw with the folder, store, file and square in the message.
+- A missing folder or `.dat` gives the message in §8. A missing `config` archive, a missing entry and a damaged map file each throw with the folder, store, file and square in the message. So do a missing `interface` archive, one without `data`, one without the logout button, and one whose components don't decode.
+- The loaded cache has the logout button's id.
 - A square without files is skipped with the warning, and the Info line is logged (`LogCapture`).
-- Config: `cacheDirectory` defaults to `cache`, an empty one fails `Validate`, and the serialized sample has it and no `crcs`. A leftover `login.crcs` logs the warning, and the file still loads.
+- Config: `cacheDirectory` defaults to `cache`, an empty one fails `Validate`, and the serialized sample has it and no `crcs`. A leftover `login.crcs` or `client.logoutComponent` logs its warning, and the file still loads.
 - `NetTests`: the login request carries the CRCs it was given, in order.
 
 ### 15.7 Collision, WorldMap and paths
@@ -1105,6 +1143,7 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 Tagged `[RealCache]`. Each test reads the folder from the `RS2004_CACHE_DIR` environment variable and calls Catch2's `SKIP` when it isn't set, so the suite passes without the cache. To run them: set `RS2004_CACHE_DIR` to `../289server/engine/data/pack`, then run `ctest` as usual.
 
 - The CRCs equal the nine values in §5.
+- The logout button is component 2458.
 - 5,116 locs, 1,596 NPCs and 4,089 objs, with 219 distinct options. 534 squares, keeping 567,454 locs and holding 543,497 blocked tiles.
 - NPC 41 is "Chicken", with op 2 "Attack", size 1 and combat level 1. NPC 1 is "Man", with "Talk-to", "Attack" and "Pickpocket".
 - Obj 995 is "Coins", stackable. Obj 526 is "Bones", with inventory op 1 "Bury". Obj 1511 is "Logs", with ground op 4 "Light". Obj 1512 is a note of 1511, named "Logs", and stackable.

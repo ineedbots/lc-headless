@@ -413,7 +413,7 @@ The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared
 
 ## 10. Limits
 
-- **What the cache doesn't give.** The game cache ([CacheDesign.md](CacheDesign.md)) supplies names, options, scenery and collision, but its interface definitions aren't decoded, so component IDs stay constants in scripts. The `get_nearest_*` functions measure in tiles, not steps.
+- **What the cache doesn't give.** The game cache ([CacheDesign.md](CacheDesign.md)) supplies names, options, scenery and collision, but its interface definitions are read only to find the logout button, so component IDs stay constants in scripts. The `get_nearest_*` functions measure in tiles, not steps.
 - **16 accounts per process**, from pocketpy's VM slots.
 - **pocketpy is a subset of Python.** The gaps script authors will hit:
     - no `finally` or `else` on `try`;

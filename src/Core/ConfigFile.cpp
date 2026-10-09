@@ -30,8 +30,6 @@ namespace
     constexpr auto MAX_KILL_GRACE = 600s;
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto LEGACY_ACCOUNT_KEY = "account";
-    constexpr auto LOGIN_KEY = "login";
-    constexpr auto LEGACY_CRCS_KEY = "crcs";
     constexpr auto FIRST_PRINTABLE = '\x20';
     constexpr auto LAST_PRINTABLE = '\x7E';
     constexpr auto SECURE_SCHEME = "wss"sv;
@@ -41,6 +39,19 @@ namespace
     {
         LogLevel_e level;
         std::string_view name;
+    };
+
+    // Keys that moved to the cache, which a config written before then still has.
+    struct LegacyKey_s
+    {
+        std::string_view section;
+        std::string_view key;
+        std::string_view replacement;
+    };
+
+    constexpr auto LEGACY_KEYS = std::array{
+        LegacyKey_s{"login", "crcs", "the CRCs come from the cache in client.cacheDirectory"},
+        LegacyKey_s{"client", "logoutComponent", "the logout button comes from the cache in client.cacheDirectory"},
     };
 
     constexpr auto LOG_LEVEL_NAMES = std::array{
@@ -232,15 +243,18 @@ namespace
         logger.Warning("Config has an account section, which is no longer read; move it to its own file in scripting.accountsDirectory");
     }
 
-    void WarnIfLegacyCrcs(const nlohmann::json& root, Logger& logger)
+    void WarnIfLegacyKeys(const nlohmann::json& root, Logger& logger)
     {
-        const auto login = root.find(LOGIN_KEY);
-        if (login == root.end() || !login->is_object() || !login->contains(LEGACY_CRCS_KEY))
+        for (const auto& legacy : LEGACY_KEYS)
         {
-            return;
-        }
+            const auto section = root.find(legacy.section);
+            if (section == root.end() || !section->is_object() || !section->contains(legacy.key))
+            {
+                continue;
+            }
 
-        logger.Warning("Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory");
+            logger.Warning("Config has {}.{}, which is no longer read; {}", legacy.section, legacy.key, legacy.replacement);
+        }
     }
 
     void WarnIfTlsVerificationDisabled(const Config_s& config, Logger& logger)
@@ -372,7 +386,7 @@ namespace nlohmann
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logoutComponent, logLevel, idleSeconds, cacheDirectory)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
 
@@ -459,7 +473,7 @@ Config_s ConfigFile::Parse(std::string_view text, Logger& logger)
     Validate(config);
     WarnIfTlsVerificationDisabled(config, logger);
     WarnIfLegacyAccount(root, logger);
-    WarnIfLegacyCrcs(root, logger);
+    WarnIfLegacyKeys(root, logger);
     return config;
 }
 

@@ -7,7 +7,10 @@ class CacheLoader
 {
 public:
     static constexpr u32 CONFIG_ARCHIVE = 2;
+    static constexpr u32 INTERFACE_ARCHIVE = 3;
     static constexpr u32 VERSIONLIST_ARCHIVE = 5;
+    // The webclient's ClientCode.CC_LOGOUT, which marks the logout button.
+    static constexpr u16 LOGOUT_CLIENT_CODE = 205;
 
     CacheLoader() = delete;
 

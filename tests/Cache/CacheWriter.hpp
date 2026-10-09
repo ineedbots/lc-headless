@@ -46,12 +46,31 @@ struct SquareFiles_s
     std::vector<u8> locs;
 };
 
+// A component in the interface archive's data entry. The writer adds the fields its type and button
+// type have, with sample values, in the order the webclient's IfType.init reads them.
+struct InterfaceComponent_s
+{
+    u16 id = 0;
+    // Starts a run of this layer's components, after the 65535 marker.
+    std::optional<u16> layer{};
+    u8 type = 0;
+    u8 buttonType = 0;
+    u16 clientCode = 0;
+    std::optional<u16> hoverLayer{};
+    // Each a comparator and its operand.
+    std::vector<std::pair<u8, u16>> conditions{};
+    std::vector<std::vector<u16>> scripts{};
+    // A layer's children.
+    std::vector<u16> children{};
+};
+
 // Each definition is a type's bytes, opcodes through the closing 0, in id order.
 struct StoreContents_s
 {
     std::vector<std::vector<u8>> locs;
     std::vector<std::vector<u8>> npcs;
     std::vector<std::vector<u8>> objs;
+    std::vector<InterfaceComponent_s> interfaces;
     std::vector<SquareFiles_s> squares;
     // Listed in map_index, but with no files in store 4.
     std::vector<u16> squaresWithoutFiles;
@@ -83,6 +102,8 @@ public:
     [[nodiscard]] static std::vector<u8> MakeLand(std::span<const LandFlags_s> flags = {});
     [[nodiscard]] static std::vector<u8> MakeLocFile(std::span<const LocPlacement_s> locs);
     [[nodiscard]] static std::vector<u8> MakeMapIndex(std::span<const u16> squares);
+    // The interface archive's data entry: the count, then the components in the order given.
+    [[nodiscard]] static std::vector<u8> MakeInterfaces(const std::vector<InterfaceComponent_s>& components);
     // Archives 1 to 8, with filler where nothing is decoded, and the squares' files in store 4. Square
     // i in map_index has land file 2i and loc file 2i + 1.
     [[nodiscard]] static CacheWriter MakeStore(const StoreContents_s& contents);

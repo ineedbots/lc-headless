@@ -216,7 +216,7 @@ Before you write one, know these limits:
 
 - **Scripts run on pocketpy, not CPython.** pocketpy implements a subset of Python 3: there's no `finally`, no generator expressions, no `re` module and no pip packages. [ScriptingApi.md](docs/ScriptingApi.md#python-dialect) lists all the differences.
 - **One thread runs every script.** A call that runs longer than `callTimeoutMs` raises `TimeoutError`, and `time.sleep()` raises an error immediately. To wait, return a delay from `loop()`.
-- **Interfaces are numbers.** The cache's interface definitions aren't decoded, so component ids, such as the bank's, are constants in scripts.
+- **Interfaces are numbers.** The cache's interface definitions are read only to find the logout button, so component ids, such as the bank's, are constants in scripts.
 - **"Nearest" counts tiles, not steps.** `reachable=True` skips targets that can't be reached at all, but the nearest one left may still be a long walk round.
 - **Scripts aren't sandboxed.** Run only scripts you trust.
 
@@ -227,7 +227,7 @@ src/
 ├── main.cpp, Application     command line, config loading, Ctrl+C
 ├── Accounts/                 each account's lifecycle, the main loop over all accounts, progress report files
 ├── Script/                   pocketpy runtime and interpreters, the Python API and its bindings, messages between scripts
-├── Cache/                    reading the server's cache: the store, archives, definitions, map squares, login CRCs
+├── Cache/                    reading the server's cache: the store, archives, definitions, map squares, login CRCs, the logout button
 ├── Game/
 │   ├── GameClient            login, reconnects, logout, polling the connection
 │   ├── Map/                  each account's collision map and scenery, and the route search

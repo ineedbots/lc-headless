@@ -87,6 +87,11 @@ TEST_CASE("The real cache gives the server's CRCs", "[RealCache]")
     }
 }
 
+TEST_CASE("The real cache gives the server's logout button", "[RealCache]")
+{
+    CHECK(RequireRealCache().logoutComponent == 2458);
+}
+
 TEST_CASE("The real cache has every type and square", "[RealCache]")
 {
     const auto& cache = RequireRealCache();

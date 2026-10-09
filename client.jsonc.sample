@@ -14,7 +14,6 @@
         "revision": 289
     },
     "client": {
-        "logoutComponent": 2458,
         "logLevel": "info",
         "idleSeconds": 5,
         "cacheDirectory": "cache"

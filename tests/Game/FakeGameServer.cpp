@@ -2,6 +2,7 @@
 #include "FakeGameServer.hpp"
 #include "../LoopbackPort.hpp"
 
+#include "Cache/GameCache_s.hpp"
 #include "Core/BigUInt.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Game/Protocol/ClientProt.hpp"
@@ -94,13 +95,19 @@ Config_s FakeGameServer::MakeConfig() const
     config.server.url = Url();
     config.login.rsaModulus = BigUInt::Parse("0x" + std::string(RSA_MODULUS_HEX_DIGITS, 'f'));
     config.login.rsaExponent = BigUInt::Parse("1");
-    config.client.logoutComponent = LOGOUT_COMPONENT;
     return config;
 }
 
 AccountSettings_s FakeGameServer::MakeAccount()
 {
     return {.username = USERNAME, .password = PASSWORD};
+}
+
+std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
+{
+    auto cache = GameCache_s{};
+    cache.logoutComponent = LOGOUT_COMPONENT;
+    return std::make_shared<const GameCache_s>(std::move(cache));
 }
 
 void FakeGameServer::SetLoginStatus(u8 status)

@@ -49,7 +49,7 @@ namespace
         HostFixture(std::string_view script, ScriptHostOptions_s options, const Files& otherFiles = {})
             : server{TestWorld::Send}
             , folder{"rs2004-script-host-tests"}
-            , client{std::make_shared<const Config_s>(server.MakeConfig()), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()}
+            , client{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()}
         {
             folder.WriteFile("main.py", script);
             for (const auto& [name, text] : otherFiles)
@@ -305,7 +305,7 @@ TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]
     auto capture = LogCapture{};
     auto server = FakeGameServer{};
     const auto folder = TempFolder{"rs2004-script-host-tests"};
-    auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger()};
+    auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger()};
     const auto load = [&](std::string_view source)
     {
         folder.WriteFile("main.py", source);
@@ -576,7 +576,7 @@ TEST_CASE("The example scripts load without warnings", "[ScriptHost]")
 {
     auto capture = LogCapture{};
     auto server = FakeGameServer{};
-    auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger()};
+    auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger()};
     const auto scripts = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts";
     auto loaded = 0;
     for (const auto& entry : std::filesystem::directory_iterator{scripts / "examples"})

@@ -25,7 +25,39 @@ namespace
     constexpr auto NAME_OPCODE = 2;
     constexpr auto FIRST_OP_OPCODE = 30;
     constexpr auto END_OPCODE = 0;
-    constexpr auto FILLER_ARCHIVES = std::to_array<u32>({1, 3, 4, 6, 7, 8});
+    constexpr auto FILLER_ARCHIVES = std::to_array<u32>({1, 4, 6, 7, 8});
+    constexpr auto INTERFACE_ARCHIVE = u32{3};
+
+    constexpr auto NEW_LAYER = 0xFFFF;
+    constexpr auto NO_ID = 0;
+    constexpr auto ID_SHIFT = 8;
+    constexpr auto LOW_BYTE = 0xFF;
+    constexpr auto IF_LAYER = 0;
+    constexpr auto IF_UNUSED = 1;
+    constexpr auto IF_INV = 2;
+    constexpr auto IF_RECT = 3;
+    constexpr auto IF_TEXT = 4;
+    constexpr auto IF_GRAPHIC = 5;
+    constexpr auto IF_MODEL = 6;
+    constexpr auto IF_INV_TEXT = 7;
+    constexpr auto BUTTON_OK = 1;
+    constexpr auto BUTTON_TARGET = 2;
+    constexpr auto BUTTON_TOGGLE = 4;
+    constexpr auto BUTTON_SELECT = 5;
+    constexpr auto BUTTON_CONTINUE = 6;
+    constexpr auto UNUSED_TYPE_SIZE = std::size_t{3};
+    constexpr auto INV_FLAG_COUNT = 6;
+    constexpr auto INV_BACKGROUND_COUNT = 20;
+    constexpr auto INV_OPTION_COUNT = 5;
+    constexpr auto RECT_TEXT_COLOUR_COUNT = 4;
+    constexpr auto MODEL_VIEW_COUNT = 3;
+    constexpr auto SAMPLE_SIZE = 32;
+    constexpr auto SAMPLE_OFFSET = -4;
+    constexpr auto SAMPLE_COLOUR = 0xFFFF00;
+    constexpr auto SAMPLE_MODEL = u16{261};
+    constexpr auto SAMPLE_ANIMATION = u16{1000};
+    constexpr auto SAMPLE_TARGET_MASK = 0x10;
+    constexpr auto SAMPLE_GRAPHIC = "miscgraphics,7"sv;
 
     std::vector<u8> ToBytes(const Packet& packet)
     {
@@ -36,6 +68,192 @@ namespace
     std::vector<u8> ToBytes(std::string_view text)
     {
         return {text.begin(), text.end()};
+    }
+
+    // As the webclient reads a hover layer, model or animation: 0 for none, or else the high byte plus 1,
+    // then the low byte.
+    void PutOptionalId(Packet& packet, std::optional<u16> id)
+    {
+        if (!id)
+        {
+            packet.P1(NO_ID);
+            return;
+        }
+
+        packet.P1((*id >> ID_SHIFT) + 1);
+        packet.P1(*id & LOW_BYTE);
+    }
+
+    void PutCentreFontShadow(Packet& packet)
+    {
+        packet.P1(1);
+        packet.P1(2);
+        packet.P1(1);
+    }
+
+    void PutColours(Packet& packet, s32 count)
+    {
+        for (auto i = 0; i < count; ++i)
+        {
+            packet.P4(SAMPLE_COLOUR);
+        }
+    }
+
+    void PutOptions(Packet& packet)
+    {
+        packet.PJStr("Use");
+        for (auto i = 1; i < INV_OPTION_COUNT; ++i)
+        {
+            packet.PJStr("");
+        }
+    }
+
+    void PutLayer(Packet& packet, std::span<const u16> children)
+    {
+        packet.P2(SAMPLE_SIZE);
+        packet.P1(0);
+        packet.P2(static_cast<s32>(children.size()));
+        for (const auto child : children)
+        {
+            packet.P2(child);
+            packet.P2(SAMPLE_OFFSET);
+            packet.P2(SAMPLE_SIZE);
+        }
+    }
+
+    // Only the first slot has a background graphic, so both forms of slot are written.
+    void PutInv(Packet& packet)
+    {
+        for (auto i = 0; i < INV_FLAG_COUNT; ++i)
+        {
+            packet.P1(1);
+        }
+
+        packet.P1(1);
+        packet.P2(SAMPLE_OFFSET);
+        packet.P2(SAMPLE_SIZE);
+        packet.PJStr(SAMPLE_GRAPHIC);
+        for (auto slot = 1; slot < INV_BACKGROUND_COUNT; ++slot)
+        {
+            packet.P1(0);
+        }
+
+        PutOptions(packet);
+    }
+
+    // A model and an animation, each without an active one, so both forms of id are written.
+    void PutModel(Packet& packet)
+    {
+        PutOptionalId(packet, SAMPLE_MODEL);
+        PutOptionalId(packet, std::nullopt);
+        PutOptionalId(packet, SAMPLE_ANIMATION);
+        PutOptionalId(packet, std::nullopt);
+        for (auto i = 0; i < MODEL_VIEW_COUNT; ++i)
+        {
+            packet.P2(SAMPLE_SIZE);
+        }
+    }
+
+    void PutTypeFields(Packet& packet, const InterfaceComponent_s& component)
+    {
+        switch (component.type)
+        {
+        case IF_LAYER:
+            PutLayer(packet, component.children);
+            return;
+        case IF_UNUSED:
+            packet.PData(std::array<u8, UNUSED_TYPE_SIZE>{});
+            PutCentreFontShadow(packet);
+            PutColours(packet, 1);
+            return;
+        case IF_INV:
+            PutInv(packet);
+            return;
+        case IF_RECT:
+            packet.P1(1);
+            PutColours(packet, RECT_TEXT_COLOUR_COUNT);
+            return;
+        case IF_TEXT:
+            PutCentreFontShadow(packet);
+            packet.PJStr("Click here to logout");
+            packet.PJStr("");
+            PutColours(packet, RECT_TEXT_COLOUR_COUNT);
+            return;
+        case IF_GRAPHIC:
+            packet.PJStr(SAMPLE_GRAPHIC);
+            packet.PJStr("");
+            return;
+        case IF_MODEL:
+            PutModel(packet);
+            return;
+        case IF_INV_TEXT:
+            PutCentreFontShadow(packet);
+            PutColours(packet, 1);
+            packet.P2(SAMPLE_OFFSET);
+            packet.P2(SAMPLE_OFFSET);
+            packet.P1(1);
+            PutOptions(packet);
+            return;
+        default:
+            return;
+        }
+    }
+
+    void PutButtonFields(Packet& packet, const InterfaceComponent_s& component)
+    {
+        const auto buttonType = component.buttonType;
+        if (buttonType == BUTTON_TARGET || component.type == IF_INV)
+        {
+            packet.PJStr("Cast");
+            packet.PJStr("Wind Strike");
+            packet.P2(SAMPLE_TARGET_MASK);
+        }
+
+        if (buttonType == BUTTON_OK || buttonType == BUTTON_TOGGLE || buttonType == BUTTON_SELECT || buttonType == BUTTON_CONTINUE)
+        {
+            packet.PJStr("Select");
+        }
+    }
+
+    void PutScripts(Packet& packet, const InterfaceComponent_s& component)
+    {
+        packet.P1(static_cast<s32>(component.conditions.size()));
+        for (const auto& [comparator, operand] : component.conditions)
+        {
+            packet.P1(comparator);
+            packet.P2(operand);
+        }
+
+        packet.P1(static_cast<s32>(component.scripts.size()));
+        for (const auto& script : component.scripts)
+        {
+            packet.P2(static_cast<s32>(script.size()));
+            for (const auto opcode : script)
+            {
+                packet.P2(opcode);
+            }
+        }
+    }
+
+    void PutComponent(Packet& packet, const InterfaceComponent_s& component)
+    {
+        if (component.layer)
+        {
+            packet.P2(NEW_LAYER);
+            packet.P2(*component.layer);
+        }
+
+        packet.P2(component.id);
+        packet.P1(component.type);
+        packet.P1(component.buttonType);
+        packet.P2(component.clientCode);
+        packet.P2(SAMPLE_SIZE);
+        packet.P2(SAMPLE_SIZE);
+        packet.P1(0);
+        PutOptionalId(packet, component.hoverLayer);
+        PutScripts(packet, component);
+        PutTypeFields(packet, component);
+        PutButtonFields(packet, component);
     }
 
     void PutEntryTable(Packet& packet, const std::vector<ArchiveEntry_s>& entries, std::span<const std::vector<u8>> packed)
@@ -308,6 +526,24 @@ std::vector<u8> CacheWriter::MakeMapIndex(std::span<const u16> squares)
     return ToBytes(index);
 }
 
+std::vector<u8> CacheWriter::MakeInterfaces(const std::vector<InterfaceComponent_s>& components)
+{
+    auto count = 0;
+    for (const auto& component : components)
+    {
+        count = std::max(count, component.id + 1);
+    }
+
+    auto packet = Packet{};
+    packet.P2(count);
+    for (const auto& component : components)
+    {
+        PutComponent(packet, component);
+    }
+
+    return ToBytes(packet);
+}
+
 CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
 {
     auto writer = CacheWriter{};
@@ -328,6 +564,8 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
         {.name = "obj.dat", .data = objs.dat},
         {.name = "obj.idx", .data = objs.idx},
     }, false));
+
+    writer.Put(CacheStore::ARCHIVES, INTERFACE_ARCHIVE, MakeArchive({{.name = "data", .data = MakeInterfaces(contents.interfaces)}}, false));
 
     auto squares = std::vector<u16>{};
     for (const auto& square : contents.squares)

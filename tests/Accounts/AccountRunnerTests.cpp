@@ -70,7 +70,7 @@ namespace
 
         [[nodiscard]] std::unique_ptr<AccountRunner> MakeRunner(std::vector<AccountConfig_s> accounts)
         {
-            return std::make_unique<AccountRunner>(std::make_shared<const Config_s>(config), std::make_shared<const GameCache_s>(), std::move(accounts), ScriptTestRuntime::Get(), capture.GetLogger(), FastOptions());
+            return std::make_unique<AccountRunner>(std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), std::move(accounts), ScriptTestRuntime::Get(), capture.GetLogger(), FastOptions());
         }
 
         [[nodiscard]] bool TimedOut() const

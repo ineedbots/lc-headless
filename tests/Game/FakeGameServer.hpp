@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
@@ -23,7 +24,8 @@ class FakeGameServer
 public:
     using Script = std::function<void(FakeGameServer& server, bool reconnect)>;
 
-    static constexpr u16 LOGOUT_COMPONENT = 2458;
+    // Not the 289 cache's 2458, so a client that clicks a fixed id instead of its cache's fails.
+    static constexpr u16 LOGOUT_COMPONENT = 1234;
     static constexpr auto USERNAME = "bot";
     static constexpr auto PASSWORD = "secret";
 
@@ -36,6 +38,8 @@ public:
     [[nodiscard]] std::string Url() const;
     [[nodiscard]] Config_s MakeConfig() const;
     [[nodiscard]] static AccountSettings_s MakeAccount();
+    // An empty cache but for the logout button this server answers.
+    [[nodiscard]] static std::shared_ptr<const GameCache_s> MakeCache();
 
     void SetLoginStatus(u8 status);
     // A stalled server accepts the connection but never answers the seed request.

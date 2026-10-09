@@ -343,9 +343,10 @@ See [`NetworkPlayer.ts`](../../289server/engine/src/engine/entity/NetworkPlayer.
 
 There is no dedicated client-to-server logout opcode. The webclient's logout button
 sends `IF_BUTTON` (client opcode `86`) with a two-byte big-endian interface component
-ID. The current project helper uses component `2458`; this value belongs to the
-active interface/cache and is not a universal protocol constant. The engine handles
-the button through the component's configured trigger.
+ID. That ID belongs to the active interface/cache and is not a universal protocol
+constant: it is `2458` in the 289 cache. This project finds it in the cache as the
+component whose client code is `205` (`CC_LOGOUT`). The engine handles the button
+through the component's configured trigger.
 
 When the world removes the player, it sends server packet `LOGOUT` (server opcode
 `121`, zero payload), then closes the client socket, removes the player, and flushes

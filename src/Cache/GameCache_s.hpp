@@ -13,6 +13,8 @@ struct GameCache_s
     static constexpr std::size_t CRC_COUNT = 9;
 
     std::array<s32, CRC_COUNT> crcs{};
+    // The logout tab's button, which the client clicks to log out.
+    u16 logoutComponent = 0;
     TextPool text;
     // Index i holds the type whose id is i.
     std::vector<LocType_s> locs;

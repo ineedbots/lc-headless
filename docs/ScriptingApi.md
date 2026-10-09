@@ -310,7 +310,7 @@ pocketpy's debugger brings some limits:
 
 ## Limits
 
-- **Interfaces are numbers.** The cache's interface definitions aren't decoded, so component ids, such as the bank's, stay constants in scripts, and `inv_button` takes option numbers.
+- **Interfaces are numbers.** The cache's interface definitions are read only to find the logout button, so component ids, such as the bank's, stay constants in scripts, and `inv_button` takes option numbers.
 - **"Nearest" counts tiles.** The `get_nearest_*` functions measure in tiles, not steps, so with `reachable=True` the nearest target that can be reached may still be a long walk round.
 
 ## Editor support

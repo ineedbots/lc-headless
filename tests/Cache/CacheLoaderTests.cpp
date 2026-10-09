@@ -23,6 +23,12 @@ namespace
     constexpr auto CENTREPIECE = u8{10};
     constexpr auto GROUND_DECOR = u8{22};
     constexpr auto BLOCK = u8{0x1};
+    constexpr auto IF_LAYER = u8{0};
+    constexpr auto IF_TEXT = u8{4};
+    constexpr auto BUTTON_OK = u8{1};
+    constexpr auto LOGOUT_CLIENT_CODE = u16{205};
+    constexpr auto LOGOUT_LAYER = u16{20};
+    constexpr auto LOGOUT_BUTTON = u16{21};
 
     StoreContents_s MakeContents()
     {
@@ -41,6 +47,11 @@ namespace
         contents.objs = {
             CacheWriter::MakeDefinition("Logs"),
             CacheWriter::MakeDefinition("", {}, std::vector<u8>{97, 0, 0, 98, 0, 5}),
+        };
+
+        contents.interfaces = {
+            {.id = LOGOUT_LAYER, .layer = LOGOUT_LAYER, .type = IF_LAYER, .children = {LOGOUT_BUTTON}},
+            {.id = LOGOUT_BUTTON, .type = IF_TEXT, .buttonType = BUTTON_OK, .clientCode = LOGOUT_CLIENT_CODE},
         };
 
         contents.squares = {{
@@ -112,6 +123,8 @@ TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
         CHECK(cache.crcs[file] == Packet::GetCrc(fixture.writer.Get(CacheStore::ARCHIVES, file)));
     }
 
+    CHECK(cache.logoutComponent == LOGOUT_BUTTON);
+
     REQUIRE(cache.locs.size() == 3);
     const auto* const tree = cache.FindLoc(2);
     REQUIRE(tree != nullptr);
@@ -179,6 +192,34 @@ TEST_CASE("CacheLoader names the folder and file that failed", "[CacheLoader]")
         contents.objs[1] = {200, 0};
         fixture.writer = CacheWriter::MakeStore(contents);
         CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 2 (config): obj 1: unknown opcode 200");
+    }
+
+    SECTION("a missing interface archive")
+    {
+        fixture.writer.Put(CacheStore::ARCHIVES, 3, {});
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): not in the cache");
+    }
+
+    SECTION("an interface archive without its data")
+    {
+        fixture.writer.Put(CacheStore::ARCHIVES, 3, CacheWriter::MakeArchive({{.name = "filler.dat", .data = {1}}}, false));
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): data not found");
+    }
+
+    SECTION("no logout button")
+    {
+        auto contents = MakeContents();
+        contents.interfaces[1].clientCode = 0;
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): no component has client code 205, which marks the logout button");
+    }
+
+    SECTION("a component that doesn't decode")
+    {
+        auto contents = MakeContents();
+        contents.interfaces[0].type = 9;
+        fixture.writer = CacheWriter::MakeStore(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "store 0 file 3 (interface): component 20: unknown type 9");
     }
 
     SECTION("a damaged map file")

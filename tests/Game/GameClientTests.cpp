@@ -63,7 +63,7 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
 {
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{TestWorld::Send};
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
     REQUIRE(client.IsInGame());
@@ -129,7 +129,8 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
 
         const auto buttons = server.GetPackets(ClientProt_e::IfButton);
         REQUIRE(buttons.size() == 1);
-        CHECK(buttons[0].payload == std::vector<u8>{0x09, 0x9A});
+        REQUIRE(buttons[0].payload.size() == sizeof(u16));
+        CHECK(Packet{buttons[0].payload}.G2() == FakeGameServer::LOGOUT_COMPONENT);
     }
 
     CHECK(server.GetErrors().empty());
@@ -139,7 +140,7 @@ TEST_CASE("GameClient reconnects when the connection drops", "[GameClient]")
 {
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{TestWorld::Send};
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
     REQUIRE(PumpUntil(client, [&client]
@@ -171,7 +172,7 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{};
     server.SetLoginStatus(3);
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     try
     {
@@ -191,7 +192,7 @@ TEST_CASE("GameClient ends the session when the server logs it out", "[GameClien
 {
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{TestWorld::Send};
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
     REQUIRE(PumpUntil(client, [&client]
@@ -215,7 +216,7 @@ TEST_CASE("GameClient reconnects without making Pump wait", "[GameClient]")
     auto options = FastOptions();
     options.loginTimeout = 300ms;
     options.retryDelay = 100ms;
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
 
     client.Login();
     REQUIRE(PumpUntil(client, [&client]
@@ -256,7 +257,7 @@ TEST_CASE("GameClient clicks logout again until the server agrees", "[GameClient
 {
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{TestWorld::Send};
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
     REQUIRE(PumpUntil(client, [&client]
     {
@@ -299,7 +300,7 @@ TEST_CASE("GameClient retries a login the server can't take yet", "[GameClient]"
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{TestWorld::Send};
     server.SetLoginStatus(5);
-    auto client = GameClient{MakeConfig(server), std::make_shared<const GameCache_s>(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.BeginLogin();
     REQUIRE(PumpUntil(client, [&capture]

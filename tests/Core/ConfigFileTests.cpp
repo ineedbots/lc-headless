@@ -35,7 +35,6 @@ namespace
         "revision": 289
     },
     "client": {
-        "logoutComponent": 2458,
         "logLevel": "verbose",
         "idleSeconds": 5,
         "cacheDirectory": "../289server/engine/data/pack"
@@ -70,7 +69,6 @@ namespace
         "revision": 289
     },
     "client": {
-        "logoutComponent": 2458,
         "logLevel": "info",
         "idleSeconds": 5,
         "cacheDirectory": "cache"
@@ -149,7 +147,6 @@ namespace
         {"server", "tlsCaFile"},
         {"login", "lowMemory"},
         {"login", "revision"},
-        {"client", "logoutComponent"},
         {"client", "logLevel"},
         {"client", "idleSeconds"},
         {"client", "cacheDirectory"},
@@ -264,7 +261,6 @@ namespace
         CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
         CHECK_FALSE(config.login.lowMemory);
         CHECK(config.login.revision == 289);
-        CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Verbose);
         CHECK(config.client.idleSeconds == 5s);
         CHECK(config.client.cacheDirectory == "../289server/engine/data/pack");
@@ -294,7 +290,6 @@ namespace
         CHECK(config.server.tlsCaFile == "SYSTEM");
         CHECK_FALSE(config.login.lowMemory);
         CHECK(config.login.revision == 289);
-        CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.idleSeconds == 5s);
         CHECK(config.client.cacheDirectory == "cache");
@@ -445,10 +440,6 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.login.revision == 289);
             }
-            else if (key.key == "logoutComponent")
-            {
-                CHECK(config.client.logoutComponent == 2458);
-            }
             else if (key.key == "logLevel")
             {
                 CHECK(config.client.logLevel == LogLevel_e::Info);
@@ -506,7 +497,6 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         CheckRejected(removeSection("login"), "login.rsaModulus");
 
         const auto config = ParseAccepted(removeSection("client"));
-        CHECK(config.client.logoutComponent == 2458);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.idleSeconds == 5s);
         CHECK(config.client.cacheDirectory == "cache");
@@ -673,9 +663,6 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
 
     SECTION("client")
     {
-        CHECK(ParseAccepted(SetKey({"client", "logoutComponent"}, 0)).client.logoutComponent == 0);
-        CHECK(ParseAccepted(SetKey({"client", "logoutComponent"}, 65535)).client.logoutComponent == 65535);
-
         CHECK(ParseAccepted(SetKey({"client", "logLevel"}, "verbose")).client.logLevel == LogLevel_e::Verbose);
         CHECK(ParseAccepted(SetKey({"client", "logLevel"}, "info")).client.logLevel == LogLevel_e::Info);
         CHECK(ParseAccepted(SetKey({"client", "logLevel"}, "warning")).client.logLevel == LogLevel_e::Warning);
@@ -715,8 +702,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"login", "revision"}, 290},
         {{"login", "revision"}, "289"},
         {{"login", "revision"}, true},
-        {{"client", "logoutComponent"}, "2458"},
-        {{"client", "logoutComponent"}, nullptr},
         {{"client", "logLevel"}, "warn"},
         {{"client", "logLevel"}, "Info"},
         {{"client", "logLevel"}, "debug"},
@@ -779,6 +764,19 @@ TEST_CASE("ConfigFile warns about login.crcs left in the config", "[ConfigFile]"
     REQUIRE(entries.size() == 1);
     CHECK(entries[0].level == LogLevel_e::Warning);
     CHECK(entries[0].message == "Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory");
+}
+
+TEST_CASE("ConfigFile warns about client.logoutComponent left in the config", "[ConfigFile]")
+{
+    const auto text = SetKey({"client", "logoutComponent"}, 2458);
+
+    auto capture = LogCapture{};
+    const auto config = ConfigFile::Parse(text, *capture.GetLogger());
+    CheckExampleMembers(config);
+    const auto entries = capture.GetEntries();
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0].level == LogLevel_e::Warning);
+    CHECK(entries[0].message == "Config has client.logoutComponent, which is no longer read; the logout button comes from the cache in client.cacheDirectory");
 }
 
 TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")

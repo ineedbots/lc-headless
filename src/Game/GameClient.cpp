@@ -159,7 +159,7 @@ void GameClient::RequestLogout(std::chrono::milliseconds timeout)
     }
 
     m_logger->Info("Logging out");
-    Send(ClientPackets::IfButton(m_config->client.logoutComponent));
+    Send(ClientPackets::IfButton(m_cache->logoutComponent));
     m_status = ClientStatus_e::LoggingOut;
     m_logoutTimeout = timeout;
     m_logoutDeadline = Clock::now() + timeout;
@@ -347,7 +347,7 @@ bool GameClient::ContinueLogout()
 
     if (now >= m_nextLogoutClick)
     {
-        m_outgoing.push_back(ClientPackets::IfButton(m_config->client.logoutComponent));
+        m_outgoing.push_back(ClientPackets::IfButton(m_cache->logoutComponent));
         m_nextLogoutClick = now + LOGOUT_RETRY;
     }
 

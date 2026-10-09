@@ -28,7 +28,6 @@ struct LoginSettings_s
 
 struct ClientSettings_s
 {
-    u16 logoutComponent = 2458;
     LogLevel_e logLevel = LogLevel_e::Info;
     std::chrono::seconds idleSeconds = 5s;
     std::string cacheDirectory = "cache";

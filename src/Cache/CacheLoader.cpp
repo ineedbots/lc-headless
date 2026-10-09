@@ -7,6 +7,7 @@
 #include "CacheStore.hpp"
 #include "Compression.hpp"
 #include "GameCache_s.hpp"
+#include "InterfaceDecoder.hpp"
 #include "JagArchive.hpp"
 #include "MapDecoder.hpp"
 #include "MapSquare.hpp"
@@ -88,6 +89,22 @@ namespace
         });
     }
 
+    u16 FindLogoutComponent(CacheStore& store)
+    {
+        auto data = ReadArchive(store, CacheLoader::INTERFACE_ARCHIVE, "interface");
+        return WithContext(DescribeFile(CacheStore::ARCHIVES, CacheLoader::INTERFACE_ARCHIVE, "interface"), [&data]
+        {
+            const auto interfaces = JagArchive{std::move(data)};
+            const auto button = InterfaceDecoder::FindClientCode(ReadEntry(interfaces, "data"), CacheLoader::LOGOUT_CLIENT_CODE);
+            if (!button)
+            {
+                throw CacheError{std::format("no component has client code {}, which marks the logout button", CacheLoader::LOGOUT_CLIENT_CODE)};
+            }
+
+            return *button;
+        });
+    }
+
     std::vector<MapIndexEntry_s> DecodeMapIndex(CacheStore& store)
     {
         auto data = ReadArchive(store, CacheLoader::VERSIONLIST_ARCHIVE, "versionlist");
@@ -161,6 +178,7 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Logger& lo
         auto cache = GameCache_s{};
         cache.crcs = ReadCrcs(store);
         DecodeTypes(store, cache);
+        cache.logoutComponent = FindLogoutComponent(store);
         const auto skipped = DecodeMaps(store, cache);
         cache.text.FinishInterning();
 
