@@ -292,6 +292,11 @@ std::optional<std::string> ScriptApi::GetComponentText(u16 com) const
     return found->second.text;
 }
 
+InterfaceView ScriptApi::GetInterfaces() const
+{
+    return InterfaceView{GetCache(), m_state.interfaces};
+}
+
 std::vector<Npc_s> ScriptApi::GetNpcs(const SearchFilter_s& filter) const
 {
     auto found = std::vector<Npc_s>{};
@@ -550,6 +555,23 @@ u8 ScriptApi::FindGroundItemOp(u16 obj, std::string_view text) const
     return ChooseOption(menu, text, DescribeType("item", type.id, type.name));
 }
 
+u8 ScriptApi::FindInventoryOption(u16 com, std::string_view text) const
+{
+    const auto* const component = GetCache().FindComponent(com);
+    if (component == nullptr || component->type != ComponentType_e::Inv)
+    {
+        throw std::invalid_argument{std::format("component {} isn't an inventory", com)};
+    }
+
+    auto menu = Menu{};
+    for (std::size_t slot = 0; slot < menu.size(); ++slot)
+    {
+        menu[slot] = component->options[slot];
+    }
+
+    return ChooseOption(menu, text, std::format("inventory {}", com));
+}
+
 u8 ScriptApi::FindItemOp(s32 obj, std::string_view text) const
 {
     const auto& type = RequireType(GetCache().FindObj(obj), "item", obj);
@@ -763,6 +785,44 @@ bool ScriptApi::CastOnItem(u16 spellCom, const InventoryItem_s& item)
 void ScriptApi::ClickButton(u16 com)
 {
     m_actions.ClickButton(com);
+}
+
+bool ScriptApi::ClickComponent(u16 com)
+{
+    const auto view = GetInterfaces();
+    const auto* const component = view.Find(com);
+    if (component == nullptr)
+    {
+        throw std::invalid_argument{std::format("the cache has no component {}", com)};
+    }
+
+    if (component->buttonType == ButtonType_e::None || component->buttonType == ButtonType_e::Target)
+    {
+        throw std::invalid_argument{std::format("component {} isn't a button a click uses", com)};
+    }
+
+    if (!view.IsVisible(*component))
+    {
+        return false;
+    }
+
+    m_actions.ClickComponent(com, component->buttonType);
+    return true;
+}
+
+bool ScriptApi::ClickText(std::string_view text, std::optional<u16> root)
+{
+    const auto view = GetInterfaces();
+    for (const auto* const found : view.FindText(text, root))
+    {
+        if (const auto* const button = view.ButtonAt(*found))
+        {
+            m_actions.ClickComponent(button->id, button->buttonType);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void ScriptApi::ContinueDialogue()

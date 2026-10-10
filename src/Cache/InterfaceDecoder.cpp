@@ -17,8 +17,7 @@ namespace
     // Fields read and dropped whole, named as IfType names them.
     constexpr auto TRANS_SIZE = sizeof(u8);
     constexpr auto COMPARATOR_SIZE = sizeof(u8);
-    constexpr auto SCROLL_HEIGHT_HIDE_SIZE = sizeof(u16) + sizeof(u8);
-    constexpr auto CHILD_SIZE = 3 * sizeof(u16);
+    constexpr auto SCROLL_HEIGHT_SIZE = sizeof(u16);
     constexpr auto UNUSED_TYPE_SIZE = std::size_t{3};
     constexpr auto OBJ_SWAP_OPS_SIZE = 2 * sizeof(u8);
     constexpr auto OBJ_REPLACE_MARGINS_SIZE = 3 * sizeof(u8);
@@ -31,12 +30,10 @@ namespace
     constexpr auto TARGET_MASK_SIZE = sizeof(u16);
 
     constexpr auto INV_BACKGROUND_COUNT = 20;
-    constexpr auto RECT_TEXT_COLOUR_COUNT = std::size_t{4};
-    constexpr auto TEXT_STRING_COUNT = std::size_t{2};
+    // A rect or text component's colour, then its active and hover colours, which aren't kept.
+    constexpr auto OTHER_COLOUR_COUNT = std::size_t{3};
     constexpr auto GRAPHIC_STRING_COUNT = std::size_t{2};
     constexpr auto MODEL_REFERENCE_COUNT = 4;
-    constexpr auto TARGET_STRING_COUNT = std::size_t{2};
-    constexpr auto BUTTON_STRING_COUNT = std::size_t{1};
     constexpr auto INV_BACKGROUND_STRING_COUNT = std::size_t{1};
 
     void Skip(Packet& packet, std::size_t count)
@@ -130,6 +127,24 @@ namespace
         Skip(packet, MODEL_ZOOM_ANGLES_SIZE);
     }
 
+    void ReadLayer(Packet& packet, IfComponent_s& component)
+    {
+        Skip(packet, SCROLL_HEIGHT_SIZE);
+        component.hidden = packet.G1() == ENABLED;
+        component.children.resize(packet.G2());
+        for (auto& child : component.children)
+        {
+            child.id = packet.G2();
+            child.x = packet.G2B();
+            child.y = packet.G2B();
+        }
+    }
+
+    u32 ReadColour(Packet& packet)
+    {
+        return static_cast<u32>(packet.G4());
+    }
+
     // IfType.init reads these in a run of ifs that some types share; each case here is one type's path
     // through them.
     void ReadTypeFields(Packet& packet, IfComponent_s& component)
@@ -137,22 +152,27 @@ namespace
         switch (component.type)
         {
         case ComponentType_e::Layer:
-            Skip(packet, SCROLL_HEIGHT_HIDE_SIZE);
-            Skip(packet, std::size_t{packet.G2()} * CHILD_SIZE);
+            ReadLayer(packet, component);
             return;
         case ComponentType_e::Unused:
-            Skip(packet, UNUSED_TYPE_SIZE + CENTRE_FONT_SHADOW_SIZE + COLOUR_SIZE);
+            Skip(packet, UNUSED_TYPE_SIZE + CENTRE_FONT_SHADOW_SIZE);
+            component.colour = ReadColour(packet);
             return;
         case ComponentType_e::Inv:
             ReadInv(packet, component);
             return;
         case ComponentType_e::Rect:
-            Skip(packet, FILL_SIZE + RECT_TEXT_COLOUR_COUNT * COLOUR_SIZE);
+            Skip(packet, FILL_SIZE);
+            component.colour = ReadColour(packet);
+            Skip(packet, OTHER_COLOUR_COUNT * COLOUR_SIZE);
             return;
         case ComponentType_e::Text:
             Skip(packet, CENTRE_FONT_SHADOW_SIZE);
-            SkipStrings(packet, TEXT_STRING_COUNT);
-            Skip(packet, RECT_TEXT_COLOUR_COUNT * COLOUR_SIZE);
+            component.text = ReadString(packet);
+            // The active text, shown while a script's condition holds, isn't kept.
+            static_cast<void>(ReadString(packet));
+            component.colour = ReadColour(packet);
+            Skip(packet, OTHER_COLOUR_COUNT * COLOUR_SIZE);
             return;
         case ComponentType_e::Graphic:
             SkipStrings(packet, GRAPHIC_STRING_COUNT);
@@ -161,7 +181,9 @@ namespace
             SkipModel(packet);
             return;
         case ComponentType_e::InvText:
-            Skip(packet, CENTRE_FONT_SHADOW_SIZE + COLOUR_SIZE + INV_TEXT_MARGINS_OBJ_OPS_SIZE);
+            Skip(packet, CENTRE_FONT_SHADOW_SIZE);
+            component.colour = ReadColour(packet);
+            Skip(packet, INV_TEXT_MARGINS_OBJ_OPS_SIZE);
             SkipStrings(packet, IfComponent_s::OPTION_COUNT);
             return;
         default:
@@ -174,24 +196,46 @@ namespace
         return buttonType == ButtonType_e::Ok || buttonType == ButtonType_e::Toggle || buttonType == ButtonType_e::Select || buttonType == ButtonType_e::Continue;
     }
 
-    void SkipButtonFields(Packet& packet, const IfComponent_s& component)
+    // IfType's default for a button with no text of its own.
+    std::string_view GetDefaultButtonText(ButtonType_e buttonType)
+    {
+        switch (buttonType)
+        {
+        case ButtonType_e::Ok:
+            return "Ok";
+        case ButtonType_e::Toggle:
+        case ButtonType_e::Select:
+            return "Select";
+        case ButtonType_e::Continue:
+            return "Continue";
+        default:
+            return {};
+        }
+    }
+
+    void ReadButtonFields(Packet& packet, IfComponent_s& component)
     {
         if (component.buttonType == ButtonType_e::Target || component.type == ComponentType_e::Inv)
         {
-            SkipStrings(packet, TARGET_STRING_COUNT);
+            component.targetVerb = ReadString(packet);
+            component.targetName = ReadString(packet);
             Skip(packet, TARGET_MASK_SIZE);
         }
 
         if (HasButtonText(component.buttonType))
         {
-            SkipStrings(packet, BUTTON_STRING_COUNT);
+            component.buttonText = ReadString(packet);
+            if (component.buttonText.empty())
+            {
+                component.buttonText = GetDefaultButtonText(component.buttonType);
+            }
         }
     }
 
     // Reads a component's fields, from just after its id.
-    IfComponent_s ReadComponent(Packet& packet, u16 id)
+    IfComponent_s ReadComponent(Packet& packet, u16 id, u16 root)
     {
-        auto component = IfComponent_s{.id = id};
+        auto component = IfComponent_s{.id = id, .root = root};
         component.type = static_cast<ComponentType_e>(packet.G1());
         component.buttonType = static_cast<ButtonType_e>(packet.G1());
         component.clientCode = static_cast<ClientCode_e>(packet.G2());
@@ -201,13 +245,13 @@ namespace
         SkipOptionalId(packet);
         ReadScripts(packet, component);
         ReadTypeFields(packet, component);
-        SkipButtonFields(packet, component);
+        ReadButtonFields(packet, component);
         return component;
     }
 
-    // The first component of each layer's group comes after a marker and the layer's id, which nothing
-    // here needs.
-    u16 ReadId(Packet& packet, std::optional<u16> previous)
+    // The first component of each interface's run comes after a marker and the interface's id, which
+    // becomes the root of every component until the next marker.
+    u16 ReadId(Packet& packet, std::optional<u16> previous, u16& root)
     {
         try
         {
@@ -217,7 +261,7 @@ namespace
                 return id;
             }
 
-            Skip(packet, sizeof(u16));
+            root = packet.G2();
             return packet.G2();
         }
         catch (const std::out_of_range&)
@@ -238,13 +282,14 @@ std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data)
     auto packet = Packet{data};
     packet.SetPos(COUNT_SIZE);
     auto components = std::vector<IfComponent_s>{};
+    auto root = u16{0};
     while (packet.GetAvailable() > 0)
     {
         const auto previous = components.empty() ? std::nullopt : std::optional{components.back().id};
-        const auto id = ReadId(packet, previous);
+        const auto id = ReadId(packet, previous, root);
         try
         {
-            components.push_back(ReadComponent(packet, id));
+            components.push_back(ReadComponent(packet, id, root));
         }
         catch (const CacheError& e)
         {
@@ -253,6 +298,24 @@ std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data)
         catch (const std::out_of_range&)
         {
             throw CacheError{std::format("component {}: runs past the end of the data", id)};
+        }
+    }
+
+    // Each child learns its parent from the layer that lists it.
+    auto parents = std::unordered_map<u16, u16>{};
+    for (const auto& component : components)
+    {
+        for (const auto& child : component.children)
+        {
+            parents.insert_or_assign(child.id, component.id);
+        }
+    }
+
+    for (auto& component : components)
+    {
+        if (const auto parent = parents.find(component.id); parent != parents.end())
+        {
+            component.parent = parent->second;
         }
     }
 

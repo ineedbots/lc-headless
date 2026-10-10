@@ -67,6 +67,42 @@ LocType_s& TestCache::AddLoc(GameCache_s& cache, u16 id, std::string_view name, 
     return type;
 }
 
+void TestCache::AddComponents(GameCache_s& cache, std::initializer_list<IfComponent_s> components)
+{
+    for (const auto& component : components)
+    {
+        cache.components.insert_or_assign(component.id, component);
+    }
+
+    for (const auto& component : components)
+    {
+        for (const auto& child : component.children)
+        {
+            if (const auto found = cache.components.find(child.id); found != cache.components.end())
+            {
+                found->second.parent = component.id;
+            }
+        }
+    }
+}
+
+void TestCache::SetTradeScreen(GameCache_s& cache)
+{
+    AddComponents(cache, {
+        {.id = TRADE_SCREEN, .root = TRADE_SCREEN, .type = ComponentType_e::Layer, .width = 488, .height = 300, .children = {
+            {.id = TRADE_ACCEPT, .x = 224, .y = 173},
+            {.id = TRADE_ACCEPT_LABEL, .x = 239, .y = 181},
+            {.id = TRADE_DECLINE, .x = 224, .y = 246},
+            {.id = TRADE_STATUS_LAYER, .x = 0, .y = 0},
+        }},
+        {.id = TRADE_ACCEPT, .root = TRADE_SCREEN, .type = ComponentType_e::Rect, .buttonType = ButtonType_e::Ok, .width = 66, .height = 31, .buttonText = "Ok"},
+        {.id = TRADE_ACCEPT_LABEL, .root = TRADE_SCREEN, .type = ComponentType_e::Text, .width = 39, .height = 14, .text = "Accept", .colour = 0x00C000},
+        {.id = TRADE_DECLINE, .root = TRADE_SCREEN, .type = ComponentType_e::Rect, .buttonType = ButtonType_e::Close, .width = 66, .height = 31},
+        {.id = TRADE_STATUS_LAYER, .root = TRADE_SCREEN, .type = ComponentType_e::Layer, .width = 488, .height = 20, .children = {{.id = TRADE_STATUS, .x = 5, .y = 2}}, .hidden = true},
+        {.id = TRADE_STATUS, .root = TRADE_SCREEN, .type = ComponentType_e::Text, .width = 100, .height = 14, .text = "Waiting"},
+    });
+}
+
 void TestCache::SetComponents(GameCache_s& cache)
 {
     cache.inventoryComponent = INVENTORY;

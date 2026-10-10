@@ -2,6 +2,7 @@
 
 #include "../Cache/GameCache_s.hpp"
 #include "../Game/GameActions.hpp"
+#include "../Game/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/Entity_s.hpp"
@@ -72,6 +73,8 @@ public:
     [[nodiscard]] const Stat_s& GetStat(s32 stat) const;
     [[nodiscard]] bool IsInterfaceOpen(s32 id) const;
     [[nodiscard]] std::optional<std::string> GetComponentText(u16 com) const;
+    // The interfaces as the player sees them.
+    [[nodiscard]] InterfaceView GetInterfaces() const;
 
     [[nodiscard]] std::vector<Npc_s> GetNpcs(const SearchFilter_s& filter) const;
     [[nodiscard]] std::optional<Npc_s> GetNearestNpc(const SearchFilter_s& filter, std::optional<bool> inCombat, bool reachable = false) const;
@@ -102,6 +105,8 @@ public:
     // option there.
     [[nodiscard]] u8 FindGroundItemOp(u16 obj, std::string_view text) const;
     [[nodiscard]] u8 FindItemOp(s32 obj, std::string_view text) const;
+    // An interface inventory's option, such as the bank's "Withdraw 5", by its text.
+    [[nodiscard]] u8 FindInventoryOption(u16 com, std::string_view text) const;
 
     // Each kind of target's menu, with the "Take" and "Drop" the menu adds where the type has nothing
     // there. A type the cache doesn't have has an empty menu, apart from those.
@@ -143,6 +148,12 @@ public:
     bool CastOnGroundItem(u16 spellCom, u16 obj, s32 x, s32 z);
     bool CastOnItem(u16 spellCom, const InventoryItem_s& item);
     void ClickButton(u16 com);
+    // Clicks the component as its button type says. False, sending nothing, when it isn't visible; one
+    // that isn't a button a click uses, such as a spell's Target button, throws std::invalid_argument.
+    bool ClickComponent(u16 com);
+    // Clicks the button under the visible text, in the open interfaces or only in root's. False when there's
+    // no such text, or no button under it.
+    bool ClickText(std::string_view text, std::optional<u16> root);
     void ContinueDialogue();
     void AnswerCountDialog(s32 value);
     void CloseInterfaces();

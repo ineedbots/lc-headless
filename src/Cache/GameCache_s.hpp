@@ -1,5 +1,6 @@
 #pragma once
 
+#include "IfComponent_s.hpp"
 #include "LocType_s.hpp"
 #include "MapSquare.hpp"
 #include "NpcType_s.hpp"
@@ -32,6 +33,8 @@ struct GameCache_s
     std::vector<ObjType_s> objs;
     // Keyed by MapSquare::GetId.
     std::unordered_map<u16, MapSquare> squares;
+    // Every interface component, by id.
+    std::unordered_map<u16, IfComponent_s> components;
 
     [[nodiscard]] const LocType_s* FindLoc(s32 id) const;
     [[nodiscard]] const NpcType_s* FindNpc(s32 id) const;
@@ -39,4 +42,5 @@ struct GameCache_s
     // Empty for TextPool::NO_OPTION.
     [[nodiscard]] std::string_view GetOption(u16 id) const;
     [[nodiscard]] const MapSquare* FindSquare(s32 squareX, s32 squareZ) const;
+    [[nodiscard]] const IfComponent_s* FindComponent(s32 id) const;
 };

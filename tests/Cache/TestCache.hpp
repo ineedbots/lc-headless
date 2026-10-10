@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Cache/GameCache_s.hpp"
+#include "Cache/IfComponent_s.hpp"
 #include "Cache/LocType_s.hpp"
 #include "Cache/NpcType_s.hpp"
 #include "Cache/ObjType_s.hpp"
@@ -28,6 +29,14 @@ public:
     static constexpr u16 RUN_OFF_BUTTON = 152;
     static constexpr u16 RUN_ON_BUTTON = 153;
     static constexpr u16 RUN_VARP = 173;
+    // SetTradeScreen's interface: an "Accept" label over an unlabelled Ok rect, a Close button, and a
+    // layer that starts hidden with a "Waiting" label in it, as trademain has them.
+    static constexpr u16 TRADE_SCREEN = 300;
+    static constexpr u16 TRADE_ACCEPT = 301;
+    static constexpr u16 TRADE_ACCEPT_LABEL = 302;
+    static constexpr u16 TRADE_DECLINE = 303;
+    static constexpr u16 TRADE_STATUS_LAYER = 304;
+    static constexpr u16 TRADE_STATUS = 305;
 
     TestCache() = delete;
 
@@ -36,6 +45,9 @@ public:
     static LocType_s& AddLoc(GameCache_s& cache, u16 id, std::string_view name, std::initializer_list<std::string_view> ops = {});
     // Gives the cache the 289 cache's components and run varp, as the constants above.
     static void SetComponents(GameCache_s& cache);
+    // Adds the components, setting each child's parent from the layers that list it.
+    static void AddComponents(GameCache_s& cache, std::initializer_list<IfComponent_s> components);
+    static void SetTradeScreen(GameCache_s& cache);
     // Replaces the map with squares holding these locs and blocked tiles.
     static void SetMap(GameCache_s& cache, std::span<const TestLoc_s> locs, std::span<const Tile_s> blocked = {});
 };

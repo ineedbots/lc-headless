@@ -92,11 +92,12 @@ namespace
         packet.P1(1);
     }
 
-    void PutColours(Packet& packet, s32 count)
+    // The component's colour, then the samples for the rest.
+    void PutColours(Packet& packet, s32 count, std::optional<u32> colour = std::nullopt)
     {
         for (auto i = 0; i < count; ++i)
         {
-            packet.P4(SAMPLE_COLOUR);
+            packet.P4(i == 0 && colour ? static_cast<s32>(*colour) : SAMPLE_COLOUR);
         }
     }
 
@@ -116,16 +117,17 @@ namespace
         }
     }
 
-    void PutLayer(Packet& packet, std::span<const u16> children)
+    void PutLayer(Packet& packet, const InterfaceComponent_s& component)
     {
         packet.P2(SAMPLE_SIZE);
-        packet.P1(0);
-        packet.P2(static_cast<s32>(children.size()));
-        for (const auto child : children)
+        packet.P1(component.hidden ? 1 : 0);
+        packet.P2(static_cast<s32>(component.children.size()));
+        for (std::size_t i = 0; i < component.children.size(); ++i)
         {
-            packet.P2(child);
-            packet.P2(SAMPLE_OFFSET);
-            packet.P2(SAMPLE_SIZE);
+            packet.P2(component.children[i]);
+            const auto offset = i < component.childOffsets.size() ? component.childOffsets[i] : std::pair<s16, s16>{SAMPLE_OFFSET, SAMPLE_SIZE};
+            packet.P2(offset.first);
+            packet.P2(offset.second);
         }
     }
 
@@ -170,25 +172,25 @@ namespace
         switch (component.type)
         {
         case IF_LAYER:
-            PutLayer(packet, component.children);
+            PutLayer(packet, component);
             return;
         case IF_UNUSED:
             packet.PData(std::array<u8, UNUSED_TYPE_SIZE>{});
             PutCentreFontShadow(packet);
-            PutColours(packet, 1);
+            PutColours(packet, 1, component.colour);
             return;
         case IF_INV:
             PutInv(packet, component);
             return;
         case IF_RECT:
             packet.P1(1);
-            PutColours(packet, RECT_TEXT_COLOUR_COUNT);
+            PutColours(packet, RECT_TEXT_COLOUR_COUNT, component.colour);
             return;
         case IF_TEXT:
             PutCentreFontShadow(packet);
-            packet.PJStr("Click here to logout");
+            packet.PJStr(component.text.value_or("Click here to logout"));
             packet.PJStr("");
-            PutColours(packet, RECT_TEXT_COLOUR_COUNT);
+            PutColours(packet, RECT_TEXT_COLOUR_COUNT, component.colour);
             return;
         case IF_GRAPHIC:
             packet.PJStr(SAMPLE_GRAPHIC);
@@ -199,7 +201,7 @@ namespace
             return;
         case IF_INV_TEXT:
             PutCentreFontShadow(packet);
-            PutColours(packet, 1);
+            PutColours(packet, 1, component.colour);
             packet.P2(SAMPLE_OFFSET);
             packet.P2(SAMPLE_OFFSET);
             packet.P1(1);
@@ -222,7 +224,7 @@ namespace
 
         if (buttonType == BUTTON_OK || buttonType == BUTTON_TOGGLE || buttonType == BUTTON_SELECT || buttonType == BUTTON_CONTINUE)
         {
-            packet.PJStr("Select");
+            packet.PJStr(component.buttonText.value_or("Select"));
         }
     }
 

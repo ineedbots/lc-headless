@@ -236,9 +236,9 @@ Until phases 3 and 4 replace them, scripts keep the interface and magic function
 
 ---
 
-## 6. Phase 3: interfaces from the cache
+## 6. Phase 3: interfaces from the cache (done)
 
-The foundation for phase 4. Today `InterfaceDecoder` reads every component but keeps a few fields, and `CacheLoader` keeps only the ids it looks for.
+The foundation for phase 4. Before it, `InterfaceDecoder` read every component but kept a few fields, and `CacheLoader` kept only the ids it looked for.
 
 ### Decoding
 
@@ -248,7 +248,11 @@ The foundation for phase 4. Today `InterfaceDecoder` reads every component but k
 - the button text, defaulted as `IfType.ts` does: "Ok" for Ok, "Select" for Toggle and Select, and "Continue" for Continue;
 - a Target button's verb and target name (`actionverb` "Cast on" and `action` "Wind strike" in `magic.if`), which name the spells.
 
-`GameCache_s` keeps the whole table, indexed by id, with each component's parent.
+`GameCache_s::components` keeps the whole table (`IfComponent_s`), keyed by id, and `FindComponent(id)` looks one up. Each component has two ids above it:
+- `root`, its interface: the id the cache's run marker gives, which the server opens;
+- `parent`, the layer that lists it among its children, filled in after decoding; `None` for a root, and for a component no layer lists.
+
+The 289 cache has 11,942 components. Kept as `std::string`s, they take an estimated 5 MB, which is shared by every account in the process. Moving their strings into the cache's `TextPool`, and keeping options only on inventories, is left until memory matters.
 
 ### InterfaceView
 
@@ -256,8 +260,8 @@ The foundation for phase 4. Today `InterfaceDecoder` reads every component but k
 
 - **Effective values.** Text, colour and the hidden flag are the server's where it set them, else the cache's.
 - **Visibility.** A component is visible when its root is open (the main, side, chat or overlay modal, or a tab) and nothing above it is hidden.
-- **Positions.** Absolute x and y.
-- **Finding text.** Visible text matched without regard to case.
+- **Positions.** x and y from the interface's corner: each layer's child offset, or the position the server moved it to (`IF_SETPOSITION`), less the layer's scroll position.
+- **Finding text.** Visible text components whose whole text matches, without regard to case, in the open interfaces or in one root's.
 - **`ButtonAt`.** The button a click on a component's centre hits: the last one in child order under that point, as the webclient's `addComponentOptions` lists every button under the mouse and a click takes the last.
 
 ### Clicking
@@ -270,13 +274,19 @@ The foundation for phase 4. Today `InterfaceDecoder` reads every component but k
 | Continue | `RESUME_PAUSEBUTTON` |
 | Close | `CLOSE_MODAL` |
 
-Interface inventories take an option's text as well as its number.
+A Target button raises `ValueError`, since it needs a target (phase 4's magic), and so does a component that isn't a button. A click on a component that isn't visible returns `False` without sending.
+
+Interface inventories take an option's text as well as its number: `inv_button(item, 'Withdraw 5')` finds it among the inventory component's options.
 
 ### Script API
 
-`interfaces.component(id)`, `interfaces.root(id)`, `interfaces.find(text=None, button=None, root=None)`, `interfaces.click(id)`, `interfaces.click_text(text, root=None)` and `interfaces.tab(n)`. They return `Component` snapshots with id, type, button, button text, text, colour, hidden, visible, options, layer, children and position. rs2b0t keeps this layer internal; it's public here as the escape hatch the facades are built on.
+`interfaces.component(id)`, `interfaces.root(id)`, `interfaces.find(text=None, button=None, root=None)`, `interfaces.click(id)`, `interfaces.click_text(text, root=None)` and `interfaces.tab(n)`. They return `Component` snapshots with id, type, button, button text, text, colour, hidden, visible, options, layer, children and position. rs2b0t keeps this layer internal; it's public here as the escape hatch the facades are built on. `interfaces.open()` lists the open roots. The core functions behind them are `get_component`, `get_interface`, `find_components`, `get_open_interfaces`, `get_tab_interface`, `click_component` and `click_text`.
 
-- **Done when:** the decoder, `InterfaceView` and real-cache tests pass (CacheDesign §15.8), and `interfaces.click_text('Accept')` on trademain sends `IF_BUTTON` for the rect under the text.
+The other component-id functions (`continue_dialogue`, `answer_count`, `close_interfaces`, `click_button`, `move_item` and `cast_on_*`) stay until phase 4's facades replace them.
+
+- **Done when:**
+    - [x] The decoder, `InterfaceView` and real-cache tests pass (CacheDesign §15.8). Against the real cache, trademain's "Accept" label hits the rect under it, and multi2's two options are their own Ok buttons.
+    - [x] `click_text('Accept')` on a test trade screen sends `IF_BUTTON` for the rect under the text (`ScriptHostTests`, through `FakeGameServer`).
 
 ---
 
@@ -483,7 +493,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
     - Done when: the porting table names the swapped damage hooks and every rename that exists today.
 1. **The runtime** (§4). Done.
 2. **Entities, items and the game** (§5). Done; ScriptingApi.md is rewritten for the new shape, and grows with each later phase.
-3. **Interfaces from the cache** (§6).
+3. **Interfaces from the cache** (§6). Done.
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7).
 5. **Reach** (§8).
 6. **Walking across levels** (§9).

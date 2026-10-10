@@ -172,7 +172,7 @@ namespace
         WithContext(DescribeFile(CacheStore::ARCHIVES, CacheLoader::INTERFACE_ARCHIVE, "interface"), [&data, &cache]
         {
             const auto interfaces = JagArchive{std::move(data)};
-            const auto components = InterfaceDecoder::Decode(ReadEntry(interfaces, "data"));
+            auto components = InterfaceDecoder::Decode(ReadEntry(interfaces, "data"));
             cache.logoutComponent = FindClientCode(components, ClientCode_e::Logout, "the logout button").id;
             cache.bankComponent = FindClientCode(components, ClientCode_e::BankMode, "the bank").id;
 
@@ -184,6 +184,10 @@ namespace
 
             cache.runOffButton = FindVarpButton(components, cache.runVarp, RUN_OFF, "the run off button").id;
             cache.runOnButton = FindVarpButton(components, cache.runVarp, RUN_ON, "the run on button").id;
+            for (auto& component : components)
+            {
+                cache.components.insert_or_assign(component.id, std::move(component));
+            }
         });
     }
 

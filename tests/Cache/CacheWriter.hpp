@@ -62,8 +62,16 @@ struct InterfaceComponent_s
     // Each a comparator and its operand.
     std::vector<std::pair<u8, u16>> conditions{};
     std::vector<std::vector<u16>> scripts{};
-    // A layer's children.
+    // A layer's children, whether it starts hidden, and its children's offsets, by position; a child past
+    // the offsets given gets a sample offset.
     std::vector<u16> children{};
+    bool hidden = false;
+    std::vector<std::pair<s16, s16>> childOffsets{};
+    // A text component's text, a text, rect or inventory text component's colour, and a button's text.
+    // Left out, each is a sample.
+    std::optional<std::string> text{};
+    std::optional<u32> colour{};
+    std::optional<std::string> buttonText{};
     // An inventory's: whether its items can be used, whether its first slot has a background, and its
     // options, with the slots past them empty.
     bool objUse = false;

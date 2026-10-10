@@ -235,18 +235,44 @@ A destination is a `Tile`, or an `(x, z)` pair on your level.
 - `stop_account()` stops the script and logs the account out.
 - `send_bot_message(username, message)` sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)).
 
-## Interfaces and magic, for now
+## Interfaces
 
-Until the phases that replace them ([BotApiDesign.md](BotApiDesign.md) §14), these take component ids, which stay constants in scripts:
-- `click_button(com)` clicks an interface button;
+`interfaces` reads the game's interfaces as the player sees them: the cache's components, with what the server has set on them (text, colour, hiding, position) taking the cache's place. It's what the coming dialogue, bank, shop and trade facades are built on, and it reaches any interface they don't cover.
+
+```python
+interfaces.click_text('Accept')                      # the trade screen's Accept, wherever its button is
+options = [c.text for c in interfaces.find(button='ok', root=reader.chat_modal())]
+```
+
+| Function | Returns or does |
+|---|---|
+| `component(id)` | A `Component`, or `None` for an id the cache doesn't have |
+| `root(id)` | The interface's components, from its root down, in drawing order |
+| `open()` | The ids of the open interfaces: the main, side and chat modals, the overlay, and each tab's |
+| `tab(n)` | The interface in side tab `n`, 0 to 14, or -1 |
+| `find(text=None, button=None, root=None)` | Visible components with that text (whole, without regard to case) and button type, where each is given, in the open interfaces or only in `root`'s |
+| `click(id)` | Clicks the component as its button type says: `IF_BUTTON` for an Ok, Toggle or Select button, a resume for a Continue button, and closing the interface for a Close button. `False` when it isn't visible; a component that isn't such a button raises `ValueError` |
+| `click_text(text, root=None)` | Clicks the button under the visible text, as a player clicking on the words would; trade's "Accept", for one, is a label over an unlabelled button. `False` when there's no such text, or no button under it |
+
+A `Component` is a snapshot. Its fields:
+- `id`, `root` (its interface) and `layer` (the layer it's in, or `None` for a root);
+- `type`: `'layer'`, `'inv'`, `'rect'`, `'text'`, `'graphic'`, `'model'` or `'invtext'`;
+- `button`: `None`, `'ok'`, `'target'`, `'close'`, `'toggle'`, `'select'` or `'continue'`, and `button_text`, its menu option;
+- `text`, `colour`, `hidden` and `visible` (in an open interface, with nothing above it hidden);
+- `options`: an inventory's five, `None` where empty;
+- `target_verb` and `target_name`: a spell button's, such as "Cast on" and "Wind strike";
+- `x` and `y` from its interface's corner, `width`, `height`, and `children` (ids).
+
+`component.click()` clicks it.
+
+These take numbers still, until phase 4 replaces them ([BotApiDesign.md](BotApiDesign.md) §14):
 - `continue_dialogue()` continues a "click here to continue" dialogue;
 - `answer_count(value)` answers an amount prompt;
 - `close_interfaces()` closes the open ones;
-- `inv_button(item, op)` clicks an option, as a number, on an item in an interface inventory, such as the bank's withdraw options;
+- `click_button(com)` sends a click on a component without checking it;
+- `inv_button(item, op)` uses an option on an item in an interface inventory, such as the bank's: its number, or its text, such as `'Withdraw 5'`;
 - `move_item(com, from_slot, to_slot)` swaps two slots;
 - `cast_on_npc`, `cast_on_player`, `cast_on_loc`, `cast_on_ground_item` and `cast_on_item(spell, target)` cast the spell whose spellbook button component is `spell`. `cast_on_loc` takes `spell, id, x, z`.
-
-The bank's main modal is 5292.
 
 ## Events and hooks
 
@@ -387,7 +413,6 @@ pocketpy's debugger brings some limits:
 
 ## Limits
 
-- **Interfaces are numbers,** until phase 3 of [BotApiDesign.md](BotApiDesign.md). The cache's interface definitions are read only to find a few components, so ids such as the bank's stay constants in scripts, and `inv_button` takes option numbers.
 - **Walking stays in the loaded area,** until phase 6. A tile beyond it is walked to in a straight line.
 - **"Nearest" counts tiles.** A query's `nearest()` measures in tiles, not steps, so with `reachable()` the nearest target that can be reached may still be a long walk round.
 

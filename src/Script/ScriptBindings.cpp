@@ -36,6 +36,7 @@ from rs2004.events import *
 from rs2004.entities import *
 from rs2004.items import *
 from rs2004.game import *
+from rs2004.interfaces import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -828,6 +829,129 @@ _rt_finish = _runtime.finish
         });
     }
 
+    // Interfaces
+
+    std::optional<u16> ToRoot(py_Ref value)
+    {
+        if (py_isnone(value))
+        {
+            return std::nullopt;
+        }
+
+        return PyConvert::ToU16(value, "root");
+    }
+
+    void FromComponents(py_OutRef out, const std::vector<const IfComponent_s*>& components, const InterfaceView& view)
+    {
+        PyConvert::FromList(out, components, [&view](py_OutRef item, const IfComponent_s* component)
+        {
+            PyConvert::FromComponent(item, *component, view);
+        });
+    }
+
+    bool GetComponent(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto view = GetApi().GetInterfaces();
+            const auto* const component = view.Find(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            if (component == nullptr)
+            {
+                return ReturnNone();
+            }
+
+            PyConvert::FromComponent(py_retval(), *component, view);
+            return true;
+        });
+    }
+
+    bool GetInterface(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto view = GetApi().GetInterfaces();
+            FromComponents(py_retval(), view.GetTree(PyConvert::ToU16(py_arg(0), "root")), view);
+            return true;
+        });
+    }
+
+    // Visible components, in the open interfaces or one root's, with that text (without regard to case)
+    // and that button type, where each is given.
+    bool FindComponents(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto view = GetApi().GetInterfaces();
+            const auto text = py_isnone(py_arg(0)) ? std::nullopt : std::optional{PyConvert::ToString(py_arg(0), "text")};
+            const auto button = py_isnone(py_arg(1)) ? std::nullopt : std::optional{PyConvert::ToString(py_arg(1), "button")};
+            const auto root = ToRoot(py_arg(2));
+            const auto roots = root ? std::vector<u16>{*root} : view.GetOpenRoots();
+            auto found = std::vector<const IfComponent_s*>{};
+            const auto lower = [](std::string_view value)
+            {
+                auto result = std::string{value};
+                std::ranges::transform(result, result.begin(), [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+                return result;
+            };
+
+            for (const auto id : roots)
+            {
+                for (const auto* const component : view.GetTree(id))
+                {
+                    if (text && lower(view.GetText(*component)) != lower(*text))
+                    {
+                        continue;
+                    }
+
+                    if (button && PyConvert::GetButtonName(component->buttonType).value_or("") != *button)
+                    {
+                        continue;
+                    }
+
+                    if (view.IsVisible(*component))
+                    {
+                        found.push_back(component);
+                    }
+                }
+            }
+
+            FromComponents(py_retval(), found, view);
+            return true;
+        });
+    }
+
+    bool GetOpenInterfaces(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetInterfaces().GetOpenRoots(), [](py_OutRef item, u16 root)
+            {
+                py_newint(item, root);
+            });
+            return true;
+        });
+    }
+
+    bool GetTabInterface(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& tabs = GetApi().GetState().interfaces.tabs;
+            const auto tab = PyConvert::ToInt(py_arg(0), "tab", 0, static_cast<s64>(tabs.size()) - 1);
+            return ReturnInt(tabs[static_cast<std::size_t>(tab)]);
+        });
+    }
+
+    bool ClickComponent(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().ClickComponent(PyConvert::ToU16(py_arg(0), "id"))); });
+    }
+
+    bool ClickText(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().ClickText(PyConvert::ToString(py_arg(0), "text"), ToRoot(py_arg(1)))); });
+    }
+
     bool GetPlayerMenu(int, py_StackRef) noexcept
     {
         return Guard([]
@@ -1047,7 +1171,17 @@ _rt_finish = _runtime.finish
 
     bool InvButton(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().InventoryButton(PyConvert::ToItem(py_arg(0), "item"), PyConvert::ToOp(py_arg(1)))); });
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
+            {
+                return api.FindInventoryOption(item.com, text);
+            });
+
+            return ReturnBool(api.InventoryButton(item, op));
+        });
     }
 
     bool DropItem(int, py_StackRef argv) noexcept
@@ -1339,6 +1473,13 @@ _rt_finish = _runtime.finish
             {"get_friends()", GetFriends},
             {"get_ignores()", GetIgnores},
             {"get_player_menu()", GetPlayerMenu},
+            {"get_component(id)", GetComponent},
+            {"get_interface(root)", GetInterface},
+            {"find_components(text=None, button=None, root=None)", FindComponents},
+            {"get_open_interfaces()", GetOpenInterfaces},
+            {"get_tab_interface(tab)", GetTabInterface},
+            {"click_component(id)", ClickComponent},
+            {"click_text(text, root=None)", ClickText},
             {"can_reach_entity(x, z)", CanReachEntity},
             {"can_reach_ground_item(x, z)", CanReachGroundItem},
             {"can_reach_loc(id, x, z)", CanReachLoc},

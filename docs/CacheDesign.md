@@ -560,7 +560,7 @@ public:
 ```
 
 - It keeps the fields above, and skips every other field by the sizes `IfType.init` reads. A type above 7, which the webclient would read nothing more for, throws, as an unknown opcode does: `component 11: unknown type 8`.
-- It reads every component, so damage anywhere in the archive throws. The decoded components are only kept until `CacheLoader` has found its ids.
+- It reads every component, so damage anywhere in the archive throws. Since [BotApiDesign.md](BotApiDesign.md) §6, `GameCache_s::components` keeps them all, with their children, text, colours and button text, for the interfaces scripts read and click.
 - Data that ends inside a component's id names the component before it: `data ends inside the id of the component after 4`.
 
 ---

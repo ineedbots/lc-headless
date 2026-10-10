@@ -38,6 +38,17 @@ const ObjType_s* GameCache_s::FindObj(s32 id) const
     return FindType(objs, id);
 }
 
+const IfComponent_s* GameCache_s::FindComponent(s32 id) const
+{
+    if (id < 0)
+    {
+        return nullptr;
+    }
+
+    const auto found = components.find(static_cast<u16>(id));
+    return found == components.end() ? nullptr : &found->second;
+}
+
 std::string_view GameCache_s::GetOption(u16 id) const
 {
     return text.GetOption(id);

@@ -78,6 +78,42 @@ TEST_CASE("InterfaceDecoder reads conditions and scripts", "[InterfaceDecoder]")
     CHECK(components[0].scripts.empty());
 }
 
+TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks components by", "[InterfaceDecoder]")
+{
+    const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces({
+        {.id = 100, .layer = 100, .type = LAYER, .children = {101, 102, 103}, .childOffsets = {{10, -5}, {-3, 7}}},
+        {.id = 101, .type = LAYER, .children = {104}, .hidden = true},
+        {.id = 102, .type = TEXT, .buttonType = BUTTON_OK, .text = "Accept", .colour = 0x00C000, .buttonText = ""},
+        {.id = 103, .type = RECT, .buttonType = BUTTON_CONTINUE, .colour = 0x123456, .buttonText = ""},
+        {.id = 104, .type = GRAPHIC, .buttonType = BUTTON_TARGET},
+        {.id = 105, .layer = 200, .type = TEXT, .buttonType = BUTTON_TOGGLE, .buttonText = ""},
+        {.id = 106, .type = RECT, .buttonType = BUTTON_SELECT, .buttonText = "Punch"},
+    }));
+    REQUIRE(components.size() == 7);
+    const auto& [screen, layer, accept, resume, spell, toggle, select] = std::tie(components[0], components[1], components[2], components[3], components[4], components[5], components[6]);
+
+    // The run marker names each component's interface; the layers that list them name their parents.
+    CHECK((screen.root == 100 && accept.root == 100 && spell.root == 100 && toggle.root == 200));
+    CHECK_FALSE(screen.parent.has_value());
+    CHECK((layer.parent == 100 && accept.parent == 100 && spell.parent == 101));
+    CHECK_FALSE(toggle.parent.has_value());
+
+    REQUIRE(screen.children.size() == 3);
+    CHECK((screen.children[0].id == 101 && screen.children[0].x == 10 && screen.children[0].y == -5));
+    CHECK((screen.children[1].x == -3 && screen.children[1].y == 7));
+    CHECK((layer.hidden && !screen.hidden));
+
+    CHECK((accept.text == "Accept" && accept.colour == 0x00C000));
+    CHECK(resume.colour == 0x123456);
+
+    // A button with no text of its own takes IfType's default.
+    CHECK(accept.buttonText == "Ok");
+    CHECK(resume.buttonText == "Continue");
+    CHECK(toggle.buttonText == "Select");
+    CHECK(select.buttonText == "Punch");
+    CHECK((spell.targetVerb == "Cast" && spell.targetName == "Wind Strike" && spell.buttonText.empty()));
+}
+
 TEST_CASE("InterfaceDecoder reads an inventory's size, use, backgrounds and options", "[InterfaceDecoder]")
 {
     const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces({

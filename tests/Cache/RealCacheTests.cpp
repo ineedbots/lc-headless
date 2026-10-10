@@ -4,9 +4,11 @@
 #include "Cache/CacheLoader.hpp"
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
+#include "Game/InterfaceView.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"
 #include "Game/State/GameState_s.hpp"
+#include "Game/State/Interfaces_s.hpp"
 #include "Game/State/Zone_s.hpp"
 #include "Game/Tile_s.hpp"
 
@@ -221,4 +223,47 @@ TEST_CASE("The real cache's map builds an area's collision", "[RealCache]")
     const auto local = Tile_s{.x = BOOTH.x - state.buildArea.baseX, .z = BOOTH.z - state.buildArea.baseZ};
     CHECK((map.GetCollision(BOOTH.level).GetFlags(local.x, local.z) & CollisionFlag::LOC) != 0);
     CHECK_FALSE(map.GetLocs(BOOTH.level).empty());
+}
+
+TEST_CASE("The real cache's interfaces click as the webclient's do", "[RealCache]")
+{
+    constexpr auto TRADE_SCREEN = u16{3323};
+    constexpr auto TRADE_ACCEPT = u16{3420};
+    constexpr auto TRADE_ACCEPT_LABEL = u16{3421};
+    constexpr auto TWO_OPTIONS = u16{2459};
+    constexpr auto TITLE = u16{2460};
+
+    const auto& cache = RequireRealCache();
+    UNSCOPED_INFO(std::format("{} interface components", cache.components.size()));
+    auto interfaces = Interfaces_s{};
+    interfaces.mainModal = TRADE_SCREEN;
+    interfaces.chatModal = TWO_OPTIONS;
+    const auto view = InterfaceView{cache, interfaces};
+
+    // trademain's "Accept" is a label over an unlabelled rect, which is what a click on it hits.
+    const auto labels = view.FindText("Accept", TRADE_SCREEN);
+    REQUIRE(labels.size() == 1);
+    CHECK(labels[0]->id == TRADE_ACCEPT_LABEL);
+    const auto* const accept = view.ButtonAt(*labels[0]);
+    REQUIRE(accept != nullptr);
+    CHECK(accept->id == TRADE_ACCEPT);
+    CHECK(accept->type == ComponentType_e::Rect);
+    CHECK(accept->buttonType == ButtonType_e::Ok);
+
+    // multi2's options are text components that are their own Ok buttons; its title isn't a button.
+    for (const auto id : {u16{2461}, u16{2462}})
+    {
+        CAPTURE(id);
+        const auto* const option = view.Find(id);
+        REQUIRE(option != nullptr);
+        CHECK(option->type == ComponentType_e::Text);
+        CHECK(option->buttonType == ButtonType_e::Ok);
+        CHECK(option->root == TWO_OPTIONS);
+        const auto* const hit = view.ButtonAt(*option);
+        REQUIRE(hit != nullptr);
+        CHECK(hit->id == id);
+    }
+
+    CHECK(view.Find(TITLE)->buttonType == ButtonType_e::None);
+    CHECK(view.GetText(*view.Find(TITLE)) == "Select an Option");
 }

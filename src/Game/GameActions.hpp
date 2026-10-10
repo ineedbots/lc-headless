@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Cache/IfComponent_s.hpp"
 #include "GameClient.hpp"
 #include "Map/PathFinder.hpp"
 #include "Map/WorldMap.hpp"
@@ -45,6 +46,9 @@ public:
     void MoveItem(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode = DragMode_e::Swap);
 
     void ClickButton(u16 com);
+    // What the webclient sends for a click on a button of that type: IF_BUTTON for Ok, Toggle and Select,
+    // RESUME_PAUSEBUTTON for Continue, and CLOSE_MODAL for Close. Others send nothing.
+    void ClickComponent(u16 com, ButtonType_e buttonType);
     void ContinueDialogue();
     void AnswerCountDialog(s32 value);
     void CloseInterfaces();

@@ -148,6 +148,117 @@ void PyConvert::FromLocType(py_OutRef out, const LocType_s& type, const GameCach
     SetBool(object, "blocks_projectiles", type.blockRange);
 }
 
+void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, const InterfaceView& view)
+{
+    const auto object = NewInstance(out, COMPONENT_CLASS);
+    SetInt(object, "id", component.id);
+    SetInt(object, "root", component.root);
+    if (component.parent)
+    {
+        SetInt(object, "layer", *component.parent);
+    }
+    else
+    {
+        SetNone(object, "layer");
+    }
+
+    SetString(object, "type", GetTypeName(component.type));
+    const auto button = GetButtonName(component.buttonType);
+    SetOptionalString(object, "button", button.value_or(std::string_view{}));
+    SetOptionalString(object, "button_text", component.buttonText);
+    SetString(object, "text", view.GetText(component));
+    SetInt(object, "colour", view.GetColour(component));
+    SetBool(object, "hidden", view.IsHidden(component));
+    SetBool(object, "visible", view.IsVisible(component));
+    SetOptionalString(object, "target_verb", component.targetVerb);
+    SetOptionalString(object, "target_name", component.targetName);
+    const auto position = view.GetPosition(component);
+    SetInt(object, "x", position.x);
+    SetInt(object, "y", position.y);
+    SetInt(object, "width", component.width);
+    SetInt(object, "height", component.height);
+
+    // As SetOptions: each list stays on the value stack until the object holds it.
+    const auto children = py_pushtmp();
+    py_newlist(children);
+    for (const auto& child : component.children)
+    {
+        py_newint(py_list_emplace(children), child.id);
+    }
+
+    py_setdict(object, py_name("children"), children);
+    py_pop();
+
+    if (component.type != ComponentType_e::Inv)
+    {
+        SetNone(object, "options");
+        return;
+    }
+
+    const auto options = py_pushtmp();
+    py_newlist(options);
+    for (const auto& option : component.options)
+    {
+        const auto item = py_list_emplace(options);
+        py_newnone(item);
+        if (!option.empty())
+        {
+            FromString(item, option);
+        }
+    }
+
+    py_setdict(object, py_name("options"), options);
+    py_pop();
+}
+
+std::string_view PyConvert::GetTypeName(ComponentType_e type)
+{
+    switch (type)
+    {
+    case ComponentType_e::Layer:
+        return "layer";
+    case ComponentType_e::Unused:
+        return "unused";
+    case ComponentType_e::Inv:
+        return "inv";
+    case ComponentType_e::Rect:
+        return "rect";
+    case ComponentType_e::Text:
+        return "text";
+    case ComponentType_e::Graphic:
+        return "graphic";
+    case ComponentType_e::Model:
+        return "model";
+    case ComponentType_e::InvText:
+        return "invtext";
+    }
+
+    return "unknown";
+}
+
+std::optional<std::string_view> PyConvert::GetButtonName(ButtonType_e button)
+{
+    switch (button)
+    {
+    case ButtonType_e::None:
+        return std::nullopt;
+    case ButtonType_e::Ok:
+        return "ok";
+    case ButtonType_e::Target:
+        return "target";
+    case ButtonType_e::Close:
+        return "close";
+    case ButtonType_e::Toggle:
+        return "toggle";
+    case ButtonType_e::Select:
+        return "select";
+    case ButtonType_e::Continue:
+        return "continue";
+    }
+
+    return std::nullopt;
+}
+
 void PyConvert::FromString(py_OutRef out, std::string_view text)
 {
     py_newstrv(out, c11_sv{text.data(), static_cast<int>(text.size())});

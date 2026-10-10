@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../Game/FakeGameServer.hpp"
 #include "../Game/Fixtures.hpp"
+#include "../Cache/TestCache.hpp"
 #include "../Game/TestWorld.hpp"
 #include "../LogCapture.hpp"
 #include "../TempFolder.hpp"
@@ -12,6 +13,7 @@
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
+#include "Io/Packet.hpp"
 #include "Script/BotMessenger.hpp"
 #include "Script/ProgressReport_s.hpp"
 #include "Script/ScriptError.hpp"
@@ -828,6 +830,29 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
     {
         return entry.level == LogLevel_e::Warning && entry.message.find("settings.colour, which its settings schema doesn't declare") != std::string::npos;
     }));
+}
+
+TEST_CASE("ScriptHost clicks the button under an interface's text", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+def loop():
+    log('>', 'clicked', interfaces.click_text('accept'), interfaces.click_text('Nothing here'))
+    stop_script()
+)python"};
+    auto openMain = Packet{};
+    openMain.P2(TestCache::TRADE_SCREEN);
+    fixture.server.Send(ServerProt_e::IfOpenMain, Fixtures::ToBytes(openMain));
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && fixture.client.GetState().interfaces.mainModal != TestCache::TRADE_SCREEN)
+    {
+        fixture.client.Pump(PUMP_STEP);
+    }
+
+    fixture.host->Step(Clock::now());
+    fixture.client.Flush();
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"clicked True False"});
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    CHECK(fixture.server.GetPackets(ClientProt_e::IfButton)[0].payload == std::vector<u8>{TestCache::TRADE_ACCEPT >> 8, TestCache::TRADE_ACCEPT & 0xFF});
 }
 
 TEST_CASE("The example scripts load without warnings", "[ScriptHost]")

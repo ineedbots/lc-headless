@@ -4,6 +4,7 @@
 #include "../Cache/LocType_s.hpp"
 #include "../Cache/NpcType_s.hpp"
 #include "../Cache/ObjType_s.hpp"
+#include "../Game/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/State/Player_s.hpp"
@@ -60,6 +61,7 @@ public:
     static constexpr auto NPC_TYPE_CLASS = "NpcType";
     static constexpr auto ITEM_TYPE_CLASS = "ItemType";
     static constexpr auto LOC_TYPE_CLASS = "LocType";
+    static constexpr auto COMPONENT_CLASS = "Component";
     // A world object's tile, which the stdlib's tile() reads, and its menu, which actions() reads.
     static constexpr auto X_FIELD = "_x";
     static constexpr auto Z_FIELD = "_z";
@@ -76,6 +78,11 @@ public:
     static void FromNpcType(py_OutRef out, const NpcType_s& type, const GameCache_s& cache);
     static void FromItemType(py_OutRef out, const ObjType_s& type, const GameCache_s& cache);
     static void FromLocType(py_OutRef out, const LocType_s& type, const GameCache_s& cache);
+    // A component as the player sees it now.
+    static void FromComponent(py_OutRef out, const IfComponent_s& component, const InterfaceView& view);
+    // The webclient's names for a component's type and button, in lower case.
+    [[nodiscard]] static std::string_view GetTypeName(ComponentType_e type);
+    [[nodiscard]] static std::optional<std::string_view> GetButtonName(ButtonType_e button);
     static void FromString(py_OutRef out, std::string_view text);
     static void FromPoint(py_OutRef out, s32 x, s32 z);
 

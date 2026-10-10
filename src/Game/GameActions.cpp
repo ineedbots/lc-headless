@@ -195,6 +195,27 @@ void GameActions::ClickButton(u16 com)
     m_client.Send(ClientPackets::IfButton(com));
 }
 
+void GameActions::ClickComponent(u16 com, ButtonType_e buttonType)
+{
+    switch (buttonType)
+    {
+    case ButtonType_e::Ok:
+    case ButtonType_e::Toggle:
+    case ButtonType_e::Select:
+        m_client.Send(ClientPackets::IfButton(com));
+        return;
+    case ButtonType_e::Continue:
+        m_client.Send(ClientPackets::ResumePauseButton(com));
+        return;
+    case ButtonType_e::Close:
+        m_client.Send(ClientPackets::CloseModal());
+        return;
+    case ButtonType_e::None:
+    case ButtonType_e::Target:
+        return;
+    }
+}
+
 void GameActions::ContinueDialogue()
 {
     // The engine resumes whichever script waits on a pause button and ignores the component.
