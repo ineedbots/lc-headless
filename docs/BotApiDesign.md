@@ -1,0 +1,466 @@
+# Bot API Design
+
+Plan for a script API with the abilities of rs2b0t's bot API, written the way Python is: rs2b0t's facades, query builder, bot classes, world walker, random-event guardian and catalogs, with snake_case names, and generators where rs2b0t awaits. The client hasn't been released, so this replaces today's flat API ([ScriptingApi.md](ScriptingApi.md)) outright; nothing keeps the old names. plutonium-rsc's abilities are a subset of rs2b0t's, and its scripts port through a table in ScriptingApi.md. rs2b0t's quest and clue engines are left for a later project. The work comes in nine phases after a docs fix (§14). Code style follows [CONVENTIONS.md](CONVENTIONS.md). It extends the interface decoding in [CacheDesign.md](CacheDesign.md) §6, the paths in CacheDesign §10–11, and the runtime, events and API in [ScriptingDesign.md](ScriptingDesign.md) §3–6, whose naming rule it replaces.
+
+Reference sources:
+
+- `rs2b0t/packages/rs2b0t-api/index.d.ts`: the public API, every facade, class and catalog this design mirrors
+- `rs2b0t/docs/reference/api-*.md`: what each facade does, and its gotchas
+- `rs2b0t/src/bot/api/`: the facades' implementations, and the reusable behaviours bundled bots share (`tasks/`, `sustain/`, `combat/`, `loadout/`, `walking/Reach.ts`)
+- `rs2b0t/src/bot/event/webwalk/` and `docs/reference/nav-*.md`, `transports-2004.md`: the world walker, and its data in `webwalk/data/` (`doors.json`, `stairEdges.json`, `transports.json`, `specialCrossings.ts`, `dangerZones.ts`), `travelCatalog.ts` and `teleportCatalog.ts`
+- `rs2b0t/src/bot/runtime/`: `randomevents/` (the guardian and its solvers), `StallGuard.ts`, `RunManager.ts`, `Settings.ts`, `defineBot.ts`
+- `rs2b0t/src/bot/data/`: the catalogs
+- `rs2b0t/LICENSE`: MIT. Ported code and data keep its notice (§2)
+- `plutonium-rsc/script.go`: plutonium's names, for its porting table
+- `289server/webclient/src/config/IfType.ts` and `client/Client.ts` (`addComponentOptions`): the interface format, default button texts, and which button a click hits
+- `289server/content/scripts/`: the interfaces and scripts each helper drives, named where they're used below; `macro events/` for the random events
+- pocketpy 2.2.0 `src/compiler/compiler.c` (`compile_yield_from`) and `src/interpreter/generator.c`: `yield from` evaluates to the inner generator's return value, and generators have `__next__` only, no `send`, `throw` or `close`
+
+---
+
+## 1. Decisions
+
+| Topic | Decision |
+|---|---|
+| Shape | rs2b0t's: facades named after game nouns (`npcs`, `inventory`, `bank`, `chat_dialog`, `traversal`), a chainable `query()` for entities, and entities with methods (`npc.interact('Attack')`, `item.use_on(range)`). An rs2b0t bot translates to Python mostly by renaming (§3) |
+| Names | camelCase becomes snake_case. A facade object is lower-case (`Npcs` is `npcs`, `ChatDialog` is `chat_dialog`, `GroundItems` is `ground_items`); classes keep CapWords (`Tile`, `LoopingBot`). A name that's a Python keyword gains a trailing underscore, as PEP 8 suggests (`chat_dialog.continue_()`) |
+| Waiting | Where rs2b0t `await`s, a script writes `yield from`. A call that waits is a generator, and its result is the generator's return value: `ok = yield from bank.withdraw_x('Feather', 100)`. pocketpy has no `send`, so results come back by `return` only |
+| Two layers | A C++ core (`ScriptApi`, bound as the private `_core` module) holds the state, fast searches, the interface model, packets and path search. A Python standard library, embedded in the executable, holds the facades, waits, bots, walker, random-event solvers and catalogs. Those are mostly sequencing (open, wait, check, retry), which reads best as generators and ports from rs2b0t's TypeScript line by line. This replaces ScriptingDesign §2's rule that all game logic is C++ |
+| Bots | rs2b0t's `LoopingBot`, `TaskBot` and `TreeBot`. A script that only defines `loop()` and hooks is a `LoopingBot` |
+| Settings | rs2b0t's typed schema. A script declares types, defaults, ranges and options, and the account file's settings are checked against it before login |
+| Events | rs2b0t's event bus (`events.on`, `bot.on`), with its events and ours under one set of names. A hook is a bot method or module function named `on_<event>` |
+| Walking | rs2b0t's walker: A* over the cache's collision plus a graph of doors, stairs, ladders, ships and other transports from rs2b0t's data, across levels, with requirements, special crossings, stuck recovery and optional teleports |
+| Random events | rs2b0t's guardian and solvers, run by the host between bot steps |
+| Catalogs | rs2b0t's data tables and planners, and its shared script behaviours, as stdlib modules |
+| Interface ids | Found in the cache by what it says about them, as `CacheLoader` finds the bank and the run buttons (CacheDesign §6). Nothing is tied to the 289 content's numbering |
+| Not ported | What a headless client has no use for: paint and the HUD, the camera, the bot panel and its map picker, the multibox wall, scene-build and render state, and browser artifacts such as bank snapshot generations. Also rs2b0t's quest and clue engines and its market price books, for now |
+
+Rejected:
+
+- **Flat functions** (today's `get_nearest_npc`, `interact_npc`) or keyword filters (`npcs.nearest(name=..., within=3)`). Either reads fine in Python, but rs2b0t's 52 bots and its manual would then need rethinking rather than translating.
+- **async/await.** pocketpy has no event loop, and generators with `yield from` already give the same shape.
+- **The whole library in C++.** The walker's executor, the solvers and the bank flows are long chains of wait-and-check steps. In C++ each would be a state machine; in Python each is a function, close to rs2b0t's.
+- **Python files in `scripts/lib`** for the library. It would version separately from the client it needs. Embedding keeps the two in step.
+- **Baking rs2b0t's collision pack.** It's built from an engine's map files; this client already reads the same collision from the cache.
+
+---
+
+## 2. Layers and layout
+
+```
+src/
+├── Script/
+│   ├── ScriptApi.hpp/.cpp      the core: state, searches, interfaces, packets, path search (bound as _core)
+│   ├── ScriptBindings.cpp      binds _core; the prelude shrinks to what the stdlib needs at startup
+│   ├── ScriptHost.cpp          drives a bot: steps, waits, events, the random-event guardian, stall guard
+│   ├── Stdlib/                 the Python standard library, embedded at build time
+│   │   ├── bot.py              AbstractBot, LoopingBot, TaskBot, TreeBot, define_bot, settings
+│   │   ├── execution.py        delays and waits
+│   │   ├── geometry.py         Tile, Area
+│   │   ├── entities.py         Npc, Player, Loc, GroundItem, EntityQuery, npcs, players, locs, ground_items
+│   │   ├── items.py            InvItem, inventory, equipment
+│   │   ├── game.py             game, skills, prayer, special, magic, reader
+│   │   ├── bank.py             bank, banking, deposit matchers
+│   │   ├── ui.py               chat_dialog, shop, trade, quests, interfaces
+│   │   ├── walking/            traversal, direct_navigator, reach, the executor and crossings
+│   │   ├── randomevents/       the guardian and solvers
+│   │   └── catalogs/           data tables, planners and behaviours (§12)
+│   └── StdlibSources.cmake     turns Stdlib/*.py into a generated header
+├── Game/
+│   ├── InterfaceView.hpp/.cpp  the cache's components merged with what the server set (§6)
+│   └── Map/
+│       ├── CollisionMap.hpp/.cpp   size becomes a constructor argument
+│       ├── SquareCollision.hpp/.cpp  a square's collision, shared by WorldMap and WalkMap
+│       ├── WalkMap.hpp/.cpp        the whole world's walkable directions, built once from the cache (§9)
+│       ├── NavGraph.hpp/.cpp       doors, stairs, transports and teleports from data/nav (§9)
+│       └── WorldPathFinder.hpp/.cpp  A* over WalkMap and NavGraph (§9)
+data/nav/                       rs2b0t's walker data, with its license (§9)
+third_party/rs2b0t/LICENSE      rs2b0t's MIT notice, for the ported code and data
+tools/nav/convert_rs2b0t.py     one-off: rs2b0t's TypeScript data tables to JSON
+scripts/typings/                the stubs, for the whole library
+scripts/examples/               rewritten bots (§14)
+tests/Stdlib/                   Python tests run in the VM (§13)
+```
+
+- **The core** keeps today's `ScriptApi` and grows with each phase. Its bindings become one private builtin module, `_core`, which only the stdlib imports. Scripts never see it.
+- **The stdlib** lives in `src/Script/Stdlib/`. CMake embeds each file as a string, and the import callback resolves those modules before `scripts/` and `scripts/lib/`, so a script can't shadow them by accident. A failure in the stdlib carries its own file and line, as a script's does.
+- **Builtins.** At startup each VM imports the stdlib's core modules and puts their public names in `builtins`, as the API is today, so scripts need no imports. Catalogs, which have hundreds of names, stay in their module: `from catalogs import nearest_bank`.
+- **Ported code** keeps rs2b0t's MIT notice. Each ported module names the rs2b0t file it came from, which is also where a reader goes to compare behaviour.
+
+---
+
+## 3. Translating an rs2b0t bot
+
+| TypeScript | Python |
+|---|---|
+| `class Miner extends LoopingBot { loop() {...} }` | `class Miner(LoopingBot): def loop(self): ...` |
+| `await Execution.delayUntil(() => Inventory.isFull(), 3000)` | `yield from execution.delay_until(lambda: inventory.is_full(), 3000)` |
+| `Npcs.query().name('Guard').within(3).nearest()` | `npcs.query().name('Guard').within(3).nearest()` |
+| `await item.interact('Bury')` | `item.interact('Bury')`, or `yield from` when the call waits (§5) |
+| `this.settings.str('rock', 'Copper rocks')` | `self.settings.str('rock', 'Copper rocks')` |
+| `this.on('skill.xp', e => ...)` | `self.on('skill_xp', lambda e: ...)` |
+| `Game.tile()?.x` | `t = game.tile()`, then `t.x if t else None` |
+| `export default defineBot({...})` | `BOT = define_bot(...)` |
+
+The stubs in `scripts/typings` mark every generator `-> Generator[..., None, T]`, so Pylance shows where `yield from` is needed.
+
+---
+
+## 4. Phase 1: the runtime
+
+### Steps and waits
+
+`loop()` returns a delay in milliseconds, or is a generator, as today. What a generator may yield grows. The stdlib's waits yield these; scripts use the waits, not the values:
+
+| Yielded | The host resumes it |
+|---|---|
+| An `int` ≥ 0 | After that many milliseconds, as today |
+| `UPDATE` | After the next pump that decoded any packet, when the state may have changed |
+| `Ticks(n)` | After `n` more server ticks |
+
+`execution` mirrors rs2b0t's `Execution`:
+
+| Function | Returns |
+|---|---|
+| `delay(ms)`, `delay_ticks(n)` | Nothing, once the time has passed |
+| `delay_until(cond, timeout_ms=6000)` | `True` as soon as `cond()` holds, re-checked after each `UPDATE`; `False` at the timeout |
+| `delay_until_ticks(cond, max_ticks)` | The same, bounded in ticks |
+| `note_progress()` | Tells the stall guard (§11) about work it can't see |
+
+Each resume is a separate call into Python, so `scripting.callTimeoutMs` bounds each stretch between yields, as it does today.
+
+### Bots
+
+| Class | Does |
+|---|---|
+| `AbstractBot` | `loop_delay`, `loop_cadence` (`{'kind': 'update' or 'server_tick' or 'time', ...}`), `settings`, `log(msg)`, `on(event, cb)`, and the optional `on_start()`, `on_stop(reason)`, `recovery_anchor()`, `grind_targets()` and `ignored_randoms()` |
+| `LoopingBot` | `loop()` returns a delay, or `None` for `loop_delay`, or is a generator |
+| `TaskBot` | `add(*tasks)` in `on_start`, highest priority first. Each step runs the `execute()` of the first task whose `validate()` holds; `execute` may be a generator |
+| `TreeBot` | `root()` returns a `BranchTask` (`validate()`, `success()`, `failure()`) or a `LeafTask` (`execute()`); each step walks the tree to a leaf and runs it |
+
+- A script sets `BOT = define_bot(name=..., description=None, version=None, category=None, tags=None, settings_schema=None, create=Miner)`. Without `BOT`, its module-level `loop()`, `on_*` functions and `SETTINGS_SCHEMA` act as a `LoopingBot`.
+- `on_stop(reason)` runs after `stop_script()`, `stop_account()`, a script error and Ctrl+C, as rs2b0t's does after a stop or a crash. It can't wait.
+- rs2b0t's `on_pause` and `on_resume` have nothing to call them headlessly, and `on_paint` gives way to progress reports, which stay as they are.
+
+### Settings
+
+`settings_schema` maps each key to a `SettingDef(type, default, label=None, min=None, max=None, help=None, options=None, group=None)`. The type is `'boolean'`, `'number'`, `'string'`, `'string[]'` or `'tile'`, as rs2b0t's.
+
+- At load, the account file's `script.settings` is checked against the schema. A wrong type, a number out of range, or a value not in `options` fails that account before login, naming the key. Missing keys take their defaults, and keys the schema doesn't know draw a warning.
+- `self.settings` is a `SettingsBag` with rs2b0t's getters (`bool`, `num`, `str`, `list`, `tile`, `raw`), and keeps today's attribute access (`settings.rock`).
+
+### Events
+
+Every event has one name, used by `events.on(name, cb)`, `bot.on(name, cb)` (removed when the bot stops) and the `on_<name>` hook:
+
+| Event | Arguments | From |
+|---|---|---|
+| `tick` | tick | rs2b0t; today's `on_server_tick` |
+| `chat_message` | `ChatLine` (type, username, text) | rs2b0t; replaces today's `on_chat_message(msg, sender)` |
+| `skill_xp` | skill, name, xp, delta | rs2b0t |
+| `skill_level` | skill, name, level, previous | rs2b0t |
+| `inventory_changed` | slot, id, name, count, previous_id, previous_count | rs2b0t, for the backpack, one per changed slot |
+| `varp_changed` | index, value, previous | rs2b0t |
+| `script_finish` | reason | rs2b0t |
+| `server_message`, `private_message`, `trade_request`, `duel_request` | as today, the sender first | today |
+| `npc_spawned`, `npc_despawned`, `npc_damaged`, `player_spawned`, `player_despawned`, `player_damaged`, `damaged`, `ground_item_spawned`, `ground_item_despawned`, `ground_item_changed`, `loc_changed`, `interface_changed`, `system_update`, `disconnect`, `reconnect`, `kill_signal`, `bot_message`, `progress_report` | as today | today |
+
+`death`, `npc_say` and `projectile` come in phase 8 (§11). Callbacks run between steps and can't wait, as rs2b0t's fire mid-frame: they set flags, and `loop()` does the work.
+
+### Geometry
+
+`Tile(x, z, level=None)` with `distance_to` (Chebyshev), `translate`, `==`, and `Tile.from_tile(t)`. `Area.rectangular(a, b)`, `Area.circular(center, radius)` and `Area.polygon(points)` (plutonium's), with `contains(tile)` and `get_random_tile()`.
+
+### Done when
+
+- `tests/Stdlib` runs, and covers the waits, the three bot classes, settings checks and every event's arguments.
+- The examples are rewritten as `LoopingBot` and `TaskBot` bots and run against the local engine.
+- `delay_until` resumes on the pump after the state changes, not on the next poll.
+
+---
+
+## 5. Phase 2: entities, items and the game
+
+These facades sit on the core's existing searches and actions, which move into `_core`. Calls that only send a packet return a bool at once; calls that wait for the outcome are generators.
+
+| Facade | Python | Notes |
+|---|---|---|
+| `npcs`, `players`, `locs`, `ground_items` | `query()`; `npcs.all()`; `npcs.nearest(count=None)` | |
+| `EntityQuery` | `name(*names)`, `action(action)`, `within(dist)`, `within_of(origin, dist)`, `inside(area)`, `where(pred)`, then `results()`, `nearest()`, `nearest_prefer_local(prefer_radius)`, `first()`, `exists()`, `count()` | Also `id(*ids)` and `reachable()`, which the core already supports. The filters run in C++ in one call; `where` runs in Python after |
+| `Npc` | `name`, `id`, `level`, `index`, `size`, `in_combat`, `health`; `tile()`, `network_tile()`, `distance()`, `actions()`, `valid()`, `targets_me()`, `targets_another_player()`, `interact(action)` | A snapshot, as objects are today; `valid()` looks the index up again |
+| `Player` | `name`, `index`, `in_combat`, `combat_level`; `tile()`, `distance()`, `actions()`, `targets_me()`, `interact(action)` | `interact` is ours; rs2b0t reaches players through the menu |
+| `Loc`, `GroundItem` | `name`, `id` (and `count`); `tile()`, `distance()`, `actions()`, `interact(action)` | |
+| `inventory` | `items()`, `first(name)`, `contains(name)`, `count(name)`, `count_by_id(id)`, `used()`, `free()`, `is_full()` | While the bank is open these read the backpack beside it, as rs2b0t's do |
+| `InvItem` | `name`, `id`, `slot`, `count`, `noted`; `actions()`, `interact(action)`, `use_on(target)` | `use_on` takes an `InvItem`, `Loc`, `Npc`, `Player` or `GroundItem` |
+| `equipment` | `items()`, `contains(name)`, `equip(name)`, `unequip(name)` | `equip` and `unequip` are generators that wait for the item to move |
+| `skills` | `index(name)`, `level(name)`, `effective(name)`, `xp(name)`, `hp_fraction()` | Names are lower-case, as rs2b0t's |
+| `game` | `ingame()`, `tile()`, `energy()`, `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `tick()`, `my_name()` | `ingame()` also covers rs2b0t's `scene_ready()`: the player is placed and the map is built |
+| `reader` | `varp(id)` and the other raw reads | For what no facade covers, as in rs2b0t |
+
+Kept from today's API because rs2b0t has nothing public for them: `chat.say(text)`, `chat.send_pm(name, text)`, `chat.command(text)`, `friends` and `ignores` (`list()`, `add(name)`, `remove(name)`), `send_bot_message`, `stop_script`, `stop_account`, `log` and `debug`.
+
+- **Done when:** the entity, item and game tests pass, and a fighter that eats and loots, and a power-miner, run against the local engine.
+
+---
+
+## 6. Phase 3: interfaces from the cache
+
+The foundation for phase 4. Today `InterfaceDecoder` reads every component but keeps a few fields, and `CacheLoader` keeps only the ids it looks for.
+
+### Decoding
+
+`InterfaceDecoder` keeps:
+- each layer's children with their signed x and y;
+- the hide flag, text and colour;
+- the button text, defaulted as `IfType.ts` does: "Ok" for Ok, "Select" for Toggle and Select, and "Continue" for Continue;
+- a Target button's verb and target name (`actionverb` "Cast on" and `action` "Wind strike" in `magic.if`), which name the spells.
+
+`GameCache_s` keeps the whole table, indexed by id, with each component's parent.
+
+### InterfaceView
+
+`InterfaceView` merges the cache's components with what the server set (`Interfaces_s`):
+
+- **Effective values.** Text, colour and the hidden flag are the server's where it set them, else the cache's.
+- **Visibility.** A component is visible when its root is open (the main, side, chat or overlay modal, or a tab) and nothing above it is hidden.
+- **Positions.** Absolute x and y.
+- **Finding text.** Visible text matched without regard to case.
+- **`ButtonAt`.** The button a click on a component's centre hits: the last one in child order under that point, as the webclient's `addComponentOptions` lists every button under the mouse and a click takes the last.
+
+### Clicking
+
+`GameActions::ClickComponent` sends what the webclient sends:
+
+| Button | Sends |
+|---|---|
+| Ok, Toggle, Select | `IF_BUTTON` |
+| Continue | `RESUME_PAUSEBUTTON` |
+| Close | `CLOSE_MODAL` |
+
+Interface inventories take an option's text as well as its number.
+
+### Script API
+
+`interfaces.component(id)`, `interfaces.root(id)`, `interfaces.find(text=None, button=None, root=None)`, `interfaces.click(id)`, `interfaces.click_text(text, root=None)` and `interfaces.tab(n)`. They return `Component` snapshots with id, type, button, button text, text, colour, hidden, visible, options, layer, children and position. rs2b0t keeps this layer internal; it's public here as the escape hatch the facades are built on.
+
+- **Done when:** the decoder, `InterfaceView` and real-cache tests pass (CacheDesign §15.8), and `interfaces.click_text('Accept')` on trademain sends `IF_BUTTON` for the rect under the text.
+
+---
+
+## 7. Phase 4: dialogue, make menus, bank, shop, trade and tabs
+
+Every facade here is rs2b0t's, and each helper that waits is a generator. Where an interface has to be recognised, it's by shape, as follows.
+
+### chat_dialog
+
+`is_open()`, `can_continue()`, `continue_()`, `options()`, `choose_option(match=None)`, `texts()`, `is_make_menu()`, `make_products()`, `make(match=None)`, `make_one(match=None)`, `make_x(match, count)`, `is_main_make_panel()`, `main_make_products()`, `make_from_panel(match, op=None)` and `make_from_panel_max(match)`.
+
+- **Options** are the visible Text components with an Ok button and text in the open chat modal, in child order. The engine's `p_choice2` to `p_choice5` set them on `multi2` to `multi5`, and `multiobj2` (cooking's karambwan choice) works the same way. A button sharing its rectangle with another isn't an option. `choose_option` matches by substring, as rs2b0t's does.
+- **Chat make menus** are groups of two or more Ok buttons with one rectangle, one button per amount:
+    - `skill_multi2` to `skill_multi5`: fletching, spinning, pottery, glass, leather, silver crafting and armour-making, with "Make 1", "Make 5", "Make 10" and "Make X".
+    - The furnace's `smelting`: "Smelt 1 @lre@Bronze" … "Smelt X @lre@Bronze".
+    - A product's name is its text without line breaks or colour tags (`\n\n\n\nOak Long Bow`, `\n\n\n\n@blu@Silver sickle`), or else what follows the colour tag in its button text.
+- **Main make panels** are of two kinds:
+    - Stacked groups in the main modal: the tanner's "Tan 1" … "Tan all @lre@Soft Leathers".
+    - Inventories whose options are one verb with amounts: the anvil's "Make", "Make 5" and "Make 10", and gold jewellery's. Jewellery fills its slots with invisible placeholders (`invis_ring1`) and draws each product as an object over its slot, so a slot's product is that object.
+    - The bank, shop and trade inventories, though shaped alike, are left out.
+- **Make X**: `make_x` clicks "X", waits for the count dialog (`skill_multi2` and the furnace call `p_countdialog` after the click), answers it, and waits for the menu to close, as rs2b0t's does. Phase 4 checks against the engine the largest count the dialog takes, and that each skill stops cleanly when the materials run out first.
+
+### bank and banking
+
+- **`bank`:** `is_open()`, `ready()`, `wait_ready(timeout_ms=None)`, `set_note_mode(on)`, `items()` (`BankItem`: slot, id, name, count, ops, com), `count(name)`, `count_by_id(id)`, `withdraw(name, op=None)`, `withdraw_by_id(id, op=None)`, `withdraw_x(name, count)`, `withdraw_x_by_id(id, count, lands_as_id=None)`, `withdraw_load(name)`, `deposit(name, op=None)`, `deposit_inventory()`, `deposit_all_matching(match)`, `open_booth(stand, booth_name, op)`, `open_nearest(booth_name, op)`, `open_nearest_access(access)` and `close(timeout_ms=None)`. Also `withdraw_op(ops, amount)`.
+- **`banking`:** `open(stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=NEARBY_BANK_RADIUS)` and `bank_nearest(deposit, common_junk=True, destination=None, return_to=None, booth_name=..., booth_op=..., after_deposit=None)`, with rs2b0t's open rules. Until phase 6 they open banks already in the scene; walking to a distant bank arrives with the walker.
+- **Deposit helpers:** `deposit_all_except(keep)`, `deposit_matcher(own, include_common)`, `matches_common_bank_loot(name, id=None)`, `COMMON_BANK_LOOT`, `RANDOM_EVENT_CASKET_ID`, `PERIODIC_BANK_SETTINGS`, `parse_bank_strategy(label)` and `should_bank_now(strategy, state)`.
+- **Ids:** the bank is the existing `bankComponent` and `bankInventoryComponent`. The deposit and withdraw generators wait for the inventory update that follows, so rs2b0t's snapshot-generation calls have no counterpart.
+
+### shop and trade
+
+- **`shop`:** `is_open()`, `open(npc_name)`, `stock()` (`ShopItem`: name, count, slot), `buy(name, n)` and `buy_by_id(id, n)`, which return the units bought, `sell(name, n)`, `sell_all(name)` and `close()`. Buying adds up 10s, 5s and 1s. The engine runs 5 user packets a tick and keeps the rest, so `buy` waits for each batch to land before counting.
+- **`trade`:** `active()`, `on_offer_screen()`, `on_confirm_screen()`, `partner()` (from the offer screen's "Trading With:" text, as `trade.rs2` sets it), `my_offer()`, `their_offer()` (`TradeItem`: id, name, count), `request(player_name)`, `offer_all(item_name, pick=None)`, `offer(item_name, n, pick=None)`, `remove_all()`, `accept()` (`click_text('Accept')` on whichever screen is open) and `decline()`.
+- **Ids,** found at load as `bankInventoryComponent` is, each by the inventory's options:
+    - the shop's stock: "Value", "Buy 1";
+    - the backpack beside it: "Value", "Sell 1";
+    - your offer: "Remove";
+    - their offer: the other inventory in that layer;
+    - the backpack beside the trade: "Offer";
+    - the confirm screen's two inventories, in id order. Phase 4 checks against `trade.rs2` that `tradeconfirm:inv1` is yours.
+
+### quests, prayer, special, combat and magic
+
+| Facade | Python | Found by |
+|---|---|---|
+| `quests` | `all()`, `status(name)` (`'not_started'`, `'in_progress'`, `'complete'` or `'unknown'`), `points()`, `journal(name)` | The quest tab's Ok buttons with text; status from the colour the server set (red, yellow, green), as rs2b0t reads it. `points()` is varp 101 |
+| `prayer` | `points()`, `max()`, `full()`, `known(name)`, `available(name)`, `active(name)`, `set(name, on)`, `clear()` | The prayer tab's Toggle buttons in child order, each with its own varp; names and levels from a table in `prayer.if`'s order |
+| `special` | `energy()`, `armed()`, `wielded()`, `cost(weapon_name)`, `ready(weapon_name)`, `bar_component()`, `arm()` | The combat tab's Ok button "Use @gre@Special Attack"; energy and armed are varps 300 and 301 (`sa_energy`, `sa_attack`), checked in phase 4; costs from a weapon table |
+| `game` (combat) | `combat_mode()`, `combat_styles()`, `combat_style_mode(style)`, `has_combat_style(style)`, `set_combat_style(style)`, `set_combat_mode(mode)`, `combat_style_resolution(style)`, `auto_retaliate_on()`, `set_auto_retaliate(on)`, `attacked_by_player()` | The combat tab's Select buttons push varp 43 (`com_mode`) with their mode; their labels ("Accurate", "Aggressive", "Controlled", "Defensive") resolve a style, as rs2b0t's do |
+| `game` (magic) | `cast_on_npc(spell, npc)`, `cast_on_loc(spell, loc)`, `cast_on_item(spell, item)`, `teleport(name)` | A targeted spell is the Target button whose target name matches ("Wind strike"); a teleport or other self-cast is the Ok button whose text, without its colour tag, does ("Cast @gre@Varrock teleport") |
+| `autocast` | `armed()`, `staff_tab_attached()`, `arm(spell)` | The staff combat tab and its spell choices, as rs2b0t's `Autocast` |
+
+- **Done when:** the tests pass, and against the local engine scripts:
+    - bank with `deposit_all_except` and `withdraw_x`;
+    - fletch 27 longbows with `chat_dialog.make_x('Long Bow', 27)`;
+    - smelt with `make('Bronze')`;
+    - buy with `shop.buy` and trade both ways between two accounts;
+    - set a combat style by name, toggle a prayer, and cast a spell and a teleport by name.
+
+---
+
+## 8. Phase 5: reach
+
+rs2b0t's `Reach` is the shared last-mile primitive: walk to a stand, then use a loc or talk to an NPC, and when the server answers that it can't reach, open the blocking door and try again. Its result is `'done'`, `'retry'` or `'unreachable'`. Ported as `reach.loc_op(...)`, `reach.npc_dialog(...)` and `reach.entity_op(...)`, with its rules: for a loc, the server's "I can't reach that!" decides; for an NPC, the scene is probed within `PROBE_RADIUS`, because a wandering NPC postpones the server's verdict indefinitely. It lands before the walker because banking and shopping use it at short range.
+
+---
+
+## 9. Phase 6: walking across levels
+
+### WalkMap
+
+A world-scale route needs collision beyond the build area, which the cache has. `WalkMap` holds, for every tile of every square on every level, one byte: the eight directions a player can step out of it, by the webclient's rules. That's 534 squares × 4 levels × 4,096 tiles, about 8.7 MB, built once at startup from the cache by `SquareCollision`, the code `WorldMap` uses, and shared read-only by every account. The flags for one square need its neighbours' edges, so the build works a square at a time with a one-tile margin. Phase 6 measures the build time. If it's too slow at startup, squares are built the first time a search reaches them; the process has one thread, so that needs no lock. Closed doors are walls in it, as the cache has them; the door graph crosses them.
+
+### NavGraph
+
+`data/nav/` holds rs2b0t's walker data. rs2b0t's MIT notice is kept in `third_party/rs2b0t/`.
+
+| File | Holds | Source |
+|---|---|---|
+| `doors.json` | Openable doors and gates, and the tiles each joins | rs2b0t `webwalk/data/doors.json` |
+| `stairEdges.json` | Stairs and ladders: from, to (another level), the loc and its action | rs2b0t `webwalk/data/stairEdges.json` |
+| `transports.json` | Ships, gangplanks, portals, shortcuts and dungeon links, with requirements | rs2b0t `webwalk/data/transports.json` |
+| `travel.json`, `crossings.json`, `teleports.json`, `danger_zones.json` | Spirit trees, gliders, carts, levers; tolls, fares, dialogue and quest unlocks; spell and jewellery teleports; avoidable areas | Converted from rs2b0t's `travelCatalog.ts`, `specialCrossings.ts`, `teleportCatalog.ts` and `dangerZones.ts` by `tools/nav/convert_rs2b0t.py`, once, and committed |
+
+`NavGraph` loads them at startup next to the cache and is shared the same way. An edge's requirements (skills, quests, items, coins, members) are checked against the account's state at search time: a live search fails closed, as rs2b0t's does. The data was built for 289-era content. An edge that disagrees with the server (a loc missing, a door that won't open) is avoided and the route searched again, rather than trusted.
+
+### WorldPathFinder
+
+- **Search.** A* over `WalkMap`, with `NavGraph`'s edges as extra moves and a Chebyshev heuristic. It switches to Dijkstra when long edges (teleports, ships) are in play, as rs2b0t's does.
+- **Snapping.** It snaps the start and the goal to a walkable tile with a way out, as rs2b0t's `snapWalkable` and `goalCandidates` do.
+- **Options.** It takes rs2b0t's: `max_expansions`, `avoid_doors`, `avoid_zones` (catalog ids or rectangles), and the teleport policy.
+- **Result.** Waypoints, each carrying its transport when it's a crossing, plus the cost and the nodes expanded. It fails with a reason.
+- **Speed.** Searches run on the main thread. The node budget keeps each one bounded, and phase 6 measures the long ones (Lumbridge to Catherby; into a dungeon) and sets the default budget from them.
+
+### The executor
+
+`traversal` ports rs2b0t's `WalkExecutor`, its `exec/` crossings, `walkLadder` and `arrival`, as stdlib generators over the core's searches, entity actions and the local route the webclient would take:
+
+- **`traversal`:**
+    - `walk_to(dest, radius=2, timeout_ms=None, max_expansions=None, use_teleport_catalog=None, policy=None, bank_item_counts=None, avoid_zones=None)`;
+    - `walk_resilient(dest, radius, attempts=None, timeout_ms=None, scene_radius=None, max_budget=None, ...)`;
+    - `remaining()`, `teleports_enabled()` and `request_repath(reason=None)`;
+    - `NAV_PURE_WALK` and `NAV_WITH_TELES`, passed with `**`.
+- **`direct_navigator`:** `walk(dest)` and `walk_to(dest, radius=None, timeout_ms=None)`, within the scene.
+- **Behaviour,** as rs2b0t documents it:
+    - **Following:** locate the player on the route (the corridor snap), click the furthest reachable tile, and re-path when the world disagrees.
+    - **Doors:** check the crossing itself, not the door's state; skip doors already open; open double doors from the outside.
+    - **Transports:** stairs, ladders, ships with their fares and landing tiles, gliders, spirit trees, carts, and the essence mine's same-origin exit.
+    - **Special crossings:** tolls and dialogue choices, and walking to a quest's NPC to unlock a gate.
+    - **Getting stuck:** the escalation ladder, reporting `'arrived'`, `'closest'`, `'budget'`, `'failed'` or `'interrupted'`.
+    - **Arrival:** beside a destination you can't stand on (a booth, a furnace) counts as arrived.
+- **Teleports** are off by default, as in rs2b0t (`scripting.navTeleports` in `client.jsonc`, or per walk). When on, they're used only if the backpack holds the runes or the jewellery.
+- `banking.open` gains walking to the nearest known bank (`catalogs.BANK_LOCATIONS`, phase 9 data that moves forward to here).
+
+### Done when
+
+- `WalkMap`, `NavGraph` and `WorldPathFinder` tests pass, including requirements failing closed, `avoid_zones`, and a route that changes level.
+- rs2b0t's pure follow-geometry tests (`test/event/webwalk/followMath.test.ts`, `dangerZones.test.ts`) are ported to `tests/Stdlib` and pass.
+- The timings are recorded here.
+- Against the local engine, `walk_resilient` takes an account:
+    - from Lumbridge to Varrock east bank;
+    - up Lumbridge castle's stairs to its bank;
+    - through the Al Kharid toll gate, paying;
+    - across to Karamja by ship.
+
+---
+
+## 10. Phase 7: random events
+
+rs2b0t's `RandomEventGuardian` and solvers, ported to `Stdlib/randomevents/`. The host runs the guardian after each pump.
+
+- **Detection.** An event NPC near the player, using rs2b0t's tables:
+    - talking events: the genie, drunken dwarf, mysterious old man, sandwich lady and frog;
+    - the strange plant;
+    - hostile events by id: river troll, swarm, rock golem, zombie, shade, watchman and tree spirit;
+    - skill events: the gas chest, the whirlpool fishing spots and the ent.
+
+  An event is skipped when it faces another player (rs2b0t's `eventNpcTargetsAnotherPlayer`), when the bot lists it in `ignored_randoms()`, or, for a hostile one, when it's in `grind_targets()`.
+- **Handling.** The guardian takes over: the bot's step in progress is dropped, the solver runs to completion, and `loop()` starts afresh. Bots are already written to be re-entered, and a walk that was interrupted re-plans.
+- **Solvers,** ported from rs2b0t:
+    - talk to a talking event and accept;
+    - rub the genie's lamp, choosing the skill from a setting;
+    - pick the strange plant;
+    - flee a hostile event only once it has really hit (a visible, positive hit), then come back;
+    - the mime, the strange box and the maze;
+    - for the gas chest, whirlpool and ent, step away or switch target.
+- The 289 content's `macro events/` scripts are the reference for what each event expects, and the source for any event rs2b0t doesn't cover.
+- `scripting.randomEvents` (on by default) turns the guardian off for an account.
+- **Done when:** the solvers' pure parts have tests (the maze route, the mime's emote for each animation, the strange box's answer), and against the local engine, events spawned with the engine's staff commands are each handled while a script runs.
+
+---
+
+## 11. Phase 8: runtime upkeep and lifecycle
+
+- **Stall guard.** rs2b0t's `StallGuard`: with no tile change and no xp for `scripting.stallMinutes` (10 by default), it walks back to `recovery_anchor()` when that's 8 or more tiles away, or else restarts the bot. `execution.note_progress()` reports work it can't see, such as a completed trade.
+- **Run manager.** Turns run back on when energy reaches a threshold: `scripting.runAuto` and `scripting.runEnergyMin` in `client.jsonc`, and `run_manager.override(run_auto=None, energy_min=None)` for one script, as rs2b0t's.
+- **Relog.** `relog(delay_seconds=0)`: logs out by the retrying logout `Account::LogOut` uses, waits, logs back in, keeps the script loaded, and raises `reconnect` once the player is placed.
+- **Events:**
+    - `death`: Hitpoints' current level falls from above 0 to 0, which `death.rs2` does before "Oh dear you are dead!";
+    - `npc_say` (npc, text): from `NpcInfoDecoder`'s `MASK_SAY`;
+    - `projectile` (a `Projectile`: spotanim, source, destination, target): from `MAP_PROJANIM`.
+- **Character design.** `game.appearance_screen_open()` (a component with `ClientCode_e::AcceptDesign` in the main modal) and `game.set_appearance(female, kits, colours)` (`IdkSaveDesign`).
+- **Done when:** the stall guard, run manager, relog and event tests pass, and `relog(5)` comes back on the local engine with the bot carrying on.
+
+---
+
+## 12. Phase 9: catalogs and behaviours
+
+Ported to `Stdlib/catalogs/` with rs2b0t's names in snake_case, and imported as `from catalogs import ...`:
+
+| Group | Contents |
+|---|---|
+| Banks | `BANK_LOCATIONS`, `bank_distance`, `nearest_bank`, `nearest_usable_bank`, `bank_unlocked`, `resolve_bank_open_route` |
+| Tools | `PICKAXES`, `AXES`, `TINDERBOX` … `NEEDLE`, the `*_req` builders, `best_pickaxe`, `best_axe`, `best_from_tiers`, `tool_restock_plan` and the rest of `api-catalogs.md`'s list |
+| Tool acquisition | The vendors and shop costs, `plan_gather_tool_acquire`, `plan_pickaxe_acquire`, `plan_axe_acquire`, `plan_broken_tool_repair`, the fishing-gear planners, `can_fund_plan` and the rest |
+| Item needs | `held`, `has_all` and `AcquireTask` |
+| Gathering | `GatheringLocation`, `resolve_gathering_location`, and the fishing, mining and woodcutting locations, with their options and resolvers |
+| Fishing and mining | `FISHING_METHODS`, gear helpers, `ROCK_TYPES`, `resolve_rock_ids`, the gas rock and whirlpool ids |
+| Other tables | Walk destinations, pickpocket targets, cow locations, rune routes, cooking ranges and locations, fire spots, herbs and the shop database |
+| Behaviours | `tasks` (`ContinueDialog`, `DeathRecovery`, `PeriodicBank`, `create_return_to_anchor_task`), `sustain`, the combat potion plans, `loadout` and the partner-trade policy helpers |
+
+The planners are pure, so their rs2b0t tests port with them. Item and object names are as the 289 cache has them; a table entry that names something the cache lacks fails a test, not a script.
+
+- **Done when:** the ported tests pass, and the end-to-end bots below run.
+
+---
+
+## 13. Tests
+
+- **C++,** as ScriptingDesign §11 sets out: the interface decoding and `InterfaceView`; `WalkMap`, `NavGraph` and `WorldPathFinder`; the new events; relog. The optional real-cache tests (CacheDesign §15.8) cover the rules that find components, and routes over the real map.
+- **Python.** `tests/Stdlib/test_*.py` run inside a VM from the test executable:
+    - pure logic directly: the query builder, settings, the planners, the maze, and rs2b0t's ported tests;
+    - facades against a `FakeGameServer` session, as `ScriptBindingsTests` does today.
+
+  Each test module is a function per case, with plain `assert`s, since pocketpy has no unittest.
+- **Smoke,** against the local engine: each phase's "Done when".
+
+---
+
+## 14. Implementation order
+
+0. **Docs.**
+    - Work: this document, and the porting sections of ScriptingApi.md and ScriptingDesign §6.
+    - Done when: the porting table names the swapped damage hooks and every rename that exists today.
+1. **The runtime** (§4).
+2. **Entities, items and the game** (§5). ScriptingApi.md is rewritten for the new shape here, and grows with each later phase.
+3. **Interfaces from the cache** (§6).
+4. **Dialogue, make menus, bank, shop, trade and tabs** (§7).
+5. **Reach** (§8).
+6. **Walking across levels** (§9).
+7. **Random events** (§10).
+8. **Runtime upkeep and lifecycle** (§11).
+9. **Catalogs and behaviours** (§12).
+
+Each phase's "Done when" is in its section. The end-to-end check translates three of rs2b0t's bundled bots into `scripts/examples/`, each running for 30 minutes without a script error, through banking trips and whatever random events come:
+- `Miner`: gathering, banking, catalogs and tools;
+- `CowKiller`: combat, loot and periodic banking;
+- `BankFletcher`: make menus and Make X.
+
+The ScriptingApi.md porting tables then map every rs2b0t export this design covers, and every name in plutonium's `script.go`, to its Python name, or mark it not ported, with the reason.

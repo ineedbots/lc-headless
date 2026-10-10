@@ -240,7 +240,7 @@ Rules:
 
 ## 6. Python API
 
-The initial surface. Names follow plutonium wherever 2004 has the same concept; where it doesn't (fatigue, sleeping), the function doesn't exist. Coordinates are absolute `x`/`z`, as plutonium uses, and functions that take a tile assume the player's level.
+The initial surface. Its names followed plutonium wherever 2004 has the same concept; where it doesn't (fatigue, sleeping), the function doesn't exist. [BotApiDesign.md](BotApiDesign.md) replaces this surface with one modelled on rs2b0t's bot API, in snake_case. Coordinates are absolute `x`/`z`, as plutonium uses, and functions that take a tile assume the player's level.
 
 ### Classes (read-only snapshots)
 
@@ -295,11 +295,12 @@ The option numbers behind the conveniences and the component constants were chec
 
 ### Porting from plutonium
 
-- `loop`, `settings`, `log` and the `on_*` hooks behave the same.
-- `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists. Routes come from the game cache's collision ([CacheDesign.md](CacheDesign.md) §11).
+- `loop`, `settings` and `log` behave the same, and so do most hooks. The damage hooks take the entity first (`on_npc_damaged(npc, damage)`), where plutonium's take the damage first. Hooks here take their subject first; [BotApiDesign.md](BotApiDesign.md) §4 renames the events and brings the chat hooks into line.
+- `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists. Routes come from the game cache's collision ([CacheDesign.md](CacheDesign.md) §11), inside the build area only.
 - `get_item_name(id)` becomes `get_item_type(id).name`.
 - `get_nearest_object_by_id` becomes `get_nearest_loc_by_id`, and `at_object(obj)` becomes `interact_loc(loc, 1)`.
-- Fatigue, sleeping and the option menu are RSC-only and have no equivalent.
+- ScriptingApi.md's porting table lists the other renames. What's still missing (long paths, the bank, shop, trade and dialogue helpers, and others) is planned in [BotApiDesign.md](BotApiDesign.md).
+- Fatigue and sleeping are RSC-only and have no equivalent. The option menu isn't: 2004's multiple-choice dialogues are chat interfaces whose options the server sets as text.
 
 ---
 

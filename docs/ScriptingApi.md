@@ -337,9 +337,42 @@ pocketpy's debugger brings some limits:
 
 ## Porting from plutonium
 
-- `loop`, `settings`, `log` and the `on_*` hooks work the same way.
+`loop`, `settings` and `log` work the same way, and so do most hooks. The differences:
+
+- `on_npc_damaged(npc, damage)` and `on_player_damaged(player, damage)` take the entity first. plutonium's take the damage first, so a ported hook gets its arguments swapped without any error.
+- `on_load` and `on_init` become `on_start`, which runs once, and `on_reconnect`, which runs each time the player is placed again after a dropped connection.
 - `on_progress_report` and `send_bot_message` work as in plutonium, with two differences. A message is copied as JSON, so it can't carry objects. A full queue makes `send_bot_message` return `False` instead of raising.
-- `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists.
-- `get_item_name(id)` becomes `get_item_type(id).name`.
-- `get_nearest_object_by_id` becomes `get_nearest_loc_by_id`, and `at_object(obj)` becomes `interact_loc(loc, 1)`.
-- Fatigue, sleeping, the option menu and other RSC-only calls don't exist.
+
+Coordinates differ between RSC and 2004, so every tile in a script changes. `in_rect(x, z, width, height)` takes the south-west corner, with the width going east and the height going north; plutonium's took the north-west corner in RSC's coordinates.
+
+Calls with another name or form:
+
+| plutonium | Here |
+|---|---|
+| `walk_path_to(x, z)` | `walk_to(x, z)`. It routes only inside the area the server has loaded (see [Limits](#limits)) |
+| `calculate_path_to(x, z)` | `find_path(x, z)`, the waypoints `walk_to` would send, inside the loaded area. There's no path object |
+| `get_item_name(id)` | `get_item_type(id).name` |
+| `get_my_player()` | `get_local_player()` |
+| `get_nearest_object_by_id`, `get_objects` | `get_nearest_loc_by_id`, `get_locs` |
+| `get_nearest_wall_object_by_id`, `get_wall_objects` | The same, with `layer=LAYER_WALL` |
+| `get_object_from_coords(x, z)`, `get_wall_object_from_coords(x, z)` | `get_loc_at(x, z)`, `get_loc_at(x, z, LAYER_WALL)` |
+| `at_object(obj)`, `at_object2(obj)`, and the wall object versions | `interact_loc(loc, 1)`, `interact_loc(loc, 2)` |
+| `pickup_item(item)` | `take_ground_item(item)` |
+| `use_item(item)` | `item_op(item, op)` with the option's text, such as `'Eat'` |
+| `use_item_with_item`, `use_item_on_object`, `use_item_on_wall_object` | `use_item_on_item`, `use_item_on_loc` |
+| `thieve_npc(npc)` | `interact_npc(npc, 'Pickpocket')` |
+| `trade_player(player)`, `follow_player(player)` | `interact_player(player, 'Trade with')`, `interact_player(player, 'Follow')` |
+| `cast_on_self(spell)` | `click_button(spell)`, since 2004 casts those spells from the spellbook button |
+| `get_inventory_items()` | `get_inventory()` |
+| `get_total_inventory_count()` | `INVENTORY_SIZE - get_empty_slots()` |
+| `has_inventory_item(id)` | `get_inventory_item_by_id(id) is not None` |
+| `is_inventory_item_equipped(id)` | `get_inventory_item_by_id(id, com=EQUIPMENT) is not None` |
+| `send_chat_message(text)`, `send_private_message(name, text)` | `say(text)`, `send_pm(name, text)` |
+| `get_ignored()` | `get_ignores()` |
+| `is_skilling()` | `get_local_player().animation != -1` |
+| `random(min, max)` | `random.randint(min, max)`, after `import random` |
+| `set_autologin(False)` then `logout()` | `stop_account()` |
+
+Not here yet: walking beyond the loaded area; helpers for the bank, shops, trades, dialogue options and skills' make menus (Make 1, 5, 10 and X), combat style, prayers and quests; logging out and back in; hooks for dying, NPCs' overhead text and projectiles; and character design. Until then the interface ones take component ids as constants. [BotApiDesign.md](BotApiDesign.md) plans all of them, and replaces this API with one modelled on rs2b0t's, so this table will be rewritten for it.
+
+Fatigue, sleeping, the sleepword and raw packets don't exist.
