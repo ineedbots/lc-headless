@@ -277,6 +277,55 @@ A `MakeProduct` has `name`, `item` (the item drawn over it, or `None`), `item_na
 - `main()` is its id, or -1, and `is_open()` says whether there is one;
 - `close()` closes it and waits for it to go, and `close_if_open()` does so only when one is open.
 
+## The bank
+
+```python
+opened = yield from banking.open()
+if opened:
+    yield from bank.deposit_all_matching(deposit_all_except(['Bronze pickaxe']))
+    yield from bank.withdraw_x('Lobster', 10)
+    yield from bank.close()
+```
+
+`bank` is the bank interface. Its items are `InvItem`s whose actions are the bank's options, "Withdraw 1" to "Withdraw X". The backpack items beside the bank have the deposit options. Options match without regard to case, and a hyphen counts as a space, so rs2b0t's `'Withdraw-1'` works too.
+
+| Function | Returns or does |
+|---|---|
+| `is_open()`, `ready()` | The bank is open, and it is open with its items sent |
+| `wait_ready(timeout_ms=4000)` | Waits for the items |
+| `items()`, `side_items()` | The bank's items, and the backpack's beside it |
+| `count(name)`, `count_by_id(id)` | How many of the item the bank holds |
+| `withdraw(name, op='Withdraw 1')`, `withdraw_by_id(id, op='Withdraw 1')` | Uses the option once, without waiting |
+| `withdraw_x(name, count)` | Withdraws `count`, or all there is. It uses Withdraw 1, 5 or 10 when one fits, and otherwise X and the count dialog. Then it waits for the items to land |
+| `withdraw_x_by_id(id, count, lands_as_id=None)` | The same by id. In note mode the backpack gets the note, which has a different id; give that as `lands_as_id` |
+| `withdraw_load(name)` | Fills the backpack: Withdraw All, or else X for the free slots |
+| `set_note_mode(on)` | Withdraws as notes or as items. Opening the bank resets this to items |
+| `deposit(name, op='Deposit 1')` | Uses the option once, without waiting |
+| `deposit_inventory()` | Deposits everything |
+| `deposit_all_matching(matches)` | Deposits each stack for which `matches(name, id)` holds, waiting for each to go |
+| `open_nearest(booth_name='Bank booth', op='Use-quickly')` | Opens the nearest booth in the area, stepping beside it if a try from here fails, and continuing a dialogue that comes first |
+| `open_booth(stand, booth_name='Bank booth', op='Use-quickly')` | The same, walking to `stand` if a try from here fails |
+| `open_nearest_access(access)` | Opens a bank by its access: `{'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': ..., 'op': ...}}` |
+| `open_npc_access(access)` | Opens a bank through a banker: `{'name': 'Banker', 'op': 'Bank', 'choose': None}`, where `choose` is the dialogue option to pick |
+| `close(timeout_ms=3000)` | Closes the bank so the backpack's own options work again |
+
+Each function that waits is a generator.
+
+`banking` handles the trip:
+- `open(stand=None, booth_name='Bank booth', booth_op='Use-quickly', ...)` opens a booth in the area, or else a banker with a "Bank" option, or else walks to `stand` and opens the booth there. Until walking across the map arrives in phase 6 ([BotApiDesign.md](BotApiDesign.md) §9), the bank has to be in the area the server has loaded.
+- `bank_nearest(deposit, common_junk=True, return_to=None, after_deposit=None, ...)` opens a bank, deposits what `deposit(name)` picks plus common junk, runs `after_deposit()`, and walks back to `return_to`.
+
+rs2b0t's deposit rules come with it:
+- `deposit_all_except(keep)` deposits every named item except those in `keep`, matching the whole name without regard to case;
+- `deposit_matcher(own, include_common)`;
+- `matches_common_bank_loot(name, id=-1)`, which covers gems, strange fruit, beer, kebabs and the random-event casket (`COMMON_BANK_LOOT`, `RANDOM_EVENT_CASKET_ID`);
+- `is_disposable_gather_junk(name, id=-1)`.
+
+For banking every so often:
+- `parse_bank_strategy(label)` and `should_bank_now(strategy, state)`;
+- `PERIODIC_BANK_SETTINGS`, a schema to merge into a script's;
+- `PeriodicBank(strategy, items_threshold, minutes_threshold, count_loot, deposit, ...)`, a `Task` that does it.
+
 ## Interfaces
 
 `interfaces` reads the game's interfaces as the player sees them: the cache's components, with what the server has set on them (text, colour, hiding, position) taking the cache's place. It's what the coming dialogue, bank, shop and trade facades are built on, and it reaches any interface they don't cover.

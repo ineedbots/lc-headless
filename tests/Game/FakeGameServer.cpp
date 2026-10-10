@@ -113,6 +113,10 @@ std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
     TestCache::AddNpc(cache, 50, "Goblin", {"Talk-to", "Attack"});
     TestCache::SetTradeScreen(cache);
     TestCache::SetChatInterfaces(cache);
+    TestCache::SetBankScreen(cache);
+    TestCache::AddObj(cache, 995, "Coins").stackable = true;
+    TestCache::AddObj(cache, 1511, "Logs");
+    TestCache::AddObj(cache, 526, "Bones", {}, {"Bury"});
     return std::make_shared<const GameCache_s>(std::move(cache));
 }
 

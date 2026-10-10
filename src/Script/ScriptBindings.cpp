@@ -38,6 +38,7 @@ from rs2004.items import *
 from rs2004.game import *
 from rs2004.interfaces import *
 from rs2004.dialogue import *
+from rs2004.bank import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -832,6 +833,11 @@ _rt_finish = _runtime.finish
 
     // Dialogues and make menus
 
+    bool HasInventory(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv] { return ReturnBool(GetApi().GetState().inventories.contains(PyConvert::ToU16(py_arg(0), "com"))); });
+    }
+
     bool GetModalChanges(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(GetApi().GetState().interfaces.modalChanges); });
@@ -1587,6 +1593,7 @@ _rt_finish = _runtime.finish
             {"cast_on_ground_item(spell, ground_item)", CastOnGroundItem},
             {"cast_on_item(spell, item)", CastOnItem},
             {"click_button(com)", ClickButton},
+            {"has_inventory(com)", HasInventory},
             {"modal_changes()", GetModalChanges},
             {"find_continue()", FindContinue},
             {"get_chat_options()", GetChatOptions},

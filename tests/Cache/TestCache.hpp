@@ -50,6 +50,14 @@ public:
     static constexpr u16 MAKE_10 = 332;
     static constexpr u16 MAKE_5 = 333;
     static constexpr u16 MAKE_1 = 334;
+    // SetBankScreen's: the bank, BANK in BANK_SCREEN beside BANK_INVENTORY in BANK_SIDE, as bank_main and
+    // bank_side have them, with "Note" and "Item" labels over the note mode's Select buttons.
+    static constexpr u16 BANK_SCREEN = 5292;
+    static constexpr u16 BANK_NOTE = 5386;
+    static constexpr u16 BANK_ITEM = 5387;
+    static constexpr u16 BANK_NOTE_LABEL = 5390;
+    static constexpr u16 BANK_ITEM_LABEL = 5391;
+    static constexpr u16 BANK_SIDE = 2005;
 
     TestCache() = delete;
 
@@ -62,6 +70,7 @@ public:
     static void AddComponents(GameCache_s& cache, std::initializer_list<IfComponent_s> components);
     static void SetTradeScreen(GameCache_s& cache);
     static void SetChatInterfaces(GameCache_s& cache);
+    static void SetBankScreen(GameCache_s& cache);
     // Replaces the map with squares holding these locs and blocked tiles.
     static void SetMap(GameCache_s& cache, std::span<const TestLoc_s> locs, std::span<const Tile_s> blocked = {});
 };

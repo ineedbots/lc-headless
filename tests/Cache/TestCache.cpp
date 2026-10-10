@@ -127,6 +127,33 @@ void TestCache::SetChatInterfaces(GameCache_s& cache)
     });
 }
 
+void TestCache::SetBankScreen(GameCache_s& cache)
+{
+    const auto selectButton = [](u16 id)
+    {
+        return IfComponent_s{.id = id, .root = BANK_SCREEN, .type = ComponentType_e::Graphic, .buttonType = ButtonType_e::Select, .width = 72, .height = 36, .buttonText = "Select"};
+    };
+
+    const auto label = [](u16 id, std::string text)
+    {
+        return IfComponent_s{.id = id, .root = BANK_SCREEN, .type = ComponentType_e::Text, .width = 27, .height = 14, .text = std::move(text)};
+    };
+
+    AddComponents(cache, {
+        {.id = BANK_SCREEN, .root = BANK_SCREEN, .type = ComponentType_e::Layer, .width = 512, .height = 334, .children = {
+            {.id = BANK, .x = 75, .y = 58}, {.id = BANK_NOTE, .x = 364, .y = 291}, {.id = BANK_ITEM, .x = 291, .y = 291},
+            {.id = BANK_ITEM_LABEL, .x = 315, .y = 301}, {.id = BANK_NOTE_LABEL, .x = 387, .y = 301},
+        }},
+        {.id = BANK, .root = BANK_SCREEN, .type = ComponentType_e::Inv, .width = 8, .height = 36, .marginX = 15, .marginY = 6, .options = {"Withdraw 1", "Withdraw 5", "Withdraw 10", "Withdraw All", "Withdraw X"}},
+        selectButton(BANK_NOTE),
+        selectButton(BANK_ITEM),
+        label(BANK_ITEM_LABEL, "Item"),
+        label(BANK_NOTE_LABEL, "Note"),
+        {.id = BANK_SIDE, .root = BANK_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = BANK_INVENTORY, .x = 16, .y = 10}}},
+        {.id = BANK_INVENTORY, .root = BANK_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Deposit 1", "Deposit 5", "Deposit 10", "Deposit All", "Deposit X"}},
+    });
+}
+
 void TestCache::SetComponents(GameCache_s& cache)
 {
     cache.inventoryComponent = INVENTORY;

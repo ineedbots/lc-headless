@@ -951,6 +951,114 @@ def loop():
     });
 }
 
+TEST_CASE("ScriptHost withdraws with X and deposits by the bank's options", "[ScriptHost]")
+{
+    constexpr auto BONES = u16{526};
+    constexpr auto COINS = u16{995};
+    constexpr auto LOGS = u16{1511};
+
+    auto fixture = HostFixture{R"python(
+def loop():
+    ok = yield from bank.wait_ready()
+    log('>', 'ready', ok, bank.count('Bones'), bank.items()[0].actions())
+    ok = yield from bank.withdraw_x('bones', 27)
+    log('>', 'withdrew', ok, inventory.count('Bones'))
+    ok = yield from bank.set_note_mode(True)
+    log('>', 'noted', ok)
+    yield from bank.deposit_all_matching(deposit_all_except(['Coins']))
+    log('>', 'deposited', bank.side_items())
+    stop_script()
+)python"};
+
+    auto& client = fixture.client;
+    const auto send = [&fixture](ServerProt_e prot, const Packet& packet)
+    {
+        fixture.server.Send(prot, Fixtures::ToBytes(packet));
+    };
+    const auto sendInventory = [&send](u16 com, const std::vector<std::pair<u16, u8>>& items)
+    {
+        auto packet = Packet{};
+        packet.P2(com);
+        packet.P2(static_cast<s32>(items.size()));
+        for (const auto& [id, count] : items)
+        {
+            packet.P2(id + 1);
+            packet.P1(count);
+        }
+
+        send(ServerProt_e::UpdateInvFull, packet);
+    };
+    const auto pumpUntil = [&client](auto condition)
+    {
+        const auto deadline = Clock::now() + WAIT;
+        while (Clock::now() < deadline && !condition())
+        {
+            client.Pump(PUMP_STEP);
+        }
+
+        REQUIRE(condition());
+    };
+    const auto step = [&fixture]
+    {
+        fixture.host->Step(Clock::now());
+        fixture.client.Flush();
+    };
+    const auto lastPayload = [&fixture](ClientProt_e prot)
+    {
+        return fixture.server.GetPackets(prot).back().payload;
+    };
+    const auto itemBytes = [](u16 obj, u16 slot, u16 com)
+    {
+        auto bytes = ComBytes(obj);
+        for (const auto value : {slot, com})
+        {
+            const auto more = ComBytes(value);
+            bytes.insert(bytes.end(), more.begin(), more.end());
+        }
+
+        return bytes;
+    };
+
+    sendInventory(TestCache::BANK, {{BONES, 30}, {COINS, 100}});
+    sendInventory(TestCache::BANK_INVENTORY, {{LOGS, 3}});
+    auto open = Packet{};
+    open.P2(TestCache::BANK_SCREEN);
+    open.P2(TestCache::BANK_SIDE);
+    send(ServerProt_e::IfOpenMainSide, open);
+    pumpUntil([&client] { return client.GetState().interfaces.mainModal == TestCache::BANK_SCREEN; });
+
+    // 27 isn't 1, 5 or 10, so it's Withdraw X and the count dialog.
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton5));
+    CHECK(lastPayload(ClientProt_e::InvButton5) == itemBytes(BONES, 0, TestCache::BANK));
+    send(ServerProt_e::PCountDialog, Packet{});
+    pumpUntil([&client] { return client.GetState().interfaces.countDialogOpen; });
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
+    CHECK(lastPayload(ClientProt_e::ResumePCountDialog) == std::vector<u8>{0, 0, 0, 27});
+
+    sendInventory(TestCache::INVENTORY, {{LOGS, 3}, {BONES, 27}});
+    pumpUntil([&client] { return client.GetState().inventories.at(TestCache::INVENTORY).slots.size() == 2; });
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    CHECK(lastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::BANK_NOTE));
+
+    fixture.SendTick();
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton4));
+    CHECK(lastPayload(ClientProt_e::InvButton4) == itemBytes(LOGS, 0, TestCache::BANK_INVENTORY));
+    sendInventory(TestCache::BANK_INVENTORY, {{0xFFFF, 0}});
+    pumpUntil([&client] { return client.GetState().inventories.at(TestCache::BANK_INVENTORY).slots[0].id == -1; });
+    step();
+
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{
+        "ready True 30 ['Withdraw 1', 'Withdraw 5', 'Withdraw 10', 'Withdraw All', 'Withdraw X']",
+        "withdrew True 27",
+        "noted True",
+        "deposited []",
+    });
+}
+
 TEST_CASE("The example scripts load without warnings", "[ScriptHost]")
 {
     auto capture = LogCapture{};
