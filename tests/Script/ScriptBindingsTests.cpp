@@ -292,3 +292,18 @@ assert settings.get('missing', 5) == 5 and 'loot' in settings and 'missing' not 
 
     CHECK_THROWS_WITH(fixture.Run("settings.missing\n"), ContainsSubstring("AttributeError"));
 }
+
+TEST_CASE("Script bindings read game messages since a mark", "[ScriptBindings]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.messages.push_back({.sequence = 7, .type = MessageType_e::Game, .text = "Welcome to RuneScape."});
+    fixture.state.messages.push_back({.sequence = 8, .type = MessageType_e::Public, .sender = "Zezima", .text = "I can't reach that!"});
+    fixture.state.messages.push_back({.sequence = 9, .type = MessageType_e::Game, .text = "I can't reach that!"});
+    fixture.Run(R"python(
+assert game_messages.mark() == 9
+assert [m.seq for m in game_messages.since(0)] == [7, 9]
+assert game_messages.saw_since(7, CANT_REACH) and not game_messages.saw_since(9, CANT_REACH)
+assert game_messages.first_since(0, lambda text: text.startswith('Welcome')).seq == 7
+assert [m.text for m in game_messages.recent(1)] == ["I can't reach that!"]
+)python");
+}

@@ -144,6 +144,7 @@ Scripts run on pocketpy 2.2, a subset of Python 3. The differences you're likely
 - In unpacking, a starred name must come last (`first, *rest = items`), and only lists and tuples unpack.
 - Tuples can't be added together, `dict(another_dict)` doesn't copy, and `dict.setdefault` and `str.isdigit` don't exist.
 - There's no `re` module.
+- A function can read the variables of the function it's defined in, but not of one further out. A lambda inside a nested function that uses the outer function's parameter fails, or quietly gets a builtin of the same name, such as `id`; copy the value into a local of the nested function first.
 - `match` is a keyword, so it can't name a variable or parameter. Where rs2b0t's functions take `match`, ours take `text` or `name`.
 
 ## The world
@@ -235,6 +236,33 @@ A destination is a `Tile`, or an `(x, z)` pair on your level.
 - `stop_script()` stops calling the script; the account stays logged in and idles. A bot's `request_finish(reason)` does the same with a reason.
 - `stop_account()` stops the script and logs the account out.
 - `send_bot_message(username, message)` sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)).
+
+## Reach
+
+`reach` is the last mile: walk to a stand, use something, and when a door is in the way, open it and try again. Each function is a generator that gives `'done'` once `expect()` holds, `'retry'` when it doesn't yet, and `'unreachable'` when the stand or the target can't be reached and no door explains it.
+
+```python
+status = yield from reach.loc_op('Crate', 'Search', Tile(3208, 3210), lambda: game_messages.saw_since(mark, 'You search the crate'))
+status = yield from reach.npc_dialog('Cook', Tile(3208, 3210))
+```
+
+- `loc_op(name, op, near, expect, within=10, id=None, expect_ms=12000, refused=None, log=None)` walks to `near`, then uses `op` on the nearest loc of that name with that option within `within` tiles. `id` picks one when the name is shared. When the server answers "I can't reach that!", reach opens the door in front, or closes an open one that's swung across the way, and tries again. `refused` is a game message that says the op can't run yet, so it isn't retried.
+- `npc_dialog(name, near, open_ms=15000, log=None)` walks to `near` and talks to the NPC until a dialogue opens. An NPC can wander, which can put the server's verdict off for good, so the scene within `PROBE_RADIUS` (10) tiles is searched for the door first.
+- `entity_op(find, op, expect, open_when_unreachable=False, expect_ms=5000, what=None, log=None)` uses `op` on whatever `find()` gives.
+
+A door is a wall loc named "door" or "gate" with an Open option; an open one has a Close option. `is_openable_barrier(name, actions)`, `is_open_barrier_leaf(name, actions)`, `open_op(actions)`, `close_op(actions)`, `talk_op(actions)` and `toward_dest(door, here, dest)` are the rules it uses.
+
+Until walking across the map arrives in phase 6, `near` must be reachable from where you are: reach opens the door between the stand and the target, not doors on the way to the stand.
+
+`game_messages` tells what the server said after an action:
+- `mark()`;
+- `since(mark)`, each a `GameMessage` with `seq` and `text`;
+- `saw_since(mark, pattern)` and `first_since(mark, pattern)`;
+- `recent(limit=8)`, newest first.
+
+A pattern is text, matched as part of the message without regard to case, or a callable given the text. `CANT_REACH` and `WRONG_SIDE` are two. It covers the last 100 messages.
+
+`direct_navigator.last_outcome` says how the last `walk_to` ended: `'arrived'`, `'unreachable'` or `'timeout'`.
 
 ## Dialogues and make menus
 
@@ -587,7 +615,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles and `Autocast`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles and `Autocast`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;

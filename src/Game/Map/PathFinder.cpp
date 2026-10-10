@@ -236,6 +236,43 @@ namespace
     }
 }
 
+bool PathFinder::CanStep(const WorldMap& map, const Tile_s& from, const Tile_s& to)
+{
+    const auto dx = to.x - from.x;
+    const auto dz = to.z - from.z;
+    if (from.level != to.level || std::max(std::abs(dx), std::abs(dz)) != 1 || !map.Contains(from) || !map.Contains(to))
+    {
+        return false;
+    }
+
+    const auto& area = map.GetBuildArea();
+    const auto& collision = map.GetCollision(from.level);
+    const auto x = from.x - area.baseX;
+    const auto z = from.z - area.baseZ;
+    const auto open = [&collision](s32 tileX, s32 tileZ, u32 mask)
+    {
+        return IsOpen(collision.GetFlags(tileX, tileZ), mask);
+    };
+
+    // The side of each tile the step comes in from.
+    const auto fromX = dx < 0 ? CollisionFlag::BLOCK_ENTER_FROM_EAST : CollisionFlag::BLOCK_ENTER_FROM_WEST;
+    const auto fromZ = dz < 0 ? CollisionFlag::BLOCK_ENTER_FROM_NORTH : CollisionFlag::BLOCK_ENTER_FROM_SOUTH;
+    if (dz == 0)
+    {
+        return open(x + dx, z, fromX);
+    }
+
+    if (dx == 0)
+    {
+        return open(x, z + dz, fromZ);
+    }
+
+    const auto diagonal = dx < 0
+        ? (dz < 0 ? CollisionFlag::BLOCK_ENTER_FROM_NORTH_EAST : CollisionFlag::BLOCK_ENTER_FROM_SOUTH_EAST)
+        : (dz < 0 ? CollisionFlag::BLOCK_ENTER_FROM_NORTH_WEST : CollisionFlag::BLOCK_ENTER_FROM_SOUTH_WEST);
+    return open(x + dx, z + dz, diagonal) && open(x + dx, z, fromX) && open(x, z + dz, fromZ);
+}
+
 std::optional<std::vector<Tile_s>> PathFinder::FindPath(const WorldMap& map, const Tile_s& start, const RouteTarget_s& target)
 {
     const auto targetOnStartLevel = Tile_s{.x = target.tile.x, .z = target.tile.z, .level = start.level};

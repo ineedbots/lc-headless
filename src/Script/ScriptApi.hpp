@@ -136,6 +136,8 @@ public:
 
     // Whether a walk can end on the tile.
     [[nodiscard]] bool IsReachable(s32 x, s32 z) const;
+    // Whether one step between neighbouring tiles on the player's level is open.
+    [[nodiscard]] bool CanStep(s32 fromX, s32 fromZ, s32 toX, s32 toZ) const;
     // The waypoints WalkTo would send along a route, or nullopt without one.
     [[nodiscard]] std::optional<std::vector<Tile_s>> FindPath(s32 x, s32 z) const;
 

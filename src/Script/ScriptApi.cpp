@@ -642,6 +642,11 @@ bool ScriptApi::IsReachable(s32 x, s32 z) const
     return PathFinder::FindPath(m_map, GetPosition(), target).has_value();
 }
 
+bool ScriptApi::CanStep(s32 fromX, s32 fromZ, s32 toX, s32 toZ) const
+{
+    return PathFinder::CanStep(m_map, ToTile(fromX, fromZ), ToTile(toX, toZ));
+}
+
 std::optional<std::vector<Tile_s>> ScriptApi::FindPath(s32 x, s32 z) const
 {
     return GameActions::FindWalkRoute(m_map, GetPosition(), ToTile(x, z));

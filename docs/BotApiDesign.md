@@ -361,9 +361,19 @@ Every facade here is rs2b0t's, and each helper that waits is a generator. Where 
 
 ---
 
-## 8. Phase 5: reach
+## 8. Phase 5: reach (done)
 
 rs2b0t's `Reach` is the shared last-mile primitive: walk to a stand, then use a loc or talk to an NPC, and when the server answers that it can't reach, open the blocking door and try again. Its result is `'done'`, `'retry'` or `'unreachable'`. Ported as `reach.loc_op(...)`, `reach.npc_dialog(...)` and `reach.entity_op(...)`, with its rules: for a loc, the server's "I can't reach that!" decides; for an NPC, the scene is probed within `PROBE_RADIUS`, because a wandering NPC postpones the server's verdict indefinitely. It lands before the walker because banking and shopping use it at short range.
+
+As built, in `rs2004/reach.py` and `rs2004/messages.py`:
+- **What it stands on.** rs2b0t's `GameMessages` is `game_messages`, over the 100 messages the state keeps with their sequence numbers (`message_mark` and `game_messages_since` in the core). Its `Reachability.canStep` is `PathFinder::CanStep`, one step by the search's own rules. `canReach` with `adjacentOk` is `can_reach_entity`, and without it `is_reachable`. `Traversal.walkResilient` is `direct_navigator.walk_to`, which now records `last_outcome` (`'arrived'`, `'unreachable'` or `'timeout'`).
+- **Patterns.** pocketpy has no `re`, so a message pattern is text, matched as part of the message without regard to case, or a callable. `CANT_REACH` is text, and `WRONG_SIDE` a callable that knows both spellings.
+- **Doors are walls.** rs2b0t's barrier test is the name alone (`/door|gate/`), which in Lumbridge's kitchen took the trapdoor for the door in the way and opened it. A barrier must also be in the wall layer.
+- **Until phase 6.** The stand is walked to by `direct_navigator`, which can't open doors, so it must be reachable; reach opens the door between the stand and the target.
+- **pocketpy closures.** A function nested two deep can't read the outermost function's variables. Where a builtin of the same name exists, such as `id`, it quietly gets the builtin. `loc_op`'s `id` filter hit this, so it copies the value into a local. A `symtable` scan finds no other case in the stdlib, and ScriptingApi.md's Python dialect section warns scripts about it.
+- **Done when:**
+    - [x] The barrier rules, the message mark and `CanStep` have tests; `CanStep` agrees with the search's step rules around a door and a blocked tile.
+    - [x] Against the local engine, from outside Lumbridge's shut kitchen door, `loc_op` searched a crate inside after the server's "I can't reach that!", opening the door; `npc_dialog` reached the Cook by searching the scene and opening the door; and a target with no door in front gave `'unreachable'`.
 
 ---
 
@@ -508,7 +518,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 2. **Entities, items and the game** (§5). Done; ScriptingApi.md is rewritten for the new shape, and grows with each later phase.
 3. **Interfaces from the cache** (§6). Done.
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7). Done.
-5. **Reach** (§8).
+5. **Reach** (§8). Done.
 6. **Walking across levels** (§9).
 7. **Random events** (§10).
 8. **Runtime upkeep and lifecycle** (§11).

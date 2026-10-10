@@ -279,7 +279,10 @@ RECLICK_MS = 2400
 
 
 class _DirectNavigator:
-    """Walking within the area the server has loaded, routed around obstacles as the webclient does."""
+    """Walking within the area the server has loaded, routed around obstacles as the webclient does.
+    last_outcome says how the last walk_to ended: 'arrived', 'unreachable' or 'timeout'."""
+
+    last_outcome = None
 
     def walk(self, dest, run=False):
         """One walk toward the tile. False when it's in view but can't be reached."""
@@ -296,14 +299,17 @@ class _DirectNavigator:
         while _core.step_time() < deadline:
             here = local_tile()
             if here.distance_to(tile) <= radius:
+                self.last_outcome = 'arrived'
                 return True
             stalled = last_tile is not None and here == last_tile
             if last_click is None or stalled or _core.step_time() - last_click > RECLICK_MS:
                 if not _core.walk_to(tile.x, tile.z, run):
+                    self.last_outcome = 'unreachable'
                     return False
                 last_click = _core.step_time()
             last_tile = here
             yield from execution.delay_ticks(2)
+        self.last_outcome = 'timeout'
         return False
 
     def walk_path(self, points, run=False):

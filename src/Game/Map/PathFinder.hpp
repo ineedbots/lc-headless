@@ -42,4 +42,7 @@ public:
     // the start already reaches the target, the start is the one waypoint. nullopt when nothing reaches
     // the target, or when the start or the target is outside the build area.
     [[nodiscard]] static std::optional<std::vector<Tile_s>> FindPath(const WorldMap& map, const Tile_s& start, const RouteTarget_s& target);
+    // Whether one step, straight or diagonal, from a tile to the next one is open, by the search's rules.
+    // False for tiles that aren't neighbours on one level, or are outside the build area.
+    [[nodiscard]] static bool CanStep(const WorldMap& map, const Tile_s& from, const Tile_s& to);
 };

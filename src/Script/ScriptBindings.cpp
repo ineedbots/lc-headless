@@ -41,6 +41,8 @@ from rs2004.dialogue import *
 from rs2004.bank import *
 from rs2004.trade import *
 from rs2004.tabs import *
+from rs2004.messages import *
+from rs2004.reach import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -879,6 +881,55 @@ _rt_finish = _runtime.finish
         });
     }
 
+    bool CanStep(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto coord = [argv](int index, std::string_view name)
+            {
+                return static_cast<s32>(PyConvert::ToInt(py_arg(index), name, 0, MAX_COORD));
+            };
+
+            return ReturnBool(GetApi().CanStep(coord(0, "from_x"), coord(1, "from_z"), coord(2, "to_x"), coord(3, "to_z")));
+        });
+    }
+
+    // The newest message's sequence number, or 0: a mark to read later messages from.
+    bool GetMessageMark(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto& messages = GetApi().GetState().messages;
+            return ReturnInt(messages.empty() ? 0 : static_cast<s64>(messages.back().sequence));
+        });
+    }
+
+    // (sequence, text) for each game message after the mark, oldest first, of the 100 the state keeps.
+    bool GetGameMessagesSince(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto mark = PyConvert::ToInt(py_arg(0), "mark");
+            auto found = std::vector<const ChatMessage_s*>{};
+            for (const auto& message : GetApi().GetState().messages)
+            {
+                if (message.type == MessageType_e::Game && static_cast<s64>(message.sequence) > mark)
+                {
+                    found.push_back(&message);
+                }
+            }
+
+            PyConvert::FromList(py_retval(), found, [](py_OutRef out, const ChatMessage_s* message)
+            {
+                py_newtuple(out, 2);
+                py_newint(py_tuple_getitem(out, 0), static_cast<s64>(message->sequence));
+                py_newnone(py_tuple_getitem(out, 1));
+                PyConvert::FromString(py_tuple_getitem(out, 1), message->text);
+            });
+            return true;
+        });
+    }
+
     bool GetModalChanges(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(GetApi().GetState().interfaces.modalChanges); });
@@ -1635,6 +1686,9 @@ _rt_finish = _runtime.finish
             {"cast_on_item(spell, item)", CastOnItem},
             {"click_button(com)", ClickButton},
             {"has_inventory(com)", HasInventory},
+            {"can_step(from_x, from_z, to_x, to_z)", CanStep},
+            {"message_mark()", GetMessageMark},
+            {"game_messages_since(mark)", GetGameMessagesSince},
             {"get_texts(root)", GetTexts},
             {"get_inventories(root)", GetInventories},
             {"modal_changes()", GetModalChanges},

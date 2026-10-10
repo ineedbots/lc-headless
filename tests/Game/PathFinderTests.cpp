@@ -263,3 +263,38 @@ TEST_CASE("PathFinder cuts a long route to 25 waypoints", "[PathFinder]")
     CHECK(route->back() == Local(40, 34));
     CheckRoute(map, Local(10, 10), *route);
 }
+
+TEST_CASE("PathFinder's single steps agree with the search's rules", "[PathFinder]")
+{
+    const auto locs = std::to_array<TestLoc_s>({{.id = DOOR, .tile = Local(40, 40), .shape = WALL, .angle = WEST}});
+    const auto blocked = Locals({{42, 41}});
+    const auto map = MakeMap(locs, blocked);
+    const auto& collision = map.GetCollision(0);
+
+    for (auto x = 38; x <= 43; ++x)
+    {
+        for (auto z = 38; z <= 43; ++z)
+        {
+            for (auto dx = -1; dx <= 1; ++dx)
+            {
+                for (auto dz = -1; dz <= 1; ++dz)
+                {
+                    if (dx == 0 && dz == 0)
+                    {
+                        continue;
+                    }
+
+                    CAPTURE(x, z, dx, dz);
+                    CHECK(PathFinder::CanStep(map, Local(x, z), Local(x + dx, z + dz)) == CanStep(collision, x, z, dx, dz));
+                }
+            }
+        }
+    }
+
+    // The door's west wall stops a step through it, and only that.
+    CHECK_FALSE(PathFinder::CanStep(map, Local(39, 40), Local(40, 40)));
+    CHECK(PathFinder::CanStep(map, Local(40, 41), Local(40, 40)));
+    CHECK_FALSE(PathFinder::CanStep(map, Local(20, 20), Local(22, 20)));
+    CHECK_FALSE(PathFinder::CanStep(map, Local(20, 20), Local(20, 20)));
+    CHECK_FALSE(PathFinder::CanStep(map, Local(20, 20), Tile_s{.x = Fixtures::BASE + 21, .z = Fixtures::BASE + 20, .level = 1}));
+}
