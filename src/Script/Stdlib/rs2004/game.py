@@ -241,6 +241,16 @@ class _Reader:
     def loc_type(self, id):
         return _core.get_loc_type(id)
 
+    def item_ids(self, name):
+        """The ids of the items with that name in the cache, without regard to case."""
+        return _core.find_type_ids('item', name)
+
+    def npc_ids(self, name):
+        return _core.find_type_ids('npc', name)
+
+    def loc_ids(self, name):
+        return _core.find_type_ids('loc', name)
+
 
 class _Chat:
     def say(self, text):

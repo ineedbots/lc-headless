@@ -391,6 +391,13 @@ class _Traversal:
             return {'ok': False, 'reason': 'navigation unavailable: the client has no walker data'}
         return json.loads(text)
 
+    def route_cost(self, start, dest, max_expansions=300000):
+        """The cost of the route the walker would plan from start to dest, without teleports, or None when it
+        finds none, as for a camp past a gate this account can't open. The budget keeps a search for a route
+        that doesn't exist to a fraction of a second in a Release build."""
+        path = self._request(Tile.from_tile(start), Tile.from_tile(dest), max_expansions, {'use_teleports': False}, False, [])
+        return path['cost'] if path['ok'] else None
+
     def walk_to(self, dest, radius=2, timeout_ms=None, max_expansions=None, use_teleport_catalog=None, policy=None, bank_item_counts=None, avoid_zones=None, log=None, force_repath=False):
         """Walks to within radius of dest, anywhere on the map. True on arrival, or when the route ends as
         close as it can get (last_outcome 'closest' or 'blocked')."""

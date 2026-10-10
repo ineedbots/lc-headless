@@ -426,7 +426,7 @@ class _Banking:
                 yield from result
         yield from execution.delay_ticks(1)
         if return_to is not None:
-            yield from direct_navigator.walk_to(return_to, 6, 120000)
+            yield from traversal.walk_resilient(return_to, 6, None, 120000)
         return True
 
 
@@ -508,10 +508,12 @@ FAILURE_BACKOFF_MS = 180000
 class PeriodicBank(Task):
     """A task that banks loot every so often, by items or time, as rs2b0t's PeriodicBank. Give it callables:
     strategy() ('off', 'items', 'time' or 'either'), items_threshold(), minutes_threshold(), count_loot()
-    and deposit(name), and optionally after_deposit(), common_junk(), return_to() and log(message)."""
+    and deposit(name), and optionally after_deposit(), common_junk(), return_to(), destination() (one of
+    bank_locations() to bank at) and log(message)."""
 
-    def __init__(self, strategy=None, items_threshold=None, minutes_threshold=None, count_loot=None, deposit=None, after_deposit=None, common_junk=None, return_to=None, log=None):
+    def __init__(self, strategy=None, items_threshold=None, minutes_threshold=None, count_loot=None, deposit=None, after_deposit=None, common_junk=None, return_to=None, log=None, destination=None):
         Task.__init__(self, None, None, 'periodic bank')
+        self.destination = destination
         self.strategy = strategy
         self.items_threshold = items_threshold
         self.minutes_threshold = minutes_threshold
@@ -538,7 +540,8 @@ class PeriodicBank(Task):
     def execute(self):
         common = True if self.common_junk is None else self.common_junk()
         back = None if self.return_to is None else self.return_to()
-        ok = yield from banking.bank_nearest(self.deposit, common, None, back, 'Bank booth', 'Use-quickly', self.after_deposit)
+        where = None if self.destination is None else self.destination()
+        ok = yield from banking.bank_nearest(self.deposit, common, where, back, 'Bank booth', 'Use-quickly', self.after_deposit)
         self.last_bank_at = _core.step_time()
         if not ok:
             self.suppress_until = _core.step_time() + FAILURE_BACKOFF_MS

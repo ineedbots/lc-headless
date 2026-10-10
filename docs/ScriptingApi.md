@@ -257,6 +257,7 @@ arrived = yield from traversal.walk_resilient(Tile(3253, 3420, 0), 2)
 | `last_outcome`, `last_reason` | How the last walk ended: `'arrived'`, `'closest'` (as near as the route goes), `'blocked'`, `'budget'`, `'failed'`, `'unreachable'` or `'interrupted'`, and why a search failed |
 | `remaining` | Route tiles left on the walk in progress |
 | `request_repath(reason=None)` | Plans the walk in progress again at its next step |
+| `route_cost(start, dest, max_expansions=300000)` | The cost of the route a walk would plan, without walking it, or `None` when there's none, as past a gate the account can't open |
 | `try_nearby_door(log=None)` | Opens a shut door or gate beside you |
 | `teleports_enabled()` | Whether walks use teleports unless told otherwise. They don't, as in rs2b0t |
 
@@ -510,6 +511,36 @@ An event NPC that's following another player is left alone. An event that isn't 
 
 `random_events.detect()` gives the waiting event, with `kind` and `name`, or `None`; `yield from random_events.handle(event)` answers one. A script with the guardian off can call them itself.
 
+## Catalogs and behaviours
+
+rs2b0t's world catalogs, its planners and its reusable tasks are in `rs2004.catalogs`, which a script imports:
+
+```python
+from rs2004.catalogs import pickaxe_req, has_all_tools, resolve_mining_location, ContinueDialog
+
+camp = resolve_mining_location('Use Closest', game.tile())
+if not has_all_tools([pickaxe_req()], skills.level, inventory.count):
+    ...
+```
+
+| Part | What's there |
+|---|---|
+| Tools | `PICKAXES` and `AXES` (best first, with their skill and Attack levels), `TINDERBOX` and the other tools, `pickaxe_req()`, `axe_req()`, `exact_tool(name)`, `best_pickaxe`, `best_axe`, `has_all_tools`, `tool_restock_plan`, `tools_needing_equip`, `best_held_tool_names` and the rest |
+| Getting tools | Bob, Nurmof, Gerrant and Harry with their shop prices; `plan_gather_tool_acquire`, `plan_pickaxe_acquire`, `plan_axe_acquire` (buy at Bob's or smith from a bar), `plan_broken_tool_repair`, `plan_fishing_gear_buys`, `fishing_gear_shop_cart`, `can_fund_plan`, `acquire_keep_names`, and `walk_to_tool_vendor` (a wait, through Nurmof's trapdoor) |
+| Fishing and mining | `FISHING_METHODS` with their gear, `spot_matches_method`, `fishing_restock_plan`; `ROCK_TYPES` by ore, `resolve_rock_ids`, `rock_tier_by_id`, `GAS_ROCK_IDS` |
+| Gathering camps | `FISHING_LOCATIONS`, `MINING_LOCATIONS` and `WOODCUTTING_LOCATIONS`, with their options for a setting and resolvers (`'Use Closest'`, `'Auto'`, a name, or None for freeform); `booth_fields`; `pick_bucket_nearest` and `pick_nearest_prefer_local` for choosing a rock or tree |
+| Other tables | Cow fields and the Al Kharid toll, runecrafting routes, pickpocket targets, herbs, walk destinations, cooking ranges and the cook location by each bank, fire spots and logs, and the shop database (`shop_db()`, `shops_selling(item)`) |
+| Combat | Food heals and when to eat (`should_eat_food`, `should_hold_eat` and `AttackClock`, so a bite doesn't cost a swing), super and ranging potions (`planned_potions`, `potion_to_sip`), `combat_keep_names`, `bury_one_in_fight` |
+| Loadouts | A script's `loadouts` setting (a list of `{name, worn, carry}`) and `loadout`, which names one: `selected_loadout`, `food_of`, `gear_of`, `weapon_of`, `supplies_of`, `script_food` |
+| Trading partners | `parse_partner_list`, `is_configured_partner`, `decide_receiver_offer_screen`, `decide_giver_offer_screen`, `count_offer_by_name`, and the mule roles |
+| Tasks | `ContinueDialog`, `DeathRecovery` (from the death event), `AcquireTask` with `ItemNeed`s from a shop or the ground, `create_return_to_anchor_task`, the leash helpers, and `sustain`. `PeriodicBank` is the bank's, and takes a `destination` too |
+
+A table entry is a `Record`: its fields are attributes, and one it doesn't set reads as `None`. Item, NPC and scenery names are the 289 cache's, and a test checks every name the tables use against it. `reader.item_ids(name)`, `npc_ids(name)` and `loc_ids(name)` look a name up in the cache.
+
+The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout, which writes `rs2004/catalogs/_data.py` and `_shops.py`.
+
+`scripts/examples` has three of rs2b0t's bots translated with them: `miner.py` (the mining side of GatheringBot), `cow_killer.py` (ChickenKiller's CowKiller, in melee) and `bank_fletcher.py` (BankFletcher, less its cut+string mode).
+
 ## Upkeep
 
 Two of rs2b0t's runtime services run for every script, once a server tick, beside the random event guardian:
@@ -682,7 +713,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, and the `StallGuard` with the supervisor's watchdog. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, and the catalogs and behaviours (`rs2004.catalogs`). [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;

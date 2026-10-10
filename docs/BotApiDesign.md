@@ -70,7 +70,7 @@ src/
 │       ├── random_events.py    the guardian: detection and handlers (§10)
 │       ├── random_solvers.py   the mime, the strange box, the lamp and the maze (§10)
 │       ├── upkeep.py           the run manager and the stall guard (§11)
-│       └── catalogs/           data tables, planners and behaviours (§12)
+│       └── catalogs/           data tables, planners and behaviours (§12), _data.py generated from rs2b0t
 ├── Game/
 │   ├── InterfaceView.hpp/.cpp  the cache's components merged with what the server set (§6)
 │   └── Map/
@@ -513,7 +513,7 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs 
 
 ---
 
-## 12. Phase 9: catalogs and behaviours
+## 12. Phase 9: catalogs and behaviours (done)
 
 Ported to `rs2004/catalogs/` with rs2b0t's names in snake_case, and imported as `from rs2004.catalogs import ...`:
 
@@ -530,7 +530,23 @@ Ported to `rs2004/catalogs/` with rs2b0t's names in snake_case, and imported as 
 
 The planners are pure, so their rs2b0t tests port with them. Item and object names are as the 289 cache has them; a table entry that names something the cache lacks fails a test, not a script.
 
-- **Done when:** the ported tests pass, and the end-to-end bots below run.
+### As built
+
+- **Modules.** `rs2004/catalogs/` holds `tools`, `tool_acquire`, `fishing`, `mining`, `gathering`, `tables` (cows, runes, pickpocketing, herbs, shops, walk destinations, cooking, fire spots), `combat`, `loadout`, `partner` and `tasks`; its `__init__` re-exports them all. The banks were already in `traversal` (phase 6).
+- **The data is generated.** `tools/catalogs/export_rs2b0t.ts` imports rs2b0t's data modules with Bun and writes `_data.py` as Python literals (snake_case keys, `Tile`s), and the shop database to `_shops.py`, which is read on first use. Table entries read as `Record`s. The logic is ported by hand.
+- **Names against the cache.** A real-cache test checks every item, NPC and loc name the tables use; all are in the 289 cache. `reader.item_ids`, `npc_ids` and `loc_ids` (`_core.find_type_ids`) were added for it.
+- **Loadouts** are settings rather than rs2b0t's panel store: `loadouts` and `loadout`. `food_of` asks the cache whether an item is eaten, in place of rs2b0t's generated item database.
+- **Left out:** the firemaking lane finder (it reads rs2b0t's collision directly), the market and price tables, the quest and clue engines, and the GatheringBot-only planners (tick manipulation, the desert camp route, mule handoffs beyond the policy helpers).
+- **The bots.** `traversal.route_cost(start, dest)` plans a route without walking it, with a 300,000-node budget. `PeriodicBank` gained `destination`, and `banking.bank_nearest` walks back with `traversal`, as rs2b0t's does, since a bank trip can cross the map. The miner chooses only camps whose resources include a chosen ore: "Use Closest" from Lumbridge otherwise picks the swamp's mithril and adamantite camp.
+
+### Done when
+
+- [x] rs2b0t's tests for the tool kit, tool acquisition, fishing methods, mining rocks, gathering, mining and fishing camps, cow fields, food, eat timing, boost potions, loadouts, partner trades, the anchor helpers and sustain are ported to `tests/Stdlib/test_catalog_*.py` and pass.
+- [x] The three bots each ran 35 minutes against the local engine, side by side, without a script error:
+    - `bank_fletcher.py` cut 845 logs into arrow shafts at Varrock West over 32 bank trips, Fletching 1 to 31, using Make X;
+    - `miner.py` chose Southeast Varrock Mine for copper and tin from Lumbridge, mined 121 ore and banked at Varrock East 4 times;
+    - `cow_killer.py` fetched toll coins at Al Kharid, crossed the toll gate to the Lumbridge field, and killed and looted cows (a shorter run banked the hides at Al Kharid and topped the toll coins up). The level-3 test account died twice to cows with no food; `DeathRecovery` walked it back each time.
+- New accounts were taken off Tutorial Island with `::setvar tutorial 1000` and a relog, and the fletcher's bank stocked with `::~fletchbank`.
 
 ---
 
@@ -559,7 +575,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 6. **Walking across levels** (§9). Done.
 7. **Random events** (§10). Done.
 8. **Runtime upkeep and lifecycle** (§11). Done.
-9. **Catalogs and behaviours** (§12).
+9. **Catalogs and behaviours** (§12). Done.
 
 Each phase's "Done when" is in its section. The end-to-end check translates three of rs2b0t's bundled bots into `scripts/examples/`, each running for 30 minutes without a script error, through banking trips and whatever random events come:
 - `Miner`: gathering, banking, catalogs and tools;

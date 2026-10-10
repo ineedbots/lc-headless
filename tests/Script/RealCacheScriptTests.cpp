@@ -151,3 +151,56 @@ for spawn in [(2891, 4597), (2933, 4597), (2933, 4555), (2891, 4555)]:
     assert (2911, 4574) not in route, (spawn, route)
 )python", "maze.py");
 }
+
+// Every item, NPC and loc the catalogs name is in the 289 cache, so a table entry that names something the
+// cache lacks fails here rather than in a script.
+TEST_CASE("The catalogs name only items, NPCs and locs the real cache has", "[RealCache]")
+{
+    auto fixture = RealCacheFixture{};
+    fixture.vm.RunSource(R"python(
+from rs2004.catalogs import tools, tool_acquire, fishing, mining, gathering, tables
+
+items = set()
+for tier in tools.PICKAXES + tools.AXES:
+    items.add(tier.name)
+for name in [tools.TINDERBOX, tools.HAMMER, tools.KNIFE, tools.CHISEL, tools.NEEDLE, tool_acquire.COINS, mining.BROKEN_PICKAXE]:
+    items.add(name)
+for name in fishing.ALL_FISHING_GEAR_NAMES + list(tool_acquire.AXE_BAR_FOR.values()) + list(tables.LOG_LEVELS.keys()):
+    items.add(name)
+for herb in tables.HERBS:
+    items.add(herb.name)
+for route in tables.RUNES.values():
+    items.add(route.rune)
+    items.add(route.talisman)
+items.add(gathering.SHILO_WATER_VENDOR.item)
+
+npcs = set()
+for vendor in [tool_acquire.BOB_VENDOR, tool_acquire.NURMOF_VENDOR, tool_acquire.GERRANT_VENDOR, tool_acquire.HARRY_VENDOR]:
+    npcs.add(vendor.keeper)
+for name in tables.PICKPOCKET_TARGET_NAMES + tables.ARDOUGNE_PICKPOCKET_TARGETS:
+    npcs.add(name)
+for loc in gathering.FISHING_LOCATIONS:
+    if loc.bait_vendor is not None:
+        npcs.add(loc.bait_vendor.keeper)
+        items.add(loc.bait_vendor.item)
+npcs.add(gathering.SHILO_WATER_VENDOR.keeper)
+
+loc_names = set([tool_acquire.NURMOF_VENDOR.hop_loc, 'Range'])
+for loc in gathering.FISHING_LOCATIONS + gathering.MINING_LOCATIONS + gathering.WOODCUTTING_LOCATIONS:
+    if loc.booth_name is not None:
+        loc_names.add(loc.booth_name)
+    if loc.range_name is not None:
+        loc_names.add(loc.range_name)
+for surface in tables.COOKING_SURFACE_LOCS:
+    loc_names.add(surface.name)
+
+missing = [('item', n) for n in items if not reader.item_ids(n)]
+missing += [('npc', n) for n in npcs if not reader.npc_ids(n)]
+missing += [('loc', n) for n in loc_names if not reader.loc_ids(n)]
+assert missing == [], sorted(missing)
+assert reader.item_ids('logs') == reader.item_ids('Logs') and len(reader.item_ids('Logs')) > 0
+
+from rs2004.catalogs import Loadout, CarryEntry, food_of
+assert food_of(Loadout('melee', {}, [CarryEntry('Prayer potion(4)', 2), CarryEntry('Lobster', 10)]), 'Trout') == 'Lobster'
+)python", "catalog_names.py");
+}

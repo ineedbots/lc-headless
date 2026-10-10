@@ -741,6 +741,56 @@ _rt_finish = _runtime.finish
         });
     }
 
+    bool SameText(std::string_view a, std::string_view b)
+    {
+        return std::ranges::equal(a, b, [](char x, char y)
+        {
+            return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+        });
+    }
+
+    // The ids of the cache's types of that kind ('item', 'npc' or 'loc') with the name, matched without regard to case.
+    bool FindTypeIds(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& cache = GetApi().GetCache();
+            const auto kind = PyConvert::ToString(py_arg(0), "kind");
+            const auto name = PyConvert::ToString(py_arg(1), "name");
+            auto ids = std::vector<s64>{};
+            const auto collect = [&ids, &name](const auto& types)
+            {
+                for (const auto& type : types)
+                {
+                    if (!type.name.empty() && SameText(type.name, name))
+                    {
+                        ids.push_back(type.id);
+                    }
+                }
+            };
+
+            if (kind == "item")
+            {
+                collect(cache.objs);
+            }
+            else if (kind == "npc")
+            {
+                collect(cache.npcs);
+            }
+            else if (kind == "loc")
+            {
+                collect(cache.locs);
+            }
+            else
+            {
+                throw std::invalid_argument{std::format("kind must be 'item', 'npc' or 'loc', not '{}'", kind)};
+            }
+
+            PyConvert::FromList(py_retval(), ids, [](py_OutRef out, s64 id) { py_newint(out, id); });
+            return true;
+        });
+    }
+
     bool GetItemType(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
@@ -1892,6 +1942,7 @@ _rt_finish = _runtime.finish
             {"has_inventory(com)", HasInventory},
             {"find_world_path(request)", FindWorldPath},
             {"is_members()", IsMembers},
+            {"find_type_ids(kind, name)", FindTypeIds},
             {"square_locs(x, z, level)", GetSquareLocs},
             {"took_damage(ticks=4)", TookDamage},
             {"in_scene(x, z)", InScene},
