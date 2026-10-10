@@ -44,6 +44,8 @@ struct ScriptHostOptions_s
     bool waitForDebugger = false;
     // For routes beyond the loaded area; without it, the script can't plan them.
     std::shared_ptr<const Navigation_s> navigation;
+    // Run the stdlib's random event guardian each server tick.
+    bool randomEvents = false;
 };
 
 // Runs one account's bot against its client, on the caller's thread between pumps. The script is loaded
@@ -103,6 +105,7 @@ private:
     void RunProgressReport(Clock::time_point now);
     [[nodiscard]] bool IsLoopDue(Clock::time_point now, const GameState_s& state) const;
     void RunLoop(Clock::time_point now);
+    void RunGuard(Clock::time_point now);
     void ScheduleLoop(Clock::time_point now, py_Ref wait);
     [[nodiscard]] bool HasHook(std::string_view name) const;
     void CallHook(std::string_view name, std::span<const py_Ref> args = {});

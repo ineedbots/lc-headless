@@ -45,6 +45,7 @@ from rs2004.tabs import *
 from rs2004.messages import *
 from rs2004.reach import *
 from rs2004.traversal import *
+from rs2004.random_events import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -54,6 +55,7 @@ _rt_load = _runtime.load
 _rt_start = _runtime.start
 _rt_dispatch = _runtime.dispatch
 _rt_step = _runtime.step
+_rt_guard = _runtime.guard
 _rt_reset = _runtime.reset
 _rt_finish = _runtime.finish
 )python"sv;
@@ -986,6 +988,57 @@ _rt_finish = _runtime.finish
         });
     }
 
+    // (lx, lz, id, shape, angle) for each of a map square's locs on a level, as the cache has them.
+    bool GetSquareLocs(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& cache = GetApi().GetCache();
+            const auto* const square = cache.FindSquare(static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, 255)), static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, 255)));
+            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, 3));
+            auto locs = std::vector<MapLoc_s>{};
+            if (square != nullptr)
+            {
+                for (const auto& loc : square->GetLocs())
+                {
+                    if (loc.GetLevel() == level)
+                    {
+                        locs.push_back(loc);
+                    }
+                }
+            }
+
+            PyConvert::FromList(py_retval(), locs, [](py_OutRef out, const MapLoc_s& loc)
+            {
+                constexpr auto FIELDS = 5;
+                py_newtuple(out, FIELDS);
+                py_newint(py_tuple_getitem(out, 0), loc.GetX());
+                py_newint(py_tuple_getitem(out, 1), loc.GetZ());
+                py_newint(py_tuple_getitem(out, 2), loc.id);
+                py_newint(py_tuple_getitem(out, 3), loc.GetShape());
+                py_newint(py_tuple_getitem(out, 4), loc.GetAngle());
+            });
+            return true;
+        });
+    }
+
+    // Whether a hit that did damage landed on you within the last ticks.
+    bool TookDamage(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto& api = GetApi();
+            const auto& state = api.GetState();
+            const auto ticks = static_cast<u64>(PyConvert::ToInt(py_arg(0), "ticks", 0, 1000));
+            const auto hurt = std::ranges::any_of(api.GetLocalPlayer().hits, [&state, ticks](const Hit_s& hit)
+            {
+                return hit.damage > 0 && hit.tick + ticks >= state.tick;
+            });
+
+            return ReturnBool(hurt);
+        });
+    }
+
     bool IsMembers(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnBool(GetApi().GetState().members); });
@@ -1761,6 +1814,8 @@ _rt_finish = _runtime.finish
             {"has_inventory(com)", HasInventory},
             {"find_world_path(request)", FindWorldPath},
             {"is_members()", IsMembers},
+            {"square_locs(x, z, level)", GetSquareLocs},
+            {"took_damage(ticks=4)", TookDamage},
             {"in_scene(x, z)", InScene},
             {"nav_data(name)", GetNavData},
             {"walk_tile(x, z, level)", GetWalkTile},

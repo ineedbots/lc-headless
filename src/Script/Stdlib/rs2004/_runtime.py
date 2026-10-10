@@ -10,6 +10,7 @@ from rs2004 import events as _events
 from rs2004.bot import AbstractBot, BotManifest, LoopingBot, is_generator, resolve_loop_cadence
 from rs2004.execution import Ticks, Update
 from rs2004.settings import SettingsBag, apply_schema
+from rs2004.random_events import random_events
 
 bot = None
 _hooks_from = None
@@ -18,16 +19,32 @@ _generator = None
 _starting = False
 _finish_reason = None
 _finished = False
+# The random event guardian's solver, while it has taken over from the bot.
+_guardian = None
 
 
 class _ModuleBot(LoopingBot):
-    """A script without BOT: its module-level loop() and on_* functions, as a LoopingBot."""
+    """A script without BOT: its module-level loop() and on_* functions, as a LoopingBot. grind_targets(),
+    ignored_randoms() and lamp_skill() at module level are used too."""
 
     def __init__(self, module):
         self._module = module
 
     def loop(self):
         return self._module.loop()
+
+    def _module_or(self, name, fallback):
+        found = getattr(self._module, name, None)
+        return found() if callable(found) else fallback
+
+    def grind_targets(self):
+        return self._module_or('grind_targets', [])
+
+    def ignored_randoms(self):
+        return self._module_or('ignored_randoms', [])
+
+    def lamp_skill(self):
+        return self._module_or('lamp_skill', 'strength')
 
 
 def make_settings(text):
@@ -40,9 +57,10 @@ def make_settings(text):
 
 def load(main, settings):
     """Makes the bot from the script's module, checks its settings, and finds its hooks. Returns warnings."""
-    global bot, _hooks_from, _generator, _starting, _finish_reason, _finished
+    global bot, _hooks_from, _generator, _starting, _finish_reason, _finished, _guardian
     bot = None
     _generator = None
+    _guardian = None
     _starting = False
     _finish_reason = None
     _finished = False
@@ -113,9 +131,31 @@ def dispatch(name, *args):
     return result
 
 
+def guard():
+    """Once a server tick: when a random event needs answering, drops the bot's step in progress for the
+    guardian's solver, which the next step runs. True when it took over. on_start isn't interrupted."""
+    global _generator, _guardian
+    if bot is None or _guardian is not None or _starting:
+        return False
+    event = random_events.check(bot)
+    if event is None:
+        return False
+    _generator = None
+    _guardian = random_events.handle(event)
+    return True
+
+
 def step():
     """Runs the bot's loop until it next waits, and returns how to wait."""
-    global _generator, _starting
+    global _generator, _starting, _guardian
+    if _guardian is not None:
+        try:
+            value = next(_guardian)
+        except StopIteration:
+            _guardian = None
+            return ('ms', 0)
+        return _yielded(value)
+
     if _generator is None:
         result = bot.loop()
         if not is_generator(result):
@@ -135,9 +175,11 @@ def step():
 
 def reset():
     """Drops the step in progress, so the next step calls loop() afresh."""
-    global _generator, _starting
+    global _generator, _starting, _guardian
     _generator = None
     _starting = False
+    _guardian = None
+    random_events.handling = False
 
 
 def _after_loop(result):

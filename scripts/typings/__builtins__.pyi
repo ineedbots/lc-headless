@@ -260,6 +260,7 @@ class AbstractBot:
     def request_finish(self, reason: str) -> None: ...
     def grind_targets(self) -> list[str]: ...
     def ignored_randoms(self) -> list[str]: ...
+    def lamp_skill(self) -> str: ...
 
 class LoopingBot(AbstractBot):
     def loop(self) -> Union[int, None, Wait[Optional[int]]]: ...
@@ -421,6 +422,7 @@ class Component:
     width: int
     height: int
     children: list[int]
+    item: Optional[int]
     varp: Optional[int]
     value: Optional[int]
     def click(self) -> bool: ...
@@ -435,6 +437,21 @@ class _Interfaces:
     def click_text(self, text: str, root: Optional[int] = None) -> bool: ...
 
 interfaces: _Interfaces
+
+# Random events
+
+class _RandomEvent:
+    kind: str
+    name: str
+    tile: Optional[Tile]
+    def key(self) -> str: ...
+
+class _RandomEvents:
+    handling: bool
+    def detect(self) -> Optional[_RandomEvent]: ...
+    def handle(self, event: _RandomEvent, log: Optional[Callable[[str], None]] = None) -> Wait[bool]: ...
+
+random_events: _RandomEvents
 
 # Walking across the world
 

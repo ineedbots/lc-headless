@@ -121,7 +121,8 @@ rs2004-headless/
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
-        "progressDirectory": "progress"
+        "progressDirectory": "progress",
+        "randomEvents": true
     }
 }
 ```
@@ -151,7 +152,8 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
     "client": {
         "logLevel": "info",
         "idleSeconds": 5,
-        "cacheDirectory": "cache"
+        "cacheDirectory": "cache",
+        "navDirectory": "data/nav"
     },
     "scripting": {
         "accountsDirectory": "accounts",
@@ -160,7 +162,8 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
-        "progressDirectory": "progress"
+        "progressDirectory": "progress",
+        "randomEvents": true
     }
 }
 ```
@@ -182,6 +185,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `client.logLevel` | string | `"info"` | `verbose`, `info`, `warning` or `error` |
 | `client.idleSeconds` | integer | `5` | 1 to 300. Stored as `std::chrono::seconds` |
 | `client.cacheDirectory` | string | `"cache"` | Not empty. The folder that holds the server's cache, `main_file_cache.dat` and its index files, relative to the working directory. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
+| `client.navDirectory` | string | `"data/nav"` | Not empty. rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes ([BotApiDesign.md](BotApiDesign.md) §9) |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
 | `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
 | `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run. Stored as `std::chrono::milliseconds` |
@@ -189,6 +193,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
+| `scripting.randomEvents` | boolean | `true` | Whether scripts' random event guardian runs ([BotApiDesign.md](BotApiDesign.md) §10) |
 
 - **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
 - **`login.crcs`**, which files from before the cache have, isn't read: the CRCs come from the cache ([CacheDesign.md](CacheDesign.md) §5). A file that still has it loads, with a warning.
@@ -277,6 +282,7 @@ struct ClientSettings_s
     LogLevel_e logLevel = LogLevel_e::Info;
     std::chrono::seconds idleSeconds = 5s;
     std::string cacheDirectory = "cache";
+    std::string navDirectory = "data/nav";
 };
 
 struct ScriptingSettings_s
@@ -288,6 +294,7 @@ struct ScriptingSettings_s
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
     std::string progressDirectory = "progress";
+    bool randomEvents = true;
 };
 
 struct Config_s
@@ -526,8 +533,8 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory, navDirectory)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory, randomEvents)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
 

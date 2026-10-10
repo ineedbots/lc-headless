@@ -67,7 +67,8 @@ src/
 │       ├── bank.py             bank, banking, deposit matchers
 │       ├── ui.py               chat_dialog, shop, trade, quests, interfaces
 │       ├── walking/            traversal, reach, the executor and crossings
-│       ├── randomevents/       the guardian and solvers
+│       ├── random_events.py    the guardian: detection and handlers (§10)
+│       ├── random_solvers.py   the mime, the strange box, the lamp and the maze (§10)
 │       └── catalogs/           data tables, planners and behaviours (§12)
 ├── Game/
 │   ├── InterfaceView.hpp/.cpp  the cache's components merged with what the server set (§6)
@@ -448,9 +449,9 @@ A world-scale route needs collision beyond the build area, which the cache has. 
 
 ---
 
-## 10. Phase 7: random events
+## 10. Phase 7: random events (done)
 
-rs2b0t's `RandomEventGuardian` and solvers, ported to `rs2004/randomevents/`. The host runs the guardian after each pump.
+rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs the guardian each server tick.
 
 - **Detection.** An event NPC near the player, using rs2b0t's tables:
     - talking events: the genie, drunken dwarf, mysterious old man, sandwich lady and frog;
@@ -469,7 +470,19 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to `rs2004/randomevents/`. Th
     - for the gas chest, whirlpool and ent, step away or switch target.
 - The 289 content's `macro events/` scripts are the reference for what each event expects, and the source for any event rs2b0t doesn't cover.
 - `scripting.randomEvents` (on by default) turns the guardian off for an account.
-- **Done when:** the solvers' pure parts have tests (the maze route, the mime's emote for each animation, the strange box's answer), and against the local engine, events spawned with the engine's staff commands are each handled while a script runs.
+### As built
+
+- **Layout.** Two flat modules rather than a `randomevents/` package: `rs2004/random_events.py` (the guardian, rs2b0t's `RandomEventGuardian.ts`, `RandomEvents.ts` and `eventEvade.ts`) and `rs2004/random_solvers.py` (its `solvers/` and `maze/`).
+- **The host.** Each server tick, after the tick hook, `ScriptHost` calls the runtime's `_rt_guard` when `scripting.randomEvents` is on. When the guardian takes over, `_runtime` drops the bot's generator and steps the solver's instead, then the next step calls `loop()` afresh. A guardian that raises fails the script as "random event guardian".
+- **Found by what they show, not by ids.** The mime's buttons by their labels ("Glass Box" and the rest) and the strange box's answers by theirs, its parts from the item each model shows (the new `Component.item`), and the lamp's skills by the varp value each button sets, as the combat styles are found.
+- **The maze from the cache.** rs2b0t ships a generated table of the maze. Here `_core.square_locs(45, 71, 0)` reads the square's walls and doors from the cache, and a breadth-first search from where you stand gives the doors to open, honouring which side each one-way door opens from.
+- **Evading.** rs2b0t flees 12 tiles. The 289 content's event monsters have a `maxrange` of 15 from where they appear, beside you, so at 12 the swarm kept chasing and killed a level-3 account. Here it's 20 tiles, running, and the walk back gets 40 seconds.
+- **New core.** `square_locs(x, z, level)` and `took_damage(ticks=4)` (a hit with damage on you within the ticks) in `_core`; `Component.item`; `scripting.randomEvents` and `ScriptHostOptions_s::randomEvents`.
+
+### Done when
+
+- [x] The solvers' pure parts have tests in `tests/Stdlib/test_random_events.py`: the mime's emote for each animation, the strange box's answers, the maze route on a synthetic room (one-way doors, the shrine's own door), and the flee and step-off candidates, plant, sacrificial item, handle, hostile, ent and lost-gear rules, ported from rs2b0t's. A real-cache test routes the maze from its four spawns to the shrine's door.
+- [x] Against the local engine (`::~macro_event <id>`, a staff level 4 debugproc), while a script idled in Lumbridge castle's courtyard: the genie (lamp rubbed for fishing), the drunken dwarf, the old man's gift, the maze (16 doors from the south-east spawn, 222 ticks), the strange box, the mime (four emotes, 141 ticks) and the swarm (gone after 70 ticks) were each handled, and the account then logged out cleanly.
 
 ---
 
@@ -531,7 +544,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7). Done.
 5. **Reach** (§8). Done.
 6. **Walking across levels** (§9). Done.
-7. **Random events** (§10).
+7. **Random events** (§10). Done.
 8. **Runtime upkeep and lifecycle** (§11).
 9. **Catalogs and behaviours** (§12).
 

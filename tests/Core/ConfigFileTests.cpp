@@ -81,7 +81,8 @@ namespace
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
-        "progressDirectory": "progress"
+        "progressDirectory": "progress",
+        "randomEvents": true
     }
 }
 )json"sv;

@@ -27,6 +27,7 @@ namespace
     constexpr auto START_BOT = "_rt_start"sv;
     constexpr auto DISPATCH = "_rt_dispatch"sv;
     constexpr auto STEP = "_rt_step"sv;
+    constexpr auto GUARD = "_rt_guard"sv;
     constexpr auto FINISH = "_rt_finish"sv;
     constexpr auto LISTENING = "_listening";
     constexpr auto SETTINGS = "settings";
@@ -150,6 +151,11 @@ void ScriptHost::Step(Clock::time_point now)
             m_vm->Activate();
             py_newint(py_r0(), static_cast<s64>(state.tick));
             CallHook("tick", std::array{py_r0()});
+        }
+
+        if (m_status == ScriptStatus_e::Running && m_options.randomEvents)
+        {
+            RunGuard(now);
         }
     }
 
@@ -715,6 +721,28 @@ bool ScriptHost::IsLoopDue(Clock::time_point now, const GameState_s& state) cons
     }
 
     return true;
+}
+
+// Once a server tick: when the guardian finds a random event, it has dropped the bot's step in progress for
+// its solver, which runs from the next step, now.
+void ScriptHost::RunGuard(Clock::time_point now)
+{
+    try
+    {
+        const auto took = m_vm->CallBuiltin(GUARD);
+        m_vm->Activate();
+        if (py_isbool(took) && py_tobool(took))
+        {
+            m_wait = LoopWait_e::Time;
+            m_nextLoop = now;
+        }
+
+        ApplyStopRequest();
+    }
+    catch (const ScriptError& e)
+    {
+        Fail("random event guardian", e.what());
+    }
 }
 
 // The runtime steps the bot's loop, generator or not, and returns how to wait before the next step.

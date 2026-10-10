@@ -179,6 +179,16 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     SetInt(object, "y", position.y);
     SetInt(object, "width", component.width);
     SetInt(object, "height", component.height);
+    // The item the server set the component to show, such as a make menu's product.
+    if (const auto shown = view.GetObject(component))
+    {
+        SetInt(object, "item", *shown);
+    }
+    else
+    {
+        SetNone(object, "item");
+    }
+
     // The varp a button's first condition reads, with pushvar (5) or testbit (13), and the value it's
     // compared with: what a Select or Toggle button sets.
     constexpr auto PUSHVAR = u16{5};

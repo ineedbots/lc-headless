@@ -121,6 +121,7 @@ Every other key has a default. These are the ones you're most likely to change:
 | `scripting.callTimeoutMs` | `1000` | How long one call into a script may run |
 | `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
 | `scripting.progressDirectory` | `progress` | Where progress reports are written |
+| `scripting.randomEvents` | `true` | Whether scripts answer random events themselves ([docs/ScriptingApi.md](docs/ScriptingApi.md#random-events)) |
 
 [docs/ConfigDesign.md §3](docs/ConfigDesign.md#3-file-format) lists every key and its rules. An error message names the key that's wrong but never shows its value, so a mistyped password doesn't end up in the log.
 

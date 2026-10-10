@@ -135,3 +135,19 @@ choices = [c.id for c in interfaces.root(interfaces.tab(0)) if c.button == 'ok']
 assert choices[:len(AUTOCAST_SPELLS)] == list(range(1830, 1830 + len(AUTOCAST_SPELLS))), choices
 )python", "spells.py");
 }
+
+TEST_CASE("The maze random event's route from each spawn ends at the shrine", "[RealCache]")
+{
+    auto fixture = RealCacheFixture{};
+    fixture.vm.RunSource(R"python(
+from rs2004.random_solvers import maze_graph, solve_maze_route, MAZE_SHRINE_DOOR
+graph = maze_graph()
+assert len(graph.walls) > 100 and len(graph.doors) > 10, (len(graph.walls), len(graph.doors))
+for spawn in [(2891, 4597), (2933, 4597), (2933, 4555), (2891, 4555)]:
+    route = solve_maze_route(graph, spawn)
+    assert len(route) > 0, spawn
+    assert route[-1] == MAZE_SHRINE_DOOR, (spawn, route)
+    # The old goal accepted the tile south of the shrine's corner, through a wall.
+    assert (2911, 4574) not in route, (spawn, route)
+)python", "maze.py");
+}

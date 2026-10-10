@@ -104,6 +104,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .watchFiles = m_options.watchScripts,
                 .waitForDebugger = m_options.waitForDebugger,
                 .navigation = m_options.navigation,
+                .randomEvents = scripting.randomEvents,
             },
             m_logger);
     }

@@ -318,7 +318,8 @@ The `account` section moves out. A new `scripting` section is added:
     "pollIntervalMs": 10,
     "loginIntervalSeconds": 2,
     "killGraceSeconds": 30,
-    "progressDirectory": "progress"
+    "progressDirectory": "progress",
+    "randomEvents": true
 }
 ```
 

@@ -34,7 +34,7 @@ def is_generator(value):
 
 class AbstractBot:
     """The base of every bot. Override the hooks you need: on_start(), on_stop(reason), on_<event>(...),
-    recovery_anchor(), grind_targets() and ignored_randoms()."""
+    recovery_anchor(), grind_targets(), ignored_randoms() and lamp_skill()."""
 
     # How long to wait between loops when loop() returns None: 600 is the next server tick.
     loop_delay = ONE_TICK_MS
@@ -64,8 +64,12 @@ class AbstractBot:
         return []
 
     def ignored_randoms(self):
-        """Random events this bot doesn't stop for."""
+        """Random events this bot doesn't stop for, by name: 'genie', 'swarm', 'maze' and so on."""
         return []
+
+    def lamp_skill(self):
+        """The skill a genie's lamp is spent on."""
+        return 'strength'
 
     def _dispose_subscriptions(self):
         for unsubscribe in self._subscriptions or []:

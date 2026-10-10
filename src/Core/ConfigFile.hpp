@@ -44,6 +44,8 @@ struct ScriptingSettings_s
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
     std::string progressDirectory = "progress";
+    // Whether scripts' random event guardian runs: it takes over to answer a random event when one comes.
+    bool randomEvents = true;
 };
 
 struct Config_s

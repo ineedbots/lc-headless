@@ -433,6 +433,7 @@ A `Component` is a snapshot. Its fields:
 - `options`: an inventory's five, `None` where empty;
 - `target_verb` and `target_name`: a spell button's, such as "Cast on" and "Wind strike";
 - `x` and `y` from its interface's corner, `width`, `height`, and `children` (ids);
+- `item`: the object the server set it to show, such as a make menu's product or a strange box's shape, or `None`;
 - `varp` and `value`: the varp a Select or Toggle button's condition reads and the value it compares with. That's what the button sets, such as varp 43, the combat mode, set to 1.
 
 `component.click()` clicks it.
@@ -479,6 +480,33 @@ And the spellbook, by name:
 - `armed()`;
 - `staff_tab_attached()`, which is true when the combat tab is a staff's;
 - `arm(spell, log=None)`, a generator that chooses the spell from `AUTOCAST_SPELLS` and turns autocasting on.
+
+## Random events
+
+While a script runs, the client answers random events for it. Once a server tick it asks `random_events` whether one needs answering. When one does, the bot's step in progress is dropped, the solver runs until it's done, and `loop()` starts afresh, as it does after a reconnect. `on_start` isn't interrupted.
+
+| Event | What's done |
+|---|---|
+| The genie, drunken dwarf, mysterious old man, sandwich lady and frog | Talks to it and goes through the dialogue |
+| A lamp in the backpack | Rubs it for `lamp_skill()`'s skill |
+| A strange box in the backpack | Reads the question and clicks the part's colour or shape |
+| The mime's stage | Copies each emote he performs, by his animation |
+| The maze | Opens the doors on the route to the centre, which it reads from the cache's map, then touches the shrine |
+| The strange plant | Picks its fruit while it can be picked |
+| A hostile event (swarm, river troll, rock golem, zombie, shade, watchman, tree spirit) that has hit you | Runs 20 tiles away until it's gone, then walks back. It chases until you're 15 from where it appeared |
+| The gas chest, smoking rocks and whirlpools | Steps away and waits a minute |
+| An ent you're chopping | Steps off it |
+| A tool whose head flew off | Picks the head up and fixes the tool, wielding it again if it was worn |
+| Fishing gear knocked out of your hands | Picks it back up |
+
+A script chooses with these, as module-level functions or methods on its bot:
+- `ignored_randoms()`: event names to leave alone, such as `['drunken dwarf']`;
+- `grind_targets()`: NPC names you fight on purpose, which are never taken for a hostile event;
+- `lamp_skill()`: the skill the lamp's experience goes to, `'strength'` unless you say otherwise.
+
+An event NPC that's following another player is left alone. An event that isn't over after 4 tries is ignored for 45 seconds, except the maze, the mime, a box and a lamp, which hold you or can't be dropped, so they're tried again. `scripting.randomEvents: false` in `client.jsonc` turns all of this off.
+
+`random_events.detect()` gives the waiting event, with `kind` and `name`, or `None`; `yield from random_events.handle(event)` answers one. A script with the guardian off can call them itself.
 
 ## Events and hooks
 
@@ -642,7 +670,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles and `Autocast`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, and the `RandomEventGuardian` with its solvers. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;
