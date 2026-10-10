@@ -29,6 +29,11 @@ class InvItem:
             return _core.inv_button(self, op)
         return _core.item_op(self, op)
 
+    def move_to(self, slot):
+        """Drags the item to another slot of its inventory, as the bank's rearranging does."""
+        _core.move_item(self.com, self.slot, slot)
+        return True
+
     def use_on(self, target):
         """Uses the item on another item, an NPC, a player, scenery or a ground item."""
         if isinstance(target, InvItem):

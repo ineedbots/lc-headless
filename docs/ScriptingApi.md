@@ -377,17 +377,53 @@ A `Component` is a snapshot. Its fields:
 - `text`, `colour`, `hidden` and `visible` (in an open interface, with nothing above it hidden);
 - `options`: an inventory's five, `None` where empty;
 - `target_verb` and `target_name`: a spell button's, such as "Cast on" and "Wind strike";
-- `x` and `y` from its interface's corner, `width`, `height`, and `children` (ids).
+- `x` and `y` from its interface's corner, `width`, `height`, and `children` (ids);
+- `varp` and `value`: the varp a Select or Toggle button's condition reads and the value it compares with. That's what the button sets, such as varp 43, the combat mode, set to 1.
 
 `component.click()` clicks it.
 
-These take numbers still, until phase 4 replaces them ([BotApiDesign.md](BotApiDesign.md) §14):
-- `continue_dialogue()` clicks "Click here to continue", and `answer_count(value)` answers an amount prompt. Each gives `False`, sending nothing, when there's no such thing to answer;
-- `close_interfaces()` closes the open ones;
-- `click_button(com)` sends a click on a component without checking it;
-- `inv_button(item, op)` uses an option on an item in an interface inventory, such as the bank's: its number, or its text, such as `'Withdraw 5'`;
-- `move_item(com, from_slot, to_slot)` swaps two slots;
-- `cast_on_npc`, `cast_on_player`, `cast_on_loc`, `cast_on_ground_item` and `cast_on_item(spell, target)` cast the spell whose spellbook button component is `spell`. `cast_on_loc` takes `spell, id, x, z`.
+An item in an interface inventory moves with `item.move_to(slot)`, as rearranging the bank does.
+
+## The side tabs
+
+`quests` is the quest list:
+- `all()` gives `Quest`s, each with `name`, `status` and `com` (the row's button);
+- `status(name)` is `'not_started'`, `'in_progress'` or `'complete'`, read from the row's colour (red, yellow or green), or `'unknown'` when there's no such row;
+- `points()` is the quest points;
+- `journal(name)` opens the quest's journal and gives its lines. It's a generator.
+
+The engine sends nothing more about a quest's progress.
+
+`prayer` handles the prayers, named as `PRAYER_NAMES` has them, such as `'protect from melee'`:
+- `points()`, `max()`, `full()`;
+- `known(name)`, and `available(name)`, which means your level is high enough and you have points left;
+- `active(name)`;
+- `set(name, on)`, a generator that waits for the server to agree;
+- `clear()`, which turns every prayer off.
+
+A prayer's button is its place among the prayer tab's toggle buttons. Whether it's on is the varp that button reads.
+
+`special` is the special attack:
+- `energy()`, from 0 to 1000 (`SA_MAX_ENERGY`), and `armed()`;
+- `wielded()`, the weapon's name;
+- `cost(weapon_name)`, from rs2b0t's table, or `None`, and `ready(weapon_name)`;
+- `bar_component()`, the combat tab's "Use Special Attack" bar, or -1 when the weapon has none;
+- `arm()`, a generator. Arming is one-shot: the next attack spends it.
+
+`game` also has the combat tab's styles:
+- `combat_mode()` and `combat_styles()`. The styles are `(mode, label)` pairs such as `(1, '(Aggressive)')`: the Select buttons that set the combat mode, each with the label drawn level with it. So they follow whatever weapon is wielded.
+- `set_combat_style(style)` and `has_combat_style(style)` take `'attack'`, `'strength'`, `'controlled'` or `'defence'`, or the labels' words, such as `'aggressive'`. A weapon without the style falls back to its last defensive one; `combat_style_resolution(style)` and `combat_style_mode(style)` say what that is. `set_combat_style` also takes a mode number, as does `set_combat_mode(mode)`. The ranged styles are modes, and `parse_range_style(name)` gives them.
+- `auto_retaliate_on()` and `set_auto_retaliate(on)`.
+- `attacked_by_player()`: you're in combat and facing a player.
+
+And the spellbook, by name:
+- `cast_on_npc(spell, npc)`, `cast_on_player(spell, player)`, `cast_on_loc(spell, loc)`, `cast_on_ground_item(spell, item)` and `cast_on_item(spell, item)`, such as `game.cast_on_item('High level alchemy', item)`. The spell is the magic tab's target button that names it. Each gives `False` when the spellbook has no such spell.
+- `teleport(name)`, such as `game.teleport('Varrock')`, clicks the "Cast Varrock teleport" button. It returns once the click is sent, so check the arrival yourself.
+
+`autocast` is a staff's autocasting:
+- `armed()`;
+- `staff_tab_attached()`, which is true when the combat tab is a staff's;
+- `arm(spell, log=None)`, a generator that chooses the spell from `AUTOCAST_SPELLS` and turns autocasting on.
 
 ## Events and hooks
 
@@ -551,12 +587,14 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`'s basics, `DirectNavigator` and `reader`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles and `Autocast`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;
     - `chat_message`'s `type` is a name (`'game'`, `'public'` and so on) rather than the webclient's number;
-    - a setting that doesn't fit its schema is an error before login rather than quietly the default.
+    - a setting that doesn't fit its schema is an error before login rather than quietly the default;
+    - `match` is a Python keyword, so `chooseOption(match)` is `choose_option(text)`, and `make(match)` is `make(name)`;
+    - `ChatDialog.continue()` is `chat_dialog.continue_()`.
 
 ## Porting from plutonium
 
@@ -597,15 +635,21 @@ Coordinates differ between RSC and 2004, so every tile in a script changes. An `
 | `in_combat()`, `is_skilling()` | `game.in_combat()`, `game.animating()` |
 | `send_chat_message(text)`, `send_private_message(name, text)` | `chat.say(text)`, `chat.send_pm(name, text)` |
 | `get_friends()`, `get_ignored()`, `add_friend(name)` and the rest | `friends.list()`, `ignores.list()`, `friends.add(name)` and so on |
-| `cast_on_self(spell)` | `click_button(spell)`, since 2004 casts those spells from the spellbook button |
+| `cast_on_self(spell)` | `game.teleport(name)` for a teleport, or `interfaces.click_text(...)` on the spellbook button |
+| `cast_on_npc(spell, npc)` and the other casts | `game.cast_on_npc('Wind strike', npc)` and so on, by the spell's name |
+| `is_bank_open()`, `deposit(id, amount)`, `withdraw(id, amount)` | `bank.is_open()`, `yield from bank.deposit_all_matching(...)`, `yield from bank.withdraw_x(name, amount)` |
+| `is_option_menu()`, `answer(i)` | `chat_dialog.options()`, `yield from chat_dialog.choose_option(text)` |
+| `get_quests()`, `is_prayer_enabled(p)`, `enable_prayer(p)` | `quests.all()`, `prayer.active(name)`, `yield from prayer.set(name, True)` |
+| `get_combat_style()`, `set_combat_style(n)` | `game.combat_mode()`, `game.set_combat_style(style)` |
+| `is_shop_open()`, `buy_shop_item(id, n)` | `shop.is_open()`, `yield from shop.buy_by_id(id, n)` |
+| `is_trade_offer_screen()`, `accept_trade_offer()`, `is_recipient_trade_accepted()` | `trade.on_offer_screen()`, `trade.accept()`, `trade.their_accepted()` |
 | `random(min, max)` | `random.randint(min, max)`, after `import random` |
 | `set_autologin(False)` then `logout()` | `stop_account()` |
 
 Not here yet:
 - walking beyond the loaded area;
-- helpers for the bank, shops, trades, dialogue options and skills' make menus (Make 1, 5, 10 and X), combat style, prayers and quests;
 - logging out and back in;
 - hooks for dying, NPCs' overhead text and projectiles;
 - character design.
 
-[BotApiDesign.md](BotApiDesign.md) plans all of them; until then the interface ones take component ids. Fatigue, sleeping, the sleepword and raw packets don't exist.
+[BotApiDesign.md](BotApiDesign.md) plans all of them. Fatigue, sleeping, the sleepword and raw packets don't exist.

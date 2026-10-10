@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "../LogCapture.hpp"
+#include "RealCache.hpp"
 
 #include "Cache/CacheLoader.hpp"
 #include "Cache/GameCache_s.hpp"
@@ -15,57 +16,17 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-// These read the 289 cache from the folder in RS2004_CACHE_DIR, such as ../289server/engine/data/pack,
-// and skip when it isn't set.
+// These read the 289 cache from the folder in RS2004_CACHE_DIR, and skip when it isn't set.
 namespace
 {
-    constexpr auto CACHE_DIR_VARIABLE = "RS2004_CACHE_DIR";
-
-    std::optional<std::filesystem::path> GetCacheDirectory()
-    {
-        // MSVC deprecates getenv in favour of _dupenv_s, which other platforms don't have.
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-        const auto* const value = std::getenv(CACHE_DIR_VARIABLE);
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-        if (value == nullptr || *value == '\0')
-        {
-            return std::nullopt;
-        }
-
-        return std::filesystem::path{value};
-    }
-
-    // Loaded once for every test here; the load time goes to the test output.
-    std::shared_ptr<const GameCache_s> GetRealCache()
-    {
-        static const auto cache = []
-        {
-            auto capture = LogCapture{};
-            auto loaded = std::make_shared<const GameCache_s>(CacheLoader::Load(*GetCacheDirectory(), *capture.GetLogger()));
-            for (const auto& entry : capture.GetEntries())
-            {
-                UNSCOPED_INFO(entry.message);
-            }
-
-            return loaded;
-        }();
-
-        return cache;
-    }
-
     const GameCache_s& RequireRealCache()
     {
-        if (!GetCacheDirectory())
-        {
-            SKIP("Set RS2004_CACHE_DIR to a 289 cache folder to run this test");
-        }
+        return RealCache::Require();
+    }
 
-        return *GetRealCache();
+    std::shared_ptr<const GameCache_s> GetRealCache()
+    {
+        return RealCache::RequireShared();
     }
 
     std::vector<std::string_view> GetOptions(const GameCache_s& cache, std::span<const u16> ops)

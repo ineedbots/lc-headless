@@ -7,6 +7,8 @@ from rs2004 import execution
 from rs2004.entities import local_tile
 from rs2004.events import SKILL_NAMES
 from rs2004.geometry import Tile
+from rs2004.tabs import COM_MODE_VARP, RETALIATE_VARP, _select_button, combat_styles, parse_combat_style
+from rs2004.tabs import resolve_combat_style, spell_button, teleport_button, try_parse_combat_style
 
 __all__ = ['game', 'skills', 'reader', 'chat', 'friends', 'ignores', 'direct_navigator']
 
@@ -61,6 +63,99 @@ class _Game:
 
     def combat_level(self):
         return _core.get_combat_level()
+
+    # Combat
+
+    def combat_mode(self):
+        """The combat tab's selected mode, the varp its style buttons set."""
+        return _core.get_varp(COM_MODE_VARP)
+
+    def combat_styles(self):
+        """The wielded weapon's style buttons as (mode, label), such as (0, '(Accurate)'). None before the
+        combat tab is sent."""
+        return combat_styles()
+
+    def combat_style_resolution(self, style):
+        """How the weapon trains style ('attack', 'strength', 'controlled' or 'defence'): a
+        CombatStyleResolution, falling back to its last defensive style, or None."""
+        offered = combat_styles()
+        if offered is None:
+            return None
+        return resolve_combat_style(parse_combat_style(style), offered)
+
+    def combat_style_mode(self, style):
+        resolution = self.combat_style_resolution(style)
+        return resolution.mode if resolution is not None else None
+
+    def has_combat_style(self, style):
+        mode = self.combat_style_mode(style)
+        return mode is not None and self.combat_mode() == mode
+
+    def set_combat_style(self, style):
+        """Selects the style, by training style or interface label ('aggressive'), or by mode number."""
+        if isinstance(style, int) and not isinstance(style, bool):
+            return self.set_combat_mode(style)
+        if try_parse_combat_style(style) is None:
+            raise ValueError(f'{repr(style)} is not a combat style; use attack, strength, controlled or defence')
+        mode = self.combat_style_mode(style)
+        return mode is not None and self.set_combat_mode(mode)
+
+    def set_combat_mode(self, mode):
+        """Clicks the combat tab's button for the mode, as ranged styles are set."""
+        button = _select_button(COM_MODE_VARP, mode)
+        return button is not None and _core.click_component(button.id)
+
+    def auto_retaliate_on(self):
+        return _core.get_varp(RETALIATE_VARP) == 0
+
+    def set_auto_retaliate(self, on):
+        button = _select_button(RETALIATE_VARP, 0 if on else 1)
+        return button is not None and _core.click_component(button.id)
+
+    def attacked_by_player(self):
+        """In combat and facing a player: one who attacked, since a bot that doesn't start fights only
+        faces players by retaliating."""
+        target = _core.get_local_player().target
+        return _core.in_combat() and target is not None and target[0] == 'player'
+
+    # Magic
+
+    def _spell(self, spell):
+        com = spell_button(spell)
+        if com == -1:
+            return None
+        return com
+
+    def cast_on_npc(self, spell, npc):
+        """Casts the spell, by name ('Wind strike'), on the NPC. False when the spellbook has no such spell."""
+        com = self._spell(spell)
+        return com is not None and _core.cast_on_npc(com, npc)
+
+    def cast_on_player(self, spell, player):
+        com = self._spell(spell)
+        return com is not None and _core.cast_on_player(com, player)
+
+    def cast_on_loc(self, spell, loc):
+        com = self._spell(spell)
+        if com is None:
+            return False
+        _core.cast_on_loc(com, loc.id, loc._x, loc._z)
+        return True
+
+    def cast_on_ground_item(self, spell, item):
+        com = self._spell(spell)
+        return com is not None and _core.cast_on_ground_item(com, item)
+
+    def cast_on_item(self, spell, item):
+        """Casts the spell on a backpack item, as Superheat Item and the alchemy spells are cast."""
+        com = self._spell(spell)
+        return com is not None and _core.cast_on_item(com, item)
+
+    def teleport(self, name):
+        """Casts a teleport by name, 'Varrock' or 'Varrock teleport'. True when the click is sent; check the
+        arrival yourself."""
+        com = teleport_button(name)
+        return com != -1 and _core.click_component(com)
 
 
 def _skill_index(name):

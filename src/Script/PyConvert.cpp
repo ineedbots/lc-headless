@@ -179,6 +179,28 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     SetInt(object, "y", position.y);
     SetInt(object, "width", component.width);
     SetInt(object, "height", component.height);
+    // The varp a button's first condition reads, with pushvar (5) or testbit (13), and the value it's
+    // compared with: what a Select or Toggle button sets.
+    constexpr auto PUSHVAR = u16{5};
+    constexpr auto TESTBIT = u16{13};
+    const auto& script = component.scripts.empty() ? std::vector<u16>{} : component.scripts.front();
+    if (script.size() >= 2 && (script[0] == PUSHVAR || script[0] == TESTBIT))
+    {
+        SetInt(object, "varp", script[1]);
+    }
+    else
+    {
+        SetNone(object, "varp");
+    }
+
+    if (component.operands.empty())
+    {
+        SetNone(object, "value");
+    }
+    else
+    {
+        SetInt(object, "value", component.operands.front());
+    }
 
     // As SetOptions: each list stays on the value stack until the object holds it.
     const auto children = py_pushtmp();

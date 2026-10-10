@@ -40,6 +40,7 @@ from rs2004.interfaces import *
 from rs2004.dialogue import *
 from rs2004.bank import *
 from rs2004.trade import *
+from rs2004.tabs import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -56,23 +57,11 @@ _rt_finish = _runtime.finish
     constexpr auto LOAD_SETTINGS = "settings = _rt_make_settings(_settings_json)\ndel _settings_json\n"sv;
     constexpr auto CORE_MODULE = "_core";
 
-    // Functions that scripts call directly until the phase that replaces them (BotApiDesign.md §14):
-    // interfaces and magic, and the script's own control.
+    // Functions that scripts call directly: the script's own control.
     constexpr auto BUILTIN_FUNCTIONS = std::to_array<std::string_view>({
         "stop_script",
         "stop_account",
         "send_bot_message",
-        "click_button",
-        "continue_dialogue",
-        "answer_count",
-        "close_interfaces",
-        "inv_button",
-        "move_item",
-        "cast_on_npc",
-        "cast_on_player",
-        "cast_on_loc",
-        "cast_on_ground_item",
-        "cast_on_item",
     });
     constexpr auto SETTINGS_JSON = "_settings_json";
     constexpr auto MAX_COORD = s64{32767};
