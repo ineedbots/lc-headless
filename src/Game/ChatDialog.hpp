@@ -58,6 +58,8 @@ namespace ChatDialog
     [[nodiscard]] std::vector<ChatOption_s> GetOptions(const InterfaceView& view);
     // The chat modal's visible text, cleaned, such as an NPC's name and lines.
     [[nodiscard]] std::vector<std::string> GetTexts(const InterfaceView& view);
+    // An interface's visible text, cleaned, in drawing order.
+    [[nodiscard]] std::vector<std::string> GetTexts(const InterfaceView& view, u16 root);
     // The products of the make menu in the chat modal, or else in the main modal, such as fletching's or
     // the tanner's.
     [[nodiscard]] std::vector<MakeProduct_s> GetMakeProducts(const InterfaceView& view);

@@ -94,12 +94,32 @@ void TestCache::SetTradeScreen(GameCache_s& cache)
             {.id = TRADE_ACCEPT_LABEL, .x = 239, .y = 181},
             {.id = TRADE_DECLINE, .x = 224, .y = 246},
             {.id = TRADE_STATUS_LAYER, .x = 0, .y = 0},
+            {.id = TRADE_MY_OFFER, .x = 23, .y = 59},
+            {.id = TRADE_THEIR_OFFER, .x = 307, .y = 59},
+            {.id = TRADE_PARTNER, .x = 180, .y = 15},
+            {.id = TRADE_DECLINE_LABEL, .x = 237, .y = 254},
         }},
         {.id = TRADE_ACCEPT, .root = TRADE_SCREEN, .type = ComponentType_e::Rect, .buttonType = ButtonType_e::Ok, .width = 66, .height = 31, .buttonText = "Ok"},
         {.id = TRADE_ACCEPT_LABEL, .root = TRADE_SCREEN, .type = ComponentType_e::Text, .width = 39, .height = 14, .text = "Accept", .colour = 0x00C000},
         {.id = TRADE_DECLINE, .root = TRADE_SCREEN, .type = ComponentType_e::Rect, .buttonType = ButtonType_e::Close, .width = 66, .height = 31},
         {.id = TRADE_STATUS_LAYER, .root = TRADE_SCREEN, .type = ComponentType_e::Layer, .width = 488, .height = 20, .children = {{.id = TRADE_STATUS, .x = 5, .y = 2}}, .hidden = true},
         {.id = TRADE_STATUS, .root = TRADE_SCREEN, .type = ComponentType_e::Text, .width = 100, .height = 14, .text = "Waiting"},
+        {.id = TRADE_MY_OFFER, .root = TRADE_SCREEN, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Remove 1", "Remove 5", "Remove 10", "Remove All", "Remove X"}},
+        {.id = TRADE_THEIR_OFFER, .root = TRADE_SCREEN, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4},
+        {.id = TRADE_PARTNER, .root = TRADE_SCREEN, .type = ComponentType_e::Text, .width = 128, .height = 14, .text = "Trading With:"},
+        {.id = TRADE_DECLINE_LABEL, .root = TRADE_SCREEN, .type = ComponentType_e::Text, .width = 42, .height = 14, .text = "Decline"},
+        {.id = TRADE_SIDE, .root = TRADE_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = TRADE_SIDE_INV, .x = 16, .y = 10}}},
+        {.id = TRADE_SIDE_INV, .root = TRADE_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Offer 1", "Offer 5", "Offer 10", "Offer All", "Offer X"}},
+    });
+}
+
+void TestCache::SetShop(GameCache_s& cache)
+{
+    AddComponents(cache, {
+        {.id = SHOP_SCREEN, .root = SHOP_SCREEN, .type = ComponentType_e::Layer, .width = 488, .height = 300, .children = {{.id = SHOP_STOCK, .x = 80, .y = 60}}},
+        {.id = SHOP_STOCK, .root = SHOP_SCREEN, .type = ComponentType_e::Inv, .width = 10, .height = 4, .marginX = 15, .marginY = 15, .options = {"Value", "Buy 1", "Buy 5", "Buy 10"}},
+        {.id = SHOP_SIDE, .root = SHOP_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = SHOP_SIDE_INV, .x = 16, .y = 10}}},
+        {.id = SHOP_SIDE_INV, .root = SHOP_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Value", "Sell 1", "Sell 5", "Sell 10"}},
     });
 }
 

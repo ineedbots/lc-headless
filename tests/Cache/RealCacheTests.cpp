@@ -370,3 +370,37 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
         CHECK((slots[1].slot == 1 && slots[1].id == PLACEHOLDER && slots[1].product == BRONZE_BAR));
     }
 }
+
+TEST_CASE("The real cache's shop and trade inventories are told apart by their options and places", "[RealCache]")
+{
+    constexpr auto TRADE_CONFIRM = u16{3443};
+
+    const auto& cache = RequireRealCache();
+    auto interfaces = Interfaces_s{};
+    interfaces.mainModal = TRADE_CONFIRM;
+    const auto view = InterfaceView{cache, interfaces};
+
+    CHECK(cache.FindComponent(3900)->options[1] == "Buy 1");
+    CHECK(cache.FindComponent(3823)->options[1] == "Sell 1");
+    CHECK(cache.FindComponent(3415)->options[0] == "Remove 1");
+    CHECK(cache.FindComponent(3416)->type == ComponentType_e::Inv);
+    CHECK(cache.FindComponent(3416)->root == cache.FindComponent(3415)->root);
+    CHECK(cache.FindComponent(3322)->options[0] == "Offer 1");
+
+    // The confirm screen lists your offer on the left and theirs on the right, whatever their ids.
+    const auto centre = cache.FindComponent(TRADE_CONFIRM)->width / 2;
+    auto mine = std::vector<u16>{};
+    auto theirs = std::vector<u16>{};
+    for (const auto* const component : view.GetTree(TRADE_CONFIRM))
+    {
+        if (component->type == ComponentType_e::InvText)
+        {
+            (view.GetPosition(*component).x < centre ? mine : theirs).push_back(component->id);
+        }
+    }
+
+    std::ranges::sort(mine);
+    std::ranges::sort(theirs);
+    CHECK(mine == std::vector<u16>{3538, 3542});
+    CHECK(theirs == std::vector<u16>{3532, 3539});
+}

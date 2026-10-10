@@ -326,6 +326,31 @@ For banking every so often:
 - `PERIODIC_BANK_SETTINGS`, a schema to merge into a script's;
 - `PeriodicBank(strategy, items_threshold, minutes_threshold, count_loot, deposit, ...)`, a `Task` that does it.
 
+## Shops and trades
+
+`shop` is a shop's interface. Nothing in it walks, so be near the keeper first. Names match whole, without regard to case.
+- `is_open()`, and `open(npc_name)`, which trades with the nearest keeper of that name and waits for the shop.
+- `stock()`: the shop's items, as `InvItem`s.
+- `buy(name, n)` and `buy_by_id(id, n)` give how many they bought. They click 10s, then 5s, then 1s, five clicks a tick, because the engine runs no more than that, and wait for each batch to land.
+- `sell(name, n, pick=None)` and `sell_all(name, pick=None)` give how many they sold. `pick(item)` chooses among stacks with that name, such as the noted one.
+- `close()`.
+
+2004 shows no prices; a shop only tells you one in a "Value" message.
+
+`trade` is a trade with another player. Both players ask, then both accept the offer, then both confirm it. Moving or fighting closes the trade, so keep one task on it until it's done.
+- `request(player_name)` asks the nearest player of that name to trade.
+- `active()`, `on_offer_screen()` and `on_confirm_screen()`.
+- `partner()` is the other player's name, from the offer screen's "Trading With:".
+- `my_offer()` and `their_offer()` are `InvItem`s, on either screen.
+- `status()` is the screen's own lines. `their_accepted()` says whether the other player has accepted, and `waiting()` whether you have and they haven't.
+- `offer(item_name, n, pick=None)` offers `n`, never more, using Offer 1, 5 or 10 when one fits and Offer X otherwise, and waits for the items to show. `offer_all(item_name, pick=None)` offers the whole stack.
+- `remove_all()` takes your offer back.
+- `accept()` clicks Accept on whichever screen is open, and `decline()` declines and waits for the trade to close.
+
+A trade request from another player comes as a `chat_message` event whose `type` is `'trade_request'`.
+
+Neither looks for ids. A shop is the main interface's inventory that offers "Buy 1", beside a backpack that offers "Sell 1". The trade offer screen holds your offer, which offers "Remove", beside theirs. The confirm screen lists the two offers as text, with yours on the left.
+
 ## Interfaces
 
 `interfaces` reads the game's interfaces as the player sees them: the cache's components, with what the server has set on them (text, colour, hiding, position) taking the cache's place. It's what the coming dialogue, bank, shop and trade facades are built on, and it reaches any interface they don't cover.

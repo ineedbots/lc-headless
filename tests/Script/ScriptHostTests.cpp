@@ -107,6 +107,58 @@ namespace
             REQUIRE(client.GetState().tick == tick + 1);
         }
 
+        void Send(ServerProt_e prot, const Packet& packet)
+        {
+            server.Send(prot, Fixtures::ToBytes(packet));
+        }
+
+        void SendInventory(u16 com, const std::vector<std::pair<u16, u8>>& items)
+        {
+            auto packet = Packet{};
+            packet.P2(com);
+            packet.P2(static_cast<s32>(items.size()));
+            for (const auto& [id, count] : items)
+            {
+                packet.P2(id + 1);
+                packet.P1(count);
+            }
+
+            Send(ServerProt_e::UpdateInvFull, packet);
+        }
+
+        void OpenMainSide(u16 main, u16 side)
+        {
+            auto packet = Packet{};
+            packet.P2(main);
+            packet.P2(side);
+            Send(ServerProt_e::IfOpenMainSide, packet);
+            PumpUntil([this, main] { return client.GetState().interfaces.mainModal == main; });
+        }
+
+        template <typename TCondition>
+        void PumpUntil(TCondition condition)
+        {
+            const auto deadline = Clock::now() + WAIT;
+            while (Clock::now() < deadline && !condition())
+            {
+                client.Pump(PUMP_STEP);
+            }
+
+            REQUIRE(condition());
+        }
+
+        // Runs the script's step now and sends what it queued.
+        void Step()
+        {
+            host->Step(Clock::now());
+            client.Flush();
+        }
+
+        [[nodiscard]] std::vector<u8> LastPayload(ClientProt_e prot) const
+        {
+            return server.GetPackets(prot).back().payload;
+        }
+
         [[nodiscard]] bool HasLog(LogLevel_e level, std::string_view text) const
         {
             return std::ranges::any_of(capture.GetEntries(), [level, text](const CapturedLog_s& entry)
@@ -1056,6 +1108,88 @@ def loop():
         "withdrew True 27",
         "noted True",
         "deposited []",
+    });
+}
+
+TEST_CASE("ScriptHost buys from a shop in batches the engine runs in a tick", "[ScriptHost]")
+{
+    constexpr auto BONES = u16{526};
+    constexpr auto LOGS = u16{1511};
+
+    auto fixture = HostFixture{R"python(
+def loop():
+    log('>', 'shop', shop.is_open(), [item.name for item in shop.stock()], trade.active())
+    bought = yield from shop.buy('Bones', 16)
+    log('>', 'bought', bought)
+    stop_script()
+)python"};
+
+    fixture.SendInventory(TestCache::SHOP_STOCK, {{BONES, 50}});
+    fixture.SendInventory(TestCache::SHOP_SIDE_INV, {{LOGS, 3}});
+    fixture.OpenMainSide(TestCache::SHOP_SCREEN, TestCache::SHOP_SIDE);
+    fixture.Step();
+    const auto bones = std::vector<u8>{BONES >> 8, BONES & 0xFF, 0, 0, TestCache::SHOP_STOCK >> 8, TestCache::SHOP_STOCK & 0xFF};
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton2));
+    for (const auto prot : {ClientProt_e::InvButton4, ClientProt_e::InvButton3, ClientProt_e::InvButton2})
+    {
+        CHECK(fixture.server.GetPackets(prot).size() == 1);
+        CHECK(fixture.LastPayload(prot) == bones);
+    }
+
+    fixture.SendInventory(TestCache::INVENTORY, {{LOGS, 3}, {BONES, 16}});
+    fixture.PumpUntil([&fixture] { return fixture.client.GetState().inventories.at(TestCache::INVENTORY).slots.size() == 2; });
+    fixture.Step();
+    fixture.SendTick();
+    fixture.Step();
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"shop True ['Bones'] False", "bought 16"});
+}
+
+TEST_CASE("ScriptHost offers, accepts and declines a trade by the screen's own options and labels", "[ScriptHost]")
+{
+    constexpr auto LOGS = u16{1511};
+
+    auto fixture = HostFixture{R"python(
+def loop():
+    log('>', 'trade', trade.on_offer_screen(), trade.on_confirm_screen(), trade.partner(), shop.is_open())
+    ok = yield from trade.offer('Logs', 2)
+    log('>', 'offered', ok, [(item.name, item.count) for item in trade.my_offer()], trade.their_offer())
+    log('>', 'accepted', trade.accept())
+    ok = yield from trade.decline()
+    log('>', 'declined', ok, trade.active())
+    stop_script()
+)python"};
+
+    auto partner = Packet{};
+    partner.P2(TestCache::TRADE_PARTNER);
+    partner.PJStr("Trading With: Zezima");
+    fixture.Send(ServerProt_e::IfSetText, partner);
+    fixture.SendInventory(TestCache::TRADE_SIDE_INV, {{LOGS, 3}});
+    fixture.OpenMainSide(TestCache::TRADE_SCREEN, TestCache::TRADE_SIDE);
+
+    // 2 isn't 1, 5 or 10, so it's Offer X and the count dialog.
+    fixture.Step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton5));
+    CHECK(fixture.LastPayload(ClientProt_e::InvButton5) == std::vector<u8>{LOGS >> 8, LOGS & 0xFF, 0, 0, TestCache::TRADE_SIDE_INV >> 8, TestCache::TRADE_SIDE_INV & 0xFF});
+    fixture.Send(ServerProt_e::PCountDialog, Packet{});
+    fixture.PumpUntil([&fixture] { return fixture.client.GetState().interfaces.countDialogOpen; });
+    fixture.Step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
+
+    fixture.SendInventory(TestCache::TRADE_MY_OFFER, {{LOGS, 1}, {LOGS, 1}});
+    fixture.PumpUntil([&fixture] { return fixture.client.GetState().inventories.contains(TestCache::TRADE_MY_OFFER); });
+    fixture.Step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    CHECK(fixture.LastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::TRADE_ACCEPT));
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::CloseModal));
+
+    fixture.Send(ServerProt_e::IfClose, Packet{});
+    fixture.PumpUntil([&fixture] { return fixture.client.GetState().interfaces.mainModal == -1; });
+    fixture.Step();
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{
+        "trade True False Zezima False",
+        "offered True [('Logs', 1), ('Logs', 1)] []",
+        "accepted True",
+        "declined True False",
     });
 }
 

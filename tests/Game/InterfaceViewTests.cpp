@@ -114,7 +114,7 @@ TEST_CASE("InterfaceView walks an interface in drawing order and finds visible t
     interfaces.chatModal = OPTIONS;
     const auto view = InterfaceView{cache, interfaces};
 
-    CHECK(Ids(view.GetTree(TestCache::TRADE_SCREEN)) == std::vector<u16>{300, 301, 302, 303, 304, 305});
+    CHECK(Ids(view.GetTree(TestCache::TRADE_SCREEN)) == std::vector<u16>{300, 301, 302, 303, 304, 305, 306, 307, 308, 309});
     CHECK(view.GetTree(999).empty());
 
     CHECK(Ids(view.FindText("OPTION2")) == std::vector<u16>{OPTION_TWO});

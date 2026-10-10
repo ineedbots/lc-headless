@@ -114,6 +114,7 @@ std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
     TestCache::SetTradeScreen(cache);
     TestCache::SetChatInterfaces(cache);
     TestCache::SetBankScreen(cache);
+    TestCache::SetShop(cache);
     TestCache::AddObj(cache, 995, "Coins").stackable = true;
     TestCache::AddObj(cache, 1511, "Logs");
     TestCache::AddObj(cache, 526, "Bones", {}, {"Bury"});

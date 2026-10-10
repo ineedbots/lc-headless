@@ -280,13 +280,13 @@ std::vector<ChatOption_s> ChatDialog::GetOptions(const InterfaceView& view)
 std::vector<std::string> ChatDialog::GetTexts(const InterfaceView& view)
 {
     const auto chatModal = view.GetInterfaces().chatModal;
-    auto texts = std::vector<std::string>{};
-    if (chatModal < 0)
-    {
-        return texts;
-    }
+    return chatModal < 0 ? std::vector<std::string>{} : GetTexts(view, static_cast<u16>(chatModal));
+}
 
-    for (const auto* const component : view.GetTree(static_cast<u16>(chatModal)))
+std::vector<std::string> ChatDialog::GetTexts(const InterfaceView& view, u16 root)
+{
+    auto texts = std::vector<std::string>{};
+    for (const auto* const component : view.GetTree(root))
     {
         if (component->type != ComponentType_e::Text || !view.IsVisible(*component))
         {

@@ -29,14 +29,26 @@ public:
     static constexpr u16 RUN_OFF_BUTTON = 152;
     static constexpr u16 RUN_ON_BUTTON = 153;
     static constexpr u16 RUN_VARP = 173;
-    // SetTradeScreen's interface: an "Accept" label over an unlabelled Ok rect, a Close button, and a
-    // layer that starts hidden with a "Waiting" label in it, as trademain has them.
+    // SetTradeScreen's interface: an "Accept" label over an unlabelled Ok rect, a Close button with a
+    // "Decline" label, a layer that starts hidden with a "Waiting" label in it, the two offers and the
+    // partner's name, as trademain has them, and the backpack beside it, as tradeside has it.
     static constexpr u16 TRADE_SCREEN = 300;
     static constexpr u16 TRADE_ACCEPT = 301;
     static constexpr u16 TRADE_ACCEPT_LABEL = 302;
     static constexpr u16 TRADE_DECLINE = 303;
     static constexpr u16 TRADE_STATUS_LAYER = 304;
     static constexpr u16 TRADE_STATUS = 305;
+    static constexpr u16 TRADE_MY_OFFER = 306;
+    static constexpr u16 TRADE_THEIR_OFFER = 307;
+    static constexpr u16 TRADE_PARTNER = 308;
+    static constexpr u16 TRADE_DECLINE_LABEL = 309;
+    static constexpr u16 TRADE_SIDE = 340;
+    static constexpr u16 TRADE_SIDE_INV = 341;
+    // SetShop's: the stock, which offers "Buy 1", beside the backpack, which offers "Sell 1".
+    static constexpr u16 SHOP_SCREEN = 350;
+    static constexpr u16 SHOP_STOCK = 351;
+    static constexpr u16 SHOP_SIDE = 352;
+    static constexpr u16 SHOP_SIDE_INV = 353;
     // SetChatInterfaces': a dialogue page with a continue button, two options as multi2 has them, and a
     // make menu of one product, a stack of Make X, 10, 5 and 1, as skill_multi has it.
     static constexpr u16 DIALOGUE = 310;
@@ -71,6 +83,7 @@ public:
     static void SetTradeScreen(GameCache_s& cache);
     static void SetChatInterfaces(GameCache_s& cache);
     static void SetBankScreen(GameCache_s& cache);
+    static void SetShop(GameCache_s& cache);
     // Replaces the map with squares holding these locs and blocked tiles.
     static void SetMap(GameCache_s& cache, std::span<const TestLoc_s> locs, std::span<const Tile_s> blocked = {});
 };

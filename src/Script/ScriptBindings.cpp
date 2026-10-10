@@ -39,6 +39,7 @@ from rs2004.game import *
 from rs2004.interfaces import *
 from rs2004.dialogue import *
 from rs2004.bank import *
+from rs2004.trade import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -838,6 +839,57 @@ _rt_finish = _runtime.finish
         return Guard([argv] { return ReturnBool(GetApi().GetState().inventories.contains(PyConvert::ToU16(py_arg(0), "com"))); });
     }
 
+    bool GetTexts(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto texts = ChatDialog::GetTexts(GetApi().GetInterfaces(), PyConvert::ToU16(py_arg(0), "root"));
+            PyConvert::FromList(py_retval(), texts, [](py_OutRef out, const std::string& text) { PyConvert::FromString(out, text); });
+            return true;
+        });
+    }
+
+    // (com, type, x, options) for the inventories in an interface, x from its corner and options with None
+    // where empty, so the stdlib can find the shop's and the trade's by what they offer.
+    bool GetInventories(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto view = GetApi().GetInterfaces();
+            auto inventories = std::vector<const IfComponent_s*>{};
+            for (const auto* const component : view.GetTree(PyConvert::ToU16(py_arg(0), "root")))
+            {
+                if (component->type == ComponentType_e::Inv || component->type == ComponentType_e::InvText)
+                {
+                    inventories.push_back(component);
+                }
+            }
+
+            PyConvert::FromList(py_retval(), inventories, [&view](py_OutRef out, const IfComponent_s* component)
+            {
+                constexpr auto FIELDS = 4;
+                py_newtuple(out, FIELDS);
+                py_newint(py_tuple_getitem(out, 0), component->id);
+                py_newnone(py_tuple_getitem(out, 1));
+                py_newint(py_tuple_getitem(out, 2), view.GetPosition(*component).x);
+                py_newnone(py_tuple_getitem(out, 3));
+                PyConvert::FromString(py_tuple_getitem(out, 1), PyConvert::GetTypeName(component->type));
+                const auto options = std::vector<std::string>{component->options.begin(), component->options.end()};
+                PyConvert::FromList(py_tuple_getitem(out, 3), options, [](py_OutRef option, const std::string& text)
+                {
+                    if (text.empty())
+                    {
+                        py_newnone(option);
+                        return;
+                    }
+
+                    PyConvert::FromString(option, text);
+                });
+            });
+            return true;
+        });
+    }
+
     bool GetModalChanges(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(GetApi().GetState().interfaces.modalChanges); });
@@ -1594,6 +1646,8 @@ _rt_finish = _runtime.finish
             {"cast_on_item(spell, item)", CastOnItem},
             {"click_button(com)", ClickButton},
             {"has_inventory(com)", HasInventory},
+            {"get_texts(root)", GetTexts},
+            {"get_inventories(root)", GetInventories},
             {"modal_changes()", GetModalChanges},
             {"find_continue()", FindContinue},
             {"get_chat_options()", GetChatOptions},
