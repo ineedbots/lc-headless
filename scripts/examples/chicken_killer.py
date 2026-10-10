@@ -22,11 +22,10 @@ class ChickenKiller(TaskBot):
         self.target = None
         self.attack_tick = 0
         self.pickup_tries = {}
-        centre = self.settings.centre
-        log('Starting at', get_x(), get_z())
-        if self.settings.teleport and distance_to(centre.x, centre.z) > 50:
+        log('Starting at', game.tile())
+        if self.settings.teleport and game.tile().distance_to(self.settings.centre) > 50:
             log('Teleporting to', self.settings.teleport)
-            command('tele ' + self.settings.teleport)
+            chat.command('tele ' + self.settings.teleport)
 
         # Highest priority first: each loop runs the first task whose check passes.
         self.add(
@@ -37,47 +36,46 @@ class ChickenKiller(TaskBot):
         )
 
     def count_loot(self):
-        return get_inventory_count_by_name(self.settings.loot)
+        return sum([inventory.count(name) for name in self.settings.loot])
 
     def is_fighting(self):
         if self.target is None:
             return False
-        npc = get_npc(self.target)
-        if npc is not None and (in_combat() or npc.in_combat() or get_tick() - self.attack_tick < GIVE_UP_TICKS):
+        npc = npcs.get(self.target)
+        if npc is not None and (game.in_combat() or npc.in_combat or game.tick() - self.attack_tick < GIVE_UP_TICKS):
             return True
         self.target = None
         return False
 
     def has_enough_loot(self):
-        return self.count_loot() >= self.settings.loot_goal or is_inventory_full()
+        return self.count_loot() >= self.settings.loot_goal or inventory.is_full()
 
     def finish(self):
-        if in_combat():
+        if game.in_combat():
             return
         log('Holding', self.count_loot(), 'loot after', self.kills, 'kills; done')
         stop_account()
 
     def next_loot(self):
-        if in_combat():
+        if game.in_combat():
             return None
-        wanted = [name.lower() for name in self.settings.loot]
-        best = None
-        for item in get_ground_items(radius=self.settings.radius):
-            if item.name is None or item.name.lower() not in wanted:
-                continue
-            if self.pickup_tries.get((item.id, item.x, item.z), 0) >= MAX_PICKUP_TRIES:
-                continue
-            if best is None or distance_to(item.x, item.z) < distance_to(best.x, best.z):
-                best = item
-        return best
+        return (ground_items.query()
+                .name(self.settings.loot)
+                .within_of(self.settings.centre, self.settings.radius)
+                .where(lambda item: self.pickup_tries.get(self.key(item), 0) < MAX_PICKUP_TRIES)
+                .nearest())
+
+    def key(self, item):
+        tile = item.tile()
+        return (item.id, tile.x, tile.z)
 
     def pick_up(self):
         loot = self.next_loot()
-        key = (loot.id, loot.x, loot.z)
+        key = self.key(loot)
         self.pickup_tries[key] = self.pickup_tries.get(key, 0) + 1
         before = self.count_loot()
         log('Picking up', loot)
-        take_ground_item(loot)
+        loot.interact('Take')
         # Waits for the backpack to change, or gives the item up for this try after 5 seconds.
         picked = yield from execution.delay_until(lambda: self.count_loot() > before, 5000)
         if not picked and self.pickup_tries[key] >= MAX_PICKUP_TRIES:
@@ -85,21 +83,25 @@ class ChickenKiller(TaskBot):
 
     def attack(self):
         centre = self.settings.centre
-        npc = get_nearest_npc_by_name(self.settings.npcs, radius=self.settings.radius, in_combat=False)
+        npc = (npcs.query()
+               .name(self.settings.npcs)
+               .within_of(centre, self.settings.radius)
+               .where(lambda npc: not npc.in_combat)
+               .nearest())
         if npc is None:
-            if distance_to(centre.x, centre.z) > 2:
-                walk_to(centre.x, centre.z)
+            if game.tile().distance_to(centre) > 2:
+                direct_navigator.walk(centre)
             yield from execution.delay(1200)
             return
 
-        if attack_npc(npc):
+        if npc.interact('Attack'):
             self.target = npc.index
-            self.attack_tick = get_tick()
+            self.attack_tick = game.tick()
             log('Attacking', npc)
         yield from execution.delay_ticks(2)
 
     def on_npc_despawned(self, npc):
-        if npc.index == self.target and npc.hp == 0:
+        if npc.index == self.target and npc.health == 0:
             self.kills += 1
             log('Killed', npc, '- kills so far:', self.kills)
             self.target = None

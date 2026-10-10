@@ -116,7 +116,7 @@ namespace
 
     constexpr auto RECORDER = R"python(
 def on_start():
-    log('>', 'start', get_x() - get_local_player().x)
+    log('>', 'start', game.tile().x - players.local().tile().x)
 
 def on_npc_spawned(npc):
     log('>', 'npc', npc.id)
@@ -188,7 +188,7 @@ TEST_CASE("ScriptHost sends what the script does", "[ScriptHost]")
 {
     auto fixture = HostFixture{R"python(
 def loop():
-    attack_npc(get_nearest_npc_by_id(50))
+    npcs.query().name('goblin').nearest().interact('Attack')
     return 10000
 )python"};
 
@@ -391,7 +391,7 @@ TEST_CASE("ScriptHost calls on_reconnect once a fresh session has placed the pla
 {
     auto fixture = HostFixture{R"python(
 def on_reconnect():
-    log('>', 'reconnect', get_x() - get_local_player().x, get_x() > 0)
+    log('>', 'reconnect', game.tile().x - players.local().tile().x, game.tile().x > 0)
 
 def loop():
     return 600
@@ -433,7 +433,7 @@ TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]
 
     CHECK_THROWS_WITH(load("def on_start():\n    pass\n"), ContainsSubstring("main.py has neither BOT = define_bot(...) nor a loop() function"));
     CHECK_THROWS_WITH(load("def loop(:\n    return 1\n"), ContainsSubstring("SyntaxError"));
-    CHECK_THROWS_WITH(load("walk_to(1, 2)\ndef loop():\n    return 1\n"), ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(load("direct_navigator.walk((1, 2))\ndef loop():\n    return 1\n"), ContainsSubstring("not in game"));
 
     SECTION("a misspelled hook is loaded, with a warning")
     {
@@ -521,7 +521,7 @@ def on_start():
     except ValueError as e:
         log('>', 'unknown', str(e))
     try:
-        send_bot_message('mule', get_local_player())
+        send_bot_message('mule', players.local())
     except TypeError:
         log('>', 'not json')
 
@@ -696,8 +696,8 @@ TEST_CASE("ScriptHost resumes a wait for an update on the pump after the state c
     auto fixture = HostFixture{R"python(
 def loop():
     log('>', 'waiting')
-    found = yield from execution.delay_until(lambda: get_tick() > 1, 60000)
-    log('>', 'found', found, get_tick())
+    found = yield from execution.delay_until(lambda: game.tick() > 1, 60000)
+    log('>', 'found', found, game.tick())
     return 100000
 )python"};
     const auto start = Clock::now();
@@ -725,7 +725,7 @@ def loop():
 
 TEST_CASE("ScriptHost waits a server tick when loop returns 600 or None", "[ScriptHost]")
 {
-    auto fixture = HostFixture{GENERATE(as<std::string>{}, "def loop():\n    log('>', 'loop', get_tick())\n", "def loop():\n    log('>', 'loop', get_tick())\n    return 600\n")};
+    auto fixture = HostFixture{GENERATE(as<std::string>{}, "def loop():\n    log('>', 'loop', game.tick())\n", "def loop():\n    log('>', 'loop', game.tick())\n    return 600\n")};
     const auto start = Clock::now();
     fixture.host->Step(start);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 1"});

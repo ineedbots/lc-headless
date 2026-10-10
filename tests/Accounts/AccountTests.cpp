@@ -103,7 +103,7 @@ TEST_CASE("An account without a script idles until interrupted", "[Account]")
 
 TEST_CASE("An account logs out when its script stops it", "[Account]")
 {
-    auto fixture = AccountFixture{"def loop():\n    if get_nearest_npc_by_id(50) is not None:\n        stop_account()\n    return 100\n"};
+    auto fixture = AccountFixture{"def loop():\n    if npcs.query().id(50).exists():\n        stop_account()\n    return 100\n"};
     REQUIRE(fixture.StepUntilFinished());
     CHECK(fixture.account->Succeeded());
     CHECK(fixture.LoggedOutByButton());

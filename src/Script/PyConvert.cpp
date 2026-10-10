@@ -30,25 +30,18 @@ void PyConvert::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCac
     const auto object = NewInstance(out, NPC_CLASS);
     SetInt(object, "id", npc.type);
     SetEntity(object, npc, tick);
+    SetMenu(object, ScriptApi::GetNpcMenu(cache, npc.type));
     const auto* const type = cache.FindNpc(npc.type);
     if (type == nullptr)
     {
         SetNone(object, "name");
-        SetNone(object, "combat_level");
+        SetInt(object, "level", 0);
         SetInt(object, "size", 1);
         return;
     }
 
     SetOptionalString(object, "name", type->name);
-    if (type->combatLevel)
-    {
-        SetInt(object, "combat_level", *type->combatLevel);
-    }
-    else
-    {
-        SetNone(object, "combat_level");
-    }
-
+    SetInt(object, "level", type->combatLevel.value_or(0));
     SetInt(object, "size", type->size);
 }
 
@@ -74,9 +67,8 @@ void PyConvert::FromGroundItem(py_OutRef out, const GroundItem_s& item, const Ga
     const auto* const type = cache.FindObj(item.id);
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetInt(object, "count", item.count);
-    SetInt(object, "x", item.tile.x);
-    SetInt(object, "z", item.tile.z);
-    SetInt(object, "level", item.tile.level);
+    SetTile(object, item.tile);
+    SetMenu(object, ScriptApi::GetGroundItemMenu(cache, item.id));
 }
 
 void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s& cache)
@@ -86,12 +78,11 @@ void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s&
     const auto* const type = cache.FindLoc(loc.id);
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetBool(object, "changed", loc.changed);
-    SetInt(object, "x", loc.tile.x);
-    SetInt(object, "z", loc.tile.z);
-    SetInt(object, "level", loc.tile.level);
+    SetTile(object, loc.tile);
     SetInt(object, "shape", loc.shape);
     SetInt(object, "angle", loc.angle);
     SetInt(object, "layer", static_cast<s64>(loc.layer));
+    SetMenu(object, ScriptApi::GetLocMenu(cache, loc.id));
 }
 
 void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameCache_s& cache)
@@ -103,6 +94,8 @@ void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameC
     SetInt(object, "count", item.count);
     SetInt(object, "slot", item.slot);
     SetInt(object, "com", item.com);
+    SetBool(object, "noted", type != nullptr && type->noteOf.has_value());
+    SetMenu(object, ScriptApi::GetItemMenu(cache, item.id));
 }
 
 void PyConvert::FromNpcType(py_OutRef out, const NpcType_s& type, const GameCache_s& cache)
@@ -331,7 +324,7 @@ InventoryItem_s PyConvert::ToItem(py_Ref value, std::string_view name)
 {
     if (!IsInstance(value, ITEM_CLASS))
     {
-        throw ScriptTypeError{std::format("{} must be an Item, not {}", name, GetTypeName(value))};
+        throw ScriptTypeError{std::format("{} must be an InvItem, not {}", name, GetTypeName(value))};
     }
 
     return {
@@ -351,8 +344,8 @@ GroundItemRef_s PyConvert::ToGroundItem(py_Ref value, std::string_view name)
 
     return {
         .id = ToU16(GetField(value, "id"), name),
-        .x = static_cast<s32>(ToInt(GetField(value, "x"), name)),
-        .z = static_cast<s32>(ToInt(GetField(value, "z"), name)),
+        .x = static_cast<s32>(ToInt(GetField(value, X_FIELD), name)),
+        .z = static_cast<s32>(ToInt(GetField(value, Z_FIELD), name)),
     };
 }
 
@@ -370,8 +363,8 @@ LocRef_s PyConvert::ToLoc(py_Ref value, std::string_view name)
 
     return {
         .id = ToU16(GetField(value, "id"), name),
-        .x = static_cast<s32>(ToInt(GetField(value, "x"), name)),
-        .z = static_cast<s32>(ToInt(GetField(value, "z"), name)),
+        .x = static_cast<s32>(ToInt(GetField(value, X_FIELD), name)),
+        .z = static_cast<s32>(ToInt(GetField(value, Z_FIELD), name)),
     };
 }
 
@@ -469,27 +462,43 @@ void PyConvert::SetOptions(py_Ref object, const char* name, std::span<const u16>
     py_pop();
 }
 
+void PyConvert::SetTile(py_Ref object, const Tile_s& tile)
+{
+    SetInt(object, X_FIELD, tile.x);
+    SetInt(object, Z_FIELD, tile.z);
+    SetInt(object, PLANE_FIELD, tile.level);
+}
+
+void PyConvert::SetMenu(py_Ref object, const ScriptApi::Menu& menu)
+{
+    // As SetOptions: the list stays on the value stack until the object holds it.
+    const auto list = py_pushtmp();
+    py_newlist(list);
+    for (const auto option : menu)
+    {
+        const auto item = py_list_emplace(list);
+        py_newnone(item);
+        if (!option.empty())
+        {
+            FromString(item, option);
+        }
+    }
+
+    py_setdict(object, py_name(MENU_FIELD), list);
+    py_pop();
+}
+
 void PyConvert::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
 {
     SetInt(object, "index", entity.index);
-    SetInt(object, "x", entity.tile.x);
-    SetInt(object, "z", entity.tile.z);
-    SetInt(object, "level", entity.tile.level);
+    SetTile(object, entity.tile);
     SetInt(object, "animation", entity.animation.id);
     SetBool(object, "moving", ScriptApi::IsMoving(entity, tick));
-    if (entity.hits.empty())
-    {
-        SetNone(object, "hp");
-        SetNone(object, "max_hp");
-        SetNone(object, "last_hit_tick");
-    }
-    else
-    {
-        const auto& hit = entity.hits.back();
-        SetInt(object, "hp", hit.health);
-        SetInt(object, "max_hp", hit.maxHealth);
-        SetInt(object, "last_hit_tick", static_cast<s64>(hit.tick));
-    }
+    SetBool(object, "in_combat", ScriptApi::InCombat(entity, tick));
+    // As rs2b0t's health, 0 until a hit shows it.
+    const auto* const hit = entity.hits.empty() ? nullptr : &entity.hits.back();
+    SetInt(object, "health", hit == nullptr ? 0 : hit->health);
+    SetInt(object, "max_health", hit == nullptr ? 0 : hit->maxHealth);
 
     if (!entity.faceEntity)
     {

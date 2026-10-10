@@ -109,6 +109,8 @@ std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
     auto cache = GameCache_s{};
     TestCache::SetComponents(cache);
     cache.logoutComponent = LOGOUT_COMPONENT;
+    // The NPC TestWorld sends, so scripts can use its options by name.
+    TestCache::AddNpc(cache, 50, "Goblin", {"Talk-to", "Attack"});
     return std::make_shared<const GameCache_s>(std::move(cache));
 }
 

@@ -45,9 +45,9 @@ struct LocRef_s
 using OpChoice = std::variant<u8, std::string>;
 
 // Converts between script values and Python values in the current VM. Game objects become instances of
-// the classes the prelude defines in builtins (Npc, Player, GroundItem, Loc, Item, and the NpcType,
-// ItemType and LocType definitions), with their fields as attributes; names and options come from the
-// cache, and are None where it has none. Out-of-range numbers throw std::invalid_argument, which the
+// the classes the standard library puts in builtins (Npc, Player, GroundItem, Loc, InvItem, and the
+// NpcType, ItemType and LocType definitions), with their fields as attributes; names and options come
+// from the cache, and are None where it has none. Out-of-range numbers throw std::invalid_argument, which the
 // binding raises as ValueError.
 class PyConvert
 {
@@ -56,10 +56,15 @@ public:
     static constexpr auto PLAYER_CLASS = "Player";
     static constexpr auto GROUND_ITEM_CLASS = "GroundItem";
     static constexpr auto LOC_CLASS = "Loc";
-    static constexpr auto ITEM_CLASS = "Item";
+    static constexpr auto ITEM_CLASS = "InvItem";
     static constexpr auto NPC_TYPE_CLASS = "NpcType";
     static constexpr auto ITEM_TYPE_CLASS = "ItemType";
     static constexpr auto LOC_TYPE_CLASS = "LocType";
+    // A world object's tile, which the stdlib's tile() reads, and its menu, which actions() reads.
+    static constexpr auto X_FIELD = "_x";
+    static constexpr auto Z_FIELD = "_z";
+    static constexpr auto PLANE_FIELD = "_plane";
+    static constexpr auto MENU_FIELD = "_ops";
 
     PyConvert() = delete;
 
@@ -129,6 +134,8 @@ private:
     // None for empty text, as the cache has it for a missing name or option.
     static void SetOptionalString(py_Ref object, const char* name, std::string_view text);
     static void SetOptions(py_Ref object, const char* name, std::span<const u16> ops, const GameCache_s& cache);
+    static void SetTile(py_Ref object, const Tile_s& tile);
+    static void SetMenu(py_Ref object, const ScriptApi::Menu& menu);
     static void SetEntity(py_Ref object, const Entity_s& entity, u64 tick);
     [[nodiscard]] static bool IsInstance(py_Ref value, std::string_view className);
     [[nodiscard]] static py_Ref GetField(py_Ref object, const char* name);

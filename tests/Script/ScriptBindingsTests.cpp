@@ -125,184 +125,159 @@ namespace
     };
 }
 
-TEST_CASE("Script bindings read the local player and the area", "[ScriptBindings]")
+TEST_CASE("Script bindings read you and the game", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
     fixture.Run(R"python(
-assert get_tick() == 50
-assert get_x() == get_position()[0] and get_z() == get_position()[1] and get_level() == 0
-assert get_pid() == 5 and get_name() == 'Bot' and get_combat_level() == 3
-assert is_moving() and get_walk_destination() == (get_x() + 4, get_z() + 4)
-assert is_running() and not in_combat()
-assert get_local_player().name == 'Bot'
-assert get_current_stat(HITPOINTS) == 5 and get_max_stat(HITPOINTS) == 10 and get_experience(3) == 1154
-assert get_hp() == 5 and get_max_hp() == 10 and get_hp_percent() == 50
-assert distance_to(get_x() + 3, get_z() - 7) == 7
-assert distance(10, 10, 13, 6) == 4
-assert in_radius_of(get_x() + 2, get_z() + 2, 2) and not in_radius_of(get_x() + 3, get_z(), 2)
-assert in_rect(get_x(), get_z(), 1, 1) and not in_rect(get_x() + 1, get_z(), 5, 5)
-assert at(get_x(), get_z()) and not at(get_x() + 1, get_z())
+assert game.tick() == 50 and game.ingame()
+here = game.tile()
+assert here.level == 0 and here == Tile(here.x, here.z)
+assert reader.pid() == 5 and game.my_name() == 'Bot' and game.combat_level() == 3
+assert game.moving() and direct_navigator.destination() == here.translate(4, 4)
+assert game.run_enabled() and not game.in_combat()
+assert players.local().name == 'Bot'
+assert skills.effective('hitpoints') == 5 and skills.level('Hitpoints') == 10 and skills.xp('hitpoints') == 1154
+assert skills.hp_fraction() == 0.5
+assert skills.index('runecraft') == 20 and skills.index('sailing') == -1
 )python");
+
+    CHECK_THROWS_WITH(fixture.Run("skills.level('sailing')\n"), ContainsSubstring("ValueError") && ContainsSubstring("'sailing' is not a skill"));
 }
 
-TEST_CASE("Script bindings return NPCs, players and things on the ground as objects", "[ScriptBindings]")
+TEST_CASE("Script bindings find NPCs, players, scenery and ground items with queries", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
     fixture.Run(R"python(
-npcs = get_npcs()
-assert len(npcs) == 2 and isinstance(npcs[0], Npc)
-chicken = get_nearest_npc_by_id(41)
-assert chicken.index == 7 and chicken.id == 41 and chicken.x == get_x() + 2 and chicken.level == 0
-assert chicken.hp == 2 and chicken.max_hp == 3 and chicken.last_hit_tick == 49
-assert chicken.target == ('player', 5)
-assert chicken.in_combat() and not chicken.is_moving()
-assert get_nearest_npc_by_id([41, 81], radius=2).index == 7
-assert get_nearest_npc_by_id(41, in_combat=False) is None
-assert get_nearest_npc_by_id(81).hp is None and get_nearest_npc_by_id(81).target is None
-assert get_nearest_npc_by_id(999) is None
-assert [n.index for n in get_npcs(ids=81)] == [8]
-assert get_npc(8).id == 81 and get_npc(9) is None
+here = game.tile()
+everyone = npcs.all()
+assert len(everyone) == 2 and isinstance(everyone[0], Npc)
+
+chicken = npcs.query().id(41).nearest()
+assert chicken.index == 7 and chicken.id == 41 and chicken.name == 'Chicken' and chicken.level == 1 and chicken.size == 1
+assert chicken.tile() == here.translate(2, 0) and chicken.distance() == 2
+assert chicken.health == 2 and chicken.max_health == 3 and chicken.in_combat and not chicken.moving
+assert chicken.target == ('player', 5) and chicken.targets_me() and not chicken.targets_another_player()
+assert chicken.actions() == ['Attack'] and chicken.valid()
 assert 'Npc(index=7' in repr(chicken)
 
-players = get_players()
-assert len(players) == 1 and players[0].name == 'Zezima' and players[0].combat_level == 126
-assert get_player_by_name('zezima').index == 20 and get_player_by_name('nobody') is None
-assert get_players(radius=0) == []
+cow = npcs.query().name('cow').first()
+assert cow.index == 8 and cow.health == 0 and cow.target is None and cow.level == 0
+assert npcs.query().id(41, 81).within(2).nearest().index == 7
+assert npcs.query().name(['Goblin', 'Cow']).count() == 1
+assert npcs.query().name('Goblin').nearest() is None and not npcs.query().name('Goblin').exists()
+assert npcs.query().action('ATTACK').count() == 2
+assert npcs.query().where(lambda npc: not npc.in_combat).first().index == 8
+assert npcs.query().within_of(here.translate(-5, 0), 1).first().index == 8
+assert npcs.query().inside(Area.rectangular(here, here.translate(3, 3))).first().index == 7
+assert npcs.query().inside({'minX': here.x - 6, 'maxX': here.x - 4, 'minZ': here.z, 'maxZ': here.z}).first().index == 8
+assert npcs.query().nearest_prefer_local(1).index == 7
+assert [npc.index for npc in npcs.nearest(2)] == [7, 8]
 
-bones = get_nearest_ground_item_by_id(526)
-assert isinstance(bones, GroundItem) and bones.count == 1 and bones.x == get_x() + 3
-assert get_ground_items(ids=[1, 2]) == []
+zezima = players.query().name('zezima').first()
+assert zezima.index == 20 and zezima.combat_level == 126 and players.all()[0].name == 'Zezima'
+assert players.query().within(0).first() is None
 
-door = get_loc_at(get_x() + 1, get_z())
-assert door.id == 1530 and door.layer == LAYER_WALL and door.angle == 2
-assert get_loc_at(get_x() + 1, get_z(), LAYER_GROUND) is None
+bones = ground_items.query().name('bones').nearest()
+assert isinstance(bones, GroundItem) and bones.count == 1 and bones.tile() == here.translate(3, 3)
+assert bones.actions() == ['Take'] and bones.valid()
+assert ground_items.query().id(1, 2).results() == []
+
+door = locs.at(here.translate(1, 0))
+assert door.id == 1530 and door.name == 'Door' and door.layer == LAYER_WALL and door.angle == 2 and door.changed
+assert door.actions() == ['Open'] and door.valid()
+assert locs.at(here.translate(1, 0), LAYER_GROUND) is None
+tree = locs.query().name('tree').nearest()
+assert tree.id == 1276 and not tree.changed and tree.tile() == here.translate(-2, 3) and tree.layer == LAYER_GROUND
+assert locs.at(here.translate(-2, 3)).id == 1276
+assert [loc.id for loc in locs.query().results()] == [1530, 1276]
+assert locs.query().id(1276).layer(LAYER_WALL).results() == [] and locs.query().within(1).first().id == 1530
+assert locs.query().id(1530).reachable().first().id == 1530
+
+assert direct_navigator.reachable(here.translate(0, 1))
+assert direct_navigator.path(here.translate(0, 3)) == [here.translate(0, 3)]
+assert direct_navigator.path(here.translate(500, 0)) is None
 )python");
 }
 
-TEST_CASE("Script bindings give names and types from the cache", "[ScriptBindings]")
+TEST_CASE("Script bindings read items, types, interfaces, varps and social lists", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
     fixture.Run(R"python(
-chicken = get_nearest_npc_by_name('chicken')
-assert chicken.index == 7 and chicken.name == 'Chicken' and chicken.combat_level == 1 and chicken.size == 1
-assert 'name=Chicken' in repr(chicken)
-cow = get_npc(8)
-assert cow.name == 'Cow' and cow.combat_level is None
-assert get_nearest_npc_by_name(['Goblin', 'Cow']).index == 8
-assert get_nearest_npc_by_name('Goblin') is None
+items = inventory.items()
+assert [(item.id, item.slot) for item in items] == [(995, 0), (526, 2)] and isinstance(items[0], InvItem)
+assert items[0].com == INVENTORY and items[0].count == 250 and items[0].name == 'Coins' and not items[0].noted
+assert items[0].actions() == ['Drop'] and items[1].actions() == ['Bury', 'Drop']
+assert inventory.first('BONES').slot == 2 and inventory.first('logs') is None
+assert inventory.contains('coins') and inventory.count('Coins') == 250 and inventory.count_by_id(526) == 1
+assert inventory.used() == 2 and inventory.free() == INVENTORY_SIZE - 2 and not inventory.is_full()
+assert equipment.items() == [] and not equipment.contains('Bronze sword') and reader.inventory(BANK) == []
 
-npc_type = get_npc_type(41)
-assert isinstance(npc_type, NpcType) and npc_type.id == 41 and npc_type.name == 'Chicken'
-assert npc_type.ops == [None, 'Attack', None, None, None]
+npc_type = reader.npc_type(41)
+assert isinstance(npc_type, NpcType) and npc_type.name == 'Chicken' and npc_type.ops == [None, 'Attack', None, None, None]
 assert npc_type.examine is None and npc_type.size == 1 and npc_type.combat_level == 1
-assert get_npc_type(5000) is None and get_npc_type(-1) is None
-
-bones = get_item_type(526)
+assert reader.npc_type(5000) is None
+bones = reader.item_type(526)
 assert isinstance(bones, ItemType) and bones.inventory_ops[0] == 'Bury' and bones.ops == [None] * 5
 assert not bones.stackable and not bones.members and bones.value == 1 and bones.note_of is None
-assert get_item_type(995).stackable
+assert reader.item_type(995).stackable
+tree = reader.loc_type(1276)
+assert isinstance(tree, LocType) and tree.ops[0] == 'Chop down' and tree.blocks_walk and tree.blocks_projectiles
 
-tree = get_loc_type(1276)
-assert isinstance(tree, LocType) and tree.name == 'Tree' and tree.ops[0] == 'Chop down'
-assert tree.width == 1 and tree.length == 1 and tree.blocks_walk and tree.blocks_projectiles
-
-assert get_nearest_ground_item_by_name('bones').name == 'Bones'
-assert get_inventory()[0].name == 'Coins'
-assert get_inventory_count_by_name(['Coins', 'Bones']) == 251 and get_inventory_count_by_name('logs') == 0
-assert get_inventory_item_by_name('BONES').slot == 2 and get_inventory_item_by_name('logs') is None
-)python");
-
-    CHECK_THROWS_WITH(fixture.Run("get_nearest_npc_by_name([])\n"), ContainsSubstring("ValueError") && ContainsSubstring("at least one name"));
-    CHECK_THROWS_WITH(fixture.Run("get_nearest_npc_by_name(41)\n"), ContainsSubstring("TypeError") && ContainsSubstring("names must be a str or a list of str"));
-}
-
-TEST_CASE("Script bindings see scenery and routes", "[ScriptBindings]")
-{
-    auto fixture = BindingFixture{};
-    fixture.Run(R"python(
-door = get_loc_at(get_x() + 1, get_z())
-assert door.name == 'Door' and door.changed and door.id == 1530
-tree = get_nearest_loc_by_name('tree')
-assert tree.id == 1276 and not tree.changed and tree.x == get_x() - 2 and tree.layer == LAYER_GROUND
-assert get_loc_at(get_x() - 2, get_z() + 3).id == 1276
-assert [loc.id for loc in get_locs()] == [1530, 1276]
-assert get_locs(ids=1276, layer=LAYER_WALL) == [] and get_locs(radius=1)[0].id == 1530
-assert get_nearest_loc_by_id(1530, reachable=True).id == 1530
-assert get_nearest_loc_by_id(9) is None
-
-assert is_reachable(get_x(), get_z() + 1)
-assert find_path(get_x(), get_z() + 3) == [(get_x(), get_z() + 3)]
-assert find_path(get_x() + 500, get_z()) is None
+assert reader.main_modal() == 5292 and reader.side_modal() == -1 and reader.chat_modal() == -1
+assert reader.interface_open(5292) and not reader.interface_open(1)
+assert reader.component_text(2458) == 'Click here to logout' and reader.component_text(1) is None
+assert not reader.count_dialog_open()
+assert reader.varp(173) == 1 and reader.varp(1) == 0
+assert friends.list() == [('Zezima', 2)] and ignores.list() == ['Spammer']
 )python");
 }
 
-TEST_CASE("Script bindings take options by their text", "[ScriptBindings]")
+TEST_CASE("Script bindings choose options by their text, as rs2b0t's interact does", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
     fixture.Run(R"python(
-assert interact_npc(99, 'Attack') is False
-door = get_loc_at(get_x() + 1, get_z())
+here = game.tile()
+chicken = npcs.query().id(41).first()
+door = locs.at(here.translate(1, 0))
+bones = ground_items.query().first()
+assert chicken.interact('Pickpocket') is False and door.interact('Close') is False and bones.interact('Eat') is False
+assert inventory.first('Coins').interact('Bury') is False
 )python");
 
-    CHECK_THROWS_WITH(fixture.Run("interact_npc(7, 'Pickpocket')\n"), ContainsSubstring("ValueError") && ContainsSubstring("Chicken (NPC 41) has no option 'Pickpocket'; its options are Attack (2)"));
-    CHECK_THROWS_WITH(fixture.Run("interact_npc(7, 2.5)\n"), ContainsSubstring("TypeError") && ContainsSubstring("op must be an int or a str"));
-    CHECK_THROWS_WITH(fixture.Run("interact_loc(1530, get_x() + 1, get_z(), 'Close')\n"), ContainsSubstring("ValueError") && ContainsSubstring("Door (loc 1530) has no option 'Close'"));
-    CHECK_THROWS_WITH(fixture.Run("interact_loc(door, 1, 2)\n"), ContainsSubstring("TypeError") && ContainsSubstring("a Loc and an op"));
-    CHECK_THROWS_WITH(fixture.Run("interact_ground_item(get_nearest_ground_item_by_id(526), 'Eat')\n"), ContainsSubstring("ValueError") && ContainsSubstring("Take (3)"));
-
-    // These choose their option, so they get as far as sending, which needs a session.
-    CHECK_THROWS_WITH(fixture.Run("interact_loc(door, 'open')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
-    CHECK_THROWS_WITH(fixture.Run("interact_loc(door, op='Open')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
-    CHECK_THROWS_WITH(fixture.Run("item_op(get_inventory()[1], 'Bury')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
-    CHECK_THROWS_WITH(fixture.Run("take_ground_item(get_nearest_ground_item_by_name('Bones'))\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
-}
-
-TEST_CASE("Script bindings read inventories, interfaces, varps and social lists", "[ScriptBindings]")
-{
-    auto fixture = BindingFixture{};
-    fixture.Run(R"python(
-items = get_inventory()
-assert [(i.id, i.slot) for i in items] == [(995, 0), (526, 2)] and isinstance(items[0], Item)
-assert items[0].com == INVENTORY and items[0].count == 250
-assert get_inventory_count_by_id(995) == 250 and get_inventory_count_by_id([995, 526]) == 251
-assert get_inventory_item_by_id(526).slot == 2 and get_inventory_item_by_id(1) is None
-assert get_empty_slots() == INVENTORY_SIZE - 2 and not is_inventory_full()
-assert get_equipment() == [] and get_inventory(BANK) == []
-
-assert get_main_modal() == 5292 and get_side_modal() == -1 and get_chat_modal() == -1
-assert is_interface_open(5292) and not is_interface_open(1)
-assert get_component_text(2458) == 'Click here to logout' and get_component_text(1) is None
-assert not is_count_dialog_open()
-assert get_varp(173) == 1 and get_varp(1) == 0
-assert get_friends() == [('Zezima', 2)] and get_ignores() == ['Spammer']
-)python");
+    // These have the option, so they get as far as sending, which needs a session.
+    CHECK_THROWS_WITH(fixture.Run("door.interact('open')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(fixture.Run("inventory.first('Bones').interact('Bury')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(fixture.Run("bones.interact('Take')\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    CHECK_THROWS_WITH(fixture.Run("inventory.first('Bones').use_on(inventory.first('Coins'))\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
 }
 
 TEST_CASE("Script bindings check argument types and ranges", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
+    fixture.Run("import _core\n");
 
-    CHECK_THROWS_WITH(fixture.Run("get_npcs(ids='chicken')\n"), ContainsSubstring("TypeError") && ContainsSubstring("ids must be an int, a list of ints or None"));
-    CHECK_THROWS_WITH(fixture.Run("get_nearest_npc_by_id(41, radius='far')\n"), ContainsSubstring("TypeError"));
-    CHECK_THROWS_WITH(fixture.Run("attack_npc('chicken')\n"), ContainsSubstring("TypeError") && ContainsSubstring("npc must be a Npc or its index"));
-    CHECK_THROWS_WITH(fixture.Run("interact_npc(7, 6)\n"), ContainsSubstring("ValueError") && ContainsSubstring("op must be from 1 to 5"));
-    CHECK_THROWS_WITH(fixture.Run("get_current_stat(25)\n"), ContainsSubstring("ValueError"));
-    CHECK_THROWS_WITH(fixture.Run("walk_to(1, 2, run=1)\n"), ContainsSubstring("TypeError") && ContainsSubstring("run must be True or False"));
-    CHECK_THROWS_WITH(fixture.Run("walk_path([(1, 2), (3,)])\n"), ContainsSubstring("TypeError") && ContainsSubstring("(x, z) pairs"));
-    CHECK_THROWS_WITH(fixture.Run("drop_item(get_nearest_ground_item_by_id(526))\n"), ContainsSubstring("TypeError") && ContainsSubstring("item must be an Item"));
+    CHECK_THROWS_WITH(fixture.Run("_core.get_npcs(ids='chicken')\n"), ContainsSubstring("TypeError") && ContainsSubstring("ids must be an int, a list of ints or None"));
+    CHECK_THROWS_WITH(fixture.Run("_core.get_npcs(names=41)\n"), ContainsSubstring("TypeError") && ContainsSubstring("names must be a str or a list of str"));
+    CHECK_THROWS_WITH(fixture.Run("_core.attack_npc('chicken')\n"), ContainsSubstring("TypeError") && ContainsSubstring("npc must be a Npc or its index"));
+    CHECK_THROWS_WITH(fixture.Run("_core.interact_npc(7, 6)\n"), ContainsSubstring("ValueError") && ContainsSubstring("op must be from 1 to 5"));
+    CHECK_THROWS_WITH(fixture.Run("_core.get_current_stat(25)\n"), ContainsSubstring("ValueError"));
+    CHECK_THROWS_WITH(fixture.Run("_core.walk_to(1, 2, run=1)\n"), ContainsSubstring("TypeError") && ContainsSubstring("run must be True or False"));
+    CHECK_THROWS_WITH(fixture.Run("direct_navigator.walk_path([(1, 2), (3,)])\n"), ContainsSubstring("TypeError") && ContainsSubstring("(x, z) pairs"));
+    CHECK_THROWS_WITH(fixture.Run("_core.drop_item(ground_items.query().first())\n"), ContainsSubstring("TypeError") && ContainsSubstring("item must be an InvItem"));
+    CHECK_THROWS_WITH(fixture.Run("inventory.first('Coins').use_on(5)\n"), ContainsSubstring("TypeError") && ContainsSubstring("not int"));
 }
 
-TEST_CASE("Script bindings report actions on targets that are gone, and need a session to send", "[ScriptBindings]")
+TEST_CASE("Script bindings report actions on targets that are gone", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
-    fixture.Run(R"python(
-assert attack_npc(99) is False and interact_player(99, 1) is False
-gone = get_nearest_ground_item_by_id(526)
-)python");
+    fixture.Run("chicken = npcs.query().id(41).first()\nbones = ground_items.query().first()\n");
 
+    fixture.state.npcs.clear();
     fixture.state.groundItems.clear();
-    fixture.Run("assert take_ground_item(gone) is False\n");
-    CHECK_THROWS_WITH(fixture.Run("drop_item(get_inventory()[0])\n"), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    fixture.Run(R"python(
+assert not chicken.valid() and chicken.interact('Attack') is False
+assert not bones.valid() and bones.interact('Take') is False
+)python");
 }
 
 TEST_CASE("Script bindings expose the account's settings", "[ScriptBindings]")

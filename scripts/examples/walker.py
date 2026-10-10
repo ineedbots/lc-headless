@@ -19,21 +19,22 @@ laps = 0
 
 def on_start():
     global points
-    start_x, start_z = get_x(), get_z()
+    start = game.tile()
+    start_x, start_z = start.x, start.z
     size = settings.get('size', 5)
     square = [[start_x + size, start_z], [start_x + size, start_z + size], [start_x, start_z + size], [start_x, start_z]]
     points = settings.get('points', square)
     log('Walking between', points)
     if settings.get('teleport'):
-        command('tele ' + settings.teleport)
+        chat.command('tele ' + settings.teleport)
 
 
 def on_reconnect():
-    log('Reconnected at', get_x(), get_z(), 'after', laps, 'laps')
+    log('Reconnected at', game.tile(), 'after', laps, 'laps')
 
 
 def on_progress_report():
-    return {'Laps': laps, 'Position': (get_x(), get_z())}
+    return {'Laps': laps, 'Position': game.tile()}
 
 
 def on_bot_message(sender, message):
@@ -43,7 +44,7 @@ def on_bot_message(sender, message):
 def loop():
     global index, laps
     x, z = points[index]
-    if at(x, z):
+    if game.tile().distance_to((x, z)) == 0:
         index = (index + 1) % len(points)
         if index == 0:
             laps += 1
@@ -54,8 +55,8 @@ def loop():
                 stop_account()
         return 0
 
-    if not is_moving():
-        walk_to(x, z, run=settings.get('run', False))
+    if not game.moving():
+        direct_navigator.walk((x, z), run=settings.get('run', False))
 
     # 600 means the next server tick, as rs2b0t reads it; any other number is milliseconds.
     return 600

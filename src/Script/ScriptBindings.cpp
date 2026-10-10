@@ -20,54 +20,6 @@
 namespace
 {
     constexpr auto PRELUDE = R"python(
-class _Entity:
-    def is_moving(self):
-        return self.moving
-
-    def in_combat(self):
-        return self.last_hit_tick is not None and get_tick() - self.last_hit_tick <= COMBAT_TICKS
-
-
-class Npc(_Entity):
-    def __repr__(self):
-        return f'Npc(index={self.index}, id={self.id}, name={self.name}, x={self.x}, z={self.z})'
-
-
-class Player(_Entity):
-    def __repr__(self):
-        return f'Player(index={self.index}, name={self.name}, x={self.x}, z={self.z})'
-
-
-class GroundItem:
-    def __repr__(self):
-        return f'GroundItem(id={self.id}, name={self.name}, count={self.count}, x={self.x}, z={self.z})'
-
-
-class Loc:
-    def __repr__(self):
-        return f'Loc(id={self.id}, name={self.name}, x={self.x}, z={self.z}, layer={self.layer})'
-
-
-class Item:
-    def __repr__(self):
-        return f'Item(id={self.id}, name={self.name}, count={self.count}, slot={self.slot})'
-
-
-class NpcType:
-    def __repr__(self):
-        return f'NpcType(id={self.id}, name={self.name})'
-
-
-class ItemType:
-    def __repr__(self):
-        return f'ItemType(id={self.id}, name={self.name})'
-
-
-class LocType:
-    def __repr__(self):
-        return f'LocType(id={self.id}, name={self.name})'
-
-
 def _report_rows(report):
     if not isinstance(report, dict):
         raise TypeError(f'on_progress_report() must return a dict, not {type(report).__name__}')
@@ -81,6 +33,9 @@ from rs2004.bot import *
 from rs2004.settings import *
 from rs2004.geometry import *
 from rs2004.events import *
+from rs2004.entities import *
+from rs2004.items import *
+from rs2004.game import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -96,6 +51,25 @@ _rt_finish = _runtime.finish
 
     constexpr auto LOAD_SETTINGS = "settings = _rt_make_settings(_settings_json)\ndel _settings_json\n"sv;
     constexpr auto CORE_MODULE = "_core";
+
+    // Functions that scripts call directly until the phase that replaces them (BotApiDesign.md §14):
+    // interfaces and magic, and the script's own control.
+    constexpr auto BUILTIN_FUNCTIONS = std::to_array<std::string_view>({
+        "stop_script",
+        "stop_account",
+        "send_bot_message",
+        "click_button",
+        "continue_dialogue",
+        "answer_count",
+        "close_interfaces",
+        "inv_button",
+        "move_item",
+        "cast_on_npc",
+        "cast_on_player",
+        "cast_on_loc",
+        "cast_on_ground_item",
+        "cast_on_item",
+    });
     constexpr auto SETTINGS_JSON = "_settings_json";
     constexpr auto MAX_COORD = s64{32767};
     constexpr auto PERCENT = 100;
@@ -232,6 +206,17 @@ _rt_finish = _runtime.finish
         return {.ids = PyConvert::ToIds(ids, "ids"), .radius = ToRadius(radius)};
     }
 
+    SearchFilter_s ToSearch(py_Ref ids, py_Ref radius, py_Ref names)
+    {
+        auto filter = ToFilter(ids, radius);
+        if (!py_isnone(names))
+        {
+            filter.names = PyConvert::ToNames(names, "names");
+        }
+
+        return filter;
+    }
+
     SearchFilter_s ToNameFilter(py_Ref names, py_Ref radius)
     {
         return {.names = PyConvert::ToNames(names, "names"), .radius = ToRadius(radius)};
@@ -309,6 +294,11 @@ _rt_finish = _runtime.finish
     bool GetTick(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(static_cast<s64>(GetApi().GetState().tick)); });
+    }
+
+    bool IsPlaced(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().GetState().placed); });
     }
 
     bool GetStepTime(int, py_StackRef) noexcept
@@ -537,7 +527,7 @@ _rt_finish = _runtime.finish
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetNpcs(ToFilter(py_arg(0), py_arg(1))), FromNpc);
+            PyConvert::FromList(py_retval(), GetApi().GetNpcs(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromNpc);
             return true;
         });
     }
@@ -595,7 +585,7 @@ _rt_finish = _runtime.finish
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetGroundItems(ToFilter(py_arg(0), py_arg(1))), FromGroundItem);
+            PyConvert::FromList(py_retval(), GetApi().GetGroundItems(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromGroundItem);
             return true;
         });
     }
@@ -634,7 +624,7 @@ _rt_finish = _runtime.finish
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetLocs(ToFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2))), FromLoc);
+            PyConvert::FromList(py_retval(), GetApi().GetLocs(ToSearch(py_arg(0), py_arg(1), py_arg(3)), ToLayer(py_arg(2))), FromLoc);
             return true;
         });
     }
@@ -838,6 +828,53 @@ _rt_finish = _runtime.finish
         });
     }
 
+    bool GetPlayerMenu(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto menu = GetApi().GetPlayerMenu();
+            py_newlist(py_retval());
+            for (const auto option : menu)
+            {
+                const auto item = py_list_emplace(py_retval());
+                py_newnone(item);
+                if (!option.empty())
+                {
+                    PyConvert::FromString(item, option);
+                }
+            }
+
+            return true;
+        });
+    }
+
+    bool CanReachEntity(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            return ReturnBool(api.CanReachEntity(api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
+        });
+    }
+
+    bool CanReachGroundItem(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            return ReturnBool(api.CanReachGroundItem(api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
+        });
+    }
+
+    bool CanReachLoc(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            return ReturnBool(api.CanReachLoc(api.ToTile(ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z")), PyConvert::ToU16(py_arg(0), "id")));
+        });
+    }
+
     // Movement and interactions
 
     bool WalkTo(int, py_StackRef argv) noexcept
@@ -946,7 +983,7 @@ _rt_finish = _runtime.finish
             });
 
             api.InteractLoc(loc.id, loc.x, loc.z, op);
-            return ReturnNone();
+            return ReturnBool(true);
         });
     }
 
@@ -963,7 +1000,7 @@ _rt_finish = _runtime.finish
             });
 
             api.InteractLocVia(points, id, ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"), op);
-            return ReturnNone();
+            return ReturnBool(true);
         });
     }
 
@@ -1232,18 +1269,13 @@ _rt_finish = _runtime.finish
         py_CFunction function;
     };
 
-    std::vector<Function_s> GetCoreFunctions()
-    {
-        return {
-            {"step_time()", GetStepTime},
-            {"tick()", GetTick},
-            {"note_progress()", NoteProgress},
-        };
-    }
-
     std::vector<Function_s> GetFunctions(const GameCache_s& cache)
     {
         return {
+            {"step_time()", GetStepTime},
+            {"is_placed()", IsPlaced},
+            {"tick()", GetTick},
+            {"note_progress()", NoteProgress},
             {"get_tick()", GetTick},
             {"stop_script()", StopScript},
             {"stop_account()", StopAccount},
@@ -1273,17 +1305,17 @@ _rt_finish = _runtime.finish
             {"in_radius_of(x, z, radius)", InRadiusOf},
             {"in_rect(x, z, width, height)", InRect},
             {"at(x, z)", At},
-            {"get_npcs(ids=None, radius=None)", GetNpcs},
+            {"get_npcs(ids=None, radius=None, names=None)", GetNpcs},
             {"get_nearest_npc_by_id(ids=None, radius=None, in_combat=None, reachable=False)", GetNearestNpcById},
             {"get_nearest_npc_by_name(names, radius=None, in_combat=None, reachable=False)", GetNearestNpcByName},
             {"get_npc(index)", GetNpc},
             {"get_players(radius=None)", GetPlayers},
             {"get_player_by_name(name)", GetPlayerByName},
-            {"get_ground_items(ids=None, radius=None)", GetGroundItems},
+            {"get_ground_items(ids=None, radius=None, names=None)", GetGroundItems},
             {"get_nearest_ground_item_by_id(ids=None, radius=None, reachable=False)", GetNearestGroundItemById},
             {"get_nearest_ground_item_by_name(names, radius=None, reachable=False)", GetNearestGroundItemByName},
             {"get_loc_at(x, z, layer=None)", GetLocAt},
-            {"get_locs(ids=None, radius=None, layer=None)", GetLocs},
+            {"get_locs(ids=None, radius=None, layer=None, names=None)", GetLocs},
             {"get_nearest_loc_by_id(ids=None, radius=None, layer=None, reachable=False)", GetNearestLocById},
             {"get_nearest_loc_by_name(names, radius=None, layer=None, reachable=False)", GetNearestLocByName},
             {"get_npc_type(id)", GetNpcType},
@@ -1306,6 +1338,10 @@ _rt_finish = _runtime.finish
             {"get_varp(id)", GetVarp},
             {"get_friends()", GetFriends},
             {"get_ignores()", GetIgnores},
+            {"get_player_menu()", GetPlayerMenu},
+            {"can_reach_entity(x, z)", CanReachEntity},
+            {"can_reach_ground_item(x, z)", CanReachGroundItem},
+            {"can_reach_loc(id, x, z)", CanReachLoc},
             {"walk_to(x, z, run=False)", WalkTo},
             {"is_reachable(x, z)", IsReachable},
             {"find_path(x, z)", FindPath},
@@ -1368,16 +1404,16 @@ void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
             SetConstant(builtins, constant);
         }
 
-        for (const auto& function : GetFunctions(cache))
-        {
-            py_bind(builtins, function.signature.c_str(), function.function);
-        }
-
         // The standard library reads the game through _core, which scripts don't use.
         const auto core = py_newmodule(CORE_MODULE);
-        for (const auto& function : GetCoreFunctions())
+        for (const auto& function : GetFunctions(cache))
         {
             py_bind(core, function.signature.c_str(), function.function);
+            const auto name = std::string_view{function.signature}.substr(0, function.signature.find('('));
+            if (std::ranges::find(BUILTIN_FUNCTIONS, name) != BUILTIN_FUNCTIONS.end())
+            {
+                py_bind(builtins, function.signature.c_str(), function.function);
+            }
         }
 
         vm.RunSource(PRELUDE, "<prelude>", builtins);

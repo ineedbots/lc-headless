@@ -8,10 +8,11 @@ __all__ = ['Tile', 'Area']
 OTHER_LEVEL_DISTANCE = 1000000
 
 
-def _coords(tile):
+def _coords(tile, level=0):
+    """x, z and level from a tile, or from an (x, z) pair, which is on the given level."""
     if isinstance(tile, (tuple, list)):
         if len(tile) == 2:
-            return tile[0], tile[1], 0
+            return tile[0], tile[1], level
         return tile[0], tile[1], tile[2]
 
     level = getattr(tile, 'level', 0)
@@ -33,7 +34,8 @@ class Tile:
         return Tile(x, z, level)
 
     def distance_to(self, other):
-        x, z, level = _coords(other)
+        """Chebyshev distance; an (x, z) pair is on this tile's level."""
+        x, z, level = _coords(other, self.level)
         distance = max(abs(self.x - x), abs(self.z - z))
         if self.level != level:
             return OTHER_LEVEL_DISTANCE + distance
@@ -43,7 +45,7 @@ class Tile:
         return Tile(self.x + dx, self.z + dz, self.level)
 
     def equals(self, other):
-        x, z, level = _coords(other)
+        x, z, level = _coords(other, self.level)
         return self.x == x and self.z == z and self.level == level
 
     def __eq__(self, other):

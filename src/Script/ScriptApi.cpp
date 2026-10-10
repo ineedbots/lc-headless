@@ -21,13 +21,11 @@
 
 namespace
 {
-    constexpr auto MENU_SIZE = std::size_t{5};
     constexpr auto TAKE_SLOT = std::size_t{2};
     constexpr auto DROP_SLOT = std::size_t{4};
     constexpr auto LAYERS = std::to_array<LocLayer_e>({LocLayer_e::Wall, LocLayer_e::WallDecor, LocLayer_e::Ground, LocLayer_e::GroundDecor});
 
-    // A target's options by slot, as its right-click menu lists them; empty where there's none.
-    using Menu = std::array<std::string_view, MENU_SIZE>;
+    using Menu = ScriptApi::Menu;
 
     bool MatchesId(std::span<const s32> ids, s32 id)
     {
@@ -180,6 +178,71 @@ const Player_s& ScriptApi::GetLocalPlayer() const
 Tile_s ScriptApi::GetPosition() const
 {
     return m_state.localPlayer.tile;
+}
+
+ScriptApi::Menu ScriptApi::GetNpcMenu(const GameCache_s& cache, s32 npc)
+{
+    const auto* const type = cache.FindNpc(npc);
+    return type == nullptr ? Menu{} : MakeMenu(cache, type->ops);
+}
+
+ScriptApi::Menu ScriptApi::GetLocMenu(const GameCache_s& cache, s32 loc)
+{
+    const auto* const type = cache.FindLoc(loc);
+    return type == nullptr ? Menu{} : MakeMenu(cache, type->ops);
+}
+
+ScriptApi::Menu ScriptApi::GetGroundItemMenu(const GameCache_s& cache, s32 obj)
+{
+    const auto* const type = cache.FindObj(obj);
+    auto menu = type == nullptr ? Menu{} : MakeMenu(cache, type->ops);
+    if (menu[TAKE_SLOT].empty())
+    {
+        menu[TAKE_SLOT] = TAKE_OPTION;
+    }
+
+    return menu;
+}
+
+ScriptApi::Menu ScriptApi::GetItemMenu(const GameCache_s& cache, s32 obj)
+{
+    const auto* const type = cache.FindObj(obj);
+    auto menu = type == nullptr ? Menu{} : MakeMenu(cache, type->inventoryOps);
+    if (menu[DROP_SLOT].empty())
+    {
+        menu[DROP_SLOT] = DROP_OPTION;
+    }
+
+    return menu;
+}
+
+ScriptApi::Menu ScriptApi::GetPlayerMenu() const
+{
+    auto menu = Menu{};
+    for (std::size_t slot = 0; slot < menu.size() && slot < m_state.playerOps.size(); ++slot)
+    {
+        if (m_state.playerOps[slot])
+        {
+            menu[slot] = m_state.playerOps[slot]->text;
+        }
+    }
+
+    return menu;
+}
+
+bool ScriptApi::CanReachEntity(const Tile_s& tile) const
+{
+    return GameActions::FindEntityRoute(m_map, GetPosition(), tile).has_value();
+}
+
+bool ScriptApi::CanReachGroundItem(const Tile_s& tile) const
+{
+    return GameActions::FindGroundItemRoute(m_map, GetPosition(), tile).has_value();
+}
+
+bool ScriptApi::CanReachLoc(const Tile_s& tile, u16 loc) const
+{
+    return GameActions::FindLocRoute(m_map, GetPosition(), tile, loc).has_value();
 }
 
 Tile_s ScriptApi::ToTile(s32 x, s32 z) const
@@ -466,16 +529,7 @@ std::optional<u8> ScriptApi::FindNpcOp(u16 index, std::string_view text) const
 
 u8 ScriptApi::FindPlayerOp(std::string_view text) const
 {
-    auto menu = Menu{};
-    for (std::size_t slot = 0; slot < menu.size() && slot < m_state.playerOps.size(); ++slot)
-    {
-        if (m_state.playerOps[slot])
-        {
-            menu[slot] = m_state.playerOps[slot]->text;
-        }
-    }
-
-    return ChooseOption(menu, text, "a player");
+    return ChooseOption(GetPlayerMenu(), text, "a player");
 }
 
 u8 ScriptApi::FindLocOp(u16 loc, std::string_view text) const

@@ -63,10 +63,10 @@ src/
 │       ├── geometry.py         Tile, Area
 │       ├── entities.py         Npc, Player, Loc, GroundItem, EntityQuery, npcs, players, locs, ground_items
 │       ├── items.py            InvItem, inventory, equipment
-│       ├── game.py             game, skills, prayer, special, magic, reader
+│       ├── game.py             game, skills, reader, chat, friends, ignores, direct_navigator; later prayer, special, magic
 │       ├── bank.py             bank, banking, deposit matchers
 │       ├── ui.py               chat_dialog, shop, trade, quests, interfaces
-│       ├── walking/            traversal, direct_navigator, reach, the executor and crossings
+│       ├── walking/            traversal, reach, the executor and crossings
 │       ├── randomevents/       the guardian and solvers
 │       └── catalogs/           data tables, planners and behaviours (§12)
 ├── Game/
@@ -193,27 +193,46 @@ The host skips an event nobody listens to before converting anything: the stdlib
 
 ---
 
-## 5. Phase 2: entities, items and the game
+## 5. Phase 2: entities, items and the game (done)
 
-These facades sit on the core's existing searches and actions, which move into `_core`. Calls that only send a packet return a bool at once; calls that wait for the outcome are generators.
+Every flat function moved into `_core`, and the facades below sit on it, in `rs2004/entities.py`, `items.py` and `game.py`. Calls that only send a packet return a bool at once; calls that wait for the outcome are generators.
 
 | Facade | Python | Notes |
 |---|---|---|
-| `npcs`, `players`, `locs`, `ground_items` | `query()`; `npcs.all()`; `npcs.nearest(count=None)` | |
-| `EntityQuery` | `name(*names)`, `action(action)`, `within(dist)`, `within_of(origin, dist)`, `inside(area)`, `where(pred)`, then `results()`, `nearest()`, `nearest_prefer_local(prefer_radius)`, `first()`, `exists()`, `count()` | Also `id(*ids)` and `reachable()`, which the core already supports. The filters run in C++ in one call; `where` runs in Python after |
-| `Npc` | `name`, `id`, `level`, `index`, `size`, `in_combat`, `health`; `tile()`, `network_tile()`, `distance()`, `actions()`, `valid()`, `targets_me()`, `targets_another_player()`, `interact(action)` | A snapshot, as objects are today; `valid()` looks the index up again |
-| `Player` | `name`, `index`, `in_combat`, `combat_level`; `tile()`, `distance()`, `actions()`, `targets_me()`, `interact(action)` | `interact` is ours; rs2b0t reaches players through the menu |
-| `Loc`, `GroundItem` | `name`, `id` (and `count`); `tile()`, `distance()`, `actions()`, `interact(action)` | |
-| `inventory` | `items()`, `first(name)`, `contains(name)`, `count(name)`, `count_by_id(id)`, `used()`, `free()`, `is_full()` | While the bank is open these read the backpack beside it, as rs2b0t's do |
-| `InvItem` | `name`, `id`, `slot`, `count`, `noted`; `actions()`, `interact(action)`, `use_on(target)` | `use_on` takes an `InvItem`, `Loc`, `Npc`, `Player` or `GroundItem` |
+| `npcs`, `players`, `locs`, `ground_items` | `query()`; `npcs.all()`, `npcs.nearest(count=1)`; `players.all()` | Ours: `npcs.get(index)`, `players.local()` and `locs.at(tile, layer=None)` |
+| `EntityQuery` | `name(*names)`, `action(action)`, `within(dist)`, `within_of(origin, dist)`, `inside(area)`, `where(pred)`, then `results()`, `nearest()`, `nearest_prefer_local(prefer_radius)`, `first()`, `exists()`, `count()` | Ours: `id(*ids)`, `layer(layer)` and `reachable()`. Names, ids, `within`'s radius and the layer go to the core's search (`SearchFilter_s`, which gained names for every kind); the other filters run in Python on the results. `inside` takes an `Area` or rs2b0t's `{minX, ...}` |
+| `Npc` | `name`, `id`, `level`, `index`, `size`, `in_combat`, `health`; `tile()`, `network_tile()`, `distance()`, `actions()`, `valid()`, `targets_me()`, `targets_another_player()`, `interact(action)` | Also `max_health`, `animation`, `moving` and `target`. `level` is the combat level, as rs2b0t's |
+| `Player` | `name`, `index`, `in_combat`, `combat_level`; `tile()`, `distance()`, `actions()`, `targets_me()`, `interact(action)`, `valid()` | `actions()` are the options the server set (`ScriptApi::GetPlayerMenu`) |
+| `Loc`, `GroundItem` | `name`, `id` (and `count`); `tile()`, `distance()`, `actions()`, `interact(action)`, `valid()` | `Loc` also has `shape`, `angle`, `layer`, `changed` and `interact_via(points, action)` |
+| `inventory` | `items()`, `first(name)`, `contains(name)`, `count(name)`, `count_by_id(id)`, `used()`, `free()`, `is_full()` | They read the backpack itself, which the server keeps sending while the bank is open; rs2b0t reads the bank's side panel because the webclient hides the backpack then |
+| `InvItem` | `name`, `id`, `slot`, `count`, `noted`; `actions()`, `interact(action)`, `use_on(target)` | Also `com`. `use_on` takes an `InvItem`, `Loc`, `Npc`, `Player` or `GroundItem` |
 | `equipment` | `items()`, `contains(name)`, `equip(name)`, `unequip(name)` | `equip` and `unequip` are generators that wait for the item to move |
-| `skills` | `index(name)`, `level(name)`, `effective(name)`, `xp(name)`, `hp_fraction()` | Names are lower-case, as rs2b0t's |
-| `game` | `ingame()`, `tile()`, `energy()`, `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `tick()`, `my_name()` | `ingame()` also covers rs2b0t's `scene_ready()`: the player is placed and the map is built |
-| `reader` | `varp(id)` and the other raw reads | For what no facade covers, as in rs2b0t |
+| `skills` | `index(name)`, `level(name)`, `effective(name)`, `xp(name)`, `hp_fraction()` | Names are lower-case, as rs2b0t's; an unknown one raises `ValueError` |
+| `game` | `ingame()`, `tile()`, `energy()`, `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `tick()`, `my_name()` | Also `moving()` and `combat_level()`. `ingame()` covers rs2b0t's `scene_ready()` too: the player is placed |
+| `direct_navigator` | `walk(dest)`, `walk_to(dest, radius=2, timeout_ms=45000)` | rs2b0t's same-scene walking, moved here from phase 6 because scripts need to walk meanwhile. Also `walk_path(points)`, `reachable(dest)`, `path(dest)` and `destination()` |
+| `reader` | `varp(id)` and the other raw reads | Here too: the modal ids, component text, the count dialog, any inventory by component, and the cache's types |
 
-Kept from today's API because rs2b0t has nothing public for them: `chat.say(text)`, `chat.send_pm(name, text)`, `chat.command(text)`, `friends` and `ignores` (`list()`, `add(name)`, `remove(name)`), `send_bot_message`, `stop_script`, `stop_account`, `log` and `debug`.
+How the objects are built:
+- `PyConvert` builds them as instances of the stdlib's classes, found in builtins by name, as it built the prelude's.
+- A thing's tile is kept in private `_x`, `_z` and `_plane` fields, which `tile()` reads. A public `level` would clash with rs2b0t's `npc.level`.
+- Its menu is a private `_ops` list, from `ScriptApi::GetNpcMenu`, `GetLocMenu`, `GetGroundItemMenu` and `GetItemMenu`, which add the "Take" and "Drop" the menu shows.
+- `interact(action)` matches the text against `_ops` and returns `False` without sending when it isn't there, as rs2b0t's `interact` does; the core's text matching, which raised `ValueError`, stays for `_core` callers.
+- Reachability for `reachable()` is `ScriptApi::CanReachEntity`, `CanReachGroundItem` and `CanReachLoc`.
 
-- **Done when:** the entity, item and game tests pass, and a fighter that eats and loots, and a power-miner, run against the local engine.
+Kept from before because rs2b0t has nothing public for them:
+- `chat.say(text)`, `chat.send_pm(name, text)` and `chat.command(text)`;
+- `friends` and `ignores`, with `list()`, `add(name)` and `remove(name)`;
+- `send_bot_message`, `stop_script`, `stop_account`, `log` and `debug`.
+
+Until phases 3 and 4 replace them, scripts keep the interface and magic functions that take component ids, bound in builtins as well as `_core` (`BUILTIN_FUNCTIONS` in `ScriptBindings.cpp`):
+- `click_button`, `continue_dialogue`, `answer_count` and `close_interfaces`;
+- `inv_button` and `move_item`;
+- the five `cast_on_*`.
+
+- **Done when:**
+    - [x] The entity, item and game tests pass (`ScriptBindingsTests`, rewritten for the facades).
+    - [x] A fighter that loots runs against the local engine: the chicken killer, now on the facades, fought, picked up its bones and logged out at its goal. It doesn't eat yet, since eating well needs phase 9's `sustain`.
+    - [x] A power-miner runs against the local engine: the new `scripts/examples/power_miner.py` mined copper and tin at Varrock, counted its ores from `skill_xp`, and logged out at its goal. The 289 content answers mining without a pickaxe with a message box (`~mesbox`), not a game message, so the miner checks for a pickaxe itself until phase 4's `chat_dialog` can read one.
 
 ---
 
@@ -361,7 +380,7 @@ A world-scale route needs collision beyond the build area, which the cache has. 
     - `walk_resilient(dest, radius, attempts=None, timeout_ms=None, scene_radius=None, max_budget=None, ...)`;
     - `remaining()`, `teleports_enabled()` and `request_repath(reason=None)`;
     - `NAV_PURE_WALK` and `NAV_WITH_TELES`, passed with `**`.
-- **`direct_navigator`:** `walk(dest)` and `walk_to(dest, radius=None, timeout_ms=None)`, within the scene.
+- **`direct_navigator`** came early, in phase 2 (§5).
 - **Behaviour,** as rs2b0t documents it:
     - **Following:** locate the player on the route (the corridor snap), click the furthest reachable tile, and re-path when the world disagrees.
     - **Doors:** check the crossing itself, not the door's state; skip doors already open; open double doors from the outside.
@@ -463,7 +482,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
     - Work: this document, and the porting sections of ScriptingApi.md and ScriptingDesign §6.
     - Done when: the porting table names the swapped damage hooks and every rename that exists today.
 1. **The runtime** (§4). Done.
-2. **Entities, items and the game** (§5). ScriptingApi.md is rewritten for the new shape here, and grows with each later phase.
+2. **Entities, items and the game** (§5). Done; ScriptingApi.md is rewritten for the new shape, and grows with each later phase.
 3. **Interfaces from the cache** (§6).
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7).
 5. **Reach** (§8).

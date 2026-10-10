@@ -53,6 +53,10 @@ public:
     static constexpr u8 OP_DROP = 5;
     static constexpr std::string_view TAKE_OPTION = "Take";
     static constexpr std::string_view DROP_OPTION = "Drop";
+    static constexpr std::size_t MENU_SIZE = 5;
+
+    // A target's options by slot, as its right-click menu lists them; empty where there's none.
+    using Menu = std::array<std::string_view, MENU_SIZE>;
 
     ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {});
 
@@ -98,6 +102,19 @@ public:
     // option there.
     [[nodiscard]] u8 FindGroundItemOp(u16 obj, std::string_view text) const;
     [[nodiscard]] u8 FindItemOp(s32 obj, std::string_view text) const;
+
+    // Each kind of target's menu, with the "Take" and "Drop" the menu adds where the type has nothing
+    // there. A type the cache doesn't have has an empty menu, apart from those.
+    [[nodiscard]] static Menu GetNpcMenu(const GameCache_s& cache, s32 npc);
+    [[nodiscard]] static Menu GetLocMenu(const GameCache_s& cache, s32 loc);
+    [[nodiscard]] static Menu GetGroundItemMenu(const GameCache_s& cache, s32 obj);
+    [[nodiscard]] static Menu GetItemMenu(const GameCache_s& cache, s32 obj);
+    [[nodiscard]] Menu GetPlayerMenu() const;
+
+    // Whether the path finder reaches the target by the rule the matching interaction walks by.
+    [[nodiscard]] bool CanReachEntity(const Tile_s& tile) const;
+    [[nodiscard]] bool CanReachGroundItem(const Tile_s& tile) const;
+    [[nodiscard]] bool CanReachLoc(const Tile_s& tile, u16 loc) const;
 
     // Whether a walk can end on the tile.
     [[nodiscard]] bool IsReachable(s32 x, s32 z) const;
