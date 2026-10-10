@@ -44,8 +44,12 @@ struct ScriptHostOptions_s
     bool waitForDebugger = false;
     // For routes beyond the loaded area; without it, the script can't plan them.
     std::shared_ptr<const Navigation_s> navigation;
-    // Run the stdlib's random event guardian each server tick.
+    // The runtime's upkeep each server tick: the random event guardian, the stall guard (off at zero) and
+    // the run manager. Off by default, so tests see only what they ask for.
     bool randomEvents = false;
+    std::chrono::minutes stallMinutes{0};
+    bool runAuto = false;
+    s32 runEnergyMin = 20;
 };
 
 // Runs one account's bot against its client, on the caller's thread between pumps. The script is loaded
@@ -79,6 +83,8 @@ public:
     [[nodiscard]] bool ReceiveBotMessage(BotMessage_s message);
     [[nodiscard]] ScriptStatus_e GetStatus() const;
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
+    // The script's relog(delay) since the last call, for the account to carry out.
+    [[nodiscard]] std::optional<std::chrono::seconds> TakeRelogRequest();
 
 private:
     enum class LoopWait_e : u8
@@ -105,7 +111,7 @@ private:
     void RunProgressReport(Clock::time_point now);
     [[nodiscard]] bool IsLoopDue(Clock::time_point now, const GameState_s& state) const;
     void RunLoop(Clock::time_point now);
-    void RunGuard(Clock::time_point now);
+    void RunUpkeep(Clock::time_point now);
     void ScheduleLoop(Clock::time_point now, py_Ref wait);
     [[nodiscard]] bool HasHook(std::string_view name) const;
     void CallHook(std::string_view name, std::span<const py_Ref> args = {});

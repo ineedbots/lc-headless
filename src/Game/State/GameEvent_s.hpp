@@ -22,6 +22,13 @@ struct NpcHit_s
     Hit_s hit;
 };
 
+// An NPC's overhead text, as MASK_SAY sets it.
+struct NpcSaid_s
+{
+    u16 index = 0;
+    std::string text;
+};
+
 struct PlayerAdded_s
 {
     Player_s player;
@@ -95,10 +102,17 @@ struct RebootStarted_s
     u16 ticks = 0;
 };
 
+// A projectile launched in the build area, from MAP_PROJANIM.
+struct ProjectileLaunched_s
+{
+    Projectile_s projectile;
+};
+
 using GameEventData = std::variant<
     NpcAdded_s,
     NpcRemoved_s,
     NpcHit_s,
+    NpcSaid_s,
     PlayerAdded_s,
     PlayerRemoved_s,
     PlayerHit_s,
@@ -111,7 +125,8 @@ using GameEventData = std::variant<
     StatChanged_s,
     VarpChanged_s,
     ModalChanged_s,
-    RebootStarted_s>;
+    RebootStarted_s,
+    ProjectileLaunched_s>;
 
 // Something the server said that changed the state, in arrival order. An entity's added event carries it
 // as it stood after the packet that added it; a removed entity carries its last state, since it's gone

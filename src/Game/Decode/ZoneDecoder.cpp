@@ -215,7 +215,8 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         projectile.arc = packet.G1();
         if (inBuildArea && IsInBuildArea(localX + dx, localZ + dz))
         {
-            StateLog::Push(state.projectiles, std::move(projectile));
+            StateLog::Push(state.projectiles, projectile);
+            StateLog::AddEvent(state, ProjectileLaunched_s{.projectile = std::move(projectile)});
         }
         return;
     }

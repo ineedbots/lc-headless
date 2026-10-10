@@ -52,6 +52,7 @@ public:
     void ContinueDialogue(u16 com);
     void AnswerCountDialog(s32 value);
     void CloseInterfaces();
+    void SaveDesign(const IdkDesign_s& design);
 
     void Say(std::string_view text, ChatColour_e colour = ChatColour_e::Yellow, ChatEffect_e effect = ChatEffect_e::None);
     void SendPrivateMessage(std::string_view name, std::string_view text);

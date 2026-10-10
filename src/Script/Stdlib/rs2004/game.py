@@ -48,6 +48,16 @@ class _Game:
         """You were hit within the last 8 ticks; 2004 has no combat-state packet."""
         return _core.in_combat()
 
+    def appearance_screen_open(self):
+        """Whether the character design screen is open, as on a new account."""
+        return _core.is_appearance_screen_open()
+
+    def set_appearance(self, female, kits, colours):
+        """Saves a character design: the 7 body kits (head, jaw, torso, arms, hands, legs, feet; idk ids) and
+        the 5 colours (hair, torso, legs, feet, skin). False when the design screen isn't open. The server
+        checks the design and ignores one it doesn't allow."""
+        return _core.set_appearance(female, kits, colours)
+
     def animating(self):
         return _core.get_local_player().animation != -1
 

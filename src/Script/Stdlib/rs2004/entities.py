@@ -12,7 +12,7 @@ import _core
 from rs2004.geometry import Tile
 
 __all__ = [
-    'Npc', 'Player', 'Loc', 'GroundItem', 'NpcType', 'ItemType', 'LocType', 'EntityQuery',
+    'Npc', 'Player', 'Loc', 'GroundItem', 'NpcType', 'ItemType', 'LocType', 'Projectile', 'EntityQuery',
     'npcs', 'players', 'locs', 'ground_items',
 ]
 
@@ -152,6 +152,24 @@ class GroundItem(_Located):
 
     def __repr__(self):
         return f'GroundItem(id={self.id}, name={self.name}, count={self.count}, tile=({self._x}, {self._z}, {self._plane}))'
+
+
+class Projectile:
+    """A projectile the server launched: spotanim, target (('npc' or 'player', index), or None for one aimed
+    at a tile), start_delay and end_delay (in the client's 20 ms cycles), and tick. source() and destination()
+    are its tiles."""
+
+    def source(self):
+        return Tile(self._sx, self._sz, self._plane)
+
+    def destination(self):
+        return Tile(self._dx, self._dz, self._plane)
+
+    def targets_me(self):
+        return _self_target(self.target) and self.target[1] == _core.get_pid()
+
+    def __repr__(self):
+        return f'Projectile(spotanim={self.spotanim}, from ({self._sx}, {self._sz}) to ({self._dx}, {self._dz}), target={self.target})'
 
 
 class NpcType:

@@ -27,7 +27,8 @@ namespace
     constexpr auto START_BOT = "_rt_start"sv;
     constexpr auto DISPATCH = "_rt_dispatch"sv;
     constexpr auto STEP = "_rt_step"sv;
-    constexpr auto GUARD = "_rt_guard"sv;
+    constexpr auto CONFIGURE = "_rt_configure"sv;
+    constexpr auto UPKEEP = "_rt_upkeep"sv;
     constexpr auto FINISH = "_rt_finish"sv;
     constexpr auto LISTENING = "_listening";
     constexpr auto SETTINGS = "settings";
@@ -39,6 +40,7 @@ namespace
     constexpr auto WAIT_MS = "ms"sv;
     constexpr auto WAIT_UPDATE = "update"sv;
     constexpr auto MILLISECONDS_PER_TICK = 600;
+    constexpr auto HITPOINTS = u8{3};
     constexpr auto MILLISECONDS_PER_SECOND = 1000;
 
     // rs2b0t's ChatLine type, as names rather than the webclient's numbers.
@@ -153,9 +155,9 @@ void ScriptHost::Step(Clock::time_point now)
             CallHook("tick", std::array{py_r0()});
         }
 
-        if (m_status == ScriptStatus_e::Running && m_options.randomEvents)
+        if (m_status == ScriptStatus_e::Running)
         {
-            RunGuard(now);
+            RunUpkeep(now);
         }
     }
 
@@ -218,6 +220,11 @@ bool ScriptHost::ReceiveBotMessage(BotMessage_s message)
 ScriptStatus_e ScriptHost::GetStatus() const
 {
     return m_status;
+}
+
+std::optional<std::chrono::seconds> ScriptHost::TakeRelogRequest()
+{
+    return m_api.TakeRelogRequest();
 }
 
 std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
@@ -288,6 +295,13 @@ void ScriptHost::LoadBot()
     {
         m_logger->Warning("{} {}", m_options.file.generic_string(), warning);
     }
+
+    m_vm->Activate();
+    py_newbool(py_r0(), m_options.randomEvents);
+    py_newint(py_r1(), m_options.stallMinutes.count());
+    py_newbool(py_r2(), m_options.runAuto);
+    py_newint(py_r3(), m_options.runEnergyMin);
+    static_cast<void>(m_vm->CallBuiltin(CONFIGURE, std::array{py_r0(), py_r1(), py_r2(), py_r3()}));
 }
 
 void ScriptHost::Unload()
@@ -525,8 +539,35 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     {
         DispatchBackpack(state);
     }
+    else if (const auto* said = std::get_if<NpcSaid_s>(&data); said && HasHook("npc_say"))
+    {
+        const auto* npc = state.FindNpc(said->index);
+        if (npc == nullptr)
+        {
+            py_newnone(py_r0());
+        }
+        else
+        {
+            PyConvert::FromNpc(py_r0(), *npc, tick, cache);
+        }
+
+        PyConvert::FromString(py_r1(), said->text);
+        CallHook("npc_say", two);
+    }
+    else if (const auto* projectile = std::get_if<ProjectileLaunched_s>(&data); projectile && HasHook("projectile"))
+    {
+        PyConvert::FromProjectile(py_r0(), projectile->projectile);
+        CallHook("projectile", one);
+    }
     else if (const auto* stat = std::get_if<StatChanged_s>(&data))
     {
+        // death.rs2 empties hitpoints before it says "Oh dear you are dead!"; the stat is the surer sign.
+        if (stat->stat == HITPOINTS && stat->previous.level > 0 && stat->current.level == 0)
+        {
+            CallHook("death");
+            m_vm->Activate();
+        }
+
         if (stat->current.xp != stat->previous.xp && HasHook("skill_xp"))
         {
             py_newint(py_r0(), stat->stat);
@@ -723,13 +764,13 @@ bool ScriptHost::IsLoopDue(Clock::time_point now, const GameState_s& state) cons
     return true;
 }
 
-// Once a server tick: when the guardian finds a random event, it has dropped the bot's step in progress for
-// its solver, which runs from the next step, now.
-void ScriptHost::RunGuard(Clock::time_point now)
+// Once a server tick: when the random event guardian or the stall guard takes over, it has dropped the bot's
+// step in progress for its own, which runs from the next step, now.
+void ScriptHost::RunUpkeep(Clock::time_point now)
 {
     try
     {
-        const auto took = m_vm->CallBuiltin(GUARD);
+        const auto took = m_vm->CallBuiltin(UPKEEP);
         m_vm->Activate();
         if (py_isbool(took) && py_tobool(took))
         {
@@ -741,7 +782,7 @@ void ScriptHost::RunGuard(Clock::time_point now)
     }
     catch (const ScriptError& e)
     {
-        Fail("random event guardian", e.what());
+        Fail("upkeep (the random event guardian, stall guard or run manager)", e.what());
     }
 }
 

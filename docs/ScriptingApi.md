@@ -216,7 +216,7 @@ An `InvItem` has `id`, `name`, `count`, `slot`, `noted` and `com` (the inventory
 
 | Facade | Functions |
 |---|---|
-| `game` | `ingame()`, `tile()` (`None` before you're placed), `energy()` (run energy, 0 to 100), `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `moving()`, `tick()` (server ticks since login), `my_name()`, `combat_level()` |
+| `game` | `ingame()`, `tile()` (`None` before you're placed), `energy()` (run energy, 0 to 100), `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `moving()`, `tick()` (server ticks since login), `my_name()`, `combat_level()`, `appearance_screen_open()`, `set_appearance(female, kits, colours)` |
 | `skills` | `level(name)` (base), `effective(name)` (boosted or drained), `xp(name)`, `index(name)` (-1 for a name that isn't a skill), `hp_fraction()`. Names are lower-case: `'attack'`, `'woodcutting'`, `'runecraft'`; an unknown one raises `ValueError` |
 | `direct_navigator` | Walking within the loaded area: `walk(dest, run=False)` (one routed walk; `False` when the tile is in view but can't be reached, and a tile beyond the loaded area is walked to in a straight line), `walk_to(dest, radius=2, timeout_ms=45000, run=False)` (a wait: walks, clicking again when it stalls, until within `radius`), `walk_path(points, run=False)` (up to 25 waypoints, each leg straight), `reachable(dest)`, `path(dest)` (the waypoints a walk would send), `destination()` |
 | `chat` | `say(text)`, `send_pm(name, text)`, `command(text)` (a `::command` for staff accounts, such as `command('tele 0,50,51,30,34')`) |
@@ -235,6 +235,8 @@ A destination is a `Tile`, or an `(x, z)` pair on your level.
 - `log(*args)` writes at Info level and `debug(*args)` at Verbose level; `print()` also goes to the log. Each line carries the account's name.
 - `stop_script()` stops calling the script; the account stays logged in and idles. A bot's `request_finish(reason)` does the same with a reason.
 - `stop_account()` stops the script and logs the account out.
+- `relog(delay_seconds=0)` logs the account out, waits, and logs it back in, with the script still loaded. `loop()` and the hooks wait meanwhile; `on_disconnect` is called at the logout and `on_reconnect` once the player is placed again, and a wait in progress carries on. It retries the logout as `stop_account()` does, through 10 seconds after combat. Ctrl+C during the wait ends the account logged out.
+- `game.set_appearance(female, kits, colours)` saves a character design and accepts it, as on a new account's design screen: 7 body kits (head, jaw, torso, arms, hands, legs, feet, as identity kit ids) and 5 colours (hair, torso, legs, feet, skin). `False` when `game.appearance_screen_open()` isn't true. The server checks the design and ignores one it doesn't allow; the engine's default man is `(False, [0, 10, 18, 26, 33, 36, 42], [0, 0, 0, 0, 0])`.
 - `send_bot_message(username, message)` sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)).
 
 ## Walking across the world
@@ -508,6 +510,13 @@ An event NPC that's following another player is left alone. An event that isn't 
 
 `random_events.detect()` gives the waiting event, with `kind` and `name`, or `None`; `yield from random_events.handle(event)` answers one. A script with the guardian off can call them itself.
 
+## Upkeep
+
+Two of rs2b0t's runtime services run for every script, once a server tick, beside the random event guardian:
+
+- **The run manager** turns run back on once energy reaches `scripting.runEnergyMin` (20), when `scripting.runAuto` is on (it is by default). It leaves run alone while a main interface is open, since clicking run makes the server close it, unless you're being hit, when any energy will do. `run_manager.override(run_auto=None, energy_min=None)` replaces the config's choices for this script; the last call wins as a whole, and one with neither goes back to the config's.
+- **The stall guard** watches for progress: a change of tile, any experience, or `execution.note_progress()`. After `scripting.stallMinutes` (10) without any, it walks back to the bot's `recovery_anchor()` (a module-level function or a bot method that gives a `Tile`) when that's more than 8 tiles away or on another level, and otherwise restarts the bot: `on_stop` with "the stall guard restarted the bot", then `BOT`'s `create()` makes a new one and `on_start` runs again. A module's globals stay as they were. It tries once, then not again for 15 minutes. Time the account spends logged out, and time a random event takes, isn't a stall. `stallMinutes: 0` turns it off.
+
 ## Events and hooks
 
 Every event has one name. A bot hears it through a hook, a function or method named `on_<event>`, or by subscribing: `events.on(name, callback)`, which returns a function that ends the subscription, or `self.on(name, callback)` in a bot, which ends when the bot stops. Hooks and subscribers that aren't there cost nothing. A script that defines an `on_` function the client doesn't know about gets a warning when it loads, which catches typos.
@@ -542,6 +551,9 @@ The rest pass their values:
 | `disconnect`, `reconnect` | | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login |
 | `kill_signal` | | Ctrl+C was pressed. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
 | `bot_message` | `sender`, `message` | Another script in this process sent this one a message (see [Messages between scripts](#messages-between-scripts)) |
+| `death` | | Your hitpoints fell to 0. The server empties them before it says "Oh dear you are dead!" |
+| `npc_say` | `npc`, `text` | An NPC said something over its head. `npc` is `None` if it has already left view |
+| `projectile` | `projectile` | A projectile was launched in the loaded area: a `Projectile` with `spotanim`, `source()` and `destination()` (tiles), `target` (`('npc' or 'player', index)`, or `None` for one aimed at the ground), `start_delay` and `end_delay` (in the client's 20 ms cycles), `tick` and `targets_me()` |
 
 A bot's lifecycle has hooks too, but no subscribers:
 
@@ -670,7 +682,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, and the `RandomEventGuardian` with its solvers. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, and the `StallGuard` with the supervisor's watchdog. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;
@@ -728,10 +740,8 @@ Coordinates differ between RSC and 2004, so every tile in a script changes. An `
 | `is_trade_offer_screen()`, `accept_trade_offer()`, `is_recipient_trade_accepted()` | `trade.on_offer_screen()`, `trade.accept()`, `trade.their_accepted()` |
 | `random(min, max)` | `random.randint(min, max)`, after `import random` |
 | `set_autologin(False)` then `logout()` | `stop_account()` |
+| `logout()` with autologin, `disconnect_for(s)` | `relog(s)` |
+| `on_death()`, `on_npc_message(npc, msg)`, `on_npc_projectile(...)` | `on_death()`, `on_npc_say(npc, text)`, `on_projectile(projectile)` |
+| `is_appearance_screen()`, `send_appearance_update(...)` | `game.appearance_screen_open()`, `game.set_appearance(female, kits, colours)` |
 
-Not here yet:
-- logging out and back in;
-- hooks for dying, NPCs' overhead text and projectiles;
-- character design.
-
-[BotApiDesign.md](BotApiDesign.md) plans all of them. Fatigue, sleeping, the sleepword and raw packets don't exist.
+Fatigue, sleeping, the sleepword and raw packets don't exist.

@@ -69,6 +69,7 @@ src/
 │       ├── walking/            traversal, reach, the executor and crossings
 │       ├── random_events.py    the guardian: detection and handlers (§10)
 │       ├── random_solvers.py   the mime, the strange box, the lamp and the maze (§10)
+│       ├── upkeep.py           the run manager and the stall guard (§11)
 │       └── catalogs/           data tables, planners and behaviours (§12)
 ├── Game/
 │   ├── InterfaceView.hpp/.cpp  the cache's components merged with what the server set (§6)
@@ -486,7 +487,7 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs 
 
 ---
 
-## 11. Phase 8: runtime upkeep and lifecycle
+## 11. Phase 8: runtime upkeep and lifecycle (done)
 
 - **Stall guard.** rs2b0t's `StallGuard`: with no tile change and no xp for `scripting.stallMinutes` (10 by default), it walks back to `recovery_anchor()` when that's 8 or more tiles away, or else restarts the bot. `execution.note_progress()` reports work it can't see, such as a completed trade.
 - **Run manager.** Turns run back on when energy reaches a threshold: `scripting.runAuto` and `scripting.runEnergyMin` in `client.jsonc`, and `run_manager.override(run_auto=None, energy_min=None)` for one script, as rs2b0t's.
@@ -496,7 +497,19 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs 
     - `npc_say` (npc, text): from `NpcInfoDecoder`'s `MASK_SAY`;
     - `projectile` (a `Projectile`: spotanim, source, destination, target): from `MAP_PROJANIM`.
 - **Character design.** `game.appearance_screen_open()` (a component with `ClientCode_e::AcceptDesign` in the main modal) and `game.set_appearance(female, kits, colours)` (`IdkSaveDesign`).
-- **Done when:** the stall guard, run manager, relog and event tests pass, and `relog(5)` comes back on the local engine with the bot carrying on.
+### As built
+
+- **Upkeep.** The host calls the runtime's `_rt_upkeep` once a server tick, in place of phase 7's guard call, and `_rt_configure` once the bot is made, with `scripting.randomEvents`, `stallMinutes`, `runAuto` and `runEnergyMin`. `rs2004/upkeep.py` holds the run manager and the stall guard; `_runtime.upkeep` runs the run manager, then the random event guardian, then the stall guard. A guard that takes over drops the bot's step in progress, as phase 7's did.
+- **The stall guard** is rs2b0t's `Supervisor` watchdog with `StallGuard`'s restart: progress is a change of tile, a change in total experience, or `note_progress()` (`_core.last_progress()` reads it). A recovery walks to `recovery_anchor()` with `traversal.walk_resilient`, or restarts the bot: `on_stop(reason)`, its subscriptions ended, `BOT`'s `create()` called again and `on_start` run. A module script keeps its globals. rs2b0t's other watchdog, a loop stuck in one await for 15 minutes, has no counterpart: every wait here has a timeout or a tick count. Ticks more than 5 s apart, as after a relog, restart the clock.
+- **The run manager** checks the run buttons' interface is open (`_core.can_set_run()`) before clicking, as rs2b0t checks the controls tab.
+- **Relog.** `relog(delay)` sets a request on `ScriptApi` that `Account` takes after the step: it logs out with the usual retries, steps the script once so `on_disconnect` is called, waits, then `BeginLogin`s. The script's host sees a fresh login, so `on_reconnect` follows once the player is placed. Ctrl+C during the logout lets it finish; during the wait it finishes the bot and ends the account.
+- **Events.** `NpcSaid_s` and `ProjectileLaunched_s` are new game events, from `NpcInfoDecoder` (after the hits) and `ZoneDecoder`. Death needs none: `ScriptHost` reads it from `StatChanged_s` for hitpoints. `Projectile` is a stdlib class beside the entities.
+- **Character design.** `set_appearance` sends `IDK_SAVEDESIGN` and then clicks the Accept button, as the webclient does; the engine's button script closes the screen. The engine only takes a design while the player is allowed one, as on Tutorial Island.
+
+### Done when
+
+- [x] Tests: `tests/Stdlib/test_upkeep.py` (run policy, the stall clock with gaps, notes and the retry), `ScriptHostTests` (death, NPC speech and a projectile reach their hooks; the stall guard restarts a bot, `note_progress` holds it off, zero turns it off), `AccountTests` (a relog comes back with the script loaded; Ctrl+C during the wait ends the account logged out), `GameEventTests` (the two new events) and `ConfigFileTests` (the new keys).
+- [x] Against the local engine: run, turned off, came back on within a tick; `relog(5)` logged out, came back, called `on_disconnect` and `on_reconnect`, and the bot carried on; the drunken dwarf's lines arrived as `npc_say`; a Wind Strike arrived as a `projectile` aimed at the Man; the swarm's kill arrived as `death`. With `stallMinutes: 1`, the stall guard walked an idle account back to its anchor 10 tiles away after a minute. A new account's design screen was found, a design saved, and the server closed the screen.
 
 ---
 
@@ -545,7 +558,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 5. **Reach** (§8). Done.
 6. **Walking across levels** (§9). Done.
 7. **Random events** (§10). Done.
-8. **Runtime upkeep and lifecycle** (§11).
+8. **Runtime upkeep and lifecycle** (§11). Done.
 9. **Catalogs and behaviours** (§12).
 
 Each phase's "Done when" is in its section. The end-to-end check translates three of rs2b0t's bundled bots into `scripts/examples/`, each running for 30 minutes without a script error, through banking trips and whatever random events come:

@@ -46,6 +46,12 @@ struct ScriptingSettings_s
     std::string progressDirectory = "progress";
     // Whether scripts' random event guardian runs: it takes over to answer a random event when one comes.
     bool randomEvents = true;
+    // How long a script may go without moving, gaining experience or noting progress before the stall guard
+    // steps in; zero turns it off.
+    std::chrono::minutes stallMinutes{10};
+    // Whether run is turned back on once energy reaches runEnergyMin, as rs2b0t's run manager does.
+    bool runAuto = true;
+    s32 runEnergyMin = 20;
 };
 
 struct Config_s

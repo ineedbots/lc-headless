@@ -227,3 +227,59 @@ TEST_CASE("An account takes bot messages for its script under its username", "[A
 
     CHECK_FALSE(messenger.Send(FakeGameServer::USERNAME, BotMessage_s{.sender = "mule", .json = "[1]"}).has_value());
 }
+
+TEST_CASE("A script's relog logs out, waits, and logs back in with the script still loaded", "[Account]")
+{
+    constexpr auto SCRIPT = R"python(
+relogs = 0
+
+def on_reconnect():
+    log('back after', relogs, 'relog')
+
+def loop():
+    global relogs
+    if relogs == 0:
+        relogs = 1
+        relog(settings.get('delay', 0))
+    return 100
+)python";
+
+    SECTION("back in after the delay")
+    {
+        auto fixture = AccountFixture{SCRIPT};
+        const auto deadline = Clock::now() + WAIT;
+        while (Clock::now() < deadline && !fixture.HasLine("back after 1 relog"))
+        {
+            fixture.account->Step(STEP);
+        }
+
+        CHECK(fixture.HasLine("back after 1 relog"));
+        CHECK(fixture.LoggedOutByButton());
+        CHECK(fixture.server.GetLoginOpcodes().size() == 2);
+        CHECK_FALSE(fixture.account->IsFinished());
+
+        fixture.account->Interrupt();
+        REQUIRE(fixture.StepUntilFinished());
+        CHECK(fixture.account->Succeeded());
+    }
+}
+
+TEST_CASE("An interrupt during a relog's wait ends the account logged out", "[Account]")
+{
+    auto fixture = AccountFixture{"def on_stop(reason):\n    log('stopped:', reason)\n\ndef loop():\n    relog(60)\n    return 100\n"};
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && fixture.account->GetClient().GetStatus() != ClientStatus_e::LoggedOut)
+    {
+        fixture.account->Step(STEP);
+    }
+
+    REQUIRE(fixture.account->GetClient().GetStatus() == ClientStatus_e::LoggedOut);
+    fixture.StepFor(100ms);
+    CHECK_FALSE(fixture.account->IsFinished());
+
+    fixture.account->Interrupt();
+    CHECK(fixture.account->IsFinished());
+    CHECK(fixture.account->Succeeded());
+    CHECK(fixture.HasLine("stopped: interrupted"));
+    CHECK(fixture.server.GetLoginOpcodes().size() == 1);
+}

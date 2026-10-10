@@ -994,6 +994,63 @@ StopRequest_e ScriptApi::TakeStopRequest()
     return std::exchange(m_stopRequest, StopRequest_e::None);
 }
 
+void ScriptApi::RequestRelog(std::chrono::seconds delay)
+{
+    m_relogRequest = delay;
+}
+
+std::optional<std::chrono::seconds> ScriptApi::TakeRelogRequest()
+{
+    return std::exchange(m_relogRequest, std::nullopt);
+}
+
+bool ScriptApi::CanSetRun() const
+{
+    const auto view = GetInterfaces();
+    const auto* const button = view.Find(GetCache().runOnButton);
+    return button != nullptr && view.IsOpen(button->root);
+}
+
+namespace
+{
+    const IfComponent_s* FindAcceptDesign(const InterfaceView& view, s32 mainModal)
+    {
+        if (mainModal < 0)
+        {
+            return nullptr;
+        }
+
+        for (const auto* component : view.GetTree(static_cast<u16>(mainModal)))
+        {
+            if (component->clientCode == ClientCode_e::AcceptDesign)
+            {
+                return component;
+            }
+        }
+
+        return nullptr;
+    }
+}
+
+bool ScriptApi::IsAppearanceScreenOpen() const
+{
+    return FindAcceptDesign(GetInterfaces(), m_state.interfaces.mainModal) != nullptr;
+}
+
+// As the webclient's Accept does: the design, then the button, whose script closes the screen.
+bool ScriptApi::SetAppearance(const IdkDesign_s& design)
+{
+    const auto* const accept = FindAcceptDesign(GetInterfaces(), m_state.interfaces.mainModal);
+    if (accept == nullptr)
+    {
+        return false;
+    }
+
+    m_actions.SaveDesign(design);
+    m_actions.ClickButton(accept->id);
+    return true;
+}
+
 void ScriptApi::SetStepTime(s64 milliseconds)
 {
     m_stepTime = milliseconds;

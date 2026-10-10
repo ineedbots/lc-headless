@@ -191,6 +191,16 @@ public:
 
     void RequestStop(StopRequest_e request);
     [[nodiscard]] StopRequest_e TakeStopRequest();
+    // relog(): log out, wait the delay, and log back in, with the script kept loaded.
+    void RequestRelog(std::chrono::seconds delay);
+    [[nodiscard]] std::optional<std::chrono::seconds> TakeRelogRequest();
+
+    // Whether the run buttons' interface is open, so clicking one would reach the server.
+    [[nodiscard]] bool CanSetRun() const;
+    // The character design screen: a main modal with the Accept button whose client code saves a design.
+    [[nodiscard]] bool IsAppearanceScreenOpen() const;
+    // Saves the design. False when the design screen isn't open.
+    bool SetAppearance(const IdkDesign_s& design);
 
     // The time of the host's current step, in milliseconds on its clock. Waits measure from it, so a test
     // that steps the host with made-up times controls them too.
@@ -219,6 +229,7 @@ private:
     std::string m_username;
     std::shared_ptr<const Navigation_s> m_navigation;
     StopRequest_e m_stopRequest = StopRequest_e::None;
+    std::optional<std::chrono::seconds> m_relogRequest;
     s64 m_stepTime = 0;
     std::optional<s64> m_lastProgress;
     // The modal change in which the dialogue was continued or the count dialog answered.

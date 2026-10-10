@@ -46,6 +46,7 @@ from rs2004.messages import *
 from rs2004.reach import *
 from rs2004.traversal import *
 from rs2004.random_events import *
+from rs2004.upkeep import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -55,7 +56,8 @@ _rt_load = _runtime.load
 _rt_start = _runtime.start
 _rt_dispatch = _runtime.dispatch
 _rt_step = _runtime.step
-_rt_guard = _runtime.guard
+_rt_configure = _runtime.configure
+_rt_upkeep = _runtime.upkeep
 _rt_reset = _runtime.reset
 _rt_finish = _runtime.finish
 )python"sv;
@@ -67,8 +69,10 @@ _rt_finish = _runtime.finish
     constexpr auto BUILTIN_FUNCTIONS = std::to_array<std::string_view>({
         "stop_script",
         "stop_account",
+        "relog",
         "send_bot_message",
     });
+    constexpr auto MAX_RELOG_SECONDS = s64{24 * 60 * 60};
     constexpr auto SETTINGS_JSON = "_settings_json";
     constexpr auto MAX_COORD = s64{32767};
     constexpr auto PERCENT = 100;
@@ -311,6 +315,75 @@ _rt_finish = _runtime.finish
         {
             GetApi().NoteProgress();
             return ReturnNone();
+        });
+    }
+
+    // When note_progress() was last called, in step time, or None.
+    bool GetLastProgress(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto last = GetApi().GetLastProgress();
+            return last ? ReturnInt(*last) : ReturnNone();
+        });
+    }
+
+    bool Relog(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto delay = PyConvert::ToInt(py_arg(0), "delay_seconds", 0, MAX_RELOG_SECONDS);
+            GetApi().RequestRelog(std::chrono::seconds{delay});
+            return ReturnNone();
+        });
+    }
+
+    bool CanSetRun(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().CanSetRun()); });
+    }
+
+    bool IsAppearanceScreenOpen(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().IsAppearanceScreenOpen()); });
+    }
+
+    // Reads exactly N small numbers from a list or tuple.
+    template <std::size_t N>
+    std::array<u8, N> ToBytes(py_Ref value, std::string_view name)
+    {
+        const auto isList = py_islist(value);
+        if (!isList && !py_istuple(value))
+        {
+            throw ScriptTypeError{std::format("{} must be a list of {} numbers", name, N)};
+        }
+
+        const auto count = isList ? py_list_len(value) : py_tuple_len(value);
+        if (count != static_cast<int>(N))
+        {
+            throw std::invalid_argument{std::format("{} must hold {} numbers, not {}", name, N, count)};
+        }
+
+        auto bytes = std::array<u8, N>{};
+        for (auto i = 0; i < count; ++i)
+        {
+            const auto item = isList ? py_list_getitem(value, i) : py_tuple_getitem(value, i);
+            bytes[static_cast<std::size_t>(i)] = static_cast<u8>(PyConvert::ToInt(item, name, 0, 255));
+        }
+
+        return bytes;
+    }
+
+    bool SetAppearance(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto design = IdkDesign_s{
+                .female = PyConvert::ToBool(py_arg(0), "female"),
+                .kits = ToBytes<IdkDesign_s::KIT_COUNT>(py_arg(1), "kits"),
+                .colours = ToBytes<IdkDesign_s::COLOUR_COUNT>(py_arg(2), "colours"),
+            };
+            return ReturnBool(GetApi().SetAppearance(design));
         });
     }
 
@@ -1711,6 +1784,11 @@ _rt_finish = _runtime.finish
             {"is_placed()", IsPlaced},
             {"tick()", GetTick},
             {"note_progress()", NoteProgress},
+            {"last_progress()", GetLastProgress},
+            {"relog(delay_seconds=0)", Relog},
+            {"can_set_run()", CanSetRun},
+            {"is_appearance_screen_open()", IsAppearanceScreenOpen},
+            {"set_appearance(female, kits, colours)", SetAppearance},
             {"get_tick()", GetTick},
             {"stop_script()", StopScript},
             {"stop_account()", StopAccount},

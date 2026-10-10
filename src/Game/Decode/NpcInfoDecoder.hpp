@@ -20,5 +20,5 @@ private:
     static constexpr std::size_t MIN_NEW_NPC_BITS = 22;
 
     static void ReadNew(Packet& packet, const GameState_s& state, std::vector<Npc_s>& npcs, std::vector<std::size_t>& extended);
-    static void ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits);
+    static void ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits, std::vector<NpcSaid_s>& said);
 };

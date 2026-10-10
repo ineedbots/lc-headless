@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../Game/BitWriter.hpp"
 #include "../Game/FakeGameServer.hpp"
 #include "../Game/Fixtures.hpp"
 #include "../Cache/TestCache.hpp"
@@ -1213,4 +1214,113 @@ TEST_CASE("The example scripts load without warnings", "[ScriptHost]")
     {
         return entry.level >= LogLevel_e::Warning;
     }));
+}
+
+TEST_CASE("ScriptHost calls on_death, on_npc_say and on_projectile", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+def on_death():
+    log('>', 'death')
+
+def on_npc_say(npc, text):
+    log('>', 'say', npc.id, text)
+
+def on_projectile(p):
+    log('>', 'projectile', p.spotanim, p.destination().x - p.source().x, p.targets_me())
+
+def loop():
+    return 600
+)python"};
+    fixture.host->Step(Clock::now());
+
+    const auto sendHitpoints = [&fixture](u8 level)
+    {
+        auto stat = Packet{};
+        stat.P1(3);
+        stat.P4(1154);
+        stat.P1(level);
+        fixture.Send(ServerProt_e::UpdateStat, stat);
+    };
+
+    // Hitpoints arriving at login aren't a death; falling to 0 is.
+    sendHitpoints(10);
+    sendHitpoints(0);
+
+    auto bits = BitWriter{};
+    bits.Put(8, 1);
+    bits.Put(1, 1).Put(2, 0);
+    bits.Put(14, 16383);
+    auto said = Packet{};
+    said.P1(0x08);
+    said.PJStr("Hello there");
+    fixture.server.Send(ServerProt_e::NpcInfo, Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(said)));
+
+    fixture.server.Send(ServerProt_e::UpdateZonePartialFollows, Fixtures::Zone(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL));
+    auto projectile = Packet{};
+    projectile.P1((2 << 4) | 2);
+    projectile.P1(3);
+    projectile.P1(0);
+    projectile.P2(-(Fixtures::PID + 1));
+    projectile.P2(91);
+    projectile.P1(43);
+    projectile.P1(31);
+    projectile.P2(51);
+    projectile.P2(70);
+    projectile.P1(16);
+    projectile.P1(64);
+    fixture.Send(ServerProt_e::MapProjAnim, projectile);
+    fixture.PumpUntil([&fixture] { return !fixture.client.GetState().projectiles.empty(); });
+
+    fixture.host->Step(Clock::now());
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"death", "say 50 Hello there", "projectile 91 3 True"});
+}
+
+TEST_CASE("ScriptHost's stall guard restarts a bot that makes no progress", "[ScriptHost]")
+{
+    constexpr auto SCRIPT = R"python(
+def on_start():
+    log('>', 'start')
+
+def on_stop(reason):
+    log('>', 'stop', reason)
+
+def loop():
+    if settings.get('busy', False):
+        execution.note_progress()
+    return 600
+)python";
+
+    const auto run = [](HostFixture& fixture)
+    {
+        // Ticks 4 s apart, so the guard doesn't take the time between them for a logout.
+        const auto start = Clock::now();
+        for (auto i = 0; i <= 17; ++i)
+        {
+            fixture.SendTick();
+            fixture.host->Step(start + std::chrono::seconds{i * 4});
+        }
+    };
+
+    SECTION("a minute without moving, experience or noted progress")
+    {
+        auto fixture = HostFixture{SCRIPT, ScriptHostOptions_s{.stallMinutes = std::chrono::minutes{1}}};
+        run(fixture);
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"start", "stop the stall guard restarted the bot", "start"});
+        CHECK(fixture.HasLog(LogLevel_e::Info, "stall guard: no progress for 1 min"));
+        CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
+    }
+
+    SECTION("note_progress() keeps it waiting")
+    {
+        auto fixture = HostFixture{SCRIPT, ScriptHostOptions_s{.settings = R"({"busy": true})", .stallMinutes = std::chrono::minutes{1}}};
+        run(fixture);
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"start"});
+    }
+
+    SECTION("off at zero")
+    {
+        auto fixture = HostFixture{SCRIPT};
+        run(fixture);
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"start"});
+    }
 }

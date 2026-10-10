@@ -29,6 +29,7 @@ void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
     auto extended = std::vector<std::size_t>{};
     auto removed = std::vector<Npc_s>{};
     auto hits = std::vector<NpcHit_s>{};
+    auto said = std::vector<NpcSaid_s>{};
 
     packet.GBitStart();
     auto npcs = EntityInfo::ReadTracked(packet, state.npcs, extended, removed, state.tick);
@@ -39,7 +40,7 @@ void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
 
     for (const auto position : extended)
     {
-        ReadExtended(packet, state, state.npcs[position], hits);
+        ReadExtended(packet, state, state.npcs[position], hits, said);
     }
 
     if (packet.GetAvailable() != 0)
@@ -60,6 +61,11 @@ void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
     for (const auto& hit : hits)
     {
         StateLog::AddEvent(state, hit);
+    }
+
+    for (auto& say : said)
+    {
+        StateLog::AddEvent(state, std::move(say));
     }
 }
 
@@ -103,7 +109,7 @@ void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vect
     }
 }
 
-void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits)
+void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits, std::vector<NpcSaid_s>& said)
 {
     const auto tick = state.tick;
     const auto mask = u32{packet.G1()};
@@ -127,6 +133,7 @@ void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc
     if ((mask & MASK_SAY) != 0)
     {
         npc.say = OverheadText_s{.text = packet.GJStr(), .tick = tick};
+        said.push_back({.index = npc.index, .text = npc.say->text});
     }
 
     if ((mask & MASK_DAMAGE) != 0)

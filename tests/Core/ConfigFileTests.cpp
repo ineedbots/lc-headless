@@ -46,7 +46,11 @@ namespace
         "pollIntervalMs": 20,
         "loginIntervalSeconds": 5,
         "killGraceSeconds": 60,
-        "progressDirectory": "reports"
+        "progressDirectory": "reports",
+        "randomEvents": false,
+        "stallMinutes": 30,
+        "runAuto": false,
+        "runEnergyMin": 50
     }
 }
 )json"sv;
@@ -82,7 +86,10 @@ namespace
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
         "progressDirectory": "progress",
-        "randomEvents": true
+        "randomEvents": true,
+        "stallMinutes": 10,
+        "runAuto": true,
+        "runEnergyMin": 20
     }
 }
 )json"sv;
@@ -152,6 +159,7 @@ namespace
         {"client", "logLevel"},
         {"client", "idleSeconds"},
         {"client", "cacheDirectory"},
+        {"client", "navDirectory"},
         {"scripting", "accountsDirectory"},
         {"scripting", "scriptsDirectory"},
         {"scripting", "callTimeoutMs"},
@@ -159,6 +167,10 @@ namespace
         {"scripting", "loginIntervalSeconds"},
         {"scripting", "killGraceSeconds"},
         {"scripting", "progressDirectory"},
+        {"scripting", "randomEvents"},
+        {"scripting", "stallMinutes"},
+        {"scripting", "runAuto"},
+        {"scripting", "runEnergyMin"},
     };
 
     nlohmann::json ParseJsonWithComments(std::string_view text)
@@ -273,6 +285,10 @@ namespace
         CHECK(config.scripting.loginIntervalSeconds == 5s);
         CHECK(config.scripting.killGraceSeconds == 60s);
         CHECK(config.scripting.progressDirectory == "reports");
+        CHECK_FALSE(config.scripting.randomEvents);
+        CHECK(config.scripting.stallMinutes == std::chrono::minutes{30});
+        CHECK_FALSE(config.scripting.runAuto);
+        CHECK(config.scripting.runEnergyMin == 50);
     }
 
     void CheckScriptingDefaults(const ScriptingSettings_s& scripting)
@@ -284,6 +300,10 @@ namespace
         CHECK(scripting.loginIntervalSeconds == 2s);
         CHECK(scripting.killGraceSeconds == 30s);
         CHECK(scripting.progressDirectory == "progress");
+        CHECK(scripting.randomEvents);
+        CHECK(scripting.stallMinutes == std::chrono::minutes{10});
+        CHECK(scripting.runAuto);
+        CHECK(scripting.runEnergyMin == 20);
     }
 
     void CheckOptionalDefaults(const Config_s& config)
@@ -482,6 +502,26 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.scripting.progressDirectory == "progress");
             }
+            else if (key.key == "navDirectory")
+            {
+                CHECK(config.client.navDirectory == "data/nav");
+            }
+            else if (key.key == "randomEvents")
+            {
+                CHECK(config.scripting.randomEvents);
+            }
+            else if (key.key == "stallMinutes")
+            {
+                CHECK(config.scripting.stallMinutes == std::chrono::minutes{10});
+            }
+            else if (key.key == "runAuto")
+            {
+                CHECK(config.scripting.runAuto);
+            }
+            else if (key.key == "runEnergyMin")
+            {
+                CHECK(config.scripting.runEnergyMin == 20);
+            }
         }
     }
 
@@ -639,6 +679,10 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 0)).scripting.killGraceSeconds == 0s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 600)).scripting.killGraceSeconds == 600s);
         CHECK(ParseAccepted(SetKey({"scripting", "progressDirectory"}, "logs/progress")).scripting.progressDirectory == "logs/progress");
+        CHECK(ParseAccepted(SetKey({"scripting", "stallMinutes"}, 0)).scripting.stallMinutes == std::chrono::minutes{0});
+        CHECK(ParseAccepted(SetKey({"scripting", "stallMinutes"}, 1440)).scripting.stallMinutes == std::chrono::minutes{1440});
+        CHECK(ParseAccepted(SetKey({"scripting", "runEnergyMin"}, 0)).scripting.runEnergyMin == 0);
+        CHECK(ParseAccepted(SetKey({"scripting", "runEnergyMin"}, 100)).scripting.runEnergyMin == 100);
     }
 
     SECTION("login RSA values")
@@ -729,6 +773,12 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "killGraceSeconds"}, 601},
         {{"scripting", "progressDirectory"}, ""},
         {{"scripting", "progressDirectory"}, 5},
+        {{"scripting", "randomEvents"}, "yes"},
+        {{"scripting", "stallMinutes"}, -1},
+        {{"scripting", "stallMinutes"}, 1441},
+        {{"scripting", "runAuto"}, 1},
+        {{"scripting", "runEnergyMin"}, -1},
+        {{"scripting", "runEnergyMin"}, 101},
     };
 
     for (const auto& rejection : rejections)

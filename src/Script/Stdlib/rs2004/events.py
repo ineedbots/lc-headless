@@ -49,6 +49,7 @@ POSITIONAL = (
     'ground_item_spawned', 'ground_item_despawned', 'ground_item_changed',
     'loc_changed', 'interface_changed', 'system_update',
     'disconnect', 'reconnect', 'kill_signal', 'bot_message',
+    'death', 'npc_say', 'projectile',
 )
 
 # A bot's lifecycle, which has hooks but no subscribers.

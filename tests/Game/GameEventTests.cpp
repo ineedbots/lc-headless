@@ -80,6 +80,11 @@ namespace
             return std::format("npc hit {} damage {}", event.index, event.hit.damage);
         }
 
+        std::string operator()(const NpcSaid_s& event) const
+        {
+            return std::format("npc said {} {}", event.index, event.text);
+        }
+
         std::string operator()(const PlayerAdded_s& event) const
         {
             return std::format("player added {} {}", event.player.index, event.player.appearance ? event.player.appearance->name : "?");
@@ -144,6 +149,11 @@ namespace
         {
             return std::format("reboot {}", event.ticks);
         }
+
+        std::string operator()(const ProjectileLaunched_s& event) const
+        {
+            return std::format("projectile {}", event.projectile.spotAnim);
+        }
     };
 
     std::vector<std::string> DescribeEventsAfter(const GameState_s& state, u64 sequence)
@@ -192,7 +202,7 @@ namespace
     };
 }
 
-TEST_CASE("NPC_INFO reports removals, then additions, then hits", "[GameEvents]")
+TEST_CASE("NPC_INFO reports removals, then additions, then hits, then speech", "[GameEvents]")
 {
     auto state = Fixtures::PlacedState();
     state.npcs = {MakeNpc(100, 50, Offset(1, 0)), MakeNpc(101, 51, Offset(0, 1)), MakeNpc(102, 52, Offset(2, 2))};
@@ -206,7 +216,8 @@ TEST_CASE("NPC_INFO reports removals, then additions, then hits", "[GameEvents]"
     bits.Put(14, 16383);
 
     auto extended = Packet{};
-    extended.P1(0x10);
+    extended.P1(0x08 | 0x10);
+    extended.PJStr("Brains!");
     PutHit(extended, 4, 6);
     extended.P1(0x01 | 0x02);
     PutHit(extended, 2, 8);
@@ -220,6 +231,7 @@ TEST_CASE("NPC_INFO reports removals, then additions, then hits", "[GameEvents]"
         "npc added 103 type 53",
         "npc hit 101 damage 4",
         "npc hit 103 damage 2",
+        "npc said 101 Brains!",
     });
 
     const auto& removed = GetEvent<NpcRemoved_s>(state, before + 1);
@@ -330,6 +342,20 @@ TEST_CASE("Zone packets report ground items and scenery, but not resets", "[Game
     delLoc.P1((10 << 2) | 1);
     fixture.Decode(ServerProt_e::LocDel, delLoc);
 
+    auto projectile = Packet{};
+    projectile.P1(ToPos(2, 2));
+    projectile.P1(3);
+    projectile.P1(-1);
+    projectile.P2(-(Fixtures::PID + 1));
+    projectile.P2(91);
+    projectile.P1(43);
+    projectile.P1(31);
+    projectile.P2(51);
+    projectile.P2(70);
+    projectile.P1(16);
+    projectile.P1(64);
+    fixture.Decode(ServerProt_e::MapProjAnim, projectile);
+
     CHECK(DescribeEventsAfter(state, before) == std::vector<std::string>{
         "item added 995 x50",
         "item count 995 50 -> 75",
@@ -337,10 +363,17 @@ TEST_CASE("Zone packets report ground items and scenery, but not resets", "[Game
         "item removed 995 x75",
         "loc 1276",
         "loc -1",
+        "projectile 91",
     });
 
     CHECK(GetEvent<GroundItemAdded_s>(state, before + 1).item.tile == ZoneOffset(2, 3));
     CHECK(GetEvent<LocChanged_s>(state, before + 5).change.tile == ZoneOffset(1, 1));
+    const auto& launched = GetEvent<ProjectileLaunched_s>(state, before + 7).projectile;
+    CHECK(launched.source == ZoneOffset(2, 2));
+    CHECK(launched.destination == ZoneOffset(5, 1));
+    REQUIRE(launched.target);
+    CHECK(launched.target->type == EntityType_e::Player);
+    CHECK(launched.target->index == Fixtures::PID);
 
     const auto afterChanges = state.eventCount;
     fixture.Decode(ServerProt_e::UpdateZoneFullFollows, zone);

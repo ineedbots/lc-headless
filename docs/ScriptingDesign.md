@@ -319,7 +319,10 @@ The `account` section moves out. A new `scripting` section is added:
     "loginIntervalSeconds": 2,
     "killGraceSeconds": 30,
     "progressDirectory": "progress",
-    "randomEvents": true
+    "randomEvents": true,
+    "stallMinutes": 10,
+    "runAuto": true,
+    "runEnergyMin": 20
 }
 ```
 

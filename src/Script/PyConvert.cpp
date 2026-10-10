@@ -85,6 +85,21 @@ void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s&
     SetMenu(object, ScriptApi::GetLocMenu(cache, loc.id));
 }
 
+void PyConvert::FromProjectile(py_OutRef out, const Projectile_s& projectile)
+{
+    const auto object = NewInstance(out, PROJECTILE_CLASS);
+    SetInt(object, "spotanim", projectile.spotAnim);
+    SetInt(object, "_sx", projectile.source.x);
+    SetInt(object, "_sz", projectile.source.z);
+    SetInt(object, "_dx", projectile.destination.x);
+    SetInt(object, "_dz", projectile.destination.z);
+    SetInt(object, PLANE_FIELD, projectile.source.level);
+    SetInt(object, "start_delay", projectile.startDelay);
+    SetInt(object, "end_delay", projectile.endDelay);
+    SetInt(object, "tick", static_cast<s64>(projectile.tick));
+    SetTarget(object, projectile.target);
+}
+
 void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameCache_s& cache)
 {
     const auto object = NewInstance(out, ITEM_CLASS);
@@ -645,7 +660,12 @@ void PyConvert::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
     SetInt(object, "health", hit == nullptr ? 0 : hit->health);
     SetInt(object, "max_health", hit == nullptr ? 0 : hit->maxHealth);
 
-    if (!entity.faceEntity)
+    SetTarget(object, entity.faceEntity);
+}
+
+void PyConvert::SetTarget(py_Ref object, const std::optional<EntityRef_s>& entity)
+{
+    if (!entity)
     {
         SetNone(object, "target");
         return;
@@ -655,8 +675,8 @@ void PyConvert::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
     const auto target = py_pushtmp();
     py_newtuple(target, 2);
     py_newnone(py_tuple_getitem(target, 0));
-    py_newint(py_tuple_getitem(target, 1), entity.faceEntity->index);
-    FromString(py_tuple_getitem(target, 0), entity.faceEntity->type == EntityType_e::Npc ? NPC_TARGET : PLAYER_TARGET);
+    py_newint(py_tuple_getitem(target, 1), entity->index);
+    FromString(py_tuple_getitem(target, 0), entity->type == EntityType_e::Npc ? NPC_TARGET : PLAYER_TARGET);
     py_setdict(object, py_name("target"), target);
     py_pop();
 }

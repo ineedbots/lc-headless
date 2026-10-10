@@ -122,7 +122,10 @@ rs2004-headless/
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
         "progressDirectory": "progress",
-        "randomEvents": true
+        "randomEvents": true,
+        "stallMinutes": 10,
+        "runAuto": true,
+        "runEnergyMin": 20
     }
 }
 ```
@@ -163,7 +166,10 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
         "progressDirectory": "progress",
-        "randomEvents": true
+        "randomEvents": true,
+        "stallMinutes": 10,
+        "runAuto": true,
+        "runEnergyMin": 20
     }
 }
 ```
@@ -194,6 +200,9 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
 | `scripting.randomEvents` | boolean | `true` | Whether scripts' random event guardian runs ([BotApiDesign.md](BotApiDesign.md) §10) |
+| `scripting.stallMinutes` | integer | `10` | 0 to 1440. How long a script may go without moving, gaining experience or noting progress before the stall guard steps in; 0 turns it off. Stored as `std::chrono::minutes` ([BotApiDesign.md](BotApiDesign.md) §11) |
+| `scripting.runAuto` | boolean | `true` | Whether the run manager turns run back on |
+| `scripting.runEnergyMin` | integer | `20` | 0 to 100. The energy at which it does |
 
 - **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
 - **`login.crcs`**, which files from before the cache have, isn't read: the CRCs come from the cache ([CacheDesign.md](CacheDesign.md) §5). A file that still has it loads, with a warning.
@@ -295,6 +304,9 @@ struct ScriptingSettings_s
     std::chrono::seconds killGraceSeconds = 30s;
     std::string progressDirectory = "progress";
     bool randomEvents = true;
+    std::chrono::minutes stallMinutes{10};
+    bool runAuto = true;
+    s32 runEnergyMin = 20;
 };
 
 struct Config_s
@@ -534,7 +546,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory, navDirectory)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory, randomEvents)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory, randomEvents, stallMinutes, runAuto, runEnergyMin)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
 

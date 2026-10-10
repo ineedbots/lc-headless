@@ -71,6 +71,10 @@ class AbstractBot:
         """The skill a genie's lamp is spent on."""
         return 'strength'
 
+    def recovery_anchor(self):
+        """Where the bot works, as a Tile, for the stall guard to walk back to; None to restart it instead."""
+        return None
+
     def _dispose_subscriptions(self):
         for unsubscribe in self._subscriptions or []:
             unsubscribe()

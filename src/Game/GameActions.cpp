@@ -231,6 +231,11 @@ void GameActions::CloseInterfaces()
     m_client.Send(ClientPackets::CloseModal());
 }
 
+void GameActions::SaveDesign(const IdkDesign_s& design)
+{
+    m_client.Send(ClientPackets::IdkSaveDesign(design));
+}
+
 void GameActions::Say(std::string_view text, ChatColour_e colour, ChatEffect_e effect)
 {
     m_client.Send(ClientPackets::MessagePublic(text, colour, effect));

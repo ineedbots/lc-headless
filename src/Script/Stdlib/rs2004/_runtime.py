@@ -6,7 +6,9 @@ Each step returns how the host should wait before the next one:
     ('ticks', n)    n more server ticks
 """
 
+import _core
 from rs2004 import events as _events
+from rs2004 import upkeep as _upkeep
 from rs2004.bot import AbstractBot, BotManifest, LoopingBot, is_generator, resolve_loop_cadence
 from rs2004.execution import Ticks, Update
 from rs2004.settings import SettingsBag, apply_schema
@@ -19,8 +21,14 @@ _generator = None
 _starting = False
 _finish_reason = None
 _finished = False
-# The random event guardian's solver, while it has taken over from the bot.
+# The random event guardian's solver, or the stall guard's recovery, while it has taken over from the bot.
 _guardian = None
+# What load() was given, so the stall guard can make the bot afresh.
+_main = None
+_settings = None
+# configure()'s choices.
+_random_events_on = False
+_stall_minutes = 0
 
 
 class _ModuleBot(LoopingBot):
@@ -46,6 +54,9 @@ class _ModuleBot(LoopingBot):
     def lamp_skill(self):
         return self._module_or('lamp_skill', 'strength')
 
+    def recovery_anchor(self):
+        return self._module_or('recovery_anchor', None)
+
 
 def make_settings(text):
     import json
@@ -57,32 +68,44 @@ def make_settings(text):
 
 def load(main, settings):
     """Makes the bot from the script's module, checks its settings, and finds its hooks. Returns warnings."""
-    global bot, _hooks_from, _generator, _starting, _finish_reason, _finished, _guardian
+    global bot, _generator, _starting, _finish_reason, _finished, _guardian, _main, _settings
     bot = None
     _generator = None
     _guardian = None
     _starting = False
     _finish_reason = None
     _finished = False
+    _main = main
+    _settings = settings
 
     manifest = getattr(main, 'BOT', None)
     if manifest is not None:
         if not isinstance(manifest, BotManifest):
             raise TypeError('BOT must be made by define_bot(...)')
         warnings = apply_schema(settings, manifest.settings_schema)
+    else:
+        if not callable(getattr(main, 'loop', None)):
+            raise ValueError('the script has neither BOT = define_bot(...) nor a loop() function')
+        warnings = apply_schema(settings, getattr(main, 'SETTINGS_SCHEMA', None))
+    return warnings + _make_bot()
+
+
+def _make_bot():
+    """Makes the bot from what load() was given, and finds its hooks. Returns warnings."""
+    global bot, _hooks_from
+    manifest = getattr(_main, 'BOT', None)
+    if manifest is not None:
         created = manifest.create()
         if not isinstance(created, AbstractBot):
             raise TypeError(f"BOT's create must make a bot, such as a LoopingBot, not {type(created).__name__}")
         bot = created
         _hooks_from = created
     else:
-        if not callable(getattr(main, 'loop', None)):
-            raise ValueError('the script has neither BOT = define_bot(...) nor a loop() function')
-        warnings = apply_schema(settings, getattr(main, 'SETTINGS_SCHEMA', None))
-        bot = _ModuleBot(main)
-        _hooks_from = main
+        bot = _ModuleBot(_main)
+        _hooks_from = _main
 
-    bot.settings = settings
+    bot.settings = _settings
+    warnings = []
     hooks = []
     for name in dir(_hooks_from):
         if not name.startswith('on_') or not callable(getattr(_hooks_from, name, None)):
@@ -131,18 +154,65 @@ def dispatch(name, *args):
     return result
 
 
-def guard():
-    """Once a server tick: when a random event needs answering, drops the bot's step in progress for the
-    guardian's solver, which the next step runs. True when it took over. on_start isn't interrupted."""
+def configure(random_events_on, stall_minutes, run_auto, run_energy_min):
+    """The config's choices for upkeep: scripting.randomEvents, stallMinutes, runAuto and runEnergyMin."""
+    global _random_events_on, _stall_minutes
+    _random_events_on = random_events_on
+    _stall_minutes = stall_minutes
+    _upkeep.run_manager.configure(run_auto, run_energy_min)
+    _upkeep.stall_guard.configure(stall_minutes)
+    _upkeep.stall_guard.reset(_core.step_time())
+
+
+def upkeep():
+    """Once a server tick: turns run on when it should be, and when a random event needs answering or the
+    bot has stalled, drops its step in progress for the guardian's solver or the stall guard's recovery,
+    which the next step runs. True when one took over. on_start isn't interrupted."""
     global _generator, _guardian
-    if bot is None or _guardian is not None or _starting:
+    if bot is None or not _core.is_placed():
         return False
-    event = random_events.check(bot)
-    if event is None:
+    now = _core.step_time()
+    _upkeep.run_manager.tick(now)
+    if _guardian is not None or _starting:
+        _upkeep.stall_guard.busy(now)
         return False
+
+    if _random_events_on:
+        event = random_events.check(bot)
+        if event is not None:
+            _generator = None
+            _guardian = random_events.handle(event)
+            return True
+
+    if _upkeep.stall_guard.observe(now, _upkeep.here(), _upkeep.total_xp(), _core.last_progress()):
+        _generator = None
+        _guardian = _recover()
+        return True
+    return False
+
+
+def _recover():
+    outcome = yield from _upkeep.recover(bot, _stall_minutes, lambda message: log(message))
+    if outcome == 'restart':
+        restart('the stall guard restarted the bot')
+    else:
+        _upkeep.stall_guard.reset(_core.step_time())
+
+
+def restart(reason):
+    """Ends the bot with on_stop(reason) and starts a new one, as rs2b0t's stall guard restarts a script:
+    BOT's create() makes it afresh, and on_start runs again. A module's globals stay as they are."""
+    global _generator, _starting
+    hook = _hook('stop')
+    if hook is not None:
+        hook(reason)
+    bot._dispose_subscriptions()
     _generator = None
-    _guardian = random_events.handle(event)
-    return True
+    _starting = False
+    for warning in _make_bot():
+        log(warning)
+    _upkeep.stall_guard.reset(_core.step_time())
+    start()
 
 
 def step():

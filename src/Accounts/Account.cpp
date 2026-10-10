@@ -105,6 +105,9 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .waitForDebugger = m_options.waitForDebugger,
                 .navigation = m_options.navigation,
                 .randomEvents = scripting.randomEvents,
+                .stallMinutes = scripting.stallMinutes,
+                .runAuto = scripting.runAuto,
+                .runEnergyMin = scripting.runEnergyMin,
             },
             m_logger);
     }
@@ -171,6 +174,11 @@ void Account::Step(std::chrono::milliseconds maxWait)
         return;
     }
 
+    if (StepRelog(Clock::now()))
+    {
+        return;
+    }
+
     UpdateFinished();
     const auto status = m_client.GetStatus();
     if (m_finished || status == ClientStatus_e::LoggingOut)
@@ -203,6 +211,26 @@ void Account::Interrupt()
     }
 
     ++m_interrupts;
+    if (m_relogDelay || m_reloginAt)
+    {
+        m_logger->Info("Interrupted during a relog; the account stays logged out");
+        const auto waiting = m_reloginAt.has_value();
+        m_relogDelay.reset();
+        m_reloginAt.reset();
+        if (m_script)
+        {
+            m_script->Finish("interrupted");
+        }
+
+        // A logout under way finishes as any other does.
+        if (waiting)
+        {
+            UpdateFinished();
+        }
+
+        return;
+    }
+
     if (m_client.GetStatus() == ClientStatus_e::LoggingOut)
     {
         m_logger->Info("Interrupted again; closing the connection without waiting for the server");
@@ -298,6 +326,11 @@ void Account::StepScript(Clock::time_point now)
     switch (m_script->GetStatus())
     {
     case ScriptStatus_e::Running:
+        if (const auto delay = m_script->TakeRelogRequest())
+        {
+            BeginRelog(*delay);
+        }
+        return;
     case ScriptStatus_e::Stopped:
         return;
     case ScriptStatus_e::AccountStopped:
@@ -355,6 +388,65 @@ void Account::LogOut(std::string_view reason)
 
     m_client.RequestLogout(LOGOUT_TIMEOUT);
     UpdateFinished();
+}
+
+// The script stays loaded: its loop and hooks wait while the account is out, and on_reconnect is called once
+// the player is placed again.
+void Account::BeginRelog(std::chrono::seconds delay)
+{
+    if (!m_client.IsInGame())
+    {
+        return;
+    }
+
+    m_logger->Info("Relogging: logging out, then back in {} s later", delay.count());
+    m_relogDelay = delay;
+    m_client.RequestLogout(LOGOUT_TIMEOUT);
+}
+
+bool Account::StepRelog(Clock::time_point now)
+{
+    if (m_relogDelay)
+    {
+        const auto status = m_client.GetStatus();
+        if (status != ClientStatus_e::LoggedOut && status != ClientStatus_e::Disconnected)
+        {
+            return true;
+        }
+
+        m_reloginAt = now + *m_relogDelay;
+        m_relogDelay.reset();
+        // The script sees the account go, as it would a dropped connection.
+        if (m_script)
+        {
+            m_script->Step(now);
+        }
+
+        return true;
+    }
+
+    if (!m_reloginAt)
+    {
+        return false;
+    }
+
+    if (now < *m_reloginAt)
+    {
+        return true;
+    }
+
+    m_reloginAt.reset();
+    m_logger->Info("Logging back in after the relog's wait");
+    try
+    {
+        m_client.BeginLogin();
+    }
+    catch (const std::exception& e)
+    {
+        Fail(e.what());
+    }
+
+    return true;
 }
 
 void Account::Fail(std::string_view reason)

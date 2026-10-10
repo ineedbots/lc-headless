@@ -48,7 +48,8 @@ public:
     void Login();
     void Step(std::chrono::milliseconds maxWait);
     // The first interrupt gives a script with on_kill_signal killGraceSeconds to stop the account, and
-    // otherwise logs out. One during a logout closes the connection without waiting for the server.
+    // otherwise logs out. One during a logout closes the connection without waiting for the server. One
+    // during a relog ends the account logged out.
     void Interrupt();
 
     [[nodiscard]] bool IsStarted() const;
@@ -66,6 +67,9 @@ private:
     void StepIdle(Clock::time_point now);
     void WriteProgressReport(const ProgressReport_s& report);
     void LogOut(std::string_view reason);
+    void BeginRelog(std::chrono::seconds delay);
+    // Carries a relog on: the logout, the wait, then the login. True while one is under way.
+    bool StepRelog(Clock::time_point now);
     void Fail(std::string_view reason);
     void UpdateFinished();
 
@@ -83,4 +87,7 @@ private:
     u32 m_interrupts = 0;
     std::optional<Clock::time_point> m_killDeadline;
     Clock::time_point m_nextSummary;
+    // relog(): the wait still to come once its logout is done, then when to log back in.
+    std::optional<std::chrono::seconds> m_relogDelay;
+    std::optional<Clock::time_point> m_reloginAt;
 };

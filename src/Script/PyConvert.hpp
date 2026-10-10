@@ -62,6 +62,7 @@ public:
     static constexpr auto ITEM_TYPE_CLASS = "ItemType";
     static constexpr auto LOC_TYPE_CLASS = "LocType";
     static constexpr auto COMPONENT_CLASS = "Component";
+    static constexpr auto PROJECTILE_CLASS = "Projectile";
     // A world object's tile, which the stdlib's tile() reads, and its menu, which actions() reads.
     static constexpr auto X_FIELD = "_x";
     static constexpr auto Z_FIELD = "_z";
@@ -80,6 +81,7 @@ public:
     static void FromNpcType(py_OutRef out, const NpcType_s& type, const GameCache_s& cache);
     static void FromItemType(py_OutRef out, const ObjType_s& type, const GameCache_s& cache);
     static void FromLocType(py_OutRef out, const LocType_s& type, const GameCache_s& cache);
+    static void FromProjectile(py_OutRef out, const Projectile_s& projectile);
     // A component as the player sees it now.
     static void FromComponent(py_OutRef out, const IfComponent_s& component, const InterfaceView& view);
     // The webclient's names for a component's type and button, in lower case.
@@ -146,6 +148,8 @@ private:
     static void SetTile(py_Ref object, const Tile_s& tile);
     static void SetMenu(py_Ref object, const ScriptApi::Menu& menu);
     static void SetEntity(py_Ref object, const Entity_s& entity, u64 tick);
+    // ('npc' or 'player', index), or None.
+    static void SetTarget(py_Ref object, const std::optional<EntityRef_s>& target);
     [[nodiscard]] static bool IsInstance(py_Ref value, std::string_view className);
     [[nodiscard]] static py_Ref GetField(py_Ref object, const char* name);
     [[nodiscard]] static std::string_view GetTypeName(py_Ref value);

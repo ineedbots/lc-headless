@@ -29,6 +29,8 @@ namespace
     constexpr auto MAX_LOGIN_INTERVAL = 60s;
     constexpr auto MAX_KILL_GRACE = 600s;
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
+    constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
+    constexpr auto MAX_RUN_ENERGY = 100;
     constexpr auto LEGACY_ACCOUNT_KEY = "account";
     constexpr auto FIRST_PRINTABLE = '\x20';
     constexpr auto LAST_PRINTABLE = '\x7E';
@@ -213,6 +215,8 @@ namespace
         Check(scripting.loginIntervalSeconds >= 0s && scripting.loginIntervalSeconds <= MAX_LOGIN_INTERVAL, "scripting.loginIntervalSeconds", std::format("must be from 0 to {}", MAX_LOGIN_INTERVAL.count()));
         Check(scripting.killGraceSeconds >= 0s && scripting.killGraceSeconds <= MAX_KILL_GRACE, "scripting.killGraceSeconds", std::format("must be from 0 to {}", MAX_KILL_GRACE.count()));
         Check(!scripting.progressDirectory.empty(), "scripting.progressDirectory", "must be a folder path");
+        Check(scripting.stallMinutes >= std::chrono::minutes{0} && scripting.stallMinutes <= MAX_STALL_MINUTES, "scripting.stallMinutes", std::format("must be from 0 to {}", MAX_STALL_MINUTES.count()));
+        Check(scripting.runEnergyMin >= 0 && scripting.runEnergyMin <= MAX_RUN_ENERGY, "scripting.runEnergyMin", std::format("must be from 0 to {}", MAX_RUN_ENERGY));
     }
 
     void ValidateAccount(const AccountConfig_s& account)
@@ -370,6 +374,20 @@ namespace nlohmann
     };
 
     template <>
+    struct adl_serializer<std::chrono::minutes>
+    {
+        static void from_json(const json& value, std::chrono::minutes& result)
+        {
+            result = std::chrono::minutes{value.get<s64>()};
+        }
+
+        static void to_json(ordered_json& value, std::chrono::minutes source)
+        {
+            value = source.count();
+        }
+    };
+
+    template <>
     struct adl_serializer<std::chrono::milliseconds>
     {
         static void from_json(const json& value, std::chrono::milliseconds& result)
@@ -388,7 +406,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, t
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory, navDirectory)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory, randomEvents)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory, randomEvents, stallMinutes, runAuto, runEnergyMin)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
 
 // Account files are only read, and a script's settings can be any object, so they convert by hand.
