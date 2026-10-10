@@ -1,13 +1,14 @@
 #pragma once
 
-// One level of the 104x104 build area, indexed by local tile: absolute minus the build area's base.
-// Angles are the webclient's: 0 west, 1 north, 2 east, 3 south.
+// One level of the 104x104 build area, indexed by local tile: absolute minus the build area's base, or of
+// another square grid, such as the one WalkMap builds a map square on. Angles are the webclient's: 0 west,
+// 1 north, 2 east, 3 south.
 class CollisionMap
 {
 public:
     static constexpr s32 SIZE = 104;
 
-    CollisionMap();
+    explicit CollisionMap(s32 size = SIZE);
 
     // Open tiles inside, and BOUNDS on the outermost ring.
     void Reset();
@@ -15,7 +16,10 @@ public:
     void AddLoc(s32 x, s32 z, s32 width, s32 length, u8 angle, bool blockRange);
     void AddWall(s32 x, s32 z, u8 shape, u8 angle, bool blockRange);
 
+    // Within the build area's size.
     [[nodiscard]] static bool Contains(s32 x, s32 z);
+    // Within this grid.
+    [[nodiscard]] bool InBounds(s32 x, s32 z) const;
     [[nodiscard]] u32 GetFlags(s32 x, s32 z) const;
     // Whether a player on (srcX, srcZ) can use the wall or wall decor on (dstX, dstZ).
     [[nodiscard]] bool CanReachWall(s32 srcX, s32 srcZ, s32 dstX, s32 dstZ, u8 shape, u8 angle) const;
@@ -27,6 +31,8 @@ public:
 private:
     // Tiles outside the area are ignored, so a large loc on the edge is cut off.
     void Add(s32 x, s32 z, u32 flags);
+    [[nodiscard]] std::size_t GetIndex(s32 x, s32 z) const;
 
+    s32 m_size;
     std::vector<u32> m_flags;
 };

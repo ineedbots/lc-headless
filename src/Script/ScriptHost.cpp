@@ -78,7 +78,7 @@ ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOpt
     : m_runtime{runtime}
     , m_client{client}
     , m_actions{client}
-    , m_api{client.GetState(), client.GetMap(), m_actions, options.messenger, options.username}
+    , m_api{client.GetState(), client.GetMap(), m_actions, options.messenger, options.username, options.navigation}
     , m_logger{std::move(logger)}
     , m_options{std::move(options)}
 {

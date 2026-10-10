@@ -203,6 +203,7 @@ namespace
         const auto& client = config.client;
         Check(client.idleSeconds >= MIN_IDLE_SECONDS && client.idleSeconds <= MAX_IDLE_SECONDS, "client.idleSeconds", std::format("must be from {} to {}", MIN_IDLE_SECONDS.count(), MAX_IDLE_SECONDS.count()));
         Check(!client.cacheDirectory.empty(), "client.cacheDirectory", "must not be empty");
+        Check(!client.navDirectory.empty(), "client.navDirectory", "must not be empty");
 
         const auto& scripting = config.scripting;
         Check(!scripting.accountsDirectory.empty(), "scripting.accountsDirectory", "must be a folder path");
@@ -386,7 +387,7 @@ namespace nlohmann
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory, navDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
 

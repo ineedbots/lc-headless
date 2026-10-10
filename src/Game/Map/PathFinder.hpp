@@ -45,4 +45,7 @@ public:
     // Whether one step, straight or diagonal, from a tile to the next one is open, by the search's rules.
     // False for tiles that aren't neighbours on one level, or are outside the build area.
     [[nodiscard]] static bool CanStep(const WorldMap& map, const Tile_s& from, const Tile_s& to);
+    // The same on a collision grid, from (x, z) by (dx, dz), each -1, 0 or 1 and not both 0. The tiles
+    // stepped across must be in the grid.
+    [[nodiscard]] static bool CanStep(const CollisionMap& collision, s32 x, s32 z, s32 dx, s32 dz);
 };

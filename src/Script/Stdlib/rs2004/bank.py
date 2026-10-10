@@ -18,6 +18,8 @@ from rs2004.bot import Task, is_generator
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import locs, npcs
 from rs2004.game import direct_navigator, game
+from rs2004.geometry import Tile
+from rs2004.traversal import nearest_reachable_bank, traversal
 from rs2004.items import inventory
 from rs2004.settings import SettingDef
 
@@ -366,28 +368,50 @@ def _loc_with_action(name, op):
 
 
 class _Banking:
-    """Opening a bank for a trip, and the whole trip. Until walking across the map arrives (BotApiDesign.md
-    phase 6), a bank has to be in the area the server has loaded, or at a stand reachable within it."""
+    """Opening a bank for a trip, and the whole trip, walking to one across the map when none is near."""
 
     def open(self, stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14):
-        """Opens a bank: a booth nearby, else a banker nearby, else the booth at stand. Use with yield from."""
+        """Opens a bank: a booth nearby, else a banker nearby, else the booth at stand, else the nearest bank
+        rs2b0t knows, walking there. destination is one of bank_locations() to go to instead. Use with yield
+        from."""
         if bank.is_open():
             return True
         booth = locs.query().name(booth_name).where(lambda l: len(l.actions()) > 0).nearest()
-        if booth is not None and (not prefer_nearby or booth.distance() <= nearby_radius or stand is None):
+        if booth is not None and (not prefer_nearby or booth.distance() <= nearby_radius or (stand is None and destination is None)):
             opened = yield from bank.open_nearest_access({'name': booth_name, 'op': booth_op})
             return opened
         banker = npcs.query().action('Bank').nearest()
-        if banker is not None and (not prefer_nearby or banker.distance() <= nearby_radius or stand is None):
+        if banker is not None and (not prefer_nearby or banker.distance() <= nearby_radius or (stand is None and destination is None)):
             opened = yield from bank.open_npc_access({'name': banker.name, 'op': 'Bank'})
             return opened
         if stand is not None:
-            arrived = yield from direct_navigator.walk_to(stand, 2, 120000)
+            arrived = yield from traversal.walk_resilient(stand, 2, None, 120000)
             if not arrived:
                 return False
             opened = yield from bank.open_booth(stand, booth_name, booth_op)
             return opened
-        return False
+        known = destination if destination is not None else nearest_reachable_bank(game.tile())
+        if known is None:
+            return False
+        tile = known['tile']
+        arrived = yield from traversal.walk_resilient(Tile(tile['x'], tile['z'], tile['level']), 4, None, 120000)
+        if not arrived:
+            return False
+        if known.get('npcAccess') is not None:
+            access = known['npcAccess']
+            opened = yield from bank.open_npc_access({'name': access['name'], 'op': access['op'], 'choose': access.get('choose')})
+            return opened
+        if known.get('access') is not None:
+            access = known['access']
+            first = access.get('openFirst')
+            opened = yield from bank.open_nearest_access({'name': access['name'], 'op': access['op'], 'open_first': first})
+            return opened
+        banker = npcs.query().action('Bank').within(10).nearest()
+        if banker is not None and locs.query().name(booth_name).within(10).nearest() is None:
+            opened = yield from bank.open_npc_access({'name': banker.name, 'op': 'Bank'})
+            return opened
+        opened = yield from bank.open_nearest(booth_name, booth_op)
+        return opened
 
     def bank_nearest(self, deposit, common_junk=True, destination=None, return_to=None, booth_name='Bank booth', booth_op='Use-quickly', after_deposit=None):
         """Opens a bank, deposits what deposit(name) picks (and common junk), runs after_deposit, and walks back

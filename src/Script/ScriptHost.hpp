@@ -4,6 +4,7 @@
 #include "../Core/Logger.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/GameClient.hpp"
+#include "../Game/Nav/NavGraph.hpp"
 #include "../Game/State/GameEvent_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "BotMessenger.hpp"
@@ -41,6 +42,8 @@ struct ScriptHostOptions_s
     bool watchFiles = false;
     // Wait for VS Code's pocketpy debugger to attach before running the script.
     bool waitForDebugger = false;
+    // For routes beyond the loaded area; without it, the script can't plan them.
+    std::shared_ptr<const Navigation_s> navigation;
 };
 
 // Runs one account's bot against its client, on the caller's thread between pumps. The script is loaded

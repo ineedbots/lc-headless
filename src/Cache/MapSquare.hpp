@@ -59,9 +59,10 @@ public:
     static constexpr s32 ID_SHIFT = 8;
 
     using BlockedTiles = std::bitset<LEVELS * SIZE * SIZE>;
+    using GroundTiles = std::bitset<LEVELS * SIZE * SIZE>;
 
-    // Sorts the locs by tile.
-    MapSquare(u8 x, u8 z, BlockedTiles blocked, std::vector<MapLoc_s> locs);
+    // Sorts the locs by tile. Without ground, every tile on every level has a floor.
+    MapSquare(u8 x, u8 z, BlockedTiles blocked, std::vector<MapLoc_s> locs, std::optional<GroundTiles> ground = std::nullopt);
 
     [[nodiscard]] static u16 GetId(s32 squareX, s32 squareZ);
     [[nodiscard]] static std::size_t GetBit(s32 level, s32 x, s32 z);
@@ -69,6 +70,9 @@ public:
     [[nodiscard]] u8 GetX() const;
     [[nodiscard]] u8 GetZ() const;
     [[nodiscard]] bool IsBlocked(s32 level, s32 x, s32 z) const;
+    // Whether the tile has a floor: every tile on level 0, and those with an underlay or overlay above it.
+    // The webclient draws none of the rest, and nobody can stand there.
+    [[nodiscard]] bool HasGround(s32 level, s32 x, s32 z) const;
     [[nodiscard]] std::span<const MapLoc_s> GetLocsAt(s32 level, s32 x, s32 z) const;
     [[nodiscard]] std::span<const MapLoc_s> GetLocs() const;
 
@@ -77,6 +81,7 @@ private:
     u8 m_z;
     // Bit (level * SIZE + x) * SIZE + z.
     BlockedTiles m_blocked;
+    GroundTiles m_ground;
     // Sorted by position, which sorts by level, then x, then z.
     std::vector<MapLoc_s> m_locs;
 };

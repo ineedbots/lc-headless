@@ -237,6 +237,33 @@ A destination is a `Tile`, or an `(x, z)` pair on your level.
 - `stop_account()` stops the script and logs the account out.
 - `send_bot_message(username, message)` sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)).
 
+## Walking across the world
+
+```python
+arrived = yield from traversal.walk_resilient(Tile(3253, 3420, 0), 2)
+```
+
+`traversal` walks anywhere on the map: through doors and gates, up and down stairs and ladders, over the Al Kharid toll, onto ships and through the other crossings rs2b0t knows. The route comes from a search over the whole map, which the client builds from the cache at startup, together with rs2b0t's walker data in `client.navDirectory`. The walker then follows the route as rs2b0t's does:
+- it finds where you are on the route and clicks the furthest tile ahead the client can walk to;
+- it takes each hop once it reaches the tile before it;
+- it plans again when the world disagrees: a door that won't open, a stall, or a step off the route.
+
+| Function | Returns or does |
+|---|---|
+| `walk_to(dest, radius=2, timeout_ms=None, max_expansions=None, use_teleport_catalog=None, policy=None, bank_item_counts=None, avoid_zones=None, log=None)` | Walks to within `radius` of `dest` and gives `True` on arrival, or when the route ends as close as it can get. `timeout_ms` defaults to 5 minutes |
+| `walk_resilient(dest, radius=2, attempts=None, timeout_ms=None, ...)` | `walk_to` behind rs2b0t's escalation ladder. A failed walk is followed by a walk within the loaded area, then a step to unstick, then a pause, before planning again. It gives up after `attempts` passes without progress, or once a fresh search finds no route at all |
+| `last_outcome`, `last_reason` | How the last walk ended: `'arrived'`, `'closest'` (as near as the route goes), `'blocked'`, `'budget'`, `'failed'`, `'unreachable'` or `'interrupted'`, and why a search failed |
+| `remaining` | Route tiles left on the walk in progress |
+| `request_repath(reason=None)` | Plans the walk in progress again at its next step |
+| `try_nearby_door(log=None)` | Opens a shut door or gate beside you |
+| `teleports_enabled()` | Whether walks use teleports unless told otherwise. They don't, as in rs2b0t |
+
+- **Requirements.** A route's hops are checked against the account: skills, quests, the coins for a toll or fare, items to use, and members' areas. A hop the account can't make isn't planned. So without 10 coins, a walk into Al Kharid goes round rather than through the toll gate.
+- **Teleports.** These are off by default. Pass `**NAV_WITH_TELES` to plan spell teleports the backpack has the runes for, or `**NAV_PURE_WALK` to walk.
+- **Policy.** `policy` is a dict of `use_teleports`, `use_ships`, `use_shortcuts`, `allow_teleport_ids` and `deny_teleport_ids`.
+- **Avoided zones.** `avoid_zones` are areas a route never enters, though it may leave one it starts in. They're ids from rs2b0t's catalog, such as `'white-wolf-mountain'`, or dicts of `min_x`, `max_x`, `min_z`, `max_z` and optionally `level`. Draynor's jail guards are avoided automatically below combat level 51.
+- **Banks.** `nearest_bank(tile)`, `nearest_banks(tile)` and `nearest_reachable_bank(tile)` rank rs2b0t's known banks, leaving out those the account can't use. `banking.open()` walks to the nearest reachable one when none is in the area.
+
 ## Reach
 
 `reach` is the last mile: walk to a stand, use something, and when a door is in the way, open it and try again. Each function is a generator that gives `'done'` once `expect()` holds, `'retry'` when it doesn't yet, and `'unreachable'` when the stand or the target can't be reached and no door explains it.
@@ -252,7 +279,7 @@ status = yield from reach.npc_dialog('Cook', Tile(3208, 3210))
 
 A door is a wall loc named "door" or "gate" with an Open option; an open one has a Close option. `is_openable_barrier(name, actions)`, `is_open_barrier_leaf(name, actions)`, `open_op(actions)`, `close_op(actions)`, `talk_op(actions)` and `toward_dest(door, here, dest)` are the rules it uses.
 
-Until walking across the map arrives in phase 6, `near` must be reachable from where you are: reach opens the door between the stand and the target, not doors on the way to the stand.
+Reach walks to `near` within the loaded area, so `near` must be reachable from where you are: reach opens the door between the stand and the target, not doors on the way to the stand. Use `traversal` to get there first.
 
 `game_messages` tells what the server said after an action:
 - `mark()`;
@@ -340,7 +367,7 @@ if opened:
 Each function that waits is a generator.
 
 `banking` handles the trip:
-- `open(stand=None, booth_name='Bank booth', booth_op='Use-quickly', ...)` opens a booth in the area, or else a banker with a "Bank" option, or else walks to `stand` and opens the booth there. Until walking across the map arrives in phase 6 ([BotApiDesign.md](BotApiDesign.md) §9), the bank has to be in the area the server has loaded.
+- `open(stand=None, booth_name='Bank booth', booth_op='Use-quickly', destination=None, ...)` opens a booth in the area, or else a banker with a "Bank" option. Failing those, it walks to `stand` and opens the booth there, or walks to `destination` (one of `bank_locations()`) or else the nearest reachable known bank, and opens that.
 - `bank_nearest(deposit, common_junk=True, return_to=None, after_deposit=None, ...)` opens a bank, deposits what `deposit(name)` picks plus common junk, runs `after_deposit()`, and walks back to `return_to`.
 
 rs2b0t's deposit rules come with it:
@@ -592,7 +619,7 @@ pocketpy's debugger brings some limits:
 
 ## Limits
 
-- **Walking stays in the loaded area,** until phase 6. A tile beyond it is walked to in a straight line.
+- **`direct_navigator` stays in the loaded area.** A tile beyond it is walked to in a straight line. `traversal` walks anywhere.
 - **"Nearest" counts tiles.** A query's `nearest()` measures in tiles, not steps, so with `reachable()` the nearest target that can be reached may still be a long walk round.
 
 ## Editor support
@@ -615,7 +642,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles and `Autocast`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles and `Autocast`. [BotApiDesign.md](BotApiDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;
@@ -640,8 +667,8 @@ Coordinates differ between RSC and 2004, so every tile in a script changes. An `
 |---|---|
 | `get_x()`, `get_z()`, `at(x, z)`, `distance_to(x, z)` | `game.tile()`, `game.tile().distance_to((x, z)) == 0`, `game.tile().distance_to((x, z))` |
 | `in_rect(...)`, `point_in_rect(...)`, `point_in_polygon(...)` | `Area.rectangular(a, b).contains(tile)`, `Area.polygon(points).contains(tile)` |
-| `walk_path_to(x, z)`, `walk_to(x, z)` | `direct_navigator.walk((x, z))`, within the loaded area for now |
-| `calculate_path_to(x, z)` | `direct_navigator.path((x, z))`, the waypoints, within the loaded area. There's no path object |
+| `walk_path_to(x, z)`, `walk_to(x, z)` | `yield from traversal.walk_resilient(Tile(x, z), 2)`, anywhere; `direct_navigator.walk((x, z))` for one click in the loaded area |
+| `calculate_path_to(x, z)` | `direct_navigator.path((x, z))`, the waypoints, within the loaded area. `traversal` plans its own routes; there's no path object |
 | `get_my_player()` | `players.local()` |
 | `get_nearest_npc_by_id(ids, in_combat=False, ...)`, `get_nearest_npc_by_id_in_rect(...)` | `npcs.query().id(ids).where(lambda n: not n.in_combat).nearest()`, with `.inside(area)` |
 | `get_nearest_object_by_id`, `get_objects` | `locs.query().id(...).nearest()`, `locs.query().results()` |
@@ -675,7 +702,6 @@ Coordinates differ between RSC and 2004, so every tile in a script changes. An `
 | `set_autologin(False)` then `logout()` | `stop_account()` |
 
 Not here yet:
-- walking beyond the loaded area;
 - logging out and back in;
 - hooks for dying, NPCs' overhead text and projectiles;
 - character design.

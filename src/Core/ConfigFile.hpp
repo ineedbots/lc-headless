@@ -31,6 +31,8 @@ struct ClientSettings_s
     LogLevel_e logLevel = LogLevel_e::Info;
     std::chrono::seconds idleSeconds = 5s;
     std::string cacheDirectory = "cache";
+    // rs2b0t's walker data, exported by tools/nav/export_rs2b0t.ts.
+    std::string navDirectory = "data/nav";
 };
 
 struct ScriptingSettings_s

@@ -18,11 +18,6 @@ namespace
     constexpr auto APPROACH_SOUTH = u8{0x4};
     constexpr auto APPROACH_WEST = u8{0x8};
 
-    std::size_t GetIndex(s32 x, s32 z)
-    {
-        return static_cast<std::size_t>(x * CollisionMap::SIZE + z);
-    }
-
     bool IsOpen(u32 flags, u32 mask)
     {
         return (flags & mask) == CollisionFlag::OPEN;
@@ -62,19 +57,20 @@ namespace
     }
 }
 
-CollisionMap::CollisionMap()
-    : m_flags(static_cast<std::size_t>(SIZE * SIZE))
+CollisionMap::CollisionMap(s32 size)
+    : m_size{size}
+    , m_flags(static_cast<std::size_t>(size * size))
 {
     Reset();
 }
 
 void CollisionMap::Reset()
 {
-    for (auto x = 0; x < SIZE; ++x)
+    for (auto x = 0; x < m_size; ++x)
     {
-        for (auto z = 0; z < SIZE; ++z)
+        for (auto z = 0; z < m_size; ++z)
         {
-            const auto onEdge = x == 0 || z == 0 || x == SIZE - 1 || z == SIZE - 1;
+            const auto onEdge = x == 0 || z == 0 || x == m_size - 1 || z == m_size - 1;
             m_flags[GetIndex(x, z)] = onEdge ? CollisionFlag::BOUNDS : CollisionFlag::OPEN;
         }
     }
@@ -191,6 +187,16 @@ void CollisionMap::AddWall(s32 x, s32 z, u8 shape, u8 angle, bool blockRange)
     }
 }
 
+bool CollisionMap::InBounds(s32 x, s32 z) const
+{
+    return x >= 0 && z >= 0 && x < m_size && z < m_size;
+}
+
+std::size_t CollisionMap::GetIndex(s32 x, s32 z) const
+{
+    return static_cast<std::size_t>(x * m_size + z);
+}
+
 bool CollisionMap::Contains(s32 x, s32 z)
 {
     return x >= 0 && z >= 0 && x < SIZE && z < SIZE;
@@ -198,7 +204,7 @@ bool CollisionMap::Contains(s32 x, s32 z)
 
 u32 CollisionMap::GetFlags(s32 x, s32 z) const
 {
-    assert(Contains(x, z) && "Tile outside the collision map");
+    assert(InBounds(x, z) && "Tile outside the collision map");
     return m_flags[GetIndex(x, z)];
 }
 
@@ -523,7 +529,7 @@ bool CollisionMap::CanReachArea(s32 srcX, s32 srcZ, s32 dstX, s32 dstZ, s32 widt
 
 void CollisionMap::Add(s32 x, s32 z, u32 flags)
 {
-    if (!Contains(x, z))
+    if (!InBounds(x, z))
     {
         return;
     }

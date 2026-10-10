@@ -10,6 +10,7 @@
 #include "../Game/State/Social_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
+#include "NavJson.hpp"
 #include "PyConvert.hpp"
 #include "ScriptApi.hpp"
 #include "ScriptRuntime.hpp"
@@ -43,6 +44,7 @@ from rs2004.trade import *
 from rs2004.tabs import *
 from rs2004.messages import *
 from rs2004.reach import *
+from rs2004.traversal import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -930,6 +932,77 @@ _rt_finish = _runtime.finish
         });
     }
 
+    // A route across the world, as NavJson describes the request and the answer; None without navigation.
+    bool FindWorldPath(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto request = NavJson::ParseRequest(PyConvert::ToString(py_arg(0), "request"));
+            const auto path = GetApi().FindWorldPath(request.from, request.to, request.options);
+            if (!path)
+            {
+                return ReturnNone();
+            }
+
+            PyConvert::FromString(py_retval(), NavJson::ToJson(*path));
+            return true;
+        });
+    }
+
+    // One of the walker's data files as JSON text, or None without navigation.
+    bool GetNavData(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto* const navigation = GetApi().GetNavigation();
+            const auto name = PyConvert::ToString(py_arg(0), "name");
+            const auto text = navigation != nullptr ? navigation->GetData(name) : std::nullopt;
+            if (!text)
+            {
+                return ReturnNone();
+            }
+
+            PyConvert::FromString(py_retval(), *text);
+            return true;
+        });
+    }
+
+    // (walkable, exits) for a tile of the world map, or None without navigation.
+    bool GetWalkTile(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            const auto* const navigation = GetApi().GetNavigation();
+            const auto x = static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_COORD));
+            const auto z = static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_COORD));
+            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, 3));
+            if (navigation == nullptr)
+            {
+                return ReturnNone();
+            }
+
+            PyConvert::FromPoint(py_retval(), navigation->map.IsWalkable(x, z, level) ? 1 : 0, navigation->map.GetExits(x, z, level));
+            return true;
+        });
+    }
+
+    bool IsMembers(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnBool(GetApi().GetState().members); });
+    }
+
+    // Whether the tile, on your level, is in the area the server has loaded.
+    bool InScene(int, py_StackRef argv) noexcept
+    {
+        return Guard([argv]
+        {
+            auto& api = GetApi();
+            const auto x = static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_COORD));
+            const auto z = static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_COORD));
+            return ReturnBool(api.GetMap().Contains(api.ToTile(x, z)));
+        });
+    }
+
     bool GetModalChanges(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(GetApi().GetState().interfaces.modalChanges); });
@@ -1686,6 +1759,11 @@ _rt_finish = _runtime.finish
             {"cast_on_item(spell, item)", CastOnItem},
             {"click_button(com)", ClickButton},
             {"has_inventory(com)", HasInventory},
+            {"find_world_path(request)", FindWorldPath},
+            {"is_members()", IsMembers},
+            {"in_scene(x, z)", InScene},
+            {"nav_data(name)", GetNavData},
+            {"walk_tile(x, z, level)", GetWalkTile},
             {"can_step(from_x, from_z, to_x, to_z)", CanStep},
             {"message_mark()", GetMessageMark},
             {"game_messages_since(mark)", GetGameMessagesSince},

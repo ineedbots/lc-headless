@@ -105,6 +105,7 @@ If `client.jsonc` doesn't exist, the client writes a sample there and exits. In 
 | `server.url` | The server's WebSocket URL, `ws://` or `wss://`. For a local engine on Windows, it's `ws://localhost:80` |
 | `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
+| `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
 | `client.cacheDirectory` | The folder that holds the server's cache: `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as the 289 engine keeps them in `engine/data/pack`. The default is `cache`, which git ignores |
 
 The RSA key comes from the server's deployment, not from the protocol, so take it from the server you're connecting to; its webclient uses the same values. The login CRCs are computed from the cache, so the cache must be the server's own. If either is wrong, the server rejects the login with status 6. The client loads the cache once at startup, in well under a second, and a missing or damaged cache stops it before any login, naming the file.

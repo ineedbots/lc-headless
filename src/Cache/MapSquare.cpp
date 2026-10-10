@@ -1,10 +1,11 @@
 #include "pch.hpp"
 #include "MapSquare.hpp"
 
-MapSquare::MapSquare(u8 x, u8 z, BlockedTiles blocked, std::vector<MapLoc_s> locs)
+MapSquare::MapSquare(u8 x, u8 z, BlockedTiles blocked, std::vector<MapLoc_s> locs, std::optional<GroundTiles> ground)
     : m_x{x}
     , m_z{z}
     , m_blocked{blocked}
+    , m_ground{ground.value_or(GroundTiles{}.set())}
     , m_locs{std::move(locs)}
 {
     std::ranges::stable_sort(m_locs, {}, &MapLoc_s::position);
@@ -35,6 +36,11 @@ u8 MapSquare::GetZ() const
 bool MapSquare::IsBlocked(s32 level, s32 x, s32 z) const
 {
     return m_blocked.test(GetBit(level, x, z));
+}
+
+bool MapSquare::HasGround(s32 level, s32 x, s32 z) const
+{
+    return level == 0 || m_ground.test(GetBit(level, x, z));
 }
 
 std::span<const MapLoc_s> MapSquare::GetLocsAt(s32 level, s32 x, s32 z) const

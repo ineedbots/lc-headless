@@ -246,9 +246,11 @@ bool PathFinder::CanStep(const WorldMap& map, const Tile_s& from, const Tile_s& 
     }
 
     const auto& area = map.GetBuildArea();
-    const auto& collision = map.GetCollision(from.level);
-    const auto x = from.x - area.baseX;
-    const auto z = from.z - area.baseZ;
+    return CanStep(map.GetCollision(from.level), from.x - area.baseX, from.z - area.baseZ, dx, dz);
+}
+
+bool PathFinder::CanStep(const CollisionMap& collision, s32 x, s32 z, s32 dx, s32 dz)
+{
     const auto open = [&collision](s32 tileX, s32 tileZ, u32 mask)
     {
         return IsOpen(collision.GetFlags(tileX, tileZ), mask);

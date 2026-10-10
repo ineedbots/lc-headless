@@ -377,7 +377,7 @@ As built, in `rs2004/reach.py` and `rs2004/messages.py`:
 
 ---
 
-## 9. Phase 6: walking across levels
+## 9. Phase 6: walking across levels (done)
 
 ### WalkMap
 
@@ -424,16 +424,27 @@ A world-scale route needs collision beyond the build area, which the cache has. 
 - **Teleports** are off by default, as in rs2b0t (`scripting.navTeleports` in `client.jsonc`, or per walk). When on, they're used only if the backpack holds the runes or the jewellery.
 - `banking.open` gains walking to the nearest known bank (`catalogs.BANK_LOCATIONS`, phase 9 data that moves forward to here).
 
+### As built
+
+- **WalkMap.** It's built square by square on a 74×74 `CollisionMap`: the square plus 5 tiles of margin, for walls and large locs in the neighbours. `CollisionMap` took its size as a constructor argument for this. `SquareCollision` holds the loc collision `WorldMap` used, so both share it. `MapSquare` gained the floor bits rs2b0t's builder reads (an underlay or overlay on levels 1 to 3), without which every upper-level tile would be walkable. A step needs a floor where it lands; a missing square has none.
+- **The data.** `tools/nav/export_rs2b0t.ts`, run with Bun against rs2b0t's tree, writes `data/nav/`: `edges.json`, compiled as rs2b0t's `PathFinder.addEdges` compiles doors, transports, stairs and curated travel; `teleports.json`; `crossings.json`; `danger_zones.json`; and `banks.json`. It replaces the planned Python converter, since evaluating rs2b0t's own modules keeps their logic, regexes included.
+- **NavGraph** loads `edges.json` and `teleports.json`. It keeps 3,398 edges, 2,056 of them doors, whose ends are walkable. `Navigation_s` holds it with `WalkMap` and the other files' JSON. `Application` builds it once after the cache and passes it to every account through `AccountOptions_s` and `ScriptHostOptions_s`.
+- **WorldPathFinder** ports rs2b0t's search: `snapWalkable`, the cardinal and radius-5 goal candidates, A* that falls back to Dijkstra when long hops exist (they do, so long searches are Dijkstra unless teleports give a floor), teleports from the start with their policy, wilderness and requirement checks, avoided zones that a route may leave but not enter, and the stair bounce rule. The essence-mine session state is left out. Requirements fail closed against a state; without one, gated edges are planned, as rs2b0t plans offline. The walker always passes a state.
+- **The bridge** is JSON: `find_world_path(request)` takes and returns what `NavJson` describes, which keeps the many optional fields out of the bindings.
+- **traversal** (`rs2004/traversal.py`) ports `WalkExecutor.walkTo`, `followPath`, `handleTransport` and `walkResilient`'s ladder, with `walkgeom.py` for the pure geometry. Doors are opened and stepped through, stairs, ladders and gangplanks are used and their landing awaited, and special crossings pay, talk and choose, NPC or loc. Spell teleports are cast; jewellery isn't yet. Left out: the bank-for-route planner (`bank_item_counts` is accepted and unused), gate-item explanations, post-quest unlock talks, quest-lock blacklisting, the essence session, and the camera and paint. A door that refuses twice is avoided on the next route.
+- **Banks.** `banking.open` walks to the nearest reachable known bank. Banks are ranked by straight-line distance whatever the level, skipping those the account can't use, as rs2b0t's `nearestBank` does, and then the nearest four by route cost. Ranking on the same level first sent a walker on Lumbridge's top floor toward the Legends' Guild, the only level-2 bank. Lumbridge castle has no bank in this revision; its top floor has sacks.
+- **Timings,** Release, on the 289 cache: `WalkMap` builds in 0.2 s and holds 952 level squares in 7.9 MB. Lumbridge to Varrock east bank expands 121,000 nodes in 80 ms (300 ms the first time), up the castle stairs 2,800 in 1 ms, into Al Kharid through the toll 16,600 in 7 ms, and Port Sarim to Musa Point by ship 16,300 in 7 ms. The slowest is a goal no route reaches: 442,000 nodes in 0.5 s. The 1.2 million default budget holds, and stays as rs2b0t set it.
+
 ### Done when
 
-- `WalkMap`, `NavGraph` and `WorldPathFinder` tests pass, including requirements failing closed, `avoid_zones`, and a route that changes level.
-- rs2b0t's pure follow-geometry tests (`test/event/webwalk/followMath.test.ts`, `dangerZones.test.ts`) are ported to `tests/Stdlib` and pass.
-- The timings are recorded here.
-- Against the local engine, `walk_resilient` takes an account:
-    - from Lumbridge to Varrock east bank;
-    - up Lumbridge castle's stairs to its bank;
-    - through the Al Kharid toll gate, paying;
-    - across to Karamja by ship.
+- [x] `WalkMap`, `NavGraph` and `WorldPathFinder` tests pass, including requirements failing closed, `avoid_zones`, a teleport only when allowed, a goal that can't be stood on, the budget, and a route that changes level. The real-cache tests plan the four routes below.
+- [x] rs2b0t's pure follow-geometry tests (`followMath.test.ts`, `dangerZones.test.ts`) are ported to `tests/Stdlib/test_walkgeom.py` and pass, less the case that needs rs2b0t's PathFinder, which `WorldPathFinderTests` covers.
+- [x] The timings are recorded here.
+- [x] Against the local engine, `walk_resilient` took an account:
+    - from Lumbridge to Varrock east bank, in 262 ticks;
+    - up Lumbridge castle's stairs, through two doors, to its top floor and back down, and `banking.open` then walked to Al Kharid's bank and opened it;
+    - through the Al Kharid toll gate, paying 10 coins;
+    - across to Karamja by ship, paying the 30 fare and crossing the gangplank.
 
 ---
 
@@ -519,7 +530,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 3. **Interfaces from the cache** (§6). Done.
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7). Done.
 5. **Reach** (§8). Done.
-6. **Walking across levels** (§9).
+6. **Walking across levels** (§9). Done.
 7. **Random events** (§10).
 8. **Runtime upkeep and lifecycle** (§11).
 9. **Catalogs and behaviours** (§12).

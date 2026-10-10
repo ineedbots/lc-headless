@@ -30,6 +30,12 @@ namespace
 
     using TileFlags = std::array<u8, MapSquare::LEVELS * MapSquare::SIZE * MapSquare::SIZE>;
 
+    struct Land_s
+    {
+        TileFlags flags{};
+        MapSquare::GroundTiles ground;
+    };
+
     void CheckUsedUp(const Packet& packet)
     {
         if (packet.GetAvailable() != 0)
@@ -38,10 +44,11 @@ namespace
         }
     }
 
-    // Only the flags are kept from each tile's run of opcodes; heights, overlays and underlays are read past.
-    TileFlags DecodeLand(std::span<const u8> land)
+    // Only the flags, and whether there's an underlay or overlay, are kept from each tile's run of opcodes.
+    Land_s DecodeLand(std::span<const u8> land)
     {
-        auto flags = TileFlags{};
+        auto decoded = Land_s{};
+        auto& flags = decoded.flags;
         auto packet = Packet{land};
         for (auto level = 0; level < MapSquare::LEVELS; ++level)
         {
@@ -67,20 +74,24 @@ namespace
                         if (opcode <= LAST_OVERLAY)
                         {
                             static_cast<void>(packet.G1());
+                            decoded.ground.set(MapSquare::GetBit(level, x, z));
                             continue;
                         }
 
                         if (opcode <= LAST_FLAGS)
                         {
                             tile = static_cast<u8>(opcode - FLAGS_OFFSET);
+                            continue;
                         }
+
+                        decoded.ground.set(MapSquare::GetBit(level, x, z));
                     }
                 }
             }
         }
 
         CheckUsedUp(packet);
-        return flags;
+        return decoded;
     }
 
     // Everything on a bridge tile is seen one level below the one it's on.
@@ -242,11 +253,12 @@ std::vector<MapIndexEntry_s> MapDecoder::DecodeIndex(std::span<const u8> data)
 MapSquare MapDecoder::DecodeSquare(u16 square, std::span<const u8> land, std::span<const u8> locs, std::span<const LocType_s> types)
 {
     const auto name = DescribeSquare(square);
-    const auto flags = DecodeFile(std::format("square {} land", name), [land]
+    const auto decodedLand = DecodeFile(std::format("square {} land", name), [land]
     {
         return DecodeLand(land);
     });
 
+    const auto& flags = decodedLand.flags;
     auto decodedLocs = DecodeFile(std::format("square {} locs", name), [locs, &flags, types]
     {
         return DecodeLocs(locs, flags, types);
@@ -254,7 +266,7 @@ MapSquare MapDecoder::DecodeSquare(u16 square, std::span<const u8> land, std::sp
 
     const auto x = static_cast<u8>(square >> MapSquare::ID_SHIFT);
     const auto z = static_cast<u8>(square & SQUARE_COORD_MASK);
-    return MapSquare{x, z, GetBlockedTiles(flags), std::move(decodedLocs)};
+    return MapSquare{x, z, GetBlockedTiles(flags), std::move(decodedLocs), decodedLand.ground};
 }
 
 std::string MapDecoder::DescribeSquare(u16 square)

@@ -146,13 +146,29 @@ namespace
     }
 }
 
-ScriptApi::ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username)
+ScriptApi::ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username, std::shared_ptr<const Navigation_s> navigation)
     : m_state{state}
     , m_map{map}
     , m_actions{actions}
     , m_messenger{messenger}
     , m_username{std::move(username)}
+    , m_navigation{std::move(navigation)}
 {
+}
+
+std::optional<NavPath_s> ScriptApi::FindWorldPath(NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options) const
+{
+    if (!m_navigation)
+    {
+        return std::nullopt;
+    }
+
+    return WorldPathFinder::FindPath(*m_navigation, from, to, options);
+}
+
+const Navigation_s* ScriptApi::GetNavigation() const
+{
+    return m_navigation.get();
 }
 
 const GameState_s& ScriptApi::GetState() const

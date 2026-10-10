@@ -8,6 +8,7 @@
 #include "../State/Zone_s.hpp"
 #include "../Tile_s.hpp"
 #include "CollisionMap.hpp"
+#include "SquareCollision.hpp"
 #include "LocShape.hpp"
 
 namespace
@@ -217,30 +218,7 @@ void WorldMap::Rebuild(const GameState_s& state)
 // ClientBuild.addLoc's collision: only types that block walking touch it.
 void WorldMap::AddCollision(s32 level, s32 x, s32 z, s32 id, u8 shape, u8 angle)
 {
-    const auto* const type = m_cache->FindLoc(id);
-    if (type == nullptr || !type->blockWalk)
-    {
-        return;
-    }
-
-    auto& collision = m_collision[static_cast<std::size_t>(level)];
-    switch (LocShape::GetLayer(shape))
-    {
-    case LocLayer_e::Wall:
-        collision.AddWall(x, z, shape, angle, type->blockRange);
-        return;
-    case LocLayer_e::Ground:
-        collision.AddLoc(x, z, type->width, type->length, angle, type->blockRange);
-        return;
-    case LocLayer_e::GroundDecor:
-        if (type->active)
-        {
-            collision.BlockGround(x, z);
-        }
-        return;
-    case LocLayer_e::WallDecor:
-        return;
-    }
+    SquareCollision::AddLoc(m_collision[static_cast<std::size_t>(level)], *m_cache, x, z, id, shape, angle);
 }
 
 const LocChange_s* WorldMap::FindChange(const Tile_s& tile, LocLayer_e layer) const

@@ -3,6 +3,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Core/Logger.hpp"
+#include "Game/Nav/NavGraph.hpp"
 
 struct CommandLine_s
 {
@@ -37,4 +38,5 @@ private:
     CommandLine_s m_commandLine;
     std::shared_ptr<const Config_s> m_config;
     std::shared_ptr<const GameCache_s> m_cache;
+    std::shared_ptr<const Navigation_s> m_navigation;
 };

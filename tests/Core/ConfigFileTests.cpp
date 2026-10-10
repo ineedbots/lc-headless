@@ -71,7 +71,8 @@ namespace
     "client": {
         "logLevel": "info",
         "idleSeconds": 5,
-        "cacheDirectory": "cache"
+        "cacheDirectory": "cache",
+        "navDirectory": "data/nav"
     },
     "scripting": {
         "accountsDirectory": "accounts",

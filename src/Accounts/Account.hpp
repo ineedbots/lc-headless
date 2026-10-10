@@ -17,6 +17,9 @@ struct AccountOptions_s
     bool watchScripts = false;
     // Wait for VS Code's pocketpy debugger to attach before running the script.
     bool waitForDebugger = false;
+    // The world's walking and rs2b0t's graph over it, shared by every account; without it, scripts can't plan
+    // routes beyond the loaded area.
+    std::shared_ptr<const Navigation_s> navigation;
 };
 
 // One account: its client and, when the account file names one, its script. Without a script the account
