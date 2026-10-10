@@ -290,9 +290,9 @@ The other component-id functions (`continue_dialogue`, `answer_count`, `close_in
 
 ---
 
-## 7. Phase 4: dialogue, make menus, bank, shop, trade and tabs
+## 7. Phase 4: dialogue, make menus, bank, shop, trade and tabs (done)
 
-Every facade here is rs2b0t's, and each helper that waits is a generator. Where an interface has to be recognised, it's by shape, as follows.
+Every facade here is rs2b0t's, and each helper that waits is a generator. Where an interface has to be recognised, it's by shape, as follows. What changed in the building is under "As built", at the end of the section.
 
 ### chat_dialog
 
@@ -340,11 +340,24 @@ Every facade here is rs2b0t's, and each helper that waits is a generator. Where 
 | `autocast` | `armed()`, `staff_tab_attached()`, `arm(spell)` | The staff combat tab and its spell choices, as rs2b0t's `Autocast` |
 
 - **Done when:** the tests pass, and against the local engine scripts:
-    - bank with `deposit_all_except` and `withdraw_x`;
-    - fletch 27 longbows with `chat_dialog.make_x('Long Bow', 27)`;
-    - smelt with `make('Bronze')`;
-    - buy with `shop.buy` and trade both ways between two accounts;
-    - set a combat style by name, toggle a prayer, and cast a spell and a teleport by name.
+    - [x] bank with `deposit_all_except` and `withdraw_x`: 27 logs by Withdraw X and the count dialog;
+    - [x] fletch 27 longbows with `chat_dialog.make_x('Long Bow', 27)`;
+    - [x] smelt with `make('Bronze')`: five bars at the Al Kharid furnace;
+    - [x] buy with `shop.buy` (three aprons from Thessalia, in one batch) and trade both ways between two accounts, run as two clients, each reading both offers on both screens;
+    - [x] set a combat style by name, toggle a prayer and auto retaliate, and cast Wind strike on a man and Varrock teleport by name.
+
+### As built
+
+- **Python keywords.** pocketpy makes `match` a keyword, so rs2b0t's `match` parameters are `text` for options and `name` for products, and `continue` is `continue_`.
+- **Waiting for an answer.** A dialogue click waits for `Interfaces_s::modalChanges`, a count of the packets that open or close a modal or the count dialog, to move, rather than for the modal id to change, as rs2b0t's does. A dialogue that opens the same interface again still counts as an answer.
+- **What the webclient keeps to itself.** It sends one resume per dialogue page and closes the count dialog when it answers it, and the server echoes neither. `ScriptApi` remembers the modal change in which it continued or answered, so `can_continue()` and `is_count_dialog_open()` read as the webclient's would. `continue_dialogue` resumes the page's Continue button, rather than the chat modal's id.
+- **Inventory menus.** `InterfaceDecoder` keeps an inventory's interactable flag (`objOps`) and its margins. An item's actions are its own (`OPHELD`) in an interactable inventory, such as the backpack, and the inventory's (`INV_BUTTON`) otherwise, such as the bank, a shop, trade and the worn equipment, as the webclient's menu shows them.
+- **Make products.** A product's name is the text on its buttons, cleaned, which for the tanner includes the price ("Soft leather: 1 gp"); matching is by part, of that name or of the item drawn over the buttons. A make panel's product is the item a model draws over its slot, found from the inventory's margins. Jewellery's first slot shows its own item, and models sit over the rest.
+- **Found at runtime, not at load.** The shop's, trade's and bank's inventories are found in the open interfaces by their options, as rs2b0t finds the bank, rather than at cache load. That needs no new `GameCache_s` ids. The trade confirm screen's lists are InvText components with no options, and their ids don't sort by owner (`tradeconfirm:otherinv1` is 3532, `inv1` 3542), so yours are the ones left of the screen's centre. Bank note mode clicks the "Note" or "Item" label, which sits over its Select button.
+- **Tabs.** `Component` gained `varp` and `value`: the varp a button's first condition reads with pushvar or testbit, and the value it compares with. Prayers are the prayer tab's toggles in order, combat styles the Select buttons that set varp 43 with the "(Accurate)"-style label level with each, retaliate the Select buttons on varp 172, the special bar the visible button whose option is "Use @gre@Special Attack", spells the Target buttons by name, teleports the "Cast @gre@... teleport" buttons, and autocast the staff tab's "Choose Spell" label and the chooser's buttons in order. The real-cache tests check each against the 289 interfaces.
+- **The interim builtins are gone.** `click_button`, `continue_dialogue`, `answer_count`, `close_interfaces`, `inv_button`, `move_item` and the `cast_on_*` by component id were all replaced, by `interfaces.click`, `chat_dialog`, `modals`, `InvItem.interact`, `InvItem.move_to` and `game.cast_on_*` by name. The builtins left are `stop_script`, `stop_account` and `send_bot_message`.
+- **A furnace is two locs.** Al Kharid's furnace is `furnace1`, with Smelt, next to a decorative `furnace2` with no options, so a script asks for `locs.query().name('Furnace').action('Smelt')`, as rs2b0t's smelter does.
+- **Not checked against the engine yet:** the largest count the count dialog takes, a skill stopping when materials run out before the count does, the special attack bar and autocast. The last two are checked against the real cache only.
 
 ---
 
@@ -494,7 +507,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 1. **The runtime** (§4). Done.
 2. **Entities, items and the game** (§5). Done; ScriptingApi.md is rewritten for the new shape, and grows with each later phase.
 3. **Interfaces from the cache** (§6). Done.
-4. **Dialogue, make menus, bank, shop, trade and tabs** (§7).
+4. **Dialogue, make menus, bank, shop, trade and tabs** (§7). Done.
 5. **Reach** (§8).
 6. **Walking across levels** (§9).
 7. **Random events** (§10).
