@@ -49,7 +49,7 @@ public:
     // What the webclient sends for a click on a button of that type: IF_BUTTON for Ok, Toggle and Select,
     // RESUME_PAUSEBUTTON for Continue, and CLOSE_MODAL for Close. Others send nothing.
     void ClickComponent(u16 com, ButtonType_e buttonType);
-    void ContinueDialogue();
+    void ContinueDialogue(u16 com);
     void AnswerCountDialog(s32 value);
     void CloseInterfaces();
 

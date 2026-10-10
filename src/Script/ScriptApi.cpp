@@ -216,6 +216,23 @@ ScriptApi::Menu ScriptApi::GetItemMenu(const GameCache_s& cache, s32 obj)
     return menu;
 }
 
+std::optional<ScriptApi::Menu> ScriptApi::GetInventoryMenu(const GameCache_s& cache, u16 com)
+{
+    const auto* const component = cache.FindComponent(com);
+    if (component == nullptr || component->type != ComponentType_e::Inv || component->objOps)
+    {
+        return std::nullopt;
+    }
+
+    auto menu = Menu{};
+    for (std::size_t slot = 0; slot < menu.size(); ++slot)
+    {
+        menu[slot] = component->options[slot];
+    }
+
+    return menu;
+}
+
 ScriptApi::Menu ScriptApi::GetPlayerMenu() const
 {
     auto menu = Menu{};
@@ -295,6 +312,41 @@ std::optional<std::string> ScriptApi::GetComponentText(u16 com) const
 InterfaceView ScriptApi::GetInterfaces() const
 {
     return InterfaceView{GetCache(), m_state.interfaces};
+}
+
+std::optional<u16> ScriptApi::FindContinue() const
+{
+    if (m_continuedAt == m_state.interfaces.modalChanges)
+    {
+        return std::nullopt;
+    }
+
+    return ChatDialog::FindContinue(GetInterfaces());
+}
+
+bool ScriptApi::IsCountDialogOpen() const
+{
+    return m_state.interfaces.countDialogOpen && m_answeredAt != m_state.interfaces.modalChanges;
+}
+
+std::vector<ChatOption_s> ScriptApi::GetChatOptions() const
+{
+    return ChatDialog::GetOptions(GetInterfaces());
+}
+
+std::vector<std::string> ScriptApi::GetChatTexts() const
+{
+    return ChatDialog::GetTexts(GetInterfaces());
+}
+
+std::vector<MakeProduct_s> ScriptApi::GetMakeProducts() const
+{
+    return ChatDialog::GetMakeProducts(GetInterfaces());
+}
+
+std::vector<MakeSlot_s> ScriptApi::GetMakePanel() const
+{
+    return ChatDialog::GetMakePanel(GetInterfaces(), m_state);
 }
 
 std::vector<Npc_s> ScriptApi::GetNpcs(const SearchFilter_s& filter) const
@@ -825,14 +877,29 @@ bool ScriptApi::ClickText(std::string_view text, std::optional<u16> root)
     return false;
 }
 
-void ScriptApi::ContinueDialogue()
+bool ScriptApi::ContinueDialogue()
 {
-    m_actions.ContinueDialogue();
+    const auto com = FindContinue();
+    if (!com)
+    {
+        return false;
+    }
+
+    m_actions.ContinueDialogue(*com);
+    m_continuedAt = m_state.interfaces.modalChanges;
+    return true;
 }
 
-void ScriptApi::AnswerCountDialog(s32 value)
+bool ScriptApi::AnswerCountDialog(s32 value)
 {
+    if (!IsCountDialogOpen())
+    {
+        return false;
+    }
+
     m_actions.AnswerCountDialog(value);
+    m_answeredAt = m_state.interfaces.modalChanges;
+    return true;
 }
 
 void ScriptApi::CloseInterfaces()

@@ -19,8 +19,8 @@ namespace
     constexpr auto COMPARATOR_SIZE = sizeof(u8);
     constexpr auto SCROLL_HEIGHT_SIZE = sizeof(u16);
     constexpr auto UNUSED_TYPE_SIZE = std::size_t{3};
-    constexpr auto OBJ_SWAP_OPS_SIZE = 2 * sizeof(u8);
-    constexpr auto OBJ_REPLACE_MARGINS_SIZE = 3 * sizeof(u8);
+    constexpr auto OBJ_SWAP_SIZE = sizeof(u8);
+    constexpr auto OBJ_REPLACE_SIZE = sizeof(u8);
     constexpr auto INV_BACKGROUND_XY_SIZE = 2 * sizeof(u16);
     constexpr auto CENTRE_FONT_SHADOW_SIZE = 3 * sizeof(u8);
     constexpr auto FILL_SIZE = sizeof(u8);
@@ -96,9 +96,12 @@ namespace
 
     void ReadInv(Packet& packet, IfComponent_s& component)
     {
-        Skip(packet, OBJ_SWAP_OPS_SIZE);
+        Skip(packet, OBJ_SWAP_SIZE);
+        component.objOps = packet.G1() == ENABLED;
         component.objUse = packet.G1() == ENABLED;
-        Skip(packet, OBJ_REPLACE_MARGINS_SIZE);
+        Skip(packet, OBJ_REPLACE_SIZE);
+        component.marginX = packet.G1();
+        component.marginY = packet.G1();
         for (auto i = 0; i < INV_BACKGROUND_COUNT; ++i)
         {
             if (packet.G1() != PRESENT)

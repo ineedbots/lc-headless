@@ -51,5 +51,8 @@ struct Interfaces_s
     u8 activeTab = DEFAULT_ACTIVE_TAB;
     s32 flashingTab = -1;
     s32 tutorialComponent = -1;
+    // Counts the packets that open or close a modal or the count dialog, so something done to the ones open
+    // now can be told from the next, even the same interface opened again.
+    u32 modalChanges = 0;
     std::unordered_map<u16, Component_s> components;
 };

@@ -66,9 +66,16 @@ struct IfComponent_s
     // Each condition's operand, and each script's opcodes, as IfType keeps them.
     std::vector<u16> operands;
     std::vector<std::vector<u16>> scripts;
-    // IfType's objUse: whether the items can be used on things.
+    // IfType's interactable, whether the menu offers the items' own options (OPHELD), as the backpack's
+    // does; otherwise it offers the inventory's options (INV_BUTTON), as the bank's does. And objUse,
+    // whether the items can be used on things.
+    bool objOps = false;
     bool objUse = false;
     bool hasSlotBackgrounds = false;
+    // The gap between slots: slot i of a width-column inventory is drawn at column i % width and row
+    // i / width, each slot 32 pixels plus the margin from the next.
+    u8 marginX = 0;
+    u8 marginY = 0;
     // Empty where the slot has no option.
     std::array<std::string, OPTION_COUNT> options;
 };

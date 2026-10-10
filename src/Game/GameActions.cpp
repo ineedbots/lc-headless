@@ -216,11 +216,9 @@ void GameActions::ClickComponent(u16 com, ButtonType_e buttonType)
     }
 }
 
-void GameActions::ContinueDialogue()
+void GameActions::ContinueDialogue(u16 com)
 {
-    // The engine resumes whichever script waits on a pause button and ignores the component.
-    const auto chatModal = m_client.GetState().interfaces.chatModal;
-    m_client.Send(ClientPackets::ResumePauseButton(static_cast<u16>(std::max(chatModal, 0))));
+    m_client.Send(ClientPackets::ResumePauseButton(com));
 }
 
 void GameActions::AnswerCountDialog(s32 value)

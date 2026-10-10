@@ -18,6 +18,8 @@ class InterfaceView
 public:
     InterfaceView(const GameCache_s& cache, const Interfaces_s& interfaces);
 
+    [[nodiscard]] const GameCache_s& GetCache() const;
+    [[nodiscard]] const Interfaces_s& GetInterfaces() const;
     [[nodiscard]] const IfComponent_s* Find(s32 id) const;
     // The interfaces that are open: the main, side and chat modals, the overlay, and each tab's.
     [[nodiscard]] std::vector<u16> GetOpenRoots() const;
@@ -26,6 +28,8 @@ public:
     [[nodiscard]] std::string_view GetText(const IfComponent_s& component) const;
     [[nodiscard]] u32 GetColour(const IfComponent_s& component) const;
     [[nodiscard]] bool IsHidden(const IfComponent_s& component) const;
+    // The item the server set the component to show (IF_SETOBJECT), or nullopt.
+    [[nodiscard]] std::optional<u16> GetObject(const IfComponent_s& component) const;
     // In an open interface, with neither it nor any layer above it hidden.
     [[nodiscard]] bool IsVisible(const IfComponent_s& component) const;
     // Its corner, from its interface's corner, through each layer's offset and scroll.

@@ -144,6 +144,7 @@ Scripts run on pocketpy 2.2, a subset of Python 3. The differences you're likely
 - In unpacking, a starred name must come last (`first, *rest = items`), and only lists and tuples unpack.
 - Tuples can't be added together, `dict(another_dict)` doesn't copy, and `dict.setdefault` and `str.isdigit` don't exist.
 - There's no `re` module.
+- `match` is a keyword, so it can't name a variable or parameter. Where rs2b0t's functions take `match`, ours take `text` or `name`.
 
 ## The world
 
@@ -206,8 +207,8 @@ Names match whole, without regard to case.
 - `equip(name)` (Wield, Wear or Equip, whichever the item has) and `unequip(name)`. Both wait until the item has moved, so use them with `yield from`; they give `True` when it did.
 
 An `InvItem` has `id`, `name`, `count`, `slot`, `noted` and `com` (the inventory it's in), and:
-- `actions()`. Inventory items offer "Drop" where their type has nothing there;
-- `interact(action)`, such as `item.interact('Eat')`;
+- `actions()`, as the right-click menu shows them. In the backpack these are the item's own, with "Drop" where its type has nothing there. In the bank, a shop, the worn equipment and other interfaces they're the inventory's, such as "Withdraw 5" or "Remove";
+- `interact(action)`, such as `item.interact('Eat')` or `item.interact('Withdraw 5')`;
 - `use_on(target)`, with another `InvItem`, an `Npc`, a `Player`, a `Loc` or a `GroundItem`.
 
 ## You and the game
@@ -234,6 +235,47 @@ A destination is a `Tile`, or an `(x, z)` pair on your level.
 - `stop_script()` stops calling the script; the account stays logged in and idles. A bot's `request_finish(reason)` does the same with a reason.
 - `stop_account()` stops the script and logs the account out.
 - `send_bot_message(username, message)` sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)).
+
+## Dialogues and make menus
+
+`chat_dialog` is the chat box: dialogue pages, choices and make menus. Each is recognised by its shape, not its ids.
+
+```python
+while chat_dialog.can_continue():
+    yield from chat_dialog.continue_()
+yield from chat_dialog.choose_option('Yes')
+yield from chat_dialog.make_x('Long Bow', 27)
+```
+
+| Function | Returns or does |
+|---|---|
+| `is_open()` | A chat box interface is open |
+| `can_continue()` | A "Click here to continue" is showing and hasn't been clicked yet. The webclient sends one click per page, and so do we |
+| `continue_()` | Clicks it, and waits for the next page or the end |
+| `texts()` | The chat box's lines, such as the speaker's name and what they say, without colour tags |
+| `options()` | The choices on offer |
+| `choose_option(text=None)` | Chooses the first option containing `text`, or the first option, and waits for what comes next |
+| `is_make_menu()`, `make_products()` | Whether a make menu is open, and its products' names |
+| `products()` | The products as `MakeProduct`s |
+| `make(name=None)` | Makes as many of the first product whose name contains `name` as one button makes without asking: "all" where there's such a button, otherwise the largest count |
+| `make_one(name=None)` | Clicks its "1" button |
+| `make_x(name, count)` | Clicks its "X" button and answers the count dialog with `count` |
+| `is_main_make_panel()`, `main_make_products()` | The same for make panels, such as the anvil and gold jewellery, which are inventories whose options make things |
+| `make_from_panel(name, op=None)` | Uses option `op`, such as `'Make 5'`, or the first, on the panel product |
+| `make_from_panel_max(name)` | Uses the option that makes the most |
+
+Each one that waits is a generator, so use it with `yield from`. It gives `True` once the server has opened, closed or changed an interface in answer, and `False` when the server didn't answer within 3 seconds, or there was nothing to click.
+
+What counts as what:
+- **Options** are the chat box's text buttons, as `multi2` to `multi5` have them.
+- **Make menus** are stacks of buttons over each product, one button per amount, all the same size and in the same place. Fletching's "Make 1" to "Make X", the furnace's "Smelt 1 @lre@Bronze" and the tanner's "Tan all" are all make menus. A stack in the chat box makes a chat box make menu, or else a stack in the main interface, as the tanner's is.
+- **A product's name** is the text the player reads on its buttons, without line breaks or colour tags, such as "Oak Long Bow" or "Soft leather: 1 gp". A product with no text is named by the item drawn over it, and failing that, by what follows the amount in its buttons' options. Matching is by part of the name, or of the item's name, without regard to case.
+
+A `MakeProduct` has `name`, `item` (the item drawn over it, or `None`), `item_name`, and `amounts`, what its buttons make. These are counts, `MAKE_X` for the button that asks and `MAKE_ALL` for one that makes all. `button(amount)` gives that button's component, and `largest()` gives the one `make` uses.
+
+`modals` is the main interface, such as the bank, a shop or the anvil:
+- `main()` is its id, or -1, and `is_open()` says whether there is one;
+- `close()` closes it and waits for it to go, and `close_if_open()` does so only when one is open.
 
 ## Interfaces
 
@@ -266,8 +308,7 @@ A `Component` is a snapshot. Its fields:
 `component.click()` clicks it.
 
 These take numbers still, until phase 4 replaces them ([BotApiDesign.md](BotApiDesign.md) §14):
-- `continue_dialogue()` continues a "click here to continue" dialogue;
-- `answer_count(value)` answers an amount prompt;
+- `continue_dialogue()` clicks "Click here to continue", and `answer_count(value)` answers an amount prompt. Each gives `False`, sending nothing, when there's no such thing to answer;
 - `close_interfaces()` closes the open ones;
 - `click_button(com)` sends a click on a component without checking it;
 - `inv_button(item, op)` uses an option on an item in an interface inventory, such as the bank's: its number, or its text, such as `'Withdraw 5'`;

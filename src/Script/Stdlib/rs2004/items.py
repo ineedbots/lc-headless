@@ -13,16 +13,20 @@ EQUIP_TIMEOUT_MS = 3000
 
 
 class InvItem:
-    """One slot of an inventory: name, id, slot, count, noted, and com, the inventory it's in."""
+    """One slot of an inventory: name, id, slot, count, noted, and com, the inventory it's in. Its actions
+    are its own, such as 'Eat', in the backpack, and its inventory's, such as 'Withdraw 5', in the bank and
+    other interfaces, as the right-click menu shows them."""
 
     def actions(self):
         return present_ops(self._ops)
 
     def interact(self, action):
-        """Uses the item's option named action, such as 'Eat' or 'Bury'. False when it has no such option."""
+        """Uses the option named action, such as 'Eat' or 'Withdraw 5'. False when it has no such option."""
         op = op_index(self._ops, action)
         if op == -1:
             return False
+        if self._button:
+            return _core.inv_button(self, op)
         return _core.item_op(self, op)
 
     def use_on(self, target):

@@ -4,6 +4,7 @@
 #include "Cache/CacheLoader.hpp"
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
+#include "Game/ChatDialog.hpp"
 #include "Game/InterfaceView.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"
@@ -266,4 +267,106 @@ TEST_CASE("The real cache's interfaces click as the webclient's do", "[RealCache
 
     CHECK(view.Find(TITLE)->buttonType == ButtonType_e::None);
     CHECK(view.GetText(*view.Find(TITLE)) == "Select an Option");
+
+    // The backpack's menu offers its items' options; the bank's and the worn equipment's, their own.
+    const auto& backpack = *cache.FindComponent(cache.inventoryComponent);
+    const auto& bank = *cache.FindComponent(cache.bankComponent);
+    const auto& worn = *cache.FindComponent(cache.equipmentComponent);
+    CHECK((backpack.objOps && !bank.objOps && !worn.objOps));
+    CHECK(bank.options[0] == "Withdraw 1");
+    CHECK(worn.options[0] == "Remove");
+    CHECK((backpack.marginX == 10 && backpack.marginY == 4));
+}
+
+TEST_CASE("The real cache's dialogues and make menus are recognised by their shape", "[RealCache]")
+{
+    constexpr auto TWO_OPTIONS = u16{2459};
+    constexpr auto SKILL_MULTI2 = u16{8866};
+    constexpr auto MODEL_A = u16{8869};
+    constexpr auto MAKE1_A = u16{8874};
+    constexpr auto SMELTING = u16{2400};
+    constexpr auto SMELTING_BRONZE_MODEL = u16{2405};
+    constexpr auto TANNER = u16{679};
+    constexpr auto JEWELLERY = u16{4161};
+    constexpr auto RINGS_INV = u16{4233};
+    constexpr auto RINGS1 = u16{4246};
+    constexpr auto BRONZE_BAR = u16{2349};
+    constexpr auto GOLD_RING = u16{1635};
+
+    const auto& cache = RequireRealCache();
+    auto state = GameState_s{};
+    auto& interfaces = state.interfaces;
+    const auto view = InterfaceView{cache, interfaces};
+
+    SECTION("multi2's options, and no make menu")
+    {
+        interfaces.chatModal = TWO_OPTIONS;
+        interfaces.components[2461].text = "Yes please.";
+        interfaces.components[2462].text = "@red@No thanks.";
+        const auto options = ChatDialog::GetOptions(view);
+        REQUIRE(options.size() == 2);
+        CHECK((options[0].com == 2461 && options[0].text == "Yes please."));
+        CHECK((options[1].com == 2462 && options[1].text == "No thanks."));
+        CHECK(ChatDialog::GetMakeProducts(view).empty());
+        CHECK_FALSE(ChatDialog::FindContinue(view).has_value());
+    }
+
+    SECTION("skill_multi2's stacked buttons, one product each, named by their text")
+    {
+        interfaces.chatModal = SKILL_MULTI2;
+        interfaces.components[MAKE1_A].text = "\n\n\n\nOak Long Bow";
+        interfaces.components[MODEL_A].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BRONZE_BAR};
+        const auto products = ChatDialog::GetMakeProducts(view);
+        REQUIRE(products.size() == 2);
+        CHECK(products[0].name == "Oak Long Bow");
+        CHECK(products[0].item == BRONZE_BAR);
+        auto amounts = std::vector<s32>{};
+        for (const auto& button : products[0].buttons)
+        {
+            amounts.push_back(button.amount);
+        }
+
+        CHECK(amounts == std::vector<s32>{MakeButton_s::X, 10, 5, 1});
+        CHECK(products[0].buttons.back().com == MAKE1_A);
+        // The second has no text of its own, so it's named by what's drawn over it, which is nothing here.
+        CHECK(products[1].item == -1);
+        CHECK(ChatDialog::GetOptions(view).empty());
+        // In drawing order, which puts the buttons before the prompt.
+        CHECK(ChatDialog::GetTexts(view) == std::vector<std::string>{"Oak Long Bow", "What would you like to make?"});
+    }
+
+    SECTION("the furnace's bars")
+    {
+        interfaces.chatModal = SMELTING;
+        interfaces.components[SMELTING_BRONZE_MODEL].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BRONZE_BAR};
+        const auto products = ChatDialog::GetMakeProducts(view);
+        REQUIRE(products.size() == 8);
+        CHECK(products[0].name == "Bronze");
+        CHECK(products[0].item == BRONZE_BAR);
+        CHECK(products[1].name == "Iron");
+        CHECK(products[0].buttons.size() == 4);
+    }
+
+    SECTION("the tanner's leathers, in the main modal, with Tan all")
+    {
+        interfaces.mainModal = TANNER;
+        const auto products = ChatDialog::GetMakeProducts(view);
+        REQUIRE_FALSE(products.empty());
+        // The name is the text the player reads, price and all.
+        CHECK(products[0].name == "Soft leather: 1 gp");
+        CHECK(std::ranges::any_of(products[0].buttons, [](const MakeButton_s& button) { return button.amount == MakeButton_s::ALL; }));
+    }
+
+    SECTION("jewellery's products are drawn over placeholder slots")
+    {
+        // The first slot shows its own item; the model over the second shows that slot's product.
+        constexpr auto PLACEHOLDER = 1;
+        interfaces.mainModal = JEWELLERY;
+        state.inventories[RINGS_INV] = Inventory_s{.com = RINGS_INV, .slots = {{.id = GOLD_RING, .count = 1}, {.id = PLACEHOLDER, .count = 1}}};
+        interfaces.components[RINGS1].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BRONZE_BAR};
+        const auto slots = ChatDialog::GetMakePanel(view, state);
+        REQUIRE(slots.size() == 2);
+        CHECK((slots[0].com == RINGS_INV && slots[0].slot == 0 && slots[0].product == GOLD_RING));
+        CHECK((slots[1].slot == 1 && slots[1].id == PLACEHOLDER && slots[1].product == BRONZE_BAR));
+    }
 }

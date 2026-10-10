@@ -112,6 +112,7 @@ std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
     // The NPC TestWorld sends, so scripts can use its options by name.
     TestCache::AddNpc(cache, 50, "Goblin", {"Talk-to", "Attack"});
     TestCache::SetTradeScreen(cache);
+    TestCache::SetChatInterfaces(cache);
     return std::make_shared<const GameCache_s>(std::move(cache));
 }
 

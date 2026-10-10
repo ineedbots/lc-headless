@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Cache/GameCache_s.hpp"
+#include "../Game/ChatDialog.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
@@ -75,6 +76,15 @@ public:
     [[nodiscard]] std::optional<std::string> GetComponentText(u16 com) const;
     // The interfaces as the player sees them.
     [[nodiscard]] InterfaceView GetInterfaces() const;
+    // The chat modal's "Click here to continue" button, until it's clicked: the webclient sends one resume
+    // per dialogue, and so does ContinueDialogue.
+    [[nodiscard]] std::optional<u16> FindContinue() const;
+    // The count dialog is open and hasn't been answered; the server doesn't say when an answer closes it.
+    [[nodiscard]] bool IsCountDialogOpen() const;
+    [[nodiscard]] std::vector<ChatOption_s> GetChatOptions() const;
+    [[nodiscard]] std::vector<std::string> GetChatTexts() const;
+    [[nodiscard]] std::vector<MakeProduct_s> GetMakeProducts() const;
+    [[nodiscard]] std::vector<MakeSlot_s> GetMakePanel() const;
 
     [[nodiscard]] std::vector<Npc_s> GetNpcs(const SearchFilter_s& filter) const;
     [[nodiscard]] std::optional<Npc_s> GetNearestNpc(const SearchFilter_s& filter, std::optional<bool> inCombat, bool reachable = false) const;
@@ -114,6 +124,9 @@ public:
     [[nodiscard]] static Menu GetLocMenu(const GameCache_s& cache, s32 loc);
     [[nodiscard]] static Menu GetGroundItemMenu(const GameCache_s& cache, s32 obj);
     [[nodiscard]] static Menu GetItemMenu(const GameCache_s& cache, s32 obj);
+    // The options of an inventory whose menu offers its own rather than its items', such as the bank's
+    // "Withdraw 1", or nullopt for one that offers its items', such as the backpack.
+    [[nodiscard]] static std::optional<Menu> GetInventoryMenu(const GameCache_s& cache, u16 com);
     [[nodiscard]] Menu GetPlayerMenu() const;
 
     // Whether the path finder reaches the target by the rule the matching interaction walks by.
@@ -154,8 +167,9 @@ public:
     // Clicks the button under the visible text, in the open interfaces or only in root's. False when there's
     // no such text, or no button under it.
     bool ClickText(std::string_view text, std::optional<u16> root);
-    void ContinueDialogue();
-    void AnswerCountDialog(s32 value);
+    // False, sending nothing, when there's nothing to continue or no count dialog to answer.
+    bool ContinueDialogue();
+    bool AnswerCountDialog(s32 value);
     void CloseInterfaces();
     void SetRun(bool run);
     void Say(std::string_view text);
@@ -200,4 +214,7 @@ private:
     StopRequest_e m_stopRequest = StopRequest_e::None;
     s64 m_stepTime = 0;
     std::optional<s64> m_lastProgress;
+    // The modal change in which the dialogue was continued or the count dialog answered.
+    std::optional<u32> m_continuedAt;
+    std::optional<u32> m_answeredAt;
 };

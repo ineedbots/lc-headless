@@ -37,6 +37,7 @@ from rs2004.entities import *
 from rs2004.items import *
 from rs2004.game import *
 from rs2004.interfaces import *
+from rs2004.dialogue import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
@@ -803,7 +804,7 @@ _rt_finish = _runtime.finish
 
     bool IsCountDialogOpen(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().GetState().interfaces.countDialogOpen); });
+        return Guard([] { return ReturnBool(GetApi().IsCountDialogOpen()); });
     }
 
     bool GetVarp(int, py_StackRef argv) noexcept
@@ -825,6 +826,87 @@ _rt_finish = _runtime.finish
         return Guard([]
         {
             PyConvert::FromList(py_retval(), GetApi().GetState().social.ignores, FromName);
+            return true;
+        });
+    }
+
+    // Dialogues and make menus
+
+    bool GetModalChanges(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.modalChanges); });
+    }
+
+    bool FindContinue(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromOptional(py_retval(), GetApi().FindContinue(), [](py_OutRef out, u16 com) { py_newint(out, com); });
+            return true;
+        });
+    }
+
+    bool GetChatOptions(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetChatOptions(), [](py_OutRef out, const ChatOption_s& option)
+            {
+                py_newtuple(out, 2);
+                py_newint(py_tuple_getitem(out, 0), option.com);
+                py_newnone(py_tuple_getitem(out, 1));
+                PyConvert::FromString(py_tuple_getitem(out, 1), option.text);
+            });
+            return true;
+        });
+    }
+
+    bool GetChatTexts(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetChatTexts(), [](py_OutRef out, const std::string& text) { PyConvert::FromString(out, text); });
+            return true;
+        });
+    }
+
+    // (name, item or -1, [(amount, com)]), with MakeButton_s's amounts.
+    bool GetMakeProducts(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            PyConvert::FromList(py_retval(), GetApi().GetMakeProducts(), [](py_OutRef out, const MakeProduct_s& product)
+            {
+                py_newtuple(out, 3);
+                py_newnone(py_tuple_getitem(out, 0));
+                py_newint(py_tuple_getitem(out, 1), product.item);
+                py_newnone(py_tuple_getitem(out, 2));
+                PyConvert::FromString(py_tuple_getitem(out, 0), product.name);
+                PyConvert::FromList(py_tuple_getitem(out, 2), product.buttons, [](py_OutRef button, const MakeButton_s& value)
+                {
+                    PyConvert::FromPoint(button, value.amount, value.com);
+                });
+            });
+            return true;
+        });
+    }
+
+    // (InvItem, product id) for each slot of the main modal's make inventories.
+    bool GetMakePanel(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            const auto& api = GetApi();
+            const auto& state = api.GetState();
+            PyConvert::FromList(py_retval(), api.GetMakePanel(), [&api, &state](py_OutRef out, const MakeSlot_s& slot)
+            {
+                const auto& items = state.inventories.at(slot.com).slots;
+                const auto item = InventoryItem_s{.com = slot.com, .slot = slot.slot, .id = slot.id, .count = items[slot.slot].count};
+                py_newtuple(out, 2);
+                py_newnone(py_tuple_getitem(out, 0));
+                py_newint(py_tuple_getitem(out, 1), slot.product);
+                PyConvert::FromItem(py_tuple_getitem(out, 0), item, api.GetCache());
+            });
             return true;
         });
     }
@@ -1305,11 +1387,7 @@ _rt_finish = _runtime.finish
 
     bool ContinueDialogue(int, py_StackRef) noexcept
     {
-        return Guard([]
-        {
-            GetApi().ContinueDialogue();
-            return ReturnNone();
-        });
+        return Guard([] { return ReturnBool(GetApi().ContinueDialogue()); });
     }
 
     bool AnswerCount(int, py_StackRef argv) noexcept
@@ -1317,8 +1395,7 @@ _rt_finish = _runtime.finish
         return Guard([argv]
         {
             const auto value = PyConvert::ToInt(py_arg(0), "value", 0, std::numeric_limits<s32>::max());
-            GetApi().AnswerCountDialog(static_cast<s32>(value));
-            return ReturnNone();
+            return ReturnBool(GetApi().AnswerCountDialog(static_cast<s32>(value)));
         });
     }
 
@@ -1510,6 +1587,12 @@ _rt_finish = _runtime.finish
             {"cast_on_ground_item(spell, ground_item)", CastOnGroundItem},
             {"cast_on_item(spell, item)", CastOnItem},
             {"click_button(com)", ClickButton},
+            {"modal_changes()", GetModalChanges},
+            {"find_continue()", FindContinue},
+            {"get_chat_options()", GetChatOptions},
+            {"get_chat_texts()", GetChatTexts},
+            {"get_make_products()", GetMakeProducts},
+            {"get_make_panel()", GetMakePanel},
             {"continue_dialogue()", ContinueDialogue},
             {"answer_count(value)", AnswerCount},
             {"close_interfaces()", CloseInterfaces},

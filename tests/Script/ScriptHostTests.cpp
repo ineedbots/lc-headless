@@ -32,6 +32,12 @@ namespace
     constexpr auto WAIT = 5s;
     constexpr auto PUMP_STEP = 20ms;
 
+    // A component id as a packet carries it.
+    std::vector<u8> ComBytes(u16 com)
+    {
+        return {static_cast<u8>(com >> 8), static_cast<u8>(com & 0xFF)};
+    }
+
     GameClientOptions_s FastOptions()
     {
         return {.retryDelay = 50ms, .loginTimeout = 5s, .keepaliveInterval = 50ms};
@@ -853,6 +859,96 @@ def loop():
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"clicked True False"});
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
     CHECK(fixture.server.GetPackets(ClientProt_e::IfButton)[0].payload == std::vector<u8>{TestCache::TRADE_ACCEPT >> 8, TestCache::TRADE_ACCEPT & 0xFF});
+}
+
+TEST_CASE("ScriptHost drives a dialogue, an option and Make X to the end", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+def loop():
+    log('>', 'page', chat_dialog.can_continue(), chat_dialog.texts())
+    ok = yield from chat_dialog.continue_()
+    log('>', 'continued', ok, chat_dialog.can_continue(), chat_dialog.options())
+    ok = yield from chat_dialog.choose_option('NO')
+    log('>', 'chose', ok, chat_dialog.make_products(), chat_dialog.options())
+    ok = yield from chat_dialog.make_x('long bow', 27)
+    log('>', 'made', ok, reader.count_dialog_open())
+    stop_script()
+)python"};
+
+    auto& client = fixture.client;
+    const auto send = [&fixture](ServerProt_e prot, const Packet& packet)
+    {
+        fixture.server.Send(prot, Fixtures::ToBytes(packet));
+    };
+    const auto openChat = [&send](u16 id)
+    {
+        auto packet = Packet{};
+        packet.P2(id);
+        send(ServerProt_e::IfOpenChat, packet);
+    };
+    const auto setText = [&send](u16 com, std::string_view text)
+    {
+        auto packet = Packet{};
+        packet.P2(com);
+        packet.PJStr(text);
+        send(ServerProt_e::IfSetText, packet);
+    };
+    const auto pumpUntil = [&client](auto condition)
+    {
+        const auto deadline = Clock::now() + WAIT;
+        while (Clock::now() < deadline && !condition())
+        {
+            client.Pump(PUMP_STEP);
+        }
+
+        REQUIRE(condition());
+    };
+    const auto step = [&fixture]
+    {
+        fixture.host->Step(Clock::now());
+        fixture.client.Flush();
+    };
+    const auto lastPayload = [&fixture](ClientProt_e prot)
+    {
+        return fixture.server.GetPackets(prot).back().payload;
+    };
+
+    setText(TestCache::DIALOGUE_TEXT, "Hello there.");
+    openChat(TestCache::DIALOGUE);
+    pumpUntil([&client] { return client.GetState().interfaces.chatModal == TestCache::DIALOGUE; });
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePauseButton));
+    CHECK(lastPayload(ClientProt_e::ResumePauseButton) == ComBytes(TestCache::DIALOGUE_CONTINUE));
+
+    // The script waits for the server's answer; nothing more is sent meanwhile.
+    step();
+    CHECK(fixture.server.GetPackets(ClientProt_e::ResumePauseButton).size() == 1);
+
+    setText(TestCache::OPTION_ONE, "Yes please.");
+    setText(TestCache::OPTION_TWO, "No thanks.");
+    openChat(TestCache::OPTIONS);
+    pumpUntil([&client] { return client.GetState().interfaces.chatModal == TestCache::OPTIONS; });
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    CHECK(lastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::OPTION_TWO));
+
+    openChat(TestCache::MAKE_MENU);
+    pumpUntil([&client] { return client.GetState().interfaces.chatModal == TestCache::MAKE_MENU; });
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton, 2));
+    CHECK(lastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::MAKE_X));
+
+    send(ServerProt_e::PCountDialog, Packet{});
+    pumpUntil([&client] { return client.GetState().interfaces.countDialogOpen; });
+    step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
+    CHECK(lastPayload(ClientProt_e::ResumePCountDialog) == std::vector<u8>{0, 0, 0, 27});
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{
+        "page True ['Hello there.', 'Click here to continue']",
+        "continued True False ['Yes please.', 'No thanks.']",
+        "chose True ['Oak Long Bow'] []",
+        "made True False",
+    });
 }
 
 TEST_CASE("The example scripts load without warnings", "[ScriptHost]")

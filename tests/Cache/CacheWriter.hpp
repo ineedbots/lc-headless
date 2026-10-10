@@ -72,9 +72,12 @@ struct InterfaceComponent_s
     std::optional<std::string> text{};
     std::optional<u32> colour{};
     std::optional<std::string> buttonText{};
-    // An inventory's: whether its items can be used, whether its first slot has a background, and its
-    // options, with the slots past them empty.
+    // An inventory's: whether its items can be used, the gap between slots, whether its first slot has a
+    // background, and its options, with the slots past them empty.
+    bool objOps = true;
     bool objUse = false;
+    u8 marginX = 1;
+    u8 marginY = 1;
     bool slotBackground = false;
     std::vector<std::string> options{};
 };

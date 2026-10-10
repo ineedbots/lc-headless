@@ -67,6 +67,8 @@ public:
     static constexpr auto Z_FIELD = "_z";
     static constexpr auto PLANE_FIELD = "_plane";
     static constexpr auto MENU_FIELD = "_ops";
+    // Whether an item's options are its inventory's, used with INV_BUTTON, rather than its own.
+    static constexpr auto BUTTON_FIELD = "_button";
 
     PyConvert() = delete;
 

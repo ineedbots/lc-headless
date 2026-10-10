@@ -103,6 +103,30 @@ void TestCache::SetTradeScreen(GameCache_s& cache)
     });
 }
 
+void TestCache::SetChatInterfaces(GameCache_s& cache)
+{
+    const auto makeButton = [](u16 id, std::string option, std::string text = {})
+    {
+        return IfComponent_s{.id = id, .root = MAKE_MENU, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 100, .height = 93, .text = std::move(text), .buttonText = std::move(option)};
+    };
+
+    AddComponents(cache, {
+        {.id = DIALOGUE, .root = DIALOGUE, .type = ComponentType_e::Layer, .width = 480, .height = 120, .children = {{.id = DIALOGUE_TEXT, .y = 20}, {.id = DIALOGUE_CONTINUE, .y = 80}}},
+        {.id = DIALOGUE_TEXT, .root = DIALOGUE, .type = ComponentType_e::Text, .width = 480, .height = 17},
+        {.id = DIALOGUE_CONTINUE, .root = DIALOGUE, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Continue, .width = 480, .height = 17, .text = "Click here to continue", .buttonText = "Continue"},
+        {.id = OPTIONS, .root = OPTIONS, .type = ComponentType_e::Layer, .width = 480, .height = 120, .children = {{.id = OPTION_ONE, .y = 31}, {.id = OPTION_TWO, .y = 63}}},
+        {.id = OPTION_ONE, .root = OPTIONS, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 480, .height = 17, .buttonText = "Ok"},
+        {.id = OPTION_TWO, .root = OPTIONS, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 480, .height = 17, .buttonText = "Ok"},
+        {.id = MAKE_MENU, .root = MAKE_MENU, .type = ComponentType_e::Layer, .width = 480, .height = 120, .children = {
+            {.id = MAKE_X, .x = 74, .y = 16}, {.id = MAKE_10, .x = 74, .y = 16}, {.id = MAKE_5, .x = 74, .y = 16}, {.id = MAKE_1, .x = 74, .y = 16},
+        }},
+        makeButton(MAKE_X, "Make X"),
+        makeButton(MAKE_10, "Make 10"),
+        makeButton(MAKE_5, "Make 5"),
+        makeButton(MAKE_1, "Make 1", "\n\n\n\nOak Long Bow"),
+    });
+}
+
 void TestCache::SetComponents(GameCache_s& cache)
 {
     cache.inventoryComponent = INVENTORY;

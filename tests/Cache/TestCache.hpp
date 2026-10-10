@@ -37,6 +37,19 @@ public:
     static constexpr u16 TRADE_DECLINE = 303;
     static constexpr u16 TRADE_STATUS_LAYER = 304;
     static constexpr u16 TRADE_STATUS = 305;
+    // SetChatInterfaces': a dialogue page with a continue button, two options as multi2 has them, and a
+    // make menu of one product, a stack of Make X, 10, 5 and 1, as skill_multi has it.
+    static constexpr u16 DIALOGUE = 310;
+    static constexpr u16 DIALOGUE_TEXT = 311;
+    static constexpr u16 DIALOGUE_CONTINUE = 312;
+    static constexpr u16 OPTIONS = 320;
+    static constexpr u16 OPTION_ONE = 321;
+    static constexpr u16 OPTION_TWO = 322;
+    static constexpr u16 MAKE_MENU = 330;
+    static constexpr u16 MAKE_X = 331;
+    static constexpr u16 MAKE_10 = 332;
+    static constexpr u16 MAKE_5 = 333;
+    static constexpr u16 MAKE_1 = 334;
 
     TestCache() = delete;
 
@@ -48,6 +61,7 @@ public:
     // Adds the components, setting each child's parent from the layers that list it.
     static void AddComponents(GameCache_s& cache, std::initializer_list<IfComponent_s> components);
     static void SetTradeScreen(GameCache_s& cache);
+    static void SetChatInterfaces(GameCache_s& cache);
     // Replaces the map with squares holding these locs and blocked tiles.
     static void SetMap(GameCache_s& cache, std::span<const TestLoc_s> locs, std::span<const Tile_s> blocked = {});
 };

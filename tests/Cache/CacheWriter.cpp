@@ -46,8 +46,8 @@ namespace
     constexpr auto BUTTON_SELECT = 5;
     constexpr auto BUTTON_CONTINUE = 6;
     constexpr auto UNUSED_TYPE_SIZE = std::size_t{3};
-    constexpr auto OBJ_SWAP_OPS_COUNT = 2;
-    constexpr auto OBJ_REPLACE_MARGINS_COUNT = 3;
+    constexpr auto OBJ_SWAP_COUNT = 1;
+    constexpr auto OBJ_REPLACE_COUNT = 1;
     constexpr auto INV_BACKGROUND_COUNT = 20;
     constexpr auto INV_OPTION_COUNT = std::size_t{5};
     constexpr auto RECT_TEXT_COLOUR_COUNT = 4;
@@ -134,9 +134,12 @@ namespace
     // Only the first slot can have a background graphic, so with one, both forms of slot are written.
     void PutInv(Packet& packet, const InterfaceComponent_s& component)
     {
-        PutFlags(packet, OBJ_SWAP_OPS_COUNT);
+        PutFlags(packet, OBJ_SWAP_COUNT);
+        packet.P1(component.objOps ? 1 : 0);
         packet.P1(component.objUse ? 1 : 0);
-        PutFlags(packet, OBJ_REPLACE_MARGINS_COUNT);
+        PutFlags(packet, OBJ_REPLACE_COUNT);
+        packet.P1(component.marginX);
+        packet.P1(component.marginY);
         for (auto slot = 0; slot < INV_BACKGROUND_COUNT; ++slot)
         {
             if (slot > 0 || !component.slotBackground)

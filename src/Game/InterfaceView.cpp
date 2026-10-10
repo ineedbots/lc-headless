@@ -27,6 +27,16 @@ InterfaceView::InterfaceView(const GameCache_s& cache, const Interfaces_s& inter
 {
 }
 
+const GameCache_s& InterfaceView::GetCache() const
+{
+    return m_cache;
+}
+
+const Interfaces_s& InterfaceView::GetInterfaces() const
+{
+    return m_interfaces;
+}
+
 const IfComponent_s* InterfaceView::Find(s32 id) const
 {
     return m_cache.FindComponent(id);
@@ -77,6 +87,17 @@ bool InterfaceView::IsHidden(const IfComponent_s& component) const
 {
     const auto* const set = FindSet(component.id);
     return set != nullptr && set->hidden ? *set->hidden : component.hidden;
+}
+
+std::optional<u16> InterfaceView::GetObject(const IfComponent_s& component) const
+{
+    const auto* const set = FindSet(component.id);
+    if (set == nullptr || !set->model || set->model->kind != ComponentModelKind_e::Object)
+    {
+        return std::nullopt;
+    }
+
+    return set->model->id;
 }
 
 bool InterfaceView::IsVisible(const IfComponent_s& component) const

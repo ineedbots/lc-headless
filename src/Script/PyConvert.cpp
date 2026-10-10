@@ -95,7 +95,9 @@ void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameC
     SetInt(object, "slot", item.slot);
     SetInt(object, "com", item.com);
     SetBool(object, "noted", type != nullptr && type->noteOf.has_value());
-    SetMenu(object, ScriptApi::GetItemMenu(cache, item.id));
+    const auto inventoryMenu = ScriptApi::GetInventoryMenu(cache, item.com);
+    SetMenu(object, inventoryMenu.value_or(ScriptApi::GetItemMenu(cache, item.id)));
+    SetBool(object, BUTTON_FIELD, inventoryMenu.has_value());
 }
 
 void PyConvert::FromNpcType(py_OutRef out, const NpcType_s& type, const GameCache_s& cache)

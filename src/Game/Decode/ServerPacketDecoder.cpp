@@ -130,7 +130,8 @@ namespace
 
     void AddModalEvent(GameState_s& state)
     {
-        const auto& interfaces = state.interfaces;
+        auto& interfaces = state.interfaces;
+        ++interfaces.modalChanges;
         StateLog::AddEvent(state, ModalChanged_s{.mainModal = interfaces.mainModal, .sideModal = interfaces.sideModal, .chatModal = interfaces.chatModal});
     }
 
