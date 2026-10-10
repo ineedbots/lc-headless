@@ -574,6 +574,7 @@ void GameClient::ProcessInput()
         }
 
         m_decoder.Decode(packet->prot, packet->payload, m_state);
+        ++m_state.updateCount;
     }
 
     LogNewMessages();

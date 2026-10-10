@@ -51,21 +51,24 @@ Rejected:
 src/
 ├── Script/
 │   ├── ScriptApi.hpp/.cpp      the core: state, searches, interfaces, packets, path search (bound as _core)
-│   ├── ScriptBindings.cpp      binds _core; the prelude shrinks to what the stdlib needs at startup
+│   ├── ScriptBindings.cpp      binds _core and loads the stdlib into builtins; the prelude shrinks phase by phase
 │   ├── ScriptHost.cpp          drives a bot: steps, waits, events, the random-event guardian, stall guard
-│   ├── Stdlib/                 the Python standard library, embedded at build time
-│   │   ├── bot.py              AbstractBot, LoopingBot, TaskBot, TreeBot, define_bot, settings
-│   │   ├── execution.py        delays and waits
-│   │   ├── geometry.py         Tile, Area
-│   │   ├── entities.py         Npc, Player, Loc, GroundItem, EntityQuery, npcs, players, locs, ground_items
-│   │   ├── items.py            InvItem, inventory, equipment
-│   │   ├── game.py             game, skills, prayer, special, magic, reader
-│   │   ├── bank.py             bank, banking, deposit matchers
-│   │   ├── ui.py               chat_dialog, shop, trade, quests, interfaces
-│   │   ├── walking/            traversal, direct_navigator, reach, the executor and crossings
-│   │   ├── randomevents/       the guardian and solvers
-│   │   └── catalogs/           data tables, planners and behaviours (§12)
-│   └── StdlibSources.cmake     turns Stdlib/*.py into a generated header
+│   ├── Stdlib.hpp/.cpp         finds an embedded stdlib file by path
+│   └── Stdlib/rs2004/          the Python standard library, embedded at build time
+│       ├── _runtime.py         the host's side: loading the bot, its steps, events and end
+│       ├── bot.py              AbstractBot, LoopingBot, Task, TaskBot, TreeBot, define_bot
+│       ├── settings.py         SettingDef, SettingsBag, schema checks
+│       ├── events.py           the event bus, payloads, the names the host checks
+│       ├── execution.py        delays and waits
+│       ├── geometry.py         Tile, Area
+│       ├── entities.py         Npc, Player, Loc, GroundItem, EntityQuery, npcs, players, locs, ground_items
+│       ├── items.py            InvItem, inventory, equipment
+│       ├── game.py             game, skills, prayer, special, magic, reader
+│       ├── bank.py             bank, banking, deposit matchers
+│       ├── ui.py               chat_dialog, shop, trade, quests, interfaces
+│       ├── walking/            traversal, direct_navigator, reach, the executor and crossings
+│       ├── randomevents/       the guardian and solvers
+│       └── catalogs/           data tables, planners and behaviours (§12)
 ├── Game/
 │   ├── InterfaceView.hpp/.cpp  the cache's components merged with what the server set (§6)
 │   └── Map/
@@ -74,18 +77,24 @@ src/
 │       ├── WalkMap.hpp/.cpp        the whole world's walkable directions, built once from the cache (§9)
 │       ├── NavGraph.hpp/.cpp       doors, stairs, transports and teleports from data/nav (§9)
 │       └── WorldPathFinder.hpp/.cpp  A* over WalkMap and NavGraph (§9)
+cmake/EmbedStdlib.cmake         turns Stdlib/**/*.py into a generated source of byte arrays
 data/nav/                       rs2b0t's walker data, with its license (§9)
 third_party/rs2b0t/LICENSE      rs2b0t's MIT notice, for the ported code and data
 tools/nav/convert_rs2b0t.py     one-off: rs2b0t's TypeScript data tables to JSON
 scripts/typings/                the stubs, for the whole library
 scripts/examples/               rewritten bots (§14)
-tests/Stdlib/                   Python tests run in the VM (§13)
+tests/Stdlib/                   Python tests, run in a VM by tests/Script/StdlibTests.cpp (§13)
 ```
 
-- **The core** keeps today's `ScriptApi` and grows with each phase. Its bindings become one private builtin module, `_core`, which only the stdlib imports. Scripts never see it.
-- **The stdlib** lives in `src/Script/Stdlib/`. CMake embeds each file as a string, and the import callback resolves those modules before `scripts/` and `scripts/lib/`, so a script can't shadow them by accident. A failure in the stdlib carries its own file and line, as a script's does.
-- **Builtins.** At startup each VM imports the stdlib's core modules and puts their public names in `builtins`, as the API is today, so scripts need no imports. Catalogs, which have hundreds of names, stay in their module: `from catalogs import nearest_bank`.
+- **The core** keeps today's `ScriptApi` and grows with each phase. Its bindings move, phase by phase, into one private builtin module, `_core`, which only the stdlib imports. Scripts never see it. Phase 1 put the runtime's needs there (`step_time`, `tick`, `note_progress`); the flat API stays in builtins until phase 2 replaces it.
+- **The stdlib** is the `rs2004` package in `src/Script/Stdlib/`. `cmake/EmbedStdlib.cmake` embeds each file as a byte array, since MSVC limits a string literal to 64 KB, and regenerates them when a `.py` file changes. The import callback resolves `rs2004` before `scripts/` and `scripts/lib/`, so a script can't shadow it, and its files aren't watched with the script's. A failure in the stdlib carries its own file and line, as a script's does.
+- **Builtins.** At startup each VM imports the stdlib's public modules and puts their names in `builtins`, as the API is today, so scripts need no imports. Catalogs, which have hundreds of names, stay in their module: `from rs2004.catalogs import nearest_bank`.
 - **Ported code** keeps rs2b0t's MIT notice. Each ported module names the rs2b0t file it came from, which is also where a reader goes to compare behaviour.
+- **pocketpy's dialect** constrains the stdlib as it does scripts (ScriptingApi.md, Python dialect). The ones that shaped phase 1:
+    - a parameter takes a keyword only when it has a default, so every parameter a script might name has one (`define_bot(name=None, create=None, ...)`, `SettingDef(type=None, default=None, ...)`);
+    - a default must be a literal;
+    - an instance attribute doesn't override a class's method, so `Task` keeps its callables as `_validate` and `_execute`;
+    - generators have only `__next__`, so the runtime drives them with `next` and reads a return value from `StopIteration.value`.
 
 ---
 
@@ -106,76 +115,81 @@ The stubs in `scripts/typings` mark every generator `-> Generator[..., None, T]`
 
 ---
 
-## 4. Phase 1: the runtime
+## 4. Phase 1: the runtime (done)
 
 ### Steps and waits
 
-`loop()` returns a delay in milliseconds, or is a generator, as today. What a generator may yield grows. The stdlib's waits yield these; scripts use the waits, not the values:
+The host steps the bot through `_runtime.step()`, which runs `loop()`, or resumes the generator it returned, until it waits, and hands back how:
 
-| Yielded | The host resumes it |
+| Step result | The host steps it again |
 |---|---|
-| An `int` ≥ 0 | After that many milliseconds, as today |
-| `UPDATE` | After the next pump that decoded any packet, when the state may have changed |
-| `Ticks(n)` | After `n` more server ticks |
+| `('ms', n)` | After `n` milliseconds |
+| `('update', n)` | After the next pump that decoded a packet (`GameState_s::updateCount` moved), or after `n` milliseconds when `n` ≥ 0, whichever is first |
+| `('ticks', n)` | Once the server tick has moved on `n`, or started over with a fresh login |
+
+What `loop()` returns is read as rs2b0t's `resolveLoopCadence` reads it: 0 is the next pass, 600 the next server tick, and anything else milliseconds. `None` uses the bot's `loop_delay` (600) or its `loop_cadence` (`{'kind': 'frame'}`, `{'kind': 'server_tick', 'ticks': n}` or `{'kind': 'time', 'ms': n}`). What a generator yields isn't resolved that way: an `int` is milliseconds, and the waits yield `execution.Update(timeout_ms)` and `execution.Ticks(n)`.
 
 `execution` mirrors rs2b0t's `Execution`:
 
 | Function | Returns |
 |---|---|
 | `delay(ms)`, `delay_ticks(n)` | Nothing, once the time has passed |
-| `delay_until(cond, timeout_ms=6000)` | `True` as soon as `cond()` holds, re-checked after each `UPDATE`; `False` at the timeout |
-| `delay_until_ticks(cond, max_ticks)` | The same, bounded in ticks |
+| `delay_until(cond, timeout_ms=6000)` | `True` as soon as `cond()` holds, checked now and after each update; `False` at the timeout |
+| `delay_until_ticks(cond, max_ticks)` | The same, checked once a tick |
 | `note_progress()` | Tells the stall guard (§11) about work it can't see |
 
-Each resume is a separate call into Python, so `scripting.callTimeoutMs` bounds each stretch between yields, as it does today.
+Waits measure time from the host's step time (`ScriptApi::SetStepTime`, `_core.step_time()`), so a test that steps the host with made-up times controls them. Each resume is a separate call into Python, so `scripting.callTimeoutMs` bounds each stretch between yields, as before.
 
 ### Bots
 
 | Class | Does |
 |---|---|
-| `AbstractBot` | `loop_delay`, `loop_cadence` (`{'kind': 'update' or 'server_tick' or 'time', ...}`), `settings`, `log(msg)`, `on(event, cb)`, and the optional `on_start()`, `on_stop(reason)`, `recovery_anchor()`, `grind_targets()` and `ignored_randoms()` |
-| `LoopingBot` | `loop()` returns a delay, or `None` for `loop_delay`, or is a generator |
-| `TaskBot` | `add(*tasks)` in `on_start`, highest priority first. Each step runs the `execute()` of the first task whose `validate()` holds; `execute` may be a generator |
+| `AbstractBot` | `loop_delay`, `loop_cadence`, `settings`, `log(*args)`, `on(event, cb)`, `request_finish(reason)`, `grind_targets()`, `ignored_randoms()`, and the hooks a subclass defines |
+| `LoopingBot` | `loop()` returns a delay, or `None`, or is a generator |
+| `TaskBot` | `add(*tasks)` in `on_start`, highest priority first. Each step runs the `execute()` of the first task whose `validate()` holds; either may be a generator. `Task(validate, execute, label)` makes one of two callables |
 | `TreeBot` | `root()` returns a `BranchTask` (`validate()`, `success()`, `failure()`) or a `LeafTask` (`execute()`); each step walks the tree to a leaf and runs it |
 
-- A script sets `BOT = define_bot(name=..., description=None, version=None, category=None, tags=None, settings_schema=None, create=Miner)`. Without `BOT`, its module-level `loop()`, `on_*` functions and `SETTINGS_SCHEMA` act as a `LoopingBot`.
-- `on_stop(reason)` runs after `stop_script()`, `stop_account()`, a script error and Ctrl+C, as rs2b0t's does after a stop or a crash. It can't wait.
+- A script sets `BOT = define_bot(name=..., create=Miner, description=None, version=None, category=None, tags=None, settings_schema=None)`. Without `BOT`, its module-level `loop()`, `on_*` functions and `SETTINGS_SCHEMA` act as a `LoopingBot`. A script with neither `BOT` nor `loop()` fails before login.
+- An `on_start()` that's a generator runs as the bot's first step, and `loop()` follows on the next pass.
+- `on_stop(reason)` runs once: after `stop_script()`, `stop_account()`, `request_finish(reason)` (whose reason wins) or a script error, and when `Account` logs out or fails for a reason of its own, such as Ctrl+C (`ScriptHost::Finish`). Then `script_finish` fires and the bot's subscriptions end. It can't wait.
 - rs2b0t's `on_pause` and `on_resume` have nothing to call them headlessly, and `on_paint` gives way to progress reports, which stay as they are.
 
 ### Settings
 
-`settings_schema` maps each key to a `SettingDef(type, default, label=None, min=None, max=None, help=None, options=None, group=None)`. The type is `'boolean'`, `'number'`, `'string'`, `'string[]'` or `'tile'`, as rs2b0t's.
+`settings_schema` maps each key to a `SettingDef(type, default, label=None, min=None, max=None, help=None, options=None, option_labels=None, group=None)`. The type is `'boolean'`, `'number'`, `'string'`, `'string[]'` or `'tile'`, as rs2b0t's.
 
-- At load, the account file's `script.settings` is checked against the schema. A wrong type, a number out of range, or a value not in `options` fails that account before login, naming the key. Missing keys take their defaults, and keys the schema doesn't know draw a warning.
-- `self.settings` is a `SettingsBag` with rs2b0t's getters (`bool`, `num`, `str`, `list`, `tile`, `raw`), and keeps today's attribute access (`settings.rock`).
+- At load, the account file's `script.settings` is checked against the schema. A wrong type, a number out of range, or a value not in `options` fails that account before login, naming the key, where rs2b0t quietly falls back to the default. Missing keys take their defaults, and keys the schema doesn't know draw a warning.
+- `self.settings` is a `SettingsBag` with rs2b0t's getters (`bool`, `num`, `str`, `list`, `tile`, `raw`), and keeps attribute access (`settings.rock`).
 
 ### Events
 
-Every event has one name, used by `events.on(name, cb)`, `bot.on(name, cb)` (removed when the bot stops) and the `on_<name>` hook:
+Every event has one name, used by `events.on(name, cb)`, `bot.on(name, cb)` (removed when the bot stops) and the `on_<name>` hook. rs2b0t's events pass one payload, an `Event` with its fields as attributes; the others pass their values, as hooks did before:
 
-| Event | Arguments | From |
+| Event | Passes | From |
 |---|---|---|
-| `tick` | tick | rs2b0t; today's `on_server_tick` |
-| `chat_message` | `ChatLine` (type, username, text) | rs2b0t; replaces today's `on_chat_message(msg, sender)` |
-| `skill_xp` | skill, name, xp, delta | rs2b0t |
-| `skill_level` | skill, name, level, previous | rs2b0t |
-| `inventory_changed` | slot, id, name, count, previous_id, previous_count | rs2b0t, for the backpack, one per changed slot |
-| `varp_changed` | index, value, previous | rs2b0t |
-| `script_finish` | reason | rs2b0t |
-| `server_message`, `private_message`, `trade_request`, `duel_request` | as today, the sender first | today |
-| `npc_spawned`, `npc_despawned`, `npc_damaged`, `player_spawned`, `player_despawned`, `player_damaged`, `damaged`, `ground_item_spawned`, `ground_item_despawned`, `ground_item_changed`, `loc_changed`, `interface_changed`, `system_update`, `disconnect`, `reconnect`, `kill_signal`, `bot_message`, `progress_report` | as today | today |
+| `tick` | `Event`: tick | rs2b0t; was `on_server_tick(tick)` |
+| `chat_message` | `Event`: type (`'game'`, `'public'`, `'private'`, `'trade_request'`, `'duel_request'`), username, text | rs2b0t's `ChatLine`, with names where it has the webclient's type numbers; was `on_chat_message(msg, sender)` |
+| `skill_xp` | `Event`: skill, name, xp, delta | rs2b0t; with `skill_level`, replaces `on_stat_changed(stat)` |
+| `skill_level` | `Event`: skill, name, level, previous | rs2b0t |
+| `inventory_changed` | `Event`: slot, id, name, count, previous_id, previous_count | rs2b0t: the backpack, one event per changed slot; was `on_inventory_changed(com)` for any inventory |
+| `varp_changed` | `Event`: index, value, previous | rs2b0t |
+| `script_finish` | `Event`: reason | rs2b0t, though there it's how a bot asks to stop; here `request_finish` does that |
+| `server_message`, `private_message`, `trade_request`, `duel_request` | values, the sender first | before |
+| `npc_spawned`, `npc_despawned`, `npc_damaged`, `player_spawned`, `player_despawned`, `player_damaged`, `damaged`, `ground_item_spawned`, `ground_item_despawned`, `ground_item_changed`, `loc_changed`, `interface_changed`, `system_update`, `disconnect`, `reconnect`, `kill_signal`, `bot_message` | values | before |
 
-`death`, `npc_say` and `projectile` come in phase 8 (§11). Callbacks run between steps and can't wait, as rs2b0t's fire mid-frame: they set flags, and `loop()` does the work.
+`start`, `stop` and `progress_report` are hooks without subscribers. `death`, `npc_say` and `projectile` come in phase 8 (§11). Callbacks run between steps and can't wait, as rs2b0t's fire mid-frame: they set flags, and `loop()` does the work.
+
+The host skips an event nobody listens to before converting anything: the stdlib keeps `_listening`, the names with a hook or subscriber, and the host reads it in place. Another account's `send_bot_message` reads it from inside its own VM, so the read puts the caller's VM back.
 
 ### Geometry
 
-`Tile(x, z, level=None)` with `distance_to` (Chebyshev), `translate`, `==`, and `Tile.from_tile(t)`. `Area.rectangular(a, b)`, `Area.circular(center, radius)` and `Area.polygon(points)` (plutonium's), with `contains(tile)` and `get_random_tile()`.
+`Tile(x, z, level=0)` with `distance_to` (Chebyshev, plus 1,000,000 across levels, as rs2b0t's), `translate`, `equals`, `==`, and `Tile.from_tile(t)`. `Area.rectangular(a, b)`, `Area.circular(center, radius)` and `Area.polygon(points, level=0)` (plutonium's), with `contains(tile)` and `get_random_tile()`. An area holds tiles on one level.
 
 ### Done when
 
-- `tests/Stdlib` runs, and covers the waits, the three bot classes, settings checks and every event's arguments.
-- The examples are rewritten as `LoopingBot` and `TaskBot` bots and run against the local engine.
-- `delay_until` resumes on the pump after the state changes, not on the next poll.
+- [x] `tests/Stdlib` runs, and covers the waits, the three bot classes, settings checks and the events' arguments.
+- [x] The examples are rewritten (`chicken_killer.py` as a `TaskBot` with a settings schema; `walker.py` stays the minimal module-level bot) and run against the local engine: the chicken killer fought, looted with `delay_until` confirming each pickup, reported progress and logged out at its goal.
+- [x] `delay_until` resumes on the pump after the state changes, not on the next poll (`ScriptHostTests`).
 
 ---
 
@@ -373,7 +387,7 @@ A world-scale route needs collision beyond the build area, which the cache has. 
 
 ## 10. Phase 7: random events
 
-rs2b0t's `RandomEventGuardian` and solvers, ported to `Stdlib/randomevents/`. The host runs the guardian after each pump.
+rs2b0t's `RandomEventGuardian` and solvers, ported to `rs2004/randomevents/`. The host runs the guardian after each pump.
 
 - **Detection.** An event NPC near the player, using rs2b0t's tables:
     - talking events: the genie, drunken dwarf, mysterious old man, sandwich lady and frog;
@@ -412,7 +426,7 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to `Stdlib/randomevents/`. Th
 
 ## 12. Phase 9: catalogs and behaviours
 
-Ported to `Stdlib/catalogs/` with rs2b0t's names in snake_case, and imported as `from catalogs import ...`:
+Ported to `rs2004/catalogs/` with rs2b0t's names in snake_case, and imported as `from rs2004.catalogs import ...`:
 
 | Group | Contents |
 |---|---|
@@ -448,7 +462,7 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 0. **Docs.**
     - Work: this document, and the porting sections of ScriptingApi.md and ScriptingDesign §6.
     - Done when: the porting table names the swapped damage hooks and every rename that exists today.
-1. **The runtime** (§4).
+1. **The runtime** (§4). Done.
 2. **Entities, items and the game** (§5). ScriptingApi.md is rewritten for the new shape here, and grows with each later phase.
 3. **Interfaces from the cache** (§6).
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7).

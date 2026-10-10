@@ -68,41 +68,34 @@ class LocType:
         return f'LocType(id={self.id}, name={self.name})'
 
 
-class Settings:
-    def __init__(self, values):
-        self._values = values
-        for key, value in values.items():
-            setattr(self, key, value)
-
-    def get(self, key, default=None):
-        return self._values.get(key, default)
-
-    def __contains__(self, key):
-        return key in self._values
-
-    def __repr__(self):
-        return f'Settings({self._values})'
-
-
-def _load_settings(text):
-    import json
-    return Settings(json.loads(text))
-
-
 def _report_rows(report):
     if not isinstance(report, dict):
         raise TypeError(f'on_progress_report() must return a dict, not {type(report).__name__}')
     return [[str(name), str(value)] for name, value in report.items()]
-
-
-def _resume_loop(generator):
-    try:
-        return False, next(generator)
-    except StopIteration as e:
-        return True, e.value
 )python"sv;
 
-    constexpr auto LOAD_SETTINGS = "settings = _load_settings(_settings_json)\ndel _settings_json\n"sv;
+    // Loads the standard library's public names into builtins, and names the runtime's entry points the
+    // host calls, which CallBuiltin finds there.
+    constexpr auto LOAD_STDLIB = R"python(
+from rs2004.bot import *
+from rs2004.settings import *
+from rs2004.geometry import *
+from rs2004.events import *
+from rs2004 import execution
+from rs2004 import _runtime
+from rs2004.events import listening as _listening
+
+_rt_make_settings = _runtime.make_settings
+_rt_load = _runtime.load
+_rt_start = _runtime.start
+_rt_dispatch = _runtime.dispatch
+_rt_step = _runtime.step
+_rt_reset = _runtime.reset
+_rt_finish = _runtime.finish
+)python"sv;
+
+    constexpr auto LOAD_SETTINGS = "settings = _rt_make_settings(_settings_json)\ndel _settings_json\n"sv;
+    constexpr auto CORE_MODULE = "_core";
     constexpr auto SETTINGS_JSON = "_settings_json";
     constexpr auto MAX_COORD = s64{32767};
     constexpr auto PERCENT = 100;
@@ -316,6 +309,20 @@ def _resume_loop(generator):
     bool GetTick(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(static_cast<s64>(GetApi().GetState().tick)); });
+    }
+
+    bool GetStepTime(int, py_StackRef) noexcept
+    {
+        return Guard([] { return ReturnInt(GetApi().GetStepTime()); });
+    }
+
+    bool NoteProgress(int, py_StackRef) noexcept
+    {
+        return Guard([]
+        {
+            GetApi().NoteProgress();
+            return ReturnNone();
+        });
     }
 
     bool StopScript(int, py_StackRef) noexcept
@@ -1225,6 +1232,15 @@ def _resume_loop(generator):
         py_CFunction function;
     };
 
+    std::vector<Function_s> GetCoreFunctions()
+    {
+        return {
+            {"step_time()", GetStepTime},
+            {"tick()", GetTick},
+            {"note_progress()", NoteProgress},
+        };
+    }
+
     std::vector<Function_s> GetFunctions(const GameCache_s& cache)
     {
         return {
@@ -1357,7 +1373,15 @@ void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
             py_bind(builtins, function.signature.c_str(), function.function);
         }
 
+        // The standard library reads the game through _core, which scripts don't use.
+        const auto core = py_newmodule(CORE_MODULE);
+        for (const auto& function : GetCoreFunctions())
+        {
+            py_bind(core, function.signature.c_str(), function.function);
+        }
+
         vm.RunSource(PRELUDE, "<prelude>", builtins);
+        vm.RunSource(LOAD_STDLIB, "<stdlib>", builtins);
     }
     catch (const std::exception&)
     {

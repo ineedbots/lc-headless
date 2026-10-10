@@ -18,6 +18,7 @@
 #include "Script/ScriptHost.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
@@ -84,6 +85,20 @@ namespace
             return lines;
         }
 
+        // Sends a PLAYER_INFO, which is a server tick, and pumps until the client has it.
+        void SendTick()
+        {
+            const auto tick = client.GetState().tick;
+            server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer());
+            const auto deadline = Clock::now() + WAIT;
+            while (Clock::now() < deadline && client.GetState().tick == tick)
+            {
+                client.Pump(PUMP_STEP);
+            }
+
+            REQUIRE(client.GetState().tick == tick + 1);
+        }
+
         [[nodiscard]] bool HasLog(LogLevel_e level, std::string_view text) const
         {
             return std::ranges::any_of(capture.GetEntries(), [level, text](const CapturedLog_s& entry)
@@ -109,18 +124,18 @@ def on_npc_spawned(npc):
 def on_ground_item_spawned(item):
     log('>', 'item', item.id, item.count)
 
-def on_inventory_changed(com):
-    log('>', 'inventory', com)
+def on_inventory_changed(e):
+    log('>', 'inventory', e.slot, e.id, e.count, e.previous_id)
 
 def on_server_message(msg):
     log('>', 'message', msg)
 
-def on_server_tick(tick):
-    log('>', 'tick', tick)
+def on_tick(e):
+    log('>', 'tick', e.tick)
 
 def loop():
     log('>', 'loop')
-    return 600
+    return 1000
 )python";
 }
 
@@ -134,7 +149,7 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
         "start 0",
         "npc 50",
         "item 995 10",
-        "inventory 3214",
+        "inventory 0 1511 3 -1",
         "message Welcome to RuneScape.",
         "tick 1",
         "loop",
@@ -142,12 +157,12 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
 
     SECTION("loop runs again only once the delay it returned has passed")
     {
-        fixture.host->Step(start + 599ms);
+        fixture.host->Step(start + 999ms);
         CHECK(fixture.GetScriptLines().size() == 7);
         REQUIRE(fixture.host->GetNextLoop().has_value());
-        CHECK(*fixture.host->GetNextLoop() == start + 600ms);
+        CHECK(*fixture.host->GetNextLoop() == start + 1000ms);
 
-        fixture.host->Step(start + 600ms);
+        fixture.host->Step(start + 1000ms);
         CHECK(fixture.GetScriptLines().back() == "loop");
         CHECK(fixture.GetScriptLines().size() == 8);
     }
@@ -195,12 +210,12 @@ TEST_CASE("ScriptHost stops a script that fails", "[ScriptHost]")
         CHECK(fixture.HasLog(LogLevel_e::Error, "on_start()"));
     }
 
-    SECTION("loop returning something other than an int")
+    SECTION("loop returning something other than an int or None")
     {
-        auto fixture = HostFixture{"def loop():\n    pass\n"};
+        auto fixture = HostFixture{"def loop():\n    return 'soon'\n"};
         fixture.host->Step(Clock::now());
         CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
-        CHECK(fixture.HasLog(LogLevel_e::Error, "loop() must return how many milliseconds to wait, as an int, not NoneType"));
+        CHECK(fixture.HasLog(LogLevel_e::Error, "loop() must return how many milliseconds to wait, as an int, or None, not str"));
     }
 
     SECTION("loop returning a negative delay")
@@ -215,7 +230,7 @@ TEST_CASE("ScriptHost stops a script that fails", "[ScriptHost]")
         auto fixture = HostFixture{"def loop():\n    yield 'soon'\n"};
         fixture.host->Step(Clock::now());
         CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
-        CHECK(fixture.HasLog(LogLevel_e::Error, "loop() must yield how many milliseconds to wait, as an int, not str"));
+        CHECK(fixture.HasLog(LogLevel_e::Error, "loop() must yield milliseconds as an int, or a wait from execution, not str"));
     }
 
     SECTION("a generator loop returning a negative delay")
@@ -250,6 +265,7 @@ def loop():
     log('>', 'bank')
     yield 1200
     log('>', 'done')
+    return 0
 )python"};
     const auto start = Clock::now();
     fixture.host->Step(start);
@@ -264,7 +280,7 @@ def loop():
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank"});
     CHECK(*fixture.host->GetNextLoop() == start + 1800ms);
 
-    // Finishing runs the rest of the generator, and loop() starts over on the next pass.
+    // Finishing runs the rest of the generator, and loop() starts over after what it returned.
     fixture.host->Step(start + 1800ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank", "done"});
     CHECK(*fixture.host->GetNextLoop() == start + 1800ms);
@@ -284,7 +300,7 @@ def loop():
     if fighting:
         fighting = False
         log('>', 'fighting')
-        return 600
+        return 700
     log('>', 'walk')
     yield 600
     log('>', 'bank')
@@ -296,19 +312,21 @@ def loop():
     fixture.host->Step(start);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting"});
     REQUIRE(fixture.host->GetNextLoop().has_value());
-    CHECK(*fixture.host->GetNextLoop() == start + 600ms);
+    CHECK(*fixture.host->GetNextLoop() == start + 700ms);
 
-    fixture.host->Step(start + 600ms);
+    // A yielded 600 is wall-clock time; only a returned 600 means a server tick.
+    fixture.host->Step(start + 700ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting", "walk"});
+    CHECK(*fixture.host->GetNextLoop() == start + 1300ms);
 
-    fixture.host->Step(start + 1200ms);
+    fixture.host->Step(start + 1300ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting", "walk", "bank"});
-    CHECK(*fixture.host->GetNextLoop() == start + 2400ms);
+    CHECK(*fixture.host->GetNextLoop() == start + 2500ms);
 
-    fixture.host->Step(start + 2399ms);
+    fixture.host->Step(start + 2499ms);
     CHECK(fixture.GetScriptLines().size() == 3);
 
-    fixture.host->Step(start + 2400ms);
+    fixture.host->Step(start + 2500ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fighting", "walk", "bank", "walk"});
 }
 
@@ -413,7 +431,7 @@ TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]
         auto host = ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = folder.GetPath(), .file = "main.py"}, capture.GetLogger()};
     };
 
-    CHECK_THROWS_WITH(load("def on_start():\n    pass\n"), ContainsSubstring("main.py has no loop() function"));
+    CHECK_THROWS_WITH(load("def on_start():\n    pass\n"), ContainsSubstring("main.py has neither BOT = define_bot(...) nor a loop() function"));
     CHECK_THROWS_WITH(load("def loop(:\n    return 1\n"), ContainsSubstring("SyntaxError"));
     CHECK_THROWS_WITH(load("walk_to(1, 2)\ndef loop():\n    return 1\n"), ContainsSubstring("not in game"));
 
@@ -614,7 +632,7 @@ def on_npc_spawned(npc):
     log('>', 'npc', npc.id)
 
 def loop():
-    return 600
+    return 1000
 )python", ScriptHostOptions_s{.watchFiles = true}, Files{{"helper.py", "NAME = 'one'\n"}}};
 
     const auto start = Clock::now();
@@ -623,7 +641,7 @@ def loop():
 
     SECTION("a changed script starts again from now, once the change has settled")
     {
-        fixture.folder.RewriteFile("main.py", "def on_start():\n    log('>', 'start', 'v2')\n\ndef on_npc_spawned(npc):\n    log('>', 'npc', npc.id)\n\ndef loop():\n    return 600\n");
+        fixture.folder.RewriteFile("main.py", "def on_start():\n    log('>', 'start', 'v2')\n\ndef on_npc_spawned(npc):\n    log('>', 'npc', npc.id)\n\ndef loop():\n    return 1000\n");
         fixture.host->Step(start + ScriptHost::WATCH_INTERVAL);
         CHECK(fixture.GetScriptLines().size() == 2);
 
@@ -631,7 +649,7 @@ def loop():
         CHECK(fixture.GetScriptLines() == std::vector<std::string>{"start v1 one", "npc 50", "start v2"});
         CHECK(fixture.HasLog(LogLevel_e::Info, "reloading main.py"));
         CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
-        CHECK(fixture.host->GetNextLoop() == start + 2 * ScriptHost::WATCH_INTERVAL + 600ms);
+        CHECK(fixture.host->GetNextLoop() == start + 2 * ScriptHost::WATCH_INTERVAL + 1000ms);
     }
 
     SECTION("a change to a module it imports reloads it too")
@@ -644,13 +662,13 @@ def loop():
 
     SECTION("a change that can't load waits for the next one")
     {
-        fixture.folder.RewriteFile("main.py", "def loop(:\n    return 600\n");
+        fixture.folder.RewriteFile("main.py", "def loop(:\n    return 1000\n");
         fixture.host->Step(start + ScriptHost::WATCH_INTERVAL);
         fixture.host->Step(start + 2 * ScriptHost::WATCH_INTERVAL);
         CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
         CHECK(fixture.HasLog(LogLevel_e::Error, "waits for its files to change again"));
 
-        fixture.folder.RewriteFile("main.py", "def on_start():\n    log('>', 'start', 'fixed')\n\ndef loop():\n    return 600\n");
+        fixture.folder.RewriteFile("main.py", "def on_start():\n    log('>', 'start', 'fixed')\n\ndef loop():\n    return 1000\n");
         fixture.host->Step(start + 3 * ScriptHost::WATCH_INTERVAL);
         fixture.host->Step(start + 4 * ScriptHost::WATCH_INTERVAL);
         CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
@@ -671,6 +689,145 @@ TEST_CASE("ScriptHost keeps a watched script that fails waiting for a change", "
     fixture.host->Step(start + 2 * ScriptHost::WATCH_INTERVAL);
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"start fixed"});
+}
+
+TEST_CASE("ScriptHost resumes a wait for an update on the pump after the state changes", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+def loop():
+    log('>', 'waiting')
+    found = yield from execution.delay_until(lambda: get_tick() > 1, 60000)
+    log('>', 'found', found, get_tick())
+    return 100000
+)python"};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting"});
+    REQUIRE(fixture.host->GetNextLoop().has_value());
+    CHECK(*fixture.host->GetNextLoop() == start + 60000ms);
+
+    SECTION("a packet resumes it, without waiting for the timeout")
+    {
+        fixture.host->Step(start + 1ms);
+        CHECK(fixture.GetScriptLines().size() == 1);
+
+        fixture.SendTick();
+        fixture.host->Step(start + 2ms);
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting", "found True 2"});
+    }
+
+    SECTION("the timeout resumes it without a packet")
+    {
+        fixture.host->Step(start + 60000ms);
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting", "found False 1"});
+    }
+}
+
+TEST_CASE("ScriptHost waits a server tick when loop returns 600 or None", "[ScriptHost]")
+{
+    auto fixture = HostFixture{GENERATE(as<std::string>{}, "def loop():\n    log('>', 'loop', get_tick())\n", "def loop():\n    log('>', 'loop', get_tick())\n    return 600\n")};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 1"});
+    CHECK_FALSE(fixture.host->GetNextLoop().has_value());
+
+    fixture.host->Step(start + 5000ms);
+    CHECK(fixture.GetScriptLines().size() == 1);
+
+    fixture.SendTick();
+    fixture.host->Step(start + 5001ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 1", "loop 2"});
+}
+
+TEST_CASE("ScriptHost runs the bot that BOT defines", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+class Fighter(TaskBot):
+    loop_delay = 0
+
+    def on_start(self):
+        self.count = 0
+        self.add(
+            Task(lambda: self.count >= 2, self.rest, label='rest'),
+            Task(lambda: True, self.fight, label='fight'),
+        )
+
+    def fight(self):
+        self.count += 1
+        log('>', 'fight', self.count, self.active_task_name)
+        yield from execution.delay(100)
+        log('>', 'fought', self.count)
+
+    def rest(self):
+        log('>', 'rest', self.settings.food, self.settings.str('food'))
+        self.request_finish('rested')
+
+    def on_stop(self, reason):
+        log('>', 'stop', reason)
+
+BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'food': SettingDef('string', 'Shrimps')})
+)python"};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fight 1 fight"});
+
+    fixture.host->Step(start + 100ms);
+    fixture.host->Step(start + 101ms);
+    fixture.host->Step(start + 201ms);
+    fixture.host->Step(start + 202ms);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fight 1 fight", "fought 1", "fight 2 fight", "fought 2", "rest Shrimps Shrimps", "stop rested"});
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Stopped);
+}
+
+TEST_CASE("ScriptHost passes events to subscribers, and ends the bot once", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+def on_start():
+    events.on('tick', lambda e: log('>', 'tick', e.tick))
+    events.on('chat_message', lambda e: log('>', 'chat', e.type, e.username, e.text))
+    events.on('script_finish', lambda e: log('>', 'finish', e.reason))
+
+def on_stop(reason):
+    log('>', 'stop', reason)
+
+def loop():
+    raise ValueError('no chickens')
+)python"};
+    fixture.host->Step(Clock::now());
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{
+        "chat game None Welcome to RuneScape.",
+        "tick 1",
+        "stop the script failed",
+        "finish the script failed",
+    });
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
+
+    fixture.host->Finish("interrupted");
+    CHECK(fixture.GetScriptLines().size() == 4);
+}
+
+TEST_CASE("ScriptHost checks a script's settings against its schema before login", "[ScriptHost]")
+{
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{};
+    const auto folder = TempFolder{"rs2004-script-host-tests"};
+    auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger()};
+    const auto load = [&](std::string settings)
+    {
+        folder.WriteFile("main.py", "SETTINGS_SCHEMA = {'count': SettingDef('number', 5, min=1), 'home': SettingDef('tile', [3222, 3218])}\n"
+                                    "def on_start():\n    log(settings.count, settings.home)\n"
+                                    "def loop():\n    return 1\n");
+        auto host = ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = folder.GetPath(), .file = "main.py", .settings = std::move(settings)}, capture.GetLogger()};
+    };
+
+    CHECK_THROWS_WITH(load(R"({"count": 0})"), ContainsSubstring("settings.count must be at least 1"));
+    CHECK_THROWS_WITH(load(R"({"count": "five"})"), ContainsSubstring("settings.count must be a number"));
+    CHECK_THROWS_WITH(load(R"({"home": "east"})"), ContainsSubstring("settings.home must be a tile"));
+    CHECK_NOTHROW(load(R"({"count": 2, "colour": "red"})"));
+    CHECK(std::ranges::any_of(capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.level == LogLevel_e::Warning && entry.message.find("settings.colour, which its settings schema doesn't declare") != std::string::npos;
+    }));
 }
 
 TEST_CASE("The example scripts load without warnings", "[ScriptHost]")

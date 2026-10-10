@@ -4,6 +4,7 @@
 #include "../Core/Logger.hpp"
 #include "ScriptError.hpp"
 #include "ScriptRuntime.hpp"
+#include "Stdlib.hpp"
 
 #include <pocketpy.h>
 
@@ -44,6 +45,20 @@ namespace
         {
             return part == "..";
         });
+    }
+
+    // pocketpy frees what an import callback returns, so it's copied into pocketpy's allocator.
+    char* CopyForPocketpy(std::string_view source, int* size)
+    {
+        auto* data = static_cast<char*>(py_malloc(source.size() + 1));
+        std::memcpy(data, source.data(), source.size());
+        data[source.size()] = '\0';
+        if (size != nullptr)
+        {
+            *size = static_cast<int>(source.size());
+        }
+
+        return data;
     }
 
     std::string TrimTrailingNewlines(std::string text)
@@ -353,6 +368,12 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
     // Called from pocketpy's C code, so no exception may leave it; a file that can't be read is a missing module.
     try
     {
+        // The standard library comes first, so a script can't shadow it. It isn't one of the script's files.
+        if (const auto library = Stdlib::Find(path))
+        {
+            return CopyForPocketpy(*library, size);
+        }
+
         auto& vm = GetCurrent();
         const auto file = vm.ResolveImport(path);
         if (!file)
@@ -367,15 +388,7 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
             return nullptr;
         }
 
-        auto* data = static_cast<char*>(py_malloc(source->size() + 1));
-        std::memcpy(data, source->data(), source->size());
-        data[source->size()] = '\0';
-        if (size != nullptr)
-        {
-            *size = static_cast<int>(source->size());
-        }
-
-        return data;
+        return CopyForPocketpy(*source, size);
     }
     catch (const std::exception& e)
     {

@@ -52,6 +52,20 @@ target_link_libraries(${PROJECT_NAME}Lib
     PUBLIC ixwebsocket::ixwebsocket pocketpy::pocketpy
     PRIVATE nlohmann_json::nlohmann_json BZip2::BZip2 ZLIB::ZLIB)
 
+# The Python standard library is embedded in the library, regenerated whenever a .py file changes.
+file(GLOB_RECURSE STDLIB_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/Script/Stdlib/*.py)
+set(STDLIB_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/generated/StdlibFiles.cpp)
+add_custom_command(
+    OUTPUT ${STDLIB_SOURCE}
+    COMMAND ${CMAKE_COMMAND}
+        -DSTDLIB_DIR=${CMAKE_CURRENT_SOURCE_DIR}/src/Script/Stdlib
+        -DOUTPUT=${STDLIB_SOURCE}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedStdlib.cmake
+    DEPENDS ${STDLIB_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedStdlib.cmake
+    COMMENT "Embedding the Python standard library"
+    VERBATIM)
+target_sources(${PROJECT_NAME}Lib PRIVATE ${STDLIB_SOURCE})
+
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE src/main.cpp)
 configure_project_target(${PROJECT_NAME})

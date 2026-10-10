@@ -1,121 +1,122 @@
-# Kills chickens and picks up their bones: walking, combat and looting in one small script.
-#
-# Settings (all optional):
-#   npc_ids    NPC types to attack                    default [41], chickens
-#   loot_ids   ground items to pick up                 default [526], bones
-#   loot_goal  log out once the inventory holds this   default 3
-#   area       [x, z, radius] to fight in              default the chicken pen east of Lumbridge
-#   teleport   a ::tele argument for staff accounts, used on start when the area is far away,
-#              e.g. "0,50,51,30,34" for the Lumbridge pen
+# Kills chickens and picks up their bones, then logs out: a TaskBot that fights, loots and waits on
+# what it did. The settings are in SETTINGS below; an account file overrides any of them.
 
-NPC_IDS = settings.get('npc_ids', [41])
-LOOT_IDS = settings.get('loot_ids', [526])
-LOOT_GOAL = settings.get('loot_goal', 3)
-AREA = settings.get('area', [3230, 3298, 8])
-TELEPORT = settings.get('teleport', None)
+SETTINGS = {
+    'npcs': SettingDef('string[]', ['Chicken'], label='NPCs to attack'),
+    'loot': SettingDef('string[]', ['Bones'], label='Items to pick up'),
+    'loot_goal': SettingDef('number', 3, min=1, label='Log out once the backpack holds this much loot'),
+    'centre': SettingDef('tile', [3230, 3298], label='Where to fight: the chicken pen east of Lumbridge'),
+    'radius': SettingDef('number', 8, min=1, max=30, label='How far from the centre to fight'),
+    'teleport': SettingDef('string', '', help='A ::tele argument for staff accounts, used on start when the centre is far away, such as "0,50,51,30,34"'),
+}
 
 # A target that neither side has hit for this many ticks after the attack is given up on.
 GIVE_UP_TICKS = 15
-# Without collision data an item behind a fence can't be reached, so it's skipped after this many tries.
+# An item that hasn't been picked up after this many tries is left, as it's probably behind a fence.
 MAX_PICKUP_TRIES = 3
 
-target = None
-attack_tick = 0
-kills = 0
-pickup_key = None
-pickup_tries = 0
-unreachable = []
 
+class ChickenKiller(TaskBot):
+    def on_start(self):
+        self.kills = 0
+        self.target = None
+        self.attack_tick = 0
+        self.pickup_tries = {}
+        centre = self.settings.centre
+        log('Starting at', get_x(), get_z())
+        if self.settings.teleport and distance_to(centre.x, centre.z) > 50:
+            log('Teleporting to', self.settings.teleport)
+            command('tele ' + self.settings.teleport)
 
-def count_loot():
-    return get_inventory_count_by_id(LOOT_IDS)
+        # Highest priority first: each loop runs the first task whose check passes.
+        self.add(
+            Task(self.is_fighting, lambda: None, label='fight'),
+            Task(self.has_enough_loot, self.finish, label='finish'),
+            Task(lambda: self.next_loot() is not None, self.pick_up, label='loot'),
+            Task(lambda: True, self.attack, label='attack'),
+        )
 
+    def count_loot(self):
+        return get_inventory_count_by_name(self.settings.loot)
 
-def on_start():
-    log('Starting at', get_x(), get_z())
-    if TELEPORT and distance_to(AREA[0], AREA[1]) > 50:
-        log('Teleporting to', TELEPORT)
-        command('tele ' + TELEPORT)
-
-
-def on_progress_report():
-    return {'Kills': kills, 'Loot held': count_loot(), 'Loot goal': LOOT_GOAL}
-
-
-def on_npc_despawned(npc):
-    global target, kills
-    if npc.index == target and npc.hp == 0:
-        kills += 1
-        log('Killed', npc, '- kills so far:', kills)
-        target = None
-
-
-def on_server_message(msg):
-    global target
-    if msg.startswith("I can't reach"):
-        log('Unreachable; picking another target')
-        target = None
-
-
-def next_loot():
-    best = None
-    for item in get_ground_items(LOOT_IDS, radius=AREA[2]):
-        if (item.id, item.x, item.z) in unreachable:
-            continue
-        if best is None or distance_to(item.x, item.z) < distance_to(best.x, best.z):
-            best = item
-    return best
-
-
-def fighting_target():
-    npc = get_npc(target)
-    if npc is None:
+    def is_fighting(self):
+        if self.target is None:
+            return False
+        npc = get_npc(self.target)
+        if npc is not None and (in_combat() or npc.in_combat() or get_tick() - self.attack_tick < GIVE_UP_TICKS):
+            return True
+        self.target = None
         return False
-    return in_combat() or npc.in_combat() or get_tick() - attack_tick < GIVE_UP_TICKS
 
+    def has_enough_loot(self):
+        return self.count_loot() >= self.settings.loot_goal or is_inventory_full()
 
-def loop():
-    global target, attack_tick, pickup_key, pickup_tries
-
-    if target is not None:
-        if fighting_target():
-            return 600
-        target = None
-
-    if count_loot() >= LOOT_GOAL:
+    def finish(self):
         if in_combat():
-            return 600
-        log('Holding', count_loot(), 'loot after', kills, 'kills; done')
+            return
+        log('Holding', self.count_loot(), 'loot after', self.kills, 'kills; done')
         stop_account()
-        return 1000
 
-    if is_inventory_full():
-        log('Inventory full; done')
-        stop_account()
-        return 1000
+    def next_loot(self):
+        if in_combat():
+            return None
+        wanted = [name.lower() for name in self.settings.loot]
+        best = None
+        for item in get_ground_items(radius=self.settings.radius):
+            if item.name is None or item.name.lower() not in wanted:
+                continue
+            if self.pickup_tries.get((item.id, item.x, item.z), 0) >= MAX_PICKUP_TRIES:
+                continue
+            if best is None or distance_to(item.x, item.z) < distance_to(best.x, best.z):
+                best = item
+        return best
 
-    loot = next_loot()
-    if loot is not None and not in_combat():
+    def pick_up(self):
+        loot = self.next_loot()
         key = (loot.id, loot.x, loot.z)
-        pickup_tries = pickup_tries + 1 if key == pickup_key else 1
-        pickup_key = key
-        if pickup_tries > MAX_PICKUP_TRIES:
-            log("Can't reach", loot, '- leaving it')
-            unreachable.append(key)
-            return 0
+        self.pickup_tries[key] = self.pickup_tries.get(key, 0) + 1
+        before = self.count_loot()
         log('Picking up', loot)
         take_ground_item(loot)
-        return 1200
+        # Waits for the backpack to change, or gives the item up for this try after 5 seconds.
+        picked = yield from execution.delay_until(lambda: self.count_loot() > before, 5000)
+        if not picked and self.pickup_tries[key] >= MAX_PICKUP_TRIES:
+            log("Can't reach", loot, '- leaving it')
 
-    npc = get_nearest_npc_by_id(NPC_IDS, radius=AREA[2], in_combat=False)
-    if npc is None:
-        if distance_to(AREA[0], AREA[1]) > 2:
-            walk_to(AREA[0], AREA[1])
-        return 1200
+    def attack(self):
+        centre = self.settings.centre
+        npc = get_nearest_npc_by_name(self.settings.npcs, radius=self.settings.radius, in_combat=False)
+        if npc is None:
+            if distance_to(centre.x, centre.z) > 2:
+                walk_to(centre.x, centre.z)
+            yield from execution.delay(1200)
+            return
 
-    if attack_npc(npc):
-        target = npc.index
-        attack_tick = get_tick()
-        log('Attacking', npc)
+        if attack_npc(npc):
+            self.target = npc.index
+            self.attack_tick = get_tick()
+            log('Attacking', npc)
+        yield from execution.delay_ticks(2)
 
-    return 1200
+    def on_npc_despawned(self, npc):
+        if npc.index == self.target and npc.hp == 0:
+            self.kills += 1
+            log('Killed', npc, '- kills so far:', self.kills)
+            self.target = None
+
+    def on_server_message(self, msg):
+        if msg.startswith("I can't reach"):
+            log('Unreachable; picking another target')
+            self.target = None
+
+    def on_progress_report(self):
+        return {'Kills': self.kills, 'Loot held': self.count_loot(), 'Loot goal': self.settings.loot_goal}
+
+
+BOT = define_bot(
+    name='Chicken killer',
+    create=ChickenKiller,
+    description='Kills chickens, picks up their bones and logs out at a goal',
+    category='Combat',
+    settings_schema=SETTINGS,
+)

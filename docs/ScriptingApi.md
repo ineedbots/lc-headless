@@ -1,6 +1,6 @@
 # Scripting API
 
-How to write Python scripts that drive the headless client. A script is a `.py` file in the scripts folder; each account file names the script it runs. The design behind it is in [ScriptingDesign.md](ScriptingDesign.md).
+How to write Python scripts that drive the headless client. A script is a `.py` file in the scripts folder; each account file names the script it runs. The design behind it is in [ScriptingDesign.md](ScriptingDesign.md), and [BotApiDesign.md](BotApiDesign.md) plans where it's going: rs2b0t's bot API, in Python's style. Its first phase, the runtime (bots, waits, settings schemas and events), is here; the rest of this page still describes the flat functions it will replace.
 
 ## Quick start
 
@@ -14,76 +14,117 @@ Ctrl+C asks each script to finish (see `on_kill_signal`). A second Ctrl+C logs e
 
 A dropped connection is restored automatically, with up to 10 attempts over about four minutes, so a server restart doesn't end a run. Each account reconnects on its own and the others keep playing. A first login is retried the same way when the server can't take it yet, for example "already logged in" after a crash.
 
-A script needs one function, `loop()`, which returns how many milliseconds to wait before it's called again:
+A script is a bot, as in rs2b0t's API: either a class set with `BOT = define_bot(...)`, or a module-level `loop()` with `on_*` hooks, which runs as a `LoopingBot`. `loop()` returns how long to wait before it's called again:
 
 ```python
-CHICKEN = 41
-
 def on_start():
     log('Starting at', get_x(), get_z())
 
 def loop():
     if in_combat():
-        return 600
+        return 600          # the next server tick
 
-    chicken = get_nearest_npc_by_id(CHICKEN, radius=8, in_combat=False)
+    chicken = get_nearest_npc_by_name('Chicken', radius=8, in_combat=False)
     if chicken is not None:
         attack_npc(chicken)
-        return 1200
-
-    return 600
+        # Wait until the fight starts, or 3 seconds.
+        yield from execution.delay_until(lambda: in_combat(), 3000)
 
 def on_server_message(msg):
     if msg.startswith('Oh dear'):
         stop_account()
 ```
 
-`scripts/examples/` has complete scripts: `chicken_killer.py` fights, loots and logs out, and `walker.py` walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Both make progress reports.
+The same as a bot, with its settings declared, and tasks chosen in priority order:
+
+```python
+class Fighter(TaskBot):
+    def on_start(self):
+        self.add(
+            Task(lambda: in_combat(), lambda: None, label='fight'),
+            Task(lambda: True, self.attack, label='attack'),
+        )
+
+    def attack(self):
+        chicken = get_nearest_npc_by_name(self.settings.npc, radius=8, in_combat=False)
+        if chicken is not None and attack_npc(chicken):
+            yield from execution.delay_ticks(2)
+
+BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': SettingDef('string', 'Chicken')})
+```
+
+`scripts/examples/` has complete scripts: `chicken_killer.py` is a `TaskBot` that fights, loots and logs out, and `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Both make progress reports.
 
 For working on a script, `--watch` reloads it whenever you save it, and `--debugger` lets VS Code debug it (see [Working on a script](#working-on-a-script)).
 
 ## How scripts run
 
-- The module body runs once, before login. Use it for constants and settings. Game functions return empty values at that point, and actions fail, since there's no session yet.
+- The module body runs once, before login. Use it for constants, classes and `BOT`. Game functions return empty values at that point, and actions fail, since there's no session yet. Once it has run, the client makes the bot and checks its settings (see [Settings](#settings)), so a broken script or a bad setting stops the run before any login.
 - `on_start()` runs once the player is first placed in the world. After that, on every pass of the main loop the client:
-  1. calls the hooks for everything that arrived since the last pass (events first, then chat messages, then messages from other scripts);
-  2. calls `on_server_tick` if a tick passed;
+  1. calls the hooks and subscribers for everything that arrived since the last pass (events first, then chat messages, then messages from other scripts);
+  2. calls `on_tick` if a server tick passed;
   3. calls `on_progress_report` if a report is due;
-  4. calls `loop()` if its delay is up.
-
-  A game tick is 600 ms, so delays of 600 or more are typical; 0 means "as soon as possible".
-- Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. `time.sleep()` raises an error: return a delay from `loop()` instead.
-- `loop()` can be a generator instead, for a task that takes several steps. Each `yield` is a delay, as a return would be, and the generator carries on from there once it's up; `return 600` ends it and waits that long before `loop()` is called again, even before the first `yield`, and a bare `return` or reaching the end calls it again on the next pass. Hooks run as usual while it waits:
-
-  ```python
-  def loop():
-      if in_combat():
-          return 600
-      walk_to(3222, 3218)
-      yield 3000
-      chicken = get_nearest_npc_by_id(CHICKEN, radius=8, in_combat=False)
-      if chicken is not None:
-          attack_npc(chicken)
-          yield 1200
-      while in_combat():
-          yield 600
-      return 1200
-  ```
-
-  Each resume is a separate call, so `scripting.callTimeoutMs` applies to each stretch between yields, not the whole generator. A reload with `--watch` starts it over.
-- An uncaught exception, or a `loop()` that returns or yields anything but an int of 0 or more, stops the script. The client logs the traceback and logs the account out, unless it's running with `--watch`.
+  4. steps the bot's `loop()` if what it's waiting for has happened.
+- What `loop()` returns says how long to wait, as rs2b0t reads it: `600` means the next server tick, `0` the next pass, and any other number that many milliseconds. `None`, or no return at all, uses the bot's `loop_delay`, which is 600; a bot can set `loop_cadence` to `{'kind': 'frame'}`, `{'kind': 'server_tick', 'ticks': n}` or `{'kind': 'time', 'ms': n}` instead.
+- Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. `time.sleep()` raises an error: wait with `execution` instead.
+- An uncaught exception, or a `loop()` that returns or yields something it can't, stops the script. The client calls `on_stop`, logs the traceback, and logs the account out, unless it's running with `--watch`.
 - Objects such as `Npc` are snapshots taken when the function returned. Keep the `index` to look one up again later with `get_npc(index)`.
 - Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view return `False`. A wrong argument type raises `TypeError`, and a value out of range (an option outside 1 to 5, say) raises `ValueError`.
 - Names, options and scenery come from the server's cache, which the client loads at startup from `client.cacheDirectory`. They're exactly as the cache has them, case included.
 - `log(*args)` writes at Info level and `debug(*args)` at Verbose level; `print()` also goes to the log. Each line carries the account's name.
 
+### Waiting
+
+Where rs2b0t awaits, a script writes `yield from`. `loop()`, a task's `execute()` and `on_start()` may be generators; each wait in `execution` is one too, and gives back its result:
+
+| Wait | Gives |
+|---|---|
+| `execution.delay(ms)` | Nothing, after `ms` milliseconds |
+| `execution.delay_ticks(n)` | Nothing, after `n` server ticks |
+| `execution.delay_until(cond, timeout_ms=6000)` | `True` as soon as `cond()` holds, checked now and after every update from the server; `False` at the timeout |
+| `execution.delay_until_ticks(cond, max_ticks)` | The same, checked once a tick |
+| `execution.note_progress()` | Not a wait: reports progress the stall guard can't see, such as a finished trade |
+
+```python
+def loop():
+    raw = get_inventory_item_by_name('Raw shrimps')
+    use_item_on_loc(raw, RANGE, 3212, 3215)
+    cooked = yield from execution.delay_until(lambda: get_inventory_count_by_name('Shrimps') > 0, 5000)
+    if not cooked:
+        log('The range did nothing')
+```
+
+- A generator can also `yield` a number of milliseconds itself; unlike a return, a yielded 600 is wall-clock time.
+- A wait resumes on the first pass after what it waits for, not on a poll, so `delay_until` sees a change the pass after the packet that made it arrives.
+- Hooks run as usual while `loop()` waits. Each resume is a separate call, so `scripting.callTimeoutMs` applies to each stretch between waits, not the whole generator. A reload with `--watch` starts it over.
+- Hooks themselves can't wait: one that's a generator is an error. Set a flag and do the work in `loop()`.
+
+### Bots
+
+Mirroring rs2b0t's bot classes:
+
+| Class | Does |
+|---|---|
+| `LoopingBot` | Override `loop()`. A script without `BOT` is one, made of its module's `loop()` and hooks |
+| `TaskBot` | `self.add(*tasks)` in `on_start`, highest priority first. Each loop runs the `execute()` of the first task whose `validate()` holds. A task is a `Task(validate, execute, label=None)` of two callables, or a `Task` subclass that overrides both; either may be a generator. `active_task_name` is the running task's label |
+| `TreeBot` | Override `root()`, returning a `BranchTask` (`validate()`, `success()`, `failure()`) or a `LeafTask` (`execute()`); each loop walks the tree to a leaf and runs it |
+
+Every bot has `settings`, `loop_delay`, `loop_cadence`, `log(*args)`, `on(event, callback)` (a subscription that ends with the bot), `request_finish(reason)` (stops the script, leaving the account logged in, with `reason` passed to `on_stop`), and the hooks it defines as methods. `define_bot(name=..., create=..., description=None, version=None, category=None, tags=None, settings_schema=None)` describes it; `create` is the class, or a function that makes the bot.
+
 ### Settings
 
-The account file's `script.settings` object becomes the global `settings`. Read its keys as attributes (`settings.loot_goal`), or with `settings.get('key', default)`; `'key' in settings` checks for one. Keys keep the spelling they have in the file.
+The account file's `script.settings` object becomes the global `settings`, and the bot's `self.settings`. Read its keys as attributes (`settings.loot_goal`), with `settings.get('key', default)`, or with rs2b0t's typed getters, `bool(key)`, `num(key)`, `str(key)`, `list(key)` and `tile(key, fallback)`, which return the fallback when the value isn't of their type. `'key' in settings` checks for one.
+
+A script can declare its settings with a schema: `settings_schema=` in `define_bot`, or a module-level `SETTINGS_SCHEMA`. It maps each key to a `SettingDef(type, default, label=None, min=None, max=None, help=None, options=None, option_labels=None, group=None)`, where type is `'boolean'`, `'number'`, `'string'`, `'string[]'` or `'tile'`. Then, before login:
+
+- a setting the account file leaves out takes its default;
+- a value of the wrong type, a number outside `min` and `max`, or a string not in `options` stops the run, naming the setting. Options match without regard to case and become the schema's spelling;
+- a `'string[]'` may be a list or a comma-separated string, and a `'tile'` may be `[x, z]`, `[x, z, level]`, `"x,z,level"` or `{"x": ..., "z": ..., "level": ...}`. A tile setting reads as a `Tile`;
+- a setting the schema doesn't declare draws a warning, since it's probably misspelled.
 
 ### Imports
 
-`import name` loads `scripts/name.py`, then `scripts/lib/name.py`; packages (folders with `__init__.py`) work too. pocketpy's own modules (`math`, `random`, `json`, `time`, `collections`, ...) are available. Nothing else is searched, and pip packages can't be used.
+`import name` loads the client's standard library first: the `rs2004` package, whose public names are already in builtins, so scripts don't import it. Then `scripts/name.py`, then `scripts/lib/name.py`; packages (folders with `__init__.py`) work too. pocketpy's own modules (`math`, `random`, `json`, `time`, `collections`, ...) are available. Nothing else is searched, and pip packages can't be used.
 
 ### Python dialect
 
@@ -92,8 +133,11 @@ Scripts run on pocketpy 2.2, a subset of Python 3. The differences you're likely
 - `try` has no `finally` or `else`.
 - Generator expressions don't exist; use list comprehensions.
 - A class has at most one base class.
-- Ints are 64-bit.
-- In unpacking, a starred name must come last (`first, *rest = items`).
+- Ints are 64-bit, and `bool` isn't a kind of `int`.
+- A parameter can be passed by keyword only when it has a default value, and a default value must be a literal (`timeout=6000`, not `timeout=TIMEOUT`).
+- An attribute set on an instance doesn't replace a method of its class; give the instance a differently named attribute and call it from the method.
+- In unpacking, a starred name must come last (`first, *rest = items`), and only lists and tuples unpack.
+- Tuples can't be added together, `dict(another_dict)` doesn't copy, and `dict.setdefault` and `str.isdigit` don't exist.
 - There's no `re` module.
 
 ## Objects
@@ -207,32 +251,50 @@ The server walks each waypoint in a straight line, so walks and interactions fin
 | `stop_account()` | Stops the script and logs the account out |
 | `send_bot_message(username, message)` | Sends a message to another account's script in this process (see [Messages between scripts](#messages-between-scripts)) |
 
-## Hooks
+## Events and hooks
 
-Define any of these to be told when something happens. Hooks that aren't defined cost nothing. A script that defines an `on_` function the client doesn't know about gets a warning when it loads, which catches typos.
+Every event has one name. A bot hears it through a hook, a function or method named `on_<event>`, or by subscribing: `events.on(name, callback)`, which returns a function that ends the subscription, or `self.on(name, callback)` in a bot, which ends when the bot stops. Hooks and subscribers that aren't there cost nothing. A script that defines an `on_` function the client doesn't know about gets a warning when it loads, which catches typos.
+
+The events rs2b0t has pass one payload object, an `Event` with an attribute per field:
+
+| Event | Payload | Happens when |
+|---|---|---|
+| `tick` | `tick` | A server tick passed |
+| `chat_message` | `type` (`'game'`, `'public'`, `'private'`, `'trade_request'` or `'duel_request'`), `username` (`None` for a game message), `text` | Any line arrived in the chat box |
+| `skill_xp` | `skill`, `name` (such as `'woodcutting'`), `xp`, `delta` | A skill gained experience |
+| `skill_level` | `skill`, `name`, `level`, `previous` | A skill's base level changed |
+| `inventory_changed` | `slot`, `id`, `name`, `count`, `previous_id`, `previous_count` | A backpack slot changed; one event per slot, with an empty slot's id -1 |
+| `varp_changed` | `index`, `value`, `previous` | A player variable was set |
+| `script_finish` | `reason` | The script stopped, after `on_stop` |
+
+The rest pass their values:
+
+| Event | Arguments | Happens when |
+|---|---|---|
+| `server_message` | `msg` | A game message arrived |
+| `private_message` | `sender`, `msg` | A private message arrived |
+| `trade_request`, `duel_request` | `name` | A player wants to trade or duel |
+| `npc_spawned`, `npc_despawned` | `npc` | An NPC came into view or left it. A despawned NPC is its last snapshot, so `npc.hp == 0` means it died |
+| `npc_damaged` | `npc`, `damage` | An NPC took a hit. `npc` is `None` if it has already left view |
+| `player_spawned`, `player_despawned`, `player_damaged` | `player` (and `damage`) | The same, for other players |
+| `damaged` | `damage` | You took a hit |
+| `ground_item_spawned`, `ground_item_despawned`, `ground_item_changed` | `item` (and `previous_count`) | An item appeared, went, or had its stack count changed |
+| `loc_changed` | `loc` | Scenery was added, changed or removed |
+| `interface_changed` | | An interface opened or closed |
+| `system_update` | `seconds` | The server announced a restart |
+| `disconnect`, `reconnect` | | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login |
+| `kill_signal` | | Ctrl+C was pressed. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
+| `bot_message` | `sender`, `message` | Another script in this process sent this one a message (see [Messages between scripts](#messages-between-scripts)) |
+
+A bot's lifecycle has hooks too, but no subscribers:
 
 | Hook | Called when |
 |---|---|
-| `on_start()` | Once, when the player is first placed after login |
-| `on_server_tick(tick)` | A server tick passed |
-| `on_server_message(msg)` | A game message arrived |
-| `on_chat_message(msg, sender)`, `on_private_message(msg, sender)` | Public or private chat arrived |
-| `on_trade_request(name)`, `on_duel_request(name)` | A player wants to trade or duel |
-| `on_npc_spawned(npc)`, `on_npc_despawned(npc)` | An NPC came into view or left it. A despawned NPC is its last snapshot, so `npc.hp == 0` means it died |
-| `on_npc_damaged(npc, damage)` | An NPC took a hit. `npc` is `None` if it has already left view |
-| `on_player_spawned(player)`, `on_player_despawned(player)`, `on_player_damaged(player, damage)` | The same, for other players |
-| `on_damaged(damage)` | You took a hit |
-| `on_ground_item_spawned(item)`, `on_ground_item_despawned(item)`, `on_ground_item_changed(item, previous_count)` | An item appeared, went, or had its stack count changed |
-| `on_loc_changed(loc)` | Scenery was added, changed or removed |
-| `on_inventory_changed(com)`, `on_stat_changed(stat)`, `on_varp_changed(varp, value)` | An inventory, stat or player variable changed |
-| `on_interface_changed()` | An interface opened or closed |
-| `on_system_update(seconds)` | The server announced a restart |
-| `on_disconnect()`, `on_reconnect()` | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login |
-| `on_kill_signal()` | Ctrl+C was pressed. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
+| `on_start()` | Once, when the player is first placed after login. One that's a generator runs before the first `loop()` |
+| `on_stop(reason)` | Once, when the script stops: after `stop_script()`, `stop_account()`, `request_finish(reason)` or an error, or when the account logs out for a reason of its own, such as Ctrl+C. It can't wait |
 | `on_progress_report()` | A progress report is due; return a `dict` (see [Progress reports](#progress-reports)) |
-| `on_bot_message(sender, message)` | Another script in this process sent this one a message (see [Messages between scripts](#messages-between-scripts)) |
 
-Hooks only report what the server said. When the map rebuilds, or an area falls out of view, things vanish from the state without a despawn hook, so check what's in view rather than keeping your own copy.
+Events only report what the server said. When the map rebuilds, or an area falls out of view, things vanish from the state without a despawn event, so check what's in view rather than keeping your own copy.
 
 ## Progress reports
 
@@ -337,9 +399,11 @@ pocketpy's debugger brings some limits:
 
 ## Porting from plutonium
 
-`loop`, `settings` and `log` work the same way, and so do most hooks. The differences:
+`loop`, `settings` and `log` work much the same way, and so do most hooks. The differences:
 
+- `loop()`'s return is read as rs2b0t reads it: 600 waits for the next server tick, 0 for the next pass, and anything else that many milliseconds.
 - `on_npc_damaged(npc, damage)` and `on_player_damaged(player, damage)` take the entity first. plutonium's take the damage first, so a ported hook gets its arguments swapped without any error.
+- `on_chat_message(msg, from_name)` becomes `on_chat_message(e)`, with `e.username` and `e.text`, and `on_private_message(msg, from_name)` becomes `on_private_message(sender, msg)`. `on_server_tick(tick)` becomes `on_tick(e)`, with `e.tick`.
 - `on_load` and `on_init` become `on_start`, which runs once, and `on_reconnect`, which runs each time the player is placed again after a dropped connection.
 - `on_progress_report` and `send_bot_message` work as in plutonium, with two differences. A message is copied as JSON, so it can't carry objects. A full queue makes `send_bot_message` return `False` instead of raising.
 

@@ -1,4 +1,5 @@
-# Walks a loop of tiles: the smallest useful script.
+# Walks a loop of tiles: the smallest useful script. Without BOT = define_bot(...), its module-level
+# loop() and on_* functions run as a LoopingBot, and without a settings schema its settings aren't checked.
 #
 # Settings (optional):
 #   points  [[x, z], ...] to visit in order           default a square from the start
@@ -56,4 +57,5 @@ def loop():
     if not is_moving():
         walk_to(x, z, run=settings.get('run', False))
 
+    # 600 means the next server tick, as rs2b0t reads it; any other number is milliseconds.
     return 600

@@ -792,6 +792,26 @@ StopRequest_e ScriptApi::TakeStopRequest()
     return std::exchange(m_stopRequest, StopRequest_e::None);
 }
 
+void ScriptApi::SetStepTime(s64 milliseconds)
+{
+    m_stepTime = milliseconds;
+}
+
+s64 ScriptApi::GetStepTime() const
+{
+    return m_stepTime;
+}
+
+void ScriptApi::NoteProgress()
+{
+    m_lastProgress = m_stepTime;
+}
+
+std::optional<s64> ScriptApi::GetLastProgress() const
+{
+    return m_lastProgress;
+}
+
 bool ScriptApi::IsMoving(const Entity_s& entity, u64 tick)
 {
     return entity.lastMovement != Movement_e::None && entity.movedTick == tick;

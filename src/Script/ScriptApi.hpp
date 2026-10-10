@@ -144,6 +144,14 @@ public:
     void RequestStop(StopRequest_e request);
     [[nodiscard]] StopRequest_e TakeStopRequest();
 
+    // The time of the host's current step, in milliseconds on its clock. Waits measure from it, so a test
+    // that steps the host with made-up times controls them too.
+    void SetStepTime(s64 milliseconds);
+    [[nodiscard]] s64 GetStepTime() const;
+    // The script reports progress the stall guard can't see, such as a finished trade.
+    void NoteProgress();
+    [[nodiscard]] std::optional<s64> GetLastProgress() const;
+
     [[nodiscard]] static bool IsMoving(const Entity_s& entity, u64 tick);
     [[nodiscard]] static bool InCombat(const Entity_s& entity, u64 tick);
 
@@ -162,4 +170,6 @@ private:
     BotMessenger* m_messenger;
     std::string m_username;
     StopRequest_e m_stopRequest = StopRequest_e::None;
+    s64 m_stepTime = 0;
+    std::optional<s64> m_lastProgress;
 };

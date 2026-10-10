@@ -100,6 +100,8 @@ struct GameState_s
     static constexpr std::size_t MAX_EVENTS = 1024;
 
     u64 tick = 0;
+    // Goes up with every packet decoded, so a reader can tell when anything at all may have changed.
+    u64 updateCount = 0;
     u16 pid = 0;
     bool members = false;
     u8 staffLevel = 0;

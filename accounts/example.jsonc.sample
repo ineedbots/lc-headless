@@ -20,10 +20,11 @@
         "progressReportMinutes": 20,
 
         // Anything here reaches the script as its settings object: settings.loot_goal,
-        // settings.get("teleport"), and so on. Keys are used as written.
+        // settings.get("teleport"), and so on. Keys are used as written. A script with a settings
+        // schema checks these before login, and fills in the ones left out with its defaults.
         "settings": {
-            "npc_ids": [41],
-            "loot_ids": [526],
+            "npcs": ["Chicken"],
+            "loot": ["Bones"],
             "loot_goal": 3
         }
     }

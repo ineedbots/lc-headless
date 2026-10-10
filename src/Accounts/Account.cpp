@@ -346,6 +346,11 @@ void Account::LogOut(std::string_view reason)
     }
 
     m_logger->Info("Logging out: {}", reason);
+    if (m_script)
+    {
+        m_script->Finish(reason);
+    }
+
     m_client.RequestLogout(LOGOUT_TIMEOUT);
     UpdateFinished();
 }
@@ -353,6 +358,11 @@ void Account::LogOut(std::string_view reason)
 void Account::Fail(std::string_view reason)
 {
     m_logger->Error("The account has stopped: {}", reason);
+    if (m_script)
+    {
+        m_script->Finish(reason);
+    }
+
     m_failed = true;
     m_client.Disconnect();
     UpdateFinished();

@@ -43,10 +43,11 @@ struct ScriptHostOptions_s
     bool waitForDebugger = false;
 };
 
-// Runs one account's script against its client, on the caller's thread between pumps. The script is
-// loaded on construction, so a broken script fails before login. Once the local player is placed it
-// calls on_start, then on every Step passes new events, messages and bot messages to the script's hooks
-// and calls loop() whenever the delay it last returned, or yielded as a generator, has passed.
+// Runs one account's bot against its client, on the caller's thread between pumps. The script is loaded
+// on construction, and the standard library's runtime makes its bot and checks its settings, so a broken
+// script fails before login. Once the local player is placed the bot starts; then every Step passes new
+// events, messages and bot messages to its hooks and subscribers, and steps its loop whenever the wait
+// it last asked for is over: a time, the next update from the server, or a number of server ticks.
 class ScriptHost
 {
 public:
@@ -55,36 +56,6 @@ public:
     static constexpr std::size_t MAX_BOT_MESSAGES = 100;
     static constexpr auto WATCH_INTERVAL = 500ms;
 
-    static constexpr std::array HOOKS = {
-        "on_start"sv,
-        "on_server_tick"sv,
-        "on_server_message"sv,
-        "on_chat_message"sv,
-        "on_private_message"sv,
-        "on_trade_request"sv,
-        "on_duel_request"sv,
-        "on_npc_spawned"sv,
-        "on_npc_despawned"sv,
-        "on_npc_damaged"sv,
-        "on_player_spawned"sv,
-        "on_player_despawned"sv,
-        "on_player_damaged"sv,
-        "on_damaged"sv,
-        "on_ground_item_spawned"sv,
-        "on_ground_item_despawned"sv,
-        "on_ground_item_changed"sv,
-        "on_loc_changed"sv,
-        "on_inventory_changed"sv,
-        "on_stat_changed"sv,
-        "on_varp_changed"sv,
-        "on_interface_changed"sv,
-        "on_system_update"sv,
-        "on_disconnect"sv,
-        "on_reconnect"sv,
-        "on_kill_signal"sv,
-        "on_progress_report"sv,
-        "on_bot_message"sv,
-    };
 
     ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOptions_s options, std::shared_ptr<Logger> logger = Logger::GetDefault());
     ~ScriptHost();
@@ -93,6 +64,9 @@ public:
     ScriptHost& operator=(const ScriptHost&) = delete;
 
     void Step(Clock::time_point now);
+    // Ends the bot, once, calling on_stop(reason) and script_finish, for an account that stops for a
+    // reason of its own, such as Ctrl+C. Stopping the script, or its failing, already does.
+    void Finish(std::string_view reason);
     [[nodiscard]] bool HandlesKillSignal() const;
     void SignalKill();
     // Queues a message from another script for the next Step. False when the script isn't running, has no
@@ -102,7 +76,15 @@ public:
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
 
 private:
+    enum class LoopWait_e : u8
+    {
+        Time,
+        Update,
+        Ticks,
+    };
+
     void Load();
+    void LoadBot();
     void Unload();
     void Reload();
     void CheckForChanges(Clock::time_point now);
@@ -112,15 +94,19 @@ private:
     void Start(Clock::time_point now);
     void DispatchEvents(const GameState_s& state);
     void DispatchEvent(const GameEvent_s& event, const GameState_s& state);
+    void DispatchBackpack(const GameState_s& state);
     void DispatchMessages(const GameState_s& state);
     void DispatchBotMessages();
     void RunProgressReport(Clock::time_point now);
+    [[nodiscard]] bool IsLoopDue(Clock::time_point now, const GameState_s& state) const;
     void RunLoop(Clock::time_point now);
-    void ScheduleLoop(Clock::time_point now, py_Ref delay, bool yielded);
+    void ScheduleLoop(Clock::time_point now, py_Ref wait);
     [[nodiscard]] bool HasHook(std::string_view name) const;
     void CallHook(std::string_view name, std::span<const py_Ref> args = {});
-    std::optional<py_GlobalRef> Invoke(std::string_view name, std::span<const py_Ref> args = {});
+    // Calls the runtime's dispatch for the event, which returns what its hook returned.
+    std::optional<py_GlobalRef> Dispatch(std::string_view name, std::span<const py_Ref> args = {});
     void Fail(std::string_view function, std::string_view message);
+    void Stop(ScriptStatus_e status, std::string_view reason);
     void ApplyStopRequest();
 
     ScriptRuntime& m_runtime;
@@ -132,10 +118,12 @@ private:
     // Empty only while a reload is replacing it, or after a reload failed to load.
     std::optional<ScriptVm> m_vm;
     std::optional<FileWatcher> m_watcher;
-    std::vector<std::string_view> m_hooks;
     std::deque<BotMessage_s> m_botMessages;
+    // The backpack as the bot last saw it, which inventory_changed reports changes to, slot by slot.
+    std::vector<Item_s> m_backpack;
     ScriptStatus_e m_status = ScriptStatus_e::Running;
     bool m_started = false;
+    bool m_finished = false;
     bool m_connected = false;
     // Set by a reconnect and cleared once the player is placed again, when on_reconnect is called.
     bool m_reconnectPending = false;
@@ -143,7 +131,14 @@ private:
     u64 m_lastEvent = 0;
     u64 m_lastMessage = 0;
     u64 m_lastTick = 0;
+    // What the loop waits for: until m_nextLoop; for an update after m_waitUpdateCount, or until
+    // m_nextLoop when m_waitHasTimeout; or for the tick to reach m_waitTick.
+    LoopWait_e m_wait = LoopWait_e::Time;
     Clock::time_point m_nextLoop;
+    u64 m_waitUpdateCount = 0;
+    bool m_waitHasTimeout = false;
+    u64 m_waitTick = 0;
+    u64 m_waitTickStart = 0;
     Clock::time_point m_nextWatch;
     // When on_start first ran, which progress reports count from.
     std::optional<Clock::time_point> m_startTime;
