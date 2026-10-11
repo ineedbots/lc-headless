@@ -23,6 +23,8 @@ public:
     static constexpr std::string_view LIBRARY_FOLDER = "lib";
     static constexpr auto DEBUGGER_HOST = "127.0.0.1";
     static constexpr u16 DEBUGGER_PORT = 6110;
+    // The walker's route search may take this many call timeouts: one across the map can outlast a single one.
+    static constexpr s32 ROUTE_SEARCH_TIMEOUTS = 5;
 
     ScriptVm(ScriptRuntime& runtime, ScriptVmOptions_s options, std::shared_ptr<Logger> logger = Logger::GetDefault());
     ~ScriptVm();
@@ -41,6 +43,11 @@ public:
     py_GlobalRef LoadJson(const std::string& json);
     // Blocks until VS Code's pocketpy debugger attaches, which then traces this VM. Once per process.
     void WaitForDebugger();
+    // Runs the walker's route search, from a binding, with ROUTE_SEARCH_TIMEOUTS call timeouts. When it returns
+    // in that time the rest of the call gets the usual timeout afresh; when it doesn't, the call stops with
+    // TimeoutError, as any call that runs too long does.
+    template <typename TSearch>
+    auto RunRouteSearch(TSearch search);
 
     void Activate() const;
     [[nodiscard]] py_GlobalRef GetBuiltins() const;
@@ -77,3 +84,18 @@ private:
     std::string m_output;
     std::vector<std::filesystem::path> m_files;
 };
+
+template <typename TSearch>
+auto ScriptVm::RunRouteSearch(TSearch search)
+{
+    const auto limit = m_options.callTimeout * ROUTE_SEARCH_TIMEOUTS;
+    const auto started = std::chrono::steady_clock::now();
+    py_watchdog_begin(limit.count());
+    auto result = search();
+    if (std::chrono::steady_clock::now() - started <= limit)
+    {
+        py_watchdog_begin(m_options.callTimeout.count());
+    }
+
+    return result;
+}

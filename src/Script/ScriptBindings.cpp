@@ -1034,7 +1034,10 @@ namespace
         return Guard([argv]
         {
             const auto request = NavJson::ParseRequest(PyConvert::ToString(py_arg(0), "request"));
-            const auto path = GetApi().FindWorldPath(request.from, request.to, request.options);
+            const auto path = ScriptVm::GetCurrent().RunRouteSearch([&request]
+            {
+                return GetApi().FindWorldPath(request.from, request.to, request.options);
+            });
             if (!path)
             {
                 return ReturnNone();

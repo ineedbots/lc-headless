@@ -70,7 +70,7 @@ For working on a script, `--watch` reloads it whenever you save it, and `--debug
   3. calls `on_progress_report` if a report is due;
   4. steps the bot's `loop()` if what it's waiting for has happened.
 - What `loop()` returns says how long to wait, as rs2b0t reads it: `600` means the next server tick, `0` the next pass, and any other number that many milliseconds. `None`, or no return at all, uses the bot's `loop_delay`, which is 600; a bot can set `loop_cadence` to `{'kind': 'frame'}`, `{'kind': 'server_tick', 'ticks': n}` or `{'kind': 'time', 'ms': n}` instead.
-- Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. `time.sleep()` raises an error: wait with `execution` instead.
+- Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. The walker's route search is the one exception: a search across the map can take longer, so it gets 5 times that, and the call gets its usual time afresh once the search returns. `time.sleep()` raises an error: wait with `execution` instead.
 - An uncaught exception, or a `loop()` that returns or yields something it can't, stops the script. The client calls `on_stop`, logs the traceback, and logs the account out, unless it's running with `--watch`.
 - Objects such as `Npc` are snapshots taken when the query ran. `valid()` asks whether one is still there; keep an NPC's `index` to find it again with `npcs.get(index)`.
 - Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view, or that has no such option, return `False`. A wrong argument type raises `TypeError`, and a value out of range (an option outside 1 to 5, say) raises `ValueError`.
@@ -541,7 +541,7 @@ A table entry is a `Record`: its fields are attributes, and one it doesn't set r
 
 The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout, which writes `rs2004/catalogs/_data.py` and `_shops.py`.
 
-`scripts/examples` has three of rs2b0t's bots translated with them: `miner.py` (the mining side of GatheringBot), `cow_killer.py` (ChickenKiller's CowKiller, in melee) and `bank_fletcher.py` (BankFletcher, less its cut+string mode).
+`scripts/examples` has three of rs2b0t's bots translated with them: `miner.py` (the mining side of GatheringBot), `cow_killer.py` (ChickenKiller's CowKiller, in melee) and `bank_fletcher.py` (BankFletcher, less its cut+string mode). `aio_thiever.py` joins three more, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
 
 ## Upkeep
 

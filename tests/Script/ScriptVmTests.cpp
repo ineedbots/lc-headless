@@ -32,6 +32,27 @@ namespace
     {
         return py_tostr(value);
     }
+
+    // Stand-ins for the walker's route search: a native call that takes as many milliseconds as it's given,
+    // run as the search is, or as any other binding.
+    bool SlowSearch(int, py_StackRef argv) noexcept
+    {
+        const auto ms = std::chrono::milliseconds{py_toint(py_arg(0))};
+        const auto found = ScriptVm::GetCurrent().RunRouteSearch([ms]
+        {
+            std::this_thread::sleep_for(ms);
+            return true;
+        });
+        py_newbool(py_retval(), found);
+        return true;
+    }
+
+    bool SlowBinding(int, py_StackRef argv) noexcept
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds{py_toint(py_arg(0))});
+        py_newnone(py_retval());
+        return true;
+    }
 }
 
 TEST_CASE("ScriptVm runs source and calls the functions it defines", "[ScriptVm]")
@@ -201,6 +222,51 @@ TEST_CASE("ScriptVm's watchdog stops a script that runs too long", "[ScriptVm]")
     CHECK(py_toint(vm.Call("ok")) == 1);
 
     CHECK_THROWS_WITH(vm.RunSource("while True:\n    pass\n", "top.py"), ContainsSubstring("TimeoutError"));
+}
+
+TEST_CASE("ScriptVm gives the walker's route search more than a call's timeout", "[ScriptVm]")
+{
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), ScriptVmOptions_s{.callTimeout = 100ms}, capture.GetLogger()};
+    vm.Activate();
+    py_bind(vm.GetMain(), "search(ms)", SlowSearch);
+    py_bind(vm.GetMain(), "slow(ms)", SlowBinding);
+    vm.RunSource("import time\n"
+                 "\n"
+                 "def busy(ms):\n"
+                 "    end = time.time() + ms / 1000\n"
+                 "    while time.time() < end:\n"
+                 "        pass\n"
+                 "\n"
+                 "def search_then(ms, busy_ms):\n"
+                 "    found = search(ms)\n"
+                 "    busy(busy_ms)\n"
+                 "    return found\n"
+                 "\n"
+                 "def slow_then(ms, busy_ms):\n"
+                 "    slow(ms)\n"
+                 "    busy(busy_ms)\n",
+        "route.py");
+
+    const auto call = [&vm](std::string_view function, s32 ms, s32 busyMs)
+    {
+        vm.Activate();
+        py_newint(py_r0(), ms);
+        py_newint(py_r1(), busyMs);
+        const auto args = std::array{py_r0(), py_r1()};
+        return vm.Call(function, args);
+    };
+
+    // Here a search may take 500 ms, and the Python after it 100 ms more. So a 250 ms search passes, a 700 ms
+    // one doesn't, and neither does a minute of Python after a short one.
+    CHECK(py_tobool(call("search_then", 250, 60)));
+    CHECK_THROWS_WITH(call("search_then", 700, 0), ContainsSubstring("TimeoutError"));
+    const auto start = std::chrono::steady_clock::now();
+    CHECK_THROWS_WITH(call("search_then", 10, 60000), ContainsSubstring("TimeoutError"));
+    CHECK(std::chrono::steady_clock::now() - start < 2s);
+
+    // Any other binding counts against the call's own timeout.
+    CHECK_THROWS_WITH(call("slow_then", 250, 0), ContainsSubstring("TimeoutError"));
 }
 
 TEST_CASE("ScriptVm makes time.sleep raise instead of stalling every account", "[ScriptVm]")

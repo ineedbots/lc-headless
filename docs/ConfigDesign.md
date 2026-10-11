@@ -185,7 +185,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `client.navDirectory` | string | `"data/nav"` | Not empty. rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes ([BotApiDesign.md](BotApiDesign.md) §9) |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
 | `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
-| `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run. Stored as `std::chrono::milliseconds` |
+| `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run; the walker's route search may take 5 times it (`ScriptVm::ROUTE_SEARCH_TIMEOUTS`). Stored as `std::chrono::milliseconds` |
 | `scripting.pollIntervalMs` | integer | `10` | 1 to 1000. The longest the main loop waits between passes |
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
