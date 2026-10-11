@@ -162,7 +162,9 @@ Waits measure time from the host's step time (`ScriptApi::SetStepTime`, `_core.s
 
 `settings_schema` maps each key to a `SettingDef(type, default, label=None, min=None, max=None, help=None, options=None, option_labels=None, group=None)`. The type is `'boolean'`, `'number'`, `'string'`, `'string[]'` or `'tile'`, as rs2b0t's.
 
-- At load, the account file's `script.settings` is checked against the schema. A wrong type, a number out of range, or a value not in `options` fails that account before login, naming the key, where rs2b0t quietly falls back to the default. Missing keys take their defaults, and keys the schema doesn't know draw a warning.
+- A `BOT`'s settings are the object under its name, `script.settings["<name>"]`, so one account file keeps the settings of several bots, as rs2b0t keeps each script's settings apart. A script without `BOT` reads the whole `script.settings`, as before.
+- At load, those settings are checked against the schema. A wrong type, a number out of range, or a value not in `options` fails that account before login, naming the key, where rs2b0t quietly falls back to the default. Missing keys take their defaults, and keys the schema doesn't know draw a warning.
+- A `BOT`'s defaults for the keys its object lacks are then written into the account file (`ScriptHostOptions_s::onSettingDefaults`, `ConfigFile::AddScriptSettings`). `JsoncEditor` inserts them into the text rather than rewriting it, so the file's comments and layout survive.
 - `self.settings` is a `SettingsBag` with rs2b0t's getters (`bool`, `num`, `str`, `list`, `tile`, `raw`), and keeps attribute access (`settings.rock`).
 
 ### Events

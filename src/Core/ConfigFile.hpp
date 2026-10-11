@@ -56,7 +56,8 @@ struct Config_s
 struct ScriptConfig_s
 {
     std::string file;
-    // The settings object as JSON text; the script reads it as its settings global.
+    // The settings object as JSON text; the script reads it as its settings global. A define_bot script reads
+    // only the object under its name, so one file can keep the settings of several.
     std::string settings = "{}";
     // How often on_progress_report is called; zero turns reports off.
     std::chrono::minutes progressReportMinutes{0};
@@ -67,6 +68,9 @@ struct ScriptConfig_s
 struct AccountConfig_s
 {
     std::string name;
+    // The file it was loaded from, which a define_bot script's default settings are added to; empty for one
+    // made in code.
+    std::filesystem::path file;
     AccountSettings_s credentials;
     bool enabled = true;
     std::optional<ServerSettings_s> server;
@@ -98,4 +102,8 @@ public:
     // The account's name is the file's name without its extension.
     [[nodiscard]] static AccountConfig_s LoadAccount(const std::filesystem::path& path);
     [[nodiscard]] static AccountConfig_s ParseAccount(std::string_view text, std::string name);
+    // Adds the settings in settingsJson, a JSON object, that the account file's script.settings[botName]
+    // lacks, keeping its comments and layout. Returns the keys added; the file is rewritten only when there
+    // are some.
+    [[nodiscard]] static std::vector<std::string> AddScriptSettings(const std::filesystem::path& path, std::string_view botName, std::string_view settingsJson);
 };

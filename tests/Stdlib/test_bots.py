@@ -84,6 +84,35 @@ def test_a_bot_from_BOT_uses_its_cadence():
     assert _runtime.bot.count == 1
 
 
+SCHEMA = {'food': SettingDef('string', 'Shrimps'), 'home': SettingDef('tile', Tile(1, 2)), 'partner': SettingDef('string', None)}
+
+
+def test_a_bot_from_BOT_reads_the_settings_under_its_name():
+    import json
+    events.clear()
+    settings = SettingsBag({'Counter': {'food': 'Trout'}, 'Fighter': {'food': 'Cake'}, 'food': 'Bread'})
+    warnings = _runtime.load(FakeModule(BOT=define_bot(name='Counter', create=Counter, settings_schema=SCHEMA)), settings)
+    assert _runtime.bot.settings is settings
+    assert settings.raw() == {'food': 'Trout', 'home': Tile(1, 2), 'partner': None}
+    assert warnings == ['ignores settings.food: a define_bot script reads only settings["Counter"]']
+
+    name, defaults = _runtime.setting_defaults()
+    assert name == 'Counter'
+    assert json.loads(defaults) == {'food': 'Shrimps', 'home': [1, 2, 0]}
+
+    message = raises(ValueError, lambda: load(FakeModule(BOT=define_bot(name='Counter', create=Counter, settings_schema=SCHEMA)), {'Counter': {'food': 5}}))
+    assert message == 'settings["Counter"].food must be a string'
+
+
+def test_a_script_without_BOT_reads_all_its_settings_and_has_no_defaults_to_give():
+    settings = SettingsBag({'food': 'Trout', 'Counter': {'food': 'Cake'}})
+    events.clear()
+    warnings = _runtime.load(FakeModule(loop=lambda: None, SETTINGS_SCHEMA=SCHEMA), settings)
+    assert settings.food == 'Trout'
+    assert warnings == ["has settings.Counter, which its settings schema doesn't declare"]
+    assert _runtime.setting_defaults() is None
+
+
 def test_BOT_must_come_from_define_bot():
     assert 'define_bot' in raises(TypeError, lambda: load(FakeModule(BOT=Counter)))
     assert 'must make a bot' in raises(TypeError, lambda: load(FakeModule(BOT=define_bot(name='x', create=lambda: 5))))

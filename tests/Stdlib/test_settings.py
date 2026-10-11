@@ -1,5 +1,5 @@
 from helpers import raises
-from rs2004.settings import apply_schema
+from rs2004.settings import apply_schema, schema_defaults, select_bot_settings
 
 SCHEMA = {
     'rock': SettingDef('string', 'Copper rocks', options=['Copper rocks', 'Tin rocks']),
@@ -70,3 +70,47 @@ def test_a_bad_schema_is_an_error():
     assert 'must be a dict' in raises(TypeError, lambda: apply_schema(SettingsBag({}), ['rock']))
     assert 'must be a SettingDef' in raises(TypeError, lambda: apply_schema(SettingsBag({}), {'rock': 'Copper rocks'}))
     assert 'a setting type must be one of' in raises(ValueError, lambda: SettingDef('colour', 'red'))
+
+
+def test_errors_and_warnings_name_where_the_settings_are():
+    where = 'settings["Miner"]'
+    assert raises(ValueError, lambda: apply_schema(SettingsBag({'trips': 0}), SCHEMA, where)) == 'settings["Miner"].trips must be at least 1'
+    assert apply_schema(SettingsBag({'colour': 'red'}), SCHEMA, where) == ["has settings[\"Miner\"].colour, which its settings schema doesn't declare"]
+
+
+def test_a_bot_reads_the_settings_under_its_name():
+    bag = SettingsBag({'Miner': {'rock': 'Tin rocks'}, 'Fighter': {'food': 'Trout'}})
+    assert select_bot_settings(bag, 'Miner') == []
+    assert bag.raw() == {'rock': 'Tin rocks'}
+
+    bag = SettingsBag({'Fighter': {'food': 'Trout'}})
+    assert select_bot_settings(bag, 'Miner') == []
+    assert bag.raw() == {}
+
+
+def test_settings_outside_any_bots_object_are_warned_about():
+    bag = SettingsBag({'rock': 'Tin rocks', 'Miner': {}, 'trips': 3, 'Fighter': {}})
+    assert select_bot_settings(bag, 'Miner') == ['ignores settings.rock, settings.trips: a define_bot script reads only settings["Miner"]']
+
+
+def test_a_bots_settings_must_be_an_object():
+    assert raises(ValueError, lambda: select_bot_settings(SettingsBag({'Miner': ['Tin rocks']}), 'Miner')) == 'settings["Miner"] must be an object'
+
+
+def test_schema_defaults_are_as_an_account_file_holds_them():
+    schema = {
+        'rock': SettingDef('string', 'Copper rocks'),
+        'home': SettingDef('tile', Tile(3222, 3218, 1)),
+        'centre': SettingDef('tile', [3230, 3298]),
+        'keep': SettingDef('string[]', ['Bronze pickaxe']),
+        'power': SettingDef('boolean', False),
+        'partner': SettingDef('string', None),
+    }
+    assert schema_defaults(schema) == {
+        'rock': 'Copper rocks',
+        'home': [3222, 3218, 1],
+        'centre': [3230, 3298],
+        'keep': ['Bronze pickaxe'],
+        'power': False,
+    }
+    assert schema_defaults(None) == {}

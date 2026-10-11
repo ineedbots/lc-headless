@@ -118,14 +118,16 @@ Every bot has `settings`, `loop_delay`, `loop_cadence`, `log(*args)`, `on(event,
 
 ### Settings
 
-The account file's `script.settings` object becomes the global `settings`, and the bot's `self.settings`. Read its keys as attributes (`settings.loot_goal`), with `settings.get('key', default)`, or with rs2b0t's typed getters, `bool(key)`, `num(key)`, `str(key)`, `list(key)` and `tile(key, fallback)`, which return the fallback when the value isn't of their type. `'key' in settings` checks for one.
+The account file's `script.settings` object becomes the global `settings`, and the bot's `self.settings`. A script with `BOT = define_bot(name=...)` gets only the object under its name, `script.settings["<name>"]`, so one account file can keep the settings of several scripts; a script without `BOT` gets the whole object. Read its keys as attributes (`settings.loot_goal`), with `settings.get('key', default)`, or with rs2b0t's typed getters, `bool(key)`, `num(key)`, `str(key)`, `list(key)` and `tile(key, fallback)`, which return the fallback when the value isn't of their type. `'key' in settings` checks for one.
 
 A script can declare its settings with a schema: `settings_schema=` in `define_bot`, or a module-level `SETTINGS_SCHEMA`. It maps each key to a `SettingDef(type, default, label=None, min=None, max=None, help=None, options=None, option_labels=None, group=None)`, where type is `'boolean'`, `'number'`, `'string'`, `'string[]'` or `'tile'`. Then, before login:
 
 - a setting the account file leaves out takes its default;
 - a value of the wrong type, a number outside `min` and `max`, or a string not in `options` stops the run, naming the setting. Options match without regard to case and become the schema's spelling;
 - a `'string[]'` may be a list or a comma-separated string, and a `'tile'` may be `[x, z]`, `[x, z, level]`, `"x,z,level"` or `{"x": ..., "z": ..., "level": ...}`. A tile setting reads as a `Tile`;
-- a setting the schema doesn't declare draws a warning, since it's probably misspelled.
+- a setting the schema doesn't declare draws a warning, since it's probably misspelled. For a `BOT`, so does a setting beside the bots' objects in `script.settings` rather than inside its own, which it doesn't read.
+
+A `BOT`'s declared settings that its object in the account file lacks, those with a default, are then written into the file with their defaults, creating the object if need be and leaving the file's comments and layout as they were. So the first run of a new script shows every setting it has, ready to edit, and a later version's new settings appear as it loads. Values already in the file are never changed. A script without `BOT` has nothing written for it.
 
 ### Imports
 

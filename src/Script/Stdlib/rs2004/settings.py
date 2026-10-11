@@ -116,10 +116,10 @@ def _match_option(definition, text):
     return None
 
 
-def _check(key, definition, value):
+def _check(key, definition, value, parent):
     """The value as the script reads it, or raises ValueError naming the setting. Messages don't quote the
     value, as config errors don't, since settings can hold secrets."""
-    where = f'settings.{key}'
+    where = f'{parent}.{key}'
     kind = definition.type
     if kind == 'boolean':
         if not isinstance(value, bool):
@@ -168,9 +168,10 @@ def _check(key, definition, value):
     return tile
 
 
-def apply_schema(bag, schema):
+def apply_schema(bag, schema, where='settings'):
     """Checks the bag's values against the schema, in place: each declared setting is checked and takes
-    its default when missing. Returns warnings for settings the schema doesn't declare."""
+    its default when missing. Returns warnings for settings the schema doesn't declare. Messages name each
+    setting from where, the bag's place in the account file."""
     if schema is None:
         return []
     if not isinstance(schema, dict):
@@ -181,8 +182,47 @@ def apply_schema(bag, schema):
         if not isinstance(definition, SettingDef):
             raise TypeError(f'settings schema entry {repr(key)} must be a SettingDef')
         if key in values:
-            values[key] = _check(key, definition, values[key])
+            values[key] = _check(key, definition, values[key], where)
         else:
-            values[key] = _check(key, definition, definition.default) if definition.default is not None else None
+            values[key] = _check(key, definition, definition.default, where) if definition.default is not None else None
 
-    return [f"has settings.{key}, which its settings schema doesn't declare" for key in values if key not in schema]
+    return [f"has {where}.{key}, which its settings schema doesn't declare" for key in values if key not in schema]
+
+
+def bot_settings_path(name):
+    """Where a define_bot script's settings are in the account file's script.settings: under its name."""
+    return f'settings["{name}"]'
+
+
+def select_bot_settings(bag, name):
+    """Narrows the bag, in place, to the object under the bot's name, so one account file can keep the
+    settings of several define_bot scripts. Returns a warning for settings outside any such object, which
+    no define_bot script reads."""
+    values = bag._values
+    own = values.get(name)
+    if own is None:
+        own = {}
+    elif not isinstance(own, dict):
+        raise ValueError(f'{bot_settings_path(name)} must be an object')
+
+    bag._values = own
+    stray = [f'settings.{key}' for key, value in values.items() if not isinstance(value, dict)]
+    if not stray:
+        return []
+    return [f'ignores {", ".join(stray)}: a define_bot script reads only {bot_settings_path(name)}']
+
+
+def schema_defaults(schema):
+    """The schema's defaults as an account file holds them, with tiles as [x, z, level]. Settings without a
+    default are left out."""
+    defaults = {}
+    for key, definition in (schema or {}).items():
+        default = definition.default
+        if default is None:
+            continue
+        if isinstance(default, Tile):
+            default = [default.x, default.z, default.level]
+        elif isinstance(default, tuple):
+            default = list(default)
+        defaults[key] = default
+    return defaults

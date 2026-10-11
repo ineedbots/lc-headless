@@ -30,13 +30,18 @@
         // 0 or leaving it out means no reports.
         "progressReportMinutes": 20,
 
-        // Anything here reaches the script as its settings object: settings.loot_goal,
-        // settings.get("teleport"), and so on. Keys are used as written. A script with a settings
-        // schema checks these before login, and fills in the ones left out with its defaults.
+        // What reaches the script as its settings object: settings.loot_goal, settings.get("teleport"),
+        // and so on. Keys are used as written. A script with BOT = define_bot(...) reads only the object
+        // under its name, so one file can keep the settings of several scripts, and when it loads, the
+        // settings it declares that this object lacks are added here with their defaults. A script
+        // without BOT reads this whole object, and nothing is added. A script with a settings schema
+        // checks these before login.
         "settings": {
-            "npcs": ["Chicken"],
-            "loot": ["Bones"],
-            "loot_goal": 3
+            "Chicken killer": {
+                "npcs": ["Chicken"],
+                "loot": ["Bones"],
+                "loot_goal": 3
+            }
         }
     }
 }

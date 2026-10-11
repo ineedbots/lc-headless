@@ -24,6 +24,7 @@ from rs2004.events import listening as _listening
 
 _rt_make_settings = _runtime.make_settings
 _rt_load = _runtime.load
+_rt_setting_defaults = _runtime.setting_defaults
 _rt_start = _runtime.start
 _rt_dispatch = _runtime.dispatch
 _rt_step = _runtime.step

@@ -3,6 +3,7 @@
 
 #include "BigUInt.hpp"
 #include "ConfigError.hpp"
+#include "JsoncEditor.hpp"
 #include "Logger.hpp"
 
 #include <ixwebsocket/IXUrlParser.h>
@@ -34,6 +35,7 @@ namespace
     constexpr auto LAST_PRINTABLE = '\x7E';
     constexpr auto SECURE_SCHEME = "wss"sv;
     constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
+    constexpr auto TEMPORARY_EXTENSION = ".tmp";
 
     struct LogLevelName_s
     {
@@ -261,6 +263,30 @@ namespace
         return text;
     }
 
+    // Through a temporary file, so the file is never left half written.
+    void ReplaceFile(const std::filesystem::path& path, std::string_view text)
+    {
+        auto temporary = path;
+        temporary += TEMPORARY_EXTENSION;
+        {
+            auto file = std::ofstream{temporary, std::ios::binary | std::ios::trunc};
+            file << text;
+            file.flush();
+            if (!file)
+            {
+                throw ConfigError{std::format("{}: couldn't be written", temporary.string())};
+            }
+        }
+
+        auto error = std::error_code{};
+        std::filesystem::rename(temporary, path, error);
+        if (error)
+        {
+            std::filesystem::remove(temporary, error);
+            throw ConfigError{std::format("{}: couldn't be replaced", path.string())};
+        }
+    }
+
     void WriteSample(const std::filesystem::path& path)
     {
         // A stream that failed to open ignores the writes, so one check covers opening and writing.
@@ -477,7 +503,9 @@ AccountConfig_s ConfigFile::LoadAccount(const std::filesystem::path& path)
     const auto text = ReadFile(path);
     try
     {
-        return ParseAccount(text, path.stem().string());
+        auto account = ParseAccount(text, path.stem().string());
+        account.file = path;
+        return account;
     }
     catch (const ConfigError& e)
     {
@@ -501,4 +529,28 @@ AccountConfig_s ConfigFile::ParseAccount(std::string_view text, std::string name
     account.name = std::move(name);
     ValidateAccount(account);
     return account;
+}
+
+std::vector<std::string> ConfigFile::AddScriptSettings(const std::filesystem::path& path, std::string_view botName, std::string_view settingsJson)
+{
+    const auto text = ReadFile(path);
+    auto edit = JsoncEdit_s{};
+    try
+    {
+        // For the parser's errors, which say where the text is wrong.
+        static_cast<void>(ParseRootObject(text));
+        const auto keys = std::array{std::string{"script"}, std::string{"settings"}, std::string{botName}};
+        edit = JsoncEditor::AddMissing(text, keys, settingsJson);
+    }
+    catch (const ConfigError& e)
+    {
+        throw ConfigError{std::format("{}: {}", path.string(), e.what())};
+    }
+
+    if (!edit.added.empty())
+    {
+        ReplaceFile(path, edit.text);
+    }
+
+    return std::move(edit.added);
 }

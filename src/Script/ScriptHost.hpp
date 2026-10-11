@@ -31,6 +31,9 @@ struct ScriptHostOptions_s
     std::filesystem::path scriptsDirectory;
     std::filesystem::path file;
     std::string settings = "{}";
+    // Given a define_bot script's name and its schema's defaults, as a JSON object, each time the script
+    // loads, so the account file can gain the settings it lacks.
+    std::function<void(std::string_view botName, std::string_view settingsJson)> onSettingDefaults;
     std::chrono::milliseconds callTimeout = 1000ms;
     // How often on_progress_report is called, with what it returns going to onProgressReport; zero for never.
     std::chrono::minutes progressInterval{0};

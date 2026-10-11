@@ -93,6 +93,10 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .scriptsDirectory = scripting.scriptsDirectory,
                 .file = script.file,
                 .settings = script.settings,
+                .onSettingDefaults = [this](std::string_view botName, std::string_view settingsJson)
+                {
+                    AddSettingDefaults(botName, settingsJson);
+                },
                 .callTimeout = scripting.callTimeoutMs,
                 .progressInterval = script.progressReportMinutes,
                 .onProgressReport = [this](const ProgressReport_s& report)
@@ -386,6 +390,35 @@ void Account::WriteProgressReport(const ProgressReport_s& report)
     catch (const std::exception& e)
     {
         m_logger->Warning("The progress report wasn't saved: {}", e.what());
+    }
+}
+
+void Account::AddSettingDefaults(std::string_view botName, std::string_view settingsJson)
+{
+    if (m_account.file.empty())
+    {
+        return;
+    }
+
+    try
+    {
+        const auto added = ConfigFile::AddScriptSettings(m_account.file, botName, settingsJson);
+        if (added.empty())
+        {
+            return;
+        }
+
+        auto keys = std::string{};
+        for (const auto& key : added)
+        {
+            keys += keys.empty() ? key : ", " + key;
+        }
+
+        m_logger->Info("Added {}'s default settings to {}: {}", botName, m_account.file.string(), keys);
+    }
+    catch (const std::exception& e)
+    {
+        m_logger->Warning("{}'s default settings weren't added to the account file: {}", botName, e.what());
     }
 }
 

@@ -1,5 +1,6 @@
 # Kills chickens and picks up their bones, then logs out: a TaskBot that fights, loots and waits on
-# what it did. The settings are in SETTINGS below; an account file overrides any of them.
+# what it did. The settings are in SETTINGS below; an account file overrides any of them in its
+# script.settings["Chicken killer"], which the client fills in with these defaults when the script loads.
 
 SETTINGS = {
     'npcs': SettingDef('string[]', ['Chicken'], label='NPCs to attack'),

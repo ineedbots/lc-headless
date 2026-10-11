@@ -906,7 +906,9 @@ TEST_CASE("ConfigFile::LoadAccount", "[ConfigFile][AccountFile]")
         WriteFile(path, ACCOUNT_EXAMPLE);
         const auto account = ConfigFile::LoadAccount(path);
         CHECK(account.name == "bot1");
+        CHECK(account.file == path);
         CHECK(account.credentials.username == "bot1");
+        CHECK(ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1").file.empty());
     }
 
     SECTION("puts the file's path in front of the message")
@@ -919,6 +921,46 @@ TEST_CASE("ConfigFile::LoadAccount", "[ConfigFile][AccountFile]")
     {
         CHECK_THROWS_WITH(ConfigFile::LoadAccount(path), Catch::Matchers::ContainsSubstring(path.string()) && Catch::Matchers::ContainsSubstring("not found"));
         CHECK_FALSE(std::filesystem::exists(path));
+    }
+}
+
+TEST_CASE("ConfigFile::AddScriptSettings", "[ConfigFile][AccountFile]")
+{
+    const auto folder = TempFolder{"rs2004-config-tests"};
+    const auto path = folder.GetPath() / "bot1.jsonc";
+    const auto defaults = R"json({"npcs": ["Chicken"], "loot_goal": 3})json"sv;
+
+    SECTION("adds a bot's settings under its name, and only the ones missing")
+    {
+        WriteFile(path, ACCOUNT_EXAMPLE);
+        CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", defaults) == std::vector<std::string>{"npcs", "loot_goal"});
+
+        const auto text = ReadFile(path);
+        CHECK(text.starts_with("{\n    // The account and what it runs.\n"));
+        CHECK(text.find(R"json("settings": {"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens", "Chicken killer": {"npcs": ["Chicken"], "loot_goal": 3}})json") != std::string::npos);
+        CHECK(nlohmann::json::parse(ConfigFile::ParseAccount(text, "bot1").script->settings)["Chicken killer"] == nlohmann::json::parse(defaults));
+        CHECK_FALSE(std::filesystem::exists(folder.GetPath() / "bot1.jsonc.tmp"));
+
+        CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", R"json({"npcs": ["Cow"], "radius": 8})json") == std::vector<std::string>{"radius"});
+        CHECK(ReadFile(path).find(R"json("Chicken killer": {"npcs": ["Chicken"], "loot_goal": 3, "radius": 8})json") != std::string::npos);
+    }
+
+    SECTION("leaves a file that has them all untouched")
+    {
+        WriteFile(path, ACCOUNT_EXAMPLE);
+        const auto before = std::filesystem::last_write_time(path);
+        CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", "{}").empty());
+        CHECK(ReadFile(path) == ACCOUNT_EXAMPLE);
+        CHECK(std::filesystem::last_write_time(path) == before);
+    }
+
+    SECTION("puts the file's path in front of the message")
+    {
+        WriteFile(path, "{\"script\": {\"settings\": {\"Chicken killer\": []}}}");
+        CHECK_THROWS_WITH(ConfigFile::AddScriptSettings(path, "Chicken killer", defaults), path.string() + ": script.settings.Chicken killer: must be an object");
+
+        WriteFile(path, "{\"script\": ");
+        CHECK_THROWS_WITH(ConfigFile::AddScriptSettings(path, "Chicken killer", defaults), Catch::Matchers::StartsWith(path.string() + ": invalid JSON at line 1"));
     }
 }
 

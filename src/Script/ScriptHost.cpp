@@ -24,6 +24,7 @@ namespace
 {
     // The standard library's runtime (rs2004/_runtime.py), as the bootstrap names it in builtins.
     constexpr auto LOAD_BOT = "_rt_load"sv;
+    constexpr auto SETTING_DEFAULTS = "_rt_setting_defaults"sv;
     constexpr auto START_BOT = "_rt_start"sv;
     constexpr auto DISPATCH = "_rt_dispatch"sv;
     constexpr auto STEP = "_rt_step"sv;
@@ -294,6 +295,18 @@ void ScriptHost::LoadBot()
     for (const auto& warning : warnings)
     {
         m_logger->Warning("{} {}", m_options.file.generic_string(), warning);
+    }
+
+    if (m_options.onSettingDefaults)
+    {
+        m_vm->Activate();
+        const auto defaults = m_vm->CallBuiltin(SETTING_DEFAULTS);
+        if (!py_isnone(defaults))
+        {
+            const auto botName = PyConvert::ToString(py_list_getitem(defaults, 0), "the bot's name");
+            const auto settingsJson = PyConvert::ToString(py_list_getitem(defaults, 1), "the default settings");
+            m_options.onSettingDefaults(botName, settingsJson);
+        }
     }
 
     m_vm->Activate();

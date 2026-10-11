@@ -11,7 +11,7 @@ from rs2004 import events as _events
 from rs2004 import upkeep as _upkeep
 from rs2004.bot import AbstractBot, BotManifest, LoopingBot, is_generator, resolve_loop_cadence
 from rs2004.execution import Ticks, Update
-from rs2004.settings import SettingsBag, apply_schema
+from rs2004.settings import SettingsBag, apply_schema, bot_settings_path, schema_defaults, select_bot_settings
 from rs2004.random_events import random_events
 
 bot = None
@@ -26,6 +26,8 @@ _guardian = None
 # What load() was given, so the stall guard can make the bot afresh.
 _main = None
 _settings = None
+# BOT's name and its schema's defaults, for setting_defaults(); None for a script without BOT.
+_setting_defaults = None
 # configure()'s choices.
 _random_events_on = False
 _stall_minutes = 0
@@ -67,8 +69,10 @@ def make_settings(text):
 
 
 def load(main, settings):
-    """Makes the bot from the script's module, checks its settings, and finds its hooks. Returns warnings."""
-    global bot, _generator, _starting, _finish_reason, _finished, _guardian, _main, _settings
+    """Makes the bot from the script's module, checks its settings, and finds its hooks. Returns warnings.
+    A BOT's settings are the object under its name in the account file's settings; a script without one
+    reads the whole object."""
+    global bot, _generator, _starting, _finish_reason, _finished, _guardian, _main, _settings, _setting_defaults
     bot = None
     _generator = None
     _guardian = None
@@ -77,17 +81,29 @@ def load(main, settings):
     _finished = False
     _main = main
     _settings = settings
+    _setting_defaults = None
 
     manifest = getattr(main, 'BOT', None)
     if manifest is not None:
         if not isinstance(manifest, BotManifest):
             raise TypeError('BOT must be made by define_bot(...)')
-        warnings = apply_schema(settings, manifest.settings_schema)
+        warnings = select_bot_settings(settings, manifest.name)
+        warnings += apply_schema(settings, manifest.settings_schema, bot_settings_path(manifest.name))
+        _setting_defaults = [manifest.name, schema_defaults(manifest.settings_schema)]
     else:
         if not callable(getattr(main, 'loop', None)):
             raise ValueError('the script has neither BOT = define_bot(...) nor a loop() function')
         warnings = apply_schema(settings, getattr(main, 'SETTINGS_SCHEMA', None))
     return warnings + _make_bot()
+
+
+def setting_defaults():
+    """BOT's name and its schema's defaults as a JSON object, for the host to add to the account file where
+    it lacks them; None for a script without BOT."""
+    if _setting_defaults is None:
+        return None
+    import json
+    return [_setting_defaults[0], json.dumps(_setting_defaults[1])]
 
 
 def _make_bot():

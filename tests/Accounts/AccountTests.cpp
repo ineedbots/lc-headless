@@ -126,6 +126,54 @@ TEST_CASE("An account without a script logs out once its idleSeconds are up", "[
     }));
 }
 
+TEST_CASE("An account adds its define_bot script's default settings to its file", "[Account]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{};
+    const auto folder = TempFolder{"rs2004-account-tests"};
+    folder.WriteFile("main.py", "class Miner(LoopingBot):\n    def loop(self):\n        pass\n\n"
+                                "BOT = define_bot(name='Miner', create=Miner, settings_schema={'trips': SettingDef('number', 5), 'rock': SettingDef('string', 'Copper rocks')})\n");
+    folder.WriteFile("bot1.jsonc", "{\n    \"script\": {\n        \"file\": \"main.py\",\n        \"settings\": {\"Miner\": {\"trips\": 3}}\n    }\n}\n");
+
+    auto config = server.MakeConfig();
+    config.scripting.scriptsDirectory = folder.GetPath().string();
+    const auto makeAccount = [&](std::filesystem::path file)
+    {
+        auto settings = AccountConfig_s{
+            .name = "bot1",
+            .file = std::move(file),
+            .credentials = FakeGameServer::MakeAccount(),
+            .script = ScriptConfig_s{.file = "main.py", .settings = R"json({"Miner": {"trips": 3}})json"},
+        };
+        return std::make_unique<Account>(std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger());
+    };
+
+    const auto hasLine = [&capture](LogLevel_e level, std::string_view start)
+    {
+        return std::ranges::any_of(capture.GetEntries(), [level, start](const CapturedLog_s& entry)
+        {
+            return entry.level == level && entry.message.starts_with(start);
+        });
+    };
+
+    SECTION("the ones it lacks, as the script loads")
+    {
+        const auto file = folder.GetPath() / "bot1.jsonc";
+        static_cast<void>(makeAccount(file));
+
+        auto stream = std::ifstream{file, std::ios::binary};
+        const auto text = std::string{std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+        CHECK(text == "{\n    \"script\": {\n        \"file\": \"main.py\",\n        \"settings\": {\"Miner\": {\"trips\": 3, \"rock\": \"Copper rocks\"}}\n    }\n}\n");
+        CHECK(hasLine(LogLevel_e::Info, std::format("Added Miner's default settings to {}: rock", file.string())));
+    }
+
+    SECTION("and runs on with a warning when it can't")
+    {
+        static_cast<void>(makeAccount(folder.GetPath() / "missing.jsonc"));
+        CHECK(hasLine(LogLevel_e::Warning, "Miner's default settings weren't added to the account file: "));
+    }
+}
+
 TEST_CASE("An account logs out when its script stops it", "[Account]")
 {
     auto fixture = AccountFixture{"def loop():\n    if npcs.query().id(50).exists():\n        stop_account()\n    return 100\n"};

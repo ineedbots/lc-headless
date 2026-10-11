@@ -137,7 +137,9 @@ Copy [accounts/example.jsonc.sample](accounts/example.jsonc.sample) to `accounts
     "script": {
         "file": "examples/chicken_killer.py",   // relative to scripts/
         "progressReportMinutes": 20,           // 0, or no key at all, means no reports
-        "settings": { "loot_goal": 3 }          // read by the script as its settings object
+        "settings": {                           // read by the script as its settings object
+            "Chicken killer": { "loot_goal": 3 }   // a define_bot script's, under its name
+        }
     }
 }
 ```
@@ -145,6 +147,7 @@ Copy [accounts/example.jsonc.sample](accounts/example.jsonc.sample) to `accounts
 - An account with no `script` logs in and idles, and logs a summary of its surroundings every 10 seconds. This is a quick way to check a new server config. It logs out after `idleSeconds`, or idles until Ctrl+C when that's `0`, the default.
 - `"enabled": false` keeps the file but doesn't run the account.
 - A `server` section, with the same keys as the one in `client.jsonc`, logs this account into a different world.
+- A script with `BOT = define_bot(name=...)` reads only `settings["<name>"]`, so one file can keep the settings of several scripts, and switching `file` between them loses nothing. When it loads, the settings its schema declares that are missing there are written into the file with their defaults, leaving your comments and layout as they were, so the file shows everything you can set. A script without `BOT` reads the whole `settings` object, and nothing is written.
 
 These keys set how the account's script is kept going. Each has a default, so leave out the ones you don't change:
 

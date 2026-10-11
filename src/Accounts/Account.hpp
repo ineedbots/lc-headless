@@ -22,7 +22,8 @@ struct AccountOptions_s
     std::shared_ptr<const Navigation_s> navigation;
 };
 
-// One account: its client and, when the account file names one, its script. Without a script the account
+// One account: its client and, when the account file names one, its script. A define_bot script's default
+// settings that the account file lacks are added to it as the script loads. Without a script the account
 // idles and logs a summary of what it sees every SUMMARY_INTERVAL, then logs out once it has been in game for
 // its idleSeconds, or idles until interrupted when that's zero. Nothing it does waits beyond Step's
 // maxWait, so many accounts can share one loop. An account finishes when it has logged out, when its
@@ -67,6 +68,7 @@ private:
     void StepScript(Clock::time_point now);
     void StepIdle(Clock::time_point now);
     void WriteProgressReport(const ProgressReport_s& report);
+    void AddSettingDefaults(std::string_view botName, std::string_view settingsJson);
     void LogOut(std::string_view reason);
     void BeginRelog(std::chrono::seconds delay);
     // Carries a relog on: the logout, the wait, then the login. True while one is under way.

@@ -240,7 +240,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `ConfigF
 | `script` | object or `null` | none: the account idles | |
 | `script.file` | string | none | Not empty. Relative to `scripting.scriptsDirectory` |
 | `script.progressReportMinutes` | integer | `0`: no reports | 0 to 1440. How often the script's `on_progress_report()` is called ([ScriptingDesign.md](ScriptingDesign.md) §12). Stored as `std::chrono::minutes` |
-| `script.settings` | object | `{}` | Any object. It's kept as JSON text and becomes the script's `settings` ([ScriptingDesign.md](ScriptingDesign.md) §7) |
+| `script.settings` | object | `{}` | Any object. It's kept as JSON text and becomes the script's `settings` ([ScriptingDesign.md](ScriptingDesign.md) §7). A `define_bot` script reads only the object under its name, and its missing defaults are added there as it loads ([BotApiDesign.md](BotApiDesign.md), Settings) |
 
 ---
 
@@ -306,7 +306,8 @@ struct Config_s
 struct ScriptConfig_s
 {
     std::string file;
-    // The settings object as JSON text; the script reads it as its settings global.
+    // The settings object as JSON text; the script reads it as its settings global. A define_bot script reads
+    // only the object under its name, so one file can keep the settings of several.
     std::string settings = "{}";
     // How often on_progress_report is called; zero turns reports off.
     std::chrono::minutes progressReportMinutes{0};
@@ -316,6 +317,9 @@ struct ScriptConfig_s
 struct AccountConfig_s
 {
     std::string name;
+    // The file it was loaded from, which a define_bot script's default settings are added to; empty for one
+    // made in code.
+    std::filesystem::path file;
     AccountSettings_s credentials;
     bool enabled = true;
     std::optional<ServerSettings_s> server;
@@ -342,11 +346,15 @@ public:
     // The account's name is the file's name without its extension.
     [[nodiscard]] static AccountConfig_s LoadAccount(const std::filesystem::path& path);
     [[nodiscard]] static AccountConfig_s ParseAccount(std::string_view text, std::string name);
+    // Adds the settings in settingsJson, a JSON object, that the account file's script.settings[botName]
+    // lacks, keeping its comments and layout. Returns the keys added; the file is rewritten only when there
+    // are some.
+    [[nodiscard]] static std::vector<std::string> AddScriptSettings(const std::filesystem::path& path, std::string_view botName, std::string_view settingsJson);
 };
 ```
 
 - `AccountSettings_s` (the username and password) is no longer part of `Config_s`. `GameClient` takes it as a constructor argument, from an `AccountConfig_s`.
-- Account files are only read, and a script's settings can be any object, so `AccountConfig_s` and `ScriptConfig_s` have hand-written `from_json` functions instead of the macro. Neither has a `to_json`, and there's no account sample to serialize.
+- A script's settings can be any object, so `AccountConfig_s` and `ScriptConfig_s` have hand-written `from_json` functions instead of the macro. Neither has a `to_json`, and there's no account sample to serialize. The one write to an account file, `AddScriptSettings`, goes through `JsoncEditor`, which inserts the new members into the text, matching its indentation and line endings, instead of serializing the file again, which would drop its comments. It writes a temporary file beside it and renames it over the original.
 
 - The member names are the JSON keys, so renaming a member renames its key.
 - `ServerSettings_s` uses the member names and the `tlsCaFile` default of `WebSocketOptions_s`, so building the options is a member-by-member copy (see Usage).

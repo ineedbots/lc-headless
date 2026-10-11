@@ -23,6 +23,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <nlohmann/json.hpp>
 
 using Catch::Matchers::ContainsSubstring;
 
@@ -873,12 +874,28 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
     auto server = FakeGameServer{};
     const auto folder = TempFolder{"rs2004-script-host-tests"};
     auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger()};
+    auto defaultsGiven = 0;
+    const auto loadFile = [&](std::string file, std::string settings)
+    {
+        auto host = ScriptHost{ScriptTestRuntime::Get(), client,
+            {
+                .scriptsDirectory = folder.GetPath(),
+                .file = std::move(file),
+                .settings = std::move(settings),
+                .onSettingDefaults = [&defaultsGiven](std::string_view, std::string_view)
+                {
+                    ++defaultsGiven;
+                },
+            },
+            capture.GetLogger()};
+    };
+
+    folder.WriteFile("main.py", "SETTINGS_SCHEMA = {'count': SettingDef('number', 5, min=1), 'home': SettingDef('tile', [3222, 3218])}\n"
+                                "def on_start():\n    log(settings.count, settings.home)\n"
+                                "def loop():\n    return 1\n");
     const auto load = [&](std::string settings)
     {
-        folder.WriteFile("main.py", "SETTINGS_SCHEMA = {'count': SettingDef('number', 5, min=1), 'home': SettingDef('tile', [3222, 3218])}\n"
-                                    "def on_start():\n    log(settings.count, settings.home)\n"
-                                    "def loop():\n    return 1\n");
-        auto host = ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = folder.GetPath(), .file = "main.py", .settings = std::move(settings)}, capture.GetLogger()};
+        loadFile("main.py", std::move(settings));
     };
 
     CHECK_THROWS_WITH(load(R"({"count": 0})"), ContainsSubstring("settings.count must be at least 1"));
@@ -888,6 +905,60 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
     CHECK(std::ranges::any_of(capture.GetEntries(), [](const CapturedLog_s& entry)
     {
         return entry.level == LogLevel_e::Warning && entry.message.find("settings.colour, which its settings schema doesn't declare") != std::string::npos;
+    }));
+    // Only a define_bot script has a place of its own in the account file to give defaults for.
+    CHECK(defaultsGiven == 0);
+
+    // A define_bot script's are the object under its name.
+    folder.WriteFile("bot.py", "class Miner(LoopingBot):\n    def loop(self):\n        pass\n\n"
+                               "BOT = define_bot(name='Miner', create=Miner, settings_schema={'count': SettingDef('number', 5, min=1)})\n");
+    const auto loadBot = [&](std::string settings)
+    {
+        loadFile("bot.py", std::move(settings));
+    };
+
+    CHECK_THROWS_WITH(loadBot(R"({"Miner": {"count": 0}})"), ContainsSubstring(R"(settings["Miner"].count must be at least 1)"));
+    CHECK_THROWS_WITH(loadBot(R"({"Miner": 5})"), ContainsSubstring(R"(settings["Miner"] must be an object)"));
+    CHECK_NOTHROW(loadBot(R"({"count": 0, "Fighter": {"count": 0}})"));
+    CHECK(defaultsGiven == 1);
+}
+
+TEST_CASE("ScriptHost gives a define_bot script the settings under its name, and passes on its defaults", "[ScriptHost]")
+{
+    auto defaults = std::vector<std::pair<std::string, std::string>>{};
+    auto fixture = HostFixture{R"python(
+class Miner(LoopingBot):
+    def on_start(self):
+        log('>', self.settings.rock, self.settings.trips, settings.rock, self.settings.home)
+
+    def loop(self):
+        pass
+
+SCHEMA = {
+    'rock': SettingDef('string', 'Copper rocks'),
+    'trips': SettingDef('number', 5, min=1),
+    'home': SettingDef('tile', [3222, 3218]),
+    'partner': SettingDef('string', None),
+}
+BOT = define_bot(name='Miner', create=Miner, settings_schema=SCHEMA)
+)python",
+        ScriptHostOptions_s{
+            .settings = R"json({"rock": "Iron rocks", "Miner": {"rock": "Tin rocks"}, "Fighter": {"food": "Trout"}})json",
+            .onSettingDefaults = [&defaults](std::string_view botName, std::string_view settingsJson)
+            {
+                defaults.emplace_back(botName, settingsJson);
+            },
+        }};
+
+    REQUIRE(defaults.size() == 1);
+    CHECK(defaults[0].first == "Miner");
+    CHECK(nlohmann::json::parse(defaults[0].second) == nlohmann::json::parse(R"json({"rock": "Copper rocks", "trips": 5, "home": [3222, 3218]})json"));
+
+    fixture.host->Step(Clock::now());
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"Tin rocks 5 Tin rocks Tile(3222, 3218, 0)"});
+    CHECK(std::ranges::any_of(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.level == LogLevel_e::Warning && entry.message == R"(main.py ignores settings.rock: a define_bot script reads only settings["Miner"])";
     }));
 }
 
