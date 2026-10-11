@@ -15,10 +15,6 @@ namespace
     constexpr auto ALLOW_EXCEPTIONS = true;
     constexpr auto IGNORE_COMMENTS = true;
     constexpr auto TYPE_ERROR_ID = 302;
-    constexpr auto SAMPLE_HEADER =
-        "// Sample config, written because none was found.\n"
-        "// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.\n"
-        "// Each account goes in its own file in scripting.accountsDirectory.\n"sv;
     constexpr auto MAX_USERNAME_LENGTH = std::size_t{12};
     constexpr auto MAX_PASSWORD_LENGTH = std::size_t{20};
     constexpr auto MAX_IDLE_SECONDS = std::chrono::seconds{24 * 60 * 60};
@@ -286,18 +282,6 @@ namespace
             throw ConfigError{std::format("{}: couldn't be replaced", path.string())};
         }
     }
-
-    void WriteSample(const std::filesystem::path& path)
-    {
-        // A stream that failed to open ignores the writes, so one check covers opening and writing.
-        auto file = std::ofstream{path, std::ios::binary};
-        file << SAMPLE_HEADER << ConfigFile::Serialize(Config_s{});
-        file.flush();
-        if (!file)
-        {
-            throw ConfigError{std::format("{}: not found, and a sample couldn't be written there", path.string())};
-        }
-    }
 }
 
 namespace nlohmann
@@ -453,8 +437,7 @@ Config_s ConfigFile::Load(const std::filesystem::path& path, Logger& logger)
 {
     if (!std::filesystem::exists(path))
     {
-        WriteSample(path);
-        throw ConfigError{std::format("{}: not found, so a sample was written there; fill it in and run again", path.string())};
+        throw ConfigError{std::format("{}: not found; copy client.jsonc.sample there and fill it in", path.string())};
     }
 
     const auto text = ReadFile(path);

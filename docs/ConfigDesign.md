@@ -1,6 +1,6 @@
 # Config Design
 
-Design and test plan for `ConfigFile`, which loads the client's settings from a JSON file with comments, and writes a sample file when there is none. It replaces the reference client's INI config. The settings structs are converted in both directions with nlohmann/json's `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, so a missing key takes its default, and a validation pass checks the rules their types don't carry. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8, parses RSA keys with `BigUInt` ([PacketDesign.md](PacketDesign.md) §5), checks the server URL the same way `WebSocketClient` does ([WebSocketDesign.md](WebSocketDesign.md) §3), and logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)).
+Design and test plan for `ConfigFile`, which loads the client's settings from a JSON file with comments, and points to the committed `client.jsonc.sample` when there is none. It replaces the reference client's INI config. The settings structs are converted in both directions with nlohmann/json's `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, so a missing key takes its default, and a validation pass checks the rules their types don't carry. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8, parses RSA keys with `BigUInt` ([PacketDesign.md](PacketDesign.md) §5), checks the server URL the same way `WebSocketClient` does ([WebSocketDesign.md](WebSocketDesign.md) §3), and logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)).
 
 Reference sources:
 
@@ -17,7 +17,7 @@ Reference sources:
 |---|---|
 | Format | JSON with `//` and `/* */` comments, parsed by nlohmann/json with `ignore_comments = true`. Apart from comments it is strict JSON, so trailing commas, single quotes and `#` comments are syntax errors |
 | File | `client.jsonc` in the working directory, or the path given as the first command-line argument. The `.jsonc` extension makes editors highlight comments instead of flagging them as errors. `client.jsonc` holds the password, so it's git-ignored |
-| Sample | When the file doesn't exist, `Load` writes a sample there and throws a `ConfigError` asking for it to be filled in. The sample is `Config_s{}` serialized, so it always has exactly the keys and defaults the structs have |
+| Sample | `client.jsonc.sample` is committed next to it. When the file doesn't exist, `Load` throws a `ConfigError` that says to copy the sample there and fill it in. Nothing is written |
 | Shape | `ConfigFile` is a non-instantiable class with static `Load`, `Parse` and `Serialize`, like `StringUtils` in CONVENTIONS §5. `Load` and `Parse` return a `Config_s`: plain data, one struct per section. Values come out already converted to the types the client uses (`BigUInt`, `LogLevel_e`, `std::chrono::seconds`), so no code downstream parses or validates anything |
 | Ownership | `Application` holds the loaded config in a `std::shared_ptr<const Config_s>` and passes it to any class that needs it. A class that keeps it stores its own copy of the pointer, so ownership is genuinely shared (CONVENTIONS §8) and no class can outlive the config it reads. The `const` keeps the settings read-only after loading, for every holder |
 | Conversion | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` generates `from_json` and `to_json` for `Config_s` and the four section structs. Each type nlohmann can't convert by itself (`BigUInt`, `LogLevel_e` and `std::chrono::seconds`) gets an `nlohmann::adl_serializer` specialization with both directions. All of it lives in `ConfigFile.cpp` |
@@ -129,14 +129,11 @@ rs2004-headless/
 
 `tlsCaFile`, `lowMemory`, `revision` and the whole `scripting` section hold their defaults here, so this file could leave them out and load the same. The account that `client.ini` held now goes in its own file (see Account files, below), and the CRCs and logout component it held now come from the server's cache, which `cacheDirectory` points at ([CacheDesign.md](CacheDesign.md)).
 
-### Generated sample
+### Default serialization
 
-What `Load` writes when the file doesn't exist. This is the exact text, byte for byte, with LF line endings and a final newline:
+`Serialize(Config_s{})`, exactly, with LF line endings and a final newline. `client.jsonc.sample` is this text with a short comment header:
 
 ```jsonc
-// Sample config, written because none was found.
-// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.
-// Each account goes in its own file in scripting.accountsDirectory.
 {
     "server": {
         "url": "",
@@ -166,7 +163,6 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 }
 ```
 
-- The three comment lines are the fixed `SAMPLE_HEADER` constant. Everything after them is `Serialize(Config_s{})`.
 - Every value is its key's default. A file that sets nothing behaves exactly like this one: it fails `Validate`, starting with `server.url`.
 
 ### Keys
@@ -359,10 +355,10 @@ public:
 - The member names are the JSON keys, so renaming a member renames its key.
 - `ServerSettings_s` uses the member names and the `tlsCaFile` default of `WebSocketOptions_s`, so building the options is a member-by-member copy (see Usage).
 - **The member initializers are the defaults.**
-    - A key missing from the file keeps its member's initializer, and the generated sample is made of them.
+    - A key missing from the file keeps its member's initializer, and the default serialization is made of them.
     - Values that differ for each server or account are left empty or zero: `url`, the credentials and the RSA key. All of them fail `Validate` until the file sets them.
     - Code that builds a struct in place starts from the same values.
-- `Load` reads a file and calls `Parse`, or writes the sample when there's no file. `Parse` and `Serialize` work on text, which is what the tests call.
+- `Load` reads a file and calls `Parse`, or throws when there's no file. `Parse` and `Serialize` work on text, which is what the tests call.
 - `Load` and `Parse` take the `Logger&` their warnings go through, and default to the default logger when it is left out. They log only during the call and don't keep the logger, so a reference is enough, as with a function that only reads the config ([LoggerDesign.md](LoggerDesign.md) §3 Usage). `Serialize` doesn't log, so it takes none.
 - `Serialize` is the inverse of `Parse`: for a valid `Config_s`, `Parse(Serialize(config))` gives the same members back.
 - All the structs follow the rule of zero, so a `Config_s` moves cheaply out of `Load` and into its `shared_ptr`.
@@ -388,10 +384,10 @@ Application::Application(const std::filesystem::path& configPath, std::shared_pt
 - `Application` passes `m_logger` on to every class it builds that logs, such as `WebSocketClient` ([LoggerDesign.md](LoggerDesign.md) §3 Usage).
 - `Application.hpp` includes `Core/ConfigFile.hpp`, because `Config_s` appears in a member's type, and `Core/Logger.hpp`, because `Logger` appears in the constructor and a member.
 
-`main.cpp` creates the logger, as in [LoggerDesign.md](LoggerDesign.md) §3 Usage, and passes it and the optional path to `Application`. A `ConfigError` reaches the last-resort catch like any other failure at startup, and the message says which file and key are wrong. On a first run, the message is the one that asks for the new sample to be filled in.
+`main.cpp` creates the logger, as in [LoggerDesign.md](LoggerDesign.md) §3 Usage, and passes it and the optional path to `Application`. A `ConfigError` reaches the last-resort catch like any other failure at startup, and the message says which file and key are wrong. On a first run, the message says to copy `client.jsonc.sample` into place.
 
 ```
-Fatal error: client.jsonc: not found, so a sample was written there; fill it in and run again
+Fatal error: client.jsonc: not found; copy client.jsonc.sample there and fill it in
 Fatal error: client.jsonc: scripting.callTimeoutMs: must be from 10 to 60000
 ```
 
@@ -451,15 +447,10 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 ### Behaviour
 
 - **Loading.**
-    1. If `std::filesystem::exists(path)` is false, write the sample there (see Sample below) and throw `ConfigError{std::format("{}: not found, so a sample was written there; fill it in and run again", path.string())}`. A filesystem error from the check itself, such as a parent folder that can't be read, is a `std::filesystem::filesystem_error` and passes through unchanged.
+    1. If `std::filesystem::exists(path)` is false, throw `ConfigError{std::format("{}: not found; copy client.jsonc.sample there and fill it in", path.string())}`. Nothing is written. A filesystem error from the check itself, such as a parent folder that can't be read, is a `std::filesystem::filesystem_error` and passes through unchanged.
     2. Open the file with `std::ifstream{path, std::ios::binary}`. Binary mode keeps the text identical to the file's bytes on every platform, so the line and column of a syntax error match what an editor shows. If the file can't be opened, throw `ConfigError{std::format("Failed to open config file {}", path.string())}`.
     3. Read it whole with `std::istreambuf_iterator`. If the stream reports `bad()`, throw `ConfigError` the same way.
     4. Call `Parse(text, logger)`. Catch `ConfigError` and throw a new one with `{path}: ` in front of the message. This is the "add context" case in CONVENTIONS §8.
-- **Sample.** `WriteSample(path)`, in the anonymous namespace:
-    - It opens `std::ofstream{path, std::ios::binary}`. Binary mode keeps the LF line endings on Windows (CONVENTIONS §7).
-    - It writes `SAMPLE_HEADER` followed by `ConfigFile::Serialize(Config_s{})`, then flushes.
-    - If the file can't be opened or the write fails, it throws `ConfigError{std::format("{}: not found, and a sample couldn't be written there", path.string())}`. A folder that doesn't exist isn't created.
-    - It never overwrites anything, because `Load` only calls it when nothing is at the path.
 - **Parsing.**
 
     ```cpp
@@ -607,13 +598,12 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: scripting.callTimeoutMs: must be from 10 to 60000` reads as one line.
 - **Logging.**
     - The TLS warning is logged while the file loads, before `Application` calls `SetLevel` with `logLevel`. It therefore shows at the threshold the logger was created with, `Info` from `main`, even when the file sets `"error"`. That is deliberate: a problem in the file that sets the level should still be visible.
-    - Writing the sample isn't logged separately. The `ConfigError` that follows says what happened, and `main` logs it once ([LoggerDesign.md](LoggerDesign.md) §4).
 - **Adding a setting.**
     1. Add the member, with its default as the initializer, to its section struct, and its name to that struct's macro, in the same position.
     2. If it has a rule, add a `Check` to `Validate`. If its type is new to the config, add an `adl_serializer` specialization with both directions.
-    3. Add a row to the §3 table, update the §3 generated sample, and add the §6.4, §6.5 and §6.7 cases.
+    3. Add a row to the §3 table, update the §3 default serialization and `client.jsonc.sample`, and add the §6.4, §6.5 and §6.7 cases.
 
-    Existing files keep loading: the new key takes its default until a file sets it. The generated sample picks it up by itself.
+    Existing files keep loading: the new key takes its default until a file sets it.
 - **Not included:**
     - Saving a loaded config back. `Serialize` could do it, but the file's comments would be lost.
     - Reloading the config while the client runs.
@@ -632,7 +622,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 |---|---|---|
 | INI, parsed with SimpleIni | JSON with comments, parsed with nlohmann/json | Nested sections map directly onto JSON objects, and nlohmann already handles the syntax |
 | A field table with a hand-written reader per key | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, three `adl_serializer` specializations, and `Validate` | The macros generate the reading and the writing |
-| A missing file is an error; `client.ini.example` is committed by hand | A missing file is replaced by a generated sample, then an error | The sample can't drift from the structs |
+| A missing file is an error; `client.ini.example` is committed by hand | The same, with `client.jsonc.sample` | Account files work the same way, with `accounts/example.jsonc.sample` |
 | snake_case keys: `connect`, `ws_origin`, `tls_ca_file`, `rsa_modulus`, `log_level`, ... | The member names: `url`, `origin`, `tlsCaFile`, `rsaModulus`, `logLevel`, ... | The macro uses each member's name as its key |
 | Keys marked required in the field table, including `crcs` | Every key optional. A key whose default breaks its rule fails in `Validate` | The macro has no notion of required, and the defaults already show which keys can't be left out |
 | Every missing required key reported together | One at a time | `Validate` stops at the first broken rule |
@@ -761,7 +751,7 @@ Each rejection is a `ConfigError` containing the key's path.
 
 ### 6.7 Serializing
 
-- **The sample.** `Serialize(Config_s{})` equals the §3 generated sample without its two header lines, exactly. That one comparison covers the key order, the 4-space indentation, the LF line endings, the final newline and the written form of every type.
+- **The sample.** `Serialize(Config_s{})` equals the §3 default serialization, exactly. That one comparison covers the key order, the 4-space indentation, the LF line endings, the final newline and the written form of every type.
 - **Round trip.** `Parse(Serialize(Parse(EXAMPLE)))` gives the members in §6.2, and `Serialize` of that equals `Serialize(Parse(EXAMPLE))`.
 - **Written forms.** Each row sets one member of the parsed §3 example and serializes it. The value appears in the output as shown and parses back to the same member:
 
@@ -776,7 +766,7 @@ Each rejection is a `ConfigError` containing the key's path.
 | `scripting.killGraceSeconds` | `600s` | `600` |
 
 - **Case on the way back.** A file whose RSA values are written in upper case parses, and `Serialize` writes them back in lower case. Both are the same value.
-- **Filling in the sample.** The test parses the generated sample with nlohmann and sets `server.url`, `account.username`, `account.password`, `login.rsaModulus` (`"3233"`) and `login.rsaExponent` (`"17"`). `Parse` then succeeds with no log entries, and gives the same members as the minimal file in §6.2 with the same five values.
+- **Filling in the sample.** The test parses the §3 default serialization with nlohmann and sets `server.url`, `account.username`, `account.password`, `login.rsaModulus` (`"3233"`) and `login.rsaExponent` (`"17"`). `Parse` then succeeds with no log entries, and gives the same members as the minimal file in §6.2 with the same five values.
 
 ### 6.8 Load
 
@@ -785,11 +775,7 @@ The tests work in a fresh folder under `std::filesystem::temp_directory_path()`,
 - The §3 example, written to a file: `Load` returns the same members as §6.2.
 - The same file with CRLF line endings and a BOM: loads.
 - A file whose `scripting.callTimeoutMs` is 0: `ConfigError` whose message starts with the path and `: `, and contains `scripting.callTimeoutMs`.
-- **First run.**
-    - A path that doesn't exist throws a `ConfigError` whose message contains the path and `sample`.
-    - The file now exists, and its bytes are exactly the §3 generated sample.
-    - A second `Load` of the same path throws a `ConfigError` containing `server.url`, the first rule the sample breaks. The sample isn't rewritten.
-- **First run, nowhere to write.** A path inside a folder that doesn't exist: `ConfigError` whose message contains the path, and neither the folder nor the file is created.
+- **Missing file.** A path that doesn't exist throws a `ConfigError` whose message contains the path and `not found`, and no file is created.
 
 ### 6.9 Tooling
 
@@ -817,9 +803,9 @@ This comes after `BigUInt` ([PacketDesign.md](PacketDesign.md) §8 step 3) and t
 3. **Conversion:** the settings structs, the `adl_serializer` specializations in both directions, the macros, `DescribeConversionError` and `Serialize`, plus the §6.2, §6.4 and §6.7 tests. The first build on each preset confirms three things:
     - The macro-generated functions work with both `json` and `ordered_json`, and `value()` reaches the custom serializers.
     - The messages carry dotted paths.
-    - `Serialize(Config_s{})` matches the §3 sample byte for byte.
+    - `Serialize(Config_s{})` matches the §3 default serialization byte for byte.
 4. **`Validate`:** plus the §6.5 and §6.6 tests.
-5. **`Load` and the sample:** plus the §6.8 tests.
+5. **`Load`:** plus the §6.8 tests.
 6. **Wiring:**
     - `main` creates the logger and passes it and the optional path to `Application`. `Application` loads the config into its `std::shared_ptr<const Config_s>`, sets the logger's level, builds `WebSocketOptions_s`, and passes the logger to the classes it builds.
     - Git-ignore `client.jsonc`.

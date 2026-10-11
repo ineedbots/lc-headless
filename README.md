@@ -98,7 +98,7 @@ The client reads two kinds of file. Both are JSON and allow `//` and `/* */` com
 
 ### `client.jsonc`: the server and process-wide settings
 
-If `client.jsonc` doesn't exist, the client writes a sample there and exits. In that sample, fill in at least these keys:
+Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If `client.jsonc` doesn't exist, the client exits with an error. Fill in at least these keys:
 
 | Key | Meaning |
 |---|---|

@@ -1,5 +1,4 @@
-// Sample config, written because none was found.
-// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.
+// Sample config. Copy it to client.jsonc, set server.url and the login RSA key, and put the server's cache in client.cacheDirectory.
 // Each account goes in its own file in scripting.accountsDirectory.
 {
     "server": {

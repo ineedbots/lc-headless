@@ -50,11 +50,6 @@ namespace
 }
 )json"sv;
 
-    constexpr auto SAMPLE_HEADER =
-        "// Sample config, written because none was found.\n"
-        "// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.\n"
-        "// Each account goes in its own file in scripting.accountsDirectory.\n"sv;
-
     constexpr auto SAMPLE_BODY = R"json({
     "server": {
         "url": "",
@@ -1031,7 +1026,7 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
 
     SECTION("the sample works once filled in")
     {
-        auto sample = ParseJsonWithComments(std::string{SAMPLE_HEADER} + std::string{SAMPLE_BODY});
+        auto sample = ParseJsonWithComments(SAMPLE_BODY);
         sample["server"]["url"] = "ws://localhost:80";
         sample["login"]["rsaModulus"] = "3233";
         sample["login"]["rsaExponent"] = "17";
@@ -1102,29 +1097,11 @@ TEST_CASE("ConfigFile::Load", "[ConfigFile]")
         CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("scripting.callTimeoutMs"));
     }
 
-    SECTION("writes a sample on the first run")
+    SECTION("a missing file is an error, and nothing is written")
     {
         CHECK_THROWS_AS(ConfigFile::Load(path, logger), ConfigError);
-        REQUIRE(std::filesystem::exists(path));
-        CHECK(ReadFile(path) == std::string{SAMPLE_HEADER} + std::string{SAMPLE_BODY});
-
-        std::filesystem::remove(path);
-        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::ContainsSubstring(path.string()) && Catch::Matchers::ContainsSubstring("sample"));
-
-        const auto edited = ReadFile(path) + "// edited\n";
-        WriteFile(path, edited);
-        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::ContainsSubstring("server.url"));
-        CHECK(ReadFile(path) == edited);
-    }
-
-    SECTION("doesn't create a missing folder for the sample")
-    {
-        const auto missingFolder = folder.GetPath() / "missing";
-        const auto missingPath = missingFolder / "client.jsonc";
-
-        CHECK_THROWS_AS(ConfigFile::Load(missingPath, logger), ConfigError);
-        CHECK_THROWS_WITH(ConfigFile::Load(missingPath, logger), Catch::Matchers::ContainsSubstring(missingPath.string()));
-        CHECK_FALSE(std::filesystem::exists(missingFolder));
+        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::ContainsSubstring(path.string()) && Catch::Matchers::ContainsSubstring("not found"));
+        CHECK_FALSE(std::filesystem::exists(path));
     }
 
     CHECK(capture.GetEntries().empty());
