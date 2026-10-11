@@ -25,12 +25,12 @@ Reference sources:
 | Keys | The JSON keys are the C++ member names, because the macro uses each member's name as its key. They are camelCase (CONVENTIONS §6), and a key's path in the file is its path in code: `login.rsaModulus` in the file is `config.login.rsaModulus` |
 | Key order | Reading uses `nlohmann::json`. Writing uses `nlohmann::ordered_json`, so a written file lists sections and keys in declaration order, the order of §3, instead of alphabetically |
 | Defaults | Every key is optional. The macro reads each member with `value(name, default)`, so a missing key keeps the member's initializer. Five initializers break their own key's rule: the empty `url`, `username` and `password`, and the zero RSA modulus and exponent. Leaving out one of those keys fails in `Validate`, which names it |
-| Rules | Rules that a type doesn't carry, such as the username's length or the range of the idle time, are checked by `Validate` after conversion |
+| Rules | Rules that a type doesn't carry, such as the username's length or the range of the call timeout, are checked by `Validate` after conversion |
 | Numbers | Counts and IDs are JSON integers. RSA values are strings holding a decimal or `0x`-hex number, because JSON has no hex literals and a 512-bit modulus doesn't fit in a JSON number. Hex is case-insensitive when read, so `0xCA1` and `0xca1` are the same value. `Serialize` writes lowercase |
 | Strictness | `Validate` is the only check beyond what conversion does: a wrong type, or a value that breaks its rule, is an error. Unknown sections and keys are ignored without a warning, and a repeated key takes its last value, as nlohmann does by default |
-| Errors | Everything `ConfigFile` throws for a missing, unreadable or invalid file is a `ConfigError`, the type in CONVENTIONS §8. Messages start with the dotted path of the key (`client.idleSeconds: ...`), and `Load` puts the file path in front. `JSON_DIAGNOSTICS` makes nlohmann's own conversion errors carry the path |
+| Errors | Everything `ConfigFile` throws for a missing, unreadable or invalid file is a `ConfigError`, the type in CONVENTIONS §8. Messages start with the dotted path of the key (`scripting.callTimeoutMs: ...`), and `Load` puts the file path in front. `JSON_DIAGNOSTICS` makes nlohmann's own conversion errors carry the path |
 | Secrets | No message or log line contains a value from the file. Syntax errors give a line and a column, but no excerpt. nlohmann's conversion errors name types and keys, never values |
-| Logging | A warning when TLS verification is turned off, and one for each key that's no longer read (a leftover `account` section, `login.crcs` or `client.logoutComponent`), logged through the `Logger&` that `Load` and `Parse` take. Loading logs nothing else |
+| Logging | A warning when TLS verification is turned off, logged through the `Logger&` that `Load` and `Parse` take. Loading logs nothing else |
 | Dependency | nlohmann/json is used only in `ConfigFile.cpp`. No header exposes it |
 | Threading | `ConfigFile` has no state. A loaded `Config_s` is `const` behind its `shared_ptr`, so any thread can read it, and copying or releasing the pointer is thread-safe |
 
@@ -45,6 +45,8 @@ Rejected:
 - **Passing nlohmann's syntax error message through.** Lexer errors quote the text they stopped in, as in `last read: '"hunter\q'`. A password with a stray backslash or quote would end up in the log.
 - **Keeping `login.crcs`.** The nine CRCs the login sends were once set here, copied from the server by hand. They come from the server's cache in `client.cacheDirectory` now ([CacheDesign.md](CacheDesign.md) §5, §9), so they can't fall out of step with it.
 - **Keeping `client.logoutComponent`.** The logout button's component id was set here, to 2458. It comes from the cache now ([CacheDesign.md](CacheDesign.md) §8), as the component with the webclient's logout client code, so a server that numbers its interfaces differently still gets a clean logout.
+- **Warning about keys that are no longer read.** A leftover `account` section, `login.crcs` and `client.logoutComponent` once each logged a warning. The client isn't released, so there are no old files to steer, and such keys are now ignored like any other unknown key.
+- **Upkeep and idle time in `client.jsonc`.** `randomEvents`, `stallMinutes`, `runAuto`, `runEnergyMin` and `idleSeconds` were once `scripting` and `client` keys, the same for every account. They're per account now (Account files, below), since one bot may want a looser stall guard or no random event answers while another doesn't.
 
 ---
 
@@ -111,7 +113,6 @@ rs2004-headless/
     },
     "client": {
         "logLevel": "verbose",
-        "idleSeconds": 5,
         "cacheDirectory": "../289server/engine/data/pack"
     },
     "scripting": {
@@ -121,16 +122,12 @@ rs2004-headless/
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
-        "progressDirectory": "progress",
-        "randomEvents": true,
-        "stallMinutes": 10,
-        "runAuto": true,
-        "runEnergyMin": 20
+        "progressDirectory": "progress"
     }
 }
 ```
 
-`tlsCaFile`, `lowMemory`, `revision`, `idleSeconds` and the whole `scripting` section hold their defaults here, so this file could leave them out and load the same. The account that `client.ini` held now goes in its own file (see Account files, below), and the CRCs and logout component it held now come from the server's cache, which `cacheDirectory` points at ([CacheDesign.md](CacheDesign.md)).
+`tlsCaFile`, `lowMemory`, `revision` and the whole `scripting` section hold their defaults here, so this file could leave them out and load the same. The account that `client.ini` held now goes in its own file (see Account files, below), and the CRCs and logout component it held now come from the server's cache, which `cacheDirectory` points at ([CacheDesign.md](CacheDesign.md)).
 
 ### Generated sample
 
@@ -154,8 +151,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
     },
     "client": {
         "logLevel": "info",
-        "idleSeconds": 5,
-        "cacheDirectory": "cache",
+        "cacheDirectory": "data/cache",
         "navDirectory": "data/nav"
     },
     "scripting": {
@@ -165,11 +161,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
-        "progressDirectory": "progress",
-        "randomEvents": true,
-        "stallMinutes": 10,
-        "runAuto": true,
-        "runEnergyMin": 20
+        "progressDirectory": "progress"
     }
 }
 ```
@@ -189,8 +181,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `login.lowMemory` | boolean | `false` | |
 | `login.revision` | integer | `289` | `289`, the only revision the client speaks |
 | `client.logLevel` | string | `"info"` | `verbose`, `info`, `warning` or `error` |
-| `client.idleSeconds` | integer | `5` | 1 to 300. Stored as `std::chrono::seconds` |
-| `client.cacheDirectory` | string | `"cache"` | Not empty. The folder that holds the server's cache, `main_file_cache.dat` and its index files, relative to the working directory. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
+| `client.cacheDirectory` | string | `"data/cache"` | Not empty. The folder that holds the server's cache, `main_file_cache.dat` and its index files, relative to the working directory. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
 | `client.navDirectory` | string | `"data/nav"` | Not empty. rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes ([BotApiDesign.md](BotApiDesign.md) §9) |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
 | `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
@@ -199,18 +190,12 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
-| `scripting.randomEvents` | boolean | `true` | Whether scripts' random event guardian runs ([BotApiDesign.md](BotApiDesign.md) §10) |
-| `scripting.stallMinutes` | integer | `10` | 0 to 1440. How long a script may go without moving, gaining experience or noting progress before the stall guard steps in; 0 turns it off. Stored as `std::chrono::minutes` ([BotApiDesign.md](BotApiDesign.md) §11) |
-| `scripting.runAuto` | boolean | `true` | Whether the run manager turns run back on |
-| `scripting.runEnergyMin` | integer | `20` | 0 to 100. The energy at which it does |
 
 - **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
-- **`login.crcs`**, which files from before the cache have, isn't read: the CRCs come from the cache ([CacheDesign.md](CacheDesign.md) §5). A file that still has it loads, with a warning.
-- **`client.logoutComponent`** isn't read either: the logout button comes from the cache ([CacheDesign.md](CacheDesign.md) §8). A file that still has it loads, with a warning.
 
 ### Rules
 
-- **Structure.** The top level is an object, and each section present is an object. Any section or key can be left out, and takes its default. Unknown sections and keys are ignored without a warning, so a misspelled key is ignored too, and its member keeps the default. The exceptions are a leftover `account` section, `login.crcs` and `client.logoutComponent`: none of them is read, and a warning says where each belongs now.
+- **Structure.** The top level is an object, and each section present is an object. Any section or key can be left out, and takes its default. Unknown sections and keys are ignored without a warning, so a misspelled key is ignored too, and its member keeps the default.
 - **Repeated keys.** A key set twice in the same object takes its last value. With alternatives kept as comments, as in the example, forgetting to comment one out means the later line wins.
 - **Types.** Strings, booleans and arrays must have their JSON type, and a key set to `null` is a wrong type. To get a key's default, leave it out.
 - **Integers.** nlohmann converts any JSON number, and a boolean, to an integer member with a `static_cast`:
@@ -218,7 +203,7 @@ What `Load` writes when the file doesn't exist. This is the exact text, byte for
     - A 16-bit key wraps: `-1` reads as 65535, and `65536` as 0.
     - A boolean reads as 0 or 1.
 
-    `Validate` then checks the converted value against the key's rule, where it has one. So `"idleSeconds": -5` still fails, and so does `"revision": -1`, which reads as 65535.
+    `Validate` then checks the converted value against the key's rule, where it has one. So `"callTimeoutMs": -5` still fails, and so does `"revision": -1`, which reads as 65535.
 - **Numbers in strings** are decimal digits, or `0x` or `0X` followed by hex digits in either case. `"0xca1"`, `"0XCA1"` and `"0xcA1"` are the same number. There's no sign, no whitespace and nothing after the digits. This is the rule `BigUInt::Parse` already uses.
 - **Printable ASCII** is `0x20` to `0x7E`, so a username can contain spaces.
 - **Case.** Section names, keys and other string values, such as `"info"` and `"SYSTEM"`, are case-sensitive. Hex numbers are the one exception (above).
@@ -232,6 +217,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `ConfigF
     "username": "bot1",
     "password": "s3cret-pw",
     "enabled": true,
+    "stallMinutes": 15,
     "script": {
         "file": "examples/chicken_killer.py",
         "progressReportMinutes": 20,
@@ -246,6 +232,11 @@ Each account has its own file in `scripting.accountsDirectory`, read by `ConfigF
 | `password` | string | none | 1 to 20 printable ASCII characters |
 | `enabled` | boolean | `true` | |
 | `server` | object or `null` | none: `client.jsonc`'s | The same keys and rules as `client.jsonc`'s `server` section, with `url` required. Logs this account into another world |
+| `idleSeconds` | integer | `0`: idle until interrupted | 0 to 86400. Without a script, how long the account idles, from its first step in game, before it logs out. Stored as `std::chrono::seconds` |
+| `randomEvents` | boolean | `true` | Whether the script's random event guardian runs ([BotApiDesign.md](BotApiDesign.md) §10) |
+| `stallMinutes` | integer | `10` | 0 to 1440. How long the script may go without moving, gaining experience or noting progress before the stall guard steps in; 0 turns it off. Stored as `std::chrono::minutes` ([BotApiDesign.md](BotApiDesign.md) §11) |
+| `runAuto` | boolean | `true` | Whether the run manager turns run back on |
+| `runEnergyMin` | integer | `20` | 0 to 100. The energy at which it does |
 | `script` | object or `null` | none: the account idles | |
 | `script.file` | string | none | Not empty. Relative to `scripting.scriptsDirectory` |
 | `script.progressReportMinutes` | integer | `0`: no reports | 0 to 1440. How often the script's `on_progress_report()` is called ([ScriptingDesign.md](ScriptingDesign.md) §12). Stored as `std::chrono::minutes` |
@@ -289,8 +280,7 @@ struct LoginSettings_s
 struct ClientSettings_s
 {
     LogLevel_e logLevel = LogLevel_e::Info;
-    std::chrono::seconds idleSeconds = 5s;
-    std::string cacheDirectory = "cache";
+    std::string cacheDirectory = "data/cache";
     std::string navDirectory = "data/nav";
 };
 
@@ -303,10 +293,6 @@ struct ScriptingSettings_s
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
     std::string progressDirectory = "progress";
-    bool randomEvents = true;
-    std::chrono::minutes stallMinutes{10};
-    bool runAuto = true;
-    s32 runEnergyMin = 20;
 };
 
 struct Config_s
@@ -332,7 +318,13 @@ struct AccountConfig_s
     std::string name;
     AccountSettings_s credentials;
     bool enabled = true;
+    std::optional<ServerSettings_s> server;
     std::optional<ScriptConfig_s> script;
+    std::chrono::seconds idleSeconds{0};
+    bool randomEvents = true;
+    std::chrono::minutes stallMinutes{10};
+    bool runAuto = true;
+    s32 runEnergyMin = 20;
 };
 
 class ConfigFile
@@ -392,7 +384,7 @@ Application::Application(const std::filesystem::path& configPath, std::shared_pt
 
 ```
 Fatal error: client.jsonc: not found, so a sample was written there; fill it in and run again
-Fatal error: client.jsonc: client.idleSeconds: must be from 1 to 300
+Fatal error: client.jsonc: scripting.callTimeoutMs: must be from 10 to 60000
 ```
 
 ```cpp
@@ -545,8 +537,8 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, idleSeconds, cacheDirectory, navDirectory)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory, randomEvents, stallMinutes, runAuto, runEnergyMin)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
 
@@ -597,16 +589,16 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     - `Check(valid, path, rule)` throws `ConfigError{std::format("{}: {}", path, rule)}` when `valid` is false.
     - `Validate` is also where a key that can't do without a value fails when it's missing: its default breaks the rule. It can't tell a missing key from one set to the same value, so the message gives the rule, not "missing".
     - `IsWebSocketUrl` calls `ix::UrlParser::parse` and requires the protocol it returns to be `ws` or `wss`.
-    - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_IDLE_SECONDS`, `MAX_IDLE_SECONDS`, ...). The revision check uses `LoginSettings_s::SUPPORTED_REVISION`.
+    - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_CALL_TIMEOUT`, `MAX_CALL_TIMEOUT`, ...). The revision check uses `LoginSettings_s::SUPPORTED_REVISION`.
     - `lowMemory` has no rule beyond its type.
     - The paths in `Validate` are written out by hand. A test for each rule (§6.5) catches a path that no longer matches its member after a rename.
 - **TLS.** `tlsCaFile` matters only for `wss`. With a `ws` URL it's stored as written and unused, without a warning, so switching `url` between a local `ws` server and a remote `wss` one stays a one-line edit, as in `client.ini`. With a `wss` URL and `NONE`, `Parse` logs `Warning` through the logger it was given: `Config disables TLS certificate verification (server.tlsCaFile is NONE)`.
 - **Error messages.**
-    - Every message from `Parse` but a syntax error reads `{path}: {problem}`, such as `client.idleSeconds: must be from 1 to 300`.
+    - Every message from `Parse` but a syntax error reads `{path}: {problem}`, such as `scripting.callTimeoutMs: must be from 10 to 60000`.
     - Messages never contain a value from the file.
-    - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: client.idleSeconds: must be from 1 to 300` reads as one line.
+    - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: scripting.callTimeoutMs: must be from 10 to 60000` reads as one line.
 - **Logging.**
-    - The warnings are logged while the file loads, before `Application` calls `SetLevel` with `logLevel`. It therefore shows at the threshold the logger was created with, `Info` from `main`, even when the file sets `"error"`. That is deliberate: a problem in the file that sets the level should still be visible.
+    - The TLS warning is logged while the file loads, before `Application` calls `SetLevel` with `logLevel`. It therefore shows at the threshold the logger was created with, `Info` from `main`, even when the file sets `"error"`. That is deliberate: a problem in the file that sets the level should still be visible.
     - Writing the sample isn't logged separately. The `ConfigError` that follows says what happened, and `main` logs it once ([LoggerDesign.md](LoggerDesign.md) §4).
 - **Adding a setting.**
     1. Add the member, with its default as the initializer, to its section struct, and its name to that struct's macro, in the same position.
@@ -661,10 +653,12 @@ The plan below was written while `client.jsonc` held the account. Since the acco
 
 Since the CRCs moved to the cache ([CacheDesign.md](CacheDesign.md) §9), `login.crcs` has no cases of its own: the key isn't read, and a leftover one only logs a warning. `client.cacheDirectory` has the default, rejection and round-trip cases of the other string keys. `client.logoutComponent` went the same way when the logout button moved to the cache: it has no cases but its warning.
 
+Those warnings are gone now, and with them their cases: a leftover key is just an unknown key. `client.idleSeconds` and the `scripting` section's upkeep keys moved to the account file, so their cases did too, and the config file's cases that used `idleSeconds` use `scripting.killGraceSeconds` or `scripting.callTimeoutMs` instead.
+
 ### 6.1 Strategy
 
 - **Inputs.**
-    - Most cases change one key of the §3 example and leave the rest valid. The test parses the example with nlohmann (`nlohmann::json::parse(EXAMPLE, nullptr, true, true)`), edits it (`json["client"]["idleSeconds"] = 0`, `json["account"].erase("password")`), and passes `json.dump()` to `ConfigFile::Parse`.
+    - Most cases change one key of the §3 example and leave the rest valid. The test parses the example with nlohmann (`nlohmann::json::parse(EXAMPLE, nullptr, true, true)`), edits it (`json["scripting"]["callTimeoutMs"] = 0`, `json["account"].erase("password")`), and passes `json.dump()` to `ConfigFile::Parse`.
     - Cases that need exact text, such as syntax errors and duplicate keys, are raw string literals with a delimiter that JSON can't end early: `R"json(...)json"`.
 - **Logging.** Every test holds a `LogCapture` ([LoggerDesign.md](LoggerDesign.md) §6.1) and passes `*capture.GetLogger()` to `Parse` and `Load`, so warnings never reach the console. The tables write `Parse(text)` and `Load(path)` and leave that argument out. Where a row says "no log entries" or names a warning, the test checks the capture.
 - **Failures.** A failure must be a `ConfigError` (`REQUIRE_THROWS_AS`), and its message must contain the key's dotted path (`REQUIRE_THROWS_WITH` with `ContainsSubstring`). The rest of the message isn't checked, except for §6.3's line and column, §6.6's secrets and §6.8's first-run message.
@@ -692,7 +686,6 @@ The §3 example parses with no log entries, and every member holds:
 | `login.lowMemory` | `false` |
 | `login.revision` | `289` |
 | `client.logLevel` | `LogLevel_e::Verbose` |
-| `client.idleSeconds` | `5s` |
 | `client.cacheDirectory` | `"../289server/engine/data/pack"` |
 
 A file with only the five keys that must be set (`server.url`, `account.username`, `account.password`, `login.rsaModulus` and `login.rsaExponent`) parses with no log entries. Every other member holds its §3 default.
@@ -725,15 +718,13 @@ A file with only the five keys that must be set (`server.url`, `account.username
 | `"server": []`, `"login": "x"` | `ConfigError` containing the section's name |
 | Each key set to `null` | `ConfigError` containing its path |
 | An extra section `"extra": {"url": "x"}` | Parses with no log entries; every member is as in §6.2 |
-| `idleSeconds` renamed to `idleSecond`, set to `30` | Parses with no log entries; `client.idleSeconds` is the default `5s` |
+| `killGraceSeconds` renamed to `killGraceSecond`, set to `5` | Parses with no log entries; `scripting.killGraceSeconds` is the default `30s` |
 | `username` renamed to `usrname` | `ConfigError` containing `account.username`, with no log entries |
 | `"Server"` instead of `"server"` | `ConfigError` containing `server.url`, with no log entries |
 | A second `"url"` in `server`, after the first, set to `"ws://other:80"` (raw text) | Parses with no log entries; `server.url` is `"ws://other:80"` |
 | A `wss://` URL with `tlsCaFile` `"NONE"` | Parses; one `Warning`, containing `server.tlsCaFile` |
 | A `wss://` URL with `tlsCaFile` `"SYSTEM"` | Parses with no log entries |
 | A `ws://` URL with `tlsCaFile` `"NONE"` or `"certs/ca.pem"` | Parses with no log entries; stored as written |
-| A leftover `login.crcs` | Parses; one `Warning`: `Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory` |
-| A leftover `client.logoutComponent` | Parses; one `Warning`: `Config has client.logoutComponent, which is no longer read; the logout button comes from the cache in client.cacheDirectory` |
 
 ### 6.5 Values
 
@@ -751,7 +742,6 @@ Each rejection is a `ConfigError` containing the key's path.
 | `login.lowMemory` | `true`, `false` | `0`, `1`, `"true"` |
 | `login.revision` | `289` | `288`, `290`, `"289"`, `true` |
 | `client.logLevel` | `"verbose"`, `"info"`, `"warning"` and `"error"` give the four levels | `"warn"`, `"Info"`, `"debug"`, `""`, `2` |
-| `client.idleSeconds` | `1` gives `1s`, `300` gives `300s` | `0`, `301`, `-5`, `"5"` |
 | `client.cacheDirectory` | `"C:/rs/pack"`, stored as written | `""`, `5` |
 
 ### 6.6 Secrets
@@ -775,7 +765,7 @@ Each rejection is a `ConfigError` containing the key's path.
 | `login.rsaModulus` | `BigUInt::Parse("0x80")` | `"0x80"`: the sign-padding byte from `ToBytesBigEndian` isn't written |
 | `login.rsaModulus` | The §3 modulus | Its §3 string |
 | `client.logLevel` | Each of the four levels | `"verbose"`, `"info"`, `"warning"`, `"error"` |
-| `client.idleSeconds` | `300s` | `300` |
+| `scripting.killGraceSeconds` | `600s` | `600` |
 
 - **Case on the way back.** A file whose RSA values are written in upper case parses, and `Serialize` writes them back in lower case. Both are the same value.
 - **Filling in the sample.** The test parses the generated sample with nlohmann and sets `server.url`, `account.username`, `account.password`, `login.rsaModulus` (`"3233"`) and `login.rsaExponent` (`"17"`). `Parse` then succeeds with no log entries, and gives the same members as the minimal file in §6.2 with the same five values.
@@ -786,7 +776,7 @@ The tests work in a fresh folder under `std::filesystem::temp_directory_path()`,
 
 - The §3 example, written to a file: `Load` returns the same members as §6.2.
 - The same file with CRLF line endings and a BOM: loads.
-- A file whose `client.idleSeconds` is 0: `ConfigError` whose message starts with the path and `: `, and contains `client.idleSeconds`.
+- A file whose `scripting.callTimeoutMs` is 0: `ConfigError` whose message starts with the path and `: `, and contains `scripting.callTimeoutMs`.
 - **First run.**
     - A path that doesn't exist throws a `ConfigError` whose message contains the path and `sample`.
     - The file now exists, and its bytes are exactly the §3 generated sample.

@@ -1,5 +1,5 @@
 """You and the game: game, skills, reader, chat, friends, ignores and direct_navigator. Mirrors rs2b0t's
-api/game/Game.ts, api/skills/Skills.ts and event/webwalk/DirectNavigator.ts (MIT, see third_party/rs2b0t);
+api/game/Game.ts, api/skills/Skills.ts and event/webwalk/DirectNavigator.ts (MIT, see thirdparty/rs2b0t);
 chat, friends and ignores are this client's own."""
 
 import _core

@@ -155,7 +155,7 @@ def dispatch(name, *args):
 
 
 def configure(random_events_on, stall_minutes, run_auto, run_energy_min):
-    """The config's choices for upkeep: scripting.randomEvents, stallMinutes, runAuto and runEnergyMin."""
+    """The account file's choices for upkeep: randomEvents, stallMinutes, runAuto and runEnergyMin."""
     global _random_events_on, _stall_minutes
     _random_events_on = random_events_on
     _stall_minutes = stall_minutes

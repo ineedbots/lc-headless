@@ -1,5 +1,5 @@
 # Ported in part from rs2b0t's test/data/GatheringLocations.test.ts, MiningLocations.test.ts,
-# FishingLocations.test.ts, CowKillerLocations.test.ts and cookingRanges.test.ts (MIT, see third_party/rs2b0t).
+# FishingLocations.test.ts, CowKillerLocations.test.ts and cookingRanges.test.ts (MIT, see thirdparty/rs2b0t).
 # The real cache's names are checked in tests/Script/RealCacheScriptTests.cpp.
 
 from rs2004.catalogs.gathering import MAP_SQUARE, booth_fields, location_options, resolve_gathering_location

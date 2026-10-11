@@ -36,7 +36,6 @@ namespace
     },
     "client": {
         "logLevel": "verbose",
-        "idleSeconds": 5,
         "cacheDirectory": "../289server/engine/data/pack"
     },
     "scripting": {
@@ -46,11 +45,7 @@ namespace
         "pollIntervalMs": 20,
         "loginIntervalSeconds": 5,
         "killGraceSeconds": 60,
-        "progressDirectory": "reports",
-        "randomEvents": false,
-        "stallMinutes": 30,
-        "runAuto": false,
-        "runEnergyMin": 50
+        "progressDirectory": "reports"
     }
 }
 )json"sv;
@@ -74,8 +69,7 @@ namespace
     },
     "client": {
         "logLevel": "info",
-        "idleSeconds": 5,
-        "cacheDirectory": "cache",
+        "cacheDirectory": "data/cache",
         "navDirectory": "data/nav"
     },
     "scripting": {
@@ -85,11 +79,7 @@ namespace
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
-        "progressDirectory": "progress",
-        "randomEvents": true,
-        "stallMinutes": 10,
-        "runAuto": true,
-        "runEnergyMin": 20
+        "progressDirectory": "progress"
     }
 }
 )json"sv;
@@ -107,6 +97,11 @@ namespace
     "username": "bot1",
     "password": "s3cret-pw",
     "enabled": false,
+    "idleSeconds": 60,
+    "randomEvents": false,
+    "stallMinutes": 30,
+    "runAuto": false,
+    "runEnergyMin": 50,
     "script": {
         "file": "examples/chicken_killer.py",
         "progressReportMinutes": 20,
@@ -157,7 +152,6 @@ namespace
         {"login", "lowMemory"},
         {"login", "revision"},
         {"client", "logLevel"},
-        {"client", "idleSeconds"},
         {"client", "cacheDirectory"},
         {"client", "navDirectory"},
         {"scripting", "accountsDirectory"},
@@ -167,10 +161,6 @@ namespace
         {"scripting", "loginIntervalSeconds"},
         {"scripting", "killGraceSeconds"},
         {"scripting", "progressDirectory"},
-        {"scripting", "randomEvents"},
-        {"scripting", "stallMinutes"},
-        {"scripting", "runAuto"},
-        {"scripting", "runEnergyMin"},
     };
 
     nlohmann::json ParseJsonWithComments(std::string_view text)
@@ -276,7 +266,6 @@ namespace
         CHECK_FALSE(config.login.lowMemory);
         CHECK(config.login.revision == 289);
         CHECK(config.client.logLevel == LogLevel_e::Verbose);
-        CHECK(config.client.idleSeconds == 5s);
         CHECK(config.client.cacheDirectory == "../289server/engine/data/pack");
         CHECK(config.scripting.accountsDirectory == "bots");
         CHECK(config.scripting.scriptsDirectory == "my-scripts");
@@ -285,10 +274,6 @@ namespace
         CHECK(config.scripting.loginIntervalSeconds == 5s);
         CHECK(config.scripting.killGraceSeconds == 60s);
         CHECK(config.scripting.progressDirectory == "reports");
-        CHECK_FALSE(config.scripting.randomEvents);
-        CHECK(config.scripting.stallMinutes == std::chrono::minutes{30});
-        CHECK_FALSE(config.scripting.runAuto);
-        CHECK(config.scripting.runEnergyMin == 50);
     }
 
     void CheckScriptingDefaults(const ScriptingSettings_s& scripting)
@@ -300,10 +285,6 @@ namespace
         CHECK(scripting.loginIntervalSeconds == 2s);
         CHECK(scripting.killGraceSeconds == 30s);
         CHECK(scripting.progressDirectory == "progress");
-        CHECK(scripting.randomEvents);
-        CHECK(scripting.stallMinutes == std::chrono::minutes{10});
-        CHECK(scripting.runAuto);
-        CHECK(scripting.runEnergyMin == 20);
     }
 
     void CheckOptionalDefaults(const Config_s& config)
@@ -313,8 +294,7 @@ namespace
         CHECK_FALSE(config.login.lowMemory);
         CHECK(config.login.revision == 289);
         CHECK(config.client.logLevel == LogLevel_e::Info);
-        CHECK(config.client.idleSeconds == 5s);
-        CHECK(config.client.cacheDirectory == "cache");
+        CHECK(config.client.cacheDirectory == "data/cache");
         CheckScriptingDefaults(config.scripting);
     }
 
@@ -466,13 +446,9 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.client.logLevel == LogLevel_e::Info);
             }
-            else if (key.key == "idleSeconds")
-            {
-                CHECK(config.client.idleSeconds == 5s);
-            }
             else if (key.key == "cacheDirectory")
             {
-                CHECK(config.client.cacheDirectory == "cache");
+                CHECK(config.client.cacheDirectory == "data/cache");
             }
             else if (key.key == "accountsDirectory")
             {
@@ -506,22 +482,6 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.client.navDirectory == "data/nav");
             }
-            else if (key.key == "randomEvents")
-            {
-                CHECK(config.scripting.randomEvents);
-            }
-            else if (key.key == "stallMinutes")
-            {
-                CHECK(config.scripting.stallMinutes == std::chrono::minutes{10});
-            }
-            else if (key.key == "runAuto")
-            {
-                CHECK(config.scripting.runAuto);
-            }
-            else if (key.key == "runEnergyMin")
-            {
-                CHECK(config.scripting.runEnergyMin == 20);
-            }
         }
     }
 
@@ -540,8 +500,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
 
         const auto config = ParseAccepted(removeSection("client"));
         CHECK(config.client.logLevel == LogLevel_e::Info);
-        CHECK(config.client.idleSeconds == 5s);
-        CHECK(config.client.cacheDirectory == "cache");
+        CHECK(config.client.cacheDirectory == "data/cache");
 
         CheckScriptingDefaults(ParseAccepted(removeSection("scripting")).scripting);
     }
@@ -587,10 +546,10 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
     {
         const auto config = ParseAccepted(EditBase([](nlohmann::json& json)
         {
-            json["client"].erase("idleSeconds");
-            json["client"]["idleSecond"] = 30;
+            json["scripting"].erase("killGraceSeconds");
+            json["scripting"]["killGraceSecond"] = 5;
         }));
-        CHECK(config.client.idleSeconds == 5s);
+        CHECK(config.scripting.killGraceSeconds == 30s);
 
         CheckRejected(EditBase([](nlohmann::json& json)
         {
@@ -679,10 +638,6 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 0)).scripting.killGraceSeconds == 0s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 600)).scripting.killGraceSeconds == 600s);
         CHECK(ParseAccepted(SetKey({"scripting", "progressDirectory"}, "logs/progress")).scripting.progressDirectory == "logs/progress");
-        CHECK(ParseAccepted(SetKey({"scripting", "stallMinutes"}, 0)).scripting.stallMinutes == std::chrono::minutes{0});
-        CHECK(ParseAccepted(SetKey({"scripting", "stallMinutes"}, 1440)).scripting.stallMinutes == std::chrono::minutes{1440});
-        CHECK(ParseAccepted(SetKey({"scripting", "runEnergyMin"}, 0)).scripting.runEnergyMin == 0);
-        CHECK(ParseAccepted(SetKey({"scripting", "runEnergyMin"}, 100)).scripting.runEnergyMin == 100);
     }
 
     SECTION("login RSA values")
@@ -713,9 +668,6 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"client", "logLevel"}, "info")).client.logLevel == LogLevel_e::Info);
         CHECK(ParseAccepted(SetKey({"client", "logLevel"}, "warning")).client.logLevel == LogLevel_e::Warning);
         CHECK(ParseAccepted(SetKey({"client", "logLevel"}, "error")).client.logLevel == LogLevel_e::Error);
-
-        CHECK(ParseAccepted(SetKey({"client", "idleSeconds"}, 1)).client.idleSeconds == 1s);
-        CHECK(ParseAccepted(SetKey({"client", "idleSeconds"}, 300)).client.idleSeconds == 300s);
 
         CHECK(ParseAccepted(SetKey({"client", "cacheDirectory"}, "C:/rs/pack")).client.cacheDirectory == "C:/rs/pack");
     }
@@ -753,10 +705,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"client", "logLevel"}, "debug"},
         {{"client", "logLevel"}, ""},
         {{"client", "logLevel"}, 2},
-        {{"client", "idleSeconds"}, 0},
-        {{"client", "idleSeconds"}, 301},
-        {{"client", "idleSeconds"}, -5},
-        {{"client", "idleSeconds"}, "5"},
         {{"client", "cacheDirectory"}, ""},
         {{"client", "cacheDirectory"}, 5},
         {{"scripting", "accountsDirectory"}, ""},
@@ -773,12 +721,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "killGraceSeconds"}, 601},
         {{"scripting", "progressDirectory"}, ""},
         {{"scripting", "progressDirectory"}, 5},
-        {{"scripting", "randomEvents"}, "yes"},
-        {{"scripting", "stallMinutes"}, -1},
-        {{"scripting", "stallMinutes"}, 1441},
-        {{"scripting", "runAuto"}, 1},
-        {{"scripting", "runEnergyMin"}, -1},
-        {{"scripting", "runEnergyMin"}, 101},
     };
 
     for (const auto& rejection : rejections)
@@ -788,49 +730,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
     }
 }
 
-TEST_CASE("ConfigFile warns about an account section left in the config", "[ConfigFile]")
-{
-    const auto text = EditBase([](nlohmann::json& json)
-    {
-        json["account"] = {{"username", "test"}, {"password", SECRET_PASSWORD}};
-    });
-
-    auto capture = LogCapture{};
-    const auto config = ConfigFile::Parse(text, *capture.GetLogger());
-    CheckExampleMembers(config);
-    const auto entries = capture.GetEntries();
-    REQUIRE(entries.size() == 1);
-    CHECK(entries[0].level == LogLevel_e::Warning);
-    CHECK_THAT(entries[0].message, Catch::Matchers::ContainsSubstring("scripting.accountsDirectory"));
-    CHECK_FALSE(HasSecret(capture));
-}
-
-TEST_CASE("ConfigFile warns about login.crcs left in the config", "[ConfigFile]")
-{
-    const auto text = SetKey({"login", "crcs"}, nlohmann::json::array({"0x00000000", "0xde5b3345"}));
-
-    auto capture = LogCapture{};
-    const auto config = ConfigFile::Parse(text, *capture.GetLogger());
-    CheckExampleMembers(config);
-    const auto entries = capture.GetEntries();
-    REQUIRE(entries.size() == 1);
-    CHECK(entries[0].level == LogLevel_e::Warning);
-    CHECK(entries[0].message == "Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory");
-}
-
-TEST_CASE("ConfigFile warns about client.logoutComponent left in the config", "[ConfigFile]")
-{
-    const auto text = SetKey({"client", "logoutComponent"}, 2458);
-
-    auto capture = LogCapture{};
-    const auto config = ConfigFile::Parse(text, *capture.GetLogger());
-    CheckExampleMembers(config);
-    const auto entries = capture.GetEntries();
-    REQUIRE(entries.size() == 1);
-    CHECK(entries[0].level == LogLevel_e::Warning);
-    CHECK(entries[0].message == "Config has client.logoutComponent, which is no longer read; the logout button comes from the cache in client.cacheDirectory");
-}
-
 TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
 {
     const auto account = ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1");
@@ -838,6 +737,11 @@ TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
     CHECK(account.credentials.username == "bot1");
     CHECK(account.credentials.password == SECRET_PASSWORD);
     CHECK_FALSE(account.enabled);
+    CHECK(account.idleSeconds == 60s);
+    CHECK_FALSE(account.randomEvents);
+    CHECK(account.stallMinutes == std::chrono::minutes{30});
+    CHECK_FALSE(account.runAuto);
+    CHECK(account.runEnergyMin == 50);
     REQUIRE(account.script.has_value());
     CHECK(account.script->file == "examples/chicken_killer.py");
     CHECK(account.script->progressReportMinutes == std::chrono::minutes{20});
@@ -847,7 +751,22 @@ TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
     {
         const auto minimal = ConfigFile::ParseAccount(R"json({"username": "bot2", "password": "pw"})json", "bot2");
         CHECK(minimal.enabled);
+        CHECK(minimal.idleSeconds == 0s);
+        CHECK(minimal.randomEvents);
+        CHECK(minimal.stallMinutes == std::chrono::minutes{10});
+        CHECK(minimal.runAuto);
+        CHECK(minimal.runEnergyMin == 20);
         CHECK_FALSE(minimal.script.has_value());
+    }
+
+    SECTION("idle time and upkeep at their limits")
+    {
+        CHECK(ConfigFile::ParseAccount(SetAccountKey("idleSeconds", 0), "bot1").idleSeconds == 0s);
+        CHECK(ConfigFile::ParseAccount(SetAccountKey("idleSeconds", 86400), "bot1").idleSeconds == 86400s);
+        CHECK(ConfigFile::ParseAccount(SetAccountKey("stallMinutes", 0), "bot1").stallMinutes == std::chrono::minutes{0});
+        CHECK(ConfigFile::ParseAccount(SetAccountKey("stallMinutes", 1440), "bot1").stallMinutes == std::chrono::minutes{1440});
+        CHECK(ConfigFile::ParseAccount(SetAccountKey("runEnergyMin", 0), "bot1").runEnergyMin == 0);
+        CHECK(ConfigFile::ParseAccount(SetAccountKey("runEnergyMin", 100), "bot1").runEnergyMin == 100);
     }
 
     SECTION("a null script means no script")
@@ -918,6 +837,15 @@ TEST_CASE("ConfigFile rejects invalid account files", "[ConfigFile][AccountFile]
         {"password", UTF8_E_ACUTE},
         {"password", 5},
         {"enabled", "yes"},
+        {"idleSeconds", -1},
+        {"idleSeconds", 86401},
+        {"idleSeconds", "5"},
+        {"randomEvents", "yes"},
+        {"stallMinutes", -1},
+        {"stallMinutes", 1441},
+        {"runAuto", 1},
+        {"runEnergyMin", -1},
+        {"runEnergyMin", 101},
         {"script", "examples/chicken_killer.py"},
     };
 
@@ -1043,10 +971,10 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
         }
 
         auto config = ParseAccepted(EXAMPLE);
-        config.client.idleSeconds = 300s;
+        config.scripting.killGraceSeconds = 600s;
         const auto serialized = ConfigFile::Serialize(config);
-        CHECK(nlohmann::json::parse(serialized).at("client").at("idleSeconds") == 300);
-        CHECK(ParseAccepted(serialized).client.idleSeconds == 300s);
+        CHECK(nlohmann::json::parse(serialized).at("scripting").at("killGraceSeconds") == 600);
+        CHECK(ParseAccepted(serialized).scripting.killGraceSeconds == 600s);
     }
 
     SECTION("hex is read in any case and written in lower case")
@@ -1125,11 +1053,11 @@ TEST_CASE("ConfigFile::Load", "[ConfigFile]")
     SECTION("puts the file's path in front of the message")
     {
         auto json = ParseJsonWithComments(EXAMPLE);
-        json["client"]["idleSeconds"] = 0;
+        json["scripting"]["callTimeoutMs"] = 0;
         WriteFile(path, json.dump());
 
         CHECK_THROWS_AS(ConfigFile::Load(path, logger), ConfigError);
-        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("client.idleSeconds"));
+        CHECK_THROWS_WITH(ConfigFile::Load(path, logger), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("scripting.callTimeoutMs"));
     }
 
     SECTION("writes a sample on the first run")

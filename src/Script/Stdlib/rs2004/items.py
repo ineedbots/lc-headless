@@ -1,5 +1,5 @@
 """The backpack and worn equipment. Mirrors rs2b0t's api/inventory/Inventory.ts, InvItem and
-api/equipment/Equipment.ts (MIT, see third_party/rs2b0t)."""
+api/equipment/Equipment.ts (MIT, see thirdparty/rs2b0t)."""
 
 import _core
 from rs2004 import execution

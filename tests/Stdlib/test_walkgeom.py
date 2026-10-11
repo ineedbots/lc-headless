@@ -1,5 +1,5 @@
 # Ported from rs2b0t's test/event/webwalk/followMath.test.ts and dangerZones.test.ts (MIT, see
-# third_party/rs2b0t), less what needs its PathFinder, which the C++ tests cover.
+# thirdparty/rs2b0t), less what needs its PathFinder, which the C++ tests cover.
 
 from rs2004.walkgeom import PathTile, choose_cross_click, crossing_eligible, expand_waypoints
 from rs2004.walkgeom import find_forward_recovery_index, is_arrived, locate_on_path, min_chebyshev_to_path

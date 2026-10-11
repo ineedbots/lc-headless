@@ -507,7 +507,7 @@ A script chooses with these, as module-level functions or methods on its bot:
 - `grind_targets()`: NPC names you fight on purpose, which are never taken for a hostile event;
 - `lamp_skill()`: the skill the lamp's experience goes to, `'strength'` unless you say otherwise.
 
-An event NPC that's following another player is left alone. An event that isn't over after 4 tries is ignored for 45 seconds, except the maze, the mime, a box and a lamp, which hold you or can't be dropped, so they're tried again. `scripting.randomEvents: false` in `client.jsonc` turns all of this off.
+An event NPC that's following another player is left alone. An event that isn't over after 4 tries is ignored for 45 seconds, except the maze, the mime, a box and a lamp, which hold you or can't be dropped, so they're tried again. `"randomEvents": false` in the account file turns all of this off.
 
 `random_events.detect()` gives the waiting event, with `kind` and `name`, or `None`; `yield from random_events.handle(event)` answers one. A script with the guardian off can call them itself.
 
@@ -545,8 +545,8 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 
 Two of rs2b0t's runtime services run for every script, once a server tick, beside the random event guardian:
 
-- **The run manager** turns run back on once energy reaches `scripting.runEnergyMin` (20), when `scripting.runAuto` is on (it is by default). It leaves run alone while a main interface is open, since clicking run makes the server close it, unless you're being hit, when any energy will do. `run_manager.override(run_auto=None, energy_min=None)` replaces the config's choices for this script; the last call wins as a whole, and one with neither goes back to the config's.
-- **The stall guard** watches for progress: a change of tile, any experience, or `execution.note_progress()`. After `scripting.stallMinutes` (10) without any, it walks back to the bot's `recovery_anchor()` (a module-level function or a bot method that gives a `Tile`) when that's more than 8 tiles away or on another level, and otherwise restarts the bot: `on_stop` with "the stall guard restarted the bot", then `BOT`'s `create()` makes a new one and `on_start` runs again. A module's globals stay as they were. It tries once, then not again for 15 minutes. Time the account spends logged out, and time a random event takes, isn't a stall. `stallMinutes: 0` turns it off.
+- **The run manager** turns run back on once energy reaches the account's `runEnergyMin` (20), when its `runAuto` is on (it is by default). It leaves run alone while a main interface is open, since clicking run makes the server close it, unless you're being hit, when any energy will do. `run_manager.override(run_auto=None, energy_min=None)` replaces the config's choices for this script; the last call wins as a whole, and one with neither goes back to the config's.
+- **The stall guard** watches for progress: a change of tile, any experience, or `execution.note_progress()`. After the account's `stallMinutes` (10) without any, it walks back to the bot's `recovery_anchor()` (a module-level function or a bot method that gives a `Tile`) when that's more than 8 tiles away or on another level, and otherwise restarts the bot: `on_stop` with "the stall guard restarted the bot", then `BOT`'s `create()` makes a new one and `on_start` runs again. A module's globals stay as they were. It tries once, then not again for 15 minutes. Time the account spends logged out, and time a random event takes, isn't a stall. `stallMinutes: 0` turns it off.
 
 ## Events and hooks
 

@@ -1,6 +1,6 @@
 # Walker data
 
-rs2b0t's web walker data, exported by `tools/nav/export_rs2b0t.ts` and used by `NavGraph` and the stdlib's `traversal`. It comes from rs2b0t under the MIT licence; see `third_party/rs2b0t/LICENSE`.
+rs2b0t's web walker data, exported by `tools/nav/export_rs2b0t.ts` and used by `NavGraph` and the stdlib's `traversal`. It comes from rs2b0t under the MIT licence; see `thirdparty/rs2b0t/LICENSE`.
 
 | File | Holds |
 |---|---|

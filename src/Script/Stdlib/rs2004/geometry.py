@@ -1,4 +1,4 @@
-"""Tiles and areas. Ported from rs2b0t's geometry/Tile.ts and Area.ts (MIT, see third_party/rs2b0t)."""
+"""Tiles and areas. Ported from rs2b0t's geometry/Tile.ts and Area.ts (MIT, see thirdparty/rs2b0t)."""
 
 import random
 

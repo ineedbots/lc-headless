@@ -1,5 +1,5 @@
 """Fishing methods and the gear each needs. Ported from rs2b0t's data/fishingMethods.ts (MIT, see
-third_party/rs2b0t)."""
+thirdparty/rs2b0t)."""
 
 
 class FishingGearPiece:

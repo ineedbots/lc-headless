@@ -1,6 +1,6 @@
 # Ported from rs2b0t's test/api/combat/food-heal.test.ts, eatTiming.test.ts, boostPotions.test.ts,
 # tasks/Anchor.test.ts, loadout/loadoutPlan.test.ts, trade/PartnerTrade.test.ts and sustain/sustain.test.ts
-# (MIT, see third_party/rs2b0t).
+# (MIT, see thirdparty/rs2b0t).
 
 from rs2004.catalogs import FOOD_OPTIONS, MIN_EAT_HP, food_heal_amount, should_eat_to_use_food, eat_at_hp_threshold
 from rs2004.catalogs import should_eat_food, should_hold_eat, URGENT_HP_FRACTION, AttackClock, food_forms, is_food_item

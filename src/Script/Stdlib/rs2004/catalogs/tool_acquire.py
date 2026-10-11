@@ -1,5 +1,5 @@
 """Planning how to get a missing or better tool: buy it, repair a broken one, or smith an axe. Ported from
-rs2b0t's api/acquisition/ToolAcquire.ts (MIT, see third_party/rs2b0t).
+rs2b0t's api/acquisition/ToolAcquire.ts (MIT, see thirdparty/rs2b0t).
 
 The planners are pure: they read an AcquireWorld of counts and levels and give a plan. A script carries the
 plan out itself (bank, walk, shop), with walk_to_tool_vendor for the walk.

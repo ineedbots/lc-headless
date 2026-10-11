@@ -1,5 +1,5 @@
 """Who to trade with, and what to do on the trade screen, for mule and runner bots. Ported from rs2b0t's
-api/trade/PartnerTrade.ts (MIT, see third_party/rs2b0t). The trade itself is rs2004.trade's."""
+api/trade/PartnerTrade.ts (MIT, see thirdparty/rs2b0t). The trade itself is rs2004.trade's."""
 
 DEFAULT_TRADE_RANGE = 2
 MULE_MODE_OPTIONS = ['Off', 'Gatherer', 'Mule', 'Cooker', 'Supplier']

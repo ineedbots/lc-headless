@@ -1,4 +1,4 @@
-"""Bots. Mirrors rs2b0t's api/bot/Bot.ts and runtime/defineBot.ts (MIT, see third_party/rs2b0t).
+"""Bots. Mirrors rs2b0t's api/bot/Bot.ts and runtime/defineBot.ts (MIT, see thirdparty/rs2b0t).
 
 A script either sets BOT = define_bot(...) to one of these classes, or defines a module-level loop() and
 on_* hooks, which then run as a LoopingBot. Where rs2b0t awaits, loop(), execute() and on_start() may be

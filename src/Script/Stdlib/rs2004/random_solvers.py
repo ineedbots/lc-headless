@@ -1,5 +1,5 @@
 """The puzzles random events set: the mime's emotes, the strange box, the genie's lamp and the maze. Mirrors
-rs2b0t's runtime/randomevents/solvers/ and maze/ (MIT, see third_party/rs2b0t). Each interface is found by
+rs2b0t's runtime/randomevents/solvers/ and maze/ (MIT, see thirdparty/rs2b0t). Each interface is found by
 what it shows, and the maze is read from the cache's own map, not a table.
 """
 

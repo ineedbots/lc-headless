@@ -1,5 +1,5 @@
 # Ported from rs2b0t's test/api/acquisition/Tools.test.ts, woodcutting-axes.test.ts, ToolAcquire.test.ts,
-# test/data/fishing-methods.test.ts and mining-rocks.test.ts (MIT, see third_party/rs2b0t).
+# test/data/fishing-methods.test.ts and mining-rocks.test.ts (MIT, see thirdparty/rs2b0t).
 
 from rs2004.catalogs.tools import AXES, PICKAXES, TINDERBOX, axe_req, best_axe, best_from_tiers, best_pickaxe
 from rs2004.catalogs.tools import can_wield_tool, exact_tool, has_all_tools, missing_tool_labels, pickaxe_req

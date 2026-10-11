@@ -1,4 +1,4 @@
-"""Shops and player trades. Mirrors rs2b0t's api/shop/Shop.ts and api/trade/Trade.ts (MIT, see third_party/rs2b0t).
+"""Shops and player trades. Mirrors rs2b0t's api/shop/Shop.ts and api/trade/Trade.ts (MIT, see thirdparty/rs2b0t).
 
     opened = yield from shop.open('Shop keeper')
     if opened:

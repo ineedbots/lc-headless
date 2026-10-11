@@ -21,7 +21,7 @@ Reference sources, in `289server/` beside this repository:
 | Topic | Decision |
 |---|---|
 | Input | The folder that holds the server's store: `main_file_cache.dat` with `main_file_cache.idx0` to `idx4`, as the engine keeps it in `engine/data/pack/`. It's the only layout with all nine archives and the maps, and it's what the engine computes its CRCs from |
-| Config | `client.cacheDirectory`, default `"cache"`, relative to the working directory like `scripting.accountsDirectory`. `login.crcs` is removed; a file that still has it loads, with a warning |
+| Config | `client.cacheDirectory`, default `"data/cache"`, relative to the working directory like `scripting.accountsDirectory`. `login.crcs` is removed; a file that still has it loads, and the key is ignored |
 | CRCs | The CRC32 (`Packet::GetCrc`) of each raw file 0 to 8 in store 0, which is what the engine's `makeCrcs` computes. A missing file counts as 0. File 0 is always empty, so the first CRC is always 0 |
 | When | Once, at startup, in `Application`, right after the config and before any script loads. A missing or damaged cache stops the process before any login, and the message names the file |
 | Sharing | `CacheLoader::Load` returns a `GameCache_s`. `Application` holds it in a `std::shared_ptr<const GameCache_s>` and passes it down to each account's `GameClient`, as it does the config (ConfigDesign §1, Ownership). Nothing modifies it after loading, so every account reads the same copy without locks |
@@ -821,10 +821,10 @@ Fatal error: cache: store 0 file 2 (config): obj 1512: unknown opcode 200
 | Change | Detail |
 |---|---|
 | Removed | `LoginSettings_s::crcs` and `CRC_COUNT`, the CRC array's `adl_serializer`, `FormatCrc`, and `crcs` in `LoginSettings_s`'s macro. Later, `ClientSettings_s::logoutComponent`, when the logout button moved to the cache (§6) |
-| Added | `ClientSettings_s::cacheDirectory`, a `std::string` defaulting to `"cache"`, after `idleSeconds`. Its rule is that it's not empty: `client.cacheDirectory: must not be empty` |
-| Leftover keys | If the `login` section has `crcs`, or the `client` section has `logoutComponent`, `Parse` logs a Warning, as it does for a leftover `account` section: `Config has login.crcs, which is no longer read; the CRCs come from the cache in client.cacheDirectory`, and `Config has client.logoutComponent, which is no longer read; the logout button comes from the cache in client.cacheDirectory`. The keys are a table, `LEGACY_KEYS`, in `ConfigFile.cpp`'s anonymous namespace |
+| Added | `ClientSettings_s::cacheDirectory`, a `std::string` defaulting to `"data/cache"`, after `logLevel`. Its rule is that it's not empty: `client.cacheDirectory: must not be empty` |
+| Leftover keys | A `login.crcs` or `client.logoutComponent` that a file still has is ignored, like any unknown key. They once logged a warning each, which was dropped along with the one for a leftover `account` section |
 | Sample header | `// Set server.url and the login RSA key, put the server's cache in client.cacheDirectory, then run again.` |
-| Sample | Loses the `crcs` array and `logoutComponent`, and gains `"cacheDirectory": "cache"` in `client` |
+| Sample | Loses the `crcs` array and `logoutComponent`, and gains `"cacheDirectory": "data/cache"` in `client` |
 | `LoginHandshake` | Takes the CRCs as `std::span<const s32, GameCache_s::CRC_COUNT>`, after the account and login settings. `BuildLoginRequest` takes them the same way. `GameClient` passes its cache's CRCs, and the cache outlives the handshake as the settings do |
 | `LoginError` | Status 6 reads `revision, cache CRC or RSA key mismatch; is client.cacheDirectory this server's cache?` |
 
@@ -1216,7 +1216,7 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 - A missing folder or `.dat` gives the message in §8. A missing `config` archive, a missing entry and a damaged map file each throw with the folder, store, file and square in the message. So do a varp that doesn't decode, a `config` without the run varp, a missing `interface` archive, one without `data`, one whose components don't decode, and one without each of the components, each naming what its rule marks.
 - The loaded cache has each component's id, the inventory's size and the run varp, with a decoy varp button before the run buttons.
 - A square without files is skipped with the warning, and the Info line is logged (`LogCapture`).
-- Config: `cacheDirectory` defaults to `cache`, an empty one fails `Validate`, and the serialized sample has it and no `crcs`. A leftover `login.crcs` or `client.logoutComponent` logs its warning, and the file still loads.
+- Config: `cacheDirectory` defaults to `data/cache`, an empty one fails `Validate`, and the serialized sample has it and no `crcs`.
 - `NetTests`: the login request carries the CRCs it was given, in order.
 
 ### 15.7 Collision, WorldMap and paths

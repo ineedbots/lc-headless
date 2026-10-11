@@ -1,5 +1,5 @@
 """Random events: telling one has come for you, and answering it. Mirrors rs2b0t's
-runtime/RandomEventGuardian.ts, randomevents/RandomEvents.ts and eventEvade.ts (MIT, see third_party/rs2b0t).
+runtime/RandomEventGuardian.ts, randomevents/RandomEvents.ts and eventEvade.ts (MIT, see thirdparty/rs2b0t).
 
 The host asks the guardian once a server tick. When an event needs answering, the bot's step in progress is
 dropped, the guardian's solver runs to the end, and loop() starts afresh. A bot can leave events alone with

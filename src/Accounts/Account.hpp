@@ -23,7 +23,8 @@ struct AccountOptions_s
 };
 
 // One account: its client and, when the account file names one, its script. Without a script the account
-// idles and logs a summary of what it sees every SUMMARY_INTERVAL. Nothing it does waits beyond Step's
+// idles and logs a summary of what it sees every SUMMARY_INTERVAL, then logs out once it has been in game for
+// its idleSeconds, or idles until interrupted when that's zero. Nothing it does waits beyond Step's
 // maxWait, so many accounts can share one loop. An account finishes when it has logged out, when its
 // login or connection fails for good, or when it's interrupted; failures are logged, not thrown. With a
 // messenger, the account takes bot messages for its script under its username until it's destroyed.
@@ -87,6 +88,8 @@ private:
     u32 m_interrupts = 0;
     std::optional<Clock::time_point> m_killDeadline;
     Clock::time_point m_nextSummary;
+    // Without a script: when its idleSeconds are up, from the first step in game.
+    std::optional<Clock::time_point> m_idleUntil;
     // relog(): the wait still to come once its logout is done, then when to log back in.
     std::optional<std::chrono::seconds> m_relogDelay;
     std::optional<Clock::time_point> m_reloginAt;

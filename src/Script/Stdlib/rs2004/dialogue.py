@@ -1,5 +1,5 @@
 """Chat dialogues, option lists and make menus, and the main modal. Mirrors rs2b0t's api/ui/dialogue/ChatDialog.ts
-and api/ui/widgets/Modals.ts (MIT, see third_party/rs2b0t).
+and api/ui/widgets/Modals.ts (MIT, see thirdparty/rs2b0t).
 
     while chat_dialog.can_continue():
         yield from chat_dialog.continue_()

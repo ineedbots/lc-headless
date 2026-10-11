@@ -318,11 +318,7 @@ The `account` section moves out. A new `scripting` section is added:
     "pollIntervalMs": 10,
     "loginIntervalSeconds": 2,
     "killGraceSeconds": 30,
-    "progressDirectory": "progress",
-    "randomEvents": true,
-    "stallMinutes": 10,
-    "runAuto": true,
-    "runEnergyMin": 20
+    "progressDirectory": "progress"
 }
 ```
 
@@ -335,6 +331,11 @@ The `account` section moves out. A new `scripting` section is added:
     "username": "test",
     "password": "…",
     "enabled": true,
+    "idleSeconds": 0,
+    "randomEvents": true,
+    "stallMinutes": 10,
+    "runAuto": true,
+    "runEnergyMin": 20,
     "script": {
         "file": "examples/chicken_killer.py",
         "progressReportMinutes": 20,
@@ -347,7 +348,8 @@ The `account` section moves out. A new `scripting` section is added:
 ```
 
 - `ConfigFile::LoadAccount` reads it with the same nlohmann setup as `client.jsonc`, so it has the same comment support, error paths and no secrets in messages. The account's name is the file name without `.jsonc`.
-- A missing `script`, or an empty `file`, means the account just idles and logs a state summary every 10 s. That's today's smoke test.
+- A missing `script`, or an empty `file`, means the account just idles and logs a state summary every 10 s. That's today's smoke test. It logs out after `idleSeconds`, or idles until interrupted when that's 0, the default.
+- `randomEvents`, `stallMinutes`, `runAuto` and `runEnergyMin` set the script's upkeep ([BotApiDesign.md](BotApiDesign.md) §10, §11). They were once in `client.jsonc`'s `scripting` section, the same for every account.
 - `settings` may be any JSON object. It travels as JSON text, and the prelude's `json.loads` turns it into a `Settings` object with each key as an attribute, plus `get()` and `in`.
 - `accounts/*.jsonc` is git-ignored; `accounts/example.jsonc.sample` is committed.
 

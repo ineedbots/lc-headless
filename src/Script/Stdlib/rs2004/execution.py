@@ -1,4 +1,4 @@
-"""Waiting. Mirrors rs2b0t's api/execution/Execution.ts (MIT, see third_party/rs2b0t), with generators where
+"""Waiting. Mirrors rs2b0t's api/execution/Execution.ts (MIT, see thirdparty/rs2b0t), with generators where
 rs2b0t awaits: each wait is used with yield from, from loop() or anything it calls, and returns its result.
 
     found = yield from execution.delay_until(lambda: inventory.is_full(), 3000)

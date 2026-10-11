@@ -1,5 +1,5 @@
 """Axe and pickaxe tiers, and the tool kit a gathering bot needs. Ported from rs2b0t's
-api/acquisition/Tools.ts (MIT, see third_party/rs2b0t).
+api/acquisition/Tools.ts (MIT, see thirdparty/rs2b0t).
 
 A requirement is a ToolReq: a tiered one picks the best axe or pickaxe the skill can use, and an exact one
 names one item. Counting and skill levels come in as functions, so the planners stay pure:

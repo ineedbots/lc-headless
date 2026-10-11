@@ -1,4 +1,4 @@
-# Mines ore at a camp and banks it: the mining side of rs2b0t's GatheringBot (MIT, see third_party/rs2b0t).
+# Mines ore at a camp and banks it: the mining side of rs2b0t's GatheringBot (MIT, see thirdparty/rs2b0t).
 # It finds the camp from the catalogs, gets the best pickaxe from the bank (or buys one, when allowed), mines
 # the best ore it can, and banks a full backpack at the camp's bank. With bank off it drops the ore instead.
 

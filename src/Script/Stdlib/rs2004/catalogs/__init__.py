@@ -1,4 +1,4 @@
-"""rs2b0t's world catalogs and behaviours (MIT, see third_party/rs2b0t): data tables, pure planners, and
+"""rs2b0t's world catalogs and behaviours (MIT, see thirdparty/rs2b0t): data tables, pure planners, and
 tasks built on them. Everything is here as rs2b0t names it, in snake_case:
 
     from rs2004.catalogs import pickaxe_req, resolve_mining_location, plan_gather_tool_acquire

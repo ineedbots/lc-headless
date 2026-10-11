@@ -1,6 +1,6 @@
 """Gathering camps for fishing, mining and woodcutting: a home spot, a bank stand and the booth to use.
 Ported from rs2b0t's data/gatheringLocations.ts, fishingLocations.ts, miningLocations.ts and
-woodcuttingLocations.ts (MIT, see third_party/rs2b0t).
+woodcuttingLocations.ts (MIT, see thirdparty/rs2b0t).
 
 A location is a Record: name, spot, bank_stand, booth_name, booth_op, verified, and where set, camp_radius,
 chase_radius, resources, obstacles, sweep, avoid_spots, bait_vendor, range_stand, range_name, notes and, for a

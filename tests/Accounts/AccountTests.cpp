@@ -101,6 +101,31 @@ TEST_CASE("An account without a script idles until interrupted", "[Account]")
     CHECK(entries.front().source == "bot1");
 }
 
+TEST_CASE("An account without a script logs out once its idleSeconds are up", "[Account]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send};
+    const auto config = std::make_shared<const Config_s>(server.MakeConfig());
+    auto account = Account{config, FakeGameServer::MakeCache(), AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount(), .idleSeconds = 1s}, ScriptTestRuntime::Get(), capture.GetLogger()};
+
+    const auto started = Clock::now();
+    account.Login();
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && !account.IsFinished())
+    {
+        account.Step(STEP);
+    }
+
+    REQUIRE(account.IsFinished());
+    CHECK(Clock::now() - started >= 1s);
+    CHECK(account.Succeeded());
+    CHECK(server.GetPackets(ClientProt_e::IfButton).size() == 1);
+    CHECK(std::ranges::any_of(capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.message == "Logging out: the account has idled for its idleSeconds (1 s)";
+    }));
+}
+
 TEST_CASE("An account logs out when its script stops it", "[Account]")
 {
     auto fixture = AccountFixture{"def loop():\n    if npcs.query().id(50).exists():\n        stop_account()\n    return 100\n"};

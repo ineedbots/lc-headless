@@ -1,5 +1,5 @@
 """Game messages since a mark, to tell what the server said after an action. Mirrors rs2b0t's
-api/chatbox/gameMessages.ts (MIT, see third_party/rs2b0t), over the last 100 messages the client keeps.
+api/chatbox/gameMessages.ts (MIT, see thirdparty/rs2b0t), over the last 100 messages the client keeps.
 
     mark = game_messages.mark()
     loc.interact('Open')

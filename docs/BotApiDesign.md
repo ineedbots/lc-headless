@@ -55,6 +55,8 @@ src/
 │   ├── ScriptHost.cpp          drives a bot: steps, waits, events, the random-event guardian, stall guard
 │   ├── Stdlib.hpp/.cpp         finds an embedded stdlib file by path
 │   └── Stdlib/rs2004/          the Python standard library, embedded at build time
+│       ├── _prelude.py         run into builtins first: helpers the host calls, such as _report_rows
+│       ├── _load_stdlib.py     run into builtins next: the stdlib's public names and the runtime's entry points
 │       ├── _runtime.py         the host's side: loading the bot, its steps, events and end
 │       ├── bot.py              AbstractBot, LoopingBot, Task, TaskBot, TreeBot, define_bot
 │       ├── settings.py         SettingDef, SettingsBag, schema checks
@@ -81,7 +83,7 @@ src/
 │       └── WorldPathFinder.hpp/.cpp  A* over WalkMap and NavGraph (§9)
 cmake/EmbedStdlib.cmake         turns Stdlib/**/*.py into a generated source of byte arrays
 data/nav/                       rs2b0t's walker data, with its license (§9)
-third_party/rs2b0t/LICENSE      rs2b0t's MIT notice, for the ported code and data
+thirdparty/rs2b0t/LICENSE       rs2b0t's MIT notice, for the ported code and data
 tools/nav/convert_rs2b0t.py     one-off: rs2b0t's TypeScript data tables to JSON
 scripts/typings/                the stubs, for the whole library
 scripts/examples/               rewritten bots (§14)
@@ -387,7 +389,7 @@ A world-scale route needs collision beyond the build area, which the cache has. 
 
 ### NavGraph
 
-`data/nav/` holds rs2b0t's walker data. rs2b0t's MIT notice is kept in `third_party/rs2b0t/`.
+`data/nav/` holds rs2b0t's walker data. rs2b0t's MIT notice is kept in `thirdparty/rs2b0t/`.
 
 | File | Holds | Source |
 |---|---|---|
@@ -470,15 +472,15 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs 
     - the mime, the strange box and the maze;
     - for the gas chest, whirlpool and ent, step away or switch target.
 - The 289 content's `macro events/` scripts are the reference for what each event expects, and the source for any event rs2b0t doesn't cover.
-- `scripting.randomEvents` (on by default) turns the guardian off for an account.
+- `randomEvents` in an account file (on by default) turns the guardian off for that account.
 ### As built
 
 - **Layout.** Two flat modules rather than a `randomevents/` package: `rs2004/random_events.py` (the guardian, rs2b0t's `RandomEventGuardian.ts`, `RandomEvents.ts` and `eventEvade.ts`) and `rs2004/random_solvers.py` (its `solvers/` and `maze/`).
-- **The host.** Each server tick, after the tick hook, `ScriptHost` calls the runtime's `_rt_guard` when `scripting.randomEvents` is on. When the guardian takes over, `_runtime` drops the bot's generator and steps the solver's instead, then the next step calls `loop()` afresh. A guardian that raises fails the script as "random event guardian".
+- **The host.** Each server tick, after the tick hook, `ScriptHost` calls the runtime's `_rt_guard` when the account's `randomEvents` is on. When the guardian takes over, `_runtime` drops the bot's generator and steps the solver's instead, then the next step calls `loop()` afresh. A guardian that raises fails the script as "random event guardian".
 - **Found by what they show, not by ids.** The mime's buttons by their labels ("Glass Box" and the rest) and the strange box's answers by theirs, its parts from the item each model shows (the new `Component.item`), and the lamp's skills by the varp value each button sets, as the combat styles are found.
 - **The maze from the cache.** rs2b0t ships a generated table of the maze. Here `_core.square_locs(45, 71, 0)` reads the square's walls and doors from the cache, and a breadth-first search from where you stand gives the doors to open, honouring which side each one-way door opens from.
 - **Evading.** rs2b0t flees 12 tiles. The 289 content's event monsters have a `maxrange` of 15 from where they appear, beside you, so at 12 the swarm kept chasing and killed a level-3 account. Here it's 20 tiles, running, and the walk back gets 40 seconds.
-- **New core.** `square_locs(x, z, level)` and `took_damage(ticks=4)` (a hit with damage on you within the ticks) in `_core`; `Component.item`; `scripting.randomEvents` and `ScriptHostOptions_s::randomEvents`.
+- **New core.** `square_locs(x, z, level)` and `took_damage(ticks=4)` (a hit with damage on you within the ticks) in `_core`; `Component.item`; `randomEvents` and `ScriptHostOptions_s::randomEvents`.
 
 ### Done when
 
@@ -489,8 +491,8 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs 
 
 ## 11. Phase 8: runtime upkeep and lifecycle (done)
 
-- **Stall guard.** rs2b0t's `StallGuard`: with no tile change and no xp for `scripting.stallMinutes` (10 by default), it walks back to `recovery_anchor()` when that's 8 or more tiles away, or else restarts the bot. `execution.note_progress()` reports work it can't see, such as a completed trade.
-- **Run manager.** Turns run back on when energy reaches a threshold: `scripting.runAuto` and `scripting.runEnergyMin` in `client.jsonc`, and `run_manager.override(run_auto=None, energy_min=None)` for one script, as rs2b0t's.
+- **Stall guard.** rs2b0t's `StallGuard`: with no tile change and no xp for the account's `stallMinutes` (10 by default), it walks back to `recovery_anchor()` when that's 8 or more tiles away, or else restarts the bot. `execution.note_progress()` reports work it can't see, such as a completed trade.
+- **Run manager.** Turns run back on when energy reaches a threshold: `runAuto` and `runEnergyMin` in the account file, and `run_manager.override(run_auto=None, energy_min=None)` for one script, as rs2b0t's.
 - **Relog.** `relog(delay_seconds=0)`: logs out by the retrying logout `Account::LogOut` uses, waits, logs back in, keeps the script loaded, and raises `reconnect` once the player is placed.
 - **Events:**
     - `death`: Hitpoints' current level falls from above 0 to 0, which `death.rs2` does before "Oh dear you are dead!";
@@ -499,7 +501,7 @@ rs2b0t's `RandomEventGuardian` and solvers, ported to the stdlib. The host runs 
 - **Character design.** `game.appearance_screen_open()` (a component with `ClientCode_e::AcceptDesign` in the main modal) and `game.set_appearance(female, kits, colours)` (`IdkSaveDesign`).
 ### As built
 
-- **Upkeep.** The host calls the runtime's `_rt_upkeep` once a server tick, in place of phase 7's guard call, and `_rt_configure` once the bot is made, with `scripting.randomEvents`, `stallMinutes`, `runAuto` and `runEnergyMin`. `rs2004/upkeep.py` holds the run manager and the stall guard; `_runtime.upkeep` runs the run manager, then the random event guardian, then the stall guard. A guard that takes over drops the bot's step in progress, as phase 7's did.
+- **Upkeep.** The host calls the runtime's `_rt_upkeep` once a server tick, in place of phase 7's guard call, and `_rt_configure` once the bot is made, with the account's `randomEvents`, `stallMinutes`, `runAuto` and `runEnergyMin`. `rs2004/upkeep.py` holds the run manager and the stall guard; `_runtime.upkeep` runs the run manager, then the random event guardian, then the stall guard. A guard that takes over drops the bot's step in progress, as phase 7's did.
 - **The stall guard** is rs2b0t's `Supervisor` watchdog with `StallGuard`'s restart: progress is a change of tile, a change in total experience, or `note_progress()` (`_core.last_progress()` reads it). A recovery walks to `recovery_anchor()` with `traversal.walk_resilient`, or restarts the bot: `on_stop(reason)`, its subscriptions ended, `BOT`'s `create()` called again and `on_start` run. A module script keeps its globals. rs2b0t's other watchdog, a loop stuck in one await for 15 minutes, has no counterpart: every wait here has a timeout or a tick count. Ticks more than 5 s apart, as after a relog, restart the clock.
 - **The run manager** checks the run buttons' interface is open (`_core.can_set_run()`) before clicking, as rs2b0t checks the controls tab.
 - **Relog.** `relog(delay)` sets a request on `ScriptApi` that `Account` takes after the step: it logs out with the usual retries, steps the script once so `on_disconnect` is called, waits, then `BeginLogin`s. The script's host sees a fresh login, so `on_reconnect` follows once the player is placed. Ctrl+C during the logout lets it finish; during the wait it finishes the bot and ends the account.

@@ -1,5 +1,5 @@
 """The bank, opening one, and when to go. Mirrors rs2b0t's api/bank/Bank.ts, Banking.ts, bankOps.ts and
-bankRules.ts, and api/tasks/PeriodicBank.ts (MIT, see third_party/rs2b0t).
+bankRules.ts, and api/tasks/PeriodicBank.ts (MIT, see thirdparty/rs2b0t).
 
     opened = yield from banking.open()
     if opened:

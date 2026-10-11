@@ -2,7 +2,7 @@
 walk destinations, cooking surfaces and fire spots, with their helpers. Ported from rs2b0t's
 data/cowKillerLocations.ts, runeCraftLocations.ts, pickpocketTargets.ts, herbs.ts, shopdb.ts,
 cookingRanges.ts, cookLocations.ts, api/cooking/CookLocations.ts, api/map/WalkDestinations.ts and
-api/firemaking/Firemaking.ts (MIT, see third_party/rs2b0t).
+api/firemaking/Firemaking.ts (MIT, see thirdparty/rs2b0t).
 """
 
 from rs2004.catalogs import _data

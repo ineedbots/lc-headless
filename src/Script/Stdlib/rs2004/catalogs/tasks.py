@@ -1,6 +1,6 @@
 """Reusable tasks for a TaskBot: get missing items, click through dialogue, recover from a death, and go
 back to camp. Ported from rs2b0t's api/acquisition/ItemAcquisition.ts, api/tasks/ContinueDialog.ts,
-DeathRecovery.ts and Anchor.ts, and api/sustain/Sustain.ts (MIT, see third_party/rs2b0t). PeriodicBank is
+DeathRecovery.ts and Anchor.ts, and api/sustain/Sustain.ts (MIT, see thirdparty/rs2b0t). PeriodicBank is
 rs2004.bank's.
 """
 

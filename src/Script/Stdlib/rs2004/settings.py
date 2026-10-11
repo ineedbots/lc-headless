@@ -1,5 +1,5 @@
 """Script settings: a schema of typed settings, checked against the account file before login, and the bag a
-script reads them from. Modelled on rs2b0t's runtime/Settings.ts (MIT, see third_party/rs2b0t), but a
+script reads them from. Modelled on rs2b0t's runtime/Settings.ts (MIT, see thirdparty/rs2b0t), but a
 value that doesn't fit its schema is an error rather than quietly replaced by the default."""
 
 from rs2004.geometry import Tile

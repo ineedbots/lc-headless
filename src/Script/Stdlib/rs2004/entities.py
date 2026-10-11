@@ -1,5 +1,5 @@
 """NPCs, players, scenery and ground items, and the query that finds them. Mirrors rs2b0t's api/model/,
-api/query/Query.ts and the Npcs, Players, Locs and GroundItems facades (MIT, see third_party/rs2b0t).
+api/query/Query.ts and the Npcs, Players, Locs and GroundItems facades (MIT, see thirdparty/rs2b0t).
 
     guard = npcs.query().name('Guard').action('Pickpocket').within(3).nearest()
     if guard:

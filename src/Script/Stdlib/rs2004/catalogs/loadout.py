@@ -1,5 +1,5 @@
 """Loadouts: the gear to wear and the supplies to carry. Ported from rs2b0t's api/loadout (MIT, see
-third_party/rs2b0t). rs2b0t keeps loadouts in its panel; here they're settings: a script's 'loadouts' setting
+thirdparty/rs2b0t). rs2b0t keeps loadouts in its panel; here they're settings: a script's 'loadouts' setting
 is a list of {name, worn: {slot: item}, carry: [{item, qty}]}, and 'loadout' names the one to use.
 """
 

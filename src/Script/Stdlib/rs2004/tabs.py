@@ -1,6 +1,6 @@
 """The side tabs: quests, prayer, the special attack bar, combat styles, spells and autocast. Mirrors rs2b0t's
 api/ui/questlog/Quests.ts, api/prayer/Prayer.ts, api/combat/Special.ts, CombatStyle.ts and CombatStyleLogic.ts,
-api/magic/Autocast.ts and the combat and magic parts of api/game/Game.ts (MIT, see third_party/rs2b0t).
+api/magic/Autocast.ts and the combat and magic parts of api/game/Game.ts (MIT, see thirdparty/rs2b0t).
 
 Everything is found in the tab's interface by what it is, so a weapon swap that changes the combat tab just
 works: prayers are the prayer tab's Toggle buttons, combat styles the Select buttons that set the combat mode

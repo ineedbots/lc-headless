@@ -15,52 +15,16 @@
 #include "ScriptApi.hpp"
 #include "ScriptRuntime.hpp"
 #include "ScriptVm.hpp"
+#include "Stdlib.hpp"
 
 #include <pocketpy.h>
 
 namespace
 {
-    constexpr auto PRELUDE = R"python(
-def _report_rows(report):
-    if not isinstance(report, dict):
-        raise TypeError(f'on_progress_report() must return a dict, not {type(report).__name__}')
-    return [[str(name), str(value)] for name, value in report.items()]
-)python"sv;
-
-    // Loads the standard library's public names into builtins, and names the runtime's entry points the
-    // host calls, which CallBuiltin finds there.
-    constexpr auto LOAD_STDLIB = R"python(
-from rs2004.bot import *
-from rs2004.settings import *
-from rs2004.geometry import *
-from rs2004.events import *
-from rs2004.entities import *
-from rs2004.items import *
-from rs2004.game import *
-from rs2004.interfaces import *
-from rs2004.dialogue import *
-from rs2004.bank import *
-from rs2004.trade import *
-from rs2004.tabs import *
-from rs2004.messages import *
-from rs2004.reach import *
-from rs2004.traversal import *
-from rs2004.random_events import *
-from rs2004.upkeep import *
-from rs2004 import execution
-from rs2004 import _runtime
-from rs2004.events import listening as _listening
-
-_rt_make_settings = _runtime.make_settings
-_rt_load = _runtime.load
-_rt_start = _runtime.start
-_rt_dispatch = _runtime.dispatch
-_rt_step = _runtime.step
-_rt_configure = _runtime.configure
-_rt_upkeep = _runtime.upkeep
-_rt_reset = _runtime.reset
-_rt_finish = _runtime.finish
-)python"sv;
+    // Run into builtins when the API is bound: helpers the host calls, then the standard library's public
+    // names and the runtime's entry points, which CallBuiltin finds there.
+    constexpr auto PRELUDE_FILE = "rs2004/_prelude.py"sv;
+    constexpr auto LOAD_STDLIB_FILE = "rs2004/_load_stdlib.py"sv;
 
     constexpr auto LOAD_SETTINGS = "settings = _rt_make_settings(_settings_json)\ndel _settings_json\n"sv;
     constexpr auto CORE_MODULE = "_core";
@@ -127,6 +91,13 @@ _rt_finish = _runtime.finish
         auto value = py_TValue{};
         py_newint(&value, constant.value);
         py_setdict(builtins, py_name(constant.name), &value);
+    }
+
+    void RunStdlibFile(ScriptVm& vm, std::string_view path, py_GlobalRef module)
+    {
+        const auto source = Stdlib::Find(path);
+        assert(source && "The bindings run a file the standard library doesn't have");
+        vm.RunSource(*source, path, module);
     }
 
     std::array<ScriptApi*, ScriptRuntime::MAX_VMS> boundApis{};
@@ -2006,8 +1977,8 @@ void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
             }
         }
 
-        vm.RunSource(PRELUDE, "<prelude>", builtins);
-        vm.RunSource(LOAD_STDLIB, "<stdlib>", builtins);
+        RunStdlibFile(vm, PRELUDE_FILE, builtins);
+        RunStdlibFile(vm, LOAD_STDLIB_FILE, builtins);
     }
     catch (const std::exception&)
     {

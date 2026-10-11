@@ -1,5 +1,5 @@
 """Food, eating, boost potions and what a fight keeps in the backpack. Ported from rs2b0t's api/combat/food.ts,
-eatTiming.ts, boostPotions.ts, keepList.ts and fightUpkeep.ts (MIT, see third_party/rs2b0t)."""
+eatTiming.ts, boostPotions.ts, keepList.ts and fightUpkeep.ts (MIT, see thirdparty/rs2b0t)."""
 
 import _core
 from rs2004 import execution

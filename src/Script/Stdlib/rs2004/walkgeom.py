@@ -1,6 +1,6 @@
 """The walker's geometry: where you are on a route, what to click next, when to take a hop, when you've
 arrived, and which areas to keep out of. Mirrors rs2b0t's event/webwalk/geometry/followMath.ts, arrival.ts,
-pathExpand.ts, routeRecovery.ts and data/dangerZones.ts (MIT, see third_party/rs2b0t). Tiles are anything
+pathExpand.ts, routeRecovery.ts and data/dangerZones.ts (MIT, see thirdparty/rs2b0t). Tiles are anything
 with x, z and level.
 """
 

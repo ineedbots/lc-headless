@@ -1,5 +1,5 @@
 # Kills cows, picks up their hides, and banks them every so often: rs2b0t's ChickenKiller with its CowKiller
-# preset (MIT, see third_party/rs2b0t), in melee. The Lumbridge field banks at Al Kharid through the toll gate,
+# preset (MIT, see thirdparty/rs2b0t), in melee. The Lumbridge field banks at Al Kharid through the toll gate,
 # so it keeps 20 coins for the toll; the other fields bank at Draynor or Falador.
 
 from rs2004.catalogs import COW_LOCATION_OPTIONS, TOLL_COIN_TARGET, AL_KHARID_BANK, ContinueDialog, DeathRecovery

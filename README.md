@@ -106,7 +106,7 @@ If `client.jsonc` doesn't exist, the client writes a sample there and exits. In 
 | `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
 | `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
-| `client.cacheDirectory` | The folder that holds the server's cache: `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as the 289 engine keeps them in `engine/data/pack`. The default is `cache`, which git ignores |
+| `client.cacheDirectory` | The folder that holds the server's cache: `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as the 289 engine keeps them in `engine/data/pack`. The default is `data/cache`, which git ignores |
 
 The RSA key comes from the server's deployment, not from the protocol, so take it from the server you're connecting to; its webclient uses the same values. The login CRCs are computed from the cache, so the cache must be the server's own. If either is wrong, the server rejects the login with status 6. The client loads the cache once at startup, in well under a second, and a missing or damaged cache stops it before any login, naming the file.
 
@@ -121,9 +121,6 @@ Every other key has a default. These are the ones you're most likely to change:
 | `scripting.callTimeoutMs` | `1000` | How long one call into a script may run |
 | `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
 | `scripting.progressDirectory` | `progress` | Where progress reports are written |
-| `scripting.randomEvents` | `true` | Whether scripts answer random events themselves ([docs/ScriptingApi.md](docs/ScriptingApi.md#random-events)) |
-| `scripting.stallMinutes` | `10` | How long a script may go without progress before the stall guard steps in; 0 turns it off ([docs/ScriptingApi.md](docs/ScriptingApi.md#upkeep)) |
-| `scripting.runAuto`, `scripting.runEnergyMin` | `true`, `20` | Turn run back on once energy reaches the minimum |
 
 [docs/ConfigDesign.md §3](docs/ConfigDesign.md#3-file-format) lists every key and its rules. An error message names the key that's wrong but never shows its value, so a mistyped password doesn't end up in the log.
 
@@ -136,6 +133,7 @@ Copy [accounts/example.jsonc.sample](accounts/example.jsonc.sample) to `accounts
     "username": "myuser",
     "password": "mypass",
     "enabled": true,
+    "stallMinutes": 15,                         // upkeep for this account's script, below
     "script": {
         "file": "examples/chicken_killer.py",   // relative to scripts/
         "progressReportMinutes": 20,           // 0, or no key at all, means no reports
@@ -144,9 +142,17 @@ Copy [accounts/example.jsonc.sample](accounts/example.jsonc.sample) to `accounts
 }
 ```
 
-- An account with no `script` logs in and idles, and logs a summary of its surroundings every 10 seconds. This is a quick way to check a new server config.
+- An account with no `script` logs in and idles, and logs a summary of its surroundings every 10 seconds. This is a quick way to check a new server config. It logs out after `idleSeconds`, or idles until Ctrl+C when that's `0`, the default.
 - `"enabled": false` keeps the file but doesn't run the account.
 - A `server` section, with the same keys as the one in `client.jsonc`, logs this account into a different world.
+
+These keys set how the account's script is kept going. Each has a default, so leave out the ones you don't change:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `randomEvents` | `true` | Whether the script answers random events itself ([docs/ScriptingApi.md](docs/ScriptingApi.md#random-events)) |
+| `stallMinutes` | `10` | How long the script may go without progress before the stall guard steps in; 0 turns it off ([docs/ScriptingApi.md](docs/ScriptingApi.md#upkeep)) |
+| `runAuto`, `runEnergyMin` | `true`, `20` | Turn run back on once energy reaches the minimum |
 
 Git ignores `client*.jsonc`, `accounts/*.jsonc` and `progress/`, so credentials stay out of the repository.
 

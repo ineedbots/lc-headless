@@ -1,6 +1,6 @@
 """Walking across the world: routes beyond the loaded area, through doors, up and down stairs and ladders,
 over tolls and onto ships. Mirrors rs2b0t's api/walking/Traversal.ts and event/webwalk/WalkExecutor.ts, with
-its exec/ crossings (MIT, see third_party/rs2b0t).
+its exec/ crossings (MIT, see thirdparty/rs2b0t).
 
     arrived = yield from traversal.walk_resilient(Tile(3253, 3420, 0), 2)
 

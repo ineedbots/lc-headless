@@ -1,5 +1,5 @@
 """Ore rocks by type, from the 289 content's rocks.loc. Ported from rs2b0t's data/miningRocks.ts (MIT, see
-third_party/rs2b0t). Every rock is named "Rocks", so ore and depleted rocks differ only by id."""
+thirdparty/rs2b0t). Every rock is named "Rocks", so ore and depleted rocks differ only by id."""
 
 # Ore names in tier order, best last.
 ROCK_OPTIONS = ['Clay', 'Copper', 'Tin', 'Iron', 'Silver', 'Coal', 'Gold', 'Mithril', 'Adamantite', 'Runite']

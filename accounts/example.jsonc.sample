@@ -10,6 +10,17 @@
     // Uncomment to log this account into a different world than client.jsonc's server.
     // "server": {"url": "wss://w2.example.com:443", "origin": "https://w2.example.com"},
 
+    // Without a script: seconds to idle before logging out. 0 idles until Ctrl+C.
+    "idleSeconds": 0,
+
+    // While the script runs: whether it answers random events itself, the minutes it may go
+    // without progress before the stall guard steps in (0 turns the guard off), and whether
+    // run is turned back on once energy reaches runEnergyMin.
+    "randomEvents": true,
+    "stallMinutes": 10,
+    "runAuto": true,
+    "runEnergyMin": 20,
+
     // Leave "script" out to log in and idle, which logs a summary of the area every 10 seconds.
     "script": {
         // Relative to scripting.scriptsDirectory in client.jsonc.

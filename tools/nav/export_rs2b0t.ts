@@ -1,4 +1,4 @@
-// Exports rs2b0t's walker data (MIT, see third_party/rs2b0t) to data/nav as JSON, compiled the way rs2b0t's
+// Exports rs2b0t's walker data (MIT, see thirdparty/rs2b0t) to data/nav as JSON, compiled the way rs2b0t's
 // PathFinder.addEdges compiles it, so NavGraph reads one list of edges with their costs and requirements.
 // Run once with Bun when rs2b0t's data changes, and commit the output:
 //

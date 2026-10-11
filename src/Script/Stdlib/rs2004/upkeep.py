@@ -1,10 +1,10 @@
 """Keeping a bot going while it runs: the run manager and the stall guard. Mirrors rs2b0t's
-runtime/RunManager.ts, and the watchdog in runtime/Supervisor.ts with StallGuard.ts (MIT, see third_party/rs2b0t).
+runtime/RunManager.ts, and the watchdog in runtime/Supervisor.ts with StallGuard.ts (MIT, see thirdparty/rs2b0t).
 
 The host calls the runtime's upkeep once a server tick. The run manager turns run back on once there's energy
 for it. The stall guard watches for progress: a change of tile, experience, or execution.note_progress().
-After scripting.stallMinutes without any, it walks back to the bot's recovery_anchor() when that's more than
-8 tiles away, and otherwise restarts the bot.
+After the account's stallMinutes without any, it walks back to the bot's recovery_anchor() when that's more
+than 8 tiles away, and otherwise restarts the bot.
 """
 
 import _core
@@ -44,7 +44,7 @@ def should_enable_run(run_on, in_combat, energy, energy_min, modal_open):
 
 
 class _RunManager:
-    """Turns run back on: scripting.runAuto and scripting.runEnergyMin, or the script's override()."""
+    """Turns run back on: the account's runAuto and runEnergyMin, or the script's override()."""
 
     def __init__(self):
         self.run_auto = True

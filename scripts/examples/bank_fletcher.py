@@ -1,6 +1,6 @@
 # Fletches at a bank until the bank runs out: logs into arrow shafts or bows with a knife through the make
 # menu's Make X, bow string onto unstrung bows, or arrowtips onto headless arrows. rs2b0t's BankFletcher (MIT,
-# see third_party/rs2b0t), less its cut+string mode.
+# see thirdparty/rs2b0t), less its cut+string mode.
 
 from rs2004.catalogs import ContinueDialog
 

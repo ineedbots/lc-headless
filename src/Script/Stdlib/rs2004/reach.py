@@ -1,6 +1,6 @@
 """The last mile: walk to a stand, then use a loc, an NPC or anything else, and when the server says it can't
 reach it, open the door in the way (or close the open one swung across it) and try again. Mirrors rs2b0t's
-api/walking/Reach.ts (MIT, see third_party/rs2b0t).
+api/walking/Reach.ts (MIT, see thirdparty/rs2b0t).
 
     status = yield from reach.loc_op('Bank booth', 'Use-quickly', Tile(3253, 3420, 0), lambda: bank.is_open())
     if status == 'unreachable':

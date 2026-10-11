@@ -1,5 +1,5 @@
 """The event bus. Every event has one name, used by events.on(name, callback), bot.on(name, callback) and a
-hook named on_<name>. The events rs2b0t has (api/events/EventBus.ts, MIT, see third_party/rs2b0t) pass one
+hook named on_<name>. The events rs2b0t has (api/events/EventBus.ts, MIT, see thirdparty/rs2b0t) pass one
 payload object with its fields; the rest pass their values as arguments."""
 
 __all__ = ['events', 'Event']

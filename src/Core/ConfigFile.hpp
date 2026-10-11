@@ -29,8 +29,7 @@ struct LoginSettings_s
 struct ClientSettings_s
 {
     LogLevel_e logLevel = LogLevel_e::Info;
-    std::chrono::seconds idleSeconds = 5s;
-    std::string cacheDirectory = "cache";
+    std::string cacheDirectory = "data/cache";
     // rs2b0t's walker data, exported by tools/nav/export_rs2b0t.ts.
     std::string navDirectory = "data/nav";
 };
@@ -44,14 +43,6 @@ struct ScriptingSettings_s
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
     std::string progressDirectory = "progress";
-    // Whether scripts' random event guardian runs: it takes over to answer a random event when one comes.
-    bool randomEvents = true;
-    // How long a script may go without moving, gaining experience or noting progress before the stall guard
-    // steps in; zero turns it off.
-    std::chrono::minutes stallMinutes{10};
-    // Whether run is turned back on once energy reaches runEnergyMin, as rs2b0t's run manager does.
-    bool runAuto = true;
-    s32 runEnergyMin = 20;
 };
 
 struct Config_s
@@ -80,6 +71,16 @@ struct AccountConfig_s
     bool enabled = true;
     std::optional<ServerSettings_s> server;
     std::optional<ScriptConfig_s> script;
+    // How long an account without a script idles before it logs out; zero idles until interrupted.
+    std::chrono::seconds idleSeconds{0};
+    // Whether the script's random event guardian runs: it takes over to answer a random event when one comes.
+    bool randomEvents = true;
+    // How long a script may go without moving, gaining experience or noting progress before the stall guard
+    // steps in; zero turns it off.
+    std::chrono::minutes stallMinutes{10};
+    // Whether run is turned back on once energy reaches runEnergyMin, as rs2b0t's run manager does.
+    bool runAuto = true;
+    s32 runEnergyMin = 20;
 };
 
 class ConfigFile

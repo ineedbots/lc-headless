@@ -104,12 +104,16 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .watchFiles = m_options.watchScripts,
                 .waitForDebugger = m_options.waitForDebugger,
                 .navigation = m_options.navigation,
-                .randomEvents = scripting.randomEvents,
-                .stallMinutes = scripting.stallMinutes,
-                .runAuto = scripting.runAuto,
-                .runEnergyMin = scripting.runEnergyMin,
+                .randomEvents = m_account.randomEvents,
+                .stallMinutes = m_account.stallMinutes,
+                .runAuto = m_account.runAuto,
+                .runEnergyMin = m_account.runEnergyMin,
             },
             m_logger);
+    }
+    else if (m_account.idleSeconds > 0s)
+    {
+        m_logger->Info("No script; the account will idle for {} s", m_account.idleSeconds.count());
     }
     else
     {
@@ -351,6 +355,18 @@ void Account::StepScript(Clock::time_point now)
 
 void Account::StepIdle(Clock::time_point now)
 {
+    // The idle time counts from the first step in game, not from the login.
+    if (m_account.idleSeconds > 0s && !m_idleUntil)
+    {
+        m_idleUntil = now + m_account.idleSeconds;
+    }
+
+    if (m_idleUntil && now >= *m_idleUntil)
+    {
+        LogOut(std::format("the account has idled for its idleSeconds ({} s)", m_account.idleSeconds.count()));
+        return;
+    }
+
     if (now < m_nextSummary)
     {
         return;

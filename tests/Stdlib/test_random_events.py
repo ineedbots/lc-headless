@@ -1,4 +1,4 @@
-# Ported in part from rs2b0t's test/runtime/randomevents (MIT, see third_party/rs2b0t): the pure parts of the
+# Ported in part from rs2b0t's test/runtime/randomevents (MIT, see thirdparty/rs2b0t): the pure parts of the
 # random event guardian and its solvers. The real maze is in tests/Script/RealCacheScriptTests.cpp.
 
 from rs2004.geometry import Tile

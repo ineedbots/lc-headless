@@ -1,5 +1,5 @@
 # The run manager's policy and the stall guard's clock, ported in part from rs2b0t's test/runtime (MIT, see
-# third_party/rs2b0t). The host-side restart is in tests/Script/ScriptHostTests.cpp.
+# thirdparty/rs2b0t). The host-side restart is in tests/Script/ScriptHostTests.cpp.
 
 from rs2004.geometry import Tile
 from rs2004.upkeep import resolve_run_policy, should_enable_run, StallGuard, anchor_is_far, run_manager
