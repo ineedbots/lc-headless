@@ -138,8 +138,10 @@ endif()
         {
             "name": "windows-msvc",
             "inherits": "base",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "x64", "strategy": "set" },
             "cacheVariables": {
-                "CMAKE_CXX_COMPILER": "cl"
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
@@ -168,7 +170,7 @@ cmake --preset linux-clang
 cmake --build --preset linux-debug
 ```
 
-On Windows, run from a Developer PowerShell / Developer Command Prompt (or open the folder in Visual Studio or VS Code with CMake Tools) so `cl` and Ninja are on `PATH`.
+On Windows, `windows-msvc` uses the Visual Studio 17 2022 generator, which locates MSVC itself, so any prompt works. Linux uses Ninja Multi-Config.
 
 ---
 

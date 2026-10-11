@@ -24,7 +24,7 @@ A headless (shell) game client for revision-289 (2004-era RuneScape) servers, su
 ## Requirements
 
 - One of these:
-  - Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC, CMake 3.25+ and Ninja all come with that workload.
+  - Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC and CMake 3.25+ both come with that workload.
   - Linux, with clang, CMake 3.25+ and Ninja. The C++ standard library has to be libstdc++ 13+ or libc++ 17+, for `<format>`. The build is tested on Ubuntu 24.04 and Arch, and [Linux](#linux) lists the packages each one needs.
 - [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
 - A revision-289 server to connect to, plus its RSA public key and a copy of its game cache (see [Configuration](#configuration)).
@@ -37,14 +37,14 @@ The first configure builds every dependency through vcpkg, so it takes a while. 
 
 ### Windows
 
-Run these from an **x64** developer prompt, such as *x64 Native Tools Command Prompt for VS 2022* or a prompt where `vcvars64.bat` has run:
+Run these from any prompt:
 
 ```sh
 cmake --preset windows-msvc
 cmake --build --preset windows-release      # or windows-debug
 ```
 
-The `windows-msvc` preset doesn't set up the compiler environment itself, so the prompt has to. The default *Developer Command Prompt* targets x86, which is the wrong architecture. Visual Studio 2022's Open Folder sets up the environment for you.
+The `windows-msvc` preset uses the *Visual Studio 17 2022* generator, which finds MSVC on its own and targets x64, so a developer prompt isn't needed. It also writes `build/windows-msvc/Rs2004Headless.sln`, which you can open in Visual Studio.
 
 The build writes these files to `build/windows-msvc/<Config>/`:
 

@@ -11,12 +11,12 @@
         {
             "name": "windows-msvc",
             "inherits": "base",
+            "generator": "Visual Studio 17 2022",
             "architecture": {
                 "value": "x64",
-                "strategy": "external"
+                "strategy": "set"
             },
             "cacheVariables": {
-                "CMAKE_CXX_COMPILER": "cl",
                 "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
