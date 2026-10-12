@@ -64,7 +64,7 @@ For working on a script, `--watch` reloads it whenever you save it, and `--debug
 ## How scripts run
 
 - The module body runs once, before login. Use it for constants, classes and `BOT`. Game functions return empty values at that point, and actions fail, since there's no session yet. Once it has run, the client makes the bot and checks its settings (see [Settings](#settings)), so a broken script or a bad setting stops the run before any login.
-- `on_start()` runs once the player is first placed in the world. After that, on every pass of the main loop the client:
+- `on_start()` runs one server tick after the player is first placed in the world, so that the stats and inventories the server sends in the tick that places the player have all arrived. After that, on every pass of the main loop the client:
   1. calls the hooks and subscribers for everything that arrived since the last pass (events first, then chat messages, then messages from other scripts);
   2. calls `on_tick` if a server tick passed;
   3. calls `on_progress_report` if a report is due;
@@ -592,7 +592,7 @@ A bot's lifecycle has hooks too, but no subscribers:
 
 | Hook | Called when |
 |---|---|
-| `on_start()` | Once, when the player is first placed after login. One that's a generator runs before the first `loop()` |
+| `on_start()` | Once, a tick after the player is first placed after login, when the stats and inventories have arrived. One that's a generator runs before the first `loop()` |
 | `on_stop(reason)` | Once, when the script stops: after `stop_script()`, `stop_account()`, `request_finish(reason)` or an error, or when the account logs out for a reason of its own, such as Ctrl+C. It can't wait |
 | `on_progress_report()` | A progress report is due; return a `dict` (see [Progress reports](#progress-reports)) |
 

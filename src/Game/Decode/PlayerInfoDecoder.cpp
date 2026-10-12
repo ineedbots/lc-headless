@@ -208,6 +208,11 @@ void PlayerInfoDecoder::ReadLocal(Packet& packet, GameState_s& state, std::vecto
     local.tile = ToAbsolute(state, localX, localZ, level);
     local.lastMovement = jump ? Movement_e::Teleport : Movement_e::Walk;
     local.movedTick = state.tick;
+    if (!state.placed)
+    {
+        state.placedTick = state.tick;
+    }
+
     state.placed = true;
 
     if (packet.GBit(EntityInfo::UPDATE_BITS) == 1)

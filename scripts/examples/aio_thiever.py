@@ -1,13 +1,14 @@
 # Trains Thieving from level 1, by level: men and women in Lumbridge to 5, then East Ardougne's Baker's stall to
-# 40, banking each full backpack of cakes, then the market guards to 55 and its knights after that, eating the
-# banked cakes. Built from rs2b0t's ThievingBot, ArdyCakes and ArdyThiever (MIT, see thirdparty/rs2b0t).
+# 40, banking each full backpack of cakes, then the market guards to 55 and its knights after that, eating cakes
+# stolen from the stall, or taken from the bank with bank_food. Built from rs2b0t's ThievingBot, ArdyCakes and ArdyThiever (MIT, see thirdparty/rs2b0t).
 # Thieving needs a members' world.
 
 from rs2004.catalogs import ContinueDialog, MIN_EAT_HP, food_heal_amount, should_eat_to_use_food
 
 SETTINGS = {
-    'food_target': SettingDef('number', 20, 'Cakes to carry', 1, 27, help='for guards and knights: how many to take from the bank'),
-    'restock_at_food': SettingDef('number', 3, 'Restock cakes at', 0, 26, help='bank for more at this many, or steal them from the stall when the bank has none'),
+    'food_target': SettingDef('number', 20, 'Cakes to carry', 1, 27, help='for guards and knights: how many to steal from the stall, or take from the bank'),
+    'restock_at_food': SettingDef('number', 3, 'Restock cakes at', 0, 26, help='steal more from the stall at this many, or bank for them'),
+    'bank_food': SettingDef('boolean', False, 'Take cakes from the bank', help='instead of the stall, while the bank has them'),
     'rest_until_hp': SettingDef('number', 70, 'Rest to HP% without food', 10, 100),
     'stop_at_level': SettingDef('number', 99, 'Stop at Thieving level', 2, 99),
 }
@@ -23,15 +24,13 @@ STALL_TILE = Tile(2667, 3310, 0)
 STALL_STAND = Tile(2668, 3312, 0)
 STALL_STAND_ALT = Tile(2669, 3310, 0)
 NEAR_STALL = 2
-# A market guard this close, in Chebyshev tiles to its south-west corner, who can see you attacks the thief.
-STALL_GUARD = 'Guard'
-GUARD_SIGHT = 5
-GUARD_WAIT_MS = 6000
 FLEE_TILE = Tile(2655, 3298, 0)
 # Port Sarim to Karamja, and Brimhaven to Ardougne.
 SHIP_FARES = 60
-# East of here is Asgarnia and Misthalin, across White Wolf Mountain or the sea from Ardougne.
+# East of here is Asgarnia and Misthalin, across White Wolf Mountain or the sea from Ardougne. Its wolves kill a
+# thief, so from there the bot sails, pickpocketing in Lumbridge first when it is short of the fares.
 ARDOUGNE_EAST_X = 2880
+WOLF_PASS = 'white-wolf-mountain'
 
 # The server's lockout after combat: no stealing from a market stall for 10 ticks.
 LOCKOUT_TICKS = 10
@@ -107,6 +106,9 @@ class AioThiever(TaskBot):
         self.xp_start = skills.xp('thieving')
         self.level_start = skills.level('thieving')
         self.last_phase = None
+        self.last_wanted = None
+        self.fare_check = False
+        self.earning_fare = False
         log('thieving', self.level_start, '; starting with', self.phase().name, 'in', self.phase().where)
         self.add(
             ContinueDialog(),
@@ -126,11 +128,35 @@ class AioThiever(TaskBot):
     # Where and how to train.
 
     def phase(self):
-        phase = phase_for(skills.level('thieving'))
+        wanted = phase_for(skills.level('thieving'))
+        if wanted.name != self.last_wanted:
+            self.last_wanted = wanted.name
+            self.fare_check = wanted.name != 'men'
+        # Decided once on the way to Ardougne, and again after a death once respawned, not on each call: the
+        # first ship takes half the fares, and that half must not send the bot back to Lumbridge.
+        if self.fare_check and skills.effective('hitpoints') > 0 and game.tile() is not None:
+            self.fare_check = False
+            self.earning_fare = self.short_of_fares()
+            if self.earning_fare:
+                log('only', inventory.count(COINS), 'coins, short of the', SHIP_FARES, 'for the ships to Ardougne; pickpocketing in Lumbridge first')
+        phase = wanted
+        if self.earning_fare and wanted.name != 'men':
+            if inventory.count(COINS) < SHIP_FARES:
+                phase = PHASES[0]
+            else:
+                self.earning_fare = False
+                log(inventory.count(COINS), 'coins, enough for the ships to Ardougne')
         if self.last_phase is not None and phase.name != self.last_phase:
             log('thieving', skills.level('thieving'), ': moving on to', phase.name, 'in', phase.where)
         self.last_phase = phase.name
         return phase
+
+    def east_of_ardougne(self):
+        here = game.tile()
+        return here is not None and here.x > ARDOUGNE_EAST_X
+
+    def short_of_fares(self):
+        return self.east_of_ardougne() and inventory.count(COINS) < SHIP_FARES
 
     def in_ardougne_phase(self):
         return self.phase().name != 'men'
@@ -163,7 +189,9 @@ class AioThiever(TaskBot):
     def on_death(self):
         self.deaths += 1
         self.bank_out_of_food = False
-        log('died; walking back to', self.phase().where)
+        # The coins may be gone; phase() looks again once respawned.
+        self.fare_check = True
+        log('died')
 
     # Health.
 
@@ -245,12 +273,10 @@ class AioThiever(TaskBot):
         if phase.anchor.distance_to(here) <= LONG_WALK_TILES:
             yield from traversal.walk_to(phase.anchor, radius=3, timeout_ms=90000, log=say)
             return
-        # From Lumbridge the walker takes the ships by Karamja, which beats the pass over White Wolf Mountain and
-        # its wolves, when you have their fares.
-        if phase.name != 'men' and here.x > ARDOUGNE_EAST_X and inventory.count(COINS) < SHIP_FARES:
-            log('only', inventory.count(COINS), 'coins, short of the', SHIP_FARES, 'for the ships to Ardougne; walking over White Wolf Mountain')
+        # From the east the walker takes the ships by Karamja, never the pass: phase() has made sure of the fares.
+        avoid = [WOLF_PASS] if self.east_of_ardougne() else None
         log('walking to', phase.where, 'at', phase.anchor)
-        yield from traversal.walk_resilient(phase.anchor, radius=3, attempts=4, timeout_ms=600000, log=say)
+        yield from traversal.walk_resilient(phase.anchor, radius=3, attempts=4, timeout_ms=600000, avoid_zones=avoid, log=say)
 
     # Banking.
 
@@ -270,11 +296,11 @@ class AioThiever(TaskBot):
         yield from traversal.walk_resilient(STALL_STAND, radius=1, attempts=4, timeout_ms=120000, log=lambda m: log(' ', m))
 
     def needs_bank(self):
-        """Guards and knights: banks for cakes when low, and the loot when the backpack fills."""
+        """Guards and knights: banks the loot when the backpack fills, and for cakes when low with bank_food."""
         phase = self.phase()
         if phase.targets is None or not self.in_ardougne_phase() or self.in_real_combat():
             return False
-        low = self.food_count() <= self.settings.restock_at_food and not self.bank_out_of_food
+        low = self.settings.bank_food and self.food_count() <= self.settings.restock_at_food and not self.bank_out_of_food
         # The coins go on their stack, so a full backpack only gets in the way when it has no coins yet, or holds
         # something else, such as a random event's gift.
         junk = [i for i in inventory.items() if not is_food(i.name) and i.name != COINS]
@@ -287,9 +313,13 @@ class AioThiever(TaskBot):
             log('could not open the bank; trying again')
             yield from execution.delay_ticks(3)
             return
-        # Everything goes in and food_target cakes come out, leaving a slot for the coins.
+        # Everything goes in, and with bank_food, food_target cakes come out, leaving a slot for the coins.
         yield from bank.deposit_inventory()
         yield from bank.wait_ready()
+        self.trips += 1
+        if not self.settings.bank_food:
+            yield from bank.close()
+            return
         target = self.settings.food_target
         for name in WITHDRAW_ORDER:
             need = target - self.food_count()
@@ -297,7 +327,6 @@ class AioThiever(TaskBot):
                 break
             if bank.count(name) > 0:
                 yield from bank.withdraw_x(name, need)
-        self.trips += 1
         self.bank_out_of_food = self.food_count() <= self.settings.restock_at_food
         if self.bank_out_of_food:
             log('the bank is out of cakes; stealing more from the stall')
@@ -313,7 +342,8 @@ class AioThiever(TaskBot):
         phase = self.phase()
         if phase.targets is None or not self.in_ardougne_phase() or self.in_real_combat() or inventory.is_full():
             return False
-        return self.bank_out_of_food and self.food_count() <= self.settings.restock_at_food
+        from_stall = not self.settings.bank_food or self.bank_out_of_food
+        return from_stall and self.food_count() <= self.settings.restock_at_food
 
     def restock_from_stall(self):
         result = yield from self.steal_cakes(self.settings.food_target)
@@ -332,9 +362,6 @@ class AioThiever(TaskBot):
 
     def lockout_over(self):
         return game.tick() >= self.lockout_until
-
-    def guard_near(self, tile):
-        return npcs.query().name(STALL_GUARD).where(lambda n: n.tile().distance_to(tile) <= GUARD_SIGHT).exists()
 
     def steal_cakes(self, fill_to):
         """rs2b0t's stealCakes: steals from a stand beside the stall until the backpack is full, or holds fill_to
@@ -363,14 +390,6 @@ class AioThiever(TaskBot):
             stall = self.stocked_stall()
             if stall is None:
                 yield from execution.delay_until(lambda: self.stocked_stall() is not None, STALL_RESTOCK_WAIT_MS)
-                continue
-
-            if self.guard_near(stand):
-                other = STALL_STAND_ALT if stand == STALL_STAND else STALL_STAND
-                if not self.guard_near(other):
-                    stand = other
-                else:
-                    yield from execution.delay_until(lambda: not self.guard_near(game.tile()), GUARD_WAIT_MS)
                 continue
 
             self.lockout_seen = False

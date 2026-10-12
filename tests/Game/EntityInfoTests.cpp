@@ -75,6 +75,15 @@ TEST_CASE("PLAYER_INFO places the local player", "[PlayerInfoDecoder]")
     CHECK(state.localPlayer.lastMovement == Movement_e::Teleport);
     REQUIRE(state.localPlayer.appearance.has_value());
     CHECK(state.localPlayer.appearance->name == "Bot");
+    CHECK(state.placedTick == 1);
+    CHECK_FALSE(state.IsSettled());
+
+    SECTION("the next tick settles it, and keeps the tick it was placed on")
+    {
+        decoder.Decode(Fixtures::PlaceLocalPlayer(48, 52, 1), state);
+        CHECK(state.placedTick == 1);
+        CHECK(state.IsSettled());
+    }
 
     SECTION("placing before any rebuild is a protocol error")
     {

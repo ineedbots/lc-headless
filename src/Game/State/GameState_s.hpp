@@ -106,6 +106,9 @@ struct GameState_s
     bool members = false;
     u8 staffLevel = 0;
     bool placed = false;
+    // The tick of the PLAYER_INFO that first placed the local player. The server sends that tick's stats and
+    // inventories after it, possibly in later frames, so they're all in only once a later tick begins.
+    u64 placedTick = 0;
 
     BuildArea_s buildArea;
     Player_s localPlayer;
@@ -148,6 +151,8 @@ struct GameState_s
     std::optional<RebootTimer_s> rebootTimer;
     std::optional<LastLogin_s> lastLogin;
 
+    // Placed, with the whole of the tick it was placed on read: stats and inventories included.
+    [[nodiscard]] bool IsSettled() const;
     [[nodiscard]] const Npc_s* FindNpc(u16 index) const;
     [[nodiscard]] Npc_s* FindNpc(u16 index);
     [[nodiscard]] const Player_s* FindPlayer(u16 index) const;

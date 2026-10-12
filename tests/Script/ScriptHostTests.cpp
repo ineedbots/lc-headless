@@ -73,12 +73,12 @@ namespace
             host.emplace(ScriptTestRuntime::Get(), client, std::move(options), capture.GetLogger());
             client.Login();
             const auto deadline = Clock::now() + WAIT;
-            while (Clock::now() < deadline && client.GetState().messages.empty())
+            while (Clock::now() < deadline && !client.GetState().IsSettled())
             {
                 client.Pump(PUMP_STEP);
             }
 
-            REQUIRE_FALSE(client.GetState().messages.empty());
+            REQUIRE(client.GetState().IsSettled());
         }
 
         [[nodiscard]] std::vector<std::string> GetScriptLines() const
@@ -213,7 +213,7 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
         "item 995 10",
         "inventory 0 1511 3 -1",
         "message Welcome to RuneScape.",
-        "tick 1",
+        "tick 2",
         "loop",
     });
 
@@ -471,7 +471,7 @@ def loop():
     }
 
     REQUIRE(fixture.client.GetLoginCount() == 2);
-    while (Clock::now() < deadline && !fixture.client.GetState().placed)
+    while (Clock::now() < deadline && !fixture.client.GetState().IsSettled())
     {
         fixture.client.Pump(PUMP_STEP);
         fixture.host->Step(Clock::now());
@@ -758,7 +758,7 @@ TEST_CASE("ScriptHost resumes a wait for an update on the pump after the state c
     auto fixture = HostFixture{R"python(
 def loop():
     log('>', 'waiting')
-    found = yield from execution.delay_until(lambda: game.tick() > 1, 60000)
+    found = yield from execution.delay_until(lambda: game.tick() > 2, 60000)
     log('>', 'found', found, game.tick())
     return 100000
 )python"};
@@ -775,13 +775,13 @@ def loop():
 
         fixture.SendTick();
         fixture.host->Step(start + 2ms);
-        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting", "found True 2"});
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting", "found True 3"});
     }
 
     SECTION("the timeout resumes it without a packet")
     {
         fixture.host->Step(start + 60000ms);
-        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting", "found False 1"});
+        CHECK(fixture.GetScriptLines() == std::vector<std::string>{"waiting", "found False 2"});
     }
 }
 
@@ -790,7 +790,7 @@ TEST_CASE("ScriptHost waits a server tick when loop returns 600 or None", "[Scri
     auto fixture = HostFixture{GENERATE(as<std::string>{}, "def loop():\n    log('>', 'loop', game.tick())\n", "def loop():\n    log('>', 'loop', game.tick())\n    return 600\n")};
     const auto start = Clock::now();
     fixture.host->Step(start);
-    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 1"});
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 2"});
     CHECK_FALSE(fixture.host->GetNextLoop().has_value());
 
     fixture.host->Step(start + 5000ms);
@@ -798,7 +798,7 @@ TEST_CASE("ScriptHost waits a server tick when loop returns 600 or None", "[Scri
 
     fixture.SendTick();
     fixture.host->Step(start + 5001ms);
-    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 1", "loop 2"});
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop 2", "loop 3"});
 }
 
 TEST_CASE("ScriptHost runs the bot that BOT defines", "[ScriptHost]")
@@ -858,7 +858,7 @@ def loop():
     fixture.host->Step(Clock::now());
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "chat game None Welcome to RuneScape.",
-        "tick 1",
+        "tick 2",
         "stop the script failed",
         "finish the script failed",
     });

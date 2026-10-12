@@ -22,6 +22,7 @@ void TestWorld::Send(FakeGameServer& server, bool reconnect)
     server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL, 0, Fixtures::Appearance(FakeGameServer::USERNAME)));
     if (reconnect)
     {
+        server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer());
         return;
     }
 
@@ -36,4 +37,7 @@ void TestWorld::Send(FakeGameServer& server, bool reconnect)
     inventory.P1(LOG_COUNT);
     server.Send(ServerProt_e::UpdateInvFull, Fixtures::ToBytes(inventory));
     server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame(WELCOME));
+
+    // The next tick, which tells the client the login tick has been read whole.
+    server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer());
 }

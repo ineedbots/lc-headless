@@ -127,7 +127,7 @@ void ScriptHost::Step(Clock::time_point now)
 
     const auto& state = m_client.GetState();
     SyncLogin(state);
-    if (!state.placed)
+    if (!state.IsSettled())
     {
         return;
     }

@@ -168,7 +168,7 @@ def on_server_message(msg):
 |---|---|
 | module body | Once, at load, before login. Use it only for definitions and constants: the API can't be called yet |
 | `on_start()` | Once, after the first placement (the first `PLAYER_INFO` after login) |
-| `loop()` | Whenever its delay has passed, while in game and placed. It must return an `int` of milliseconds (≥ 0), or be a generator that yields them and may return the last one; one that returns nothing means `loop()` is called again on the next pass |
+| `loop()` | Whenever its delay has passed, while in game and placed, from the tick after placement. It must return an `int` of milliseconds (≥ 0), or be a generator that yields them and may return the last one; one that returns nothing means `loop()` is called again on the next pass |
 | `on_*` event hooks | After each pump, in event order, before `loop()` |
 | `on_disconnect()` / `on_reconnect()` | The connection dropped / a reconnect succeeded. `loop()` and the event hooks pause in between |
 | `on_kill_signal()` | Once, on the first Ctrl+C |
@@ -179,7 +179,7 @@ Each account does this on every pass of the main loop:
 
 1. `GameClient::Pump(0ms)`.
 2. Dispatch new events in sequence order. `on_server_tick` is called at most once per pass, with the current tick.
-3. If the account is in game and placed, and `loop()`'s delay has passed, call `loop()` and schedule the next call.
+3. If the account is in game and placed, and the tick it was placed on has been read whole (`GameState_s::IsSettled`: a later PLAYER_INFO has arrived, because the server sends that tick's stats and inventories after placing the player), and `loop()`'s delay has passed, call `loop()` and schedule the next call.
 4. `GameClient::Flush()`, so the packets `loop()` queued leave now rather than on the next pump.
 
 Hooks see the state as it stands after the whole pump, not as it was when the event happened. A removed entity is passed as its last snapshot.
@@ -382,7 +382,7 @@ until every account has finished:
 - A dropped connection starts a reconnect from `Pump`. A login that fails with a retryable status (such as 5, "already logged in", after a crash) or a connection error is retried the same way. There are up to `connectAttempts` (10) attempts. The waits between them double from `retryDelay` (2 s) up to `maxRetryDelay` (30 s), roughly four minutes in all, enough for a server restart. Wrong credentials and other final statuses fail at once. A reconnect that gives up throws `ConnectionLostError`, and a login that gives up rethrows its last error.
 - `RequestLogout()` clicks the logout button and returns. `Pump` clicks it again every 2 s, because the server refuses during combat and for 10 s after it, and disconnects at the deadline (30 s for accounts) if the server never agrees. A logout requested while connecting abandons the login.
 - IXWebSocket waits up to about 300 ms for a peer's reply when an open connection closes. So `Disconnect` sets the closing socket aside and starts any next attempt on a fresh one, and later pumps free closed sockets once they report `Closed`. Without this, a login timing out against a stalled server stalled every account for 300 ms.
-- `GetLoginCount()` rises on each successful login or reconnect, so the host can tell a reconnect happened. `on_reconnect` waits until the player is placed again, because a reconnect after a restart becomes a fresh login that resets the state.
+- `GetLoginCount()` rises on each successful login or reconnect, so the host can tell a reconnect happened. `on_reconnect` waits until the player is placed again and settled, because a reconnect after a restart becomes a fresh login that resets the state.
 - The blocking `Login()` and `Logout(timeout)` remain as wrappers that pump until done, for the tests and single-account tools.
 
 `Account::Step` never throws: a failed login, a connection that can't be restored or a desync logs an error and finishes that account as failed, and the others carry on. `AccountRunner::Run` returns true only when every account that started logged out cleanly, which `Application` turns into the exit code.

@@ -71,6 +71,11 @@ const Player_s* GameState_s::FindPlayerByName(std::string_view name) const
     return &*found;
 }
 
+bool GameState_s::IsSettled() const
+{
+    return placed && tick > placedTick;
+}
+
 const Inventory_s* GameState_s::FindInventory(u16 com) const
 {
     const auto found = inventories.find(com);

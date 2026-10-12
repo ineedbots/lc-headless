@@ -3,8 +3,9 @@
 #include "FakeGameServer.hpp"
 
 // What FakeGameServer sends on login in the client tests: a rebuild, the PID, the local player placed
-// at home, one NPC two tiles east, coins one tile north-east, logs in the inventory and a welcome message.
-// A reconnect only gets the rebuild and the placement, as the session carries on.
+// at home, one NPC two tiles east, coins one tile north-east, logs in the inventory and a welcome message,
+// then a second PLAYER_INFO for the next tick.
+// A reconnect only gets the rebuild, the placement and the next tick, as the session carries on.
 class TestWorld
 {
 public:
