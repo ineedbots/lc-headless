@@ -8,6 +8,7 @@
 #include "../Game/State/GameEvent_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "BotMessenger.hpp"
+#include "ConsoleCommand_s.hpp"
 #include "ProgressReport_s.hpp"
 #include "ScriptApi.hpp"
 #include "ScriptRuntime.hpp"
@@ -66,6 +67,7 @@ public:
     using Clock = std::chrono::steady_clock;
 
     static constexpr std::size_t MAX_BOT_MESSAGES = 100;
+    static constexpr std::size_t MAX_COMMANDS = 100;
     static constexpr auto WATCH_INTERVAL = 500ms;
 
 
@@ -84,6 +86,11 @@ public:
     // Queues a message from another script for the next Step. False when the script isn't running, has no
     // on_bot_message, or already has MAX_BOT_MESSAGES waiting.
     [[nodiscard]] bool ReceiveBotMessage(BotMessage_s message);
+    // The console commands the script has added, by name; none once it has stopped.
+    [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
+    // Queues a console command for the next Step that finds the player placed. False when the script isn't
+    // running, hasn't added the command, or already has MAX_COMMANDS waiting.
+    [[nodiscard]] bool ReceiveCommand(ConsoleCommand_s command);
     [[nodiscard]] ScriptStatus_e GetStatus() const;
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
     // The script's relog(delay) since the last call, for the account to carry out.
@@ -111,6 +118,7 @@ private:
     void DispatchBackpack(const GameState_s& state);
     void DispatchMessages(const GameState_s& state);
     void DispatchBotMessages();
+    void DispatchCommands();
     void RunProgressReport(Clock::time_point now);
     [[nodiscard]] bool IsLoopDue(Clock::time_point now, const GameState_s& state) const;
     void RunLoop(Clock::time_point now);
@@ -120,7 +128,8 @@ private:
     void CallHook(std::string_view name, std::span<const py_Ref> args = {});
     // Calls the runtime's dispatch for the event, which returns what its hook returned.
     std::optional<py_GlobalRef> Dispatch(std::string_view name, std::span<const py_Ref> args = {});
-    void Fail(std::string_view function, std::string_view message);
+    // where names the code that failed, such as "loop()".
+    void Fail(std::string_view where, std::string_view message);
     void Stop(ScriptStatus_e status, std::string_view reason);
     void ApplyStopRequest();
 
@@ -134,6 +143,7 @@ private:
     std::optional<ScriptVm> m_vm;
     std::optional<FileWatcher> m_watcher;
     std::deque<BotMessage_s> m_botMessages;
+    std::deque<ConsoleCommand_s> m_commands;
     // The backpack as the bot last saw it, which inventory_changed reports changes to, slot by slot.
     std::vector<Item_s> m_backpack;
     ScriptStatus_e m_status = ScriptStatus_e::Running;

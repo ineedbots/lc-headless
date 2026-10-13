@@ -18,15 +18,18 @@ from rs2004.reach import *
 from rs2004.traversal import *
 from rs2004.random_events import *
 from rs2004.upkeep import *
+from rs2004.console import *
 from rs2004 import execution
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
+from rs2004.console import commands as _commands
 
 _rt_make_settings = _runtime.make_settings
 _rt_load = _runtime.load
 _rt_setting_defaults = _runtime.setting_defaults
 _rt_start = _runtime.start
 _rt_dispatch = _runtime.dispatch
+_rt_command = _runtime.command
 _rt_step = _runtime.step
 _rt_configure = _runtime.configure
 _rt_upkeep = _runtime.upkeep

@@ -31,7 +31,9 @@ namespace
     constexpr auto CONFIGURE = "_rt_configure"sv;
     constexpr auto UPKEEP = "_rt_upkeep"sv;
     constexpr auto FINISH = "_rt_finish"sv;
+    constexpr auto RUN_COMMAND = "_rt_command"sv;
     constexpr auto LISTENING = "_listening";
+    constexpr auto COMMANDS = "_commands";
     constexpr auto SETTINGS = "settings";
     constexpr auto REPORT_ROWS = "_report_rows"sv;
 
@@ -146,6 +148,7 @@ void ScriptHost::Step(Clock::time_point now)
     DispatchEvents(state);
     DispatchMessages(state);
     DispatchBotMessages();
+    DispatchCommands();
     if (state.tick != m_lastTick)
     {
         m_lastTick = state.tick;
@@ -215,6 +218,55 @@ bool ScriptHost::ReceiveBotMessage(BotMessage_s message)
     }
 
     m_botMessages.push_back(std::move(message));
+    return true;
+}
+
+std::vector<ScriptCommand_s> ScriptHost::GetCommands() const
+{
+    auto commands = std::vector<ScriptCommand_s>{};
+    if (!m_vm || m_status != ScriptStatus_e::Running)
+    {
+        return commands;
+    }
+
+    // Like HasHook, this may be asked from inside another VM, which is current again afterward.
+    const auto previous = py_currentvm();
+    const auto found = py_getdict(m_vm->GetBuiltins(), py_name(COMMANDS));
+    if (found != nullptr && py_isdict(found))
+    {
+        // The console module keeps every name and help a str.
+        const auto added = py_dict_apply(found, [](py_Ref name, py_Ref help, void* context)
+        {
+            if (!py_isstr(name) || !py_isstr(help))
+            {
+                return true;
+            }
+
+            static_cast<std::vector<ScriptCommand_s>*>(context)->push_back(ScriptCommand_s{.name = py_tostr(name), .help = py_tostr(help)});
+            return true;
+        }, &commands);
+
+        if (!added)
+        {
+            py_clearexc(nullptr);
+        }
+    }
+
+    py_switchvm(previous);
+    std::ranges::sort(commands, {}, &ScriptCommand_s::name);
+    return commands;
+}
+
+bool ScriptHost::ReceiveCommand(ConsoleCommand_s command)
+{
+    const auto commands = GetCommands();
+    const auto added = std::ranges::find(commands, command.name, &ScriptCommand_s::name) != commands.end();
+    if (!added || m_commands.size() >= MAX_COMMANDS)
+    {
+        return false;
+    }
+
+    m_commands.push_back(std::move(command));
     return true;
 }
 
@@ -427,7 +479,7 @@ void ScriptHost::Start(Clock::time_point now)
     }
     catch (const ScriptError& e)
     {
-        Fail("on_start", e.what());
+        Fail("on_start()", e.what());
     }
 }
 
@@ -714,6 +766,39 @@ void ScriptHost::DispatchBotMessages()
     }
 }
 
+// A command the script removed after it was queued is skipped.
+void ScriptHost::DispatchCommands()
+{
+    const auto commands = std::exchange(m_commands, {});
+    for (const auto& command : commands)
+    {
+        if (m_status != ScriptStatus_e::Running)
+        {
+            return;
+        }
+
+        m_vm->Activate();
+        PyConvert::FromString(py_r0(), command.name);
+        PyConvert::FromString(py_r1(), command.text);
+        py_newlist(py_r2());
+        for (const auto& arg : command.args)
+        {
+            PyConvert::FromString(py_r3(), arg);
+            py_list_append(py_r2(), py_r3());
+        }
+
+        try
+        {
+            static_cast<void>(m_vm->CallBuiltin(RUN_COMMAND, std::array{py_r0(), py_r1(), py_r2()}));
+            ApplyStopRequest();
+        }
+        catch (const ScriptError& e)
+        {
+            Fail(std::format("the {} command", command.name), e.what());
+        }
+    }
+}
+
 void ScriptHost::RunProgressReport(Clock::time_point now)
 {
     if (m_status != ScriptStatus_e::Running || !HasHook(PROGRESS_REPORT))
@@ -742,7 +827,7 @@ void ScriptHost::RunProgressReport(Clock::time_point now)
     }
     catch (const ScriptError& e)
     {
-        Fail("on_progress_report", e.what());
+        Fail("on_progress_report()", e.what());
         return;
     }
 
@@ -785,7 +870,7 @@ void ScriptHost::RunUpkeep(Clock::time_point now)
     }
     catch (const ScriptError& e)
     {
-        Fail("upkeep (the random event guardian, stall guard or run manager)", e.what());
+        Fail("the upkeep (the random event guardian, stall guard or run manager)", e.what());
     }
 }
 
@@ -802,7 +887,7 @@ void ScriptHost::RunLoop(Clock::time_point now)
     }
     catch (const ScriptError& e)
     {
-        Fail("loop", e.what());
+        Fail("loop()", e.what());
         return;
     }
 
@@ -890,20 +975,20 @@ std::optional<py_GlobalRef> ScriptHost::Dispatch(std::string_view name, std::spa
     }
     catch (const ScriptError& e)
     {
-        Fail(std::format("on_{}", name), e.what());
+        Fail(std::format("on_{}()", name), e.what());
         return std::nullopt;
     }
 }
 
-void ScriptHost::Fail(std::string_view function, std::string_view message)
+void ScriptHost::Fail(std::string_view where, std::string_view message)
 {
     if (m_watcher)
     {
-        m_logger->Error("Script error in {}(), so the script has stopped until its files change:\n{}", function, message);
+        m_logger->Error("Script error in {}, so the script has stopped until its files change:\n{}", where, message);
     }
     else
     {
-        m_logger->Error("Script error in {}(), so the script has stopped:\n{}", function, message);
+        m_logger->Error("Script error in {}, so the script has stopped:\n{}", where, message);
     }
 
     Stop(ScriptStatus_e::Failed, "the script failed");

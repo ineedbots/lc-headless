@@ -295,6 +295,81 @@ std::string_view Account::DescribeOutcome() const
     return m_client.GetStatus() == ClientStatus_e::LoggedOut ? "logged out" : "disconnected without a confirmed logout";
 }
 
+std::string Account::DescribeStatus() const
+{
+    if (!m_started)
+    {
+        return "waiting to log in";
+    }
+
+    if (m_finished)
+    {
+        return std::string{DescribeOutcome()};
+    }
+
+    auto text = std::string{};
+    if (m_relogDelay || m_reloginAt)
+    {
+        text = "relogging";
+    }
+    else
+    {
+        switch (m_client.GetStatus())
+        {
+        case ClientStatus_e::Connecting:
+            text = m_client.GetLoginCount() == 0 ? "logging in" : "reconnecting";
+            break;
+        case ClientStatus_e::InGame:
+        {
+            const auto& tile = m_client.GetState().localPlayer.tile;
+            text = std::format("in game at ({}, {}, {})", tile.x, tile.z, tile.level);
+            break;
+        }
+        case ClientStatus_e::LoggingOut:
+            text = "logging out";
+            break;
+        case ClientStatus_e::LoggedOut:
+        case ClientStatus_e::Disconnected:
+            text = "logged out";
+            break;
+        }
+    }
+
+    if (!m_script)
+    {
+        return text + ", no script";
+    }
+
+    switch (m_script->GetStatus())
+    {
+    case ScriptStatus_e::Running:
+        return text + ", script running";
+    case ScriptStatus_e::Stopped:
+        return text + ", script stopped";
+    case ScriptStatus_e::AccountStopped:
+        return text + ", script stopped the account";
+    case ScriptStatus_e::Failed:
+        return text + ", script failed";
+    }
+
+    return text;
+}
+
+std::vector<ScriptCommand_s> Account::GetCommands() const
+{
+    if (!m_script || m_finished)
+    {
+        return {};
+    }
+
+    return m_script->GetCommands();
+}
+
+bool Account::SendCommand(ConsoleCommand_s command)
+{
+    return m_script && !m_finished && m_script->ReceiveCommand(std::move(command));
+}
+
 std::optional<Account::Clock::time_point> Account::GetNextLoop() const
 {
     if (!m_script || m_finished)
@@ -308,6 +383,11 @@ std::optional<Account::Clock::time_point> Account::GetNextLoop() const
 const std::string& Account::GetName() const
 {
     return m_account.name;
+}
+
+const std::string& Account::GetUsername() const
+{
+    return m_account.credentials.username;
 }
 
 const GameClient& Account::GetClient() const

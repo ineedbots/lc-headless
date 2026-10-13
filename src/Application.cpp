@@ -7,6 +7,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Core/ConfigError.hpp"
 #include "Core/ConfigFile.hpp"
+#include "Core/ConsoleInput.hpp"
 #include "Core/Logger.hpp"
 #include "Script/ScriptRuntime.hpp"
 
@@ -52,6 +53,44 @@ namespace
 
         return lower;
     }
+
+    // While the console is interactive, log lines go above its prompt. On the way out, even by an
+    // exception, the prompt is erased, the terminal put back and the logger's own sink restored.
+    class ConsoleLogScope
+    {
+    public:
+        ConsoleLogScope(std::shared_ptr<Logger> logger, std::shared_ptr<ConsoleInput> console)
+            : m_logger{std::move(logger)}
+            , m_console{std::move(console)}
+        {
+            if (!m_console->IsInteractive())
+            {
+                return;
+            }
+
+            m_previousSink = m_logger->SetSink([console = m_console](const LogEntry_s& entry)
+            {
+                console->Print(entry.level >= LogLevel_e::Warning ? stderr : stdout, Logger::FormatLine(entry));
+            });
+        }
+
+        ~ConsoleLogScope()
+        {
+            m_console->Close();
+            if (m_previousSink)
+            {
+                m_logger->SetSink(std::move(m_previousSink));
+            }
+        }
+
+        ConsoleLogScope(const ConsoleLogScope&) = delete;
+        ConsoleLogScope& operator=(const ConsoleLogScope&) = delete;
+
+    private:
+        std::shared_ptr<Logger> m_logger;
+        std::shared_ptr<ConsoleInput> m_console;
+        Logger::Sink m_previousSink;
+    };
 
     // The server lets a username log in once, so a second file for the same one would only be kicked.
     void CheckUsernamesAreUnique(const std::vector<AccountConfig_s>& accounts)
@@ -143,10 +182,13 @@ int Application::Run()
 
     // Installed only once the scripts have loaded, so Ctrl+C still ends the process while it waits for the debugger.
     std::signal(SIGINT, SignalHandler);
+    const auto console = ConsoleInput::ReadStdin();
+    const auto consoleLog = ConsoleLogScope{m_logger, console};
+    m_logger->Info("Type {} for the console commands", AccountRunner::COMMAND_HELP);
     const auto succeeded = runner.Run([]
     {
         return interruptCount.load();
-    });
+    }, console.get());
 
     return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 }

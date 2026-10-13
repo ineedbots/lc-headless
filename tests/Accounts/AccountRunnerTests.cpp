@@ -8,6 +8,7 @@
 #include "Accounts/AccountRunner.hpp"
 #include "Cache/GameCache_s.hpp"
 #include "Core/ConfigFile.hpp"
+#include "Core/ConsoleInput.hpp"
 #include "Core/Logger.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
@@ -315,4 +316,92 @@ def loop():
     CHECK(succeeded);
     CHECK(CountLines(fixture.capture, "bot1", "sent True False") == 1);
     CHECK(CountLines(fixture.capture, "bot1", "reply bot2 2") == 1);
+}
+
+TEST_CASE("AccountRunner sends console commands to the scripts that added them", "[AccountRunner]")
+{
+    auto fixture = RunnerFixture{};
+    fixture.folder.WriteFile("commands.py", R"python(
+def say(command):
+    log('said', command.text)
+
+console.command('say', say, 'Logs the text')
+
+def loop():
+    return 100
+)python");
+
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "commands.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
+    auto console = ConsoleInput{};
+    // Handled before the logins; the commands wait until the player is placed.
+    for (const auto* line : {"say to everyone", "@BOT1   Say  just  me ", "@bot2 say hi", "@nobody status", "@bot1", "dance", "help", "@bot2 help", "loglevel", "loglevel loud", "   "})
+    {
+        console.Push(line);
+    }
+
+    auto quitSent = false;
+    const auto succeeded = runner->Run([&]
+    {
+        if (!quitSent && CountLines(fixture.capture, "bot1", "said just  me") == 1)
+        {
+            console.Push("status");
+            console.Push("quit");
+            quitSent = true;
+        }
+
+        return fixture.TimedOut() ? 1u : 0u;
+    }, &console);
+
+    CHECK(succeeded);
+    CHECK(CountLines(fixture.capture, "bot1", "said to everyone") == 1);
+    CHECK(CountLines(fixture.capture, "bot1", "said just  me") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot2 has no console command say; type @bot2 help for its commands") == 1);
+    CHECK(CountLines(fixture.capture, "", "No account is named nobody; the accounts are bot1, bot2") == 1);
+    CHECK(CountLines(fixture.capture, "", "@bot1 needs a command after it, such as @bot1 help") == 1);
+    CHECK(CountLines(fixture.capture, "", "Unknown command dance; type help for the commands") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot1: say - Logs the text") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot2: no console commands") == 1);
+    CHECK(CountLines(fixture.capture, "", "The log level is info") == 1);
+    CHECK(CountLines(fixture.capture, "", "loglevel takes one of verbose, info, warning or error") == 1);
+
+    const auto entries = fixture.capture.GetEntries();
+    const auto status = [&entries](std::string_view prefix, std::string_view suffix)
+    {
+        return std::ranges::count_if(entries, [prefix, suffix](const CapturedLog_s& entry)
+        {
+            return entry.source.empty() && entry.message.starts_with(prefix) && entry.message.ends_with(suffix);
+        });
+    };
+
+    CHECK(status("bot1: in game at (", "), script running") == 1);
+    CHECK(status("bot2: in game at (", "), script running") == 1);
+    CHECK(runner->GetAccount(0).DescribeOutcome() == "logged out");
+    CHECK(runner->GetAccount(1).DescribeOutcome() == "logged out");
+}
+
+TEST_CASE("AccountRunner quits one account from the console", "[AccountRunner]")
+{
+    auto fixture = RunnerFixture{};
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
+    auto console = ConsoleInput{};
+    console.Push("@bot2 quit");
+
+    auto quitSent = false;
+    const auto succeeded = runner->Run([&]
+    {
+        if (!quitSent && CountLines(fixture.capture, "bot1", "loop") >= 2)
+        {
+            console.Push("@bot1 exit");
+            quitSent = true;
+        }
+
+        return fixture.TimedOut() ? 1u : 0u;
+    }, &console);
+    fixture.ReportProblems();
+
+    CHECK(succeeded);
+    CHECK(CountLines(fixture.capture, "", "bot2 won't log in") == 1);
+    CHECK(runner->GetAccount(0).DescribeOutcome() == "logged out");
+    CHECK_FALSE(runner->GetAccount(1).IsStarted());
+    CHECK(fixture.second.GetPackets(ClientProt_e::IfButton).empty());
 }

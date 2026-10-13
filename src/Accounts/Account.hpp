@@ -5,6 +5,7 @@
 #include "../Core/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Script/BotMessenger.hpp"
+#include "../Script/ConsoleCommand_s.hpp"
 #include "../Script/ProgressReport_s.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
@@ -59,8 +60,15 @@ public:
     // Finished with a logout the server confirmed, and no failure.
     [[nodiscard]] bool Succeeded() const;
     [[nodiscard]] std::string_view DescribeOutcome() const;
+    // Where the account is, and its script's state, for the console's status command.
+    [[nodiscard]] std::string DescribeStatus() const;
+    // The console commands its script has added; none without a running script.
+    [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
+    // Queues a console command for the script, as ScriptHost::ReceiveCommand does. False without a script.
+    [[nodiscard]] bool SendCommand(ConsoleCommand_s command);
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
     [[nodiscard]] const std::string& GetName() const;
+    [[nodiscard]] const std::string& GetUsername() const;
     [[nodiscard]] const GameClient& GetClient() const;
 
 private:

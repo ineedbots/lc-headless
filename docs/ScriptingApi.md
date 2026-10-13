@@ -12,6 +12,8 @@ An account file can have its own `server` section, with the same keys as `client
 
 Ctrl+C asks each script to finish (see `on_kill_signal`). A second Ctrl+C logs every account out at once, and one more closes any connection whose logout the server is still refusing. The exit code is 0 when every account logged out cleanly and no script failed.
 
+While it runs, the client takes commands typed into its console: `help` lists them, `status` shows where each account is, and `quit` does what Ctrl+C does. Scripts can add commands of their own (see [Console commands](#console-commands)).
+
 A dropped connection is restored automatically, with up to 10 attempts over about four minutes, so a server restart doesn't end a run. Each account reconnects on its own and the others keep playing. A first login is retried the same way when the server can't take it yet, for example "already logged in" after a crash.
 
 A script is a bot, as in rs2b0t's API: either a class set with `BOT = define_bot(...)`, or a module-level `loop()` with `on_*` hooks, which runs as a `LoopingBot`. It finds things with queries, acts on what it finds, and returns how long to wait before `loop()` runs again:
@@ -55,7 +57,7 @@ BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': Setting
 `scripts/examples/` has complete scripts:
 - `chicken_killer.py` is a `TaskBot` that fights, loots and logs out.
 - `power_miner.py` is a `LoopingBot` that mines and drops the ore.
-- `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one.
+- `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Its console commands pause it and change the number of laps.
 
 All three make progress reports.
 
@@ -582,7 +584,7 @@ The rest pass their values:
 | `interface_changed` | | An interface opened or closed |
 | `system_update` | `seconds` | The server announced a restart |
 | `disconnect`, `reconnect` | | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login, except that `game.tick()` and message marks carry on |
-| `kill_signal` | | Ctrl+C was pressed. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
+| `kill_signal` | | Ctrl+C was pressed, or `quit` was typed in the console. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
 | `bot_message` | `sender`, `message` | Another script in this process sent this one a message (see [Messages between scripts](#messages-between-scripts)) |
 | `death` | | Your hitpoints fell to 0. The server empties them before it says "Oh dear you are dead!" |
 | `npc_say` | `npc`, `text` | An NPC said something over its head. `npc` is `None` if it has already left view |
@@ -638,6 +640,41 @@ def on_bot_message(sender, message):
 - The message is copied as JSON, so it can be a dict with string keys, a list, a string, a number, a bool or `None`, nested as deep as you like, up to 64 KiB. Tuples arrive as lists. Anything else raises `TypeError`.
 - It returns `True` once the message is queued. `False` means the receiver can't take it now: its script has stopped or doesn't define `on_bot_message`, or 100 of its messages are already waiting. A username that no account in the process has raises `ValueError`.
 - Messages arrive in the order sent, on the receiver's next pass, and wait while it logs in or reconnects. A script can message itself; a message sent while handling one arrives on the next pass.
+
+## Console commands
+
+The client reads each line typed into its console while it runs. In a terminal, it keeps a `> ` prompt on the bottom line and prints log lines above it, so they never run into what you're typing. The left and right arrows, Home, End, Backspace and Delete edit the line, Ctrl+U and Ctrl+K clear it before and after the cursor, and Up and Down go back through the last 100 lines entered. The terminal needs to understand VT100 codes, as the Windows 10 and later console, Windows Terminal and Linux terminals do. When the input is piped in instead, lines are read as they come, with no prompt.
+
+These commands are built in:
+
+| Command | What it does |
+|---|---|
+| `help` | Lists the commands, including those of every running script |
+| `status` | Shows one line per account: logging in, in game and where, reconnecting, or finished, and its script's state |
+| `quit`, `exit` | Does what Ctrl+C does: each script gets `on_kill_signal`, and typing it again logs the accounts out at once |
+| `loglevel [verbose\|info\|warning\|error]` | Shows or changes the log level of every account |
+
+To send a line to just one account, start it with `@<account>`, using the account file's name or its username, in any case: `@mule status`, `@mule help`, or `@mule quit` to stop only that account. An account that is quit before its turn to log in never logs in. `loglevel` always applies to every account.
+
+A script adds its own commands with `console.command(name, handler, help=None)`. When the command is typed, the client calls `handler(command)` with a `Command` holding the name, `text` (the rest of the line, trimmed) and `args` (that text split at whitespace):
+
+```python
+banking = False
+
+def bank_soon(command):
+    global banking
+    banking = True
+    log('Banking after this load')
+
+console.command('bank', bank_soon, 'Bank once the backpack is full')
+```
+
+- A line without `@` goes to every running script that added the command, and a line with `@<account>` goes only to that account's script. A name that no running script has added gets a warning.
+- A command name is one word, matched in any case. `help`, `status`, `quit`, `exit` and `loglevel` belong to the client and can't be added. Adding the same name twice raises `ValueError`.
+- The handler runs on the script's next pass, once the player is placed, so a line typed while the account logs in or reconnects waits until it's back. Like a hook, the handler can't wait: set a flag and do the work in `loop()`. An exception in the handler stops the script, just as one in a hook does, so check `args` before using them.
+- `console.command` returns a function that removes the command, and `console.remove(name)` removes it too. In a bot, `self.command(name, handler, help)` adds a command that is removed when the bot stops. A command added at module level lasts as long as the script.
+
+`scripts/examples/walker.py` adds `pause` and `laps` commands.
 
 ## Working on a script
 

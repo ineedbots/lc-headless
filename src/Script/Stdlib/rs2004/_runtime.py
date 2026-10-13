@@ -7,6 +7,7 @@ Each step returns how the host should wait before the next one:
 """
 
 import _core
+from rs2004 import console as _console
 from rs2004 import events as _events
 from rs2004 import upkeep as _upkeep
 from rs2004.bot import AbstractBot, BotManifest, LoopingBot, is_generator, resolve_loop_cadence
@@ -168,6 +169,16 @@ def dispatch(name, *args):
     for callback in _events.events.subscribers(name):
         callback(*call_args)
     return result
+
+
+def command(name, text, args):
+    """Calls a console command's handler with a Command. One removed since the line was queued is skipped."""
+    handler = _console.handler(name)
+    if handler is None:
+        return
+    result = handler(_console.Command(name, text, args))
+    if is_generator(result):
+        raise TypeError(f"the {name} command's handler can't wait; set a flag and do the work in loop()")
 
 
 def configure(random_events_on, stall_minutes, run_auto, run_energy_min):

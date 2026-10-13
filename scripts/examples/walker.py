@@ -9,12 +9,42 @@
 #   teleport  a ::tele argument for staff accounts, used on start, e.g. "0,50,51,29,34"
 #   partner   the username of another account in this process, told about each lap
 #
+# Console commands: "pause" stops walking or starts again, and "laps [n]" tells the laps done, or sets
+# how many to walk before logging out. With several accounts, "@<account> pause" pauses just one.
+#
 # The server walks each step in a straight line and stops at the first obstacle, so keep the points
 # in sight of each other.
 
 points = []
 index = 0
 laps = 0
+paused = False
+lap_limit = settings.get('laps', 0)
+
+
+def toggle_pause(command):
+    global paused
+    paused = not paused
+    log('Paused' if paused else 'Walking again')
+
+
+def set_laps(command):
+    global lap_limit
+    if command.args:
+        # An exception in a handler stops the script, so a typo is only logged.
+        try:
+            lap_limit = int(command.args[0])
+        except ValueError:
+            log('laps takes a number, not', command.args[0])
+            return
+    if lap_limit > 0:
+        log(laps, 'laps done; logging out after', lap_limit)
+    else:
+        log(laps, 'laps done, with no limit')
+
+
+console.command('pause', toggle_pause, 'Stops walking, or starts again')
+console.command('laps', set_laps, 'Tells the laps done; "laps 3" logs out after 3, "laps 0" never')
 
 
 def on_start():
@@ -51,9 +81,12 @@ def loop():
             log('Lap', laps, 'done')
             if settings.get('partner'):
                 send_bot_message(settings.partner, {'lap': laps})
-            if laps == settings.get('laps', 0):
+            if lap_limit > 0 and laps >= lap_limit:
                 stop_account()
         return 0
+
+    if paused:
+        return 600
 
     if not game.moving():
         direct_navigator.walk((x, z), run=settings.get('run', False))

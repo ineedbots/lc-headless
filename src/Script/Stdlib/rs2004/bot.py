@@ -5,6 +5,7 @@ on_* hooks, which then run as a LoopingBot. Where rs2b0t awaits, loop(), execute
 generators, used with yield from.
 """
 
+from rs2004.console import console
 from rs2004.events import events
 
 __all__ = [
@@ -34,7 +35,8 @@ def is_generator(value):
 
 class AbstractBot:
     """The base of every bot. Override the hooks you need: on_start(), on_stop(reason), on_<event>(...),
-    recovery_anchor(), grind_targets(), ignored_randoms() and lamp_skill()."""
+    recovery_anchor(), grind_targets(), ignored_randoms() and lamp_skill(). Subscriptions and console
+    commands made through the bot end when it stops."""
 
     # How long to wait between loops when loop() returns None: 600 is the next server tick.
     loop_delay = ONE_TICK_MS
@@ -53,6 +55,13 @@ class AbstractBot:
         if self._subscriptions is None:
             self._subscriptions = []
         self._subscriptions.append(unsubscribe)
+
+    def command(self, name, handler, help=None):
+        """Adds a console command until the bot stops (see console.command)."""
+        remove = console.command(name, handler, help)
+        if self._subscriptions is None:
+            self._subscriptions = []
+        self._subscriptions.append(remove)
 
     def request_finish(self, reason):
         """Stops the script, giving on_stop and script_finish the reason. The account stays logged in."""

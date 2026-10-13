@@ -248,6 +248,22 @@ class _EventBus:
 
 events: _EventBus
 
+# Console commands
+
+class Command:
+    """A console line for this script: the command's name, the rest of the line trimmed, and that split at
+    whitespace."""
+    name: str
+    text: str
+    args: list[str]
+
+class _Console:
+    def command(self, name: str, handler: Callable[[Command], None], help: Optional[str] = None) -> Callable[[], None]: ...
+    def remove(self, name: str) -> None: ...
+    def names(self) -> list[str]: ...
+
+console: _Console
+
 # Waiting
 
 class _Execution:
@@ -267,6 +283,7 @@ class AbstractBot:
     settings: SettingsBag
     def log(self, *args: Any) -> None: ...
     def on(self, event: str, callback: Callable[..., Any]) -> None: ...
+    def command(self, name: str, handler: Callable[[Command], None], help: Optional[str] = None) -> None: ...
     def request_finish(self, reason: str) -> None: ...
     def grind_targets(self) -> list[str]: ...
     def ignored_randoms(self) -> list[str]: ...
