@@ -126,7 +126,7 @@ void ScriptHost::Step(Clock::time_point now)
     }
 
     const auto& state = m_client.GetState();
-    SyncLogin(state);
+    SyncLogin();
     if (!state.IsSettled())
     {
         return;
@@ -388,7 +388,7 @@ void ScriptHost::SkipToPresent()
     m_backpack = backpack ? backpack->slots : std::vector<Item_s>{};
 }
 
-void ScriptHost::SyncLogin(const GameState_s& state)
+void ScriptHost::SyncLogin()
 {
     m_connected = true;
     const auto loginCount = m_client.GetLoginCount();
@@ -399,15 +399,6 @@ void ScriptHost::SyncLogin(const GameState_s& state)
 
     const auto reconnected = m_loginCount != 0;
     m_loginCount = loginCount;
-
-    // A fresh login resets the state, so its numbering, ticks and backpack start over.
-    if (state.eventCount < m_lastEvent || state.messageCount < m_lastMessage || state.tick < m_lastTick)
-    {
-        m_lastEvent = 0;
-        m_lastMessage = 0;
-        m_lastTick = 0;
-        m_backpack.clear();
-    }
 
     // A reconnect that became a fresh login, as after a server restart, isn't placed yet, so the hook
     // waits until it is and the script sees where the player is.
@@ -770,8 +761,7 @@ bool ScriptHost::IsLoopDue(Clock::time_point now, const GameState_s& state) cons
     case LoopWait_e::Update:
         return state.updateCount != m_waitUpdateCount || (m_waitHasTimeout && now >= m_nextLoop);
     case LoopWait_e::Ticks:
-        // A fresh login starts the tick count over, which ends the wait too.
-        return state.tick >= m_waitTick || state.tick < m_waitTickStart;
+        return state.tick >= m_waitTick;
     }
 
     return true;
@@ -846,7 +836,6 @@ void ScriptHost::ScheduleLoop(Clock::time_point now, py_Ref wait)
     }
 
     m_wait = LoopWait_e::Ticks;
-    m_waitTickStart = state.tick;
     m_waitTick = state.tick + static_cast<u64>(value);
 }
 

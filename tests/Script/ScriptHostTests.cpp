@@ -481,6 +481,43 @@ def loop():
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"reconnect 0 True"});
 }
 
+TEST_CASE("ScriptHost's ticks and message marks carry on across a fresh session", "[ScriptHost]")
+{
+    // A bot that keeps "stunned until tick n" would otherwise wait until the new session's count caught up.
+    auto fixture = HostFixture{R"python(
+saved = {}
+
+def on_reconnect():
+    log('>', 'reconnect', game.tick() > saved['tick'], game_messages.mark() >= saved['mark'])
+
+def loop():
+    if 'tick' not in saved:
+        saved['tick'] = game.tick()
+        saved['mark'] = game_messages.mark()
+    return 600
+)python"};
+    fixture.host->Step(Clock::now());
+
+    fixture.server.SetLoginStatus(2);
+    fixture.server.Close();
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
+    {
+        fixture.client.Pump(PUMP_STEP);
+        fixture.host->Step(Clock::now());
+    }
+
+    REQUIRE(fixture.client.GetLoginCount() == 2);
+    while (Clock::now() < deadline && !fixture.client.GetState().IsSettled())
+    {
+        fixture.client.Pump(PUMP_STEP);
+        fixture.host->Step(Clock::now());
+    }
+
+    fixture.host->Step(Clock::now());
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"reconnect True True"});
+}
+
 TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]")
 {
     auto capture = LogCapture{};

@@ -90,7 +90,8 @@ struct Audio_s
 // Everything the server has told this client. Ticks count PLAYER_INFO packets, one per server tick.
 // Packets a script sends during a server tick arrive before that tick's PLAYER_INFO, so they carry
 // the previous count; everything from PLAYER_INFO onward carries the new one. Messages and events are
-// numbered from 1, and a fresh login resets the state, so the numbering starts over after one.
+// numbered from 1. A fresh login resets the state, but the tick, updateCount and that numbering carry on,
+// so none of them ever goes back.
 struct GameState_s
 {
     static constexpr std::size_t STAT_COUNT = 25;

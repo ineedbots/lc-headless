@@ -299,6 +299,7 @@ TEST_CASE("Script bindings read game messages since a mark", "[ScriptBindings]")
     fixture.state.messages.push_back({.sequence = 7, .type = MessageType_e::Game, .text = "Welcome to RuneScape."});
     fixture.state.messages.push_back({.sequence = 8, .type = MessageType_e::Public, .sender = "Zezima", .text = "I can't reach that!"});
     fixture.state.messages.push_back({.sequence = 9, .type = MessageType_e::Game, .text = "I can't reach that!"});
+    fixture.state.messageCount = 9;
     fixture.Run(R"python(
 assert game_messages.mark() == 9
 assert [m.seq for m in game_messages.since(0)] == [7, 9]

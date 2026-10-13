@@ -61,8 +61,7 @@ def delay_until_ticks(cond, max_ticks):
     while True:
         if cond():
             return True
-        # A fresh login starts the tick count over, which ends the wait too.
-        if _core.tick() >= start + max_ticks or _core.tick() < start:
+        if _core.tick() >= start + max_ticks:
             return False
         yield Ticks(1)
 

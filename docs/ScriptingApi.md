@@ -218,7 +218,7 @@ An `InvItem` has `id`, `name`, `count`, `slot`, `noted` and `com` (the inventory
 
 | Facade | Functions |
 |---|---|
-| `game` | `ingame()`, `tile()` (`None` before you're placed), `energy()` (run energy, 0 to 100), `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `moving()`, `tick()` (server ticks since login), `my_name()`, `combat_level()`, `appearance_screen_open()`, `set_appearance(female, kits, colours)` |
+| `game` | `ingame()`, `tile()` (`None` before you're placed), `energy()` (run energy, 0 to 100), `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `moving()`, `tick()` (server ticks since the first login; it carries on across reconnects and server restarts, so a tick kept to compare against later stays valid), `my_name()`, `combat_level()`, `appearance_screen_open()`, `set_appearance(female, kits, colours)` |
 | `skills` | `level(name)` (base), `effective(name)` (boosted or drained), `xp(name)`, `index(name)` (-1 for a name that isn't a skill), `hp_fraction()`. Names are lower-case: `'attack'`, `'woodcutting'`, `'runecraft'`; an unknown one raises `ValueError` |
 | `direct_navigator` | Walking within the loaded area: `walk(dest, run=False)` (one routed walk; `False` when the tile is in view but can't be reached, and a tile beyond the loaded area is walked to in a straight line), `walk_to(dest, radius=2, timeout_ms=45000, run=False)` (a wait: walks, clicking again when it stalls, until within `radius`), `walk_path(points, run=False)` (up to 25 waypoints, each leg straight), `reachable(dest)`, `path(dest)` (the waypoints a walk would send), `destination()` |
 | `chat` | `say(text)`, `send_pm(name, text)`, `command(text)` (a `::command` for staff accounts, such as `command('tele 0,50,51,30,34')`) |
@@ -581,7 +581,7 @@ The rest pass their values:
 | `loc_changed` | `loc` | Scenery was added, changed or removed |
 | `interface_changed` | | An interface opened or closed |
 | `system_update` | `seconds` | The server announced a restart |
-| `disconnect`, `reconnect` | | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login |
+| `disconnect`, `reconnect` | | The connection dropped; it came back and the player is placed again. After a server restart the reconnect is a fresh login, so the state starts over, much as at login, except that `game.tick()` and message marks carry on |
 | `kill_signal` | | Ctrl+C was pressed. Call `stop_account()` once it's safe; after `scripting.killGraceSeconds` the account logs out anyway |
 | `bot_message` | `sender`, `message` | Another script in this process sent this one a message (see [Messages between scripts](#messages-between-scripts)) |
 | `death` | | Your hitpoints fell to 0. The server empties them before it says "Oh dear you are dead!" |

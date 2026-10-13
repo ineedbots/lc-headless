@@ -65,7 +65,7 @@ class _Game:
         return _core.is_moving()
 
     def tick(self):
-        """Server ticks since login."""
+        """Server ticks since the first login; they carry on across reconnects and server restarts."""
         return _core.get_tick()
 
     def my_name(self):

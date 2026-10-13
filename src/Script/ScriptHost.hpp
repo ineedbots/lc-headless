@@ -104,7 +104,7 @@ private:
     void CheckForChanges(Clock::time_point now);
     void SkipToPresent();
     void FindHooks();
-    void SyncLogin(const GameState_s& state);
+    void SyncLogin();
     void Start(Clock::time_point now);
     void DispatchEvents(const GameState_s& state);
     void DispatchEvent(const GameEvent_s& event, const GameState_s& state);
@@ -153,7 +153,6 @@ private:
     u64 m_waitUpdateCount = 0;
     bool m_waitHasTimeout = false;
     u64 m_waitTick = 0;
-    u64 m_waitTickStart = 0;
     Clock::time_point m_nextWatch;
     // When on_start first ran, which progress reports count from.
     std::optional<Clock::time_point> m_startTime;

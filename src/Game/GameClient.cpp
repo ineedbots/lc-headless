@@ -452,13 +452,19 @@ void GameClient::FinishLogin(const LoginResult_s& result)
 {
     if (!result.reconnected)
     {
+        // The tick and the numbering carry on, so a tick or a message mark a script kept from before,
+        // as across a server restart, stays in the past rather than hours ahead.
+        auto fresh = GameState_s{};
+        fresh.tick = m_state.tick;
+        fresh.updateCount = m_state.updateCount;
+        fresh.messageCount = m_state.messageCount;
+        fresh.eventCount = m_state.eventCount;
+        fresh.staffLevel = result.staffLevel;
+        m_state = std::move(fresh);
         // The fresh state's scene count starts over, so the map forgets the old one rather than risk
         // the count coming round to where it was built.
-        m_state = GameState_s{};
         m_map.Clear();
         m_decoder.Reset();
-        m_loggedMessageCount = 0;
-        m_state.staffLevel = result.staffLevel;
     }
 
     m_handshake.reset();

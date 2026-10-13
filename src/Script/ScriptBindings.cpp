@@ -992,13 +992,12 @@ namespace
         });
     }
 
-    // The newest message's sequence number, or 0: a mark to read later messages from.
+    // The newest message's sequence number, or 0 before any: a mark to read later messages from.
     bool GetMessageMark(int, py_StackRef) noexcept
     {
         return Guard([]
         {
-            const auto& messages = GetApi().GetState().messages;
-            return ReturnInt(messages.empty() ? 0 : static_cast<s64>(messages.back().sequence));
+            return ReturnInt(static_cast<s64>(GetApi().GetState().messageCount));
         });
     }
 
