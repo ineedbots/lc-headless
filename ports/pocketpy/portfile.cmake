@@ -21,6 +21,15 @@ vcpkg_replace_string("${SOURCE_PATH}/include/pocketpy/export.h"
     "#define PK_INLINE __forceinline"
     "#define PK_INLINE")
 
+# Upstream's fix after 2.2.0: a traceback frame's locals and globals are only filled in while the debugger
+# is attached, but the GC marks them on every exception, so otherwise it follows uninitialized memory.
+# upstream commit: de8351ed0f5646cf3117bc4009afce14bfbfaa47
+vcpkg_replace_string("${SOURCE_PATH}/src/public/PyException.c"
+    "    BaseExceptionFrame* frame_dump = c11_vector__emplace(&ud->stacktrace);"
+    "    BaseExceptionFrame* frame_dump = c11_vector__emplace(&ud->stacktrace);
+    py_newnil(&frame_dump->locals);
+    py_newnil(&frame_dump->globals);")
+
 # Upstream's CMakeLists has no install rules, so the port builds the sources with its own.
 file(COPY "${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt" DESTINATION "${SOURCE_PATH}")
 
