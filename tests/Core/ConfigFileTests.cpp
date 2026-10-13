@@ -45,6 +45,8 @@ namespace
         "pollIntervalMs": 20,
         "loginIntervalSeconds": 5,
         "killGraceSeconds": 60,
+        "connectAttempts": 3,
+        "reloginDelaySeconds": 120,
         "progressDirectory": "reports"
     }
 }
@@ -74,6 +76,8 @@ namespace
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
+        "connectAttempts": 10,
+        "reloginDelaySeconds": 60,
         "progressDirectory": "progress"
     }
 }
@@ -155,6 +159,8 @@ namespace
         {"scripting", "pollIntervalMs"},
         {"scripting", "loginIntervalSeconds"},
         {"scripting", "killGraceSeconds"},
+        {"scripting", "connectAttempts"},
+        {"scripting", "reloginDelaySeconds"},
         {"scripting", "progressDirectory"},
     };
 
@@ -268,6 +274,8 @@ namespace
         CHECK(config.scripting.pollIntervalMs == 20ms);
         CHECK(config.scripting.loginIntervalSeconds == 5s);
         CHECK(config.scripting.killGraceSeconds == 60s);
+        CHECK(config.scripting.connectAttempts == 3);
+        CHECK(config.scripting.reloginDelaySeconds == 120s);
         CHECK(config.scripting.progressDirectory == "reports");
     }
 
@@ -279,6 +287,8 @@ namespace
         CHECK(scripting.pollIntervalMs == 10ms);
         CHECK(scripting.loginIntervalSeconds == 2s);
         CHECK(scripting.killGraceSeconds == 30s);
+        CHECK(scripting.connectAttempts == 10);
+        CHECK(scripting.reloginDelaySeconds == 60s);
         CHECK(scripting.progressDirectory == "progress");
     }
 
@@ -469,6 +479,14 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             {
                 CHECK(config.scripting.killGraceSeconds == 30s);
             }
+            else if (key.key == "connectAttempts")
+            {
+                CHECK(config.scripting.connectAttempts == 10);
+            }
+            else if (key.key == "reloginDelaySeconds")
+            {
+                CHECK(config.scripting.reloginDelaySeconds == 60s);
+            }
             else if (key.key == "progressDirectory")
             {
                 CHECK(config.scripting.progressDirectory == "progress");
@@ -632,6 +650,10 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "loginIntervalSeconds"}, 60)).scripting.loginIntervalSeconds == 60s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 0)).scripting.killGraceSeconds == 0s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 600)).scripting.killGraceSeconds == 600s);
+        CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 1)).scripting.connectAttempts == 1);
+        CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 100)).scripting.connectAttempts == 100);
+        CHECK(ParseAccepted(SetKey({"scripting", "reloginDelaySeconds"}, 0)).scripting.reloginDelaySeconds == 0s);
+        CHECK(ParseAccepted(SetKey({"scripting", "reloginDelaySeconds"}, 3600)).scripting.reloginDelaySeconds == 3600s);
         CHECK(ParseAccepted(SetKey({"scripting", "progressDirectory"}, "logs/progress")).scripting.progressDirectory == "logs/progress");
     }
 
@@ -714,6 +736,11 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "loginIntervalSeconds"}, 61},
         {{"scripting", "killGraceSeconds"}, -1},
         {{"scripting", "killGraceSeconds"}, 601},
+        {{"scripting", "connectAttempts"}, 0},
+        {{"scripting", "connectAttempts"}, -1},
+        {{"scripting", "connectAttempts"}, 101},
+        {{"scripting", "reloginDelaySeconds"}, -1},
+        {{"scripting", "reloginDelaySeconds"}, 3601},
         {{"scripting", "progressDirectory"}, ""},
         {{"scripting", "progressDirectory"}, 5},
     };

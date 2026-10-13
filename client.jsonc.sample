@@ -24,6 +24,8 @@
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
+        "connectAttempts": 10,
+        "reloginDelaySeconds": 60,
         "progressDirectory": "progress"
     }
 }

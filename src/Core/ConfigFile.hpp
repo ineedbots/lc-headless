@@ -42,6 +42,11 @@ struct ScriptingSettings_s
     std::chrono::milliseconds pollIntervalMs = 10ms;
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
+    // Attempts at each login or reconnect before the account stops; the waits between them double from 2 s
+    // up to 30 s.
+    s32 connectAttempts = 10;
+    // The wait before an account logs in afresh after its session ended unexpectedly.
+    std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
 };
 

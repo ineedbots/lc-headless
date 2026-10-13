@@ -21,7 +21,7 @@ struct AccountOptions_s
     // The world's walking and rs2b0t's graph over it, shared by every account; without it, scripts can't plan
     // routes beyond the loaded area.
     std::shared_ptr<const Navigation_s> navigation;
-    // The wait before logging in afresh after the session ended unexpectedly.
+    // The wait before logging in afresh after the session ended unexpectedly: scripting.reloginDelaySeconds.
     std::chrono::milliseconds reloginDelay = 60s;
 };
 
@@ -31,7 +31,7 @@ struct AccountOptions_s
 // its idleSeconds, or idles until interrupted when that's zero. Nothing it does waits beyond Step's
 // maxWait, so many accounts can share one loop. An account finishes only when it's interrupted, when its
 // script stops it or fails, or when a login or reconnect fails for good: refused for a reason no retry would
-// change, such as a wrong password, or after all the client's connectAttempts. When the session ends any
+// change, such as a wrong password, or after all of scripting.connectAttempts. When the session ends any
 // other way, such as by the server logging the player out or a desync, the account logs in afresh after
 // reloginDelay, its script still loaded. Failures are logged, never thrown. With a messenger, the account
 // takes bot messages for its script under its username until it's destroyed.

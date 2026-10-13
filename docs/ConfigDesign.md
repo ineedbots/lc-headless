@@ -158,6 +158,8 @@ rs2004-headless/
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
+        "connectAttempts": 10,
+        "reloginDelaySeconds": 60,
         "progressDirectory": "progress"
     }
 }
@@ -185,6 +187,8 @@ rs2004-headless/
 | `scripting.pollIntervalMs` | integer | `10` | 1 to 1000. The longest the main loop waits between passes |
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
+| `scripting.connectAttempts` | integer | `10` | 1 to 100. Attempts at each login or reconnect before the account stops. The waits between them double from 2 s up to 30 s, so 10 cover about four minutes. Passed to `GameClientOptions_s::connectAttempts` |
+| `scripting.reloginDelaySeconds` | integer | `60` | 0 to 3600. How long an account waits before logging in afresh after its session ended unexpectedly, such as the server logging it out ([ScriptingDesign.md](ScriptingDesign.md)). Passed to `AccountOptions_s::reloginDelay` |
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
 
 - **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
@@ -288,6 +292,8 @@ struct ScriptingSettings_s
     std::chrono::milliseconds pollIntervalMs = 10ms;
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
+    s32 connectAttempts = 10;
+    std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
 };
 
@@ -537,7 +543,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, reloginDelaySeconds, progressDirectory)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```
 

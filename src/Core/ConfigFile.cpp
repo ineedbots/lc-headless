@@ -24,6 +24,8 @@ namespace
     constexpr auto MAX_POLL_INTERVAL = 1000ms;
     constexpr auto MAX_LOGIN_INTERVAL = 60s;
     constexpr auto MAX_KILL_GRACE = 600s;
+    constexpr auto MAX_CONNECT_ATTEMPTS = 100;
+    constexpr auto MAX_RELOGIN_DELAY = 3600s;
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
     constexpr auto MAX_RUN_ENERGY = 100;
@@ -196,6 +198,8 @@ namespace
         Check(scripting.pollIntervalMs >= MIN_POLL_INTERVAL && scripting.pollIntervalMs <= MAX_POLL_INTERVAL, "scripting.pollIntervalMs", std::format("must be from {} to {}", MIN_POLL_INTERVAL.count(), MAX_POLL_INTERVAL.count()));
         Check(scripting.loginIntervalSeconds >= 0s && scripting.loginIntervalSeconds <= MAX_LOGIN_INTERVAL, "scripting.loginIntervalSeconds", std::format("must be from 0 to {}", MAX_LOGIN_INTERVAL.count()));
         Check(scripting.killGraceSeconds >= 0s && scripting.killGraceSeconds <= MAX_KILL_GRACE, "scripting.killGraceSeconds", std::format("must be from 0 to {}", MAX_KILL_GRACE.count()));
+        Check(scripting.connectAttempts >= 1 && scripting.connectAttempts <= MAX_CONNECT_ATTEMPTS, "scripting.connectAttempts", std::format("must be from 1 to {}", MAX_CONNECT_ATTEMPTS));
+        Check(scripting.reloginDelaySeconds >= 0s && scripting.reloginDelaySeconds <= MAX_RELOGIN_DELAY, "scripting.reloginDelaySeconds", std::format("must be from 0 to {}", MAX_RELOGIN_DELAY.count()));
         Check(!scripting.progressDirectory.empty(), "scripting.progressDirectory", "must be a folder path");
     }
 
@@ -377,7 +381,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, t
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, progressDirectory)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, reloginDelaySeconds, progressDirectory)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
 
 // Account files are only read, and a script's settings can be any object, so they convert by hand.

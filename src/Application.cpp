@@ -173,7 +173,14 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
 int Application::Run()
 {
     auto runtime = ScriptRuntime{};
-    const auto options = AccountOptions_s{.watchScripts = m_commandLine.watch, .waitForDebugger = m_commandLine.debugger, .navigation = m_navigation};
+    const auto& scripting = m_config->scripting;
+    const auto options = AccountOptions_s{
+        .client = {.connectAttempts = static_cast<u32>(scripting.connectAttempts)},
+        .watchScripts = m_commandLine.watch,
+        .waitForDebugger = m_commandLine.debugger,
+        .navigation = m_navigation,
+        .reloginDelay = scripting.reloginDelaySeconds,
+    };
     auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options};
     if (m_commandLine.watch)
     {
