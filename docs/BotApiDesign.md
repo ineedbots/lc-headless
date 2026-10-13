@@ -72,6 +72,7 @@ src/
 │       ├── random_events.py    the guardian: detection and handlers (§10)
 │       ├── random_solvers.py   the mime, the strange box, the lamp and the maze (§10)
 │       ├── upkeep.py           the run manager and the stall guard (§11)
+│       ├── tutorial.py         skipping Tutorial Island with the RuneScape Guide, before on_start
 │       └── catalogs/           data tables, planners and behaviours (§12), _data.py generated from rs2b0t
 ├── Game/
 │   ├── InterfaceView.hpp/.cpp  the cache's components merged with what the server set (§6)

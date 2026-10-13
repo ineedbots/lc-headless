@@ -9,6 +9,7 @@ Each step returns how the host should wait before the next one:
 import _core
 from rs2004 import console as _console
 from rs2004 import events as _events
+from rs2004 import tutorial as _tutorial
 from rs2004 import upkeep as _upkeep
 from rs2004.bot import AbstractBot, BotManifest, LoopingBot, is_generator, resolve_loop_cadence
 from rs2004.execution import Ticks, Update
@@ -20,9 +21,12 @@ _hooks_from = None
 _generator = None
 # Set while the step in progress is on_start, not loop().
 _starting = False
+# Set while the tutorial skip runs before on_start; the bot's hooks wait for on_start.
+_skipping_tutorial = False
 _finish_reason = None
 _finished = False
-# The random event guardian's solver, or the stall guard's recovery, while it has taken over from the bot.
+# The random event guardian's solver, the stall guard's recovery, or the tutorial skip before on_start, while
+# it has taken over from the bot.
 _guardian = None
 # What load() was given, so the stall guard can make the bot afresh.
 _main = None
@@ -73,11 +77,13 @@ def load(main, settings):
     """Makes the bot from the script's module, checks its settings, and finds its hooks. Returns warnings.
     A BOT's settings are the object under its name in the account file's settings; a script without one
     reads the whole object."""
-    global bot, _generator, _starting, _finish_reason, _finished, _guardian, _main, _settings, _setting_defaults
+    global bot, _generator, _starting, _skipping_tutorial, _finish_reason, _finished, _guardian, _main, _settings
+    global _setting_defaults
     bot = None
     _generator = None
     _guardian = None
     _starting = False
+    _skipping_tutorial = False
     _finish_reason = None
     _finished = False
     _main = main
@@ -146,8 +152,24 @@ def _hook(name):
 
 def start():
     """Runs on_start once the player is first placed. One that's a generator runs as the first step, and
-    loop() follows on the next pass once it finishes."""
-    global _generator, _starting
+    loop() follows on the next pass once it finishes. On Tutorial Island, the guardian first asks the guide to
+    skip the tutorial, and on_start follows."""
+    global _guardian, _skipping_tutorial
+    if _tutorial.on_tutorial_island():
+        _guardian = _skip_tutorial()
+        _skipping_tutorial = True
+        return
+    _start_bot()
+
+
+def _skip_tutorial():
+    yield from _tutorial.skip(lambda message: log(message))
+    _start_bot()
+
+
+def _start_bot():
+    global _generator, _starting, _skipping_tutorial
+    _skipping_tutorial = False
     hook = _hook('start')
     if hook is None:
         return
@@ -158,7 +180,10 @@ def start():
 
 
 def dispatch(name, *args):
-    """Calls the event's hook, then its subscribers, and returns what the hook returned."""
+    """Calls the event's hook, then its subscribers, and returns what the hook returned. Game events that
+    come while the tutorial skip runs are dropped, as on_start hasn't run yet."""
+    if _skipping_tutorial and name != 'script_finish':
+        return None
     call_args = _events.make_args(name, args)
     result = None
     hook = _hook(name)
@@ -239,7 +264,7 @@ def restart(reason):
     for warning in _make_bot():
         log(warning)
     _upkeep.stall_guard.reset(_core.step_time())
-    start()
+    _start_bot()
 
 
 def step():
@@ -272,10 +297,11 @@ def step():
 
 def reset():
     """Drops the step in progress, so the next step calls loop() afresh."""
-    global _generator, _starting, _guardian
+    global _generator, _starting, _guardian, _skipping_tutorial
     _generator = None
     _starting = False
     _guardian = None
+    _skipping_tutorial = False
     random_events.handling = False
 
 
