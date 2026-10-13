@@ -1,8 +1,68 @@
 #include "pch.hpp"
 #include "Logger.hpp"
 
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace
 {
+    constexpr auto COLOR_RESET = "\x1B[0m"sv;
+
+    // Empty for the terminal's own color.
+    std::string_view GetLevelColor(LogLevel_e level)
+    {
+        switch (level)
+        {
+        case LogLevel_e::Verbose:
+            return "\x1B[36m";
+        case LogLevel_e::Info:
+            return {};
+        case LogLevel_e::Warning:
+            return "\x1B[33m";
+        case LogLevel_e::Error:
+            return "\x1B[31m";
+        }
+
+        return {};
+    }
+
+#ifdef _WIN32
+    bool CanColor(std::FILE* stream)
+    {
+        // https://no-color.org: set and not empty. The size counts the terminating null.
+        if (GetEnvironmentVariableA("NO_COLOR", nullptr, 0) > 1)
+        {
+            return false;
+        }
+
+        const auto handle = GetStdHandle(stream == stderr ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
+        auto mode = DWORD{0};
+        if (!GetConsoleMode(handle, &mode))
+        {
+            return false;
+        }
+
+        return (mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0 || SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0;
+    }
+#else
+    bool CanColor(std::FILE* stream)
+    {
+        const auto* const noColor = std::getenv("NO_COLOR");
+        const auto* const term = std::getenv("TERM");
+        return (noColor == nullptr || *noColor == '\0') && isatty(fileno(stream)) != 0 && (term == nullptr || std::string_view{term} != "dumb");
+    }
+#endif
+
+    // Checked once per stream, the first time something is written to the console.
+    bool CanColorStream(std::FILE* stream)
+    {
+        static const auto output = CanColor(stdout);
+        static const auto error = CanColor(stderr);
+        return stream == stderr ? error : output;
+    }
     std::string_view GetLevelName(LogLevel_e level)
     {
         switch (level)
@@ -108,12 +168,36 @@ std::shared_ptr<Logger> Logger::SetDefault(std::shared_ptr<Logger> logger) noexc
 
 void Logger::WriteToConsole(const LogEntry_s& entry)
 {
-    auto line = FormatLine(entry);
+    auto line = FormatConsoleLine(entry);
     line += '\n';
 
-    auto* const stream = entry.level >= LogLevel_e::Warning ? stderr : stdout;
+    auto* const stream = GetConsoleStream(entry.level);
     std::fwrite(line.data(), 1, line.size(), stream);
     std::fflush(stream);
+}
+
+std::string Logger::FormatColoredLine(const LogEntry_s& entry)
+{
+    const auto color = GetLevelColor(entry.level);
+    if (color.empty())
+    {
+        return FormatLine(entry);
+    }
+
+    auto line = std::string{color};
+    line += FormatLine(entry);
+    line += COLOR_RESET;
+    return line;
+}
+
+std::string Logger::FormatConsoleLine(const LogEntry_s& entry)
+{
+    return CanColorStream(GetConsoleStream(entry.level)) ? FormatColoredLine(entry) : FormatLine(entry);
+}
+
+std::FILE* Logger::GetConsoleStream(LogLevel_e level)
+{
+    return level >= LogLevel_e::Warning ? stderr : stdout;
 }
 
 std::string Logger::FormatLine(const LogEntry_s& entry)

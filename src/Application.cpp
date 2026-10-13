@@ -70,7 +70,7 @@ namespace
 
             m_previousSink = m_logger->SetSink([console = m_console](const LogEntry_s& entry)
             {
-                console->Print(entry.level >= LogLevel_e::Warning ? stderr : stdout, Logger::FormatLine(entry));
+                console->Print(Logger::GetConsoleStream(entry.level), Logger::FormatConsoleLine(entry));
             });
         }
 

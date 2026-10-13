@@ -542,6 +542,19 @@ TEST_CASE("Logger::FormatLine", "[Logger]")
     CHECK(Logger::FormatLine(named) == "2026-10-05T18:34:12.345Z WARNING [bot1] hello");
 }
 
+TEST_CASE("Logger::FormatColoredLine colors each level but info", "[Logger]")
+{
+    const auto time = GetSampleTime();
+
+    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Verbose, time)) == "\x1B[36m2026-10-05T18:34:12.345Z VERBOSE hello\x1B[0m");
+    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Info, time)) == "2026-10-05T18:34:12.345Z INFO    hello");
+    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Warning, time)) == "\x1B[33m2026-10-05T18:34:12.345Z WARNING hello\x1B[0m");
+    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Error, time)) == "\x1B[31m2026-10-05T18:34:12.345Z ERROR   hello\x1B[0m");
+
+    CHECK(Logger::GetConsoleStream(LogLevel_e::Info) == stdout);
+    CHECK(Logger::GetConsoleStream(LogLevel_e::Warning) == stderr);
+}
+
 TEST_CASE("Logger never interleaves writes from several threads", "[Logger][threads]")
 {
     constexpr auto THREAD_COUNT = 8;

@@ -645,6 +645,8 @@ def on_bot_message(sender, message):
 
 The client reads each line typed into its console while it runs. In a terminal, it keeps a `> ` prompt on the bottom line and prints log lines above it, so they never run into what you're typing. The left and right arrows, Home, End, Backspace and Delete edit the line, Ctrl+U and Ctrl+K clear it before and after the cursor, and Up and Down go back through the last 100 lines entered. The terminal needs to understand VT100 codes, as the Windows 10 and later console, Windows Terminal and Linux terminals do. When the input is piped in instead, lines are read as they come, with no prompt.
 
+In a terminal, log lines are colored by level: verbose cyan, info in the terminal's own color, warnings yellow and errors red. Output redirected to a file stays plain, and setting `NO_COLOR` turns the colors off.
+
 These commands are built in:
 
 | Command | What it does |

@@ -123,6 +123,14 @@ public:
 
     static void WriteToConsole(const LogEntry_s& entry);
     [[nodiscard]] static std::string FormatLine(const LogEntry_s& entry);
+    // FormatLine in the level's VT100 color: cyan for verbose, the terminal's own for info, yellow for
+    // warnings and red for errors.
+    [[nodiscard]] static std::string FormatColoredLine(const LogEntry_s& entry);
+    // The line WriteToConsole writes: colored when its stream is a terminal that shows VT100 colors, which
+    // on Windows it's switched to, and NO_COLOR isn't set.
+    [[nodiscard]] static std::string FormatConsoleLine(const LogEntry_s& entry);
+    // Where WriteToConsole writes: stderr for warnings and errors, stdout for the rest.
+    [[nodiscard]] static std::FILE* GetConsoleStream(LogLevel_e level);
 
 private:
     void Write(LogLevel_e level, std::optional<std::source_location> location, std::string_view message);
