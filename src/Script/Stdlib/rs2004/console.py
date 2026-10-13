@@ -6,7 +6,7 @@ account only."""
 __all__ = ['console', 'Command']
 
 # The client's own commands, which a script can't add. AccountRunner handles them.
-RESERVED = ('help', 'status', 'quit', 'exit', 'loglevel')
+RESERVED = ('help', 'status', 'quit', 'exit', 'loglevel', 'say')
 
 # Each command's help by name, '' for none. The host reads it to route lines and list the commands, so it's
 # only ever changed in place.

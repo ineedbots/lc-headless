@@ -71,6 +71,9 @@ public:
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
     // Queues a console command for the script, as ScriptHost::ReceiveCommand does. False without a script.
     [[nodiscard]] bool SendCommand(ConsoleCommand_s command);
+    // Sends the text to public chat, as typing it into the chatbox does. False, sending nothing, when the
+    // account isn't in game.
+    [[nodiscard]] bool Say(std::string_view text);
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
     [[nodiscard]] const std::string& GetName() const;
     [[nodiscard]] const std::string& GetUsername() const;

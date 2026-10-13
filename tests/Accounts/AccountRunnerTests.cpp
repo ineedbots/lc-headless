@@ -12,6 +12,7 @@
 #include "Core/Logger.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
+#include "Game/Protocol/WordPack.hpp"
 #include "Script/ScriptError.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -322,10 +323,10 @@ TEST_CASE("AccountRunner sends console commands to the scripts that added them",
 {
     auto fixture = RunnerFixture{};
     fixture.folder.WriteFile("commands.py", R"python(
-def say(command):
+def echo(command):
     log('said', command.text)
 
-console.command('say', say, 'Logs the text')
+console.command('echo', echo, 'Logs the text')
 
 def loop():
     return 100
@@ -334,7 +335,7 @@ def loop():
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "commands.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
     auto console = ConsoleInput{};
     // Handled before the logins; the commands wait until the player is placed.
-    for (const auto* line : {"say to everyone", "@BOT1   Say  just  me ", "@bot2 say hi", "@nobody status", "@bot1", "dance", "help", "@bot2 help", "loglevel", "loglevel loud", "   "})
+    for (const auto* line : {"echo to everyone", "@BOT1   Echo  just  me ", "@bot2 echo hi", "@nobody status", "@bot1", "dance", "help", "@bot2 help", "loglevel", "loglevel loud", "   "})
     {
         console.Push(line);
     }
@@ -355,11 +356,11 @@ def loop():
     CHECK(succeeded);
     CHECK(CountLines(fixture.capture, "bot1", "said to everyone") == 1);
     CHECK(CountLines(fixture.capture, "bot1", "said just  me") == 1);
-    CHECK(CountLines(fixture.capture, "", "bot2 has no console command say; type @bot2 help for its commands") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot2 has no console command echo; type @bot2 help for its commands") == 1);
     CHECK(CountLines(fixture.capture, "", "No account is named nobody; the accounts are bot1, bot2") == 1);
     CHECK(CountLines(fixture.capture, "", "@bot1 needs a command after it, such as @bot1 help") == 1);
     CHECK(CountLines(fixture.capture, "", "Unknown command dance; type help for the commands") == 1);
-    CHECK(CountLines(fixture.capture, "", "bot1: say - Logs the text") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot1: echo - Logs the text") == 1);
     CHECK(CountLines(fixture.capture, "", "bot2: no console commands") == 1);
     CHECK(CountLines(fixture.capture, "", "The log level is info") == 1);
     CHECK(CountLines(fixture.capture, "", "loglevel takes one of verbose, info, warning or error") == 1);
@@ -377,6 +378,52 @@ def loop():
     CHECK(status("bot2: in game at (", "), script running") == 1);
     CHECK(runner->GetAccount(0).DescribeOutcome() == "logged out");
     CHECK(runner->GetAccount(1).DescribeOutcome() == "logged out");
+}
+
+TEST_CASE("AccountRunner says console text in public chat", "[AccountRunner]")
+{
+    auto fixture = RunnerFixture{};
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
+    auto console = ConsoleInput{};
+    // Before the logins, so no account is in game yet.
+    console.Push("say too soon");
+
+    auto sent = false;
+    const auto succeeded = runner->Run([&]
+    {
+        if (!sent && CountLines(fixture.capture, "bot1", "loop") >= 1 && CountLines(fixture.capture, "bot2", "loop") >= 1)
+        {
+            console.Push("say Hello there");
+            console.Push("@bot2 say Just me");
+            console.Push("say");
+            console.Push("quit");
+            sent = true;
+        }
+
+        return fixture.TimedOut() ? 1u : 0u;
+    }, &console);
+    fixture.ReportProblems();
+
+    CHECK(succeeded);
+    CHECK(CountLines(fixture.capture, "", "No account is in game to say it") == 1);
+    CHECK(CountLines(fixture.capture, "", "say needs the text to say") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot1 says: Hello there") == 1);
+    CHECK(CountLines(fixture.capture, "", "bot2 says: Just me") == 1);
+
+    // Unpacking pads an odd length with a space.
+    const auto said = [](const FakeGameServer& server)
+    {
+        auto texts = std::vector<std::string>{};
+        for (const auto& packet : server.GetPackets(ClientProt_e::MessagePublic))
+        {
+            texts.push_back(WordPack::Unpack(std::span{packet.payload}.subspan(2)));
+        }
+
+        return texts;
+    };
+
+    CHECK(said(fixture.first) == std::vector<std::string>{"Hello there "});
+    CHECK(said(fixture.second) == std::vector<std::string>{"Hello there ", "Just me "});
 }
 
 TEST_CASE("AccountRunner quits one account from the console", "[AccountRunner]")

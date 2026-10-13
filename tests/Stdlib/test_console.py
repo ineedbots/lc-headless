@@ -36,9 +36,9 @@ def test_bad_commands_are_refused():
 def test_the_runtime_calls_the_handler_with_the_line():
     _clear()
     seen = []
-    console.command('say', lambda command: seen.append([command.name, command.text, command.args]))
-    _runtime.command('say', 'hello  world', ['hello', 'world'])
-    assert seen == [['say', 'hello  world', ['hello', 'world']]]
+    console.command('echo', lambda command: seen.append([command.name, command.text, command.args]))
+    _runtime.command('echo', 'hello  world', ['hello', 'world'])
+    assert seen == [['echo', 'hello  world', ['hello', 'world']]]
 
     # A command removed after the line was queued is skipped.
     _runtime.command('gone', '', [])

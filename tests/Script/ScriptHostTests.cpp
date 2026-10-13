@@ -1437,10 +1437,10 @@ def loop():
 TEST_CASE("ScriptHost runs the console commands its script added", "[ScriptHost]")
 {
     auto fixture = HostFixture{R"python(
-def say(command):
+def echo(command):
     log('>', command.name, command.text, command.args)
 
-console.command('Say', say, 'Logs the text')
+console.command('Echo', echo, 'Logs the text')
 
 class Digger(LoopingBot):
     def on_start(self):
@@ -1467,16 +1467,16 @@ BOT = define_bot(name='Digger', create=Digger)
         return found;
     };
 
-    CHECK(names() == std::vector<std::string>{"say:Logs the text"});
+    CHECK(names() == std::vector<std::string>{"echo:Logs the text"});
     CHECK_FALSE(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
 
     fixture.host->Step(Clock::now());
-    CHECK(names() == std::vector<std::string>{"dig:", "say:Logs the text"});
-    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "say", .text = "hello  world", .args = {"hello", "world"}}));
+    CHECK(names() == std::vector<std::string>{"dig:", "echo:Logs the text"});
+    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "echo", .text = "hello  world", .args = {"hello", "world"}}));
     CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
 
     fixture.host->Step(Clock::now());
-    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"say hello  world ['hello', 'world']", "digging"});
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"echo hello  world ['hello', 'world']", "digging"});
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::AccountStopped);
     CHECK(fixture.host->GetCommands().empty());
 }

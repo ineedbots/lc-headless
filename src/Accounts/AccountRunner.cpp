@@ -5,6 +5,7 @@
 #include "../Core/ConfigFile.hpp"
 #include "../Core/ConsoleInput.hpp"
 #include "../Core/Logger.hpp"
+#include "../Game/Protocol/WordPack.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ConsoleCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
@@ -196,6 +197,10 @@ void AccountRunner::HandleCommand(std::string_view line)
     {
         SetLogLevel(target, command.args);
     }
+    else if (command.name == COMMAND_SAY)
+    {
+        Say(target, command.text);
+    }
     else
     {
         SendToScripts(target, command);
@@ -264,8 +269,8 @@ void AccountRunner::ShowHelp(const Account* target) const
 {
     if (target == nullptr)
     {
-        m_logger->Info("Console commands: {}, {}, {} (or {}; as Ctrl+C), {} [verbose|info|warning|error]. Start a line with {}<account> to send it to that account only",
-                       COMMAND_HELP, COMMAND_STATUS, COMMAND_QUIT, COMMAND_EXIT, COMMAND_LOG_LEVEL, TARGET_PREFIX);
+        m_logger->Info("Console commands: {}, {}, {} (or {}; as Ctrl+C), {} [verbose|info|warning|error], {} <text>. Start a line with {}<account> to send it to that account only",
+                       COMMAND_HELP, COMMAND_STATUS, COMMAND_QUIT, COMMAND_EXIT, COMMAND_LOG_LEVEL, COMMAND_SAY, TARGET_PREFIX);
     }
 
     auto any = false;
@@ -361,6 +366,50 @@ void AccountRunner::SetLogLevel(const Account* target, std::span<const std::stri
     m_logger->SetLevel(chosen->level);
     // A warning, so it shows at every level but error.
     m_logger->Warning("The log level is now {}", chosen->name);
+}
+
+void AccountRunner::Say(Account* target, std::string_view text)
+{
+    if (text.empty())
+    {
+        m_logger->Warning("{} needs the text to say", COMMAND_SAY);
+        return;
+    }
+
+    if (text.size() > WordPack::MAX_PACK_LENGTH)
+    {
+        m_logger->Warning("Public chat holds {} characters; the rest is cut off", WordPack::MAX_PACK_LENGTH);
+        text = text.substr(0, WordPack::MAX_PACK_LENGTH);
+    }
+
+    if (target != nullptr)
+    {
+        if (target->Say(text))
+        {
+            m_logger->Info("{} says: {}", target->GetName(), text);
+        }
+        else
+        {
+            m_logger->Warning("{} isn't in game to say it", target->GetName());
+        }
+
+        return;
+    }
+
+    auto said = false;
+    for (const auto& account : m_accounts)
+    {
+        if (account->Say(text))
+        {
+            said = true;
+            m_logger->Info("{} says: {}", account->GetName(), text);
+        }
+    }
+
+    if (!said)
+    {
+        m_logger->Warning("No account is in game to say it");
+    }
 }
 
 void AccountRunner::SendToScripts(Account* target, const ConsoleCommand_s& command)

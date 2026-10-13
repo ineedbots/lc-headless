@@ -31,13 +31,14 @@ public:
     static constexpr auto COMMAND_QUIT = "quit"sv;
     static constexpr auto COMMAND_EXIT = "exit"sv;
     static constexpr auto COMMAND_LOG_LEVEL = "loglevel"sv;
+    static constexpr auto COMMAND_SAY = "say"sv;
 
     // Returns once every started account has finished; after an interrupt, accounts not yet started
     // never are. True when every started account logged out cleanly. With a console, each line typed is
     // handled as HandleCommand describes, at the start of the next pass.
     [[nodiscard]] bool Run(const InterruptCount& interrupts, ConsoleInput* console = nullptr);
-    // A line typed into the console. help, status, quit (or exit, which is a Ctrl+C) and loglevel are the
-    // runner's own; any other command goes to every running script that added it. "@<account> <command>"
+    // A line typed into the console. help, status, quit (or exit, which is a Ctrl+C), loglevel and say
+    // (public chat from every account in game) are the runner's own; any other command goes to every running script that added it. "@<account> <command>"
     // sends a line to one account, named by its file or its username, in any case; quit then stops just
     // that account. Mistakes are logged as warnings.
     void HandleCommand(std::string_view line);
@@ -53,6 +54,7 @@ private:
     void ShowStatus(const Account* target) const;
     void Quit(Account* target);
     void SetLogLevel(const Account* target, std::span<const std::string> args);
+    void Say(Account* target, std::string_view text);
     void SendToScripts(Account* target, const ConsoleCommand_s& command);
     void Wait(Clock::time_point now, ConsoleInput* console) const;
     [[nodiscard]] bool LogOutcomes() const;

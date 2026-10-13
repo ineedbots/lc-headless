@@ -5,6 +5,7 @@
 #include "../Core/ConfigFile.hpp"
 #include "../Core/Logger.hpp"
 #include "../Game/GameClient.hpp"
+#include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/Tile_s.hpp"
@@ -399,6 +400,17 @@ std::vector<ScriptCommand_s> Account::GetCommands() const
 bool Account::SendCommand(ConsoleCommand_s command)
 {
     return m_script && !m_finished && m_script->ReceiveCommand(std::move(command));
+}
+
+bool Account::Say(std::string_view text)
+{
+    if (m_finished || !m_client.IsInGame())
+    {
+        return false;
+    }
+
+    m_client.Send(ClientPackets::MessagePublic(text));
+    return true;
 }
 
 std::optional<Account::Clock::time_point> Account::GetNextLoop() const

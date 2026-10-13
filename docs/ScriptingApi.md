@@ -657,8 +657,9 @@ These commands are built in:
 | `status` | Shows one line per account: logging in, in game and where, reconnecting, or finished, and its script's state |
 | `quit`, `exit` | Does what Ctrl+C does: each script gets `on_kill_signal`, and typing it again logs the accounts out at once |
 | `loglevel [verbose\|info\|warning\|error]` | Shows or changes the log level of every account |
+| `say <text>` | Types the text into public chat from every account that's in game, cut to 80 characters |
 
-To send a line to just one account, start it with `@<account>`, using the account file's name or its username, in any case: `@mule status`, `@mule help`, or `@mule quit` to stop only that account. An account that is quit before its turn to log in never logs in. `loglevel` always applies to every account.
+To send a line to just one account, start it with `@<account>`, using the account file's name or its username, in any case: `@mule status`, `@mule help`, `@mule say hi` to chat from only that account, or `@mule quit` to stop only that account. An account that is quit before its turn to log in never logs in. `loglevel` always applies to every account.
 
 A script adds its own commands with `console.command(name, handler, help=None)`. When the command is typed, the client calls `handler(command)` with a `Command` holding the name, `text` (the rest of the line, trimmed) and `args` (that text split at whitespace):
 
@@ -674,7 +675,7 @@ console.command('bank', bank_soon, 'Bank once the backpack is full')
 ```
 
 - A line without `@` goes to every running script that added the command, and a line with `@<account>` goes only to that account's script. A name that no running script has added gets a warning.
-- A command name is one word, matched in any case. `help`, `status`, `quit`, `exit` and `loglevel` belong to the client and can't be added. Adding the same name twice raises `ValueError`.
+- A command name is one word, matched in any case. `help`, `status`, `quit`, `exit`, `loglevel` and `say` belong to the client and can't be added. Adding the same name twice raises `ValueError`.
 - The handler runs on the script's next pass, once the player is placed, so a line typed while the account logs in or reconnects waits until it's back. Like a hook, the handler can't wait: set a flag and do the work in `loop()`. An exception in the handler stops the script, just as one in a hook does, so check `args` before using them.
 - `console.command` returns a function that removes the command, and `console.remove(name)` removes it too. In a bot, `self.command(name, handler, help)` adds a command that is removed when the bot stops. A command added at module level lasts as long as the script.
 
