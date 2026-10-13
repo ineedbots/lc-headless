@@ -29,6 +29,7 @@ TEST_CASE("Application reads its command line", "[Application]")
     CHECK_FALSE(defaults.accountPath.has_value());
     CHECK_FALSE(defaults.watch);
     CHECK_FALSE(defaults.debugger);
+    CHECK_FALSE(defaults.rawConsole);
 
     const auto everything = Parse({"live.jsonc", "--account", "accounts/bot1.jsonc", "--debugger"});
     CHECK(everything.configPath == "live.jsonc");
@@ -36,6 +37,7 @@ TEST_CASE("Application reads its command line", "[Application]")
     CHECK(everything.debugger);
 
     CHECK(Parse({"--watch"}).watch);
+    CHECK(Parse({"--raw-console", "--watch"}).rawConsole);
     CHECK(Parse({"--watch", "--account", "accounts/bot1.jsonc"}).watch);
 }
 

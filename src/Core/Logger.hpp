@@ -122,6 +122,8 @@ public:
     static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
 
     static void WriteToConsole(const LogEntry_s& entry);
+    // WriteToConsole without colors or any other VT100 code, whatever the stream is.
+    static void WritePlainToConsole(const LogEntry_s& entry);
     [[nodiscard]] static std::string FormatLine(const LogEntry_s& entry);
     // FormatLine in the level's VT100 color: cyan for verbose, the terminal's own for info, yellow for
     // warnings and red for errors.

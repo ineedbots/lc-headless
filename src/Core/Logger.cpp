@@ -56,6 +56,13 @@ namespace
     }
 #endif
 
+    void WriteConsoleLine(std::FILE* stream, std::string line)
+    {
+        line += '\n';
+        std::fwrite(line.data(), 1, line.size(), stream);
+        std::fflush(stream);
+    }
+
     // Checked once per stream, the first time something is written to the console.
     bool CanColorStream(std::FILE* stream)
     {
@@ -168,12 +175,12 @@ std::shared_ptr<Logger> Logger::SetDefault(std::shared_ptr<Logger> logger) noexc
 
 void Logger::WriteToConsole(const LogEntry_s& entry)
 {
-    auto line = FormatConsoleLine(entry);
-    line += '\n';
+    WriteConsoleLine(GetConsoleStream(entry.level), FormatConsoleLine(entry));
+}
 
-    auto* const stream = GetConsoleStream(entry.level);
-    std::fwrite(line.data(), 1, line.size(), stream);
-    std::fflush(stream);
+void Logger::WritePlainToConsole(const LogEntry_s& entry)
+{
+    WriteConsoleLine(GetConsoleStream(entry.level), FormatLine(entry));
 }
 
 std::string Logger::FormatColoredLine(const LogEntry_s& entry)

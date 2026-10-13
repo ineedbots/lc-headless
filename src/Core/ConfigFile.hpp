@@ -32,6 +32,8 @@ struct ClientSettings_s
     std::string cacheDirectory = "data/cache";
     // rs2b0t's walker data, exported by tools/nav/export_rs2b0t.ts.
     std::string navDirectory = "data/nav";
+    // Where log lines are appended, as well as the console; empty for no file.
+    std::string logFile;
 };
 
 struct ScriptingSettings_s

@@ -4,3 +4,4 @@ client*.jsonc
 accounts/*.jsonc
 /progress/
 /data/cache/
+*.log

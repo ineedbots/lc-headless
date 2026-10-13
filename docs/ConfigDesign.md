@@ -149,7 +149,8 @@ rs2004-headless/
     "client": {
         "logLevel": "info",
         "cacheDirectory": "data/cache",
-        "navDirectory": "data/nav"
+        "navDirectory": "data/nav",
+        "logFile": "rs2004-headless.log"
     },
     "scripting": {
         "accountsDirectory": "accounts",
@@ -181,6 +182,7 @@ rs2004-headless/
 | `client.logLevel` | string | `"info"` | `verbose`, `info`, `warning` or `error` |
 | `client.cacheDirectory` | string | `"data/cache"` | Not empty. The folder that holds the server's cache, `main_file_cache.dat` and its index files, relative to the working directory. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
 | `client.navDirectory` | string | `"data/nav"` | Not empty. rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes ([BotApiDesign.md](BotApiDesign.md) §9) |
+| `client.logFile` | string | `""` | Where log lines are appended as plain text, at `logLevel`, as well as the console. Its folder is made if need be. Empty for no file. Lines logged while the config file loads come before it opens, so they're only on the console |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
 | `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
 | `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run; the walker's route search may take 5 times it (`ScriptVm::ROUTE_SEARCH_TIMEOUTS`). Stored as `std::chrono::milliseconds` |
@@ -282,6 +284,7 @@ struct ClientSettings_s
     LogLevel_e logLevel = LogLevel_e::Info;
     std::string cacheDirectory = "data/cache";
     std::string navDirectory = "data/nav";
+    std::string logFile;
 };
 
 struct ScriptingSettings_s
@@ -542,7 +545,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, reloginDelaySeconds, progressDirectory)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
     ```

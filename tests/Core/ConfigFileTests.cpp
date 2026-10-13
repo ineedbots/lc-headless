@@ -36,7 +36,8 @@ namespace
     },
     "client": {
         "logLevel": "verbose",
-        "cacheDirectory": "../289server/engine/data/pack"
+        "cacheDirectory": "../289server/engine/data/pack",
+        "logFile": "logs/bots.log"
     },
     "scripting": {
         "accountsDirectory": "bots",
@@ -67,7 +68,8 @@ namespace
     "client": {
         "logLevel": "info",
         "cacheDirectory": "data/cache",
-        "navDirectory": "data/nav"
+        "navDirectory": "data/nav",
+        "logFile": ""
     },
     "scripting": {
         "accountsDirectory": "accounts",
@@ -153,6 +155,7 @@ namespace
         {"client", "logLevel"},
         {"client", "cacheDirectory"},
         {"client", "navDirectory"},
+        {"client", "logFile"},
         {"scripting", "accountsDirectory"},
         {"scripting", "scriptsDirectory"},
         {"scripting", "callTimeoutMs"},
@@ -268,6 +271,7 @@ namespace
         CHECK(config.login.revision == 289);
         CHECK(config.client.logLevel == LogLevel_e::Verbose);
         CHECK(config.client.cacheDirectory == "../289server/engine/data/pack");
+        CHECK(config.client.logFile == "logs/bots.log");
         CHECK(config.scripting.accountsDirectory == "bots");
         CHECK(config.scripting.scriptsDirectory == "my-scripts");
         CHECK(config.scripting.callTimeoutMs == 500ms);
@@ -494,6 +498,10 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             else if (key.key == "navDirectory")
             {
                 CHECK(config.client.navDirectory == "data/nav");
+            }
+            else if (key.key == "logFile")
+            {
+                CHECK(config.client.logFile.empty());
             }
         }
     }

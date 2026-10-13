@@ -8,6 +8,7 @@
 #include "Core/ConfigError.hpp"
 #include "Core/ConfigFile.hpp"
 #include "Core/ConsoleInput.hpp"
+#include "Core/LogFile.hpp"
 #include "Core/Logger.hpp"
 #include "Script/ScriptRuntime.hpp"
 
@@ -54,42 +55,36 @@ namespace
         return lower;
     }
 
-    // While the console is interactive, log lines go above its prompt. On the way out, even by an
-    // exception, the prompt is erased, the terminal put back and the logger's own sink restored.
+    // Log lines go through the console while the scope lasts. On the way out, even by an exception, the
+    // prompt is erased, the terminal put back and the sink installed again without the console.
     class ConsoleLogScope
     {
     public:
-        ConsoleLogScope(std::shared_ptr<Logger> logger, std::shared_ptr<ConsoleInput> console)
-            : m_logger{std::move(logger)}
+        using Install = std::function<void(std::shared_ptr<ConsoleInput>)>;
+
+        ConsoleLogScope(Install install, std::shared_ptr<ConsoleInput> console)
+            : m_install{std::move(install)}
             , m_console{std::move(console)}
         {
-            if (!m_console->IsInteractive())
-            {
-                return;
-            }
-
-            m_previousSink = m_logger->SetSink([console = m_console](const LogEntry_s& entry)
-            {
-                console->Print(Logger::GetConsoleStream(entry.level), Logger::FormatConsoleLine(entry));
-            });
+            m_install(m_console);
         }
 
         ~ConsoleLogScope()
         {
-            m_console->Close();
-            if (m_previousSink)
+            if (m_console)
             {
-                m_logger->SetSink(std::move(m_previousSink));
+                m_console->Close();
             }
+
+            m_install(nullptr);
         }
 
         ConsoleLogScope(const ConsoleLogScope&) = delete;
         ConsoleLogScope& operator=(const ConsoleLogScope&) = delete;
 
     private:
-        std::shared_ptr<Logger> m_logger;
+        Install m_install;
         std::shared_ptr<ConsoleInput> m_console;
-        Logger::Sink m_previousSink;
     };
 
     // The server lets a username log in once, so a second file for the same one would only be kicked.
@@ -131,6 +126,10 @@ CommandLine_s Application::ParseCommandLine(std::span<char* const> args)
         {
             commandLine.debugger = true;
         }
+        else if (arg == RAW_CONSOLE_OPTION)
+        {
+            commandLine.rawConsole = true;
+        }
         else if (arg.starts_with("--"))
         {
             throw std::invalid_argument{std::format("Unknown option {}; {}", arg, USAGE)};
@@ -159,8 +158,17 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
     , m_commandLine{std::move(commandLine)}
 {
     assert(m_logger && "Application needs a logger");
+    // Before the config loads, so a raw console has no colors from the first line.
+    InstallLogSink(nullptr);
     m_config = std::make_shared<const Config_s>(ConfigFile::Load(m_commandLine.configPath, *m_logger));
     m_logger->SetLevel(m_config->client.logLevel);
+    if (!m_config->client.logFile.empty())
+    {
+        m_logFile = std::make_shared<LogFile>(m_config->client.logFile);
+        InstallLogSink(nullptr);
+        m_logger->Info("Logging to {} too", m_logFile->GetPath().string());
+    }
+
     m_logger->Info("Config loaded from {}", m_commandLine.configPath.string());
     m_cache = std::make_shared<const GameCache_s>(CacheLoader::Load(m_config->client.cacheDirectory, *m_logger));
     const auto started = std::chrono::steady_clock::now();
@@ -189,15 +197,52 @@ int Application::Run()
 
     // Installed only once the scripts have loaded, so Ctrl+C still ends the process while it waits for the debugger.
     std::signal(SIGINT, SignalHandler);
-    const auto console = ConsoleInput::ReadStdin();
-    const auto consoleLog = ConsoleLogScope{m_logger, console};
-    m_logger->Info("Type {} for the console commands", AccountRunner::COMMAND_HELP);
+    const auto console = m_commandLine.rawConsole ? nullptr : ConsoleInput::ReadStdin();
+    const auto consoleLog = ConsoleLogScope{[this](std::shared_ptr<ConsoleInput> current)
+    {
+        InstallLogSink(std::move(current));
+    }, console};
+
+    if (console)
+    {
+        m_logger->Info("Type {} for the console commands", AccountRunner::COMMAND_HELP);
+    }
+
     const auto succeeded = runner.Run([]
     {
         return interruptCount.load();
     }, console.get());
 
     return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+void Application::InstallLogSink(std::shared_ptr<ConsoleInput> console)
+{
+    if (console && !console->IsInteractive())
+    {
+        console.reset();
+    }
+
+    m_logger->SetSink([file = m_logFile, console = std::move(console), raw = m_commandLine.rawConsole](const LogEntry_s& entry)
+    {
+        if (file)
+        {
+            file->Write(entry);
+        }
+
+        if (console)
+        {
+            console->Print(Logger::GetConsoleStream(entry.level), Logger::FormatConsoleLine(entry));
+        }
+        else if (raw)
+        {
+            Logger::WritePlainToConsole(entry);
+        }
+        else
+        {
+            Logger::WriteToConsole(entry);
+        }
+    });
 }
 
 std::vector<AccountConfig_s> Application::LoadAccounts() const

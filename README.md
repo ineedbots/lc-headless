@@ -162,7 +162,7 @@ Git ignores `client*.jsonc`, `accounts/*.jsonc` and `progress/`, so credentials 
 ## Running
 
 ```
-Rs2004Headless.exe [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger]
+Rs2004Headless.exe [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger] [--raw-console]
 ```
 
 | Argument | Effect |
@@ -171,6 +171,9 @@ Rs2004Headless.exe [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [-
 | `--account <file>` | Runs only this account. Without it, every enabled file in the accounts folder runs |
 | `--watch` | Reloads a script, without logging out, whenever the script or a module it imports is saved. A script that fails stays logged in and idle until the next save |
 | `--debugger` | Waits for VS Code's pocketpy debugger to attach on `127.0.0.1:6110` before logging in. Needs `--account`, and can't be used with `--watch` |
+| `--raw-console` | Writes plain log lines, with no colors, prompt or other VT100 codes, and doesn't read console input, for a service or another program reading the output. Ctrl+C still works |
+
+`client.logFile` in `client.jsonc` names a file that log lines are appended to as well, as plain text; `client.jsonc.sample` sets it to `rs2004-headless.log`, which git ignores.
 
 From the repository root:
 
