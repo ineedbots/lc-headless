@@ -321,3 +321,35 @@ TEST_CASE("GameClient retries a login the server can't take yet", "[GameClient]"
     CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 16});
     CHECK(client.GetLoginCount() == 1);
 }
+
+TEST_CASE("GameClient reconnects when a send meets a dropped connection", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.GetState().placed;
+    }));
+
+    // Sending without pumping finds the closed connection before Pump can.
+    server.SetLoginStatus(15);
+    server.Close();
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && client.IsInGame())
+    {
+        client.Send(ClientPackets::NoTimeout());
+        REQUIRE_NOTHROW(client.Flush());
+        std::this_thread::sleep_for(10ms);
+    }
+
+    CHECK(client.GetStatus() == ClientStatus_e::Connecting);
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.GetLoginCount() == 2;
+    }));
+
+    CHECK(client.IsInGame());
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 18});
+}

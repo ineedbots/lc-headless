@@ -21,15 +21,20 @@ struct AccountOptions_s
     // The world's walking and rs2b0t's graph over it, shared by every account; without it, scripts can't plan
     // routes beyond the loaded area.
     std::shared_ptr<const Navigation_s> navigation;
+    // The wait before logging in afresh after the session ended unexpectedly.
+    std::chrono::milliseconds reloginDelay = 60s;
 };
 
 // One account: its client and, when the account file names one, its script. A define_bot script's default
 // settings that the account file lacks are added to it as the script loads. Without a script the account
 // idles and logs a summary of what it sees every SUMMARY_INTERVAL, then logs out once it has been in game for
 // its idleSeconds, or idles until interrupted when that's zero. Nothing it does waits beyond Step's
-// maxWait, so many accounts can share one loop. An account finishes when it has logged out, when its
-// login or connection fails for good, or when it's interrupted; failures are logged, not thrown. With a
-// messenger, the account takes bot messages for its script under its username until it's destroyed.
+// maxWait, so many accounts can share one loop. An account finishes only when it's interrupted, when its
+// script stops it or fails, or when a login or reconnect fails for good: refused for a reason no retry would
+// change, such as a wrong password, or after all the client's connectAttempts. When the session ends any
+// other way, such as by the server logging the player out or a desync, the account logs in afresh after
+// reloginDelay, its script still loaded. Failures are logged, never thrown. With a messenger, the account
+// takes bot messages for its script under its username until it's destroyed.
 class Account
 {
 public:
@@ -81,6 +86,10 @@ private:
     void BeginRelog(std::chrono::seconds delay);
     // Carries a relog on: the logout, the wait, then the login. True while one is under way.
     bool StepRelog(Clock::time_point now);
+    void Recover(std::string_view reason);
+    void BeginRelogin();
+    [[nodiscard]] bool IsStopping() const;
+    [[nodiscard]] s64 GetReloginSeconds() const;
     void Fail(std::string_view reason);
     void UpdateFinished();
 
@@ -95,6 +104,8 @@ private:
     bool m_started = false;
     bool m_finished = false;
     bool m_failed = false;
+    // Logging out to end the account, so a failure on the way finishes it rather than logging back in.
+    bool m_stopping = false;
     u32 m_interrupts = 0;
     std::optional<Clock::time_point> m_killDeadline;
     Clock::time_point m_nextSummary;

@@ -267,7 +267,14 @@ void GameClient::Flush()
 
     m_outgoing.clear();
     m_lastSend = Clock::now();
-    m_socket->Send(bytes);
+    try
+    {
+        m_socket->Send(bytes);
+    }
+    catch (const WebSocketError& e)
+    {
+        LoseConnection(e.what());
+    }
 }
 
 void GameClient::PumpSession(std::chrono::milliseconds maxWait)
@@ -318,11 +325,15 @@ void GameClient::PumpSession(std::chrono::milliseconds maxWait)
         throw;
     }
 
-    if (!lostReason)
+    if (lostReason)
     {
-        return;
+        LoseConnection(*lostReason);
     }
+}
 
+// A connection lost during a logout ends the session as the logout would have; any other is reconnected.
+void GameClient::LoseConnection(std::string_view reason)
+{
     if (m_status == ClientStatus_e::LoggingOut)
     {
         m_status = ClientStatus_e::LoggedOut;
@@ -330,7 +341,7 @@ void GameClient::PumpSession(std::chrono::milliseconds maxWait)
         return;
     }
 
-    BeginReconnect(*lostReason);
+    BeginReconnect(reason);
 }
 
 // The server refuses a logout during combat and for 10 seconds after it, so the button is clicked again

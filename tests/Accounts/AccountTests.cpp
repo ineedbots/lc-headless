@@ -356,3 +356,70 @@ TEST_CASE("An interrupt during a relog's wait ends the account logged out", "[Ac
     CHECK(fixture.HasLine("stopped: interrupted"));
     CHECK(fixture.server.GetLoginOpcodes().size() == 1);
 }
+
+TEST_CASE("An account whose reconnect attempts all fail stops", "[Account]")
+{
+    const auto options = AccountOptions_s{.client = {.connectAttempts = 1, .retryDelay = 50ms, .keepaliveInterval = 50ms}, .reloginDelay = 100ms};
+    auto fixture = AccountFixture{"def loop():\n    return 100\n", 30s, options};
+    fixture.StepFor(200ms);
+
+    fixture.server.SetLoginStatus(14);
+    fixture.server.Close();
+    REQUIRE(fixture.StepUntilFinished());
+    CHECK(fixture.account->DescribeOutcome() == "failed");
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16, 18});
+}
+
+TEST_CASE("An account the server logs out logs in again with its script still loaded", "[Account]")
+{
+    constexpr auto SCRIPT = R"python(
+def on_disconnect():
+    log('gone')
+
+def on_reconnect():
+    log('back')
+
+def loop():
+    return 100
+)python";
+
+    const auto options = AccountOptions_s{.client = {.connectAttempts = 2, .retryDelay = 50ms, .keepaliveInterval = 50ms}, .reloginDelay = 300ms};
+    auto fixture = AccountFixture{SCRIPT, 30s, options};
+    fixture.StepFor(200ms);
+
+    fixture.server.Send(ServerProt_e::Logout);
+    auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && !fixture.HasLine("gone") && !fixture.account->IsFinished())
+    {
+        fixture.account->Step(STEP);
+    }
+
+    REQUIRE(fixture.HasLine("gone"));
+    CHECK_FALSE(fixture.account->IsFinished());
+    CHECK(fixture.account->DescribeStatus() == "relogging, script running");
+
+    SECTION("back in after the wait")
+    {
+        deadline = Clock::now() + WAIT;
+        while (Clock::now() < deadline && !fixture.HasLine("back") && !fixture.account->IsFinished())
+        {
+            fixture.account->Step(STEP);
+        }
+
+        CHECK(fixture.HasLine("back"));
+        CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16, 16});
+        CHECK_FALSE(fixture.account->IsFinished());
+
+        fixture.account->Interrupt();
+        REQUIRE(fixture.StepUntilFinished());
+        CHECK(fixture.account->Succeeded());
+    }
+
+    SECTION("stopped once the login fails for good")
+    {
+        fixture.server.SetLoginStatus(7);
+        REQUIRE(fixture.StepUntilFinished());
+        CHECK(fixture.account->DescribeOutcome() == "failed");
+        CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16, 16, 16});
+    }
+}

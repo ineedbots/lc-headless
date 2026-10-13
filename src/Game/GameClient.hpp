@@ -74,6 +74,7 @@ public:
 
     void Send(ClientPacket_s packet);
     void SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run);
+    // Sends the queued packets. A send that fails counts as a dropped connection, as it does in Pump.
     void Flush();
 
 private:
@@ -84,6 +85,7 @@ private:
     void StartAttempt();
     void AdvanceAttempt(std::chrono::milliseconds maxWait);
     void FinishLogin(const LoginResult_s& result);
+    void LoseConnection(std::string_view reason);
     void BeginReconnect(std::string_view reason);
     [[nodiscard]] bool ScheduleRetry(std::string_view error, bool retryable);
     [[nodiscard]] bool ContinueLogout();

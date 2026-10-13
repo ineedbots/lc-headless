@@ -172,42 +172,66 @@ void Account::Step(std::chrono::milliseconds maxWait)
         return;
     }
 
+    // Many accounts share the caller's loop, so nothing one of them hits may reach it. While logging in, Pump
+    // throws only once the client has used up its attempts, or for a refusal no attempt would change.
+    const auto loggingIn = m_client.GetStatus() == ClientStatus_e::Connecting;
     try
     {
         m_client.Pump(GetWait(maxWait));
     }
     catch (const std::exception& e)
     {
-        Fail(e.what());
+        if (loggingIn)
+        {
+            Fail(e.what());
+            return;
+        }
+
+        Recover(e.what());
         return;
     }
 
-    if (StepRelog(Clock::now()))
+    try
     {
-        return;
-    }
+        if (StepRelog(Clock::now()))
+        {
+            return;
+        }
 
-    UpdateFinished();
-    const auto status = m_client.GetStatus();
-    if (m_finished || status == ClientStatus_e::LoggingOut)
-    {
-        return;
-    }
+        const auto ended = m_client.GetStatus() == ClientStatus_e::LoggedOut || m_client.GetStatus() == ClientStatus_e::Disconnected;
+        if (ended && !IsStopping())
+        {
+            m_logger->Warning("The server ended the session; logging in again in {} s", GetReloginSeconds());
+            BeginRelogin();
+            return;
+        }
 
-    const auto now = Clock::now();
-    if (m_script)
-    {
-        StepScript(now);
-    }
-    else if (status == ClientStatus_e::InGame)
-    {
-        StepIdle(now);
-    }
+        UpdateFinished();
+        const auto status = m_client.GetStatus();
+        if (m_finished || status == ClientStatus_e::LoggingOut)
+        {
+            return;
+        }
 
-    if (!m_finished && m_killDeadline && now >= *m_killDeadline)
+        const auto now = Clock::now();
+        if (m_script)
+        {
+            StepScript(now);
+        }
+        else if (status == ClientStatus_e::InGame)
+        {
+            StepIdle(now);
+        }
+
+        if (!m_finished && m_killDeadline && now >= *m_killDeadline)
+        {
+            m_killDeadline.reset();
+            LogOut("the script didn't stop within scripting.killGraceSeconds");
+        }
+    }
+    catch (const std::exception& e)
     {
-        m_killDeadline.reset();
-        LogOut("the script didn't stop within scripting.killGraceSeconds");
+        Recover(e.what());
     }
 }
 
@@ -257,7 +281,14 @@ void Account::Interrupt()
     m_logger->Info("Interrupted; the script has {} s to stop the account, or interrupt again to log out now", grace.count());
     m_killDeadline = Clock::now() + grace;
     m_script->SignalKill();
-    StepScript(Clock::now());
+    try
+    {
+        StepScript(Clock::now());
+    }
+    catch (const std::exception& e)
+    {
+        Recover(e.what());
+    }
 }
 
 bool Account::IsStarted() const
@@ -510,6 +541,7 @@ void Account::LogOut(std::string_view reason)
     }
 
     m_logger->Info("Logging out: {}", reason);
+    m_stopping = true;
     if (m_script)
     {
         m_script->Finish(reason);
@@ -576,6 +608,53 @@ bool Account::StepRelog(Clock::time_point now)
     }
 
     return true;
+}
+
+// A failure during the session, such as a desync, logs back in unless the account is on its way out anyway.
+void Account::Recover(std::string_view reason)
+{
+    if (IsStopping())
+    {
+        Fail(reason);
+        return;
+    }
+
+    m_logger->Error("{}; logging in again in {} s", reason, GetReloginSeconds());
+    BeginRelogin();
+}
+
+// As a relog does, the script stays loaded, sees the account go, and gets on_reconnect once the player is
+// placed again. A login that then fails for good stops the account.
+void Account::BeginRelogin()
+{
+    m_client.Disconnect();
+    const auto now = Clock::now();
+    m_relogDelay.reset();
+    m_reloginAt = now + m_options.reloginDelay;
+    if (!m_script)
+    {
+        return;
+    }
+
+    try
+    {
+        m_script->Step(now);
+    }
+    catch (const std::exception& e)
+    {
+        m_reloginAt.reset();
+        Fail(e.what());
+    }
+}
+
+bool Account::IsStopping() const
+{
+    return m_stopping || m_interrupts > 0;
+}
+
+s64 Account::GetReloginSeconds() const
+{
+    return std::chrono::duration_cast<std::chrono::seconds>(m_options.reloginDelay).count();
 }
 
 void Account::Fail(std::string_view reason)
