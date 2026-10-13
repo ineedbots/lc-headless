@@ -30,6 +30,29 @@ vcpkg_replace_string("${SOURCE_PATH}/src/public/PyException.c"
     py_newnil(&frame_dump->locals);
     py_newnil(&frame_dump->globals);")
 
+# The watchdog's deadline uses clock(), which is wall time on Windows but CPU time on Linux, so on Linux
+# a call blocked in a binding never times out. It's moved to the monotonic clock, in 64-bit nanoseconds
+# because clock_t is a 32-bit long on Windows.
+vcpkg_replace_string("${SOURCE_PATH}/include/pocketpy/pocketpy.h"
+    "int64_t time_ns();"
+    "int64_t time_ns();
+int64_t time_monotonic_ns();")
+vcpkg_replace_string("${SOURCE_PATH}/include/pocketpy/interpreter/vm.h"
+    "clock_t max_reset_time;"
+    "int64_t max_reset_time;")
+vcpkg_replace_string("${SOURCE_PATH}/src/modules/pkpy.c"
+    "info->max_reset_time = clock() + (timeout * (CLOCKS_PER_SEC / 1000));"
+    "info->max_reset_time = time_monotonic_ns() + timeout * 1000000;")
+vcpkg_replace_string("${SOURCE_PATH}/src/interpreter/ceval.c"
+    "clock() > self->watchdog_info.max_reset_time"
+    "time_monotonic_ns() > self->watchdog_info.max_reset_time")
+
+# On Windows the monotonic clock multiplies the performance counter's ticks by a billion before dividing,
+# which overflows once the machine has been up for about 15 minutes at the usual 10 MHz counter.
+vcpkg_replace_string("${SOURCE_PATH}/src/modules/time.c"
+    "return (ticksll * NANOS_PER_SEC) / freq.QuadPart;"
+    "return (ticksll / freq.QuadPart) * NANOS_PER_SEC + (ticksll % freq.QuadPart) * NANOS_PER_SEC / freq.QuadPart;")
+
 # Upstream's CMakeLists has no install rules, so the port builds the sources with its own.
 file(COPY "${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt" DESTINATION "${SOURCE_PATH}")
 

@@ -147,15 +147,12 @@ void FakeGameServer::Send(ServerProt_e prot, std::span<const u8> payload)
 
 void FakeGameServer::Close()
 {
-    auto* connection = static_cast<ix::WebSocket*>(nullptr);
+    // Held across close(), as SendLocked holds it across a send: the server frees a connection once
+    // its Close callback returns, and that callback waits for this lock to clear m_connection.
+    const auto lock = std::scoped_lock{m_mutex};
+    if (m_connection != nullptr)
     {
-        const auto lock = std::scoped_lock{m_mutex};
-        connection = m_connection;
-    }
-
-    if (connection != nullptr)
-    {
-        connection->close();
+        m_connection->close();
     }
 }
 
