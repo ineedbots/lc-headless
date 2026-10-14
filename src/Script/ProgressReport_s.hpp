@@ -1,7 +1,6 @@
 #pragma once
 
-// What a script's on_progress_report returned, as text in the script's order, and how long the script had
-// been running.
+// What on_progress_report returned, as text in the script's order.
 struct ProgressReport_s
 {
     std::chrono::seconds runTime{};

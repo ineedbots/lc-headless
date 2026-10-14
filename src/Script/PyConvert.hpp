@@ -14,14 +14,14 @@
 
 #include <pocketpy.h>
 
-// A Python argument had the wrong type; the binding raises it as TypeError.
+// The binding raises it as TypeError.
 class ScriptTypeError : public std::runtime_error
 {
 public:
     using std::runtime_error::runtime_error;
 };
 
-// Python raised while a value was being converted; the binding leaves that exception in place.
+// The binding leaves Python's exception in place.
 class ScriptRaisedError : public std::runtime_error
 {
 public:
@@ -42,14 +42,10 @@ struct LocRef_s
     s32 z = 0;
 };
 
-// An option chosen by its number, or by its text.
 using OpChoice = std::variant<u8, std::string>;
 
-// Converts between script values and Python values in the current VM. Game objects become instances of
-// the classes the standard library puts in builtins (Npc, Player, GroundItem, Loc, InvItem, and the
-// NpcType, ItemType and LocType definitions), with their fields as attributes; names and options come
-// from the cache, and are None where it has none. Out-of-range numbers throw std::invalid_argument, which the
-// binding raises as ValueError.
+// Game objects become instances of the classes the standard library puts in builtins. Out-of-range numbers
+// throw std::invalid_argument, which the binding raises as ValueError.
 class PyConvert
 {
 public:
@@ -82,9 +78,8 @@ public:
     static void FromItemType(py_OutRef out, const ObjType_s& type, const GameCache_s& cache);
     static void FromLocType(py_OutRef out, const LocType_s& type, const GameCache_s& cache);
     static void FromProjectile(py_OutRef out, const Projectile_s& projectile);
-    // A component as the player sees it now.
     static void FromComponent(py_OutRef out, const IfComponent_s& component, const InterfaceView& view);
-    // The webclient's names for a component's type and button, in lower case.
+    // In lower case, as the webclient names them.
     [[nodiscard]] static std::string_view GetTypeName(ComponentType_e type);
     [[nodiscard]] static std::optional<std::string_view> GetButtonName(ButtonType_e button);
     static void FromString(py_OutRef out, std::string_view text);

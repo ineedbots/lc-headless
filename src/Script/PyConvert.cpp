@@ -194,7 +194,7 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     SetInt(object, "y", position.y);
     SetInt(object, "width", component.width);
     SetInt(object, "height", component.height);
-    // The item the server set the component to show, such as a make menu's product.
+    // Such as a make menu's product.
     if (const auto shown = view.GetObject(component))
     {
         SetInt(object, "item", *shown);

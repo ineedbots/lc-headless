@@ -1,8 +1,7 @@
 #pragma once
 
-// pocketpy for the whole process. pocketpy can be initialized and finalized only once per process, so
-// exactly one ScriptRuntime may ever exist, and it must outlive every ScriptVm. It hands out pocketpy's
-// VM slots, each an isolated interpreter.
+// pocketpy can be initialized and finalized only once per process, so exactly one ScriptRuntime may ever
+// exist, and it must outlive every ScriptVm.
 class ScriptRuntime
 {
 public:

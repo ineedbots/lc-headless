@@ -11,12 +11,8 @@ struct ScriptVmOptions_s
     std::chrono::milliseconds callTimeout = 1000ms;
 };
 
-// One isolated interpreter in a runtime VM slot, handed back when destroyed. pocketpy runs one VM at a
-// time, so every entry point switches to this one first, and values passed to Call must have been made
-// after that switch. Python's print, log() and debug() write to the logger; imports resolve in the
-// embedded standard library, then the scripts directory, then its lib folder; time.sleep raises, because
-// it would stall every account. It remembers each script file it ran or imported, so a watcher can tell
-// when the script changes.
+// pocketpy runs one VM at a time, so every entry point switches to this one first, and values passed to Call
+// must have been made after that switch. time.sleep raises, because it would stall every account.
 class ScriptVm
 {
 public:

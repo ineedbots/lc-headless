@@ -263,8 +263,6 @@ namespace
         PyConvert::FromString(out, Base37::DecodeDisplayName(name37));
     }
 
-    // Control and the local player
-
     bool GetTick(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(static_cast<s64>(GetApi().GetState().tick)); });
@@ -470,8 +468,6 @@ namespace
         });
     }
 
-    // Stats
-
     const Stat_s& GetStatArgument(py_StackRef argv)
     {
         return GetApi().GetStat(static_cast<s32>(PyConvert::ToInt(py_arg(0), "stat")));
@@ -510,8 +506,6 @@ namespace
             return ReturnInt(hitpoints.baseLevel == 0 ? 0 : hitpoints.level * PERCENT / hitpoints.baseLevel);
         });
     }
-
-    // Area
 
     bool DistanceTo(int, py_StackRef argv) noexcept
     {
@@ -563,8 +557,6 @@ namespace
             return ReturnBool(api.GetPosition() == api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
         });
     }
-
-    // NPCs, players, ground items and scenery
 
     bool GetNpcs(int, py_StackRef argv) noexcept
     {
@@ -694,8 +686,6 @@ namespace
         });
     }
 
-    // Types
-
     bool GetNpcType(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
@@ -794,8 +784,6 @@ namespace
         });
     }
 
-    // Inventories
-
     bool GetInventory(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
@@ -862,8 +850,6 @@ namespace
         return Guard([] { return ReturnBool(GetApi().GetEmptySlots() == 0); });
     }
 
-    // Interfaces, varps and social lists
-
     bool GetMainModal(int, py_StackRef) noexcept
     {
         return Guard([] { return ReturnInt(GetApi().GetState().interfaces.mainModal); });
@@ -920,8 +906,6 @@ namespace
             return true;
         });
     }
-
-    // Dialogues and make menus
 
     bool HasInventory(int, py_StackRef argv) noexcept
     {
@@ -1231,8 +1215,6 @@ namespace
         });
     }
 
-    // Interfaces
-
     std::optional<u16> ToRoot(py_Ref value)
     {
         if (py_isnone(value))
@@ -1401,8 +1383,6 @@ namespace
         });
     }
 
-    // Movement and interactions
-
     bool WalkTo(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
@@ -1554,8 +1534,6 @@ namespace
         });
     }
 
-    // Items
-
     bool ItemOp(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
@@ -1646,8 +1624,6 @@ namespace
         });
     }
 
-    // Magic
-
     bool CastOnNpc(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
@@ -1693,8 +1669,6 @@ namespace
             return ReturnBool(GetApi().CastOnItem(spell, PyConvert::ToItem(py_arg(1), "item")));
         });
     }
-
-    // Interfaces, settings and chat
 
     bool ClickButton(int, py_StackRef argv) noexcept
     {

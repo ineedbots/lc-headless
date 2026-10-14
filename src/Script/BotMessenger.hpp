@@ -1,15 +1,13 @@
 #pragma once
 
-// A message one script sent another, as the JSON text of the value it sent: each VM has its own heap, so
-// the receiver gets a copy.
+// As the JSON text of the value it sent: each VM has its own heap, so the receiver gets a copy.
 struct BotMessage_s
 {
     std::string sender;
     std::string json;
 };
 
-// Passes messages between the scripts in one process. Each account registers a receiver under its
-// username, which senders give in any case, and unregisters before it goes away.
+// Senders give the username in any case. Each account unregisters before it goes away.
 class BotMessenger
 {
 public:

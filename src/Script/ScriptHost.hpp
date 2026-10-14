@@ -42,11 +42,10 @@ struct ScriptHostOptions_s
     // Where send_bot_message sends, and the username it sends under.
     BotMessenger* messenger = nullptr;
     std::string username;
-    // Reload the script when its files change. A script that fails then waits for the next change.
+    // A script that fails then waits for the next change.
     bool watchFiles = false;
-    // Wait for VS Code's pocketpy debugger to attach before running the script.
     bool waitForDebugger = false;
-    // For routes beyond the loaded area; without it, the script can't plan them.
+    // Without it, the script can't plan routes beyond the loaded area.
     std::shared_ptr<const Navigation_s> navigation;
     // The runtime's upkeep each server tick: the random event guardian, the stall guard (off at zero) and
     // the run manager. Off by default, so tests see only what they ask for.
@@ -56,11 +55,7 @@ struct ScriptHostOptions_s
     s32 runEnergyMin = 20;
 };
 
-// Runs one account's bot against its client, on the caller's thread between pumps. The script is loaded
-// on construction, and the standard library's runtime makes its bot and checks its settings, so a broken
-// script fails before login. Once the local player is placed the bot starts; then every Step passes new
-// events, messages and bot messages to its hooks and subscribers, and steps its loop whenever the wait
-// it last asked for is over: a time, the next update from the server, or a number of server ticks.
+// The script is loaded on construction, so a broken script fails before login.
 class ScriptHost
 {
 public:
@@ -86,7 +81,7 @@ public:
     // Queues a message from another script for the next Step. False when the script isn't running, has no
     // on_bot_message, or already has MAX_BOT_MESSAGES waiting.
     [[nodiscard]] bool ReceiveBotMessage(BotMessage_s message);
-    // The console commands the script has added, by name; none once it has stopped.
+    // None once the script has stopped.
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
     // Queues a console command for the next Step that finds the player placed. False when the script isn't
     // running, hasn't added the command, or already has MAX_COMMANDS waiting.

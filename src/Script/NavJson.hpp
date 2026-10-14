@@ -25,7 +25,6 @@ struct NavRequest_s
 // hop that arrives there.
 namespace NavJson
 {
-    // Throws std::invalid_argument naming what's wrong.
     [[nodiscard]] NavRequest_s ParseRequest(std::string_view json);
     [[nodiscard]] std::string ToJson(const NavPath_s& path);
 }

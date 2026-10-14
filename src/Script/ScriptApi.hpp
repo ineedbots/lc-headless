@@ -40,12 +40,8 @@ enum class StopRequest_e : u8
     Account,
 };
 
-// What a script can see and do, in plain C++ over the tracked state, the map and GameActions, so a
-// binding only converts arguments and results. Tiles given as x and z are on the local player's level.
-// Actions on a target that's no longer tracked return false; arguments out of range throw
-// std::invalid_argument. A nearest search with reachable skips targets the path finder can't reach by
-// the rule the matching interaction walks by. Bot messages go through the messenger, if there is one,
-// under the account's username.
+// Plain C++ over the tracked state, the map and GameActions, so a binding only converts arguments and results.
+// Tiles given as x and z are on the local player's level. Actions on a target that's no longer tracked return false.
 class ScriptApi
 {
 public:
@@ -75,7 +71,6 @@ public:
     [[nodiscard]] const Stat_s& GetStat(s32 stat) const;
     [[nodiscard]] bool IsInterfaceOpen(s32 id) const;
     [[nodiscard]] std::optional<std::string> GetComponentText(u16 com) const;
-    // The interfaces as the player sees them.
     [[nodiscard]] InterfaceView GetInterfaces() const;
     // The chat modal's "Click here to continue" button, until it's clicked: the webclient sends one resume
     // per dialogue, and so does ContinueDialogue.
@@ -106,9 +101,8 @@ public:
     [[nodiscard]] std::optional<InventoryItem_s> FindItem(const SearchFilter_s& filter, u16 com) const;
     [[nodiscard]] s32 GetEmptySlots() const;
 
-    // An option's number, from its text as the right-click menu shows it, matched without regard to case.
-    // Text that matches no option throws std::invalid_argument, listing the options there are.
-    // FindNpcOp gives nullopt when the NPC isn't tracked.
+    // Matched without regard to case. Text that matches no option throws std::invalid_argument, listing the
+    // options there are.
     [[nodiscard]] std::optional<u8> FindNpcOp(u16 index, std::string_view text) const;
     [[nodiscard]] u8 FindPlayerOp(std::string_view text) const;
     [[nodiscard]] u8 FindLocOp(u16 loc, std::string_view text) const;
@@ -116,7 +110,7 @@ public:
     // option there.
     [[nodiscard]] u8 FindGroundItemOp(u16 obj, std::string_view text) const;
     [[nodiscard]] u8 FindItemOp(s32 obj, std::string_view text) const;
-    // An interface inventory's option, such as the bank's "Withdraw 5", by its text.
+    // Such as the bank's "Withdraw 5".
     [[nodiscard]] u8 FindInventoryOption(u16 com, std::string_view text) const;
 
     // Each kind of target's menu, with the "Take" and "Drop" the menu adds where the type has nothing
@@ -137,7 +131,7 @@ public:
 
     // Whether a walk can end on the tile.
     [[nodiscard]] bool IsReachable(s32 x, s32 z) const;
-    // A route across the world, or nullopt when the client has no Navigation_s.
+    // Nullopt when the client has no Navigation_s.
     [[nodiscard]] std::optional<NavPath_s> FindWorldPath(NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options) const;
     [[nodiscard]] const Navigation_s* GetNavigation() const;
     // Whether one step between neighbouring tiles on the player's level is open.
@@ -170,8 +164,7 @@ public:
     // Clicks the component as its button type says. False, sending nothing, when it isn't visible; one
     // that isn't a button a click uses, such as a spell's Target button, throws std::invalid_argument.
     bool ClickComponent(u16 com);
-    // Clicks the button under the visible text, in the open interfaces or only in root's. False when there's
-    // no such text, or no button under it.
+    // False when there's no such text, or no button under it.
     bool ClickText(std::string_view text, std::optional<u16> root);
     // False, sending nothing, when there's nothing to continue or no count dialog to answer.
     bool ContinueDialogue();
@@ -199,7 +192,7 @@ public:
     [[nodiscard]] bool CanSetRun() const;
     // The character design screen: a main modal with the Accept button whose client code saves a design.
     [[nodiscard]] bool IsAppearanceScreenOpen() const;
-    // Saves the design. False when the design screen isn't open.
+    // False when the design screen isn't open.
     bool SetAppearance(const IdkDesign_s& design);
 
     // The time of the host's current step, in milliseconds on its clock. Waits measure from it, so a test
