@@ -169,8 +169,10 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
 
     m_logger->Info("Config loaded from {}", m_commandLine.configPath.string());
     m_cache = std::make_shared<const GameCache_s>(CacheLoader::Load(m_config->client.cacheDirectory, *m_logger));
+
     const auto started = std::chrono::steady_clock::now();
     m_navigation = std::make_shared<const Navigation_s>(*m_cache, m_config->client.navDirectory);
+
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
     m_logger->Info("Walking map built and walker graph loaded from {} in {} ms: {:.1f} MB, {} edges",
                    m_config->client.navDirectory, elapsed.count(), static_cast<double>(m_navigation->map.GetMemoryBytes()) / (1024.0 * 1024.0), m_navigation->graph.GetEdgeCount());
@@ -188,6 +190,7 @@ int Application::Run()
         .reloginDelay = scripting.reloginDelaySeconds,
     };
     auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options};
+
     if (m_commandLine.watch)
     {
         m_logger->Info("Watching the scripts: each reloads when its files change, and one that fails waits for a fix");
@@ -195,6 +198,7 @@ int Application::Run()
 
     // Installed only once the scripts have loaded, so Ctrl+C still ends the process while it waits for the debugger.
     std::signal(SIGINT, SignalHandler);
+
     const auto console = m_commandLine.rawConsole ? nullptr : ConsoleInput::ReadStdin();
     const auto consoleLog = ConsoleLogScope{[this](std::shared_ptr<ConsoleInput> current)
     {

@@ -70,6 +70,7 @@ namespace
         static const auto error = CanColor(stderr);
         return stream == stderr ? error : output;
     }
+
     std::string_view GetLevelName(LogLevel_e level)
     {
         switch (level)
@@ -150,6 +151,7 @@ const std::string& Logger::GetSource() const noexcept
 std::shared_ptr<Logger> Logger::CreateNamed(std::shared_ptr<Logger> parent, std::string source)
 {
     assert(parent && "A named logger needs a parent");
+
     auto named = std::make_shared<Logger>(LogLevel_e::Verbose, nullptr);
     named->m_parent = std::move(parent);
     named->m_source = std::move(source);
@@ -239,6 +241,7 @@ void Logger::Deliver(LogLevel_e level, std::optional<std::source_location> locat
     }
 
     const auto lock = std::scoped_lock{m_mutex};
+
     if (!m_sink)
     {
         return;

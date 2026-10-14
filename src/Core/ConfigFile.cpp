@@ -211,6 +211,7 @@ namespace
         Check(account.idleSeconds >= 0s && account.idleSeconds <= MAX_IDLE_SECONDS, "idleSeconds", std::format("must be from 0 (idle until interrupted) to {}", MAX_IDLE_SECONDS.count()));
         Check(account.stallMinutes >= std::chrono::minutes{0} && account.stallMinutes <= MAX_STALL_MINUTES, "stallMinutes", std::format("must be from 0 to {}", MAX_STALL_MINUTES.count()));
         Check(account.runEnergyMin >= 0 && account.runEnergyMin <= MAX_RUN_ENERGY, "runEnergyMin", std::format("must be from 0 to {}", MAX_RUN_ENERGY));
+
         if (account.server)
         {
             ValidateServer(*account.server);
@@ -255,6 +256,7 @@ namespace
         }
 
         auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+
         if (file.bad())
         {
             throw ConfigError{std::format("Failed to read config file {}", path.string())};
@@ -280,6 +282,7 @@ namespace
 
         auto error = std::error_code{};
         std::filesystem::rename(temporary, path, error);
+
         if (error)
         {
             std::filesystem::remove(temporary, error);
@@ -389,6 +392,7 @@ void from_json(const nlohmann::json& value, ScriptConfig_s& script)
 {
     script.file = value.value("file", std::string{});
     script.progressReportMinutes = std::chrono::minutes{value.value("progressReportMinutes", s64{0})};
+
     const auto settings = value.find("settings");
     if (settings == value.end())
     {
@@ -412,6 +416,7 @@ void from_json(const nlohmann::json& value, AccountConfig_s& account)
     account.stallMinutes = value.value("stallMinutes", account.stallMinutes);
     account.runAuto = value.value("runAuto", account.runAuto);
     account.runEnergyMin = value.value("runEnergyMin", account.runEnergyMin);
+
     const auto server = value.find("server");
     if (server != value.end() && !server->is_null())
     {
@@ -526,6 +531,7 @@ std::vector<std::string> ConfigFile::AddScriptSettings(const std::filesystem::pa
     {
         // For the parser's errors, which say where the text is wrong.
         static_cast<void>(ParseRootObject(text));
+
         const auto keys = std::array{std::string{"script"}, std::string{"settings"}, std::string{botName}};
         edit = JsoncEditor::AddMissing(text, keys, settingsJson);
     }

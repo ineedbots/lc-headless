@@ -72,6 +72,7 @@ namespace
         Value_s ScanDocument()
         {
             SkipSpace();
+
             auto value = ScanValue();
             SkipSpace();
             Expect(m_pos == m_text.size());
@@ -122,6 +123,7 @@ namespace
         Value_s ScanValue()
         {
             const auto begin = m_pos;
+
             switch (Peek())
             {
             case '{':
@@ -145,6 +147,7 @@ namespace
             auto object = Value_s{.begin = m_pos, .isObject = true};
             ++m_pos;
             SkipSpace();
+
             if (Peek() != '}')
             {
                 while (true)
@@ -160,6 +163,7 @@ namespace
                     member.value = ScanValue();
                     object.members.push_back(std::move(member));
                     SkipSpace();
+
                     if (Peek() != ',')
                     {
                         break;
@@ -180,12 +184,14 @@ namespace
         {
             ++m_pos;
             SkipSpace();
+
             if (Peek() != ']')
             {
                 while (true)
                 {
                     static_cast<void>(ScanValue());
                     SkipSpace();
+
                     if (Peek() != ',')
                     {
                         break;
@@ -203,6 +209,7 @@ namespace
         void ScanString()
         {
             ++m_pos;
+
             while (Peek() != '"')
             {
                 m_pos += Peek() == '\\' ? std::size_t{2} : std::size_t{1};
@@ -214,6 +221,7 @@ namespace
         void ScanLiteral()
         {
             const auto begin = m_pos;
+
             while (m_pos < m_text.size() && IsLiteral(m_text[m_pos]))
             {
                 ++m_pos;
@@ -421,6 +429,7 @@ namespace
         const auto lineEnd = SkipToLineEnd(text, last.value.end);
         auto between = text.substr(last.value.end, lineEnd - last.value.end);
         between = between.substr(0, between.find_last_not_of(" \t") + 1);
+
         auto replacement = "," + std::string{between} + eol + FormatMemberLines(members, indent, layout);
         if (lineEnd == close)
         {
@@ -503,6 +512,7 @@ JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::
         }
 
         missing[path[depth]] = std::move(nested);
+
         for (const auto& [key, value] : members.items())
         {
             edit.added.push_back(key);

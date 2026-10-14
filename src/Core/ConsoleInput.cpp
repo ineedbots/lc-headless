@@ -216,6 +216,7 @@ void ConsoleInput::Print(std::FILE* stream, std::string_view text)
     auto line = std::string{text};
     line += '\n';
     Write(stream, line);
+
     if (prompting)
     {
         Write(stdout, m_editor->Render());
@@ -225,6 +226,7 @@ void ConsoleInput::Print(std::FILE* stream, std::string_view text)
 void ConsoleInput::Close()
 {
     const auto lock = std::lock_guard{m_outputMutex};
+
     if (!m_editor || m_closed)
     {
         return;
@@ -284,12 +286,14 @@ void ConsoleInput::ReadKeys()
         auto entered = std::vector<std::string>{};
         {
             const auto lock = std::lock_guard{m_outputMutex};
+
             if (m_closed)
             {
                 return;
             }
 
             entered = m_editor->Feed(*bytes);
+
             auto text = std::string{};
             for (const auto& line : entered)
             {

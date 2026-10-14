@@ -217,6 +217,7 @@ void WebSocketClient::Send(std::span<const u8> data)
     }
 
     m_logger->Verbose("WebSocket sending {} bytes", data.size());
+
     const auto sendInfo = m_socket->sendBinary(ix::IXWebSocketSendData{reinterpret_cast<const char*>(data.data()), data.size()});
     if (sendInfo.success)
     {
@@ -234,6 +235,7 @@ void WebSocketClient::Send(std::span<const u8> data)
 WebSocketState_e WebSocketClient::Pump()
 {
     Drain();
+
     if (m_status.failed)
     {
         throw WebSocketError{m_status.reason};
@@ -337,12 +339,14 @@ bool WebSocketClient::WaitAvailableUntil(std::size_t count, Deadline deadline)
     while (true)
     {
         Drain();
+
         if (Available() >= count)
         {
             return true;
         }
 
         ThrowIfEnded(m_status);
+
         if (IsPast(deadline))
         {
             return false;
@@ -357,12 +361,14 @@ bool WebSocketClient::WaitOpenUntil(Deadline deadline)
     while (true)
     {
         Drain();
+
         if (m_status.state == WebSocketState_e::Open)
         {
             return true;
         }
 
         ThrowIfEnded(m_status);
+
         if (IsPast(deadline))
         {
             return false;
@@ -377,6 +383,7 @@ bool WebSocketClient::WaitClosedUntil(Deadline deadline)
     while (true)
     {
         Drain();
+
         if (m_status.state == WebSocketState_e::Closed)
         {
             if (m_status.failed)

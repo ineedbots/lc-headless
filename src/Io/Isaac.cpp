@@ -101,6 +101,7 @@ void Isaac::Generate()
     for (auto i = std::size_t{0}; i < SIZE; ++i)
     {
         const auto x = m_memory[i];
+
         switch (i & 3)
         {
         case 0:
@@ -118,6 +119,7 @@ void Isaac::Generate()
         }
 
         m_a += m_memory[(i + SIZE / 2) % SIZE];
+
         const auto y = m_memory[(x >> 2) % SIZE] + m_a + m_b;
         m_memory[i] = y;
         m_b = m_memory[(y >> 10) % SIZE] + x;

@@ -59,6 +59,7 @@ namespace
 std::vector<std::string> LineEditor::Feed(std::string_view bytes)
 {
     m_pending += bytes;
+
     auto entered = std::vector<std::string>{};
     while (!m_pending.empty())
     {
@@ -79,6 +80,7 @@ std::string LineEditor::Render() const
     auto text = std::string{CLEAR_LINE};
     text += PROMPT;
     text += m_line;
+
     const auto behind = CountColumns(std::string_view{m_line}.substr(m_cursor));
     if (behind > 0)
     {
@@ -127,6 +129,7 @@ std::size_t LineEditor::HandleNext(std::vector<std::string>& entered)
         {
             Enter(entered);
         }
+
         return 1;
     case KEY_BACKSPACE:
     case KEY_DELETE:
@@ -236,6 +239,7 @@ void LineEditor::Enter(std::vector<std::string>& entered)
     auto line = std::exchange(m_line, {});
     m_cursor = 0;
     m_draft.clear();
+
     if (!line.empty() && (m_history.empty() || m_history.back() != line))
     {
         m_history.push_back(line);

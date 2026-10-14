@@ -183,6 +183,7 @@ s64 Packet::G8()
 s32 Packet::GSmart()
 {
     RequireBytes(1);
+
     if (m_readData[m_pos] < SMART_ONE_BYTE_LIMIT)
     {
         return G1();
@@ -194,6 +195,7 @@ s32 Packet::GSmart()
 s32 Packet::GSmarts()
 {
     RequireBytes(1);
+
     if (m_readData[m_pos] < SMART_ONE_BYTE_LIMIT)
     {
         return G1() - SMARTS_ONE_BYTE_OFFSET;
@@ -205,6 +207,7 @@ s32 Packet::GSmarts()
 std::string Packet::GJStr()
 {
     RequireBytes(1);
+
     const auto unread = m_readData.subspan(m_pos);
     const auto terminator = std::ranges::find(unread, STRING_TERMINATOR);
     if (terminator != unread.end())
@@ -354,6 +357,7 @@ void Packet::RsaEnc(const BigUInt& modulus, const BigUInt& exponent)
 std::span<const u8> Packet::NextRead(std::size_t count)
 {
     RequireBytes(count);
+
     const auto bytes = m_readData.subspan(m_pos, count);
     m_pos += count;
     return bytes;
@@ -377,6 +381,7 @@ std::span<u8> Packet::NextWrite(std::size_t count)
 void Packet::RequireBytes(std::size_t count) const
 {
     assert(m_mode == Mode_e::Read && "Packet read called on a write-mode packet");
+
     if (count <= GetAvailable())
     {
         return;
@@ -388,6 +393,7 @@ void Packet::RequireBytes(std::size_t count) const
 void Packet::RequireBits(u32 bitCount) const
 {
     assert(m_mode == Mode_e::Read && "GBit called on a write-mode packet");
+
     const auto availableBits = m_readData.size() * 8 - m_bitPos;
     if (bitCount <= availableBits)
     {

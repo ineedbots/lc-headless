@@ -81,6 +81,7 @@ BigUInt BigUInt::ModPow(const BigUInt& base, const BigUInt& exponent, const BigU
 
     auto result = BigUInt{};
     result.m_limbs = {1};
+
     auto factor = base;
     const auto bitLength = exponent.GetBitLength();
     for (auto bit = std::size_t{0}; bit < bitLength; ++bit)
@@ -251,6 +252,7 @@ void BigUInt::Subtract(const BigUInt& other)
 void BigUInt::AddMod(const BigUInt& other, const BigUInt& modulus)
 {
     Add(other);
+
     if (*this >= modulus)
     {
         Subtract(modulus);
