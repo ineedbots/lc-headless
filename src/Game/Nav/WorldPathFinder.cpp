@@ -72,7 +72,10 @@ namespace
     std::string Lower(std::string_view text)
     {
         auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+        std::ranges::transform(result, result.begin(), [](char c)
+        {
+            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        });
         return result;
     }
 
@@ -93,7 +96,10 @@ namespace
 
     bool InZones(const std::vector<NavRect_s>& zones, s32 x, s32 z, s32 level)
     {
-        return std::ranges::any_of(zones, [x, z, level](const NavRect_s& zone) { return zone.Contains(x, z, level); });
+        return std::ranges::any_of(zones, [x, z, level](const NavRect_s& zone)
+        {
+            return zone.Contains(x, z, level);
+        });
     }
 
     // One move the search can make besides a step.

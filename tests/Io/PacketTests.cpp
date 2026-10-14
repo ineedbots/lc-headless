@@ -428,37 +428,79 @@ TEST_CASE("Packet writes read back unchanged", "[Packet]")
 {
     SECTION("P1 and G1")
     {
-        CheckRoundTrip({0, 255, 0, 1}, [](Packet& packet, s64 value) { packet.P1(static_cast<s32>(value)); }, [](Packet& packet) -> s64 { return packet.G1(); });
+        CheckRoundTrip({0, 255, 0, 1}, [](Packet& packet, s64 value)
+        {
+            packet.P1(static_cast<s32>(value));
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G1();
+        });
     }
 
     SECTION("P1 and G1B")
     {
-        CheckRoundTrip({-128, 127, 0, 1, -1}, [](Packet& packet, s64 value) { packet.P1(static_cast<s32>(value)); }, [](Packet& packet) -> s64 { return packet.G1B(); });
+        CheckRoundTrip({-128, 127, 0, 1, -1}, [](Packet& packet, s64 value)
+        {
+            packet.P1(static_cast<s32>(value));
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G1B();
+        });
     }
 
     SECTION("P2 and G2")
     {
-        CheckRoundTrip({0, 65535, 0, 1}, [](Packet& packet, s64 value) { packet.P2(static_cast<s32>(value)); }, [](Packet& packet) -> s64 { return packet.G2(); });
+        CheckRoundTrip({0, 65535, 0, 1}, [](Packet& packet, s64 value)
+        {
+            packet.P2(static_cast<s32>(value));
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G2();
+        });
     }
 
     SECTION("P2 and G2B")
     {
-        CheckRoundTrip({-32768, 32767, 0, 1, -1}, [](Packet& packet, s64 value) { packet.P2(static_cast<s32>(value)); }, [](Packet& packet) -> s64 { return packet.G2B(); });
+        CheckRoundTrip({-32768, 32767, 0, 1, -1}, [](Packet& packet, s64 value)
+        {
+            packet.P2(static_cast<s32>(value));
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G2B();
+        });
     }
 
     SECTION("P3 and G3")
     {
-        CheckRoundTrip({0, 16777215, 0, 1}, [](Packet& packet, s64 value) { packet.P3(static_cast<s32>(value)); }, [](Packet& packet) -> s64 { return packet.G3(); });
+        CheckRoundTrip({0, 16777215, 0, 1}, [](Packet& packet, s64 value)
+        {
+            packet.P3(static_cast<s32>(value));
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G3();
+        });
     }
 
     SECTION("P4 and G4")
     {
-        CheckRoundTrip({std::numeric_limits<s32>::min(), std::numeric_limits<s32>::max(), 0, 1, -1}, [](Packet& packet, s64 value) { packet.P4(static_cast<s32>(value)); }, [](Packet& packet) -> s64 { return packet.G4(); });
+        CheckRoundTrip({std::numeric_limits<s32>::min(), std::numeric_limits<s32>::max(), 0, 1, -1}, [](Packet& packet, s64 value)
+        {
+            packet.P4(static_cast<s32>(value));
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G4();
+        });
     }
 
     SECTION("P8 and G8")
     {
-        CheckRoundTrip({std::numeric_limits<s64>::min(), std::numeric_limits<s64>::max(), 0, 1, -1}, [](Packet& packet, s64 value) { packet.P8(value); }, [](Packet& packet) -> s64 { return packet.G8(); });
+        CheckRoundTrip({std::numeric_limits<s64>::min(), std::numeric_limits<s64>::max(), 0, 1, -1}, [](Packet& packet, s64 value)
+        {
+            packet.P8(value);
+        }, [](Packet& packet) -> s64
+        {
+            return packet.G8();
+        });
     }
 
     SECTION("PJStr and GJStr")

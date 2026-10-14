@@ -22,7 +22,10 @@ namespace
     std::string Lower(std::string_view text)
     {
         auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+        std::ranges::transform(result, result.begin(), [](char c)
+        {
+            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        });
         return result;
     }
 
@@ -335,7 +338,10 @@ std::vector<MakeSlot_s> ChatDialog::GetMakePanel(const InterfaceView& view, cons
 
     for (const auto* const component : view.GetTree(static_cast<u16>(mainModal)))
     {
-        const auto makes = std::ranges::any_of(component->options, [](const std::string& option) { return Lower(option).starts_with("make"); });
+        const auto makes = std::ranges::any_of(component->options, [](const std::string& option)
+        {
+            return Lower(option).starts_with("make");
+        });
         if (component->type != ComponentType_e::Inv || !makes || component->width == 0 || !view.IsVisible(*component))
         {
             continue;

@@ -129,7 +129,10 @@ TEST_CASE("WorldPathFinder routes round avoided zones, though it may leave one i
     const auto path = fixture.Find(At(5, 10), At(25, 10), options);
     REQUIRE(path.ok);
     CHECK(path.cost > 20);
-    CHECK_FALSE(Visits(path, [](const NavPoint_s& tile) { return tile.x == BASE + 15 && tile.z <= BASE + 20; }));
+    CHECK_FALSE(Visits(path, [](const NavPoint_s& tile)
+    {
+        return tile.x == BASE + 15 && tile.z <= BASE + 20;
+    }));
 
     const auto escaping = fixture.Find(At(15, 10), At(25, 10), options);
     REQUIRE(escaping.ok);
@@ -143,7 +146,10 @@ TEST_CASE("WorldPathFinder takes a hop to another level when the account meets i
     const auto path = fixture.Find(At(5, 5), At(10, 20, 1), options);
     REQUIRE(path.ok);
 
-    const auto hop = std::ranges::find_if(path.waypoints, [](const NavWaypoint_s& waypoint) { return waypoint.edge != nullptr; });
+    const auto hop = std::ranges::find_if(path.waypoints, [](const NavWaypoint_s& waypoint)
+    {
+        return waypoint.edge != nullptr;
+    });
     REQUIRE(hop != path.waypoints.end());
     CHECK(hop->edge->action == "Climb-up");
     CHECK((hop - 1)->point == At(10, 10));

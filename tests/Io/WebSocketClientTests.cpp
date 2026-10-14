@@ -210,11 +210,11 @@ namespace
             switch (message.type)
             {
             case ix::WebSocketMessageType::Open:
-                {
-                    const auto lock = std::scoped_lock{m_mutex};
-                    m_headers = message.openInfo.headers;
-                    m_isOpen = true;
-                }
+            {
+                const auto lock = std::scoped_lock{m_mutex};
+                m_headers = message.openInfo.headers;
+                m_isOpen = true;
+            }
 
                 m_changed.notify_all();
 
@@ -226,10 +226,10 @@ namespace
                 return;
 
             case ix::WebSocketMessageType::Message:
-                {
-                    const auto lock = std::scoped_lock{m_mutex};
-                    m_messages.push_back(message.str);
-                }
+            {
+                const auto lock = std::scoped_lock{m_mutex};
+                m_messages.push_back(message.str);
+            }
 
                 m_changed.notify_all();
 
@@ -241,10 +241,10 @@ namespace
                 return;
 
             case ix::WebSocketMessageType::Close:
-                {
-                    const auto lock = std::scoped_lock{m_mutex};
-                    m_isClosed = true;
-                }
+            {
+                const auto lock = std::scoped_lock{m_mutex};
+                m_isClosed = true;
+            }
 
                 m_changed.notify_all();
                 return;

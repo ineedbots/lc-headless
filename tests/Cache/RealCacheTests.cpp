@@ -331,7 +331,10 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
         REQUIRE_FALSE(products.empty());
         // The name is the text the player reads, price and all.
         CHECK(products[0].name == "Soft leather: 1 gp");
-        CHECK(std::ranges::any_of(products[0].buttons, [](const MakeButton_s& button) { return button.amount == MakeButton_s::ALL; }));
+        CHECK(std::ranges::any_of(products[0].buttons, [](const MakeButton_s& button)
+        {
+            return button.amount == MakeButton_s::ALL;
+        }));
     }
 
     SECTION("jewellery's products are drawn over placeholder slots")

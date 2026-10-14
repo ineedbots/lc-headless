@@ -10,7 +10,10 @@ namespace
     std::string Lower(std::string_view text)
     {
         auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+        std::ranges::transform(result, result.begin(), [](char c)
+        {
+            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        });
         return result;
     }
 

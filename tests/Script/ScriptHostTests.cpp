@@ -137,7 +137,10 @@ namespace
             packet.P2(main);
             packet.P2(side);
             Send(ServerProt_e::IfOpenMainSide, packet);
-            PumpUntil([this, main] { return client.GetState().interfaces.mainModal == main; });
+            PumpUntil([this, main]
+            {
+                return client.GetState().interfaces.mainModal == main;
+            });
         }
 
         template <typename TCondition>
@@ -1108,7 +1111,10 @@ def loop():
 
     setText(TestCache::DIALOGUE_TEXT, "Hello there.");
     openChat(TestCache::DIALOGUE);
-    pumpUntil([&client] { return client.GetState().interfaces.chatModal == TestCache::DIALOGUE; });
+    pumpUntil([&client]
+    {
+        return client.GetState().interfaces.chatModal == TestCache::DIALOGUE;
+    });
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePauseButton));
     CHECK(lastPayload(ClientProt_e::ResumePauseButton) == ComBytes(TestCache::DIALOGUE_CONTINUE));
@@ -1120,19 +1126,28 @@ def loop():
     setText(TestCache::OPTION_ONE, "Yes please.");
     setText(TestCache::OPTION_TWO, "No thanks.");
     openChat(TestCache::OPTIONS);
-    pumpUntil([&client] { return client.GetState().interfaces.chatModal == TestCache::OPTIONS; });
+    pumpUntil([&client]
+    {
+        return client.GetState().interfaces.chatModal == TestCache::OPTIONS;
+    });
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
     CHECK(lastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::OPTION_TWO));
 
     openChat(TestCache::MAKE_MENU);
-    pumpUntil([&client] { return client.GetState().interfaces.chatModal == TestCache::MAKE_MENU; });
+    pumpUntil([&client]
+    {
+        return client.GetState().interfaces.chatModal == TestCache::MAKE_MENU;
+    });
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton, 2));
     CHECK(lastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::MAKE_X));
 
     send(ServerProt_e::PCountDialog, Packet{});
-    pumpUntil([&client] { return client.GetState().interfaces.countDialogOpen; });
+    pumpUntil([&client]
+    {
+        return client.GetState().interfaces.countDialogOpen;
+    });
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
     CHECK(lastPayload(ClientProt_e::ResumePCountDialog) == std::vector<u8>{0, 0, 0, 27});
@@ -1221,20 +1236,29 @@ def loop():
     open.P2(TestCache::BANK_SCREEN);
     open.P2(TestCache::BANK_SIDE);
     send(ServerProt_e::IfOpenMainSide, open);
-    pumpUntil([&client] { return client.GetState().interfaces.mainModal == TestCache::BANK_SCREEN; });
+    pumpUntil([&client]
+    {
+        return client.GetState().interfaces.mainModal == TestCache::BANK_SCREEN;
+    });
 
     // 27 isn't 1, 5 or 10, so it's Withdraw X and the count dialog.
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton5));
     CHECK(lastPayload(ClientProt_e::InvButton5) == itemBytes(BONES, 0, TestCache::BANK));
     send(ServerProt_e::PCountDialog, Packet{});
-    pumpUntil([&client] { return client.GetState().interfaces.countDialogOpen; });
+    pumpUntil([&client]
+    {
+        return client.GetState().interfaces.countDialogOpen;
+    });
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
     CHECK(lastPayload(ClientProt_e::ResumePCountDialog) == std::vector<u8>{0, 0, 0, 27});
 
     sendInventory(TestCache::INVENTORY, {{LOGS, 3}, {BONES, 27}});
-    pumpUntil([&client] { return client.GetState().inventories.at(TestCache::INVENTORY).slots.size() == 2; });
+    pumpUntil([&client]
+    {
+        return client.GetState().inventories.at(TestCache::INVENTORY).slots.size() == 2;
+    });
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
     CHECK(lastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::BANK_NOTE));
@@ -1244,7 +1268,10 @@ def loop():
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton4));
     CHECK(lastPayload(ClientProt_e::InvButton4) == itemBytes(LOGS, 0, TestCache::BANK_INVENTORY));
     sendInventory(TestCache::BANK_INVENTORY, {{0xFFFF, 0}});
-    pumpUntil([&client] { return client.GetState().inventories.at(TestCache::BANK_INVENTORY).slots[0].id == -1; });
+    pumpUntil([&client]
+    {
+        return client.GetState().inventories.at(TestCache::BANK_INVENTORY).slots[0].id == -1;
+    });
     step();
 
     // clang-format off
@@ -1285,7 +1312,10 @@ def loop():
     }
 
     fixture.SendInventory(TestCache::INVENTORY, {{LOGS, 3}, {BONES, 16}});
-    fixture.PumpUntil([&fixture] { return fixture.client.GetState().inventories.at(TestCache::INVENTORY).slots.size() == 2; });
+    fixture.PumpUntil([&fixture]
+    {
+        return fixture.client.GetState().inventories.at(TestCache::INVENTORY).slots.size() == 2;
+    });
     fixture.Step();
     fixture.SendTick();
     fixture.Step();
@@ -1319,19 +1349,28 @@ def loop():
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton5));
     CHECK(fixture.LastPayload(ClientProt_e::InvButton5) == std::vector<u8>{LOGS >> 8, LOGS & 0xFF, 0, 0, TestCache::TRADE_SIDE_INV >> 8, TestCache::TRADE_SIDE_INV & 0xFF});
     fixture.Send(ServerProt_e::PCountDialog, Packet{});
-    fixture.PumpUntil([&fixture] { return fixture.client.GetState().interfaces.countDialogOpen; });
+    fixture.PumpUntil([&fixture]
+    {
+        return fixture.client.GetState().interfaces.countDialogOpen;
+    });
     fixture.Step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
 
     fixture.SendInventory(TestCache::TRADE_MY_OFFER, {{LOGS, 1}, {LOGS, 1}});
-    fixture.PumpUntil([&fixture] { return fixture.client.GetState().inventories.contains(TestCache::TRADE_MY_OFFER); });
+    fixture.PumpUntil([&fixture]
+    {
+        return fixture.client.GetState().inventories.contains(TestCache::TRADE_MY_OFFER);
+    });
     fixture.Step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
     CHECK(fixture.LastPayload(ClientProt_e::IfButton) == ComBytes(TestCache::TRADE_ACCEPT));
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::CloseModal));
 
     fixture.Send(ServerProt_e::IfClose, Packet{});
-    fixture.PumpUntil([&fixture] { return fixture.client.GetState().interfaces.mainModal == -1; });
+    fixture.PumpUntil([&fixture]
+    {
+        return fixture.client.GetState().interfaces.mainModal == -1;
+    });
     fixture.Step();
     // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
@@ -1421,7 +1460,10 @@ def loop():
     projectile.P1(16);
     projectile.P1(64);
     fixture.Send(ServerProt_e::MapProjAnim, projectile);
-    fixture.PumpUntil([&fixture] { return !fixture.client.GetState().projectiles.empty(); });
+    fixture.PumpUntil([&fixture]
+    {
+        return !fixture.client.GetState().projectiles.empty();
+    });
 
     fixture.host->Step(Clock::now());
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"death", "say 50 Hello there", "projectile 91 3 True"});

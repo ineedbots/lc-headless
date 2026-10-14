@@ -86,7 +86,10 @@ TEST_CASE("WorldPathFinder plans routes across the real map", "[RealCache]")
         REQUIRE(path.ok);
 
         const auto hops = GetHops(path);
-        CHECK(std::ranges::count_if(hops, [](const std::string& hop) { return hop.starts_with("Climb-up"); }) == 2);
+        CHECK(std::ranges::count_if(hops, [](const std::string& hop)
+        {
+            return hop.starts_with("Climb-up");
+        }) == 2);
         CHECK(path.waypoints.back().point.level == 2);
     }
 

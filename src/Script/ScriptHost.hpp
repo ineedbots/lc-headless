@@ -65,7 +65,6 @@ public:
     static constexpr std::size_t MAX_COMMANDS = 100;
     static constexpr auto WATCH_INTERVAL = 500ms;
 
-
     ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOptions_s options, std::shared_ptr<Logger> logger = Logger::GetDefault());
     ~ScriptHost();
 

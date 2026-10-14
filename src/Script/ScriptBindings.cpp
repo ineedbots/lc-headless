@@ -265,17 +265,26 @@ namespace
 
     bool GetTick(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(static_cast<s64>(GetApi().GetState().tick)); });
+        return Guard([]
+        {
+            return ReturnInt(static_cast<s64>(GetApi().GetState().tick));
+        });
     }
 
     bool IsPlaced(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().GetState().placed); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().GetState().placed);
+        });
     }
 
     bool GetStepTime(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetStepTime()); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetStepTime());
+        });
     }
 
     bool NoteProgress(int, py_StackRef) noexcept
@@ -309,12 +318,18 @@ namespace
 
     bool CanSetRun(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().CanSetRun()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().CanSetRun());
+        });
     }
 
     bool IsAppearanceScreenOpen(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().IsAppearanceScreenOpen()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().IsAppearanceScreenOpen());
+        });
     }
 
     // Reads exactly N small numbers from a list or tuple.
@@ -376,17 +391,26 @@ namespace
 
     bool GetX(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetPosition().x); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetPosition().x);
+        });
     }
 
     bool GetZ(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetPosition().z); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetPosition().z);
+        });
     }
 
     bool GetLevel(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetPosition().level); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetPosition().level);
+        });
     }
 
     bool GetPosition(int, py_StackRef) noexcept
@@ -401,7 +425,10 @@ namespace
 
     bool GetPid(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().pid); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().pid);
+        });
     }
 
     bool GetName(int, py_StackRef) noexcept
@@ -424,17 +451,26 @@ namespace
 
     bool GetRunEnergy(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().runEnergy); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().runEnergy);
+        });
     }
 
     bool GetWeight(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().runWeight); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().runWeight);
+        });
     }
 
     bool IsMoving(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().IsMoving()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().IsMoving());
+        });
     }
 
     bool GetWalkDestination(int, py_StackRef) noexcept
@@ -451,12 +487,18 @@ namespace
 
     bool InCombat(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().InCombat()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().InCombat());
+        });
     }
 
     bool IsRunning(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().IsRunning()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().IsRunning());
+        });
     }
 
     bool GetLocalPlayer(int, py_StackRef) noexcept
@@ -475,27 +517,42 @@ namespace
 
     bool GetCurrentStat(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnInt(GetStatArgument(argv).level); });
+        return Guard([argv]
+        {
+            return ReturnInt(GetStatArgument(argv).level);
+        });
     }
 
     bool GetMaxStat(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnInt(GetStatArgument(argv).baseLevel); });
+        return Guard([argv]
+        {
+            return ReturnInt(GetStatArgument(argv).baseLevel);
+        });
     }
 
     bool GetExperience(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnInt(GetStatArgument(argv).xp); });
+        return Guard([argv]
+        {
+            return ReturnInt(GetStatArgument(argv).xp);
+        });
     }
 
     bool GetHp(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetStat(HITPOINTS).level); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetStat(HITPOINTS).level);
+        });
     }
 
     bool GetMaxHp(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetStat(HITPOINTS).baseLevel); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetStat(HITPOINTS).baseLevel);
+        });
     }
 
     bool GetHpPercent(int, py_StackRef) noexcept
@@ -747,7 +804,10 @@ namespace
                 throw std::invalid_argument{std::format("kind must be 'item', 'npc' or 'loc', not '{}'", kind)};
             }
 
-            PyConvert::FromList(py_retval(), ids, [](py_OutRef out, s64 id) { py_newint(out, id); });
+            PyConvert::FromList(py_retval(), ids, [](py_OutRef out, s64 id)
+            {
+                py_newint(out, id);
+            });
             return true;
         });
     }
@@ -842,32 +902,50 @@ namespace
 
     bool GetEmptySlots(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetEmptySlots()); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetEmptySlots());
+        });
     }
 
     bool IsInventoryFull(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().GetEmptySlots() == 0); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().GetEmptySlots() == 0);
+        });
     }
 
     bool GetMainModal(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.mainModal); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().interfaces.mainModal);
+        });
     }
 
     bool GetSideModal(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.sideModal); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().interfaces.sideModal);
+        });
     }
 
     bool GetChatModal(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.chatModal); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().interfaces.chatModal);
+        });
     }
 
     bool IsInterfaceOpen(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().IsInterfaceOpen(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")))); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().IsInterfaceOpen(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id"))));
+        });
     }
 
     bool GetComponentText(int, py_StackRef argv) noexcept
@@ -881,12 +959,18 @@ namespace
 
     bool IsCountDialogOpen(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().IsCountDialogOpen()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().IsCountDialogOpen());
+        });
     }
 
     bool GetVarp(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnInt(GetApi().GetState().GetVarp(PyConvert::ToU16(py_arg(0), "id"))); });
+        return Guard([argv]
+        {
+            return ReturnInt(GetApi().GetState().GetVarp(PyConvert::ToU16(py_arg(0), "id")));
+        });
     }
 
     bool GetFriends(int, py_StackRef) noexcept
@@ -909,7 +993,10 @@ namespace
 
     bool HasInventory(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().GetState().inventories.contains(PyConvert::ToU16(py_arg(0), "com"))); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().GetState().inventories.contains(PyConvert::ToU16(py_arg(0), "com")));
+        });
     }
 
     bool GetTexts(int, py_StackRef argv) noexcept
@@ -917,7 +1004,10 @@ namespace
         return Guard([argv]
         {
             const auto texts = ChatDialog::GetTexts(GetApi().GetInterfaces(), PyConvert::ToU16(py_arg(0), "root"));
-            PyConvert::FromList(py_retval(), texts, [](py_OutRef out, const std::string& text) { PyConvert::FromString(out, text); });
+            PyConvert::FromList(py_retval(), texts, [](py_OutRef out, const std::string& text)
+            {
+                PyConvert::FromString(out, text);
+            });
             return true;
         });
     }
@@ -1122,7 +1212,10 @@ namespace
 
     bool IsMembers(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().GetState().members); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().GetState().members);
+        });
     }
 
     // Whether the tile, on your level, is in the area the server has loaded.
@@ -1139,14 +1232,20 @@ namespace
 
     bool GetModalChanges(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnInt(GetApi().GetState().interfaces.modalChanges); });
+        return Guard([]
+        {
+            return ReturnInt(GetApi().GetState().interfaces.modalChanges);
+        });
     }
 
     bool FindContinue(int, py_StackRef) noexcept
     {
         return Guard([]
         {
-            PyConvert::FromOptional(py_retval(), GetApi().FindContinue(), [](py_OutRef out, u16 com) { py_newint(out, com); });
+            PyConvert::FromOptional(py_retval(), GetApi().FindContinue(), [](py_OutRef out, u16 com)
+            {
+                py_newint(out, com);
+            });
             return true;
         });
     }
@@ -1170,7 +1269,10 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetChatTexts(), [](py_OutRef out, const std::string& text) { PyConvert::FromString(out, text); });
+            PyConvert::FromList(py_retval(), GetApi().GetChatTexts(), [](py_OutRef out, const std::string& text)
+            {
+                PyConvert::FromString(out, text);
+            });
             return true;
         });
     }
@@ -1275,7 +1377,10 @@ namespace
             const auto lower = [](std::string_view value)
             {
                 auto result = std::string{value};
-                std::ranges::transform(result, result.begin(), [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+                std::ranges::transform(result, result.begin(), [](char c)
+                {
+                    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                });
                 return result;
             };
 
@@ -1329,12 +1434,18 @@ namespace
 
     bool ClickComponent(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().ClickComponent(PyConvert::ToU16(py_arg(0), "id"))); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().ClickComponent(PyConvert::ToU16(py_arg(0), "id")));
+        });
     }
 
     bool ClickText(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().ClickText(PyConvert::ToString(py_arg(0), "text"), ToRoot(py_arg(1)))); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().ClickText(PyConvert::ToString(py_arg(0), "text"), ToRoot(py_arg(1))));
+        });
     }
 
     bool GetPlayerMenu(int, py_StackRef) noexcept
@@ -1396,7 +1507,10 @@ namespace
 
     bool IsReachable(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().IsReachable(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().IsReachable(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
+        });
     }
 
     bool FindPath(int, py_StackRef argv) noexcept
@@ -1440,12 +1554,18 @@ namespace
 
     bool TalkToNpc(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_TALK)); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_TALK));
+        });
     }
 
     bool AttackNpc(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_ATTACK)); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_ATTACK));
+        });
     }
 
     bool InteractPlayer(int, py_StackRef argv) noexcept
@@ -1569,7 +1689,10 @@ namespace
 
     bool DropItem(int, py_StackRef argv) noexcept
     {
-        return Guard([argv] { return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), ScriptApi::OP_DROP)); });
+        return Guard([argv]
+        {
+            return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), ScriptApi::OP_DROP));
+        });
     }
 
     bool MoveItem(int, py_StackRef argv) noexcept
@@ -1684,7 +1807,10 @@ namespace
 
     bool ContinueDialogue(int, py_StackRef) noexcept
     {
-        return Guard([] { return ReturnBool(GetApi().ContinueDialogue()); });
+        return Guard([]
+        {
+            return ReturnBool(GetApi().ContinueDialogue());
+        });
     }
 
     bool AnswerCount(int, py_StackRef argv) noexcept
