@@ -51,7 +51,6 @@ namespace
         return text.substr(first, text.find_last_not_of(WHITESPACE) - first + 1);
     }
 
-    // The text's first word, and the rest of it, trimmed.
     std::pair<std::string_view, std::string_view> SplitFirstWord(std::string_view text)
     {
         text = Trim(text);

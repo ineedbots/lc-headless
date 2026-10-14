@@ -14,10 +14,8 @@ struct LoginResult_s
     std::array<s32, SEED_SIZE> seed{};
 };
 
-// The login exchange on an open socket, one step at a time. Advance sends each request when its turn
-// comes and reads each response once all of it has arrived, so it never waits; the caller owns the
-// timeout. Bytes after the login response stay in the socket. The account, the login settings and the
-// CRCs must outlive the handshake.
+// Never waits, so the caller owns the timeout. Bytes after the login response stay in the socket. The
+// account, the login settings and the CRCs must outlive the handshake.
 class LoginHandshake
 {
 public:
@@ -32,8 +30,7 @@ public:
 
     LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect);
 
-    // The result once the server has accepted the login, or nullopt while a response is still on its
-    // way. Throws LoginError when the server refuses.
+    // Nullopt while a response is still on its way.
     [[nodiscard]] std::optional<LoginResult_s> Advance(WebSocketClient& socket);
     [[nodiscard]] std::string_view GetWaitingFor() const;
 

@@ -1,6 +1,5 @@
 #pragma once
 
-// The server answered a login with a status other than success.
 class LoginError : public std::runtime_error
 {
 public:

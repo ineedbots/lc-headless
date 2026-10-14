@@ -50,10 +50,8 @@ struct NavPath_s
     s32 expanded = 0;
 };
 
-// rs2b0t's PathFinder over WalkMap and NavGraph: A* by Chebyshev distance with the graph's hops as extra
-// moves, falling back to Dijkstra when long hops would make the heuristic overestimate. It snaps the start
-// and the goal to walkable tiles as rs2b0t's snapWalkable and goalCandidates do, so a booth or a furnace
-// can be the goal. A route's waypoints are its turns, the tiles either side of each hop, and its end.
+// A* by Chebyshev distance with the graph's hops as extra moves, falling back to Dijkstra when long hops would
+// make the heuristic overestimate. A route's waypoints are its turns, the tiles either side of each hop, and its end.
 class WorldPathFinder
 {
 public:

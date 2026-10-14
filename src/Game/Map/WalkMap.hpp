@@ -2,11 +2,8 @@
 
 #include "../../Cache/GameCache_s.hpp"
 
-// The whole world's walking, for routes beyond the build area: for every tile of every map square on every
-// level with a floor, the directions a player can step out of it, whether it can be stood on, and which of
-// its sides have walls. It's built once from the cache by the webclient's rules (SquareCollision and
-// PathFinder::CanStep), and shared read-only by every account. The doors the cache places shut are walls in
-// it; NavGraph's door edges cross them.
+// The whole world's walking, for routes beyond the build area, built by the webclient's rules (SquareCollision
+// and PathFinder::CanStep). The doors the cache places shut are walls in it; NavGraph's door edges cross them.
 class WalkMap
 {
 public:

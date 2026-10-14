@@ -7,7 +7,7 @@
 #include "PlayerInfoDecoder.hpp"
 #include "ZoneDecoder.hpp"
 
-// Applies each server packet to the game state. Packets must arrive in stream order.
+// Packets must arrive in stream order.
 class ServerPacketDecoder
 {
 public:

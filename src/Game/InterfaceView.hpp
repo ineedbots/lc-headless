@@ -10,9 +10,8 @@ struct ComponentPoint_s
     s32 y = 0;
 };
 
-// The interfaces as the player sees them: the cache's components, with what the server has set on them
-// (text, colour, hiding, position, scroll) taking the cache's place. It reads both in place, so it's cheap
-// to make whenever it's needed, and it can't go stale.
+// The cache's components, with what the server has set on them taking the cache's place. It reads both in
+// place, so it's cheap to make and can't go stale.
 class InterfaceView
 {
 public:
@@ -21,21 +20,21 @@ public:
     [[nodiscard]] const GameCache_s& GetCache() const;
     [[nodiscard]] const Interfaces_s& GetInterfaces() const;
     [[nodiscard]] const IfComponent_s* Find(s32 id) const;
-    // The interfaces that are open: the main, side and chat modals, the overlay, and each tab's.
+    // The main, side and chat modals, the overlay, and each tab's.
     [[nodiscard]] std::vector<u16> GetOpenRoots() const;
     [[nodiscard]] bool IsOpen(u16 root) const;
 
     [[nodiscard]] std::string_view GetText(const IfComponent_s& component) const;
     [[nodiscard]] u32 GetColour(const IfComponent_s& component) const;
     [[nodiscard]] bool IsHidden(const IfComponent_s& component) const;
-    // The item the server set the component to show (IF_SETOBJECT), or nullopt.
+    // As IF_SETOBJECT set it.
     [[nodiscard]] std::optional<u16> GetObject(const IfComponent_s& component) const;
     // In an open interface, with neither it nor any layer above it hidden.
     [[nodiscard]] bool IsVisible(const IfComponent_s& component) const;
     // Its corner, from its interface's corner, through each layer's offset and scroll.
     [[nodiscard]] ComponentPoint_s GetPosition(const IfComponent_s& component) const;
 
-    // The root and everything under it, in drawing order; empty for an id the cache doesn't have.
+    // In drawing order; empty for an id the cache doesn't have.
     [[nodiscard]] std::vector<const IfComponent_s*> GetTree(u16 root) const;
     // Visible text components whose text matches, without regard to case, in the open interfaces or
     // only in root's.

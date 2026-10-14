@@ -38,11 +38,8 @@ struct GameClientOptions_s
     std::chrono::milliseconds serverSilenceTimeout = 15s;
 };
 
-// A single-threaded game session that only waits when told to. The caller's loop drives it with Pump(),
-// which advances a login or reconnect in progress, applies what the server sent, brings the map up to
-// date with it, and sends the queued packets, waiting for data at most maxWait. State reads and sends
-// happen on that same thread. Login() and Logout() are blocking conveniences over BeginLogin() and
-// RequestLogout().
+// Single-threaded, and only waits when told to: Pump() does the work, waiting for data at most maxWait.
+// Login() and Logout() are blocking conveniences over BeginLogin() and RequestLogout().
 class GameClient
 {
 public:
@@ -53,11 +50,8 @@ public:
 
     void BeginLogin();
     void Login();
-    // Throws LoginError when a login is refused, ConnectionLostError when a dropped connection can't be
-    // restored, and ProtocolError when the server's data can't be followed.
     void Pump(std::chrono::milliseconds maxWait = 0ms);
-    // Clicks logout, and again every few seconds until the server agrees or the timeout passes. Abandons
-    // a login or reconnect in progress.
+    // Abandons a login or reconnect in progress.
     void RequestLogout(std::chrono::milliseconds timeout = 5s);
     void Logout(std::chrono::milliseconds timeout = 5s);
     void Disconnect() noexcept;
@@ -74,7 +68,7 @@ public:
 
     void Send(ClientPacket_s packet);
     void SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run);
-    // Sends the queued packets. A send that fails counts as a dropped connection, as it does in Pump.
+    // A send that fails counts as a dropped connection, as it does in Pump.
     void Flush();
 
 private:

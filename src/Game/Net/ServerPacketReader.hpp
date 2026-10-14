@@ -9,8 +9,7 @@ struct ServerPacket_s
     std::vector<u8> payload;
 };
 
-// Splits the server's byte stream into packets. Bytes may arrive in any grouping; each opcode is
-// decrypted exactly once, and a frame is returned only when all of it has arrived.
+// Bytes may arrive in any grouping; each opcode is decrypted exactly once.
 class ServerPacketReader
 {
 public:

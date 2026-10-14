@@ -14,27 +14,16 @@
 struct AccountOptions_s
 {
     GameClientOptions_s client;
-    // Reload the script when its files change, and keep the account logged in while the script is failed.
+    // Also keeps the account logged in while the script is failed.
     bool watchScripts = false;
-    // Wait for VS Code's pocketpy debugger to attach before running the script.
     bool waitForDebugger = false;
-    // The world's walking and rs2b0t's graph over it, shared by every account; without it, scripts can't plan
-    // routes beyond the loaded area.
+    // Without it, scripts can't plan routes beyond the loaded area.
     std::shared_ptr<const Navigation_s> navigation;
-    // The wait before logging in afresh after the session ended unexpectedly: scripting.reloginDelaySeconds.
     std::chrono::milliseconds reloginDelay = 60s;
 };
 
-// One account: its client and, when the account file names one, its script. A define_bot script's default
-// settings that the account file lacks are added to it as the script loads. Without a script the account
-// idles and logs a summary of what it sees every SUMMARY_INTERVAL, then logs out once it has been in game for
-// its idleSeconds, or idles until interrupted when that's zero. Nothing it does waits beyond Step's
-// maxWait, so many accounts can share one loop. An account finishes only when it's interrupted, when its
-// script stops it or fails, or when a login or reconnect fails for good: refused for a reason no retry would
-// change, such as a wrong password, or after all of scripting.connectAttempts. When the session ends any
-// other way, such as by the server logging the player out or a desync, the account logs in afresh after
-// reloginDelay, its script still loaded. Failures are logged, never thrown. With a messenger, the account
-// takes bot messages for its script under its username until it's destroyed.
+// Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is
+// in docs/ScriptingDesign.md §8.
 class Account
 {
 public:
@@ -50,9 +39,9 @@ public:
     Account(const Account&) = delete;
     Account& operator=(const Account&) = delete;
 
-    // Starts logging in; Step does the rest.
+    // Step does the rest.
     void Start();
-    // Logs in before returning, for callers that run a single account.
+    // For callers that run a single account.
     void Login();
     void Step(std::chrono::milliseconds maxWait);
     // The first interrupt gives a script with on_kill_signal killGraceSeconds to stop the account, and
@@ -65,14 +54,12 @@ public:
     // Finished with a logout the server confirmed, and no failure.
     [[nodiscard]] bool Succeeded() const;
     [[nodiscard]] std::string_view DescribeOutcome() const;
-    // Where the account is, and its script's state, for the console's status command.
+    // For the console's status command.
     [[nodiscard]] std::string DescribeStatus() const;
-    // The console commands its script has added; none without a running script.
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
-    // Queues a console command for the script, as ScriptHost::ReceiveCommand does. False without a script.
+    // False without a script.
     [[nodiscard]] bool SendCommand(ConsoleCommand_s command);
-    // Sends the text to public chat, as typing it into the chatbox does. False, sending nothing, when the
-    // account isn't in game.
+    // False, sending nothing, when the account isn't in game.
     [[nodiscard]] bool Say(std::string_view text);
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
     [[nodiscard]] const std::string& GetName() const;
@@ -87,7 +74,7 @@ private:
     void AddSettingDefaults(std::string_view botName, std::string_view settingsJson);
     void LogOut(std::string_view reason);
     void BeginRelog(std::chrono::seconds delay);
-    // Carries a relog on: the logout, the wait, then the login. True while one is under way.
+    // True while a relog is under way.
     bool StepRelog(Clock::time_point now);
     void Recover(std::string_view reason);
     void BeginRelogin();

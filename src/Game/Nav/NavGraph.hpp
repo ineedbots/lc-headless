@@ -65,7 +65,6 @@ struct NavRequires_s
     bool forbidEntranaRestricted = false;
     bool slashTool = false;
 
-    // Whether anything here gates the edge.
     [[nodiscard]] bool IsGated() const;
     // nullopt when the state meets it, else why not. An unknown quest status fails closed.
     [[nodiscard]] std::optional<std::string> Check(const NavState_s& state) const;
@@ -107,16 +106,12 @@ struct NavTeleport_s
     std::vector<std::string> itemNameMatch;
 };
 
-// rs2b0t's walker graph: its doors, stairs, ships and other transports, compiled to edges by
-// tools/nav/export_rs2b0t.ts, and its teleports. Edges whose ends WalkMap can't stand on are left out, as
-// rs2b0t's PathFinder leaves them out. Loaded once and shared read-only by every account.
+// Edges whose ends WalkMap can't stand on are left out, as rs2b0t's PathFinder leaves them out.
 class NavGraph
 {
 public:
-    // Reads edges.json and teleports.json from the folder. Throws std::runtime_error naming the file that's
-    // missing or malformed.
     NavGraph(const WalkMap& map, const std::filesystem::path& directory);
-    // From JSON text, for tests.
+    // For tests.
     NavGraph(const WalkMap& map, std::string_view edgesJson, std::string_view teleportsJson);
 
     [[nodiscard]] static u32 GetNodeId(s32 x, s32 z, s32 level);
@@ -145,10 +140,10 @@ struct Navigation_s
     static constexpr std::array<std::string_view, 3> DATA_FILES = {"crossings", "banks", "danger_zones"};
 
     Navigation_s(const GameCache_s& cache, const std::filesystem::path& directory);
-    // From the graph's JSON text, without the data files, for tests.
+    // Without the data files, for tests.
     Navigation_s(const GameCache_s& cache, std::string_view edgesJson, std::string_view teleportsJson);
 
-    // A data file's JSON, by name without ".json", or nullopt for one it doesn't have.
+    // By name without ".json".
     [[nodiscard]] std::optional<std::string_view> GetData(std::string_view name) const;
 
     WalkMap map;

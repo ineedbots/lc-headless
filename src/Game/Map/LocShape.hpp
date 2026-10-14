@@ -24,6 +24,5 @@ public:
 
     LocShape() = delete;
 
-    // Throws ProtocolError for a shape past GROUND_DECOR.
     [[nodiscard]] static LocLayer_e GetLayer(u8 shape);
 };
