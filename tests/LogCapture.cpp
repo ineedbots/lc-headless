@@ -3,11 +3,13 @@
 
 #include "Core/Logger.hpp"
 
+// clang-format off
 LogCapture::LogCapture(LogLevel_e level)
     : m_logger{std::make_shared<Logger>(level, [this](const LogEntry_s& entry)
     {
         Append(entry);
     })}
+// clang-format on
 {
 }
 

@@ -315,11 +315,13 @@ namespace
     class SilentServer
     {
     public:
+        // clang-format off
         SilentServer()
             : m_server{ListenOnFreePort<SilentSocketServer>([](int port)
             {
                 return std::make_unique<SilentSocketServer>(port);
             })}
+        // clang-format on
         {
         }
 

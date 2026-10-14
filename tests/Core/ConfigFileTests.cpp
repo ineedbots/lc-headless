@@ -535,6 +535,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
 
     SECTION("a section that isn't an object")
     {
+        // clang-format off
         CheckRejected(EditBase([](nlohmann::json& json)
         {
             json["server"] = nlohmann::json::array();
@@ -543,6 +544,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         {
             json["login"] = "x";
         }), "login");
+        // clang-format on
     }
 
     SECTION("a key set to null is a wrong type")
@@ -574,20 +576,24 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         }));
         CHECK(config.scripting.killGraceSeconds == 30s);
 
+        // clang-format off
         CheckRejected(EditBase([](nlohmann::json& json)
         {
             json["server"].erase("url");
             json["server"]["uri"] = "ws://localhost:80";
         }), "server.url");
+        // clang-format on
     }
 
     SECTION("section names are case-sensitive")
     {
+        // clang-format off
         CheckRejected(EditBase([](nlohmann::json& json)
         {
             json["Server"] = json["server"];
             json.erase("server");
         }), "server.url");
+        // clang-format on
     }
 
     SECTION("a repeated key takes its last value")
@@ -894,6 +900,7 @@ TEST_CASE("ConfigFile rejects invalid account files", "[ConfigFile][AccountFile]
     CheckAccountRejected(SetScriptKey("progressReportMinutes", -1), "script.progressReportMinutes");
     CheckAccountRejected(SetScriptKey("progressReportMinutes", 1441), "script.progressReportMinutes");
     CheckAccountRejected(SetScriptKey("progressReportMinutes", "20"), "script.progressReportMinutes");
+    // clang-format off
     CheckAccountRejected(EditAccount([](nlohmann::json& json)
     {
         json["script"].erase("file");
@@ -902,6 +909,7 @@ TEST_CASE("ConfigFile rejects invalid account files", "[ConfigFile][AccountFile]
     {
         json.erase("password");
     }), "password");
+    // clang-format on
     CHECK_THROWS_AS(ConfigFile::ParseAccount("[]", "bot1"), ConfigError);
 }
 
@@ -1016,6 +1024,7 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
 
     SECTION("each type has its written form")
     {
+        // clang-format off
         const auto forms = std::vector<WrittenForm_s>{
             {"modulus 0", [](Config_s& config) { config.login.rsaModulus = BigUInt{}; }, "/login/rsaModulus", "0x0"},
             {"modulus 3233", [](Config_s& config) { config.login.rsaModulus = BigUInt::Parse("3233"); }, "/login/rsaModulus", "0xca1"},
@@ -1027,6 +1036,7 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
             {"warning", [](Config_s& config) { config.client.logLevel = LogLevel_e::Warning; }, "/client/logLevel", "warning"},
             {"error", [](Config_s& config) { config.client.logLevel = LogLevel_e::Error; }, "/client/logLevel", "error"},
         };
+        // clang-format on
 
         for (const auto& form : forms)
         {

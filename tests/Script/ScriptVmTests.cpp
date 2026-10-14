@@ -81,13 +81,16 @@ TEST_CASE("ScriptVm sends print, log and debug to its logger", "[ScriptVm]")
     auto capture = LogCapture{};
     {
         auto vm = ScriptVm{ScriptTestRuntime::Get(), {}, capture.GetLogger()};
+        // clang-format off
         vm.RunSource("log('hello', 42, None)\n"
                      "debug('detail')\n"
                      "print('a', 'b')\n"
                      "print('first\\nsecond')\n"
                      "print('partial', end='')\n",
             "output.py");
+        // clang-format on
 
+        // clang-format off
         CHECK(GetLines(capture) == std::vector<LogLine>{
             {LogLevel_e::Info, "hello 42 None"},
             {LogLevel_e::Verbose, "detail"},
@@ -95,6 +98,7 @@ TEST_CASE("ScriptVm sends print, log and debug to its logger", "[ScriptVm]")
             {LogLevel_e::Info, "first"},
             {LogLevel_e::Info, "second"},
         });
+        // clang-format on
     }
 
     REQUIRE_FALSE(capture.GetEntries().empty());
@@ -127,6 +131,7 @@ TEST_CASE("ScriptVm imports from the scripts folder, then its lib folder", "[Scr
     folder.WriteFile("lib/shared.py", "def greet(name):\n    log('hello from lib', name)\n    return 'lib'\n");
     folder.WriteFile("lib/tools/__init__.py", "");
     folder.WriteFile("lib/tools/walking.py", "NAME = 'walking'\n");
+    // clang-format off
     folder.WriteFile("main.py",
         "import helper\n"
         "import shared\n"
@@ -134,6 +139,7 @@ TEST_CASE("ScriptVm imports from the scripts folder, then its lib folder", "[Scr
         "\n"
         "def sources():\n"
         "    return helper.SOURCE + ',' + shared.greet('bot') + ',' + tools.walking.NAME\n");
+    // clang-format on
 
     auto vm = ScriptVm{ScriptTestRuntime::Get(), ScriptVmOptions_s{.scriptsDirectory = folder.GetPath()}, capture.GetLogger()};
     vm.RunFile("main.py");
@@ -232,6 +238,7 @@ TEST_CASE("ScriptVm gives the walker's route search more than a call's timeout",
     vm.Activate();
     py_bind(vm.GetMain(), "search(ms)", SlowSearch);
     py_bind(vm.GetMain(), "slow(ms)", SlowBinding);
+    // clang-format off
     vm.RunSource("import time\n"
                  "\n"
                  "def busy(ms):\n"
@@ -248,6 +255,7 @@ TEST_CASE("ScriptVm gives the walker's route search more than a call's timeout",
                  "    slow(ms)\n"
                  "    busy(busy_ms)\n",
         "route.py");
+    // clang-format on
 
     const auto call = [&vm](std::string_view function, s32 ms, s32 busyMs)
     {
@@ -276,6 +284,7 @@ TEST_CASE("ScriptVm makes time.sleep raise instead of stalling every account", "
 {
     auto capture = LogCapture{};
     auto vm = ScriptVm{ScriptTestRuntime::Get(), {}, capture.GetLogger()};
+    // clang-format off
     vm.RunSource("import time\n"
                  "from time import sleep\n"
                  "\n"
@@ -288,6 +297,7 @@ TEST_CASE("ScriptVm makes time.sleep raise instead of stalling every account", "
                  "def now():\n"
                  "    return time.time()\n",
         "sleepy.py");
+    // clang-format on
 
     CHECK_THROWS_WITH(vm.Call("nap"), ContainsSubstring("return a delay from loop()"));
     CHECK_THROWS_WITH(vm.Call("nap_imported"), ContainsSubstring("return a delay from loop()"));

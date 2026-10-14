@@ -89,6 +89,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     {
         const auto& scripting = m_config->scripting;
         const auto& script = *m_account.script;
+        // clang-format off
         m_script.emplace(runtime, m_client,
             ScriptHostOptions_s{
                 .scriptsDirectory = scripting.scriptsDirectory,
@@ -115,6 +116,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .runEnergyMin = m_account.runEnergyMin,
             },
             m_logger);
+        // clang-format on
     }
     else if (m_account.idleSeconds > 0s)
     {

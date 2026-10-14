@@ -43,6 +43,7 @@ namespace
         auto cache = GameCache_s{};
         TestCache::AddObj(cache, BOW, "Oak longbow (u)");
         TestCache::AddObj(cache, RING, "Gold ring");
+        // clang-format off
         TestCache::AddComponents(cache, {
             {.id = DIALOGUE, .root = DIALOGUE, .type = ComponentType_e::Layer, .width = 480, .height = 120, .children = {{.id = SPEAKER}, {.id = LINE, .y = 20}, {.id = CONTINUE, .y = 80}}},
             {.id = SPEAKER, .root = DIALOGUE, .type = ComponentType_e::Text, .width = 480, .height = 17, .text = "@red@Hans"},
@@ -65,6 +66,7 @@ namespace
             {.id = PANEL_INV, .root = PANEL, .type = ComponentType_e::Inv, .width = 4, .height = 1, .marginX = 10, .options = {"Make", "Make 5", "Make 10"}},
             {.id = PANEL_MODEL, .root = PANEL, .type = ComponentType_e::Model, .width = 32, .height = 32},
         });
+        // clang-format on
         return cache;
     }
 }

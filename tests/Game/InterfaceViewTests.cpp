@@ -19,6 +19,7 @@ namespace
     {
         auto cache = GameCache_s{};
         TestCache::SetTradeScreen(cache);
+        // clang-format off
         TestCache::AddComponents(cache, {
             {.id = OPTIONS, .root = OPTIONS, .type = ComponentType_e::Layer, .width = 480, .height = 120, .children = {
                 {.id = TITLE, .x = 0, .y = 0},
@@ -29,6 +30,7 @@ namespace
             {.id = OPTION_ONE, .root = OPTIONS, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 480, .height = 17, .text = "option1", .buttonText = "Ok"},
             {.id = OPTION_TWO, .root = OPTIONS, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 480, .height = 17, .text = "option2", .buttonText = "Ok"},
         });
+        // clang-format on
         return cache;
     }
 

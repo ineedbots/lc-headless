@@ -226,6 +226,7 @@ TEST_CASE("NPC_INFO reports removals, then additions, then hits, then speech", "
     extended.P1(0);
     NpcInfoDecoder::Decode(Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(extended)), state);
 
+    // clang-format off
     CHECK(DescribeEventsAfter(state, before) == std::vector<std::string>{
         "npc removed 100",
         "npc removed 102",
@@ -234,6 +235,7 @@ TEST_CASE("NPC_INFO reports removals, then additions, then hits, then speech", "
         "npc hit 103 damage 2",
         "npc said 101 Brains!",
     });
+    // clang-format on
 
     const auto& removed = GetEvent<NpcRemoved_s>(state, before + 1);
     CHECK(removed.npc.type == 50);
@@ -281,12 +283,14 @@ TEST_CASE("PLAYER_INFO reports players, and hits on the local player apart from 
     extended.PData(appearance);
     decoder.Decode(Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(extended)), state);
 
+    // clang-format off
     CHECK(DescribeEventsAfter(state, before) == std::vector<std::string>{
         "player removed 7",
         "player added 9 Zezima",
         "local hit damage 5",
         "player hit 8 damage 2",
     });
+    // clang-format on
 
     CHECK(GetEvent<PlayerRemoved_s>(state, before + 1).player.tile == Offset(1, 1));
     CHECK(GetEvent<PlayerAdded_s>(state, before + 2).player.tile == Offset(1, 1));
@@ -358,6 +362,7 @@ TEST_CASE("Zone packets report ground items and scenery, but not resets", "[Game
     projectile.P1(64);
     fixture.Decode(ServerProt_e::MapProjAnim, projectile);
 
+    // clang-format off
     CHECK(DescribeEventsAfter(state, before) == std::vector<std::string>{
         "item added 995 x50",
         "item count 995 50 -> 75",
@@ -367,6 +372,7 @@ TEST_CASE("Zone packets report ground items and scenery, but not resets", "[Game
         "loc -1",
         "projectile 91",
     });
+    // clang-format on
 
     CHECK(GetEvent<GroundItemAdded_s>(state, before + 1).item.tile == ZoneOffset(2, 3));
     CHECK(GetEvent<LocChanged_s>(state, before + 5).change.tile == ZoneOffset(1, 1));
@@ -445,6 +451,7 @@ TEST_CASE("Server packets report inventories, stats, varps, modals and reboots",
     reboot.P2(500);
     fixture.Decode(ServerProt_e::UpdateRebootTimer, reboot);
 
+    // clang-format off
     CHECK(DescribeEventsAfter(state, before) == std::vector<std::string>{
         "inventory 3214",
         "inventory 3214",
@@ -459,6 +466,7 @@ TEST_CASE("Server packets report inventories, stats, varps, modals and reboots",
         "modals -1 -1 356",
         "reboot 500",
     });
+    // clang-format on
 
     const auto& levelDrop = GetEvent<StatChanged_s>(state, before + 5);
     CHECK(levelDrop.previous.level == 10);

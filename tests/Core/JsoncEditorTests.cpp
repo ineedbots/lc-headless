@@ -18,6 +18,7 @@ namespace
 
 TEST_CASE("JsoncEditor adds the members an object lacks, keeping its comments", "[JsoncEditor]")
 {
+    // clang-format off
     const auto edit = AddToMiner(R"json({
     // The account.
     "username": "bot1",
@@ -32,6 +33,7 @@ TEST_CASE("JsoncEditor adds the members an object lacks, keeping its comments", 
 }
 )json",
         R"json({"rock": "Copper rocks", "trips": 10, "keep": ["Pickaxe", "Hammer"]})json");
+    // clang-format on
 
     CHECK(edit.text == R"json({
     // The account.
@@ -53,6 +55,7 @@ TEST_CASE("JsoncEditor adds the members an object lacks, keeping its comments", 
 
 TEST_CASE("JsoncEditor creates the objects on the path that are missing", "[JsoncEditor]")
 {
+    // clang-format off
     const auto edit = AddToMiner(R"json({
     "script": {
         "file": "main.py" /* no settings yet */
@@ -60,6 +63,7 @@ TEST_CASE("JsoncEditor creates the objects on the path that are missing", "[Json
 }
 )json",
         R"json({"rock": "Copper rocks", "home": [1, 2, 0]})json");
+    // clang-format on
 
     CHECK(edit.text == R"json({
     "script": {
@@ -82,6 +86,7 @@ TEST_CASE("JsoncEditor fills an empty object", "[JsoncEditor]")
 
     SECTION("written as {}")
     {
+        // clang-format off
         const auto edit = AddToMiner(R"json({
     "script": {
         "file": "main.py",
@@ -90,6 +95,7 @@ TEST_CASE("JsoncEditor fills an empty object", "[JsoncEditor]")
 }
 )json",
             members);
+        // clang-format on
 
         CHECK(edit.text == R"json({
     "script": {
@@ -106,6 +112,7 @@ TEST_CASE("JsoncEditor fills an empty object", "[JsoncEditor]")
 
     SECTION("holding a comment, with its closing brace on a line of its own")
     {
+        // clang-format off
         const auto edit = AddToMiner(R"json({
     "script": {
         "settings": {
@@ -115,6 +122,7 @@ TEST_CASE("JsoncEditor fills an empty object", "[JsoncEditor]")
 }
 )json",
             members);
+        // clang-format on
 
         CHECK(edit.text == R"json({
     "script": {
@@ -140,6 +148,7 @@ TEST_CASE("JsoncEditor follows the layout around it", "[JsoncEditor]")
 
     SECTION("a closing brace on the last member's line moves below the new members")
     {
+        // clang-format off
         const auto edit = AddToMiner(R"json({
     "script": {
         "settings": {
@@ -150,6 +159,7 @@ TEST_CASE("JsoncEditor follows the layout around it", "[JsoncEditor]")
 }
 )json",
             R"json({"trips": 10})json");
+        // clang-format on
 
         CHECK(edit.text == R"json({
     "script": {

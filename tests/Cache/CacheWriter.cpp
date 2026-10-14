@@ -585,6 +585,7 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
     const auto npcs = MakeTypeFiles(contents.npcs);
     const auto objs = MakeTypeFiles(contents.objs);
     const auto varps = MakeTypeFiles(contents.varps);
+    // clang-format off
     writer.Put(CacheStore::ARCHIVES, 2, MakeArchive({
         {.name = "loc.dat", .data = locs.dat},
         {.name = "loc.idx", .data = locs.idx},
@@ -595,6 +596,7 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
         {.name = "varp.dat", .data = varps.dat},
         {.name = "varp.idx", .data = varps.idx},
     }, false));
+    // clang-format on
 
     writer.Put(CacheStore::ARCHIVES, INTERFACE_ARCHIVE, MakeArchive({{.name = "data", .data = MakeInterfaces(contents.interfaces)}}, false));
 

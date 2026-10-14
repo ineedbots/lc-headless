@@ -89,6 +89,7 @@ void TestCache::AddComponents(GameCache_s& cache, std::initializer_list<IfCompon
 
 void TestCache::SetTradeScreen(GameCache_s& cache)
 {
+    // clang-format off
     AddComponents(cache, {
         {.id = TRADE_SCREEN, .root = TRADE_SCREEN, .type = ComponentType_e::Layer, .width = 488, .height = 300, .children = {
             {.id = TRADE_ACCEPT, .x = 224, .y = 173},
@@ -112,16 +113,19 @@ void TestCache::SetTradeScreen(GameCache_s& cache)
         {.id = TRADE_SIDE, .root = TRADE_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = TRADE_SIDE_INV, .x = 16, .y = 10}}},
         {.id = TRADE_SIDE_INV, .root = TRADE_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Offer 1", "Offer 5", "Offer 10", "Offer All", "Offer X"}},
     });
+    // clang-format on
 }
 
 void TestCache::SetShop(GameCache_s& cache)
 {
+    // clang-format off
     AddComponents(cache, {
         {.id = SHOP_SCREEN, .root = SHOP_SCREEN, .type = ComponentType_e::Layer, .width = 488, .height = 300, .children = {{.id = SHOP_STOCK, .x = 80, .y = 60}}},
         {.id = SHOP_STOCK, .root = SHOP_SCREEN, .type = ComponentType_e::Inv, .width = 10, .height = 4, .marginX = 15, .marginY = 15, .options = {"Value", "Buy 1", "Buy 5", "Buy 10"}},
         {.id = SHOP_SIDE, .root = SHOP_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = SHOP_SIDE_INV, .x = 16, .y = 10}}},
         {.id = SHOP_SIDE_INV, .root = SHOP_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Value", "Sell 1", "Sell 5", "Sell 10"}},
     });
+    // clang-format on
 }
 
 void TestCache::SetChatInterfaces(GameCache_s& cache)
@@ -131,6 +135,7 @@ void TestCache::SetChatInterfaces(GameCache_s& cache)
         return IfComponent_s{.id = id, .root = MAKE_MENU, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 100, .height = 93, .text = std::move(text), .buttonText = std::move(option)};
     };
 
+    // clang-format off
     AddComponents(cache, {
         {.id = DIALOGUE, .root = DIALOGUE, .type = ComponentType_e::Layer, .width = 480, .height = 120, .children = {{.id = DIALOGUE_TEXT, .y = 20}, {.id = DIALOGUE_CONTINUE, .y = 80}}},
         {.id = DIALOGUE_TEXT, .root = DIALOGUE, .type = ComponentType_e::Text, .width = 480, .height = 17},
@@ -146,6 +151,7 @@ void TestCache::SetChatInterfaces(GameCache_s& cache)
         makeButton(MAKE_5, "Make 5"),
         makeButton(MAKE_1, "Make 1", "\n\n\n\nOak Long Bow"),
     });
+    // clang-format on
 }
 
 void TestCache::SetBankScreen(GameCache_s& cache)
@@ -160,6 +166,7 @@ void TestCache::SetBankScreen(GameCache_s& cache)
         return IfComponent_s{.id = id, .root = BANK_SCREEN, .type = ComponentType_e::Text, .width = 27, .height = 14, .text = std::move(text)};
     };
 
+    // clang-format off
     AddComponents(cache, {
         {.id = BANK_SCREEN, .root = BANK_SCREEN, .type = ComponentType_e::Layer, .width = 512, .height = 334, .children = {
             {.id = BANK, .x = 75, .y = 58}, {.id = BANK_NOTE, .x = 364, .y = 291}, {.id = BANK_ITEM, .x = 291, .y = 291},
@@ -173,6 +180,7 @@ void TestCache::SetBankScreen(GameCache_s& cache)
         {.id = BANK_SIDE, .root = BANK_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = BANK_INVENTORY, .x = 16, .y = 10}}},
         {.id = BANK_INVENTORY, .root = BANK_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Deposit 1", "Deposit 5", "Deposit 10", "Deposit All", "Deposit X"}},
     });
+    // clang-format on
 }
 
 void TestCache::SetComponents(GameCache_s& cache)

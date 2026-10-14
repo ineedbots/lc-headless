@@ -56,10 +56,12 @@ TEST_CASE("JagArchive reads entries packed either way", "[JagArchive]")
 
 TEST_CASE("JagArchive takes the first of two entries with the same name", "[JagArchive]")
 {
+    // clang-format off
     const auto archive = JagArchive{CacheWriter::MakeArchive({
         {.name = "loc.dat", .data = ToBytes("first")},
         {.name = "LOC.DAT", .data = ToBytes("second")},
     }, false)};
+    // clang-format on
 
     CHECK(archive.Read("loc.dat") == ToBytes("first"));
 }

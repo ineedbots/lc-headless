@@ -10,12 +10,14 @@ namespace
     constexpr auto NIBBLE_MASK = 0xF;
 
     // '\xA3' is the pound sign as a Latin-1 byte, the encoding every protocol string uses.
+    // clang-format off
     constexpr auto TABLE = std::to_array<char>({
         ' ', 'e', 't', 'a', 'o', 'i', 'h', 'n', 's', 'r', 'd', 'l', 'u',
         'm', 'w', 'c', 'y', 'f', 'g', 'p', 'b', 'v', 'k', 'x', 'j', 'q', 'z',
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
         ' ', '!', '?', '.', ',', ':', ';', '(', ')', '-', '&', '*', '\\', '\'', '@', '#', '+', '=', '\xA3', '$', '%', '"', '[', ']',
     });
+    // clang-format on
 
     static_assert(TABLE.size() == 61, "WordPack has 61 characters");
 

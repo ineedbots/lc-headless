@@ -175,9 +175,11 @@ TEST_CASE("LoginHandshake builds the login request", "[LoginHandshake]")
     const auto login = MakeLoginSettings();
     const auto request = LoginHandshake::BuildLoginRequest(account, login, CRCS, SEED, false);
 
+    // clang-format off
     const auto block = std::vector<u8>{
         10, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0x05, 0x39, 'b', 'o', 't', '\n', 'p', 'w', '\n',
     };
+    // clang-format on
 
     auto expected = std::vector<u8>{16, 0, 0xFF, 0x01, 0x21, 0};
     for (auto crc = u8{1}; crc <= 9; ++crc)

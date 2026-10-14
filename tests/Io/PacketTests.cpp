@@ -388,6 +388,7 @@ TEST_CASE("Packet GData", "[Packet]")
 
 TEST_CASE("Packet writes", "[Packet]")
 {
+    // clang-format off
     const auto testCase = GENERATE(
         WriteCase_s{"P1(0x12)", [](Packet& packet) { packet.P1(0x12); }, {0x12}},
         WriteCase_s{"P1(-1)", [](Packet& packet) { packet.P1(-1); }, {0xFF}},
@@ -413,6 +414,7 @@ TEST_CASE("Packet writes", "[Packet]")
         WriteCase_s{"PJStr(\"\\xE9\")", [](Packet& packet) { packet.PJStr("\xE9"); }, {0xE9, 0x0A}},
         WriteCase_s{"PData({09 08 07})", [](Packet& packet) { packet.PData(std::array<u8, 3>{0x09, 0x08, 0x07}); }, {0x09, 0x08, 0x07}},
         WriteCase_s{"PData({})", [](Packet& packet) { packet.PData({}); }, {}});
+    // clang-format on
 
     CAPTURE(testCase.call);
 
@@ -526,6 +528,7 @@ TEST_CASE("Packet PSize1 fills in a length placeholder", "[Packet]")
 
 TEST_CASE("Packet reads past the end throw and leave pos unchanged", "[Packet]")
 {
+    // clang-format off
     const auto testCase = GENERATE(
         BoundsCase_s{"G1", 1, [](Packet& packet) { packet.G1(); }},
         BoundsCase_s{"G1B", 1, [](Packet& packet) { packet.G1B(); }},
@@ -540,6 +543,7 @@ TEST_CASE("Packet reads past the end throw and leave pos unchanged", "[Packet]")
         BoundsCase_s{"GSmarts", 1, [](Packet& packet) { packet.GSmarts(); }},
         BoundsCase_s{"GSmarts, two-byte form", 2, [](Packet& packet) { packet.GSmarts(); }},
         BoundsCase_s{"GJStr", 1, [](Packet& packet) { packet.GJStr(); }});
+    // clang-format on
 
     CAPTURE(testCase.call);
 
@@ -790,10 +794,12 @@ TEST_CASE("Packet RsaEnc with a 512-bit key", "[Packet]")
         packet.PJStr("pass");
         packet.RsaEnc(modulus, exponent);
 
+        // clang-format off
         const auto expected = std::vector<u8>{
             0x0A, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04,
             0x00, 0x00, 0x05, 0x39, 0x75, 0x73, 0x65, 0x72, 0x0A, 0x70, 0x61, 0x73, 0x73, 0x0A,
         };
+        // clang-format on
         CHECK(Decrypt(packet.GetData().subspan(1)) == expected);
     }
 }

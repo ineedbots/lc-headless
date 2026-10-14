@@ -210,6 +210,7 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
     const auto start = Clock::now();
     fixture.host->Step(start);
 
+    // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "start 0",
         "npc 50",
@@ -219,6 +220,7 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
         "tick 2",
         "loop",
     });
+    // clang-format on
 
     SECTION("loop runs again only once the delay it returned has passed")
     {
@@ -557,6 +559,7 @@ TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]
 TEST_CASE("ScriptHost asks for progress reports", "[ScriptHost]")
 {
     auto reports = std::vector<ProgressReport_s>{};
+    // clang-format off
     auto fixture = HostFixture{R"python(
 kills = 0
 
@@ -571,6 +574,7 @@ def loop():
     {
         reports.push_back(report);
     }}};
+    // clang-format on
 
     const auto start = Clock::now();
     fixture.host->Step(start);
@@ -620,6 +624,7 @@ TEST_CASE("ScriptHost sends and receives bot messages", "[ScriptHost]")
         return false;
     });
 
+    // clang-format off
     auto fixture = HostFixture{R"python(
 def on_start():
     log('>', 'sent', send_bot_message('Mule', {'want': [995, 10], 'pair': (1, 2), 'note': 'say "hi"', 'none': None}))
@@ -642,6 +647,7 @@ def on_bot_message(sender, message):
 def loop():
     return 600
 )python", ScriptHostOptions_s{.messenger = &messenger, .username = "bot1"}};
+    // clang-format on
     messenger.Register("bot1", [&fixture](BotMessage_s message)
     {
         return fixture.host->ReceiveBotMessage(std::move(message));
@@ -649,6 +655,7 @@ def loop():
 
     const auto start = Clock::now();
     fixture.host->Step(start);
+    // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "sent True",
         "busy False",
@@ -657,6 +664,7 @@ def loop():
         "not json",
         "got bot1 {'items': [1, 2], 'none': None}",
     });
+    // clang-format on
 
     REQUIRE(sent.size() == 1);
     CHECK(sent[0].sender == "bot1");
@@ -678,6 +686,7 @@ TEST_CASE("ScriptHost refuses a bot message over the size limit", "[ScriptHost]"
         return true;
     });
 
+    // clang-format off
     auto fixture = HostFixture{R"python(
 def on_start():
     try:
@@ -689,6 +698,7 @@ def on_start():
 def loop():
     return 600
 )python", ScriptHostOptions_s{.messenger = &messenger, .username = "bot1"}};
+    // clang-format on
 
     fixture.host->Step(Clock::now());
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"The message is 65538 bytes as JSON, over the limit of 65536", "True"});
@@ -732,6 +742,7 @@ TEST_CASE("ScriptHost turns bot messages down when the script can't take them", 
 
 TEST_CASE("ScriptHost reloads a watched script when its files change", "[ScriptHost]")
 {
+    // clang-format off
     auto fixture = HostFixture{R"python(
 import helper
 
@@ -744,6 +755,7 @@ def on_npc_spawned(npc):
 def loop():
     return 1000
 )python", ScriptHostOptions_s{.watchFiles = true}, Files{{"helper.py", "NAME = 'one'\n"}}};
+    // clang-format on
 
     const auto start = Clock::now();
     fixture.host->Step(start);
@@ -904,12 +916,14 @@ def loop():
     raise ValueError('no chickens')
 )python"};
     fixture.host->Step(Clock::now());
+    // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "chat game None Welcome to RuneScape.",
         "tick 2",
         "stop the script failed",
         "finish the script failed",
     });
+    // clang-format on
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
 
     fixture.host->Finish("interrupted");
@@ -925,6 +939,7 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
     auto defaultsGiven = 0;
     const auto loadFile = [&](std::string file, std::string settings)
     {
+        // clang-format off
         auto host = ScriptHost{ScriptTestRuntime::Get(), client,
             {
                 .scriptsDirectory = folder.GetPath(),
@@ -936,6 +951,7 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
                 },
             },
             capture.GetLogger()};
+        // clang-format on
     };
 
     folder.WriteFile("main.py", "SETTINGS_SCHEMA = {'count': SettingDef('number', 5, min=1), 'home': SettingDef('tile', [3222, 3218])}\n"
@@ -976,6 +992,7 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
 TEST_CASE("ScriptHost gives a define_bot script the settings under its name, and passes on its defaults", "[ScriptHost]")
 {
     auto defaults = std::vector<std::pair<std::string, std::string>>{};
+    // clang-format off
     auto fixture = HostFixture{R"python(
 class Miner(LoopingBot):
     def on_start(self):
@@ -999,6 +1016,7 @@ BOT = define_bot(name='Miner', create=Miner, settings_schema=SCHEMA)
                 defaults.emplace_back(botName, settingsJson);
             },
         }};
+    // clang-format on
 
     REQUIRE(defaults.size() == 1);
     CHECK(defaults[0].first == "Miner");
@@ -1118,12 +1136,14 @@ def loop():
     step();
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::ResumePCountDialog));
     CHECK(lastPayload(ClientProt_e::ResumePCountDialog) == std::vector<u8>{0, 0, 0, 27});
+    // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "page True ['Hello there.', 'Click here to continue']",
         "continued True False ['Yes please.', 'No thanks.']",
         "chose True ['Oak Long Bow'] []",
         "made True False",
     });
+    // clang-format on
 }
 
 TEST_CASE("ScriptHost withdraws with X and deposits by the bank's options", "[ScriptHost]")
@@ -1227,12 +1247,14 @@ def loop():
     pumpUntil([&client] { return client.GetState().inventories.at(TestCache::BANK_INVENTORY).slots[0].id == -1; });
     step();
 
+    // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "ready True 30 ['Withdraw 1', 'Withdraw 5', 'Withdraw 10', 'Withdraw All', 'Withdraw X']",
         "withdrew True 27",
         "noted True",
         "deposited []",
     });
+    // clang-format on
 }
 
 TEST_CASE("ScriptHost buys from a shop in batches the engine runs in a tick", "[ScriptHost]")
@@ -1311,12 +1333,14 @@ def loop():
     fixture.Send(ServerProt_e::IfClose, Packet{});
     fixture.PumpUntil([&fixture] { return fixture.client.GetState().interfaces.mainModal == -1; });
     fixture.Step();
+    // clang-format off
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{
         "trade True False Zezima False",
         "offered True [('Logs', 1), ('Logs', 1)] []",
         "accepted True",
         "declined True False",
     });
+    // clang-format on
 }
 
 TEST_CASE("The example scripts load without warnings", "[ScriptHost]")

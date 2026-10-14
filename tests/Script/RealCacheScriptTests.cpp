@@ -79,6 +79,7 @@ namespace
 TEST_CASE("The stdlib finds the real cache's combat styles, prayers, spells and quests", "[RealCache]")
 {
     auto fixture = RealCacheFixture{};
+    // clang-format off
     fixture.vm.RunSource(R"python(
 assert game.combat_styles() == [(0, '(Accurate)'), (1, '(Aggressive)'), (2, '(Defensive)')], game.combat_styles()
 assert game.combat_style_mode('strength') == 1
@@ -103,6 +104,7 @@ assert len(all_quests) > 10
 assert quests.status("Cook's Assistant") == 'not_started', all_quests
 assert special.bar_component() == -1
 )python", "real_cache.py");
+    // clang-format on
 }
 
 TEST_CASE("The stdlib finds the real cache's special attack bar and autocast spells", "[RealCache]")
@@ -110,35 +112,44 @@ TEST_CASE("The stdlib finds the real cache's special attack bar and autocast spe
     auto fixture = RealCacheFixture{};
     auto& tabs = fixture.state.interfaces.tabs;
     tabs[0] = COMBAT_STABSWORD;
+    // clang-format off
     fixture.vm.RunSource(R"python(
 assert special.bar_component() == -1
 assert not autocast.staff_tab_attached()
 )python", "hidden_special.py");
+    // clang-format on
 
     // The bar's layer starts hidden; the server shows it when a weapon with a special is wielded.
     const auto layer = *fixture.cache->FindComponent(STABSWORD_SPECIAL_BAR)->parent;
     fixture.state.interfaces.components[layer].hidden = false;
+    // clang-format off
     fixture.vm.RunSource(R"python(
 assert special.bar_component() == 7562
 )python", "special.py");
+    // clang-format on
 
     tabs[0] = COMBAT_STAFF;
+    // clang-format off
     fixture.vm.RunSource(R"python(
 assert autocast.staff_tab_attached()
 from rs2004.tabs import _select_button_reading
 assert _select_button_reading(108) is not None
 )python", "staff.py");
+    // clang-format on
 
     tabs[0] = STAFF_SPELLS;
+    // clang-format off
     fixture.vm.RunSource(R"python(
 choices = [c.id for c in interfaces.root(interfaces.tab(0)) if c.button == 'ok']
 assert choices[:len(AUTOCAST_SPELLS)] == list(range(1830, 1830 + len(AUTOCAST_SPELLS))), choices
 )python", "spells.py");
+    // clang-format on
 }
 
 TEST_CASE("The maze random event's route from each spawn ends at the shrine", "[RealCache]")
 {
     auto fixture = RealCacheFixture{};
+    // clang-format off
     fixture.vm.RunSource(R"python(
 from rs2004.random_solvers import maze_graph, solve_maze_route, MAZE_SHRINE_DOOR
 graph = maze_graph()
@@ -150,6 +161,7 @@ for spawn in [(2891, 4597), (2933, 4597), (2933, 4555), (2891, 4555)]:
     # The old goal accepted the tile south of the shrine's corner, through a wall.
     assert (2911, 4574) not in route, (spawn, route)
 )python", "maze.py");
+    // clang-format on
 }
 
 // Every item, NPC and loc the catalogs name is in the 289 cache, so a table entry that names something the
@@ -157,6 +169,7 @@ for spawn in [(2891, 4597), (2933, 4597), (2933, 4555), (2891, 4555)]:
 TEST_CASE("The catalogs name only items, NPCs and locs the real cache has", "[RealCache]")
 {
     auto fixture = RealCacheFixture{};
+    // clang-format off
     fixture.vm.RunSource(R"python(
 from rs2004.catalogs import tools, tool_acquire, fishing, mining, gathering, tables
 
@@ -203,4 +216,5 @@ assert reader.item_ids('logs') == reader.item_ids('Logs') and len(reader.item_id
 from rs2004.catalogs import Loadout, CarryEntry, food_of
 assert food_of(Loadout('melee', {}, [CarryEntry('Prayer potion(4)', 2), CarryEntry('Lobster', 10)]), 'Trout') == 'Lobster'
 )python", "catalog_names.py");
+    // clang-format on
 }
