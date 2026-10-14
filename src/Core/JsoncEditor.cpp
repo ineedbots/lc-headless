@@ -36,7 +36,7 @@ namespace
     {
         std::string_view eol;
         // One level of indentation.
-        std::string_view unit;
+        std::string_view indentUnit;
     };
 
     struct Replacement_s
@@ -289,7 +289,7 @@ namespace
 
     Layout_s DetectLayout(std::string_view text, const Value_s& root)
     {
-        auto layout = Layout_s{.eol = text.find(CRLF) == std::string_view::npos ? LF : CRLF, .unit = DEFAULT_INDENT};
+        auto layout = Layout_s{.eol = text.find(CRLF) == std::string_view::npos ? LF : CRLF, .indentUnit = DEFAULT_INDENT};
         const auto rootIndent = GetIndent(text, root.begin);
         for (const auto& member : root.members)
         {
@@ -301,7 +301,7 @@ namespace
             const auto indent = GetIndent(text, member.keyBegin);
             if (indent.size() > rootIndent.size() && indent.starts_with(rootIndent))
             {
-                layout.unit = indent.substr(rootIndent.size());
+                layout.indentUnit = indent.substr(rootIndent.size());
             }
 
             break;
@@ -345,7 +345,7 @@ namespace
             return FormatInline(value);
         }
 
-        const auto inner = indent + std::string{layout.unit};
+        const auto inner = indent + std::string{layout.indentUnit};
         auto text = std::string{isObject ? "{" : "["};
         auto first = true;
         for (const auto& [key, item] : value.items())
@@ -386,7 +386,7 @@ namespace
         const auto close = object.end - 1;
         const auto objectIndent = std::string{GetIndent(text, object.begin)};
         const auto eol = std::string{layout.eol};
-        const auto unit = std::string{layout.unit};
+        const auto unit = std::string{layout.indentUnit};
         const auto oneLine = text.substr(object.begin, object.end - object.begin).find('\n') == std::string_view::npos;
 
         if (object.members.empty())
