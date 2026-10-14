@@ -95,6 +95,7 @@ void EntityInfo::ReadMovement(Packet& packet, s32 moveType, Entity_s& entity, u6
     Step(entity, packet.GBit(DIRECTION_BITS));
     entity.lastMovement = Movement_e::Walk;
     entity.movedTick = tick;
+
     if (moveType != MOVE_RUN)
     {
         return;

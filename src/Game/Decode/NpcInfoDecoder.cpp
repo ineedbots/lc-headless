@@ -32,6 +32,7 @@ void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
     auto said = std::vector<NpcSaid_s>{};
 
     packet.GBitStart();
+
     auto npcs = EntityInfo::ReadTracked(packet, state.npcs, extended, removed, state.tick);
     const auto firstAdded = npcs.size();
     ReadNew(packet, state, npcs, extended);

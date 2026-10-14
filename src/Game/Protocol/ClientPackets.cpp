@@ -141,6 +141,7 @@ ClientPacket_s ClientPackets::Move(MoveKind_e kind, std::span<const Tile_s> wayp
     auto packet = Packet{};
     packet.P1(run ? 1 : 0);
     PutTile(packet, start);
+
     for (const auto& waypoint : waypoints.subspan(1))
     {
         PutWaypointOffset(packet, waypoint.x - start.x);

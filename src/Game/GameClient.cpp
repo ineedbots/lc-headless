@@ -104,6 +104,7 @@ void GameClient::BeginLogin()
     m_attempt = 0;
     m_retryAt.reset();
     m_status = ClientStatus_e::Connecting;
+
     try
     {
         StartAttempt();
@@ -118,6 +119,7 @@ void GameClient::BeginLogin()
 void GameClient::Login()
 {
     BeginLogin();
+
     while (m_status == ClientStatus_e::Connecting)
     {
         Pump(LOGIN_POLL);
@@ -127,6 +129,7 @@ void GameClient::Login()
 void GameClient::Pump(std::chrono::milliseconds maxWait)
 {
     FreeClosedSockets();
+
     switch (m_status)
     {
     case ClientStatus_e::Connecting:
@@ -169,6 +172,7 @@ void GameClient::RequestLogout(std::chrono::milliseconds timeout)
 void GameClient::Logout(std::chrono::milliseconds timeout)
 {
     RequestLogout(timeout);
+
     while (m_status == ClientStatus_e::LoggingOut)
     {
         Pump(std::min(GetRemaining(m_logoutDeadline), LOGOUT_POLL));
@@ -184,6 +188,7 @@ void GameClient::Disconnect() noexcept
     m_reader.reset();
     m_writer.reset();
     m_outgoing.clear();
+
     if (m_status != ClientStatus_e::LoggedOut)
     {
         m_status = ClientStatus_e::Disconnected;
@@ -267,6 +272,7 @@ void GameClient::Flush()
 
     m_outgoing.clear();
     m_lastSend = Clock::now();
+
     try
     {
         m_socket->Send(bytes);
@@ -289,6 +295,7 @@ void GameClient::PumpSession(std::chrono::milliseconds maxWait)
 
         const auto socketState = m_socket->Pump();
         ProcessInput();
+
         if (m_status == ClientStatus_e::LoggedOut)
         {
             Disconnect();
@@ -368,6 +375,7 @@ bool GameClient::ContinueLogout()
 void GameClient::StartAttempt()
 {
     ++m_attempt;
+
     if (m_reconnecting)
     {
         m_logger->Info("Reconnecting as {} (attempt {} of {})", m_account.username, m_attempt, m_options.connectAttempts);
@@ -412,6 +420,7 @@ void GameClient::PumpConnecting(std::chrono::milliseconds maxWait)
     catch (const LoginError& e)
     {
         Disconnect();
+
         if (!ScheduleRetry(e.what(), e.IsRetryable()))
         {
             throw;
@@ -420,6 +429,7 @@ void GameClient::PumpConnecting(std::chrono::milliseconds maxWait)
     catch (const std::runtime_error& e)
     {
         Disconnect();
+
         if (!ScheduleRetry(e.what(), true))
         {
             throw;
@@ -502,6 +512,7 @@ void GameClient::BeginReconnect(std::string_view reason)
 {
     Disconnect();
     m_logger->Warning("Connection lost: {}", reason);
+
     if (!m_options.autoReconnect)
     {
         throw ConnectionLostError{std::format("Connection lost: {}", reason)};
@@ -522,6 +533,7 @@ bool GameClient::ScheduleRetry(std::string_view error, bool retryable)
     if (m_reconnecting)
     {
         m_logger->Warning("Reconnect attempt {} of {} failed: {}", m_attempt, m_options.connectAttempts, error);
+
         if (!retryable)
         {
             throw ConnectionLostError{std::format("Connection lost ({}), and reconnecting failed: {}", m_lostReason, error)};

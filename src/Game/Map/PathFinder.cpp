@@ -290,6 +290,7 @@ std::optional<std::vector<Tile_s>> PathFinder::FindPath(const WorldMap& map, con
 
     auto search = Search{collision};
     search.Start(from);
+
     auto stop = std::optional<LocalTile_s>{};
     while (const auto tile = search.Next())
     {
@@ -314,6 +315,7 @@ std::optional<std::vector<Tile_s>> PathFinder::FindPath(const WorldMap& map, con
 
     auto turns = search.TraceBack(*stop, from);
     std::ranges::reverse(turns);
+
     if (turns.size() > MAX_WAYPOINTS)
     {
         turns.resize(MAX_WAYPOINTS);

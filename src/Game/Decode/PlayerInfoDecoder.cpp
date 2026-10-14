@@ -208,6 +208,7 @@ void PlayerInfoDecoder::ReadLocal(Packet& packet, GameState_s& state, std::vecto
     local.tile = ToAbsolute(state, localX, localZ, level);
     local.lastMovement = jump ? Movement_e::Teleport : Movement_e::Walk;
     local.movedTick = state.tick;
+
     if (!state.placed)
     {
         state.placedTick = state.tick;
@@ -278,6 +279,7 @@ void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_
     {
         auto bytes = std::vector<u8>(packet.G1());
         packet.GData(bytes);
+
         auto appearance = ReadAppearance(bytes);
         if (!isLocal)
         {

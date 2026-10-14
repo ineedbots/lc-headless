@@ -679,6 +679,7 @@ void ServerPacketDecoder::DecodePlayerInfo(Packet& packet, GameState_s& state)
     packet.SetPos(packet.GetLength());
 
     ZoneDecoder::PruneInactive(state);
+
     if (!state.walkDestination || !state.placed)
     {
         return;

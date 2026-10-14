@@ -26,6 +26,7 @@ void SquareCollision::AddLoc(CollisionMap& collision, const GameCache_s& cache, 
         {
             collision.BlockGround(x, z);
         }
+
         return;
     case LocLayer_e::WallDecor:
         return;

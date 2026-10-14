@@ -63,6 +63,7 @@ public:
             }
 
             ReadMovement(packet, moveType, entity, tick);
+
             const auto hasExtended = moveType == MOVE_NONE || packet.GBit(UPDATE_BITS) == 1;
             survivors.push_back(std::move(entity));
             if (hasExtended)

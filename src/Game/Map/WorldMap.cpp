@@ -171,6 +171,7 @@ void WorldMap::Rebuild(const GameState_s& state)
 {
     m_area = state.buildArea;
     m_changes = state.locChanges;
+
     for (auto& collision : m_collision)
     {
         collision.Reset();

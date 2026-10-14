@@ -147,6 +147,7 @@ void Account::Start()
     assert(!m_started && "Account started twice");
     m_started = true;
     m_nextSummary = Clock::now() + SUMMARY_INTERVAL;
+
     try
     {
         m_client.BeginLogin();
@@ -160,6 +161,7 @@ void Account::Start()
 void Account::Login()
 {
     Start();
+
     while (!m_finished && m_client.GetStatus() == ClientStatus_e::Connecting)
     {
         Step(m_config->scripting.pollIntervalMs);
@@ -176,6 +178,7 @@ void Account::Step(std::chrono::milliseconds maxWait)
     // Many accounts share the caller's loop, so nothing one of them hits may reach it. While logging in, Pump
     // throws only once the client has used up its attempts, or for a refusal no attempt would change.
     const auto loggingIn = m_client.GetStatus() == ClientStatus_e::Connecting;
+
     try
     {
         m_client.Pump(GetWait(maxWait));
@@ -208,6 +211,7 @@ void Account::Step(std::chrono::milliseconds maxWait)
         }
 
         UpdateFinished();
+
         const auto status = m_client.GetStatus();
         if (m_finished || status == ClientStatus_e::LoggingOut)
         {
@@ -244,12 +248,15 @@ void Account::Interrupt()
     }
 
     ++m_interrupts;
+
     if (m_relogDelay || m_reloginAt)
     {
         m_logger->Info("Interrupted during a relog; the account stays logged out");
+
         const auto waiting = m_reloginAt.has_value();
         m_relogDelay.reset();
         m_reloginAt.reset();
+
         if (m_script)
         {
             m_script->Finish("interrupted");
@@ -282,6 +289,7 @@ void Account::Interrupt()
     m_logger->Info("Interrupted; the script has {} s to stop the account, or interrupt again to log out now", grace.count());
     m_killDeadline = Clock::now() + grace;
     m_script->SignalKill();
+
     try
     {
         StepScript(Clock::now());
@@ -454,6 +462,7 @@ void Account::StepScript(Clock::time_point now)
 {
     m_script->Step(now);
     m_client.Flush();
+
     switch (m_script->GetStatus())
     {
     case ScriptStatus_e::Running:
@@ -461,6 +470,7 @@ void Account::StepScript(Clock::time_point now)
         {
             BeginRelog(*delay);
         }
+
         return;
     case ScriptStatus_e::Stopped:
         return;
@@ -506,6 +516,7 @@ void Account::StepIdle(Clock::time_point now)
 void Account::WriteProgressReport(const ProgressReport_s& report)
 {
     m_logger->Info("Progress: {}", ProgressReportFile::Summarize(report));
+
     try
     {
         m_progressFile.Write(report, std::chrono::system_clock::now());
@@ -554,6 +565,7 @@ void Account::LogOut(std::string_view reason)
 
     m_logger->Info("Logging out: {}", reason);
     m_stopping = true;
+
     if (m_script)
     {
         m_script->Finish(reason);
@@ -589,6 +601,7 @@ bool Account::StepRelog(Clock::time_point now)
 
         m_reloginAt = now + *m_relogDelay;
         m_relogDelay.reset();
+
         // The script sees the account go, as it would a dropped connection.
         if (m_script)
         {
@@ -610,6 +623,7 @@ bool Account::StepRelog(Clock::time_point now)
 
     m_reloginAt.reset();
     m_logger->Info("Logging back in after the relog's wait");
+
     try
     {
         m_client.BeginLogin();
@@ -640,9 +654,11 @@ void Account::Recover(std::string_view reason)
 void Account::BeginRelogin()
 {
     m_client.Disconnect();
+
     const auto now = Clock::now();
     m_relogDelay.reset();
     m_reloginAt = now + m_options.reloginDelay;
+
     if (!m_script)
     {
         return;
@@ -672,6 +688,7 @@ s64 Account::GetReloginSeconds() const
 void Account::Fail(std::string_view reason)
 {
     m_logger->Error("The account has stopped: {}", reason);
+
     if (m_script)
     {
         m_script->Finish(reason);

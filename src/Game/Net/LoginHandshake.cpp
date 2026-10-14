@@ -184,6 +184,7 @@ std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& accou
     auto packet = Packet{};
     packet.P1(reconnect ? RECONNECT_LOGIN : NORMAL_LOGIN);
     packet.P1(0);
+
     const auto bodyStart = packet.GetPos();
     packet.P1(REVISION_MARKER);
     packet.P2(login.revision);

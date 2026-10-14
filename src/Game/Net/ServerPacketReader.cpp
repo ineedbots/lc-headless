@@ -76,6 +76,7 @@ std::size_t ServerPacketReader::GetBuffered() const
 std::span<const u8> ServerPacketReader::Take(std::size_t count)
 {
     assert(count <= GetBuffered() && "Take past the buffered bytes");
+
     const auto bytes = std::span{m_buffer}.subspan(m_readOffset, count);
     m_readOffset += count;
     return bytes;

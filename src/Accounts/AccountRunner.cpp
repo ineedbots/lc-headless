@@ -54,6 +54,7 @@ namespace
     std::pair<std::string_view, std::string_view> SplitFirstWord(std::string_view text)
     {
         text = Trim(text);
+
         const auto end = text.find_first_of(WHITESPACE);
         if (end == std::string_view::npos)
         {
@@ -88,6 +89,7 @@ AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared
     , m_logger{std::move(logger)}
 {
     assert(m_cache && "AccountRunner needs a cache");
+
     for (auto& account : accounts)
     {
         m_accounts.push_back(std::make_unique<Account>(m_config, m_cache, std::move(account), runtime, m_logger, options, &m_messenger));
@@ -98,9 +100,11 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
 {
     m_loginTurns = 0;
     m_nextLogin = m_accounts.empty() ? std::nullopt : std::optional{Clock::now()};
+
     auto handledInterrupts = interrupts();
 
     m_logger->Info("Running {} account{}", m_accounts.size(), m_accounts.size() == 1 ? "" : "s");
+
     while (true)
     {
         // Before the steps, so a command queued for a script runs in this pass.
@@ -153,6 +157,7 @@ void AccountRunner::HandleCommand(std::string_view line)
     }
 
     Account* target = nullptr;
+
     if (rest.front() == TARGET_PREFIX)
     {
         const auto [name, after] = SplitFirstWord(rest.substr(1));
@@ -283,6 +288,7 @@ void AccountRunner::ShowHelp(const Account* target) const
         for (const auto& command : account->GetCommands())
         {
             any = true;
+
             if (command.help.empty())
             {
                 m_logger->Info("{}: {}", account->GetName(), command.name);
@@ -436,6 +442,7 @@ void AccountRunner::SendToScripts(Account* target, const ConsoleCommand_s& comma
         }
 
         found = true;
+
         if (!account->SendCommand(command))
         {
             m_logger->Warning("{} can't take more console commands until it has run the ones waiting", account->GetName());

@@ -266,6 +266,7 @@ void NavGraph::Load(const WalkMap& map, std::string_view edgesJson, std::string_
 
             edge.acceptAnyLanding = entry.value("acceptAnyLanding", false);
             edge.requirement = ReadRequires(entry);
+
             const auto span = std::max(std::abs(edge.to.x - edge.from.x), std::abs(edge.to.z - edge.from.z));
             m_longEdges = m_longEdges || span > edge.cost;
             m_doors += edge.kind == "door" ? 1 : 0;

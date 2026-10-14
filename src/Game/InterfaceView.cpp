@@ -57,6 +57,7 @@ std::vector<u16> InterfaceView::GetOpenRoots() const
     add(m_interfaces.sideModal);
     add(m_interfaces.chatModal);
     add(m_interfaces.overlay);
+
     for (const auto tab : m_interfaces.tabs)
     {
         add(tab);

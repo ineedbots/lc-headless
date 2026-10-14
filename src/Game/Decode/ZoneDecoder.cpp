@@ -105,6 +105,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             SetLoc(state, tile, info, loc);
         }
+
         return;
     }
     case ServerProt_e::LocDel:
@@ -114,6 +115,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             SetLoc(state, tile, info, -1);
         }
+
         return;
     }
     case ServerProt_e::LocAnim:
@@ -125,6 +127,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
             const auto shape = GetShape(info);
             StateLog::Push(state.locAnims, LocAnim_s{.tile = tile, .layer = LocShape::GetLayer(shape), .shape = shape, .angle = GetAngle(info), .seq = seq, .tick = state.tick});
         }
+
         return;
     }
     case ServerProt_e::ObjAdd:
@@ -135,6 +138,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             AddObj(state, tile, obj, count);
         }
+
         return;
     }
     case ServerProt_e::ObjDel:
@@ -144,6 +148,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             DeleteObj(state, tile, obj);
         }
+
         return;
     }
     case ServerProt_e::ObjCount:
@@ -155,6 +160,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             CountObj(state, tile, obj, oldCount, newCount);
         }
+
         return;
     }
     case ServerProt_e::ObjReveal:
@@ -166,6 +172,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             AddObj(state, tile, obj, count);
         }
+
         return;
     }
     case ServerProt_e::LocMerge:
@@ -178,6 +185,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         merge.startCycle = packet.G2();
         merge.endCycle = packet.G2();
         merge.player = packet.G2();
+
         const auto east = packet.G1B();
         const auto south = packet.G1B();
         const auto west = packet.G1B();
@@ -196,6 +204,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         {
             StateLog::Push(state.mapAnims, MapAnim_s{.tile = tile, .spotAnim = spotAnim, .height = height, .delay = delay, .tick = state.tick});
         }
+
         return;
     }
     case ServerProt_e::MapProjAnim:
@@ -218,6 +227,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
             StateLog::Push(state.projectiles, projectile);
             StateLog::AddEvent(state, ProjectileLaunched_s{.projectile = std::move(projectile)});
         }
+
         return;
     }
     default:

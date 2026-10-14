@@ -291,6 +291,7 @@ namespace
                 const auto node = queue.front();
                 queue.pop_front();
                 goals.insert(node);
+
                 const auto x = NodeX(node);
                 const auto z = NodeZ(node);
                 const auto exits = m_map.GetExits(x, z, point.level);
@@ -423,8 +424,10 @@ namespace
             m_cost.clear();
             m_cameFrom.clear();
             m_via.clear();
+
             auto closed = std::unordered_set<u32>{};
             using Entry = std::pair<s64, u32>;
+
             auto open = std::priority_queue<Entry, std::vector<Entry>, std::greater<>>{};
 
             const auto distance = [goal, goalSlack](s32 x, s32 z)
@@ -459,11 +462,13 @@ namespace
 
             m_cost[m_start] = 0;
             push(m_start, 0);
+
             auto expanded = 0;
             while (!open.empty())
             {
                 const auto current = open.top().second;
                 open.pop();
+
                 if (!closed.insert(current).second)
                 {
                     continue;
@@ -500,6 +505,7 @@ namespace
 
                     m_cost[next] = nextCost;
                     m_cameFrom[next] = current;
+
                     if (hop != nullptr)
                     {
                         m_via[next] = *hop;
@@ -572,6 +578,7 @@ namespace
             for (auto node = goal;;)
             {
                 chain.push_back(node);
+
                 if (node == m_start)
                 {
                     break;
@@ -581,6 +588,7 @@ namespace
             }
 
             std::ranges::reverse(chain);
+
             const auto direction = [](u32 a, u32 b)
             {
                 const auto dx = (NodeX(b) > NodeX(a)) - (NodeX(b) < NodeX(a));
