@@ -89,6 +89,7 @@ ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOpt
     , m_options{std::move(options)}
 {
     Load();
+
     if (m_options.progressInterval > std::chrono::minutes::zero() && !HasHook(PROGRESS_REPORT))
     {
         m_logger->Warning("{} has no on_progress_report(), so progressReportMinutes has no effect", m_options.file.generic_string());
@@ -111,6 +112,7 @@ void ScriptHost::Step(Clock::time_point now)
 {
     m_api.SetStepTime(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
     CheckForChanges(now);
+
     if (m_status != ScriptStatus_e::Running)
     {
         return;
@@ -129,6 +131,7 @@ void ScriptHost::Step(Clock::time_point now)
 
     const auto& state = m_client.GetState();
     SyncLogin();
+
     if (!state.IsSettled())
     {
         return;
@@ -149,9 +152,11 @@ void ScriptHost::Step(Clock::time_point now)
     DispatchMessages(state);
     DispatchBotMessages();
     DispatchCommands();
+
     if (state.tick != m_lastTick)
     {
         m_lastTick = state.tick;
+
         if (m_status == ScriptStatus_e::Running && HasHook("tick"))
         {
             m_vm->Activate();
@@ -187,6 +192,7 @@ void ScriptHost::Finish(std::string_view reason)
     m_finished = true;
     m_vm->Activate();
     PyConvert::FromString(py_r0(), reason);
+
     try
     {
         static_cast<void>(m_vm->CallBuiltin(FINISH, std::array{py_r0()}));
@@ -300,9 +306,11 @@ void ScriptHost::Load()
 {
     m_vm.emplace(m_runtime, ScriptVmOptions_s{.scriptsDirectory = m_options.scriptsDirectory, .callTimeout = m_options.callTimeout}, m_logger);
     ScriptBindings::Bind(*m_vm, m_api);
+
     try
     {
         ScriptBindings::SetSettings(*m_vm, m_options.settings);
+
         if (m_options.waitForDebugger)
         {
             m_vm->WaitForDebugger();
@@ -330,6 +338,7 @@ void ScriptHost::LoadBot()
     m_vm->Activate();
     py_assign(py_r0(), main);
     py_assign(py_r1(), py_getdict(m_vm->GetBuiltins(), py_name(SETTINGS)));
+
     auto warnings = std::vector<std::string>{};
     try
     {
@@ -352,6 +361,7 @@ void ScriptHost::LoadBot()
     if (m_options.onSettingDefaults)
     {
         m_vm->Activate();
+
         const auto defaults = m_vm->CallBuiltin(SETTING_DEFAULTS);
         if (!py_isnone(defaults))
         {
@@ -383,6 +393,7 @@ void ScriptHost::Unload()
 void ScriptHost::Reload()
 {
     m_logger->Info("The script's files changed; reloading {}", m_options.file.generic_string());
+
     if (m_status == ScriptStatus_e::Running)
     {
         Finish("the script's files changed");
@@ -420,6 +431,7 @@ void ScriptHost::CheckForChanges(Clock::time_point now)
     }
 
     m_nextWatch = now + WATCH_INTERVAL;
+
     if (m_watcher->Check())
     {
         Reload();
@@ -436,6 +448,7 @@ void ScriptHost::SkipToPresent()
     m_loginCount = m_client.GetLoginCount();
     m_connected = false;
     m_reconnectPending = false;
+
     const auto* backpack = state.FindInventory(m_client.GetCache().inventoryComponent);
     m_backpack = backpack ? backpack->slots : std::vector<Item_s>{};
 }
@@ -443,6 +456,7 @@ void ScriptHost::SkipToPresent()
 void ScriptHost::SyncLogin()
 {
     m_connected = true;
+
     const auto loginCount = m_client.GetLoginCount();
     if (loginCount == m_loginCount)
     {
@@ -462,9 +476,11 @@ void ScriptHost::Start(Clock::time_point now)
     m_started = true;
     m_wait = LoopWait_e::Time;
     m_nextLoop = now;
+
     if (!m_startTime)
     {
         m_startTime = now;
+
         if (m_options.progressInterval > std::chrono::minutes::zero())
         {
             m_nextReport = now + m_options.progressInterval;
@@ -494,6 +510,7 @@ void ScriptHost::DispatchEvents(const GameState_s& state)
     for (const auto* event : events)
     {
         m_lastEvent = event->sequence;
+
         if (m_status == ScriptStatus_e::Running)
         {
             DispatchEvent(*event, state);
@@ -507,6 +524,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     const auto tick = state.tick;
     const auto& cache = m_client.GetCache();
     m_vm->Activate();
+
     const auto one = std::array{py_r0()};
     const auto two = std::array{py_r0(), py_r1()};
     const auto three = std::array{py_r0(), py_r1(), py_r2()};
@@ -665,6 +683,7 @@ void ScriptHost::DispatchBackpack(const GameState_s& state)
     const auto& cache = m_client.GetCache();
     const auto* inventory = state.FindInventory(cache.inventoryComponent);
     const auto previous = std::exchange(m_backpack, inventory ? inventory->slots : std::vector<Item_s>{});
+
     if (!HasHook(INVENTORY_CHANGED))
     {
         return;
@@ -698,6 +717,7 @@ void ScriptHost::DispatchMessages(const GameState_s& state)
     for (const auto* message : state.GetMessagesAfter(m_lastMessage))
     {
         m_lastMessage = message->sequence;
+
         const auto type = DescribeChatType(message->type);
         if (m_status != ScriptStatus_e::Running || !type)
         {
@@ -716,6 +736,7 @@ void ScriptHost::DispatchMessages(const GameState_s& state)
         m_vm->Activate();
         PyConvert::FromString(py_r0(), message->sender);
         PyConvert::FromString(py_r1(), message->text);
+
         switch (message->type)
         {
         case MessageType_e::Game:
@@ -781,6 +802,7 @@ void ScriptHost::DispatchCommands()
         PyConvert::FromString(py_r0(), command.name);
         PyConvert::FromString(py_r1(), command.text);
         py_newlist(py_r2());
+
         for (const auto& arg : command.args)
         {
             PyConvert::FromString(py_r3(), arg);
@@ -818,6 +840,7 @@ void ScriptHost::RunProgressReport(Clock::time_point now)
         // The prelude checks the result and turns it into text, so a failing __str__ has a traceback.
         m_vm->Activate();
         py_assign(py_r0(), *result);
+
         const auto rows = m_vm->CallBuiltin(REPORT_ROWS, std::array{py_r0()});
         for (auto i = 0; i < py_list_len(rows); ++i)
         {
@@ -860,6 +883,7 @@ void ScriptHost::RunUpkeep(Clock::time_point now)
     {
         const auto took = m_vm->CallBuiltin(UPKEEP);
         m_vm->Activate();
+
         if (py_isbool(took) && py_tobool(took))
         {
             m_wait = LoopWait_e::Time;
@@ -965,6 +989,7 @@ std::optional<py_GlobalRef> ScriptHost::Dispatch(std::string_view name, std::spa
     // The event's name goes first, in a register the arguments don't use.
     m_vm->Activate();
     PyConvert::FromString(py_r7(), name);
+
     auto all = std::vector<py_Ref>{py_r7()};
     all.insert(all.end(), args.begin(), args.end());
     try

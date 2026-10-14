@@ -53,6 +53,7 @@ namespace
         auto* data = static_cast<char*>(py_malloc(source.size() + 1));
         std::memcpy(data, source.data(), source.size());
         data[source.size()] = '\0';
+
         if (size != nullptr)
         {
             *size = static_cast<int>(source.size());
@@ -82,6 +83,7 @@ ScriptVm::ScriptVm(ScriptRuntime& runtime, ScriptVmOptions_s options, std::share
     {
         Activate();
         py_setvmctx(this);
+
         auto* callbacks = py_callbacks();
         callbacks->importfile = ImportFile;
         callbacks->print = Print;
@@ -112,6 +114,7 @@ void ScriptVm::RunFile(const std::filesystem::path& relativePath)
 
     const auto path = m_options.scriptsDirectory / relativePath;
     m_files.push_back(path);
+
     const auto source = ReadText(path);
     if (!source)
     {
@@ -124,6 +127,7 @@ void ScriptVm::RunFile(const std::filesystem::path& relativePath)
 void ScriptVm::RunSource(std::string_view source, std::string_view filename, py_GlobalRef module)
 {
     Activate();
+
     const auto sourceText = std::string{source};
     const auto filenameText = std::string{filename};
     RunGuarded([&sourceText, &filenameText, module]
@@ -135,6 +139,7 @@ void ScriptVm::RunSource(std::string_view source, std::string_view filename, py_
 bool ScriptVm::HasFunction(std::string_view name)
 {
     Activate();
+
     const auto item = py_getdict(GetMain(), py_namev(ToSv(name)));
     return item != nullptr && py_callable(item);
 }
@@ -152,6 +157,7 @@ py_GlobalRef ScriptVm::CallBuiltin(std::string_view function, std::span<const py
 py_GlobalRef ScriptVm::LoadJson(const std::string& json)
 {
     Activate();
+
     if (py_import(JSON_MODULE) != 1)
     {
         ThrowPythonError(nullptr);
@@ -176,6 +182,7 @@ void ScriptVm::WaitForDebugger()
 py_GlobalRef ScriptVm::CallIn(py_GlobalRef module, std::string_view function, std::span<const py_Ref> args)
 {
     Activate();
+
     const auto callable = py_getdict(module, py_namev(ToSv(function)));
     if (callable == nullptr || !py_callable(callable))
     {
@@ -186,6 +193,7 @@ py_GlobalRef ScriptVm::CallIn(py_GlobalRef module, std::string_view function, st
     {
         py_push(callable);
         py_pushnil();
+
         for (const auto arg : args)
         {
             py_push(arg);
@@ -258,8 +266,10 @@ void ScriptVm::RunGuarded(TCall call)
 {
     const auto unwindPoint = py_peek(0);
     py_watchdog_begin(m_options.callTimeout.count());
+
     const auto succeeded = call();
     py_watchdog_end();
+
     if (!succeeded)
     {
         ThrowPythonError(unwindPoint);
@@ -345,6 +355,7 @@ bool ScriptVm::WriteLog(LogLevel_e level, py_Ref args) noexcept
 
         auto size = 0;
         const auto* text = py_tostrn(py_retval(), &size);
+
         if (i > 0)
         {
             message += ' ';
@@ -382,6 +393,7 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
         }
 
         vm.m_files.push_back(*file);
+
         const auto source = ReadText(*file);
         if (!source)
         {

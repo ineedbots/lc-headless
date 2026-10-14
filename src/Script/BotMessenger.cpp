@@ -18,6 +18,7 @@ namespace
 void BotMessenger::Register(std::string_view username, Receiver receiver)
 {
     assert(receiver && "A bot message receiver must be callable");
+
     const auto [entry, added] = m_receivers.try_emplace(ToLower(username), std::move(receiver));
     assert(added && "Two accounts registered the same username");
     static_cast<void>(entry);

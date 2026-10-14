@@ -38,6 +38,7 @@ s32 ScriptRuntime::AcquireSlot()
 void ScriptRuntime::ReleaseSlot(s32 slot)
 {
     assert(slot >= 0 && slot < MAX_VMS && "VM slot out of range");
+
     const auto index = static_cast<std::size_t>(slot);
     assert(m_used[index] && "Releasing a VM slot that isn't in use");
 

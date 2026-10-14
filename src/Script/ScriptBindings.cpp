@@ -947,6 +947,7 @@ namespace
                 py_newint(py_tuple_getitem(out, 2), view.GetPosition(*component).x);
                 py_newnone(py_tuple_getitem(out, 3));
                 PyConvert::FromString(py_tuple_getitem(out, 1), PyConvert::GetTypeName(component->type));
+
                 const auto options = std::vector<std::string>{component->options.begin(), component->options.end()};
                 PyConvert::FromList(py_tuple_getitem(out, 3), options, [](py_OutRef option, const std::string& text)
                 {
@@ -1342,10 +1343,12 @@ namespace
         {
             const auto menu = GetApi().GetPlayerMenu();
             py_newlist(py_retval());
+
             for (const auto option : menu)
             {
                 const auto item = py_list_emplace(py_retval());
                 py_newnone(item);
+
                 if (!option.empty())
                 {
                     PyConvert::FromString(item, option);
@@ -1743,6 +1746,7 @@ namespace
         return Guard([argv]
         {
             const auto username = PyConvert::ToString(py_arg(0), "username");
+
             if (!py_json_dumps(py_arg(1), 0))
             {
                 return false;
@@ -1946,6 +1950,7 @@ void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
         for (const auto& function : GetFunctions(cache))
         {
             py_bind(core, function.signature.c_str(), function.function);
+
             const auto name = std::string_view{function.signature}.substr(0, function.signature.find('('));
             if (std::ranges::find(BUILTIN_FUNCTIONS, name) != BUILTIN_FUNCTIONS.end())
             {

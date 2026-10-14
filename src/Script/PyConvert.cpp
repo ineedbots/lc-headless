@@ -31,6 +31,7 @@ void PyConvert::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCac
     SetInt(object, "id", npc.type);
     SetEntity(object, npc, tick);
     SetMenu(object, ScriptApi::GetNpcMenu(cache, npc.type));
+
     const auto* const type = cache.FindNpc(npc.type);
     if (type == nullptr)
     {
@@ -49,6 +50,7 @@ void PyConvert::FromPlayer(py_OutRef out, const Player_s& player, u64 tick)
 {
     const auto object = NewInstance(out, PLAYER_CLASS);
     SetEntity(object, player, tick);
+
     if (!player.appearance)
     {
         SetNone(object, "name");
@@ -64,6 +66,7 @@ void PyConvert::FromGroundItem(py_OutRef out, const GroundItem_s& item, const Ga
 {
     const auto object = NewInstance(out, GROUND_ITEM_CLASS);
     SetInt(object, "id", item.id);
+
     const auto* const type = cache.FindObj(item.id);
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetInt(object, "count", item.count);
@@ -75,6 +78,7 @@ void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s&
 {
     const auto object = NewInstance(out, LOC_CLASS);
     SetInt(object, "id", loc.id);
+
     const auto* const type = cache.FindLoc(loc.id);
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetBool(object, "changed", loc.changed);
@@ -104,12 +108,14 @@ void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameC
 {
     const auto object = NewInstance(out, ITEM_CLASS);
     SetInt(object, "id", item.id);
+
     const auto* const type = cache.FindObj(item.id);
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetInt(object, "count", item.count);
     SetInt(object, "slot", item.slot);
     SetInt(object, "com", item.com);
     SetBool(object, "noted", type != nullptr && type->noteOf.has_value());
+
     const auto inventoryMenu = ScriptApi::GetInventoryMenu(cache, item.com);
     SetMenu(object, inventoryMenu.value_or(ScriptApi::GetItemMenu(cache, item.id)));
     SetBool(object, BUTTON_FIELD, inventoryMenu.has_value());
@@ -123,6 +129,7 @@ void PyConvert::FromNpcType(py_OutRef out, const NpcType_s& type, const GameCach
     SetOptionalString(object, "examine", type.examine);
     SetOptions(object, "ops", type.ops, cache);
     SetInt(object, "size", type.size);
+
     if (type.combatLevel)
     {
         SetInt(object, "combat_level", *type.combatLevel);
@@ -143,6 +150,7 @@ void PyConvert::FromItemType(py_OutRef out, const ObjType_s& type, const GameCac
     SetBool(object, "stackable", type.stackable);
     SetBool(object, "members", type.members);
     SetInt(object, "value", type.cost);
+
     if (type.noteOf)
     {
         SetInt(object, "note_of", *type.noteOf);
@@ -170,6 +178,7 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     const auto object = NewInstance(out, COMPONENT_CLASS);
     SetInt(object, "id", component.id);
     SetInt(object, "root", component.root);
+
     if (component.parent)
     {
         SetInt(object, "layer", *component.parent);
@@ -180,6 +189,7 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     }
 
     SetString(object, "type", GetTypeName(component.type));
+
     const auto button = GetButtonName(component.buttonType);
     SetOptionalString(object, "button", button.value_or(std::string_view{}));
     SetOptionalString(object, "button_text", component.buttonText);
@@ -189,11 +199,13 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     SetBool(object, "visible", view.IsVisible(component));
     SetOptionalString(object, "target_verb", component.targetVerb);
     SetOptionalString(object, "target_name", component.targetName);
+
     const auto position = view.GetPosition(component);
     SetInt(object, "x", position.x);
     SetInt(object, "y", position.y);
     SetInt(object, "width", component.width);
     SetInt(object, "height", component.height);
+
     // Such as a make menu's product.
     if (const auto shown = view.GetObject(component))
     {
@@ -230,6 +242,7 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
     // As SetOptions: each list stays on the value stack until the object holds it.
     const auto children = py_pushtmp();
     py_newlist(children);
+
     for (const auto& child : component.children)
     {
         py_newint(py_list_emplace(children), child.id);
@@ -246,10 +259,12 @@ void PyConvert::FromComponent(py_OutRef out, const IfComponent_s& component, con
 
     const auto options = py_pushtmp();
     py_newlist(options);
+
     for (const auto& option : component.options)
     {
         const auto item = py_list_emplace(options);
         py_newnone(item);
+
         if (!option.empty())
         {
             FromString(item, option);
@@ -608,10 +623,12 @@ void PyConvert::SetOptions(py_Ref object, const char* name, std::span<const u16>
     // is made, so a collection never sees an uninitialized value.
     const auto list = py_pushtmp();
     py_newlist(list);
+
     for (const auto op : ops)
     {
         const auto item = py_list_emplace(list);
         py_newnone(item);
+
         if (op != TextPool::NO_OPTION)
         {
             FromString(item, cache.GetOption(op));
@@ -634,10 +651,12 @@ void PyConvert::SetMenu(py_Ref object, const ScriptApi::Menu& menu)
     // As SetOptions: the list stays on the value stack until the object holds it.
     const auto list = py_pushtmp();
     py_newlist(list);
+
     for (const auto option : menu)
     {
         const auto item = py_list_emplace(list);
         py_newnone(item);
+
         if (!option.empty())
         {
             FromString(item, option);
@@ -655,6 +674,7 @@ void PyConvert::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
     SetInt(object, "animation", entity.animation.id);
     SetBool(object, "moving", ScriptApi::IsMoving(entity, tick));
     SetBool(object, "in_combat", ScriptApi::InCombat(entity, tick));
+
     // As rs2b0t's health, 0 until a hit shows it.
     const auto* const hit = entity.hits.empty() ? nullptr : &entity.hits.back();
     SetInt(object, "health", hit == nullptr ? 0 : hit->health);

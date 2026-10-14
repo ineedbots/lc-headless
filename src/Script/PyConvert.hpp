@@ -91,6 +91,7 @@ public:
     static void FromList(py_OutRef out, const std::vector<T>& values, TConvert convert)
     {
         py_newlist(out);
+
         for (const auto& value : values)
         {
             const auto item = py_list_emplace(out);

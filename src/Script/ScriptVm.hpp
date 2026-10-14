@@ -87,7 +87,9 @@ auto ScriptVm::RunRouteSearch(TSearch search)
     const auto limit = m_options.callTimeout * ROUTE_SEARCH_TIMEOUTS;
     const auto started = std::chrono::steady_clock::now();
     py_watchdog_begin(limit.count());
+
     auto result = search();
+
     if (std::chrono::steady_clock::now() - started <= limit)
     {
         py_watchdog_begin(m_options.callTimeout.count());

@@ -68,6 +68,7 @@ namespace
     std::optional<T> FindNearest(std::vector<T> candidates, const Tile_s& from, TTile getTile, TAccept accept)
     {
         SortByDistance(candidates, from, getTile);
+
         const auto found = std::ranges::find_if(candidates, accept);
         if (found == candidates.end())
         {
