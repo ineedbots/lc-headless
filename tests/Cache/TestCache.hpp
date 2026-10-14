@@ -78,12 +78,11 @@ public:
     static LocType_s& AddLoc(GameCache_s& cache, u16 id, std::string_view name, std::initializer_list<std::string_view> ops = {});
     // Gives the cache the 289 cache's components and run varp, as the constants above.
     static void SetComponents(GameCache_s& cache);
-    // Adds the components, setting each child's parent from the layers that list it.
+    // Sets each child's parent from the layers that list it.
     static void AddComponents(GameCache_s& cache, std::initializer_list<IfComponent_s> components);
     static void SetTradeScreen(GameCache_s& cache);
     static void SetChatInterfaces(GameCache_s& cache);
     static void SetBankScreen(GameCache_s& cache);
     static void SetShop(GameCache_s& cache);
-    // Replaces the map with squares holding these locs and blocked tiles.
     static void SetMap(GameCache_s& cache, std::span<const TestLoc_s> locs, std::span<const Tile_s> blocked = {});
 };

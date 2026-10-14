@@ -38,7 +38,7 @@ struct LocPlacement_s
     u8 angle = 0;
 };
 
-// A square's map files, unpacked.
+// Unpacked.
 struct SquareFiles_s
 {
     u16 square = 0;

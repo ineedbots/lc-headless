@@ -3,7 +3,7 @@
 #include "Game/State/GameState_s.hpp"
 #include "Io/Packet.hpp"
 
-// Payload builders that encode server packets the way the engine's encoders do.
+// Server packet payloads, encoded the way the engine's encoders do.
 class Fixtures
 {
 public:

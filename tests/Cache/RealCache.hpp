@@ -9,7 +9,7 @@ class RealCache
 public:
     RealCache() = delete;
 
-    // The cache, or a SKIP of the test when RS2004_CACHE_DIR isn't set.
+    // Skips the test when RS2004_CACHE_DIR isn't set.
     [[nodiscard]] static const GameCache_s& Require();
     [[nodiscard]] static std::shared_ptr<const GameCache_s> RequireShared();
 };

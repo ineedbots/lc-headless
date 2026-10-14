@@ -1,6 +1,6 @@
 #pragma once
 
-// A uniquely named folder under the system temp directory, removed with everything in it when destroyed.
+// Under the system temp directory, removed with everything in it when destroyed.
 class TempFolder
 {
 public:
