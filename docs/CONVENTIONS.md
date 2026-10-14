@@ -449,7 +449,35 @@ enum class BlendMode_e : u8
 - The `*` and `&` attach to the type: `Texture* texture`, `const Config& config`.
 - One declaration per line (`int* a, b;` is a trap).
 
-Three files enforce this. `.clang-format` handles C++ code, `.editorconfig` makes every editor use spaces and LF for every file type, and `.gitattributes` guarantees git stores and checks out LF regardless of anyone's `core.autocrlf` setting.
+### Blank lines
+
+Blank lines split a function body into groups that each do one thing:
+
+- Put a blank line before a block (`if`, `for`, `while`, `switch`, `try`, `do`), unless it opens its scope or the lines directly above set up what the block uses.
+- Put a blank line before a declaration that follows other statements, so the declaration leads the lines that use it. Consecutive declarations stay together.
+- Put a blank line after a block's closing brace, unless `else`, `catch`, or another closing brace follows.
+
+```cpp
+const auto object = NewInstance(out, COMPONENT_CLASS);
+SetInt(object, "id", component.id);
+
+if (component.parent)
+{
+    SetInt(object, "layer", *component.parent);
+}
+
+const auto position = view.GetPosition(component);
+SetInt(object, "x", position.x);
+SetInt(object, "y", position.y);
+
+const auto first = text.find_first_not_of(WHITESPACE);
+if (first == std::string_view::npos)
+{
+    return {};
+}
+```
+
+Three files enforce the rest of this section. `.clang-format` handles C++ code, `.editorconfig` makes every editor use spaces and LF for every file type, and `.gitattributes` guarantees git stores and checks out LF regardless of anyone's `core.autocrlf` setting.
 
 ### `.clang-format`
 
@@ -546,6 +574,7 @@ for (const auto& entry : entries)
 ```
 
 - To commit to a specific type, write `auto x = Type{...};`.
+- Loop counters too: `for (auto i = std::size_t{0}; i < items.size(); ++i)`, or `for (auto i = 0; i < count; ++i)` for an `int`.
 - `auto` drops `const` and references, so spell out `const auto&` or `auto&` when that's what you mean.
 - Watch out for proxy types such as `std::vector<bool>::reference`.
 
