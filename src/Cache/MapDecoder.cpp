@@ -166,6 +166,7 @@ namespace
             }
 
             id += deltaId;
+
             auto position = 0;
             while (true)
             {
@@ -176,6 +177,7 @@ namespace
                 }
 
                 position += deltaPosition - 1;
+
                 const auto info = packet.G1();
                 const auto level = position >> MapLoc_s::LEVEL_SHIFT;
                 if (level > MAX_LEVEL)
@@ -237,6 +239,7 @@ std::vector<MapIndexEntry_s> MapDecoder::DecodeIndex(std::span<const u8> data)
 
     auto entries = std::vector<MapIndexEntry_s>{};
     entries.reserve(data.size() / INDEX_ENTRY_SIZE);
+
     auto packet = Packet{data};
     while (packet.GetAvailable() > 0)
     {

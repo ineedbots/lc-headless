@@ -318,6 +318,7 @@ namespace
     void ReadOption(Packet& packet, std::size_t slot, std::span<u16> ops, TextPool& text, bool dropHidden)
     {
         const auto option = ReadString(packet);
+
         if (slot >= ops.size())
         {
             return;
@@ -345,6 +346,7 @@ namespace
         for (auto i = 0; i < count; ++i)
         {
             static_cast<void>(packet.G2());
+
             if (!withShapes)
             {
                 continue;
@@ -361,6 +363,7 @@ namespace
     void SkipMultiloc(Packet& packet)
     {
         static_cast<void>(packet.G2());
+
         const auto count = std::size_t{packet.G1()};
         Skip(packet, (count + 1) * sizeof(u16));
     }
@@ -420,6 +423,7 @@ namespace
             case LOC_ACTIVE:
                 // As the webclient reads it: a 1 makes the loc active, and any value stops the default.
                 activeGiven = true;
+
                 if (packet.G1() == ACTIVE_VALUE)
                 {
                     type.active = true;

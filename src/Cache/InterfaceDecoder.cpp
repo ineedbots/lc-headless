@@ -284,6 +284,7 @@ std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data)
 
     auto packet = Packet{data};
     packet.SetPos(COUNT_SIZE);
+
     auto components = std::vector<IfComponent_s>{};
     auto root = u16{0};
     while (packet.GetAvailable() > 0)

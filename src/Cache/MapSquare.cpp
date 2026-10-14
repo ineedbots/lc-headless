@@ -46,6 +46,7 @@ bool MapSquare::HasGround(s32 level, s32 x, s32 z) const
 std::span<const MapLoc_s> MapSquare::GetLocsAt(s32 level, s32 x, s32 z) const
 {
     assert(level >= 0 && level < LEVELS && x >= 0 && x < SIZE && z >= 0 && z < SIZE && "Tile outside the square");
+
     const auto [first, last] = std::ranges::equal_range(m_locs, MapLoc_s::PackPosition(level, x, z), {}, &MapLoc_s::position);
     return {first, last};
 }

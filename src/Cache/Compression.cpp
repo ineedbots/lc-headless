@@ -198,6 +198,7 @@ std::vector<u8> Compression::Gunzip(std::span<const u8> source)
 
         stream.next_out = output.data() + produced;
         stream.avail_out = static_cast<uInt>(output.size() - produced);
+
         const auto result = inflate(&stream, Z_NO_FLUSH);
         if (result == Z_STREAM_END)
         {

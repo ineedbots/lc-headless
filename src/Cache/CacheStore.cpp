@@ -80,6 +80,7 @@ CacheStore::CacheStore(const std::filesystem::path& directory)
     }
 
     m_datSize = std::filesystem::file_size(datPath);
+
     for (auto store = u32{0}; store < STORE_COUNT; ++store)
     {
         const auto indexPath = directory / GetIndexFileName(store);
@@ -98,6 +99,7 @@ std::string CacheStore::GetIndexFileName(u32 store)
 u32 CacheStore::GetFileCount(u32 store) const
 {
     assert(store < STORE_COUNT && "Store number out of range");
+
     const auto& index = m_indexes[store];
     if (!index)
     {
@@ -110,6 +112,7 @@ u32 CacheStore::GetFileCount(u32 store) const
 std::optional<std::vector<u8>> CacheStore::Read(u32 store, u32 file)
 {
     assert(store < STORE_COUNT && "Store number out of range");
+
     if (!m_indexes[store])
     {
         throw CacheError{std::format("{} not found", GetIndexFileName(store))};

@@ -11,6 +11,7 @@ TextPool::TextPool()
 std::string_view TextPool::Intern(std::string_view text)
 {
     assert(!m_finished && "Text interned after FinishInterning");
+
     if (text.empty())
     {
         return {};
@@ -23,6 +24,7 @@ std::string_view TextPool::Intern(std::string_view text)
     }
 
     char* destination = nullptr;
+
     if (text.size() > CHUNK_SIZE)
     {
         // A string that fills a chunk on its own gets one, and the next string starts a fresh chunk.
@@ -43,6 +45,7 @@ std::string_view TextPool::Intern(std::string_view text)
     }
 
     std::ranges::copy(text, destination);
+
     const auto interned = std::string_view{destination, text.size()};
     m_strings.insert(interned);
     return interned;
@@ -51,6 +54,7 @@ std::string_view TextPool::Intern(std::string_view text)
 u16 TextPool::InternOption(std::string_view text)
 {
     assert(!m_finished && "Option interned after FinishInterning");
+
     if (text.empty())
     {
         return NO_OPTION;

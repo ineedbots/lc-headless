@@ -101,12 +101,15 @@ namespace
             const auto locDat = ReadEntry(config, "loc.dat");
             const auto locIdx = ReadEntry(config, "loc.idx");
             cache.locs = TypeDecoder::DecodeLocs(locDat, locIdx, cache.text);
+
             const auto npcDat = ReadEntry(config, "npc.dat");
             const auto npcIdx = ReadEntry(config, "npc.idx");
             cache.npcs = TypeDecoder::DecodeNpcs(npcDat, npcIdx, cache.text);
+
             const auto objDat = ReadEntry(config, "obj.dat");
             const auto objIdx = ReadEntry(config, "obj.idx");
             cache.objs = TypeDecoder::DecodeObjs(objDat, objIdx, cache.text);
+
             const auto varpDat = ReadEntry(config, "varp.dat");
             const auto varpIdx = ReadEntry(config, "varp.idx");
             cache.runVarp = FindRunVarp(TypeDecoder::DecodeVarps(varpDat, varpIdx));
@@ -265,6 +268,7 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Logger& lo
         cache.crcs = ReadCrcs(store);
         DecodeConfig(store, cache);
         FindComponents(store, cache);
+
         const auto skipped = DecodeMaps(store, cache);
         cache.text.FinishInterning();
 
