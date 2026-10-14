@@ -22,6 +22,7 @@ void TempFolder::WriteFile(const std::filesystem::path& relativePath, std::strin
 {
     const auto path = m_path / relativePath;
     std::filesystem::create_directories(path.parent_path());
+
     auto file = std::ofstream{path, std::ios::binary};
     if (!file)
     {

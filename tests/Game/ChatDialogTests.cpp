@@ -105,6 +105,7 @@ TEST_CASE("ChatDialog tells make menus from options by their stacked buttons", "
     const auto cache = MakeCache();
     auto interfaces = Interfaces_s{};
     interfaces.chatModal = MENU;
+
     const auto view = InterfaceView{cache, interfaces};
 
     const auto options = ChatDialog::GetOptions(view);
@@ -147,6 +148,7 @@ TEST_CASE("ChatDialog reads a make panel's products, drawn over its slots or in 
 
     interfaces.mainModal = PANEL;
     interfaces.components[PANEL_MODEL].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BOW};
+
     const auto slots = ChatDialog::GetMakePanel(view, state);
     REQUIRE(slots.size() == 2);
     CHECK((slots[0].slot == 0 && slots[0].id == RING && slots[0].product == RING));

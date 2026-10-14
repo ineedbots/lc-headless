@@ -109,6 +109,7 @@ TEST_CASE("JagArchive rejects a header or table that doesn't fit", "[JagArchive]
         packet.P3(13);
         packet.P3(static_cast<s32>(packed.size()));
         packet.PData(packed);
+
         const auto archive = JagArchive{ToBytes(packet)};
         CHECK_THROWS_WITH(archive.Read("loc.dat"), ContainsSubstring("loc.dat: bzip2 data unpacks to 12 bytes, not 13"));
     }

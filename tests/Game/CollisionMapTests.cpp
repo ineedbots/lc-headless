@@ -44,6 +44,7 @@ namespace
     std::vector<WallCase_s> GetWallCases()
     {
         using F = CollisionFlag;
+
         auto cases = std::vector<WallCase_s>{
             {LocShape::WALL_STRAIGHT, WEST, {{0, 0, F::WALL_WEST}, {-1, 0, F::WALL_EAST}}},
             {LocShape::WALL_STRAIGHT, NORTH, {{0, 0, F::WALL_NORTH}, {0, 1, F::WALL_SOUTH}}},
@@ -97,6 +98,7 @@ TEST_CASE("CollisionMap adds walls to both sides", "[CollisionMap]")
     for (const auto& wall : GetWallCases())
     {
         CAPTURE(wall.shape, wall.angle);
+
         auto map = CollisionMap{};
         map.AddWall(X, Z, wall.shape, wall.angle, false);
         for (const auto& tile : wall.tiles)

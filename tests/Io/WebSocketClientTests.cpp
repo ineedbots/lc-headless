@@ -217,10 +217,12 @@ namespace
                 }
 
                 m_changed.notify_all();
+
                 if (m_onOpen)
                 {
                     m_onOpen(connection);
                 }
+
                 return;
 
             case ix::WebSocketMessageType::Message:
@@ -230,10 +232,12 @@ namespace
                 }
 
                 m_changed.notify_all();
+
                 if (m_echoes)
                 {
                     connection.sendBinary(message.str);
                 }
+
                 return;
 
             case ix::WebSocketMessageType::Close:
@@ -369,6 +373,7 @@ namespace
     {
         client.Send(bytes);
         REQUIRE(client.WaitAvailable(bytes.size(), WAIT));
+
         auto received = std::vector<u8>(bytes.size());
         client.Read(received);
         CHECK(received == bytes);
@@ -436,6 +441,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
         client.Append(std::array<u8, 2>{1, 2});
         client.Append(std::array<u8, 1>{3});
         client.Append(std::span<const u8>{});
+
         auto destination = std::array<u8, 3>{};
         client.Read(destination);
         CHECK(destination == std::array<u8, 3>{1, 2, 3});
@@ -445,6 +451,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("read returns the span it was given")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto destination = std::array<u8, 3>{};
         const auto partial = client.Read(std::span{destination}.first(2));
         CHECK(partial.data() == destination.data());
@@ -458,6 +465,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("peek doesn't consume")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto destination = std::array<u8, 2>{};
         client.Peek(destination);
         CHECK(destination == std::array<u8, 2>{1, 2});
@@ -467,6 +475,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("peek then read give the same bytes")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto peeked = std::array<u8, 2>{};
         auto read = std::array<u8, 2>{};
         client.Peek(peeked);
@@ -479,6 +488,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("consecutive reads")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto first = std::array<u8, 2>{};
         auto second = std::array<u8, 1>{};
         client.Read(first);
@@ -491,6 +501,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("a short read throws and consumes nothing")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto destination = std::array<u8, 4>{9, 9, 9, 9};
         CHECK_THROWS_AS(client.Read(destination), std::out_of_range);
         CHECK(destination == std::array<u8, 4>{9, 9, 9, 9});
@@ -500,6 +511,7 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("a short peek throws")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto destination = std::array<u8, 4>{9, 9, 9, 9};
         CHECK_THROWS_AS(client.Peek(destination), std::out_of_range);
         CHECK(destination == std::array<u8, 4>{9, 9, 9, 9});
@@ -514,10 +526,12 @@ TEST_CASE("WebSocketClient receive buffer", "[WebSocketClient]")
     SECTION("clear drops read and unread bytes")
     {
         client.Append(std::array<u8, 3>{1, 2, 3});
+
         auto first = std::array<u8, 1>{};
         client.Read(first);
         client.Clear();
         client.Append(std::array<u8, 1>{9});
+
         auto next = std::array<u8, 1>{};
         client.Read(next);
         CHECK(next == std::array<u8, 1>{9});
@@ -539,6 +553,7 @@ TEST_CASE("WebSocketClient receive buffer compacts without losing bytes", "[WebS
     {
         auto piece = std::vector<u8>(size);
         client.Read(piece);
+
         for (const auto byte : piece)
         {
             if (byte != static_cast<u8>(nextRead & 0xFF))
@@ -694,6 +709,7 @@ TEST_CASE("WebSocketClient connects and exchanges data", "[WebSocketClient][netw
         auto server = MakeEchoServer();
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
+
         auto bytes = std::vector<u8>(65'536);
         for (auto i = std::size_t{0}; i < bytes.size(); ++i)
         {
@@ -725,6 +741,7 @@ TEST_CASE("WebSocketClient connects and exchanges data", "[WebSocketClient][netw
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
         REQUIRE(client.WaitAvailable(6, WAIT));
+
         auto received = std::array<u8, 6>{};
         client.Read(received);
         CHECK(received == std::array<u8, 6>{1, 2, 3, 4, 5, 6});
@@ -754,6 +771,7 @@ TEST_CASE("WebSocketClient connects and exchanges data", "[WebSocketClient][netw
         auto server = SilentServer{};
         auto client = WebSocketClient{MakeConsoleLogger()};
         client.Connect(MakeOptions(server.Url(), SILENT_HANDSHAKE_TIMEOUT));
+
         auto outcome = Outcome_e::Returned;
         const auto elapsed = Measure([&]
         {
@@ -774,6 +792,7 @@ TEST_CASE("WebSocketClient timeouts and wake-ups", "[WebSocketClient][network]")
         auto server = LoopbackServer{};
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
+
         auto isAvailable = true;
         const auto elapsed = Measure([&]
         {
@@ -790,6 +809,7 @@ TEST_CASE("WebSocketClient timeouts and wake-ups", "[WebSocketClient][network]")
         auto server = LoopbackServer{};
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
+
         auto results = std::array<bool, 2>{true, true};
         const auto elapsed = Measure([&]
         {
@@ -814,6 +834,7 @@ TEST_CASE("WebSocketClient timeouts and wake-ups", "[WebSocketClient][network]")
         auto server = LoopbackServer{SendAfter(SERVER_DELAY, "\x01\x02\x03\x04")};
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
+
         auto isAvailable = false;
         const auto elapsed = Measure([&]
         {
@@ -872,6 +893,7 @@ TEST_CASE("WebSocketClient peer close and failure", "[WebSocketClient][network]"
         auto server = LoopbackServer{CloseAfter(SERVER_DELAY)};
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
+
         auto isClosed = false;
         const auto elapsed = Measure([&]
         {
@@ -974,6 +996,7 @@ TEST_CASE("WebSocketClient local close", "[WebSocketClient][network]")
         ConnectAndWaitOpen(client, server.Url());
 
         client.Close();
+
         const auto deadline = Clock::now() + 1s;
         auto state = client.Pump();
         while (state != WebSocketState_e::Closed && Clock::now() < deadline)

@@ -206,6 +206,7 @@ TEST_CASE("NPC_INFO reports removals, then additions, then hits, then speech", "
 {
     auto state = Fixtures::PlacedState();
     state.npcs = {MakeNpc(100, 50, Offset(1, 0)), MakeNpc(101, 51, Offset(0, 1)), MakeNpc(102, 52, Offset(2, 2))};
+
     const auto before = state.eventCount;
 
     auto bits = BitWriter{};
@@ -256,6 +257,7 @@ TEST_CASE("PLAYER_INFO reports players, and hits on the local player apart from 
 {
     auto state = Fixtures::PlacedState();
     state.players = {MakePlayer(7, Offset(1, 1)), MakePlayer(8, Offset(2, 2))};
+
     const auto before = state.eventCount;
     auto decoder = PlayerInfoDecoder{};
 
@@ -368,6 +370,7 @@ TEST_CASE("Zone packets report ground items and scenery, but not resets", "[Game
 
     CHECK(GetEvent<GroundItemAdded_s>(state, before + 1).item.tile == ZoneOffset(2, 3));
     CHECK(GetEvent<LocChanged_s>(state, before + 5).change.tile == ZoneOffset(1, 1));
+
     const auto& launched = GetEvent<ProjectileLaunched_s>(state, before + 7).projectile;
     CHECK(launched.source == ZoneOffset(2, 2));
     CHECK(launched.destination == ZoneOffset(5, 1));

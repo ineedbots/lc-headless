@@ -378,6 +378,7 @@ TEST_CASE("ServerPacketDecoder applies zone updates", "[ServerPacketDecoder]")
         CHECK(state.locChanges[0].shape == 10);
         CHECK(state.locChanges[0].angle == 1);
         REQUIRE(state.projectiles.size() == 1);
+
         const auto& projectile = state.projectiles[0];
         CHECK(projectile.destination.x == projectile.source.x + 3);
         CHECK(projectile.destination.z == projectile.source.z - 2);
@@ -540,6 +541,7 @@ TEST_CASE("ServerPacketDecoder ends a walk the server never starts", "[ServerPac
 
     auto standStill = BitWriter{};
     standStill.Put(1, 0).Put(8, 0);
+
     auto stepEast = BitWriter{};
     stepEast.Put(1, 1).Put(2, 1).Put(3, 4).Put(1, 0).Put(8, 0);
 

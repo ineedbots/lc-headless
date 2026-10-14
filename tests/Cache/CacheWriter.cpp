@@ -125,6 +125,7 @@ namespace
         for (auto i = std::size_t{0}; i < component.children.size(); ++i)
         {
             packet.P2(component.children[i]);
+
             const auto offset = i < component.childOffsets.size() ? component.childOffsets[i] : std::pair<s16, s16>{SAMPLE_OFFSET, SAMPLE_SIZE};
             packet.P2(offset.first);
             packet.P2(offset.second);
@@ -164,6 +165,7 @@ namespace
         PutOptionalId(packet, std::nullopt);
         PutOptionalId(packet, SAMPLE_ANIMATION);
         PutOptionalId(packet, std::nullopt);
+
         for (auto i = 0; i < MODEL_VIEW_COUNT; ++i)
         {
             packet.P2(SAMPLE_SIZE);
@@ -318,6 +320,7 @@ WrittenStore_s CacheWriter::Build() const
 
         // Each file starts on a fresh sector, so only the .dat's last sector can be short, as the engine leaves it.
         written.dat.resize((written.dat.size() + CacheStore::SECTOR_SIZE - 1) / CacheStore::SECTOR_SIZE * CacheStore::SECTOR_SIZE);
+
         const auto firstSector = written.dat.size() / CacheStore::SECTOR_SIZE;
         auto entry = Packet{};
         entry.P3(static_cast<s32>(bytes.size()));
@@ -330,11 +333,13 @@ WrittenStore_s CacheWriter::Build() const
             const auto chunk = std::min(SECTOR_DATA_SIZE, bytes.size() - offset);
             const auto last = offset + chunk == bytes.size();
             written.dat.resize(sector * CacheStore::SECTOR_SIZE);
+
             auto header = Packet{};
             header.P2(static_cast<s32>(file));
             header.P2(static_cast<s32>(part));
             header.P3(last ? 0 : static_cast<s32>(sector + 1));
             header.P1(static_cast<s32>(store + 1));
+
             const auto headerBytes = header.GetData();
             written.dat.insert(written.dat.end(), headerBytes.begin(), headerBytes.end());
             written.dat.insert(written.dat.end(), bytes.begin() + static_cast<std::ptrdiff_t>(offset), bytes.begin() + static_cast<std::ptrdiff_t>(offset + chunk));
@@ -349,6 +354,7 @@ void CacheWriter::WriteStore(const std::filesystem::path& directory, const Writt
 {
     std::filesystem::create_directories(directory);
     WriteFile(directory / CacheStore::DAT_FILE, store.dat);
+
     for (auto i = u32{0}; i < CacheStore::STORE_COUNT; ++i)
     {
         WriteFile(directory / CacheStore::GetIndexFileName(i), store.indexes[i]);
@@ -359,6 +365,7 @@ std::vector<u8> CacheWriter::Bzip2Headerless(std::span<const u8> data)
 {
     auto packed = std::vector<u8>(data.size() + data.size() / 100 + BZIP2_SLACK);
     auto packedSize = static_cast<unsigned int>(packed.size());
+
     // libbzip2 rejects a null source even when it's empty.
     auto nothing = char{0};
     auto* const source = data.empty() ? &nothing : reinterpret_cast<char*>(const_cast<u8*>(data.data()));
@@ -386,9 +393,11 @@ std::vector<u8> CacheWriter::Gzip(std::span<const u8> data, u16 version)
     stream.avail_in = static_cast<uInt>(data.size());
     stream.next_out = packed.data();
     stream.avail_out = static_cast<uInt>(packed.size());
+
     const auto result = deflate(&stream, Z_FINISH);
     packed.resize(stream.total_out);
     deflateEnd(&stream);
+
     if (result != Z_STREAM_END)
     {
         throw std::runtime_error{std::format("deflate failed with {}", result)};
@@ -396,6 +405,7 @@ std::vector<u8> CacheWriter::Gzip(std::span<const u8> data, u16 version)
 
     auto trailer = Packet{};
     trailer.P2(version);
+
     const auto trailerBytes = trailer.GetData();
     packed.insert(packed.end(), trailerBytes.begin(), trailerBytes.end());
     return packed;
@@ -411,6 +421,7 @@ std::vector<u8> CacheWriter::MakeArchive(const std::vector<ArchiveEntry_s>& entr
 
     auto body = Packet{};
     PutEntryTable(body, entries, packed);
+
     auto contents = ToBytes(body);
     if (compressWhole)
     {
@@ -512,6 +523,7 @@ std::vector<u8> CacheWriter::MakeLocFile(std::span<const LocPlacement_s> locs)
         const auto id = sorted[i].id;
         PutSmart(bytes, id - lastId);
         lastId = id;
+
         auto lastPosition = 0;
         for (; i < sorted.size() && sorted[i].id == id; ++i)
         {

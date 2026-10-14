@@ -69,6 +69,7 @@ TEST_CASE("ScriptVm runs source and calls the functions it defines", "[ScriptVm]
     vm.Activate();
     py_newint(py_r0(), 2);
     py_newint(py_r1(), 3);
+
     const auto args = std::array{py_r0(), py_r1()};
     CHECK(py_toint(vm.Call("add", args)) == 5);
 
@@ -253,6 +254,7 @@ TEST_CASE("ScriptVm gives the walker's route search more than a call's timeout",
         vm.Activate();
         py_newint(py_r0(), ms);
         py_newint(py_r1(), busyMs);
+
         const auto args = std::array{py_r0(), py_r1()};
         return vm.Call(function, args);
     };
@@ -261,6 +263,7 @@ TEST_CASE("ScriptVm gives the walker's route search more than a call's timeout",
     // one doesn't, and neither does a minute of Python after a short one.
     CHECK(py_tobool(call("search_then", 250, 60)));
     CHECK_THROWS_WITH(call("search_then", 700, 0), ContainsSubstring("TimeoutError"));
+
     const auto start = std::chrono::steady_clock::now();
     CHECK_THROWS_WITH(call("search_then", 10, 60000), ContainsSubstring("TimeoutError"));
     CHECK(std::chrono::steady_clock::now() - start < 2s);

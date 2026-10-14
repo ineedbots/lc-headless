@@ -4,6 +4,7 @@
 BitWriter& BitWriter::Put(u32 bitCount, s32 value)
 {
     assert(bitCount >= 1 && bitCount <= 32 && "BitWriter writes 1 to 32 bits at a time");
+
     const auto bits = static_cast<u32>(value);
     for (auto i = bitCount; i > 0; --i)
     {

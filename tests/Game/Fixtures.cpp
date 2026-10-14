@@ -100,6 +100,7 @@ std::vector<u8> Fixtures::PlaceLocalPlayer(s32 localX, s32 localZ, s32 level, st
     }
 
     bits.Put(11, 2047);
+
     auto extended = Packet{};
     extended.P1(0x01);
     extended.P1(static_cast<s32>(appearance.size()));

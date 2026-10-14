@@ -23,6 +23,7 @@ namespace
     void SetOptions(TextPool& text, std::array<u16, TCount>& slots, std::initializer_list<std::string_view> ops)
     {
         assert(ops.size() <= TCount && "More options than slots");
+
         auto slot = std::size_t{0};
         for (const auto op : ops)
         {

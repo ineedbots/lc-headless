@@ -100,13 +100,17 @@ TEST_CASE("The standard library's Python tests pass", "[Stdlib]")
 
     std::ranges::sort(files);
     REQUIRE_FALSE(files.empty());
+
     for (const auto& file : files)
     {
         CAPTURE(file.string());
+
         auto fixture = StdlibFixture{};
         REQUIRE_NOTHROW(fixture.vm.RunFile(file));
+
         const auto tests = fixture.GetTests();
         CHECK_FALSE(tests.empty());
+
         for (const auto& test : tests)
         {
             CAPTURE(test);

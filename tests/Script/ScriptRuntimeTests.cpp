@@ -27,6 +27,7 @@ TEST_CASE("ScriptRuntime hands out at most 16 isolated VMs", "[ScriptRuntime]")
     }
 
     CHECK(runtime.GetFreeSlotCount() == 0);
+
     for (auto i = 0; i < ScriptRuntime::MAX_VMS; ++i)
     {
         CHECK(py_toint(vms[static_cast<std::size_t>(i)]->Call("number")) == i);

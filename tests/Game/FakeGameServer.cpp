@@ -150,6 +150,7 @@ void FakeGameServer::Close()
     // Held across close(), as SendLocked holds it across a send: the server frees a connection once
     // its Close callback returns, and that callback waits for this lock to clear m_connection.
     const auto lock = std::scoped_lock{m_mutex};
+
     if (m_connection != nullptr)
     {
         m_connection->close();
@@ -215,6 +216,7 @@ void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMes
     {
         {
             const auto lock = std::scoped_lock{m_mutex};
+
             if (m_connection == &connection)
             {
                 m_connection = nullptr;
@@ -265,6 +267,7 @@ void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<cons
     response.P8(SERVER_SEED);
     {
         const auto lock = std::scoped_lock{m_mutex};
+
         if (m_stalled)
         {
             return;
@@ -289,6 +292,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
 
     packet.G1();
     packet.SetPos(packet.GetPos() + CRC_BYTES);
+
     const auto blockSize = packet.G1();
     if (packet.GetAvailable() != blockSize || packet.G1() != 10)
     {
@@ -329,6 +333,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
     }
 
     m_changed.notify_all();
+
     if (status != LOGGED_IN && status != RECONNECTED)
     {
         connection.close();
@@ -373,6 +378,7 @@ void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<cons
     }
 
     m_changed.notify_all();
+
     if (loggedOut)
     {
         connection.close();
@@ -389,6 +395,7 @@ void FakeGameServer::SendLocked(ServerProt_e prot, std::span<const u8> payload)
 
     auto packet = Packet{};
     packet.P1(static_cast<s32>(static_cast<u32>(prot) + static_cast<u32>(m_toClient->NextInt())));
+
     const auto size = ServerProt::GetSize(static_cast<u8>(prot));
     if (size == ServerProt::VAR_BYTE)
     {

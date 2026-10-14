@@ -267,6 +267,7 @@ TEST_CASE("Packet fixed-width reads", "[Packet]")
         ReadCase_s{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, "G8", readG8, -1, 8});
 
     CAPTURE(testCase.call, testCase.bytes);
+
     auto packet = Packet{testCase.bytes};
     CHECK(testCase.read(packet) == testCase.expected);
     CHECK(packet.GetPos() == testCase.posAfter);
@@ -284,6 +285,7 @@ TEST_CASE("Packet smart reads", "[Packet]")
         SmartCase_s{{0xFF, 0xFF}, 32767, 16383, 2});
 
     CAPTURE(testCase.bytes);
+
     auto smartPacket = Packet{testCase.bytes};
     CHECK(smartPacket.GSmart() == testCase.smart);
     CHECK(smartPacket.GetPos() == testCase.posAfter);
@@ -359,6 +361,7 @@ TEST_CASE("Packet GData", "[Packet]")
     SECTION("copies bytes from pos")
     {
         packet.SetPos(1);
+
         auto destination = std::array<u8, 3>{};
         packet.GData(destination);
         CHECK(destination == std::array<u8, 3>{0x02, 0x03, 0x04});
@@ -375,6 +378,7 @@ TEST_CASE("Packet GData", "[Packet]")
     SECTION("too few bytes throws and changes nothing")
     {
         packet.SetPos(3);
+
         auto destination = std::array<u8, 3>{0x09, 0x09, 0x09};
         CHECK_THROWS_AS(packet.GData(destination), std::out_of_range);
         CHECK(packet.GetPos() == 3);
@@ -411,6 +415,7 @@ TEST_CASE("Packet writes", "[Packet]")
         WriteCase_s{"PData({})", [](Packet& packet) { packet.PData({}); }, {}});
 
     CAPTURE(testCase.call);
+
     auto packet = Packet{};
     testCase.write(packet);
     CHECK(ToVector(packet.GetData()) == testCase.expected);
@@ -498,9 +503,11 @@ TEST_CASE("Packet PSize1 fills in a length placeholder", "[Packet]")
         auto packet = Packet{};
         packet.P1(42);
         packet.P1(0);
+
         const auto start = packet.GetPos();
         packet.PJStr("hello");
         packet.P1(7);
+
         const auto end = packet.GetPos();
         packet.PSize1(end - start);
 
@@ -535,6 +542,7 @@ TEST_CASE("Packet reads past the end throw and leave pos unchanged", "[Packet]")
         BoundsCase_s{"GJStr", 1, [](Packet& packet) { packet.GJStr(); }});
 
     CAPTURE(testCase.call);
+
     const auto bytes = std::vector<u8>(BOUNDS_START + testCase.bytesNeeded - 1, BOUNDS_FILL);
     auto packet = Packet{bytes};
     packet.SetPos(BOUNDS_START);
@@ -570,6 +578,7 @@ TEST_CASE("Packet bit reads", "[Packet]")
         BitCase_s{{0x12, 0x34}, 0, {9}, {0x24}, 2});
 
     CAPTURE(testCase.bytes, testCase.widths);
+
     auto packet = Packet{testCase.bytes};
     for (auto i = std::size_t{0}; i < testCase.bytesBeforeStart; ++i)
     {
@@ -665,6 +674,7 @@ TEST_CASE("Packet P1Enc and G1Enc code opcodes with the ISAAC cipher", "[Packet]
         auto twin = Isaac{ISAAC_SEED};
         const auto data = packet.GetData();
         REQUIRE(data.size() == COUNT);
+
         for (auto i = std::size_t{0}; i < COUNT; ++i)
         {
             CAPTURE(i);
@@ -737,6 +747,7 @@ TEST_CASE("Packet RsaEnc with small keys", "[Packet]")
     SECTION("a result over 255 bytes throws")
     {
         packet.P1(0x02);
+
         const auto modulus = BigUInt::Parse("0x8" + std::string(510, '0') + "1");
         CHECK_THROWS_AS(packet.RsaEnc(modulus, BigUInt::Parse("2046")), std::length_error);
     }
@@ -759,6 +770,7 @@ TEST_CASE("Packet RsaEnc with a 512-bit key", "[Packet]")
 
         const auto data = packet.GetData();
         REQUIRE(data.size() == std::size_t{1} + data[0]);
+
         const auto ciphertext = data.subspan(1);
         CHECK(ToVector(ciphertext) == BigUInt::ModPow(BigUInt::FromBytesBigEndian(block), exponent, modulus).ToBytesBigEndian());
         CHECK(Decrypt(ciphertext) == block);

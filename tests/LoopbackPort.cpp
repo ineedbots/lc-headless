@@ -17,6 +17,7 @@ namespace
 {
 #ifdef _WIN32
     using NativeSocket = SOCKET;
+
     const auto INVALID_NATIVE_SOCKET = INVALID_SOCKET;
 
     void CloseNativeSocket(NativeSocket socket)
@@ -32,6 +33,7 @@ namespace
     }
 #else
     using NativeSocket = int;
+
     const auto INVALID_NATIVE_SOCKET = -1;
 
     void CloseNativeSocket(NativeSocket socket)
@@ -56,10 +58,12 @@ bool LoopbackPort::IsFree(int port)
     }
 
     RefuseToShareAddress(probe);
+
     auto address = sockaddr_in{};
     address.sin_family = AF_INET;
     address.sin_port = htons(static_cast<u16>(port));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
     const auto bound = bind(probe, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
     CloseNativeSocket(probe);
     return bound;

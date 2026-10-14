@@ -51,6 +51,7 @@ TEST_CASE("InterfaceDecoder reads every component in order", "[InterfaceDecoder]
     const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(MakeComponents()));
     const auto ids = std::vector<u16>{0, 1, 2, 3, 10, 11, 12, 13, 2458};
     REQUIRE(components.size() == ids.size());
+
     for (auto i = std::size_t{0}; i < ids.size(); ++i)
     {
         CHECK(components[i].id == ids[i]);
@@ -90,6 +91,7 @@ TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks compon
         {.id = 106, .type = RECT, .buttonType = BUTTON_SELECT, .buttonText = "Punch"},
     }));
     REQUIRE(components.size() == 7);
+
     const auto& [screen, layer, accept, resume, spell, toggle, select] = std::tie(components[0], components[1], components[2], components[3], components[4], components[5], components[6]);
 
     // The run marker names each component's interface; the layers that list them name their parents.
@@ -122,6 +124,7 @@ TEST_CASE("InterfaceDecoder reads an inventory's size, use, backgrounds and opti
     }));
 
     REQUIRE(components.size() == 2);
+
     const auto& backpack = components[0];
     CHECK(backpack.width == 4);
     CHECK(backpack.height == 7);

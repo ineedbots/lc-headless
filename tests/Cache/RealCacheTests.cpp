@@ -79,6 +79,7 @@ TEST_CASE("The real cache has every type and square", "[RealCache]")
     for (const auto& [id, square] : cache.squares)
     {
         locCount += square.GetLocs().size();
+
         for (auto level = 0; level < MapSquare::LEVELS; ++level)
         {
             for (auto x = 0; x < MapSquare::SIZE; ++x)
@@ -108,6 +109,7 @@ TEST_CASE("The real cache's NPCs", "[RealCache]")
     const auto* const man = cache.FindNpc(1);
     REQUIRE(man != nullptr);
     CHECK(man->name == "Man");
+
     const auto options = GetOptions(cache, man->ops);
     CHECK(std::ranges::find(options, "Talk-to") != options.end());
     CHECK(std::ranges::find(options, "Attack") != options.end());
@@ -147,6 +149,7 @@ TEST_CASE("The real cache's locs", "[RealCache]")
     const auto* const booth = cache.FindLoc(2213);
     REQUIRE(booth != nullptr);
     CHECK(booth->name == "Bank booth");
+
     const auto options = GetOptions(cache, booth->ops);
     CHECK(std::ranges::find(options, "Use") != options.end());
     CHECK(std::ranges::find(options, "Use-quickly") != options.end());
@@ -155,6 +158,7 @@ TEST_CASE("The real cache's locs", "[RealCache]")
 
     const auto* const square = cache.FindSquare(38, 53);
     REQUIRE(square != nullptr);
+
     const auto locs = square->GetLocsAt(1, 2444 - 38 * MapSquare::SIZE, 3424 - 53 * MapSquare::SIZE);
     const auto found = std::ranges::find(locs, u16{2213}, &MapLoc_s::id);
     REQUIRE(found != locs.end());
@@ -176,12 +180,14 @@ TEST_CASE("The real cache's map builds an area's collision", "[RealCache]")
     auto map = WorldMap{GetRealCache()};
     const auto start = std::chrono::steady_clock::now();
     map.Update(state);
+
     const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start);
     UNSCOPED_INFO(std::format("Rebuilt the area in {} us", elapsed.count()));
 
     const auto booth = map.GetLoc(BOOTH, LocLayer_e::Ground);
     REQUIRE(booth.has_value());
     CHECK(booth->id == 2213);
+
     const auto local = Tile_s{.x = BOOTH.x - state.buildArea.baseX, .z = BOOTH.z - state.buildArea.baseZ};
     CHECK((map.GetCollision(BOOTH.level).GetFlags(local.x, local.z) & CollisionFlag::LOC) != 0);
     CHECK_FALSE(map.GetLocs(BOOTH.level).empty());
@@ -197,15 +203,18 @@ TEST_CASE("The real cache's interfaces click as the webclient's do", "[RealCache
 
     const auto& cache = RequireRealCache();
     UNSCOPED_INFO(std::format("{} interface components", cache.components.size()));
+
     auto interfaces = Interfaces_s{};
     interfaces.mainModal = TRADE_SCREEN;
     interfaces.chatModal = TWO_OPTIONS;
+
     const auto view = InterfaceView{cache, interfaces};
 
     // trademain's "Accept" is a label over an unlabelled rect, which is what a click on it hits.
     const auto labels = view.FindText("Accept", TRADE_SCREEN);
     REQUIRE(labels.size() == 1);
     CHECK(labels[0]->id == TRADE_ACCEPT_LABEL);
+
     const auto* const accept = view.ButtonAt(*labels[0]);
     REQUIRE(accept != nullptr);
     CHECK(accept->id == TRADE_ACCEPT);
@@ -216,11 +225,13 @@ TEST_CASE("The real cache's interfaces click as the webclient's do", "[RealCache
     for (const auto id : {u16{2461}, u16{2462}})
     {
         CAPTURE(id);
+
         const auto* const option = view.Find(id);
         REQUIRE(option != nullptr);
         CHECK(option->type == ComponentType_e::Text);
         CHECK(option->buttonType == ButtonType_e::Ok);
         CHECK(option->root == TWO_OPTIONS);
+
         const auto* const hit = view.ButtonAt(*option);
         REQUIRE(hit != nullptr);
         CHECK(hit->id == id);
@@ -264,6 +275,7 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
         interfaces.chatModal = TWO_OPTIONS;
         interfaces.components[2461].text = "Yes please.";
         interfaces.components[2462].text = "@red@No thanks.";
+
         const auto options = ChatDialog::GetOptions(view);
         REQUIRE(options.size() == 2);
         CHECK((options[0].com == 2461 && options[0].text == "Yes please."));
@@ -277,10 +289,12 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
         interfaces.chatModal = SKILL_MULTI2;
         interfaces.components[MAKE1_A].text = "\n\n\n\nOak Long Bow";
         interfaces.components[MODEL_A].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BRONZE_BAR};
+
         const auto products = ChatDialog::GetMakeProducts(view);
         REQUIRE(products.size() == 2);
         CHECK(products[0].name == "Oak Long Bow");
         CHECK(products[0].item == BRONZE_BAR);
+
         auto amounts = std::vector<s32>{};
         for (const auto& button : products[0].buttons)
         {
@@ -300,6 +314,7 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
     {
         interfaces.chatModal = SMELTING;
         interfaces.components[SMELTING_BRONZE_MODEL].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BRONZE_BAR};
+
         const auto products = ChatDialog::GetMakeProducts(view);
         REQUIRE(products.size() == 8);
         CHECK(products[0].name == "Bronze");
@@ -311,6 +326,7 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
     SECTION("the tanner's leathers, in the main modal, with Tan all")
     {
         interfaces.mainModal = TANNER;
+
         const auto products = ChatDialog::GetMakeProducts(view);
         REQUIRE_FALSE(products.empty());
         // The name is the text the player reads, price and all.
@@ -325,6 +341,7 @@ TEST_CASE("The real cache's dialogues and make menus are recognised by their sha
         interfaces.mainModal = JEWELLERY;
         state.inventories[RINGS_INV] = Inventory_s{.com = RINGS_INV, .slots = {{.id = GOLD_RING, .count = 1}, {.id = PLACEHOLDER, .count = 1}}};
         interfaces.components[RINGS1].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = BRONZE_BAR};
+
         const auto slots = ChatDialog::GetMakePanel(view, state);
         REQUIRE(slots.size() == 2);
         CHECK((slots[0].com == RINGS_INV && slots[0].slot == 0 && slots[0].product == GOLD_RING));
@@ -339,6 +356,7 @@ TEST_CASE("The real cache's shop and trade inventories are told apart by their o
     const auto& cache = RequireRealCache();
     auto interfaces = Interfaces_s{};
     interfaces.mainModal = TRADE_CONFIRM;
+
     const auto view = InterfaceView{cache, interfaces};
 
     CHECK(cache.FindComponent(3900)->options[1] == "Buy 1");

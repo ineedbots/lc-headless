@@ -172,6 +172,7 @@ TEST_CASE("Logger writes messages at or above its threshold", "[Logger]")
     SECTION("as IsEnabled reports")
     {
         CHECK(logger->GetLevel() == threshold);
+
         for (const auto level : ALL_LEVELS)
         {
             CHECK(logger->IsEnabled(level) == (level >= threshold));
@@ -190,6 +191,7 @@ TEST_CASE("Logger SetLevel changes the threshold", "[Logger]")
 
     CHECK(logger->GetLevel() == LogLevel_e::Warning);
     CHECK_FALSE(logger->IsEnabled(LogLevel_e::Info));
+
     const auto entries = capture.GetEntries();
     REQUIRE(entries.size() == 1);
     CHECK(entries[0].message == "kept");
@@ -244,6 +246,7 @@ TEST_CASE("Logger formats messages", "[Logger]")
 
     const auto entries = capture.GetEntries();
     REQUIRE(entries.size() == expected.size());
+
     for (auto i = std::size_t{0}; i < entries.size(); ++i)
     {
         CAPTURE(i);
@@ -259,6 +262,7 @@ TEST_CASE("Logger stamps entries with the time of the call", "[Logger]")
 
     const auto before = std::chrono::system_clock::now();
     logger->Info("x");
+
     const auto after = std::chrono::system_clock::now();
 
     const auto entries = capture.GetEntries();
@@ -274,14 +278,17 @@ TEST_CASE("Logger records the call site in Debug builds only", "[Logger]")
 
     const auto infoLine = std::source_location::current().line() + 1;
     logger->Info("x");
+
     const auto warningLine = std::source_location::current().line() + 1;
     logger->Warning("{}", 1);
+
     const auto logLine = std::source_location::current().line() + 1;
     logger->Log(LogLevel_e::Error, "x");
 
     const auto expectedLines = std::array{infoLine, warningLine, logLine};
     const auto entries = capture.GetEntries();
     REQUIRE(entries.size() == expectedLines.size());
+
     for (auto i = std::size_t{0}; i < entries.size(); ++i)
     {
         CAPTURE(i);
@@ -304,6 +311,7 @@ TEST_CASE("Logger drops a message that can't be formatted", "[Logger]")
     CHECK(capture.GetEntries().empty());
 
     logger->Info("ok");
+
     const auto entries = capture.GetEntries();
     REQUIRE(entries.size() == 1);
     CHECK(entries[0].message == "ok");
@@ -315,6 +323,7 @@ TEST_CASE("Logger drops a message whose sink throws", "[Logger]")
     auto logger = Logger{LogLevel_e::Verbose, [&received](const LogEntry_s& entry)
     {
         received.emplace_back(entry.message);
+
         if (entry.message == "x")
         {
             throw std::runtime_error{"sink failed"};
@@ -503,6 +512,7 @@ TEST_CASE("Logger GetDefault is safe while another thread sets the default", "[L
     }
 
     isStopping = true;
+
     for (auto& thread : threads)
     {
         thread.join();
@@ -646,6 +656,7 @@ TEST_CASE("Logger SetSink is safe while other threads log", "[Logger][threads]")
     }
 
     isStopping = true;
+
     for (auto& thread : threads)
     {
         thread.join();

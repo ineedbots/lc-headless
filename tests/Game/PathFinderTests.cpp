@@ -55,6 +55,7 @@ namespace
     {
         auto cache = GameCache_s{};
         TestCache::AddLoc(cache, DOOR, "Door", {"Open"});
+
         auto& tree = TestCache::AddLoc(cache, TREE, "Tree", {"Chop down"});
         tree.width = 2;
         tree.length = 2;
@@ -80,6 +81,7 @@ namespace
             auto mask = CollisionFlag::BLOCKED;
             mask |= fromX < 0 ? CollisionFlag::WALL_WEST : (fromX > 0 ? CollisionFlag::WALL_EAST : 0);
             mask |= fromZ < 0 ? CollisionFlag::WALL_SOUTH : (fromZ > 0 ? CollisionFlag::WALL_NORTH : 0);
+
             if (fromX != 0 && fromZ != 0)
             {
                 mask |= fromX < 0 ? (fromZ < 0 ? CollisionFlag::WALL_SOUTH_WEST : CollisionFlag::WALL_NORTH_WEST) : (fromZ < 0 ? CollisionFlag::WALL_SOUTH_EAST : CollisionFlag::WALL_NORTH_EAST);
@@ -112,6 +114,7 @@ namespace
             CAPTURE(x, z, targetX, targetZ);
             REQUIRE((targetX == x || targetZ == z || std::abs(targetX - x) == std::abs(targetZ - z)));
             CHECK(direction != lastDirection);
+
             while (x != targetX || z != targetZ)
             {
                 REQUIRE(CanStep(collision, x, z, direction.first, direction.second));
@@ -152,6 +155,7 @@ TEST_CASE("PathFinder goes round obstacles, keeping only the turns", "[PathFinde
 {
     auto blocked = std::vector<Tile_s>{};
     AddBlock(blocked, 15, 25, 25, 25);
+
     const auto map = MakeMap(blocked);
 
     const auto route = FindTilePath(map, Local(20, 20), Local(20, 30));
@@ -164,6 +168,7 @@ TEST_CASE("PathFinder breaks ties between equal routes as the webclient does", "
 {
     auto blocked = std::vector<Tile_s>{};
     AddBlock(blocked, 47, 53, 53, 53);
+
     const auto map = MakeMap(blocked);
 
     CHECK(FindTilePath(map, Local(50, 50), Local(50, 56)) == Locals({{48, 50}, {46, 52}, {46, 54}, {48, 54}, {50, 56}}));
@@ -185,6 +190,7 @@ TEST_CASE("PathFinder reports what it can't reach", "[PathFinder]")
     AddBlock(blocked, 29, 30, 29, 30);
     AddBlock(blocked, 31, 30, 31, 30);
     AddBlock(blocked, 40, 40, 40, 40);
+
     const auto map = MakeMap(blocked);
 
     CHECK_FALSE(FindTilePath(map, Local(20, 30), Local(30, 30)).has_value());
@@ -228,6 +234,7 @@ TEST_CASE("PathFinder reaches areas from any side forceApproach allows", "[PathF
     CHECK(PathFinder::FindPath(map, Local(66, 61), tree) == Locals({{62, 61}}));
 
     tree.forceApproach = APPROACH_SOUTH;
+
     const auto route = PathFinder::FindPath(map, Local(60, 55), tree);
     REQUIRE(route.has_value());
     CHECK(*route == Locals({{60, 58}, {59, 59}, {59, 60}}));
@@ -241,6 +248,7 @@ TEST_CASE("PathFinder cuts a long route to 25 waypoints", "[PathFinder]")
     AddBlock(blocked, 9, 9, 41, 9);
     AddBlock(blocked, 9, 9, 9, 50);
     AddBlock(blocked, 41, 9, 41, 50);
+
     for (auto row = 0; row < 20; ++row)
     {
         const auto z = 11 + row * 2;

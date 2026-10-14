@@ -73,6 +73,7 @@ namespace
             options.file = "main.py";
             host.emplace(ScriptTestRuntime::Get(), client, std::move(options), capture.GetLogger());
             client.Login();
+
             const auto deadline = Clock::now() + WAIT;
             while (Clock::now() < deadline && !client.GetState().IsSettled())
             {
@@ -101,6 +102,7 @@ namespace
         {
             const auto tick = client.GetState().tick;
             server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer());
+
             const auto deadline = Clock::now() + WAIT;
             while (Clock::now() < deadline && client.GetState().tick == tick)
             {
@@ -233,6 +235,7 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
     SECTION("each event and message is passed once")
     {
         fixture.server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("You catch a shrimp."));
+
         const auto deadline = Clock::now() + WAIT;
         while (Clock::now() < deadline && fixture.client.GetState().messages.size() < 2)
         {
@@ -439,6 +442,7 @@ TEST_CASE("ScriptHost calls on_reconnect after a dropped connection", "[ScriptHo
 
     fixture.server.SetLoginStatus(15);
     fixture.server.Close();
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
     {
@@ -464,6 +468,7 @@ def loop():
     // The server lost the old session, as after a restart, so the reconnect becomes a fresh login.
     fixture.server.SetLoginStatus(2);
     fixture.server.Close();
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
     {
@@ -472,6 +477,7 @@ def loop():
     }
 
     REQUIRE(fixture.client.GetLoginCount() == 2);
+
     while (Clock::now() < deadline && !fixture.client.GetState().IsSettled())
     {
         fixture.client.Pump(PUMP_STEP);
@@ -501,6 +507,7 @@ def loop():
 
     fixture.server.SetLoginStatus(2);
     fixture.server.Close();
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
     {
@@ -509,6 +516,7 @@ def loop():
     }
 
     REQUIRE(fixture.client.GetLoginCount() == 2);
+
     while (Clock::now() < deadline && !fixture.client.GetState().IsSettled())
     {
         fixture.client.Pump(PUMP_STEP);
@@ -528,6 +536,7 @@ TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]
     const auto load = [&](std::string_view source)
     {
         folder.WriteFile("main.py", source);
+
         auto host = ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = folder.GetPath(), .file = "main.py"}, capture.GetLogger()};
     };
 
@@ -696,6 +705,7 @@ TEST_CASE("ScriptHost holds bot messages until the script can handle them", "[Sc
     CHECK_FALSE(fixture.host->ReceiveBotMessage(BotMessage_s{.sender = "mule", .json = "100"}));
 
     fixture.host->Step(Clock::now());
+
     const auto lines = fixture.GetScriptLines();
     REQUIRE(lines.size() == ScriptHost::MAX_BOT_MESSAGES);
     CHECK(lines.front() == "mule 0");
@@ -931,6 +941,7 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
     folder.WriteFile("main.py", "SETTINGS_SCHEMA = {'count': SettingDef('number', 5, min=1), 'home': SettingDef('tile', [3222, 3218])}\n"
                                 "def on_start():\n    log(settings.count, settings.home)\n"
                                 "def loop():\n    return 1\n");
+
     const auto load = [&](std::string settings)
     {
         loadFile("main.py", std::move(settings));
@@ -950,6 +961,7 @@ TEST_CASE("ScriptHost checks a script's settings against its schema before login
     // A define_bot script's are the object under its name.
     folder.WriteFile("bot.py", "class Miner(LoopingBot):\n    def loop(self):\n        pass\n\n"
                                "BOT = define_bot(name='Miner', create=Miner, settings_schema={'count': SettingDef('number', 5, min=1)})\n");
+
     const auto loadBot = [&](std::string settings)
     {
         loadFile("bot.py", std::move(settings));
@@ -1010,6 +1022,7 @@ def loop():
     auto openMain = Packet{};
     openMain.P2(TestCache::TRADE_SCREEN);
     fixture.server.Send(ServerProt_e::IfOpenMain, Fixtures::ToBytes(openMain));
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && fixture.client.GetState().interfaces.mainModal != TestCache::TRADE_SCREEN)
     {
@@ -1183,6 +1196,7 @@ def loop():
 
     sendInventory(TestCache::BANK, {{BONES, 30}, {COINS, 100}});
     sendInventory(TestCache::BANK_INVENTORY, {{LOGS, 3}});
+
     auto open = Packet{};
     open.P2(TestCache::BANK_SCREEN);
     open.P2(TestCache::BANK_SIDE);
@@ -1238,8 +1252,10 @@ def loop():
     fixture.SendInventory(TestCache::SHOP_SIDE_INV, {{LOGS, 3}});
     fixture.OpenMainSide(TestCache::SHOP_SCREEN, TestCache::SHOP_SIDE);
     fixture.Step();
+
     const auto bones = std::vector<u8>{BONES >> 8, BONES & 0xFF, 0, 0, TestCache::SHOP_STOCK >> 8, TestCache::SHOP_STOCK & 0xFF};
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButton2));
+
     for (const auto prot : {ClientProt_e::InvButton4, ClientProt_e::InvButton3, ClientProt_e::InvButton2})
     {
         CHECK(fixture.server.GetPackets(prot).size() == 1);
@@ -1313,6 +1329,7 @@ TEST_CASE("The example scripts load without warnings", "[ScriptHost]")
     for (const auto& entry : std::filesystem::directory_iterator{scripts / "examples"})
     {
         CAPTURE(entry.path().string());
+
         const auto file = std::filesystem::relative(entry.path(), scripts);
         CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = scripts, .file = file}, capture.GetLogger()});
         ++loaded;
@@ -1359,12 +1376,14 @@ def loop():
     bits.Put(8, 1);
     bits.Put(1, 1).Put(2, 0);
     bits.Put(14, 16383);
+
     auto said = Packet{};
     said.P1(0x08);
     said.PJStr("Hello there");
     fixture.server.Send(ServerProt_e::NpcInfo, Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(said)));
 
     fixture.server.Send(ServerProt_e::UpdateZonePartialFollows, Fixtures::Zone(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL));
+
     auto projectile = Packet{};
     projectile.P1((2 << 4) | 2);
     projectile.P1(3);

@@ -44,6 +44,7 @@ namespace
         while (Clock::now() < deadline)
         {
             client.Pump(PUMP_STEP);
+
             if (condition())
             {
                 return true;
@@ -104,6 +105,7 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
         client.Pump();
 
         REQUIRE(server.WaitForPacket(ClientProt_e::OpNpc1));
+
         const auto moves = server.GetPackets(ClientProt_e::MoveOpClick);
         REQUIRE(moves.size() == 1);
         CHECK(moves[0].payload == std::vector<u8>{0, 0x0C, 0x81, 0x0C, 0x80});
@@ -172,6 +174,7 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{};
     server.SetLoginStatus(3);
+
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     try
@@ -216,6 +219,7 @@ TEST_CASE("GameClient reconnects without making Pump wait", "[GameClient]")
     auto options = FastOptions();
     options.loginTimeout = 300ms;
     options.retryDelay = 100ms;
+
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
 
     client.Login();
@@ -237,6 +241,7 @@ TEST_CASE("GameClient reconnects without making Pump wait", "[GameClient]")
         const auto start = Clock::now();
         client.Pump();
         longestPump = std::max(longestPump, std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start));
+
         if (!unstalled && client.GetStatus() == ClientStatus_e::Connecting && capture.GetEntries().back().message.starts_with("Trying again"))
         {
             server.SetStalled(false);
@@ -300,6 +305,7 @@ TEST_CASE("GameClient retries a login the server can't take yet", "[GameClient]"
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{TestWorld::Send};
     server.SetLoginStatus(5);
+
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.BeginLogin();
@@ -336,6 +342,7 @@ TEST_CASE("GameClient reconnects when a send meets a dropped connection", "[Game
     // Sending without pumping finds the closed connection before Pump can.
     server.SetLoginStatus(15);
     server.Close();
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && client.IsInGame())
     {

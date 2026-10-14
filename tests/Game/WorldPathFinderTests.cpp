@@ -125,6 +125,7 @@ TEST_CASE("WorldPathFinder routes round avoided zones, though it may leave one i
     const auto fixture = Fixture{};
     auto options = NavFindOptions_s{};
     options.avoidZones.push_back({.minX = BASE + 15, .maxX = BASE + 15, .minZ = BASE + 0, .maxZ = BASE + 20, .level = 0});
+
     const auto path = fixture.Find(At(5, 10), At(25, 10), options);
     REQUIRE(path.ok);
     CHECK(path.cost > 20);
@@ -141,6 +142,7 @@ TEST_CASE("WorldPathFinder takes a hop to another level when the account meets i
     auto options = NavFindOptions_s{.state = MakeState(10, 0)};
     const auto path = fixture.Find(At(5, 5), At(10, 20, 1), options);
     REQUIRE(path.ok);
+
     const auto hop = std::ranges::find_if(path.waypoints, [](const NavWaypoint_s& waypoint) { return waypoint.edge != nullptr; });
     REQUIRE(hop != path.waypoints.end());
     CHECK(hop->edge->action == "Climb-up");
@@ -151,6 +153,7 @@ TEST_CASE("WorldPathFinder takes a hop to another level when the account meets i
     SECTION("an unmet requirement fails closed")
     {
         options.state = MakeState(9, 0);
+
         const auto refused = fixture.Find(At(5, 5), At(10, 20, 1), options);
         CHECK_FALSE(refused.ok);
         CHECK(refused.reason == "unreachable");
@@ -173,6 +176,7 @@ TEST_CASE("WorldPathFinder plans a teleport only when the policy and the account
     const auto fixture = Fixture{};
     auto options = NavFindOptions_s{.state = MakeState(1, 1)};
     options.policy.useTeleports = true;
+
     const auto path = fixture.Find(At(1, 1), At(60, 1), options);
     REQUIRE(path.ok);
     REQUIRE(path.waypoints.size() >= 2);
@@ -180,6 +184,7 @@ TEST_CASE("WorldPathFinder plans a teleport only when the policy and the account
     CHECK(path.cost < 20);
 
     options.state = MakeState(1, 0);
+
     const auto walking = fixture.Find(At(1, 1), At(60, 1), options);
     REQUIRE(walking.ok);
     CHECK(walking.cost == 59);
@@ -194,6 +199,7 @@ TEST_CASE("WorldPathFinder ends beside a goal that can't be stood on, and report
     const auto fixture = Fixture{};
     const auto booth = fixture.Find(At(30, 40), At(BOOTH, BOOTH));
     REQUIRE(booth.ok);
+
     const auto end = booth.waypoints.back().point;
     CHECK(std::max(std::abs(end.x - (BASE + BOOTH)), std::abs(end.z - (BASE + BOOTH))) == 1);
 
@@ -204,6 +210,7 @@ TEST_CASE("WorldPathFinder ends beside a goal that can't be stood on, and report
 
     const auto offMap = fixture.Find(At(1, 1), {.x = 100, .z = 100, .level = 0});
     CHECK_FALSE(offMap.ok);
+
     const auto start = fixture.Find({.x = 100, .z = 100, .level = 0}, At(1, 1));
     CHECK_THAT(start.reason, ContainsSubstring("not walkable"));
 }

@@ -163,6 +163,7 @@ namespace
     bool IsActive(std::vector<u8> opcodes)
     {
         opcodes.push_back(0);
+
         auto text = TextPool{};
         return DecodeLocs({opcodes}, text)[0].active;
     }
@@ -225,6 +226,7 @@ TEST_CASE("TypeDecoder reads every NPC opcode", "[TypeDecoder]")
     chicken.P1(95);
     chicken.P2(0);
     chicken.P1(0);
+
     const auto npcs = DecodeNpcs({MakeEveryNpcOpcode(), ToBytes(chicken)}, text);
     REQUIRE(npcs.size() == 2);
 

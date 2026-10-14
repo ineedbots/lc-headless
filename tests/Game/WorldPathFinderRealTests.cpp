@@ -40,6 +40,7 @@ namespace
     {
         auto options = NavFindOptions_s{.state = std::move(state)};
         options.policy.useTeleports = false;
+
         const auto started = std::chrono::steady_clock::now();
         auto path = WorldPathFinder::FindPath(GetNavigation(), from, to, options);
         const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started);
@@ -83,6 +84,7 @@ TEST_CASE("WorldPathFinder plans routes across the real map", "[RealCache]")
     {
         const auto path = Find(LUMBRIDGE, {.x = 3208, .z = 3220, .level = 2}, MakeState(0));
         REQUIRE(path.ok);
+
         const auto hops = GetHops(path);
         CHECK(std::ranges::count_if(hops, [](const std::string& hop) { return hop.starts_with("Climb-up"); }) == 2);
         CHECK(path.waypoints.back().point.level == 2);
@@ -103,6 +105,7 @@ TEST_CASE("WorldPathFinder plans routes across the real map", "[RealCache]")
     {
         const auto path = Find({.x = 3029, .z = 3217, .level = 0}, {.x = 2918, .z = 3176, .level = 0}, MakeState(30));
         REQUIRE(path.ok);
+
         const auto hops = GetHops(path);
         CHECK(Has(hops, "Pay-fare Seaman Thresnor"));
         CHECK(Has(hops, "Cross Gangplank"));
@@ -115,6 +118,7 @@ TEST_CASE("WorldPathFinder plans routes across the real map", "[RealCache]")
     {
         const auto path = Find(LUMBRIDGE, {.x = 3252, .z = 3419, .level = 0});
         REQUIRE(path.ok);
+
         const auto end = path.waypoints.back().point;
         CHECK(std::max(std::abs(end.x - 3252), std::abs(end.z - 3419)) <= 1);
     }

@@ -128,6 +128,7 @@ namespace
         [[nodiscard]] std::string LoadError()
         {
             static_cast<void>(writer.Write(folder.GetPath()));
+
             try
             {
                 static_cast<void>(CacheLoader::Load(folder.GetPath(), *capture.GetLogger()));
@@ -163,9 +164,11 @@ TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
 {
     auto fixture = LoaderFixture{};
     static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
+
     const auto cache = CacheLoader::Load(fixture.folder.GetPath(), *fixture.capture.GetLogger());
 
     CHECK(cache.crcs[0] == 0);
+
     for (auto file = u32{1}; file < GameCache_s::CRC_COUNT; ++file)
     {
         CHECK(cache.crcs[file] == Packet::GetCrc(fixture.writer.Get(CacheStore::ARCHIVES, file)));
@@ -182,6 +185,7 @@ TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
     CHECK(cache.runOnButton == RUN_ON_BUTTON);
 
     REQUIRE(cache.locs.size() == 3);
+
     const auto* const tree = cache.FindLoc(2);
     REQUIRE(tree != nullptr);
     CHECK(tree->name == "Tree");
@@ -213,6 +217,7 @@ TEST_CASE("CacheLoader's cache keeps its text when moved", "[CacheLoader]")
 {
     auto fixture = LoaderFixture{};
     static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
+
     auto loaded = CacheLoader::Load(fixture.folder.GetPath(), *fixture.capture.GetLogger());
     const auto shared = std::make_shared<const GameCache_s>(std::move(loaded));
     CHECK(shared->FindLoc(0)->name == "Door");

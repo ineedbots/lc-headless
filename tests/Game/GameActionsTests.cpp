@@ -65,6 +65,7 @@ namespace
     {
         auto packet = Packet{payload};
         static_cast<void>(packet.G1());
+
         const auto start = Tile_s{.x = packet.G2(), .z = packet.G2()};
         auto waypoints = std::vector<Tile_s>{start};
         while (packet.GetAvailable() >= 2)
@@ -86,6 +87,7 @@ namespace
             , actions{client}
         {
             client.Login();
+
             const auto deadline = Clock::now() + WAIT;
             while (Clock::now() < deadline && client.GetState().messages.empty())
             {
@@ -129,6 +131,7 @@ TEST_CASE("GameActions doesn't walk to a tile it can't reach, but walks straight
 
     // Both went out in one flush, so the second walk's arrival shows the first sent nothing.
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::MoveGameClick));
+
     const auto moves = fixture.server.GetPackets(ClientProt_e::MoveGameClick);
     REQUIRE(moves.size() == 1);
     CHECK(ReadWaypoints(moves[0].payload) == std::vector<Tile_s>{{.x = Fixtures::HOME + 200, .z = Fixtures::HOME}});

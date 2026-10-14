@@ -254,6 +254,7 @@ namespace
     {
         auto capture = LogCapture{};
         CHECK_THROWS_AS(ConfigFile::Parse(text, *capture.GetLogger()), ConfigError);
+
         if (!position.empty())
         {
             CHECK_THROWS_WITH(ConfigFile::Parse(text, *capture.GetLogger()), Catch::Matchers::ContainsSubstring(std::string{position}));
@@ -434,6 +435,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         for (const auto& key : OPTIONAL_KEYS)
         {
             CAPTURE(key.GetPath());
+
             const auto config = ParseAccepted(RemoveKey(key));
             if (key.key == "origin")
             {
@@ -605,6 +607,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         auto capture = LogCapture{};
         const auto config = ConfigFile::Parse(text, *capture.GetLogger());
         CHECK(config.server.tlsCaFile == "NONE");
+
         const auto entries = capture.GetEntries();
         REQUIRE(entries.size() == 1);
         CHECK(entries[0].level == LogLevel_e::Warning);
@@ -934,6 +937,7 @@ TEST_CASE("ConfigFile::LoadAccount", "[ConfigFile][AccountFile]")
     SECTION("names the account after the file")
     {
         WriteFile(path, ACCOUNT_EXAMPLE);
+
         const auto account = ConfigFile::LoadAccount(path);
         CHECK(account.name == "bot1");
         CHECK(account.file == path);
@@ -978,6 +982,7 @@ TEST_CASE("ConfigFile::AddScriptSettings", "[ConfigFile][AccountFile]")
     SECTION("leaves a file that has them all untouched")
     {
         WriteFile(path, ACCOUNT_EXAMPLE);
+
         const auto before = std::filesystem::last_write_time(path);
         CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", "{}").empty());
         CHECK(ReadFile(path) == ACCOUNT_EXAMPLE);
@@ -1026,8 +1031,10 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
         for (const auto& form : forms)
         {
             CAPTURE(form.description);
+
             auto config = ParseAccepted(EXAMPLE);
             form.set(config);
+
             const auto serialized = ConfigFile::Serialize(config);
             CHECK(nlohmann::json::parse(serialized).at(nlohmann::json::json_pointer{form.pointer}) == form.written);
 
@@ -1044,6 +1051,7 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
 
         auto config = ParseAccepted(EXAMPLE);
         config.scripting.killGraceSeconds = 600s;
+
         const auto serialized = ConfigFile::Serialize(config);
         CHECK(nlohmann::json::parse(serialized).at("scripting").at("killGraceSeconds") == 600);
         CHECK(ParseAccepted(serialized).scripting.killGraceSeconds == 600s);

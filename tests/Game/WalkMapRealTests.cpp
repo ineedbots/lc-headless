@@ -25,6 +25,7 @@ namespace
         {
             const auto tile = queue.front();
             queue.pop_front();
+
             const auto exits = map.GetExits(tile.x, tile.z, level);
             for (auto direction = 0; direction < WalkMap::DIRECTIONS; ++direction)
             {
@@ -64,6 +65,7 @@ TEST_CASE("WalkMap builds the real cache's world, doors shut", "[RealCache]")
     const auto kitchen = Flood(map, {3209, 3215}, 0, 12);
     CHECK(kitchen.size() < 60);
     CHECK_FALSE(kitchen.contains({3208, 3209}));
+
     // South of it, the room with the staircase, shut off by its own door.
     const auto stairRoom = Flood(map, {3208, 3209}, 0, 12);
     CHECK(stairRoom.contains({3205, 3209}));

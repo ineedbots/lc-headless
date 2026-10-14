@@ -42,6 +42,7 @@ namespace
         auto cache = GameCache_s{};
         TestCache::AddLoc(cache, DOOR, "Door", {"Open"});
         TestCache::AddLoc(cache, GATE, "Gate", {"Open"});
+
         auto& tree = TestCache::AddLoc(cache, TREE, "Tree", {"Chop down"});
         tree.width = 2;
         tree.length = 2;
@@ -138,6 +139,7 @@ TEST_CASE("WorldMap puts the server's changes in place of the cache's locs", "[W
     {
         fixture.SetChange(-1, WALL, WEST);
         CHECK(fixture.GetFlags(DOOR_TILE) == CollisionFlag::OPEN);
+
         const auto removed = map.GetLoc(DOOR_TILE, LocLayer_e::Wall);
         REQUIRE(removed.has_value());
         CHECK(removed->id == -1);
@@ -185,6 +187,7 @@ TEST_CASE("WorldMap follows the decoders' zone resets", "[WorldMap]")
     const auto doorPos = static_cast<u8>(1 << 4);
 
     decoder.Decode(ServerProt_e::UpdateZonePartialFollows, zone, fixture.state);
+
     auto del = Packet{};
     del.P1(doorPos);
     del.P1((WALL << 2) | WEST);

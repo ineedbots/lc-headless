@@ -126,6 +126,7 @@ TEST_CASE("AccountRunner keeps scripts running while another account's login sta
 {
     auto fixture = RunnerFixture{};
     fixture.second.SetStalled(true);
+
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
 
     auto loopsDone = std::optional<Clock::time_point>{};
@@ -163,6 +164,7 @@ TEST_CASE("AccountRunner keeps scripts running while another account reconnects"
         auto& first = fixture.first;
         const auto bot1Loops = CountLines(fixture.capture, "bot1", "loop");
         const auto bot2Loops = CountLines(fixture.capture, "bot2", "loop");
+
         if (fixture.TimedOut())
         {
             return 1u;
@@ -207,6 +209,7 @@ TEST_CASE("AccountRunner carries on when one account's login is refused", "[Acco
 {
     auto fixture = RunnerFixture{};
     fixture.second.SetLoginStatus(3);
+
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
 
     const auto succeeded = runner->Run([&fixture]
@@ -224,6 +227,7 @@ TEST_CASE("AccountRunner logs everyone out on a second interrupt, without waitin
 {
     auto fixture = RunnerFixture{};
     fixture.folder.WriteFile("stubborn.py", "def on_kill_signal():\n    log('kill')\n\ndef loop():\n    log('loop')\n    return 100\n");
+
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "stubborn.py"), MakeAccount("bot2", &fixture.second, "stubborn.py")});
 
     const auto succeeded = runner->Run([&fixture]
@@ -246,6 +250,7 @@ TEST_CASE("AccountRunner loads every script before the first login", "[AccountRu
 {
     auto fixture = RunnerFixture{};
     fixture.folder.WriteFile("broken.py", "def on_start():\n    pass\n");
+
     const auto makeRunner = [&fixture]
     {
         static_cast<void>(fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py"), MakeAccount("bot2", &fixture.second, "broken.py")}));
@@ -260,6 +265,7 @@ TEST_CASE("AccountRunner spaces the logins out", "[AccountRunner]")
 {
     auto fixture = RunnerFixture{};
     fixture.config.scripting.loginIntervalSeconds = 1s;
+
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, std::nullopt), MakeAccount("bot2", &fixture.second, std::nullopt)});
 
     auto firstLogin = std::optional<Clock::time_point>{};
@@ -334,6 +340,7 @@ def loop():
 
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "commands.py"), MakeAccount("bot2", &fixture.second, "looper.py")});
     auto console = ConsoleInput{};
+
     // Handled before the logins; the commands wait until the player is placed.
     for (const auto* line : {"echo to everyone", "@BOT1   Echo  just  me ", "@bot2 echo hi", "@nobody status", "@bot1", "dance", "help", "@bot2 help", "loglevel", "loglevel loud", "   "})
     {

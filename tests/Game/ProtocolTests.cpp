@@ -64,6 +64,7 @@ namespace
 TEST_CASE("ServerProt sizes match the protocol table for all 256 opcodes", "[ServerProt]")
 {
     static_assert(SERVER_SIZES.size() == ServerProt::COUNT);
+
     for (auto opcode = 0; opcode < 256; ++opcode)
     {
         CAPTURE(opcode);
@@ -76,6 +77,7 @@ TEST_CASE("ServerProt marks exactly the zone sub-packets", "[ServerProt]")
     for (auto opcode = 0; opcode < 256; ++opcode)
     {
         CAPTURE(opcode);
+
         const auto isZone = std::ranges::find(ZONE_OPCODES, static_cast<u8>(opcode)) != ZONE_OPCODES.end();
         CHECK(ServerProt::IsZoneProt(static_cast<u8>(opcode)) == isZone);
     }
@@ -91,6 +93,7 @@ TEST_CASE("ServerProt names use the engine's names", "[ServerProt]")
 TEST_CASE("ClientProt sizes match the protocol table for all 256 opcodes", "[ClientProt]")
 {
     static_assert(CLIENT_SIZES.size() == ClientProt::COUNT);
+
     for (auto opcode = 0; opcode < 256; ++opcode)
     {
         CAPTURE(opcode);

@@ -130,6 +130,7 @@ TEST_CASE("PLAYER_INFO keeps the tracked list in server order", "[PlayerInfoDeco
 {
     auto state = Fixtures::PlacedState();
     state.players = {MakePlayer(7, Offset(1, 1)), MakePlayer(8, Offset(2, 2)), MakePlayer(9, Offset(3, 3))};
+
     auto decoder = PlayerInfoDecoder{};
 
     SECTION("unchanged, removed and walking entries")
@@ -182,6 +183,7 @@ TEST_CASE("PLAYER_INFO adds new players relative to the local player", "[PlayerI
     decoder.Decode(WithExtended(bits, extended), state);
 
     REQUIRE(GetIndices(state.players) == std::vector<u16>{7, 12});
+
     const auto& zezima = state.players[0];
     CHECK(zezima.tile == Offset(-3, 2));
     CHECK(zezima.addedTick == 1);
@@ -230,6 +232,7 @@ TEST_CASE("PLAYER_INFO reads extended blocks", "[PlayerInfoDecoder]")
     auto state = Fixtures::PlacedState();
     state.players = {MakePlayer(7, Offset(1, 1))};
     state.players[0].appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("zezima"));
+
     auto decoder = PlayerInfoDecoder{};
 
     auto bits = BitWriter{};
@@ -340,6 +343,7 @@ TEST_CASE("PLAYER_INFO hits from a later tick replace the earlier ones", "[Playe
     {
         auto bits = BitWriter{};
         bits.Put(1, 1).Put(2, 0).Put(8, 0).Put(11, 2047);
+
         auto extended = Packet{};
         extended.P1(0x10);
         extended.P1(damage);

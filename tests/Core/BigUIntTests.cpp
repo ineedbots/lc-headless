@@ -103,6 +103,7 @@ TEST_CASE("BigUInt::ModPow", "[BigUInt]")
         ModPowCase_s{"3", "0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE", "0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "1"});
 
     CAPTURE(testCase.base, testCase.exponent, testCase.modulus);
+
     const auto result = BigUInt::ModPow(BigUInt::Parse(testCase.base), BigUInt::Parse(testCase.exponent), BigUInt::Parse(testCase.modulus));
     CHECK(result == BigUInt::Parse(testCase.result));
 }

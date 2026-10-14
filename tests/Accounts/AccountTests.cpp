@@ -110,6 +110,7 @@ TEST_CASE("An account without a script logs out once its idleSeconds are up", "[
 
     const auto started = Clock::now();
     account.Login();
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && !account.IsFinished())
     {
@@ -137,6 +138,7 @@ TEST_CASE("An account adds its define_bot script's default settings to its file"
 
     auto config = server.MakeConfig();
     config.scripting.scriptsDirectory = folder.GetPath().string();
+
     const auto makeAccount = [&](std::filesystem::path file)
     {
         auto settings = AccountConfig_s{
@@ -245,10 +247,12 @@ TEST_CASE("An account whose login is refused fails without throwing", "[Account]
     auto capture = LogCapture{LogLevel_e::Info};
     auto server = FakeGameServer{};
     server.SetLoginStatus(3);
+
     const auto config = std::make_shared<const Config_s>(server.MakeConfig());
     auto account = Account{config, FakeGameServer::MakeCache(), AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), capture.GetLogger()};
 
     account.Start();
+
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && !account.IsFinished())
     {
@@ -388,6 +392,7 @@ def loop():
     fixture.StepFor(200ms);
 
     fixture.server.Send(ServerProt_e::Logout);
+
     auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && !fixture.HasLine("gone") && !fixture.account->IsFinished())
     {

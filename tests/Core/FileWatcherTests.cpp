@@ -19,6 +19,7 @@ TEST_CASE("FileWatcher reports a change once it has held still for a check", "[F
     const auto folder = TempFolder{"rs2004-watcher-tests"};
     folder.WriteFile("main.py", "a");
     folder.WriteFile("helper.py", "b");
+
     const auto main = folder.GetPath() / "main.py";
     const auto helper = folder.GetPath() / "helper.py";
     auto watcher = FileWatcher{{main, helper}};

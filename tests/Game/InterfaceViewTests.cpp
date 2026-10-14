@@ -52,6 +52,7 @@ TEST_CASE("InterfaceView lists the open interfaces once each", "[InterfaceView]"
     interfaces.chatModal = OPTIONS;
     interfaces.tabs[0] = 50;
     interfaces.tabs[3] = 50;
+
     const auto view = InterfaceView{cache, interfaces};
 
     CHECK(view.GetOpenRoots() == std::vector<u16>{TestCache::TRADE_SCREEN, OPTIONS, 50});
@@ -64,6 +65,7 @@ TEST_CASE("InterfaceView prefers what the server set to what the cache has", "[I
     const auto cache = MakeCache();
     auto interfaces = Interfaces_s{};
     interfaces.mainModal = TestCache::TRADE_SCREEN;
+
     const auto view = InterfaceView{cache, interfaces};
     const auto& label = *view.Find(TestCache::TRADE_ACCEPT_LABEL);
     const auto& status = *view.Find(TestCache::TRADE_STATUS);
@@ -112,6 +114,7 @@ TEST_CASE("InterfaceView walks an interface in drawing order and finds visible t
     const auto cache = MakeCache();
     auto interfaces = Interfaces_s{};
     interfaces.chatModal = OPTIONS;
+
     const auto view = InterfaceView{cache, interfaces};
 
     CHECK(Ids(view.GetTree(TestCache::TRADE_SCREEN)) == std::vector<u16>{300, 301, 302, 303, 304, 305, 306, 307, 308, 309});
@@ -131,6 +134,7 @@ TEST_CASE("InterfaceView finds the button a click on a component hits", "[Interf
     auto interfaces = Interfaces_s{};
     interfaces.mainModal = TestCache::TRADE_SCREEN;
     interfaces.chatModal = OPTIONS;
+
     const auto view = InterfaceView{cache, interfaces};
 
     // The label isn't a button; the rect under it is.

@@ -43,6 +43,7 @@ namespace
         TestCache::AddObj(cache, 995, "Coins").stackable = true;
         TestCache::AddLoc(cache, 1530, "Door", {"Open"});
         TestCache::AddLoc(cache, 1276, "Tree", {"Chop down"});
+
         const auto locs = std::to_array<TestLoc_s>({{.id = 1276, .tile = Offset(-2, 3), .shape = 10}});
         TestCache::SetMap(cache, locs);
         return std::make_shared<const GameCache_s>(std::move(cache));
@@ -99,6 +100,7 @@ namespace
             chicken.tile = Offset(2, 0);
             chicken.hits.push_back({.damage = 1, .health = 2, .maxHealth = 3, .tick = 49});
             chicken.faceEntity = EntityRef_s{.type = EntityType_e::Player, .index = Fixtures::PID};
+
             auto cow = Npc_s{};
             cow.index = 8;
             cow.type = 81;

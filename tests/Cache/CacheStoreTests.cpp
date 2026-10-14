@@ -54,6 +54,7 @@ namespace
         std::string ReadError()
         {
             CacheWriter::WriteStore(folder.GetPath(), written);
+
             auto store = CacheStore{folder.GetPath()};
             try
             {
