@@ -16,7 +16,6 @@ namespace
 
     struct Member_s;
 
-    // Where a value is in the text, and for an object, where its members are.
     struct Value_s
     {
         std::size_t begin = 0;
@@ -35,7 +34,6 @@ namespace
     struct Layout_s
     {
         std::string_view eol;
-        // One level of indentation.
         std::string_view indentUnit;
     };
 
@@ -61,7 +59,7 @@ namespace
         return !value.is_object() && !value.is_array();
     }
 
-    // Finds where each value is. Anything it doesn't expect is an error, so a bad edit is never made.
+    // Anything it doesn't expect is an error, so a bad edit is never made.
     class Scanner
     {
     public:
@@ -234,7 +232,6 @@ namespace
         return newline == std::string_view::npos ? 0 : newline + 1;
     }
 
-    // The spaces and tabs that start pos's line.
     std::string_view GetIndent(std::string_view text, std::size_t pos)
     {
         const auto start = GetLineStart(text, pos);
@@ -252,8 +249,7 @@ namespace
         return GetLineStart(text, pos) + GetIndent(text, pos).size() == pos;
     }
 
-    // Past the spaces and comments that follow pos on its line: the line's end, or what else is on it. A block
-    // comment that runs onto another line counts as what else is on it.
+    // A block comment that runs onto another line counts as more on this one.
     std::size_t SkipToLineEnd(std::string_view text, std::size_t pos)
     {
         while (pos < text.size())
@@ -363,7 +359,7 @@ namespace
         return text + (isObject ? "}" : "]");
     }
 
-    // A line for each member, without the first line's break or the last's.
+    // Without the first line's break or the last's.
     std::string FormatMemberLines(const Json& members, const std::string& indent, const Layout_s& layout)
     {
         auto text = std::string{};

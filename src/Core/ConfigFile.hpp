@@ -32,7 +32,7 @@ struct ClientSettings_s
     std::string cacheDirectory = "data/cache";
     // rs2b0t's walker data, exported by tools/nav/export_rs2b0t.ts.
     std::string navDirectory = "data/nav";
-    // Where log lines are appended, as well as the console; empty for no file.
+    // Empty for no file.
     std::string logFile;
 };
 
@@ -44,10 +44,8 @@ struct ScriptingSettings_s
     std::chrono::milliseconds pollIntervalMs = 10ms;
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
-    // Attempts at each login or reconnect before the account stops; the waits between them double from 2 s
-    // up to 30 s.
+    // Per login or reconnect; the waits between them double from 2 s up to 30 s.
     s32 connectAttempts = 10;
-    // The wait before an account logs in afresh after its session ended unexpectedly.
     std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
 };
@@ -63,33 +61,28 @@ struct Config_s
 struct ScriptConfig_s
 {
     std::string file;
-    // The settings object as JSON text; the script reads it as its settings global. A define_bot script reads
-    // only the object under its name, so one file can keep the settings of several.
+    // A define_bot script reads only the object under its name, so one file can keep the settings of several.
     std::string settings = "{}";
-    // How often on_progress_report is called; zero turns reports off.
+    // Zero turns reports off.
     std::chrono::minutes progressReportMinutes{0};
 };
 
-// One account file. Without a script, the account logs in and idles. A server section replaces
-// client.jsonc's for this account, to log it into another world.
+// A server section replaces client.jsonc's for this account.
 struct AccountConfig_s
 {
     std::string name;
-    // The file it was loaded from, which a define_bot script's default settings are added to; empty for one
-    // made in code.
+    // Where a define_bot script's default settings are added; empty for one made in code.
     std::filesystem::path file;
     AccountSettings_s credentials;
     bool enabled = true;
     std::optional<ServerSettings_s> server;
     std::optional<ScriptConfig_s> script;
-    // How long an account without a script idles before it logs out; zero idles until interrupted.
+    // Zero idles until interrupted.
     std::chrono::seconds idleSeconds{0};
-    // Whether the script's random event guardian runs: it takes over to answer a random event when one comes.
     bool randomEvents = true;
-    // How long a script may go without moving, gaining experience or noting progress before the stall guard
-    // steps in; zero turns it off.
+    // Zero turns the stall guard off.
     std::chrono::minutes stallMinutes{10};
-    // Whether run is turned back on once energy reaches runEnergyMin, as rs2b0t's run manager does.
+    // Turns run back on once energy reaches runEnergyMin, as rs2b0t's run manager does.
     bool runAuto = true;
     s32 runEnergyMin = 20;
 };
@@ -109,8 +102,6 @@ public:
     // The account's name is the file's name without its extension.
     [[nodiscard]] static AccountConfig_s LoadAccount(const std::filesystem::path& path);
     [[nodiscard]] static AccountConfig_s ParseAccount(std::string_view text, std::string name);
-    // Adds the settings in settingsJson, a JSON object, that the account file's script.settings[botName]
-    // lacks, keeping its comments and layout. Returns the keys added; the file is rewritten only when there
-    // are some.
+    // Keeps the file's comments and layout, and rewrites it only when a key is added.
     [[nodiscard]] static std::vector<std::string> AddScriptSettings(const std::filesystem::path& path, std::string_view botName, std::string_view settingsJson);
 };

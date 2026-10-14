@@ -14,7 +14,7 @@ struct LogEntry_s
     std::chrono::system_clock::time_point time;
     std::optional<std::source_location> location;
     std::string_view message;
-    // The name of the logger that wrote the entry, empty for an unnamed one.
+    // Empty for an unnamed logger.
     std::string_view source;
 };
 
@@ -122,16 +122,11 @@ public:
     static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
 
     static void WriteToConsole(const LogEntry_s& entry);
-    // WriteToConsole without colors or any other VT100 code, whatever the stream is.
     static void WritePlainToConsole(const LogEntry_s& entry);
     [[nodiscard]] static std::string FormatLine(const LogEntry_s& entry);
-    // FormatLine in the level's VT100 color: cyan for verbose, the terminal's own for info, yellow for
-    // warnings and red for errors.
     [[nodiscard]] static std::string FormatColoredLine(const LogEntry_s& entry);
-    // The line WriteToConsole writes: colored when its stream is a terminal that shows VT100 colors, which
-    // on Windows it's switched to, and NO_COLOR isn't set.
+    // Colored only on a terminal that shows VT100 colors, and only when NO_COLOR isn't set.
     [[nodiscard]] static std::string FormatConsoleLine(const LogEntry_s& entry);
-    // Where WriteToConsole writes: stderr for warnings and errors, stdout for the rest.
     [[nodiscard]] static std::FILE* GetConsoleStream(LogLevel_e level);
 
 private:

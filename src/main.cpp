@@ -3,7 +3,6 @@
 
 #include "Core/Logger.hpp"
 
-// Usage: Application::USAGE
 int main(int argc, char** argv)
 {
     const auto logger = std::make_shared<Logger>();

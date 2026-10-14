@@ -19,7 +19,7 @@ namespace
         return (static_cast<unsigned char>(byte) & 0xC0) == 0x80;
     }
 
-    // The length of the UTF-8 character that starts with the byte; zero for a byte that can't start one.
+    // Zero for a byte that can't start a character.
     std::size_t GetCharacterLength(char lead)
     {
         const auto byte = static_cast<unsigned char>(lead);
@@ -46,7 +46,7 @@ namespace
         return 0;
     }
 
-    // Terminal columns, counting each character as one.
+    // Counts each character as one column.
     std::size_t CountColumns(std::string_view text)
     {
         return static_cast<std::size_t>(std::ranges::count_if(text, [](char byte)

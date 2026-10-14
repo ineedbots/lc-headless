@@ -55,8 +55,6 @@ namespace
         return lower;
     }
 
-    // Log lines go through the console while the scope lasts. On the way out, even by an exception, the
-    // prompt is erased, the terminal put back and the sink installed again without the console.
     class ConsoleLogScope
     {
     public:

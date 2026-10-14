@@ -2,32 +2,25 @@
 
 #include "LineEditor.hpp"
 
-// Lines typed into the console. ReadStdin reads them on a thread of its own, so the caller's loop never
-// blocks on input: it takes what has arrived, and can sleep until a time or the next line, whichever is
-// first. Tests push lines instead.
-//
-// When standard input and output are both a terminal, it's interactive: the terminal goes into raw VT100
-// mode, a LineEditor draws a prompt on the last line, and output given to Print goes above the prompt, so
-// it never runs through what's being typed. Otherwise, as with piped input, lines are read as they come.
+// ReadStdin reads on a thread of its own, so the caller's loop never blocks on input. On a terminal, a
+// LineEditor keeps a prompt on the last line and Print writes above it.
 class ConsoleInput
 {
 public:
     using Clock = std::chrono::steady_clock;
 
-    // Starts reading standard input on a detached thread, which outlives the returned object if need be
-    // and ends at the end of the input. A Ctrl+C at the console doesn't end it.
+    // The thread is detached: it outlives the returned object if need be, and ends with the input.
     [[nodiscard]] static std::shared_ptr<ConsoleInput> ReadStdin();
 
     void Push(std::string line);
-    // The lines that have arrived since the last call, oldest first.
     [[nodiscard]] std::vector<std::string> TakeLines();
-    // Sleeps until the time, or until a line arrives that hasn't been taken yet.
+    // Returns early when a line arrives.
     void WaitUntil(Clock::time_point time);
 
     [[nodiscard]] bool IsInteractive() const;
-    // Writes the text and a line break to the stream, above the prompt while there is one.
+    // Above the prompt while there is one.
     void Print(std::FILE* stream, std::string_view text);
-    // Erases the prompt and puts the terminal back as it was. Typing after that is ignored.
+    // Typing after this is ignored.
     void Close();
 
 private:

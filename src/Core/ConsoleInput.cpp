@@ -36,8 +36,7 @@ namespace
         return _isatty(_fileno(stdin)) != 0;
     }
 
-    // Raw VT input, with Ctrl+C still a signal, VT output, and UTF-8 output. Returns how to undo it, or
-    // nothing when either side isn't a console that can.
+    // Returns how to undo it, or nothing when either side isn't a console.
     std::function<void()> EnterRawMode()
     {
         const auto input = GetStdHandle(STD_INPUT_HANDLE);
@@ -71,7 +70,7 @@ namespace
         };
     }
 
-    // What the console sent next, as UTF-8: empty after a Ctrl+C, nothing once it's gone.
+    // Empty after a Ctrl+C, nullopt once the console is gone.
     std::optional<std::string> ReadTerminal()
     {
         auto buffer = std::array<wchar_t, READ_SIZE>{};
@@ -98,8 +97,7 @@ namespace
         return isatty(STDIN_FILENO) != 0;
     }
 
-    // Keys as they're pressed, unechoed, with Ctrl+C still a signal. Returns how to undo it, or nothing when
-    // either side isn't a terminal that takes VT100 codes.
+    // Returns how to undo it, or nothing when either side isn't a terminal that takes VT100 codes.
     std::function<void()> EnterRawMode()
     {
         const auto* const term = std::getenv("TERM");
@@ -129,7 +127,7 @@ namespace
         };
     }
 
-    // What the terminal sent next; nothing once it's gone.
+    // Nullopt once the terminal is gone.
     std::optional<std::string> ReadTerminal()
     {
         auto buffer = std::array<char, READ_SIZE>{};
@@ -273,7 +271,6 @@ void ConsoleInput::ReadLines()
     }
 }
 
-// Each key is drawn as it's typed; an entered line stays on screen above the new prompt.
 void ConsoleInput::ReadKeys()
 {
     while (true)
