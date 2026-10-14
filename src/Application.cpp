@@ -90,9 +90,9 @@ namespace
     // The server lets a username log in once, so a second file for the same one would only be kicked.
     void CheckUsernamesAreUnique(const std::vector<AccountConfig_s>& accounts)
     {
-        for (std::size_t i = 0; i < accounts.size(); ++i)
+        for (auto i = std::size_t{0}; i < accounts.size(); ++i)
         {
-            for (std::size_t j = i + 1; j < accounts.size(); ++j)
+            for (auto j = i + 1; j < accounts.size(); ++j)
             {
                 if (ToLower(accounts[i].credentials.username) == ToLower(accounts[j].credentials.username))
                 {
@@ -106,7 +106,7 @@ namespace
 CommandLine_s Application::ParseCommandLine(std::span<char* const> args)
 {
     auto commandLine = CommandLine_s{};
-    for (std::size_t i = 0; i < args.size(); ++i)
+    for (auto i = std::size_t{0}; i < args.size(); ++i)
     {
         const auto arg = std::string_view{args[i]};
         if (arg == ACCOUNT_OPTION)

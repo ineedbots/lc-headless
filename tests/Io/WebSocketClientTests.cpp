@@ -695,7 +695,7 @@ TEST_CASE("WebSocketClient connects and exchanges data", "[WebSocketClient][netw
         auto client = WebSocketClient{MakeConsoleLogger()};
         ConnectAndWaitOpen(client, server.Url());
         auto bytes = std::vector<u8>(65'536);
-        for (std::size_t i = 0; i < bytes.size(); ++i)
+        for (auto i = std::size_t{0}; i < bytes.size(); ++i)
         {
             bytes[i] = static_cast<u8>(i & 0xFF);
         }

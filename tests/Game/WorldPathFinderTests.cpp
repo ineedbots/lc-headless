@@ -78,7 +78,7 @@ namespace
 
     bool Visits(const NavPath_s& path, const std::function<bool(const NavPoint_s&)>& test)
     {
-        for (std::size_t i = 1; i < path.waypoints.size(); ++i)
+        for (auto i = std::size_t{1}; i < path.waypoints.size(); ++i)
         {
             auto from = path.waypoints[i - 1].point;
             const auto to = path.waypoints[i].point;

@@ -45,7 +45,7 @@ TEST_CASE("The real cache gives the server's CRCs", "[RealCache]")
 {
     const auto& cache = RequireRealCache();
     const auto expected = std::array<u32, GameCache_s::CRC_COUNT>{0x00000000, 0xde5b3345, 0x6026f8fe, 0x07550309, 0x9a13636e, 0xca2717bd, 0x368f1792, 0x1b1fb6b2, 0xa7129379};
-    for (std::size_t i = 0; i < expected.size(); ++i)
+    for (auto i = std::size_t{0}; i < expected.size(); ++i)
     {
         CHECK(std::bit_cast<u32>(cache.crcs[i]) == expected[i]);
     }

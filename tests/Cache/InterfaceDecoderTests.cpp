@@ -51,7 +51,7 @@ TEST_CASE("InterfaceDecoder reads every component in order", "[InterfaceDecoder]
     const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(MakeComponents()));
     const auto ids = std::vector<u16>{0, 1, 2, 3, 10, 11, 12, 13, 2458};
     REQUIRE(components.size() == ids.size());
-    for (std::size_t i = 0; i < ids.size(); ++i)
+    for (auto i = std::size_t{0}; i < ids.size(); ++i)
     {
         CHECK(components[i].id == ids[i]);
     }

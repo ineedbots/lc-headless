@@ -99,7 +99,7 @@ namespace
     {
         auto block = std::vector<u8>(length);
         block[0] = 0x0A;
-        for (std::size_t i = 1; i < length; ++i)
+        for (auto i = std::size_t{1}; i < length; ++i)
         {
             block[i] = static_cast<u8>(i * 37 + 11);
         }
@@ -571,13 +571,13 @@ TEST_CASE("Packet bit reads", "[Packet]")
 
     CAPTURE(testCase.bytes, testCase.widths);
     auto packet = Packet{testCase.bytes};
-    for (std::size_t i = 0; i < testCase.bytesBeforeStart; ++i)
+    for (auto i = std::size_t{0}; i < testCase.bytesBeforeStart; ++i)
     {
         packet.G1();
     }
 
     packet.GBitStart();
-    for (std::size_t i = 0; i < testCase.widths.size(); ++i)
+    for (auto i = std::size_t{0}; i < testCase.widths.size(); ++i)
     {
         CHECK(packet.GBit(testCase.widths[i]) == testCase.results[i]);
     }
@@ -655,7 +655,7 @@ TEST_CASE("Packet P1Enc and G1Enc code opcodes with the ISAAC cipher", "[Packet]
 
     auto encoder = Isaac{ISAAC_SEED};
     auto packet = Packet{};
-    for (std::size_t i = 0; i < COUNT; ++i)
+    for (auto i = std::size_t{0}; i < COUNT; ++i)
     {
         packet.P1Enc(encoder, static_cast<s32>(i));
     }
@@ -665,7 +665,7 @@ TEST_CASE("Packet P1Enc and G1Enc code opcodes with the ISAAC cipher", "[Packet]
         auto twin = Isaac{ISAAC_SEED};
         const auto data = packet.GetData();
         REQUIRE(data.size() == COUNT);
-        for (std::size_t i = 0; i < COUNT; ++i)
+        for (auto i = std::size_t{0}; i < COUNT; ++i)
         {
             CAPTURE(i);
             CHECK(data[i] == static_cast<u8>(static_cast<u32>(i) + static_cast<u32>(twin.NextInt())));
@@ -676,7 +676,7 @@ TEST_CASE("Packet P1Enc and G1Enc code opcodes with the ISAAC cipher", "[Packet]
     {
         auto decoder = Isaac{ISAAC_SEED};
         auto reader = Packet{packet.GetData()};
-        for (std::size_t i = 0; i < COUNT; ++i)
+        for (auto i = std::size_t{0}; i < COUNT; ++i)
         {
             CAPTURE(i);
             CHECK(reader.G1Enc(decoder) == static_cast<u8>(i));

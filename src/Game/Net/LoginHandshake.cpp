@@ -217,7 +217,7 @@ std::array<s32, LoginResult_s::SEED_SIZE> LoginHandshake::MakeSeed(s64 serverSee
 std::array<s32, LoginResult_s::SEED_SIZE> LoginHandshake::GetInboundSeed(std::span<const s32, LoginResult_s::SEED_SIZE> seed)
 {
     auto inbound = std::array<s32, LoginResult_s::SEED_SIZE>{};
-    for (std::size_t i = 0; i < inbound.size(); ++i)
+    for (auto i = std::size_t{0}; i < inbound.size(); ++i)
     {
         inbound[i] = static_cast<s32>(static_cast<u32>(seed[i]) + SERVER_SEED_OFFSET);
     }

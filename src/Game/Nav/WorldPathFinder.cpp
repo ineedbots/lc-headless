@@ -590,7 +590,7 @@ namespace
 
             auto path = NavPath_s{.ok = true, .cost = m_cost.at(goal), .expanded = expanded};
             path.waypoints.push_back({.point = ToPoint(chain.front())});
-            for (std::size_t i = 1; i < chain.size(); ++i)
+            for (auto i = std::size_t{1}; i < chain.size(); ++i)
             {
                 const auto via = m_via.find(chain[i]);
                 const auto hop = via == m_via.end() ? nullptr : &via->second;

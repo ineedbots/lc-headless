@@ -57,7 +57,7 @@ BigUInt BigUInt::FromBytesBigEndian(std::span<const u8> bytes)
 {
     auto result = BigUInt{};
     result.m_limbs.resize((bytes.size() + LIMB_BYTES - 1) / LIMB_BYTES);
-    for (std::size_t i = 0; i < bytes.size(); ++i)
+    for (auto i = std::size_t{0}; i < bytes.size(); ++i)
     {
         const auto byte = bytes[bytes.size() - 1 - i];
         result.m_limbs[i / LIMB_BYTES] |= static_cast<u32>(byte) << (8 * (i % LIMB_BYTES));
@@ -83,7 +83,7 @@ BigUInt BigUInt::ModPow(const BigUInt& base, const BigUInt& exponent, const BigU
     result.m_limbs = {1};
     auto factor = base;
     const auto bitLength = exponent.GetBitLength();
-    for (std::size_t bit = 0; bit < bitLength; ++bit)
+    for (auto bit = std::size_t{0}; bit < bitLength; ++bit)
     {
         if (exponent.GetBit(bit))
         {
@@ -209,7 +209,7 @@ void BigUInt::Add(const BigUInt& other)
     }
 
     auto carry = u64{0};
-    for (std::size_t i = 0; i < m_limbs.size(); ++i)
+    for (auto i = std::size_t{0}; i < m_limbs.size(); ++i)
     {
         if (carry == 0 && i >= other.m_limbs.size())
         {
@@ -232,7 +232,7 @@ void BigUInt::Subtract(const BigUInt& other)
     assert(*this >= other && "BigUInt::Subtract would go below zero");
 
     auto borrow = u64{0};
-    for (std::size_t i = 0; i < m_limbs.size(); ++i)
+    for (auto i = std::size_t{0}; i < m_limbs.size(); ++i)
     {
         if (borrow == 0 && i >= other.m_limbs.size())
         {
@@ -262,7 +262,7 @@ BigUInt BigUInt::MultiplyMod(const BigUInt& other, const BigUInt& modulus) const
     auto result = BigUInt{};
     auto addend = *this;
     const auto bitLength = other.GetBitLength();
-    for (std::size_t bit = 0; bit < bitLength; ++bit)
+    for (auto bit = std::size_t{0}; bit < bitLength; ++bit)
     {
         if (other.GetBit(bit))
         {
@@ -294,7 +294,7 @@ void BigUInt::MultiplySmall(u32 factor)
 void BigUInt::AddSmall(u32 value)
 {
     auto carry = u64{value};
-    for (std::size_t i = 0; carry != 0; ++i)
+    for (auto i = std::size_t{0}; carry != 0; ++i)
     {
         if (i == m_limbs.size())
         {

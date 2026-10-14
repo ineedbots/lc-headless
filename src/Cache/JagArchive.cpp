@@ -56,7 +56,7 @@ JagArchive::JagArchive(std::vector<u8> data)
     }
 
     m_entries.reserve(count);
-    for (std::size_t i = 0; i < count; ++i)
+    for (auto i = std::size_t{0}; i < count; ++i)
     {
         auto entry = Entry_s{};
         entry.nameHash = table.G4();

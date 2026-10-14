@@ -64,7 +64,7 @@ namespace
     u8 GetBaseLevel(s32 xp)
     {
         auto level = 1;
-        for (std::size_t i = 0; i < MAX_BASE_LEVEL_INDEX; ++i)
+        for (auto i = std::size_t{0}; i < MAX_BASE_LEVEL_INDEX; ++i)
         {
             if (xp >= LEVEL_XP[i])
             {

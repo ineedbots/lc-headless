@@ -11,7 +11,7 @@ namespace
     constexpr auto LIMIT = []
     {
         auto limit = u64{1};
-        for (std::size_t i = 0; i < Base37::MAX_LENGTH; ++i)
+        for (auto i = std::size_t{0}; i < Base37::MAX_LENGTH; ++i)
         {
             limit *= RADIX;
         }
@@ -100,7 +100,7 @@ std::string Base37::Decode(u64 value)
 std::string Base37::ToDisplayName(std::string_view rawName)
 {
     auto name = std::string{rawName};
-    for (std::size_t i = 0; i < name.size(); ++i)
+    for (auto i = std::size_t{0}; i < name.size(); ++i)
     {
         if (name[i] != '_')
         {

@@ -46,7 +46,7 @@ public:
 
         auto survivors = std::vector<TEntity>{};
         survivors.reserve(count);
-        for (std::size_t i = 0; i < count; ++i)
+        for (auto i = std::size_t{0}; i < count; ++i)
         {
             auto& entity = tracked[i];
             if (packet.GBit(UPDATE_BITS) == 0)

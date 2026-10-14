@@ -471,7 +471,7 @@ TEST_CASE("The event log keeps the newest events, numbered in arrival order", "[
     constexpr auto EXTRA = std::size_t{76};
     constexpr auto TOTAL = GameState_s::MAX_EVENTS + EXTRA;
 
-    for (std::size_t i = 0; i < TOTAL; ++i)
+    for (auto i = std::size_t{0}; i < TOTAL; ++i)
     {
         auto varp = Packet{};
         varp.P2(static_cast<s32>(i % 100));

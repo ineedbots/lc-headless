@@ -103,7 +103,7 @@ namespace
 
     void PutOptions(Packet& packet, const std::vector<std::string>& options)
     {
-        for (std::size_t i = 0; i < INV_OPTION_COUNT; ++i)
+        for (auto i = std::size_t{0}; i < INV_OPTION_COUNT; ++i)
         {
             packet.PJStr(i < options.size() ? options[i] : "");
         }
@@ -122,7 +122,7 @@ namespace
         packet.P2(SAMPLE_SIZE);
         packet.P1(component.hidden ? 1 : 0);
         packet.P2(static_cast<s32>(component.children.size()));
-        for (std::size_t i = 0; i < component.children.size(); ++i)
+        for (auto i = std::size_t{0}; i < component.children.size(); ++i)
         {
             packet.P2(component.children[i]);
             const auto offset = i < component.childOffsets.size() ? component.childOffsets[i] : std::pair<s16, s16>{SAMPLE_OFFSET, SAMPLE_SIZE};
@@ -275,7 +275,7 @@ namespace
     void PutEntryTable(Packet& packet, const std::vector<ArchiveEntry_s>& entries, std::span<const std::vector<u8>> packed)
     {
         packet.P2(static_cast<s32>(entries.size()));
-        for (std::size_t i = 0; i < entries.size(); ++i)
+        for (auto i = std::size_t{0}; i < entries.size(); ++i)
         {
             packet.P4(JagArchive::HashName(entries[i].name));
             packet.P3(static_cast<s32>(entries[i].data.size()));
@@ -325,7 +325,7 @@ WrittenStore_s CacheWriter::Build() const
         std::ranges::copy(entry.GetData(), index.begin() + static_cast<std::ptrdiff_t>(file * CacheStore::INDEX_ENTRY_SIZE));
 
         auto sector = firstSector;
-        for (std::size_t part = 0, offset = 0; offset < bytes.size(); ++part, ++sector)
+        for (auto part = std::size_t{0}, offset = std::size_t{0}; offset < bytes.size(); ++part, ++sector)
         {
             const auto chunk = std::min(SECTOR_DATA_SIZE, bytes.size() - offset);
             const auto last = offset + chunk == bytes.size();
@@ -449,7 +449,7 @@ std::vector<u8> CacheWriter::MakeDefinition(std::string_view name, const std::ve
         packet.PJStr(name);
     }
 
-    for (std::size_t i = 0; i < ops.size(); ++i)
+    for (auto i = std::size_t{0}; i < ops.size(); ++i)
     {
         if (ops[i].empty())
         {
@@ -507,7 +507,7 @@ std::vector<u8> CacheWriter::MakeLocFile(std::span<const LocPlacement_s> locs)
 
     auto bytes = std::vector<u8>{};
     auto lastId = -1;
-    for (std::size_t i = 0; i < sorted.size();)
+    for (auto i = std::size_t{0}; i < sorted.size();)
     {
         const auto id = sorted[i].id;
         PutSmart(bytes, id - lastId);
@@ -531,7 +531,7 @@ std::vector<u8> CacheWriter::MakeLocFile(std::span<const LocPlacement_s> locs)
 std::vector<u8> CacheWriter::MakeMapIndex(std::span<const u16> squares)
 {
     auto index = Packet{};
-    for (std::size_t i = 0; i < squares.size(); ++i)
+    for (auto i = std::size_t{0}; i < squares.size(); ++i)
     {
         index.P2(squares[i]);
         index.P2(static_cast<s32>(i * 2));
@@ -594,7 +594,7 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
 
     squares.insert(squares.end(), contents.squaresWithoutFiles.begin(), contents.squaresWithoutFiles.end());
     writer.Put(CacheStore::ARCHIVES, 5, MakeArchive({{.name = "map_index", .data = MakeMapIndex(squares)}}, true));
-    for (std::size_t i = 0; i < contents.squares.size(); ++i)
+    for (auto i = std::size_t{0}; i < contents.squares.size(); ++i)
     {
         writer.Put(CacheStore::MAPS, static_cast<u32>(i * 2), Gzip(contents.squares[i].land));
         writer.Put(CacheStore::MAPS, static_cast<u32>(i * 2 + 1), Gzip(contents.squares[i].locs));

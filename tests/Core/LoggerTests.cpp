@@ -244,7 +244,7 @@ TEST_CASE("Logger formats messages", "[Logger]")
 
     const auto entries = capture.GetEntries();
     REQUIRE(entries.size() == expected.size());
-    for (std::size_t i = 0; i < entries.size(); ++i)
+    for (auto i = std::size_t{0}; i < entries.size(); ++i)
     {
         CAPTURE(i);
         CHECK(entries[i].level == expected[i].level);
@@ -282,7 +282,7 @@ TEST_CASE("Logger records the call site in Debug builds only", "[Logger]")
     const auto expectedLines = std::array{infoLine, warningLine, logLine};
     const auto entries = capture.GetEntries();
     REQUIRE(entries.size() == expectedLines.size());
-    for (std::size_t i = 0; i < entries.size(); ++i)
+    for (auto i = std::size_t{0}; i < entries.size(); ++i)
     {
         CAPTURE(i);
 #ifdef NDEBUG
@@ -638,7 +638,7 @@ TEST_CASE("Logger SetSink is safe while other threads log", "[Logger][threads]")
     }
 
     auto countsWhenReplaced = std::array<u64, SWAP_COUNT>{};
-    for (std::size_t i = 0; i < SWAP_COUNT; ++i)
+    for (auto i = std::size_t{0}; i < SWAP_COUNT; ++i)
     {
         std::this_thread::sleep_for(1ms);
         logger->SetSink(makeSink(i + 1));
@@ -651,7 +651,7 @@ TEST_CASE("Logger SetSink is safe while other threads log", "[Logger][threads]")
         thread.join();
     }
 
-    for (std::size_t i = 0; i < SWAP_COUNT; ++i)
+    for (auto i = std::size_t{0}; i < SWAP_COUNT; ++i)
     {
         CAPTURE(i);
         CHECK(sinkCounts[i].load() == countsWhenReplaced[i]);

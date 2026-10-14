@@ -115,7 +115,7 @@ namespace
         const auto cleaned = ChatDialog::CleanText(option);
         const auto words = SplitWords(cleaned);
         auto subject = std::string{};
-        for (std::size_t i = 2; i < words.size(); ++i)
+        for (auto i = std::size_t{2}; i < words.size(); ++i)
         {
             subject += subject.empty() ? "" : " ";
             subject += words[i];
@@ -165,7 +165,7 @@ namespace
 std::string ChatDialog::CleanText(std::string_view text)
 {
     auto spaced = std::string{};
-    for (std::size_t i = 0; i < text.size(); ++i)
+    for (auto i = std::size_t{0}; i < text.size(); ++i)
     {
         if (text[i] == '\\' && i + 1 < text.size() && text[i + 1] == 'n')
         {
@@ -349,7 +349,7 @@ std::vector<MakeSlot_s> ChatDialog::GetMakePanel(const InterfaceView& view, cons
 
         const auto corner = view.GetPosition(*component);
         const auto& items = inventory->second.slots;
-        for (std::size_t slot = 0; slot < items.size(); ++slot)
+        for (auto slot = std::size_t{0}; slot < items.size(); ++slot)
         {
             if (items[slot].id < 0)
             {

@@ -30,7 +30,7 @@ namespace
     {
         auto values = std::vector<s32>{};
         values.reserve(count);
-        for (std::size_t i = 0; i < count; ++i)
+        for (auto i = std::size_t{0}; i < count; ++i)
         {
             values.push_back(isaac.NextInt());
         }
@@ -85,7 +85,7 @@ TEST_CASE("Isaac instances share no state", "[Isaac]")
         auto second = Isaac{secondSeed};
         auto interleavedFirst = std::vector<s32>{};
         auto interleavedSecond = std::vector<s32>{};
-        for (std::size_t i = 0; i < COUNT; ++i)
+        for (auto i = std::size_t{0}; i < COUNT; ++i)
         {
             interleavedFirst.push_back(first.NextInt());
             interleavedSecond.push_back(second.NextInt());

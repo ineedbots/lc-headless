@@ -41,9 +41,9 @@ namespace
     {
         assert(source.size() == memory.size() && "Isaac source and memory differ in size");
 
-        for (std::size_t i = 0; i < memory.size(); i += STATE_SIZE)
+        for (auto i = std::size_t{0}; i < memory.size(); i += STATE_SIZE)
         {
-            for (std::size_t j = 0; j < STATE_SIZE; ++j)
+            for (auto j = std::size_t{0}; j < STATE_SIZE; ++j)
             {
                 state[j] += source[i + j];
             }
@@ -98,7 +98,7 @@ void Isaac::Generate()
     ++m_c;
     m_b += m_c;
 
-    for (std::size_t i = 0; i < SIZE; ++i)
+    for (auto i = std::size_t{0}; i < SIZE; ++i)
     {
         const auto x = m_memory[i];
         switch (i & 3)

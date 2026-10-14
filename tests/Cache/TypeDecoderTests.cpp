@@ -33,7 +33,7 @@ namespace
         for (const auto opcode : opcodes)
         {
             packet.P1(opcode);
-            for (std::size_t i = 0; i < size; ++i)
+            for (auto i = std::size_t{0}; i < size; ++i)
             {
                 packet.P1(0x5A);
             }
@@ -44,7 +44,7 @@ namespace
     {
         packet.P1(opcode);
         packet.P1(count);
-        for (std::size_t i = 0; i < static_cast<std::size_t>(count) * itemSize; ++i)
+        for (auto i = std::size_t{0}; i < static_cast<std::size_t>(count) * itemSize; ++i)
         {
             packet.P1(0x33);
         }

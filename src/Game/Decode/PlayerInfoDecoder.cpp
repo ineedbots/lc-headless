@@ -138,7 +138,7 @@ Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes)
     appearance.gender = packet.G1();
     appearance.headIcons = packet.G1();
 
-    for (std::size_t slot = 0; slot < appearance.wear.size(); ++slot)
+    for (auto slot = std::size_t{0}; slot < appearance.wear.size(); ++slot)
     {
         const auto high = packet.G1();
         if (high == 0)

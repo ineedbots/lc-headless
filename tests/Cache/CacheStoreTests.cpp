@@ -20,7 +20,7 @@ namespace
     std::vector<u8> MakeBytes(std::size_t size, u8 seed)
     {
         auto bytes = std::vector<u8>(size);
-        for (std::size_t i = 0; i < size; ++i)
+        for (auto i = std::size_t{0}; i < size; ++i)
         {
             bytes[i] = static_cast<u8>(seed + i * 7);
         }

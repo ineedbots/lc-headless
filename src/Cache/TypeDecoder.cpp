@@ -643,7 +643,7 @@ namespace
 
         auto types = std::vector<T>(count);
         auto offset = COUNT_SIZE;
-        for (std::size_t id = 0; id < count; ++id)
+        for (auto id = std::size_t{0}; id < count; ++id)
         {
             const auto size = std::size_t{index.G2()};
             if (offset + size > dat.size())

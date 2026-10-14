@@ -55,7 +55,7 @@ namespace
     std::vector<LocType_s> MakeNamedTypes(std::size_t count)
     {
         auto types = std::vector<LocType_s>{};
-        for (std::size_t id = 0; id < count; ++id)
+        for (auto id = std::size_t{0}; id < count; ++id)
         {
             types.push_back(MakeType(static_cast<u16>(id), "Named"));
         }

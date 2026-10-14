@@ -80,7 +80,7 @@ namespace
     Menu MakeMenu(const GameCache_s& cache, std::span<const u16> ops)
     {
         auto menu = Menu{};
-        for (std::size_t slot = 0; slot < menu.size() && slot < ops.size(); ++slot)
+        for (auto slot = std::size_t{0}; slot < menu.size() && slot < ops.size(); ++slot)
         {
             menu[slot] = cache.GetOption(ops[slot]);
         }
@@ -91,7 +91,7 @@ namespace
     std::string DescribeMenu(const Menu& menu)
     {
         auto text = std::string{};
-        for (std::size_t slot = 0; slot < menu.size(); ++slot)
+        for (auto slot = std::size_t{0}; slot < menu.size(); ++slot)
         {
             if (menu[slot].empty())
             {
@@ -241,7 +241,7 @@ std::optional<ScriptApi::Menu> ScriptApi::GetInventoryMenu(const GameCache_s& ca
     }
 
     auto menu = Menu{};
-    for (std::size_t slot = 0; slot < menu.size(); ++slot)
+    for (auto slot = std::size_t{0}; slot < menu.size(); ++slot)
     {
         menu[slot] = component->options[slot];
     }
@@ -252,7 +252,7 @@ std::optional<ScriptApi::Menu> ScriptApi::GetInventoryMenu(const GameCache_s& ca
 ScriptApi::Menu ScriptApi::GetPlayerMenu() const
 {
     auto menu = Menu{};
-    for (std::size_t slot = 0; slot < menu.size() && slot < m_state.playerOps.size(); ++slot)
+    for (auto slot = std::size_t{0}; slot < menu.size() && slot < m_state.playerOps.size(); ++slot)
     {
         if (m_state.playerOps[slot])
         {
@@ -538,7 +538,7 @@ std::vector<InventoryItem_s> ScriptApi::GetInventory(u16 com) const
         return items;
     }
 
-    for (std::size_t slot = 0; slot < inventory->slots.size(); ++slot)
+    for (auto slot = std::size_t{0}; slot < inventory->slots.size(); ++slot)
     {
         const auto& item = inventory->slots[slot];
         if (item.id < 0)
@@ -632,7 +632,7 @@ u8 ScriptApi::FindInventoryOption(u16 com, std::string_view text) const
     }
 
     auto menu = Menu{};
-    for (std::size_t slot = 0; slot < menu.size(); ++slot)
+    for (auto slot = std::size_t{0}; slot < menu.size(); ++slot)
     {
         menu[slot] = component->options[slot];
     }

@@ -59,7 +59,7 @@ namespace
 
     void SkipStrings(Packet& packet, std::size_t count)
     {
-        for (std::size_t i = 0; i < count; ++i)
+        for (auto i = std::size_t{0}; i < count; ++i)
         {
             static_cast<void>(ReadString(packet));
         }
