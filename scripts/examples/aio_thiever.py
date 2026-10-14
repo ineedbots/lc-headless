@@ -9,8 +9,9 @@ SETTINGS = {
     'food_target': SettingDef('number', 20, 'Cakes to carry', 1, 27, help='for guards and knights: how many to steal from the stall, or take from the bank'),
     'restock_at_food': SettingDef('number', 3, 'Restock cakes at', 0, 26, help='steal more from the stall at this many, or bank for them'),
     'bank_food': SettingDef('boolean', False, 'Take cakes from the bank', help='instead of the stall, while the bank has them'),
-    'rest_until_hp': SettingDef('number', 70, 'Rest to HP% without food', 10, 100),
-    'stop_at_level': SettingDef('number', 99, 'Stop at Thieving level', 2, 99),
+    'rest_until_hp': SettingDef('number', 10, 'Rest to HP% without food', 10, 100),
+    'bank_every_minutes': SettingDef('number', 60, 'Bank run every N minutes', 0, 120, help='also whenever the backpack fills; 0 for only then. Keeps food, and coins in Lumbridge'),
+    'stop_at_level': SettingDef('number', 100, 'Stop at Thieving level', 2, 100),
 }
 
 LUMBRIDGE = Tile(3221, 3219, 0)
@@ -43,11 +44,15 @@ STALL_RESTOCK_WAIT_MS = 8000
 STEAL_PASS_TICKS = 150
 LEASH_SLACK = 6
 LONG_WALK_TILES = 30
+TICKS_PER_MINUTE = 100
+# A bank run keeps food, but at most this much, so the backpack keeps room for loot.
+MAX_KEPT_FOOD = 22
 
 # Every food the stall gives. Eaten partial forms first, so slots free up; withdrawn whole cakes first.
 FOOD_NAMES = ['cake', '2/3 cake', 'slice of cake', 'bread', 'chocolate slice']
 EAT_ORDER = ['Slice of cake', '2/3 cake', 'Chocolate slice', 'Bread', 'Cake']
 WITHDRAW_ORDER = ['Cake', '2/3 cake', 'Chocolate slice', 'Bread', 'Slice of cake']
+DEPOSIT_FOOD_ORDER = ['Slice of cake', 'Bread', 'Chocolate slice', '2/3 cake', 'Cake']
 
 COINS = 'Coins'
 MEMBERS_ONLY = "members' world to gain experience in thieving"
@@ -109,6 +114,7 @@ class AioThiever(TaskBot):
         self.last_wanted = None
         self.fare_check = False
         self.earning_fare = False
+        self.last_bank_tick = game.tick()
         log('thieving', self.level_start, '; starting with', self.phase().name, 'in', self.phase().where)
         self.add(
             ContinueDialog(),
@@ -118,6 +124,7 @@ class AioThiever(TaskBot):
             Task(self.far_from_post, self.travel, 'travel'),
             Task(lambda: self.phase().name == 'cakes' and inventory.is_full(), self.bank_haul, 'bank cakes'),
             Task(self.needs_bank, self.restock_from_bank, 'bank'),
+            Task(self.bank_run_due, self.bank_run, 'bank run'),
             Task(self.must_rest, self.rest, 'rest'),
             Task(self.needs_stall_food, self.restock_from_stall, 'steal food'),
             Task(lambda: self.phase().name == 'cakes', self.steal_cakes_task, 'steal cakes'),
@@ -291,6 +298,7 @@ class AioThiever(TaskBot):
         yield from bank.deposit_inventory()
         self.banked += max(0, cakes - self.food_count())
         self.trips += 1
+        self.last_bank_tick = game.tick()
         log('banked', cakes, 'stall food;', self.banked, 'in all')
         yield from bank.close()
         yield from traversal.walk_resilient(STALL_STAND, radius=1, attempts=4, timeout_ms=120000, log=lambda m: log(' ', m))
@@ -317,6 +325,7 @@ class AioThiever(TaskBot):
         yield from bank.deposit_inventory()
         yield from bank.wait_ready()
         self.trips += 1
+        self.last_bank_tick = game.tick()
         if not self.settings.bank_food:
             yield from bank.close()
             return
@@ -335,6 +344,57 @@ class AioThiever(TaskBot):
         yield from bank.close()
         if not self.bank_out_of_food:
             yield from traversal.walk_resilient(self.phase().anchor, radius=3, attempts=4, timeout_ms=120000, log=lambda m: log(' ', m))
+
+    def bank_run_due(self):
+        """A full backpack the run would make room in, or bank_every_minutes since the last bank, between
+        steals."""
+        if self.in_real_combat() or self.stunned():
+            return False
+        if inventory.is_full() and self.bank_run_frees_space():
+            return True
+        minutes = self.settings.bank_every_minutes
+        return minutes > 0 and game.tick() - self.last_bank_tick >= minutes * TICKS_PER_MINUTE
+
+    def keeps_coins(self):
+        return self.phase().name == 'men'
+
+    def banks_on_run(self, name):
+        return len(name) > 0 and not is_food(name) and not (self.keeps_coins() and name == COINS)
+
+    def bank_run_frees_space(self):
+        return self.food_count() > self.kept_food() or len([i for i in inventory.items() if self.banks_on_run(i.name or '')]) > 0
+
+    def kept_food(self):
+        return min(self.settings.food_target, MAX_KEPT_FOOD)
+
+    def bank_run(self):
+        """Banks everything except food, and except coins in Lumbridge, where they are the fares to Ardougne. Food beyond
+        kept_food() goes in too, the partial forms first."""
+        phase = self.phase()
+        stand = None if phase.name == 'men' else ARDOUGNE_BANK_STAND
+        if inventory.is_full():
+            log('bank run: the backpack is full')
+        else:
+            log('bank run after', self.settings.bank_every_minutes, 'minutes')
+        opened = yield from banking.open(stand)
+        if not opened:
+            log('could not open the bank; trying again')
+            yield from execution.delay_ticks(3)
+            return
+        yield from bank.deposit_all_matching(lambda name, id: self.banks_on_run(name))
+        food_before = self.food_count()
+        for name in DEPOSIT_FOOD_ORDER:
+            while self.food_count() > self.kept_food() and inventory.count(name) > 0:
+                before = self.food_count()
+                if not bank.deposit(name, 'Deposit 1'):
+                    break
+                yield from execution.delay_until(lambda: self.food_count() < before, 2000)
+        self.banked += max(0, food_before - self.food_count())
+        self.trips += 1
+        self.last_bank_tick = game.tick()
+        log('bank run done; carrying', self.food_count(), 'food')
+        yield from bank.close()
+        yield from traversal.walk_resilient(phase.anchor, radius=3, attempts=4, timeout_ms=120000, log=lambda m: log(' ', m))
 
     # The Baker's stall.
 
