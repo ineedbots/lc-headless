@@ -500,7 +500,16 @@ AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 SortIncludes: Never   # keeps pch.hpp and the own header first
+AlignOperands: DontAlign
+AccessModifierOffset: -4                    # public: and private: at the class's own indentation
+FixNamespaceComments: false
+PackConstructorInitializers: Never          # one member initializer per line,
+BreakConstructorInitializers: BeforeComma   # each starting with its comma
+AllowShortLambdasOnASingleLine: None        # lambdas are Allman too
+LambdaBodyIndentation: OuterScope
 ```
+
+clang-format can't keep a hand-laid table or list readable, such as a byte table, a `GENERATE` list of cases, or a designated initializer that holds a lambda. Wrap that statement, and only that statement, in `// clang-format off` and `// clang-format on`.
 
 ### `.editorconfig`
 
