@@ -235,7 +235,7 @@ namespace
         }
     }
 
-    // Reads a component's fields, from just after its id.
+    // From just after its id.
     IfComponent_s ReadComponent(Packet& packet, u16 id, u16 root)
     {
         auto component = IfComponent_s{.id = id, .root = root};
@@ -304,7 +304,6 @@ std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data)
         }
     }
 
-    // Each child learns its parent from the layer that lists it.
     auto parents = std::unordered_map<u16, u16>{};
     for (const auto& component : components)
     {

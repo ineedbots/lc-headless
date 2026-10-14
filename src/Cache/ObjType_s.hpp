@@ -8,7 +8,6 @@ struct ObjType_s
     bool stackable = false;
     bool members = false;
     s32 cost = 1;
-    // For a banknote, the item it's a note of.
     std::optional<u16> noteOf;
     std::string_view name;
     std::string_view examine;

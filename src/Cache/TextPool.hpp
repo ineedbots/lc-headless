@@ -1,7 +1,7 @@
 #pragma once
 
-// The types' text, with each distinct string stored once. The views it hands out stay valid as long as
-// the pool lives, after a move too, because the text sits in chunks that never move.
+// The views it hands out stay valid as long as the pool lives, after a move too, because the text sits in
+// chunks that never move.
 class TextPool
 {
 public:
@@ -16,12 +16,12 @@ public:
     TextPool& operator=(TextPool&&) noexcept = default;
 
     [[nodiscard]] std::string_view Intern(std::string_view text);
-    // The option's id in the option table. Empty text is NO_OPTION.
+    // Empty text is NO_OPTION.
     [[nodiscard]] u16 InternOption(std::string_view text);
     [[nodiscard]] std::string_view GetOption(u16 id) const;
     // Counting NO_OPTION.
     [[nodiscard]] std::size_t GetOptionCount() const;
-    // Frees the lookup tables that interning needs. Nothing can be interned afterward.
+    // Nothing can be interned afterward.
     void FinishInterning();
 
 private:

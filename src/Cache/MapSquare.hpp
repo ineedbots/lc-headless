@@ -1,6 +1,6 @@
 #pragma once
 
-// One loc, packed as the loc file packs it, in 6 bytes.
+// Packed as the loc file packs it, in 6 bytes.
 struct MapLoc_s
 {
     static constexpr u16 COORD_MASK = 0x3F;
@@ -48,9 +48,8 @@ struct MapLoc_s
 
 static_assert(sizeof(MapLoc_s) == 6);
 
-// One 64x64 square of the map: the tiles that block walking and the locs a bot can use, both on the
-// levels they're seen on. Code outside Cache/ reads it only through these functions, so the way it's
-// stored can change without touching its readers.
+// Code outside Cache/ reads it only through these functions, so the way it's stored can change without
+// touching its readers.
 class MapSquare
 {
 public:
@@ -61,7 +60,7 @@ public:
     using BlockedTiles = std::bitset<LEVELS * SIZE * SIZE>;
     using GroundTiles = std::bitset<LEVELS * SIZE * SIZE>;
 
-    // Sorts the locs by tile. Without ground, every tile on every level has a floor.
+    // Without ground, every tile on every level has a floor.
     MapSquare(u8 x, u8 z, BlockedTiles blocked, std::vector<MapLoc_s> locs, std::optional<GroundTiles> ground = std::nullopt);
 
     [[nodiscard]] static u16 GetId(s32 squareX, s32 squareZ);
@@ -70,8 +69,8 @@ public:
     [[nodiscard]] u8 GetX() const;
     [[nodiscard]] u8 GetZ() const;
     [[nodiscard]] bool IsBlocked(s32 level, s32 x, s32 z) const;
-    // Whether the tile has a floor: every tile on level 0, and those with an underlay or overlay above it.
-    // The webclient draws none of the rest, and nobody can stand there.
+    // Every tile on level 0, and above it those with an underlay or overlay. The webclient draws none of the
+    // rest, and nobody can stand there.
     [[nodiscard]] bool HasGround(s32 level, s32 x, s32 z) const;
     [[nodiscard]] std::span<const MapLoc_s> GetLocsAt(s32 level, s32 x, s32 z) const;
     [[nodiscard]] std::span<const MapLoc_s> GetLocs() const;

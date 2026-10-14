@@ -7,8 +7,7 @@
 #include "ObjType_s.hpp"
 #include "TextPool.hpp"
 
-// Everything the client uses from the game cache. It's loaded once, and shared read-only by every
-// account in the process. It moves but doesn't copy, because the types' text points into its pool.
+// Moves but doesn't copy, because the types' text points into its pool.
 struct GameCache_s
 {
     static constexpr std::size_t CRC_COUNT = 9;
@@ -33,7 +32,6 @@ struct GameCache_s
     std::vector<ObjType_s> objs;
     // Keyed by MapSquare::GetId.
     std::unordered_map<u16, MapSquare> squares;
-    // Every interface component, by id.
     std::unordered_map<u16, IfComponent_s> components;
 
     [[nodiscard]] const LocType_s* FindLoc(s32 id) const;

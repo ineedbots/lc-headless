@@ -166,7 +166,7 @@ namespace
         return {.first = first, .last = last, .size = size};
     }
 
-    // we drop to save ram, as we do not need this info
+    // Fields the client never reads, dropped to save memory.
     constexpr auto LOC_DROPPED = std::to_array({
         Drop(LOC_HILLSKEW, NO_VALUE),
         Drop(LOC_SHARELIGHT, NO_VALUE),

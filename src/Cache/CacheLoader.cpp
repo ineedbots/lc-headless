@@ -215,7 +215,7 @@ namespace
         });
     }
 
-    // Returns how many squares were skipped because their files aren't in the store.
+    // Returns how many squares were missing from the store.
     std::size_t DecodeMaps(CacheStore& store, GameCache_s& cache)
     {
         auto skipped = std::size_t{0};

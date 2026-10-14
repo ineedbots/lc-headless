@@ -6,7 +6,6 @@ struct NpcType_s
 
     u16 id = 0;
     u8 size = 1;
-    // The level the menu shows, if any.
     std::optional<u16> combatLevel;
     std::string_view name;
     std::string_view examine;

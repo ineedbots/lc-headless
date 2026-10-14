@@ -12,7 +12,5 @@ public:
 
     CacheLoader() = delete;
 
-    // Reads and decodes the server's store in the folder, then closes it. Throws CacheError, with the
-    // folder in front of the message, when a file is missing or damaged.
     [[nodiscard]] static GameCache_s Load(const std::filesystem::path& directory, Logger& logger = *Logger::GetDefault());
 };

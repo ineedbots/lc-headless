@@ -1,16 +1,13 @@
 #pragma once
 
-// A JAG archive's entries, looked up by name. An entry is unpacked when it's read.
+// An entry is unpacked when it's read.
 class JagArchive
 {
 public:
-    // Throws CacheError when the header or the entry table doesn't fit the data.
     explicit JagArchive(std::vector<u8> data);
 
     [[nodiscard]] static s32 HashName(std::string_view name);
 
-    // The entry, unpacked, or nullopt when the archive has no entry by that name. Throws CacheError when
-    // the entry doesn't unpack to its listed size.
     [[nodiscard]] std::optional<std::vector<u8>> Read(std::string_view name) const;
 
 private:

@@ -60,7 +60,6 @@ namespace
         return const_cast<char*>(data);
     }
 
-    // libbzip2's decompression state, released on every path.
     class Bzip2Stream
     {
     public:
@@ -90,7 +89,6 @@ namespace
         bz_stream m_stream{};
     };
 
-    // zlib's decompression state, released on every path.
     class GzipStream
     {
     public:

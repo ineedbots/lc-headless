@@ -1,6 +1,6 @@
 #pragma once
 
-// The webclient's ClientCode: a component's client code, which tells the client what to do with it.
+// The webclient's ClientCode.
 enum class ClientCode_e : u16
 {
     None = 0,

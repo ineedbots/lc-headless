@@ -27,7 +27,6 @@ enum class ButtonType_e : u8
     Continue,
 };
 
-// One child of a layer, at an offset from the layer's corner.
 struct IfChild_s
 {
     u16 id = 0;
@@ -35,27 +34,24 @@ struct IfChild_s
     s16 y = 0;
 };
 
-// The fields of a component that the client finds, reads and clicks components by. The inventory fields
-// are only set for ComponentType_e::Inv.
+// The inventory fields are only set for ComponentType_e::Inv.
 struct IfComponent_s
 {
     static constexpr std::size_t OPTION_COUNT = 5;
 
     u16 id = 0;
-    // The interface the component belongs to: the layer whose id opens its run in the data, IfType's
-    // layerId. An interface's own layer is its root.
+    // IfType's layerId: the layer that opens the component's run in the data. An interface's own layer is its root.
     u16 root = 0;
-    // The layer that lists it as a child; nullopt for a root. Decode fills it in once every layer is read.
+    // Nullopt for a root. Decode fills it in once every layer is read.
     std::optional<u16> parent;
     ComponentType_e type = ComponentType_e::Layer;
     ButtonType_e buttonType = ButtonType_e::None;
     ClientCode_e clientCode = ClientCode_e::None;
     u16 width = 0;
     u16 height = 0;
-    // A layer's children in drawing order, and whether it starts hidden.
     std::vector<IfChild_s> children;
     bool hidden = false;
-    // A text component's text and a text or rect component's colour, as RGB.
+    // A text or rect component's colour is RGB.
     std::string text;
     u32 colour = 0;
     // An Ok, Toggle, Select or Continue button's option, with IfType's defaults where the data has none.
