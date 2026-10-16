@@ -284,6 +284,8 @@ Everything in `src/` except `main.cpp` builds into a static library. The client 
 | [ScriptingApi.md](docs/ScriptingApi.md) | How to write scripts: the API, hooks and tools |
 | [ScriptingDesign.md](docs/ScriptingDesign.md) | How scripting works inside: the runtime, events, the main loop and accounts |
 | [tcp-protocol-289.md](docs/tcp-protocol-289.md) | The revision-289 wire protocol: login, framing and the payload of every opcode |
+| [tcp-protocol-225.md](docs/tcp-protocol-225.md) | The revision-225 wire protocol, as its differences from 289's |
+| [RevisionDesign.md](docs/RevisionDesign.md) | Speaking more than one revision: the opcode tables, where the code branches, and adding a revision |
 | [ConfigDesign.md](docs/ConfigDesign.md) | The formats of the config and account files, with every key and rule |
 | [CacheDesign.md](docs/CacheDesign.md) | Loading the game cache, the collision map and the route search |
 | [WebSocketDesign.md](docs/WebSocketDesign.md) | The non-blocking WebSocket transport |
