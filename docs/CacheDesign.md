@@ -79,7 +79,9 @@ rs2004-headless/
 │   │   ├── CacheStore.hpp/.cpp         reads files out of main_file_cache.dat by way of the idx files
 │   │   ├── Compression.hpp/.cpp        static: headerless bzip2, gzip
 │   │   ├── JagArchive.hpp/.cpp         the named entries of a JAG archive
-│   │   ├── TypeDecoder.hpp/.cpp        static: loc, NPC, obj and varp definitions
+│   │   ├── TypeDecoder.hpp/.cpp        static: what the type decoders share, the .dat/.idx framing and field readers
+│   │   ├── LocTypeDecoder.hpp/.cpp     static: loc definitions; Npc-, Obj- and VarpTypeDecoder likewise
+│   │   ├── DroppedOpcodes_s.hpp        the opcodes a type reads and drops
 │   │   ├── MapDecoder.hpp/.cpp         static: map_index, land files, loc files
 │   │   ├── InterfaceDecoder.hpp/.cpp   static: the interface archive's components
 │   │   ├── ClientCode_e.hpp            the webclient's ClientCode
@@ -434,31 +436,25 @@ An obj with a `certtemplate` is a banknote. Once every obj is decoded, each note
 
 A `certlink` that isn't an obj throws. The 289 cache has 1,333 notes; 1512 is the note of 1511, "Logs".
 
-### TypeDecoder
+### The type decoders
+
+Each type has a decoder of its own, which takes the type's .dat and .idx entries from the config archive, interns the text into the pool, and returns the types in id order:
 
 ```cpp
-#pragma once
-
-#include "LocType_s.hpp"
-#include "NpcType_s.hpp"
-#include "ObjType_s.hpp"
-#include "TextPool.hpp"
-
-class TypeDecoder
+class LocTypeDecoder
 {
 public:
-    TypeDecoder() = delete;
+    LocTypeDecoder() = delete;
 
-    // Each takes a type's .dat and .idx entries from the config archive, interns the text into the
-    // pool, and returns the types in id order.
-    [[nodiscard]] static std::vector<LocType_s> DecodeLocs(std::span<const u8> dat, std::span<const u8> idx, TextPool& text);
-    [[nodiscard]] static std::vector<NpcType_s> DecodeNpcs(std::span<const u8> dat, std::span<const u8> idx, TextPool& text);
-    [[nodiscard]] static std::vector<ObjType_s> DecodeObjs(std::span<const u8> dat, std::span<const u8> idx, TextPool& text);
+    [[nodiscard]] static std::vector<LocType_s> Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text);
 };
 ```
 
-- Reading goes through `Packet`. Its reads throw `std::out_of_range` at the end of the data, and the decoders turn that into a `CacheError` naming the type and id.
-- The opcode loops are functions in the anonymous namespace, one per type, with a shared helper for the option strings.
+`NpcTypeDecoder`, `ObjTypeDecoder` and `VarpTypeDecoder` are the same, except that `VarpTypeDecoder::Decode` takes no pool, since a varp keeps no text.
+
+- Each decoder's .cpp holds its type's opcodes, the table of opcodes it reads and drops (`DroppedOpcodes_s`), and its opcode loop.
+- `TypeDecoder` holds what they share: `DecodeAll`, which walks the .idx sizes and checks each definition ends where its size says; the opcodes every type uses (end, name, examine, recolour); and the readers for strings, options and dropped values.
+- Reading goes through `Packet`. Its reads throw `std::out_of_range` at the end of the data, and `DecodeAll` turns that into a `CacheError` naming the type and id.
 
 ### Components and the run varp
 
@@ -492,7 +488,7 @@ In the 289 content each rule matches only the component it's for. A missing matc
 
 #### varp.dat
 
-`config` also holds `varp.dat` and `varp.idx`, in the format of the other types (Index and data files, above). `TypeDecoder::DecodeVarps` keeps each varp's client code (opcode 5, a `u16`) in a `VarpType_s`, and reads and drops the webclient's other opcodes: 1 and 2 (a byte), 7 and 12 (4 bytes), 10 (a string) and 3, 4, 6, 8, 11 and 13 (nothing). Any other opcode throws, as for the other types: `varp 1: unknown opcode 9`.
+`config` also holds `varp.dat` and `varp.idx`, in the format of the other types (Index and data files, above). `VarpTypeDecoder` keeps each varp's client code (opcode 5, a `u16`) in a `VarpType_s`, and reads and drops the webclient's other opcodes: 1 and 2 (a byte), 7 and 12 (4 bytes), 10 (a string) and 3, 4, 6, 8, 11 and 13 (nothing). Any other opcode throws, as for the other types: `varp 1: unknown opcode 9`.
 
 #### The interface archive
 

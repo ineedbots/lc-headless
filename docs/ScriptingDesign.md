@@ -226,11 +226,11 @@ std::deque<GameEvent_s> events;
 | `GroundItemAdded_s` / `GroundItemRemoved_s` (with the `GroundItem_s`) | `ZoneDecoder` (`OBJ_ADD`, `OBJ_REVEAL` / `OBJ_DEL`) | `on_ground_item_spawned(item)` / `on_ground_item_despawned(item)` |
 | `GroundItemCountChanged_s` (the item, previous count) | `ZoneDecoder` (`OBJ_COUNT`) | `on_ground_item_changed(item, previous_count)` |
 | `LocChanged_s` (the `LocChange_s`) | `ZoneDecoder` (`LOC_ADD_CHANGE`, `LOC_DEL`) | `on_loc_changed(loc)` |
-| `InventoryChanged_s` (com) | `ServerPacketDecoder` (`UPDATE_INV_FULL`, `_PARTIAL`, `_STOP_TRANSMIT`) | `on_inventory_changed(com)` |
-| `StatChanged_s` (stat, previous and current `Stat_s`) | `ServerPacketDecoder` | `on_stat_changed(stat)` |
-| `VarpChanged_s` (varp, previous, value) | `ServerPacketDecoder` | `on_varp_changed(varp, value)` |
-| `ModalChanged_s` (main, side and chat modal after the change) | `ServerPacketDecoder` (`IF_OPEN*`, `IF_CLOSE`, `P_COUNTDIALOG`) | `on_interface_changed()` |
-| `RebootStarted_s` (ticks) | `ServerPacketDecoder` | `on_system_update(seconds)` |
+| `InventoryChanged_s` (com) | `InventoryDecoder` (`UPDATE_INV_FULL`, `_PARTIAL`, `_STOP_TRANSMIT`) | `on_inventory_changed(com)` |
+| `StatChanged_s` (stat, previous and current `Stat_s`) | `PlayerStateDecoder` | `on_stat_changed(stat)` |
+| `VarpChanged_s` (varp, previous, value) | `PlayerStateDecoder` | `on_varp_changed(varp, value)` |
+| `ModalChanged_s` (main, side and chat modal after the change) | `InterfacePacketDecoder` (`IF_OPEN*`, `IF_CLOSE`, `P_COUNTDIALOG`) | `on_interface_changed()` |
+| `RebootStarted_s` (ticks) | `PlayerStateDecoder` | `on_system_update(seconds)` |
 | messages (existing log) | existing | `on_server_message(msg)`, `on_chat_message(msg, sender)`, `on_private_message(msg, sender)`, `on_trade_request(name)`, `on_duel_request(name)` |
 
 Rules:

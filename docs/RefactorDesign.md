@@ -757,7 +757,7 @@ Whichever lands first, the other's plan gets these paths before its work starts.
 
 ## 14. As built
 
-Phases 1 to 9 and 11 are done. Phase 10 is not started. Where the code differs from the plan above:
+Every phase is done. Where the code differs from the plan above:
 
 | Plan | As built |
 |---|---|
@@ -767,4 +767,7 @@ Phases 1 to 9 and 11 are done. Phase 10 is not started. Where the code differs f
 | §9.3: the argument helpers | `ToRoot` is in `PyArgs`, since both `InterfaceBindings` and `ActionBindings` use it |
 | §8.1: constants | Three more: `Tile_s::MAX_COORD` with `Tile_s::IsInRect`, `MapSquare::MAX_SQUARE`, and the name and id lookups on `GameCache_s` (`FindLocName`, `FindLocIds` and the NPC and object ones) that several bindings had written out |
 | §2's test helpers | `tests/Support/Game/QueryWorld` builds the state the `Game/Query` tests search, and `tests/Support/Script/HostFixture` is shared by the host, progress and account tests |
+| §12, phase 10: `RetrySchedule` | It lives in `Game/Net/`, and counts the attempts and holds when the next is due as well as working out the delay. `GameClient` keeps the log lines and decides when a failure ends the login or the reconnect |
+| §12, phase 10: `ServerPacketDecoder` | The switch still lists every opcode, so GCC and Clang warn about one with no decoder, and hands each group to `InterfacePacketDecoder`, `InventoryDecoder`, `PlayerStateDecoder`, `SocialDecoder` (which remembers the private message ids) or `SceneDecoder` (rebuild, camera and sound). `PacketFields` reads the id and base-37 name fields that these and `EntityInfo` share |
+| §12, phase 10: `TypeDecoder` | `LocTypeDecoder`, `NpcTypeDecoder`, `ObjTypeDecoder` and `VarpTypeDecoder`, with `TypeDecoder` keeping the shared framing and readers and `DroppedOpcodes_s` in a header of its own. The tests stay in `TypeDecoderTests.cpp`, which shares its definition builders across the types |
 | §12: docs in the phase that moves a file | Every doc was updated in phase 11. The plans not yet built, [RevisionDesign.md](RevisionDesign.md) and [ProxyDesign.md](ProxyDesign.md), now use §13's paths. The other designs' change records keep the names they had at the time, under a note that points here |
