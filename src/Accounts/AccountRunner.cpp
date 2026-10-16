@@ -2,7 +2,8 @@
 #include "AccountRunner.hpp"
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Config/ConfigFile.hpp"
+#include "../Config/AccountConfig_s.hpp"
+#include "../Config/Config_s.hpp"
 #include "../Console/ConsoleCommandParser.hpp"
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/ConsoleInput.hpp"

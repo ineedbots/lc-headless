@@ -10,7 +10,7 @@
 
 #include "Accounts/ProgressReport_s.hpp"
 #include "Cache/GameCache_s.hpp"
-#include "Config/ConfigFile.hpp"
+#include "Config/Config_s.hpp"
 #include "Console/ConsoleCommand_s.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"

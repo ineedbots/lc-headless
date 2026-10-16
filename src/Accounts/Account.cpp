@@ -2,7 +2,10 @@
 #include "Account.hpp"
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Config/ConfigFile.hpp"
+#include "../Config/AccountConfig_s.hpp"
+#include "../Config/AccountFile.hpp"
+#include "../Config/ConfigOverrides.hpp"
+#include "../Config/Config_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
@@ -51,18 +54,6 @@ namespace
         return text.empty() ? "none" : text;
     }
 
-    std::shared_ptr<const Config_s> WithServer(std::shared_ptr<const Config_s> config, const std::optional<ServerSettings_s>& server)
-    {
-        if (!server)
-        {
-            return config;
-        }
-
-        auto own = *config;
-        own.server = *server;
-        return std::make_shared<const Config_s>(std::move(own));
-    }
-
     void LogSummary(Logger& logger, const GameState_s& state)
     {
         const auto& tile = state.localPlayer.tile;
@@ -79,7 +70,7 @@ namespace
 }
 
 Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger)
-    : m_config{WithServer(std::move(config), account.server)}
+    : m_config{ConfigOverrides::ForAccount(std::move(config), account)}
     , m_account{std::move(account)}
     , m_logger{Logger::CreateNamed(std::move(logger), m_account.name)}
     , m_options{options}
@@ -540,7 +531,7 @@ void Account::AddSettingDefaults(std::string_view botName, std::string_view sett
 
     try
     {
-        const auto added = ConfigFile::AddScriptSettings(m_account.file, botName, settingsJson);
+        const auto added = AccountFile::AddScriptSettings(m_account.file, botName, settingsJson);
         if (added.empty())
         {
             return;

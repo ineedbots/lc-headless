@@ -1,7 +1,8 @@
 #include "pch.hpp"
 
 #include "Cache/GameCache_s.hpp"
-#include "Config/ConfigFile.hpp"
+#include "Config/AccountConfig_s.hpp"
+#include "Config/Config_s.hpp"
 #include "Game/Error/ProtocolError.hpp"
 #include "Game/Net/ClientPacketWriter.hpp"
 #include "Game/Net/Error/LoginError.hpp"

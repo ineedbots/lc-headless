@@ -5,7 +5,11 @@
 #include "../Accounts/AccountRunner.hpp"
 #include "../Cache/CacheLoader.hpp"
 #include "../Cache/GameCache_s.hpp"
+#include "../Config/AccountConfig_s.hpp"
+#include "../Config/AccountDirectory.hpp"
+#include "../Config/AccountFile.hpp"
 #include "../Config/ConfigFile.hpp"
+#include "../Config/Config_s.hpp"
 #include "../Config/Error/ConfigError.hpp"
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/ConsoleLogScope.hpp"
@@ -13,7 +17,6 @@
 #include "../Console/LogSinks.hpp"
 #include "../Console/Logger.hpp"
 #include "../Script/ScriptRuntime.hpp"
-#include "../Utils/StringUtils.hpp"
 
 namespace
 {
@@ -24,41 +27,6 @@ namespace
         if (signalNum == SIGINT)
         {
             ++interruptCount;
-        }
-    }
-
-    std::vector<std::filesystem::path> FindAccountFiles(const std::filesystem::path& directory)
-    {
-        if (!std::filesystem::is_directory(directory))
-        {
-            throw ConfigError{std::format("{}: no accounts folder; add one file per account (see accounts/example.jsonc.sample), or pass {} <file>", directory.string(), Application::ACCOUNT_OPTION)};
-        }
-
-        auto files = std::vector<std::filesystem::path>{};
-        for (const auto& entry : std::filesystem::directory_iterator{directory})
-        {
-            if (entry.is_regular_file() && entry.path().extension() == ConfigFile::ACCOUNT_EXTENSION)
-            {
-                files.push_back(entry.path());
-            }
-        }
-
-        std::ranges::sort(files);
-        return files;
-    }
-
-    // The server lets a username log in once, so a second file for the same one would only be kicked.
-    void CheckUsernamesAreUnique(const std::vector<AccountConfig_s>& accounts)
-    {
-        for (auto i = std::size_t{0}; i < accounts.size(); ++i)
-        {
-            for (auto j = i + 1; j < accounts.size(); ++j)
-            {
-                if (StringUtils::EqualsIgnoringCase(accounts[i].credentials.username, accounts[j].credentials.username))
-                {
-                    throw ConfigError{std::format("Accounts {} and {} have the same username", accounts[i].name, accounts[j].name)};
-                }
-            }
         }
     }
 }
@@ -190,7 +158,7 @@ std::vector<AccountConfig_s> Application::LoadAccounts() const
     if (m_commandLine.accountPath)
     {
         auto accounts = std::vector<AccountConfig_s>{};
-        accounts.push_back(ConfigFile::LoadAccount(*m_commandLine.accountPath));
+        accounts.push_back(AccountFile::Load(*m_commandLine.accountPath));
         if (m_commandLine.debugger && !accounts.front().script)
         {
             throw ConfigError{std::format("{}: {} needs an account with a script", m_commandLine.accountPath->string(), DEBUGGER_OPTION)};
@@ -200,21 +168,10 @@ std::vector<AccountConfig_s> Application::LoadAccounts() const
     }
 
     const auto directory = std::filesystem::path{m_config->scripting.accountsDirectory};
-    auto enabled = std::vector<AccountConfig_s>{};
-    for (const auto& file : FindAccountFiles(directory))
+    if (!std::filesystem::is_directory(directory))
     {
-        auto account = ConfigFile::LoadAccount(file);
-        if (account.enabled)
-        {
-            enabled.push_back(std::move(account));
-        }
+        throw ConfigError{std::format("{}: no accounts folder; add one file per account (see accounts/example.jsonc.sample), or pass {} <file>", directory.string(), ACCOUNT_OPTION)};
     }
 
-    if (enabled.empty())
-    {
-        throw ConfigError{std::format("{}: no enabled account files", directory.string())};
-    }
-
-    CheckUsernamesAreUnique(enabled);
-    return enabled;
+    return AccountDirectory::LoadEnabled(directory);
 }

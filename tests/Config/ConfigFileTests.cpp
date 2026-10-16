@@ -3,7 +3,9 @@
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
 
+#include "Config/AccountFile.hpp"
 #include "Config/ConfigFile.hpp"
+#include "Config/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
@@ -94,27 +96,9 @@ namespace
     }
 })json"sv;
 
-    constexpr auto ACCOUNT_EXAMPLE = R"json({
-    // The account and what it runs.
-    "username": "bot1",
-    "password": "s3cret-pw",
-    "enabled": false,
-    "idleSeconds": 60,
-    "randomEvents": false,
-    "stallMinutes": 30,
-    "runAuto": false,
-    "runEnergyMin": 50,
-    "script": {
-        "file": "examples/chicken_killer.py",
-        "progressReportMinutes": 20,
-        "settings": {"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens"}
-    }
-})json"sv;
-
     constexpr auto EXAMPLE_MODULUS = "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d";
     constexpr auto EXAMPLE_EXPONENT = "0x81f390b2cf8ca7039ee507975951d5a0b15a87bf8b3f99c966834118c50fd94d";
     constexpr auto SECRET_PASSWORD = "s3cret-pw";
-    constexpr auto UTF8_E_ACUTE = "\xC3\xA9";
     constexpr auto BOM = "\xEF\xBB\xBF"sv;
 
     struct KeyPath_s
@@ -309,45 +293,10 @@ namespace
         CheckScriptingDefaults(config.scripting);
     }
 
-    std::string EditAccount(const std::function<void(nlohmann::json&)>& edit)
-    {
-        auto json = ParseJsonWithComments(ACCOUNT_EXAMPLE);
-        edit(json);
-        return json.dump();
-    }
-
-    std::string SetAccountKey(const std::string& key, nlohmann::json value)
-    {
-        return EditAccount([&](nlohmann::json& json)
-        {
-            json[key] = std::move(value);
-        });
-    }
-
-    std::string SetScriptKey(const std::string& key, nlohmann::json value)
-    {
-        return EditAccount([&](nlohmann::json& json)
-        {
-            json["script"][key] = std::move(value);
-        });
-    }
-
-    void CheckAccountRejected(std::string_view text, const std::string& path)
-    {
-        CHECK_THROWS_AS(ConfigFile::ParseAccount(text, "bot1"), ConfigError);
-        CHECK_THROWS_WITH(ConfigFile::ParseAccount(text, "bot1"), Catch::Matchers::ContainsSubstring(path) && !Catch::Matchers::ContainsSubstring(SECRET_PASSWORD));
-    }
-
     void WriteFile(const std::filesystem::path& path, std::string_view text)
     {
         auto file = std::ofstream{path, std::ios::binary};
         file << text;
-    }
-
-    std::string ReadFile(const std::filesystem::path& path)
-    {
-        auto file = std::ifstream{path, std::ios::binary};
-        return std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
     }
 }
 
@@ -767,244 +716,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
     {
         CAPTURE(rejection.key.GetPath(), rejection.value.dump());
         CheckRejected(SetKey(rejection.key, rejection.value), rejection.key.GetPath());
-    }
-}
-
-TEST_CASE("ConfigFile parses an account file", "[ConfigFile][AccountFile]")
-{
-    const auto account = ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1");
-    CHECK(account.name == "bot1");
-    CHECK(account.credentials.username == "bot1");
-    CHECK(account.credentials.password == SECRET_PASSWORD);
-    CHECK_FALSE(account.enabled);
-    CHECK(account.idleSeconds == 60s);
-    CHECK_FALSE(account.randomEvents);
-    CHECK(account.stallMinutes == std::chrono::minutes{30});
-    CHECK_FALSE(account.runAuto);
-    CHECK(account.runEnergyMin == 50);
-    REQUIRE(account.script.has_value());
-    CHECK(account.script->file == "examples/chicken_killer.py");
-    CHECK(account.script->progressReportMinutes == std::chrono::minutes{20});
-    CHECK(nlohmann::json::parse(account.script->settings) == nlohmann::json::parse(R"json({"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens"})json"));
-
-    SECTION("only the credentials are required")
-    {
-        const auto minimal = ConfigFile::ParseAccount(R"json({"username": "bot2", "password": "pw"})json", "bot2");
-        CHECK(minimal.enabled);
-        CHECK(minimal.idleSeconds == 0s);
-        CHECK(minimal.randomEvents);
-        CHECK(minimal.stallMinutes == std::chrono::minutes{10});
-        CHECK(minimal.runAuto);
-        CHECK(minimal.runEnergyMin == 20);
-        CHECK_FALSE(minimal.script.has_value());
-    }
-
-    SECTION("idle time and upkeep at their limits")
-    {
-        CHECK(ConfigFile::ParseAccount(SetAccountKey("idleSeconds", 0), "bot1").idleSeconds == 0s);
-        CHECK(ConfigFile::ParseAccount(SetAccountKey("idleSeconds", 86400), "bot1").idleSeconds == 86400s);
-        CHECK(ConfigFile::ParseAccount(SetAccountKey("stallMinutes", 0), "bot1").stallMinutes == std::chrono::minutes{0});
-        CHECK(ConfigFile::ParseAccount(SetAccountKey("stallMinutes", 1440), "bot1").stallMinutes == std::chrono::minutes{1440});
-        CHECK(ConfigFile::ParseAccount(SetAccountKey("runEnergyMin", 0), "bot1").runEnergyMin == 0);
-        CHECK(ConfigFile::ParseAccount(SetAccountKey("runEnergyMin", 100), "bot1").runEnergyMin == 100);
-    }
-
-    SECTION("a null script means no script")
-    {
-        CHECK_FALSE(ConfigFile::ParseAccount(SetAccountKey("script", nullptr), "bot1").script.has_value());
-    }
-
-    SECTION("a script without settings gets an empty object")
-    {
-        const auto text = EditAccount([](nlohmann::json& json)
-        {
-            json["script"].erase("settings");
-        });
-        CHECK(ConfigFile::ParseAccount(text, "bot1").script->settings == "{}");
-    }
-
-    SECTION("progress reports are off unless asked for, and allowed up to a day apart")
-    {
-        const auto text = EditAccount([](nlohmann::json& json)
-        {
-            json["script"].erase("progressReportMinutes");
-        });
-        CHECK(ConfigFile::ParseAccount(text, "bot1").script->progressReportMinutes == std::chrono::minutes{0});
-        CHECK(ConfigFile::ParseAccount(SetScriptKey("progressReportMinutes", 1), "bot1").script->progressReportMinutes == std::chrono::minutes{1});
-        CHECK(ConfigFile::ParseAccount(SetScriptKey("progressReportMinutes", 1440), "bot1").script->progressReportMinutes == std::chrono::minutes{1440});
-    }
-
-    SECTION("usernames and passwords at their limits")
-    {
-        for (const auto& username : {std::string{"a"}, std::string(12, 'a'), std::string{"a b"}})
-        {
-            CHECK(ConfigFile::ParseAccount(SetAccountKey("username", username), "bot1").credentials.username == username);
-        }
-
-        for (const auto& password : {std::string{"a"}, std::string(20, 'a')})
-        {
-            CHECK(ConfigFile::ParseAccount(SetAccountKey("password", password), "bot1").credentials.password == password);
-        }
-    }
-}
-
-TEST_CASE("ConfigFile reads an account's own server", "[ConfigFile][AccountFile]")
-{
-    CHECK_FALSE(ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1").server.has_value());
-
-    const auto account = ConfigFile::ParseAccount(SetAccountKey("server", {{"url", "wss://w2.example.com:443"}, {"origin", "https://w2.example.com"}}), "bot1");
-    REQUIRE(account.server.has_value());
-    CHECK(account.server->url == "wss://w2.example.com:443");
-    CHECK(account.server->origin == "https://w2.example.com");
-    CHECK(account.server->tlsCaFile == "SYSTEM");
-
-    CheckAccountRejected(SetAccountKey("server", {{"url", "http://w2.example.com"}}), "server.url");
-    CheckAccountRejected(SetAccountKey("server", nlohmann::json::object()), "server.url");
-    CheckAccountRejected(SetAccountKey("server", "ws://w2.example.com"), "server");
-}
-
-TEST_CASE("ConfigFile rejects invalid account files", "[ConfigFile][AccountFile]")
-{
-    const auto rejections = std::vector<std::pair<std::string, nlohmann::json>>{
-        {"username", ""},
-        {"username", std::string(13, 'a')},
-        {"username", "tab\there"},
-        {"username", UTF8_E_ACUTE},
-        {"username", 5},
-        {"password", ""},
-        {"password", std::string(21, 'a')},
-        {"password", std::string{"nul\0x", 5}},
-        {"password", UTF8_E_ACUTE},
-        {"password", 5},
-        {"enabled", "yes"},
-        {"idleSeconds", -1},
-        {"idleSeconds", 86401},
-        {"idleSeconds", "5"},
-        {"randomEvents", "yes"},
-        {"stallMinutes", -1},
-        {"stallMinutes", 1441},
-        {"runAuto", 1},
-        {"runEnergyMin", -1},
-        {"runEnergyMin", 101},
-        {"script", "examples/chicken_killer.py"},
-    };
-
-    for (const auto& [key, value] : rejections)
-    {
-        CAPTURE(key, value.dump());
-        CheckAccountRejected(SetAccountKey(key, value), key);
-    }
-
-    CheckAccountRejected(SetScriptKey("file", ""), "script.file");
-    CheckAccountRejected(SetScriptKey("file", 5), "script.file");
-    CheckAccountRejected(SetScriptKey("settings", nlohmann::json::array({41})), "script.settings");
-    CheckAccountRejected(SetScriptKey("progressReportMinutes", -1), "script.progressReportMinutes");
-    CheckAccountRejected(SetScriptKey("progressReportMinutes", 1441), "script.progressReportMinutes");
-    CheckAccountRejected(SetScriptKey("progressReportMinutes", "20"), "script.progressReportMinutes");
-    // clang-format off
-    CheckAccountRejected(EditAccount([](nlohmann::json& json)
-    {
-        json["script"].erase("file");
-    }), "script.file");
-    CheckAccountRejected(EditAccount([](nlohmann::json& json)
-    {
-        json.erase("password");
-    }), "password");
-    // clang-format on
-    CHECK_THROWS_AS(ConfigFile::ParseAccount("[]", "bot1"), ConfigError);
-}
-
-TEST_CASE("ConfigFile messages never contain credentials", "[ConfigFile][AccountFile]")
-{
-    SECTION("rejected usernames and passwords aren't quoted")
-    {
-        for (const auto* const key : {"username", "password"})
-        {
-            for (const auto& value : {std::string(21, 'q'), std::string{"tab\there"}, std::string{UTF8_E_ACUTE}, std::string{"nul\0x", 5}})
-            {
-                CHECK_THROWS_WITH(ConfigFile::ParseAccount(SetAccountKey(key, value), "bot1"), !Catch::Matchers::ContainsSubstring(value));
-            }
-        }
-    }
-
-    SECTION("a syntax error inside the password doesn't quote it")
-    {
-        for (const auto* const text : {R"json({"username": "bot1", "password": "hunter\q2"})json", R"json({"username": "bot1", "password": "hunter2)json"})
-        {
-            CAPTURE(text);
-            CHECK_THROWS_AS(ConfigFile::ParseAccount(text, "bot1"), ConfigError);
-            CHECK_THROWS_WITH(ConfigFile::ParseAccount(text, "bot1"), !Catch::Matchers::ContainsSubstring("hunter"));
-        }
-    }
-}
-
-TEST_CASE("ConfigFile::LoadAccount", "[ConfigFile][AccountFile]")
-{
-    const auto folder = TempFolder{"rs2004-config-tests"};
-    const auto path = folder.GetPath() / "bot1.jsonc";
-
-    SECTION("names the account after the file")
-    {
-        WriteFile(path, ACCOUNT_EXAMPLE);
-
-        const auto account = ConfigFile::LoadAccount(path);
-        CHECK(account.name == "bot1");
-        CHECK(account.file == path);
-        CHECK(account.credentials.username == "bot1");
-        CHECK(ConfigFile::ParseAccount(ACCOUNT_EXAMPLE, "bot1").file.empty());
-    }
-
-    SECTION("puts the file's path in front of the message")
-    {
-        WriteFile(path, SetAccountKey("username", ""));
-        CHECK_THROWS_WITH(ConfigFile::LoadAccount(path), Catch::Matchers::StartsWith(path.string() + ": ") && Catch::Matchers::ContainsSubstring("username"));
-    }
-
-    SECTION("a missing file is an error, and no sample is written")
-    {
-        CHECK_THROWS_WITH(ConfigFile::LoadAccount(path), Catch::Matchers::ContainsSubstring(path.string()) && Catch::Matchers::ContainsSubstring("not found"));
-        CHECK_FALSE(std::filesystem::exists(path));
-    }
-}
-
-TEST_CASE("ConfigFile::AddScriptSettings", "[ConfigFile][AccountFile]")
-{
-    const auto folder = TempFolder{"rs2004-config-tests"};
-    const auto path = folder.GetPath() / "bot1.jsonc";
-    const auto defaults = R"json({"npcs": ["Chicken"], "loot_goal": 3})json"sv;
-
-    SECTION("adds a bot's settings under its name, and only the ones missing")
-    {
-        WriteFile(path, ACCOUNT_EXAMPLE);
-        CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", defaults) == std::vector<std::string>{"npcs", "loot_goal"});
-
-        const auto text = ReadFile(path);
-        CHECK(text.starts_with("{\n    // The account and what it runs.\n"));
-        CHECK(text.find(R"json("settings": {"npc_ids": [41], "loot": true, "area": {"x": 3230, "z": 3298}, "name": "chickens", "Chicken killer": {"npcs": ["Chicken"], "loot_goal": 3}})json") != std::string::npos);
-        CHECK(nlohmann::json::parse(ConfigFile::ParseAccount(text, "bot1").script->settings)["Chicken killer"] == nlohmann::json::parse(defaults));
-        CHECK_FALSE(std::filesystem::exists(folder.GetPath() / "bot1.jsonc.tmp"));
-
-        CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", R"json({"npcs": ["Cow"], "radius": 8})json") == std::vector<std::string>{"radius"});
-        CHECK(ReadFile(path).find(R"json("Chicken killer": {"npcs": ["Chicken"], "loot_goal": 3, "radius": 8})json") != std::string::npos);
-    }
-
-    SECTION("leaves a file that has them all untouched")
-    {
-        WriteFile(path, ACCOUNT_EXAMPLE);
-
-        const auto before = std::filesystem::last_write_time(path);
-        CHECK(ConfigFile::AddScriptSettings(path, "Chicken killer", "{}").empty());
-        CHECK(ReadFile(path) == ACCOUNT_EXAMPLE);
-        CHECK(std::filesystem::last_write_time(path) == before);
-    }
-
-    SECTION("puts the file's path in front of the message")
-    {
-        WriteFile(path, "{\"script\": {\"settings\": {\"Chicken killer\": []}}}");
-        CHECK_THROWS_WITH(ConfigFile::AddScriptSettings(path, "Chicken killer", defaults), path.string() + ": script.settings.Chicken killer: must be an object");
-
-        WriteFile(path, "{\"script\": ");
-        CHECK_THROWS_WITH(ConfigFile::AddScriptSettings(path, "Chicken killer", defaults), Catch::Matchers::StartsWith(path.string() + ": invalid JSON at line 1"));
     }
 }
 

@@ -3,6 +3,8 @@
 
 #include "../Utils/StringUtils.hpp"
 #include "Error/ConfigError.hpp"
+#include "JsoncScanner.hpp"
+#include "JsoncValue_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -10,27 +12,9 @@ namespace
 {
     using Json = nlohmann::ordered_json;
 
-    constexpr auto UTF8_BOM = "\xEF\xBB\xBF"sv;
     constexpr auto CRLF = "\r\n"sv;
     constexpr auto LF = "\n"sv;
     constexpr auto DEFAULT_INDENT = "    "sv;
-
-    struct Member_s;
-
-    struct Value_s
-    {
-        std::size_t begin = 0;
-        std::size_t end = 0;
-        bool isObject = false;
-        std::vector<Member_s> members;
-    };
-
-    struct Member_s
-    {
-        std::string key;
-        std::size_t keyBegin = 0;
-        Value_s value;
-    };
 
     struct Layout_s
     {
@@ -45,195 +29,10 @@ namespace
         std::string text;
     };
 
-    bool IsSpace(char character)
-    {
-        return character == ' ' || character == '\t' || character == '\r' || character == '\n';
-    }
-
-    bool IsLiteral(char character)
-    {
-        return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '-' || character == '+' || character == '.';
-    }
-
     bool IsScalar(const Json& value)
     {
         return !value.is_object() && !value.is_array();
     }
-
-    // Anything it doesn't expect is an error, so a bad edit is never made.
-    class Scanner
-    {
-    public:
-        explicit Scanner(std::string_view text)
-            : m_text{text}
-            , m_pos{text.starts_with(UTF8_BOM) ? UTF8_BOM.size() : 0}
-        {
-        }
-
-        Value_s ScanDocument()
-        {
-            SkipSpace();
-
-            auto value = ScanValue();
-            SkipSpace();
-            Expect(m_pos == m_text.size());
-            return value;
-        }
-
-    private:
-        static void Expect(bool valid)
-        {
-            if (!valid)
-            {
-                throw ConfigError{"invalid JSON"};
-            }
-        }
-
-        [[nodiscard]] char Peek() const
-        {
-            Expect(m_pos < m_text.size());
-            return m_text[m_pos];
-        }
-
-        void SkipSpace()
-        {
-            while (m_pos < m_text.size())
-            {
-                const auto rest = m_text.substr(m_pos);
-                if (rest.starts_with("//"))
-                {
-                    m_pos = std::min(m_text.find('\n', m_pos), m_text.size());
-                }
-                else if (rest.starts_with("/*"))
-                {
-                    const auto close = m_text.find("*/", m_pos + 2);
-                    Expect(close != std::string_view::npos);
-                    m_pos = close + 2;
-                }
-                else if (IsSpace(m_text[m_pos]))
-                {
-                    ++m_pos;
-                }
-                else
-                {
-                    return;
-                }
-            }
-        }
-
-        Value_s ScanValue()
-        {
-            const auto begin = m_pos;
-
-            switch (Peek())
-            {
-            case '{':
-                return ScanObject();
-            case '[':
-                ScanArray();
-                break;
-            case '"':
-                ScanString();
-                break;
-            default:
-                ScanLiteral();
-                break;
-            }
-
-            return Value_s{.begin = begin, .end = m_pos};
-        }
-
-        Value_s ScanObject()
-        {
-            auto object = Value_s{.begin = m_pos, .isObject = true};
-            ++m_pos;
-            SkipSpace();
-
-            if (Peek() != '}')
-            {
-                while (true)
-                {
-                    auto member = Member_s{.keyBegin = m_pos};
-                    Expect(Peek() == '"');
-                    ScanString();
-                    member.key = Json::parse(std::string{m_text.substr(member.keyBegin, m_pos - member.keyBegin)}).get<std::string>();
-                    SkipSpace();
-                    Expect(Peek() == ':');
-                    ++m_pos;
-                    SkipSpace();
-                    member.value = ScanValue();
-                    object.members.push_back(std::move(member));
-                    SkipSpace();
-
-                    if (Peek() != ',')
-                    {
-                        break;
-                    }
-
-                    ++m_pos;
-                    SkipSpace();
-                }
-            }
-
-            Expect(Peek() == '}');
-            ++m_pos;
-            object.end = m_pos;
-            return object;
-        }
-
-        void ScanArray()
-        {
-            ++m_pos;
-            SkipSpace();
-
-            if (Peek() != ']')
-            {
-                while (true)
-                {
-                    static_cast<void>(ScanValue());
-                    SkipSpace();
-
-                    if (Peek() != ',')
-                    {
-                        break;
-                    }
-
-                    ++m_pos;
-                    SkipSpace();
-                }
-            }
-
-            Expect(Peek() == ']');
-            ++m_pos;
-        }
-
-        void ScanString()
-        {
-            ++m_pos;
-
-            while (Peek() != '"')
-            {
-                m_pos += Peek() == '\\' ? std::size_t{2} : std::size_t{1};
-            }
-
-            ++m_pos;
-        }
-
-        void ScanLiteral()
-        {
-            const auto begin = m_pos;
-
-            while (m_pos < m_text.size() && IsLiteral(m_text[m_pos]))
-            {
-                ++m_pos;
-            }
-
-            Expect(m_pos > begin);
-        }
-
-        std::string_view m_text;
-        std::size_t m_pos;
-    };
 
     std::size_t GetLineStart(std::string_view text, std::size_t pos)
     {
@@ -292,7 +91,7 @@ namespace
         return pos;
     }
 
-    Layout_s DetectLayout(std::string_view text, const Value_s& root)
+    Layout_s DetectLayout(std::string_view text, const JsoncValue_s& root)
     {
         auto layout = Layout_s{.eol = text.find(CRLF) == std::string_view::npos ? LF : CRLF, .indentUnit = DEFAULT_INDENT};
         const auto rootIndent = GetIndent(text, root.begin);
@@ -386,7 +185,7 @@ namespace
         return text;
     }
 
-    Replacement_s AddMembers(std::string_view text, const Value_s& object, const Json& members, const Layout_s& layout)
+    Replacement_s AddMembers(std::string_view text, const JsoncValue_s& object, const Json& members, const Layout_s& layout)
     {
         const auto close = object.end - 1;
         const auto objectIndent = std::string{GetIndent(text, object.begin)};
@@ -405,7 +204,7 @@ namespace
 
             const auto lines = eol + FormatMemberLines(members, objectIndent + unit, layout) + eol + objectIndent;
             const auto inside = text.substr(object.begin + 1, close - object.begin - 1);
-            if (std::ranges::all_of(inside, IsSpace))
+            if (std::ranges::all_of(inside, JsoncScanner::IsSpace))
             {
                 return {.offset = object.begin + 1, .length = inside.size(), .text = lines};
             }
@@ -414,6 +213,7 @@ namespace
         }
 
         const auto& last = object.members.back();
+        const auto& lastValue = object.values.back();
         if (oneLine)
         {
             auto added = std::string{};
@@ -422,13 +222,13 @@ namespace
                 added += ", " + Quote(key) + ": " + FormatInline(value);
             }
 
-            return {.offset = last.value.end, .text = added};
+            return {.offset = lastValue.end, .text = added};
         }
 
         // The comma goes after the last member's value, and the new members after any comment on its line.
         const auto indent = StartsLine(text, last.keyBegin) ? std::string{GetIndent(text, last.keyBegin)} : objectIndent + unit;
-        const auto lineEnd = SkipToLineEnd(text, last.value.end);
-        auto between = text.substr(last.value.end, lineEnd - last.value.end);
+        const auto lineEnd = SkipToLineEnd(text, lastValue.end);
+        auto between = text.substr(lastValue.end, lineEnd - lastValue.end);
         between = between.substr(0, between.find_last_not_of(" \t") + 1);
 
         auto replacement = "," + std::string{between} + eol + FormatMemberLines(members, indent, layout);
@@ -437,17 +237,17 @@ namespace
             replacement += eol + objectIndent;
         }
 
-        return {.offset = last.value.end, .length = lineEnd - last.value.end, .text = std::move(replacement)};
+        return {.offset = lastValue.end, .length = lineEnd - lastValue.end, .text = std::move(replacement)};
     }
 
     // The last, as a JSON parser keeps the last of a repeated key.
-    const Member_s* FindMember(const Value_s& object, std::string_view key)
+    const JsoncValue_s* FindMemberValue(const JsoncValue_s& object, std::string_view key)
     {
-        for (auto member = object.members.rbegin(); member != object.members.rend(); ++member)
+        for (auto i = object.members.size(); i > 0; --i)
         {
-            if (member->key == key)
+            if (object.members[i - 1].key == key)
             {
-                return &*member;
+                return &object.values[i - 1];
             }
         }
 
@@ -460,7 +260,7 @@ JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::
     const auto members = Json::parse(membersJson);
     assert(members.is_object() && "JsoncEditor::AddMissing takes a JSON object of members");
 
-    const auto root = Scanner{text}.ScanDocument();
+    const auto root = JsoncScanner{text}.ScanDocument();
     if (!root.isObject)
     {
         throw ConfigError{"the top level must be an object"};
@@ -476,18 +276,18 @@ JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::
     auto depth = std::size_t{0};
     for (; depth < path.size(); ++depth)
     {
-        const auto* member = FindMember(*object, path[depth]);
-        if (member == nullptr)
+        const auto* value = FindMemberValue(*object, path[depth]);
+        if (value == nullptr)
         {
             break;
         }
 
-        if (!member->value.isObject)
+        if (!value->isObject)
         {
             throw ConfigError{std::format("{}: must be an object", StringUtils::Join(path.first(depth + 1), "."))};
         }
 
-        object = &member->value;
+        object = value;
     }
 
     auto missing = Json::object();
@@ -512,7 +312,7 @@ JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::
     {
         for (const auto& [key, value] : members.items())
         {
-            if (FindMember(*object, key) == nullptr)
+            if (FindMemberValue(*object, key) == nullptr)
             {
                 missing[key] = value;
                 edit.added.push_back(key);

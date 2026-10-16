@@ -2,7 +2,8 @@
 #include "LoginHandshake.hpp"
 
 #include "../../Cache/GameCache_s.hpp"
-#include "../../Config/ConfigFile.hpp"
+#include "../../Config/AccountConfig_s.hpp"
+#include "../../Config/Config_s.hpp"
 #include "../../Io/Packet.hpp"
 #include "../../Io/WebSocketClient.hpp"
 #include "../Protocol/Base37.hpp"

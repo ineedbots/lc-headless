@@ -7,7 +7,8 @@
 
 #include "Accounts/Account.hpp"
 #include "Cache/GameCache_s.hpp"
-#include "Config/ConfigFile.hpp"
+#include "Config/AccountConfig_s.hpp"
+#include "Config/Config_s.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/GameClient.hpp"

@@ -5,7 +5,7 @@
 #include "../Support/LogCapture.hpp"
 
 #include "Cache/GameCache_s.hpp"
-#include "Config/ConfigFile.hpp"
+#include "Config/Config_s.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"

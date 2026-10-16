@@ -2,7 +2,8 @@
 #include "GameClient.hpp"
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Config/ConfigFile.hpp"
+#include "../Config/AccountConfig_s.hpp"
+#include "../Config/Config_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Io/Error/WebSocketError.hpp"
 #include "../Io/WebSocketClient.hpp"
