@@ -2,21 +2,23 @@
 #include "../Support/Cache/RealCache.hpp"
 
 #include "Cache/GameCache_s.hpp"
-#include "Game/Nav/NavGraph.hpp"
+#include "Game/Nav/NavPoint_s.hpp"
+#include "Game/Nav/NavState_s.hpp"
+#include "Game/Nav/Navigation.hpp"
 #include "Game/Nav/WorldPathFinder.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace
 {
-    const Navigation_s& GetNavigation()
+    const Navigation& GetNavigation()
     {
         static const auto navigation = []
         {
             const auto started = std::chrono::steady_clock::now();
-            auto loaded = std::make_unique<Navigation_s>(RealCache::Require(), std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
+            auto loaded = std::make_unique<Navigation>(RealCache::Require(), std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
             const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
-            UNSCOPED_INFO(std::format("Navigation built in {} ms: {} edges ({} doors), {} teleports", elapsed.count(), loaded->graph.GetEdgeCount(), loaded->graph.GetDoorCount(), loaded->graph.GetTeleports().size()));
+            UNSCOPED_INFO(std::format("Navigation built in {} ms: {} edges ({} doors), {} teleports", elapsed.count(), loaded->GetGraph().GetEdgeCount(), loaded->GetGraph().GetDoorCount(), loaded->GetGraph().GetTeleports().size()));
             return loaded;
         }();
 

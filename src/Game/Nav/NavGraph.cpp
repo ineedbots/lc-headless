@@ -1,30 +1,16 @@
 #include "pch.hpp"
 #include "NavGraph.hpp"
 
-#include "../../Utils/FileUtils.hpp"
-#include "../../Utils/StringUtils.hpp"
+#include "NavEdge_s.hpp"
+#include "NavPoint_s.hpp"
+#include "NavRequires_s.hpp"
+#include "NavTeleport_s.hpp"
 
 #include <nlohmann/json.hpp>
 
 namespace
 {
     using Json = nlohmann::json;
-
-    s32 QuestRank(std::string_view status)
-    {
-        if (status == "complete")
-        {
-            return 2;
-        }
-
-        return status == "started" ? 1 : 0;
-    }
-
-    s32 Count(const std::unordered_map<std::string, s32>& counts, std::string_view name)
-    {
-        const auto found = counts.find(StringUtils::ToLower(name));
-        return found == counts.end() ? 0 : found->second;
-    }
 
     NavPoint_s ReadPoint(const Json& json)
     {
@@ -90,17 +76,6 @@ namespace
         return requirement;
     }
 
-    std::string ReadFile(const std::filesystem::path& path)
-    {
-        auto text = FileUtils::ReadText(path);
-        if (!text)
-        {
-            throw std::runtime_error{std::format("{}: can't be read", path.string())};
-        }
-
-        return std::move(*text);
-    }
-
     template <typename TRead>
     auto WithFile(std::string_view name, TRead read)
     {
@@ -115,110 +90,7 @@ namespace
     }
 }
 
-bool NavRect_s::Contains(s32 x, s32 z, s32 tileLevel) const
-{
-    return x >= minX && x <= maxX && z >= minZ && z <= maxZ && (!level || *level == tileLevel);
-}
-
-bool NavRequires_s::IsGated() const
-{
-    return members || freeSlots || !skills.empty() || !items.empty() || !worn.empty() || currency || !questWaivesItems.empty() || !quests.empty() || forbidEntranaRestricted || slashTool;
-}
-
-std::optional<std::string> NavRequires_s::Check(const NavState_s& state) const
-{
-    if (members && !state.members)
-    {
-        return "members-only";
-    }
-
-    if (freeSlots && state.freeSlots < *freeSlots)
-    {
-        return std::format("need {} free inventory slots (have {})", *freeSlots, state.freeSlots);
-    }
-
-    for (const auto& skill : skills)
-    {
-        const auto have = Count(state.skills, skill.name);
-        if (have < skill.count)
-        {
-            return std::format("need {} {} (have {})", skill.name, skill.count, have);
-        }
-    }
-
-    const auto waived = !questWaivesItems.empty() && [&]
-    {
-        const auto found = state.quests.find(StringUtils::ToLower(questWaivesItems));
-        return found != state.quests.end() && found->second == "complete";
-    }();
-
-    if (currency && !waived && Count(state.items, currency->name) < currency->count)
-    {
-        return std::format("need {} {} (have {})", currency->count, currency->name, Count(state.items, currency->name));
-    }
-
-    for (const auto& item : items)
-    {
-        if (!waived && Count(state.items, item.name) < item.count)
-        {
-            return std::format("need {} {} (have {})", item.count, item.name, Count(state.items, item.name));
-        }
-    }
-
-    for (const auto& item : worn)
-    {
-        if (Count(state.worn, item.name) < item.count)
-        {
-            return std::format("need to wear {}", item.name);
-        }
-    }
-
-    if (forbidEntranaRestricted && state.entranaRestrictedGear)
-    {
-        return "remove weapons and armour before Entrana";
-    }
-
-    if (slashTool && state.canSlashWeb == false)
-    {
-        return "need a knife or a bladed weapon to slash webs";
-    }
-
-    for (const auto& quest : quests)
-    {
-        const auto found = state.quests.find(StringUtils::ToLower(quest.quest));
-        const auto status = found == state.quests.end() ? std::string{"unknown"} : found->second;
-        if (status == "unknown" && !quest.maxStatus.empty())
-        {
-            return std::format("need to know where {} stands", quest.quest);
-        }
-
-        if (!quest.maxStatus.empty() && QuestRank(status) > QuestRank(quest.maxStatus))
-        {
-            return std::format("need {} at most {} (it's {})", quest.quest, quest.maxStatus, status);
-        }
-
-        if (!quest.minStatus.empty() && QuestRank(status) < QuestRank(quest.minStatus))
-        {
-            return std::format("need {} {} (it's {})", quest.quest, quest.minStatus, status);
-        }
-    }
-
-    return std::nullopt;
-}
-
-NavGraph::NavGraph(const WalkMap& map, const std::filesystem::path& directory)
-{
-    const auto edges = ReadFile(directory / "edges.json");
-    const auto teleports = ReadFile(directory / "teleports.json");
-    Load(map, edges, teleports);
-}
-
 NavGraph::NavGraph(const WalkMap& map, std::string_view edgesJson, std::string_view teleportsJson)
-{
-    Load(map, edgesJson, teleportsJson);
-}
-
-void NavGraph::Load(const WalkMap& map, std::string_view edgesJson, std::string_view teleportsJson)
 {
     WithFile("edges.json", [&]
     {
@@ -338,31 +210,4 @@ std::size_t NavGraph::GetEdgeCount() const
 std::size_t NavGraph::GetDoorCount() const
 {
     return m_doors;
-}
-
-Navigation_s::Navigation_s(const GameCache_s& cache, const std::filesystem::path& directory)
-    : map{cache}
-    , graph{map, directory}
-{
-    for (const auto name : DATA_FILES)
-    {
-        data.emplace(std::string{name}, ReadFile(directory / std::format("{}.json", name)));
-    }
-}
-
-Navigation_s::Navigation_s(const GameCache_s& cache, std::string_view edgesJson, std::string_view teleportsJson)
-    : map{cache}
-    , graph{map, edgesJson, teleportsJson}
-{
-}
-
-std::optional<std::string_view> Navigation_s::GetData(std::string_view name) const
-{
-    const auto found = data.find(std::string{name});
-    if (found == data.end())
-    {
-        return std::nullopt;
-    }
-
-    return std::string_view{found->second};
 }

@@ -6,6 +6,7 @@
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptHost.hpp"
@@ -20,7 +21,7 @@ struct AccountOptions_s
     bool watchScripts = false;
     bool waitForDebugger = false;
     // Without it, scripts can't plan routes beyond the loaded area.
-    std::shared_ptr<const Navigation_s> navigation;
+    std::shared_ptr<const Navigation> navigation;
     std::chrono::milliseconds reloginDelay = 60s;
 };
 

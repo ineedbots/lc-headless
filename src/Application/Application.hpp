@@ -6,7 +6,7 @@
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/LogFile.hpp"
 #include "../Console/Logger.hpp"
-#include "../Game/Nav/NavGraph.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "CommandLine.hpp"
 
 class Application
@@ -25,6 +25,6 @@ private:
     CommandLine_s m_commandLine;
     std::shared_ptr<const Config_s> m_config;
     std::shared_ptr<const GameCache_s> m_cache;
-    std::shared_ptr<const Navigation_s> m_navigation;
+    std::shared_ptr<const Navigation> m_navigation;
     std::shared_ptr<LogFile> m_logFile;
 };

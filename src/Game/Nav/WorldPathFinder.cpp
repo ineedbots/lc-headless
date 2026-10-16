@@ -2,6 +2,12 @@
 #include "WorldPathFinder.hpp"
 
 #include "../../Utils/StringUtils.hpp"
+#include "NavEdge_s.hpp"
+#include "NavGraph.hpp"
+#include "NavPoint_s.hpp"
+#include "NavRect_s.hpp"
+#include "NavTeleport_s.hpp"
+#include "Navigation.hpp"
 
 #include <queue>
 
@@ -106,9 +112,9 @@ namespace
     class Search
     {
     public:
-        Search(const Navigation_s& navigation, const NavFindOptions_s& options)
-            : m_map{navigation.map}
-            , m_graph{navigation.graph}
+        Search(const Navigation& navigation, const NavFindOptions_s& options)
+            : m_map{navigation.GetMap()}
+            , m_graph{navigation.GetGraph()}
             , m_options{options}
         {
         }
@@ -627,7 +633,7 @@ namespace
     };
 }
 
-NavPath_s WorldPathFinder::FindPath(const Navigation_s& navigation, NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options)
+NavPath_s WorldPathFinder::FindPath(const Navigation& navigation, NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options)
 {
     auto search = Search{navigation, options};
     return search.Run(from, to);

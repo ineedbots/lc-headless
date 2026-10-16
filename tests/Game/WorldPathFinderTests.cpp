@@ -2,8 +2,10 @@
 
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
-#include "Game/Nav/NavGraph.hpp"
 #include "Game/Nav/NavJson.hpp"
+#include "Game/Nav/NavPoint_s.hpp"
+#include "Game/Nav/NavState_s.hpp"
+#include "Game/Nav/Navigation.hpp"
 #include "Game/Nav/WorldPathFinder.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -73,7 +75,7 @@ namespace
 
     private:
         GameCache_s m_cache = MakeCache();
-        Navigation_s m_navigation;
+        Navigation m_navigation;
     };
 
     bool Visits(const NavPath_s& path, const std::function<bool(const NavPoint_s&)>& test)

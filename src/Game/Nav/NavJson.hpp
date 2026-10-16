@@ -1,5 +1,6 @@
 #pragma once
 
+#include "NavPoint_s.hpp"
 #include "WorldPathFinder.hpp"
 
 struct NavRequest_s
@@ -23,8 +24,11 @@ struct NavRequest_s
 // "transport": {"kind", "loc_name", "action", "loc_x", "loc_z", "loc_id", "open_loc_id", "to_level",
 // "to_tile": [x, z], "accept_any_landing", "teleport_id", "edge_cost"}}]}, a waypoint's transport being the
 // hop that arrives there.
-namespace NavJson
+class NavJson
 {
-    [[nodiscard]] NavRequest_s ParseRequest(std::string_view json);
-    [[nodiscard]] std::string ToJson(const NavPath_s& path);
-}
+public:
+    NavJson() = delete;
+
+    [[nodiscard]] static NavRequest_s ParseRequest(std::string_view json);
+    [[nodiscard]] static std::string ToJson(const NavPath_s& path);
+};

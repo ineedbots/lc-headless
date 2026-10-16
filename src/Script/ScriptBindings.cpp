@@ -3,9 +3,11 @@
 
 #include "../Cache/GameCache_s.hpp"
 #include "../Cache/MapSquare.hpp"
+#include "../Game/Map/WalkMap.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Menu/MenuOp.hpp"
 #include "../Game/Nav/NavJson.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "../Game/Protocol/Base37.hpp"
 #include "../Game/State/EntityStatus.hpp"
 #include "../Game/State/GameState_s.hpp"
@@ -1157,7 +1159,7 @@ namespace
                 return ReturnNone();
             }
 
-            PyConvert::FromPoint(py_retval(), navigation->map.IsWalkable(x, z, level) ? 1 : 0, navigation->map.GetExits(x, z, level));
+            PyConvert::FromPoint(py_retval(), navigation->GetMap().IsWalkable(x, z, level) ? 1 : 0, navigation->GetMap().GetExits(x, z, level));
             return true;
         });
     }

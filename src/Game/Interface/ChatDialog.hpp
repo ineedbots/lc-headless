@@ -42,22 +42,25 @@ struct MakeSlot_s
 
 // The chat box's dialogues, option lists and make menus, recognised by their shape rather than by their ids,
 // as rs2b0t's ChatDialog does.
-namespace ChatDialog
+class ChatDialog
 {
-    // Text as the player reads it: without colour tags, and with line breaks as spaces.
-    [[nodiscard]] std::string CleanText(std::string_view text);
-    // Such as 5 for "Make 5" or "Smelt 5 @lre@Bronze".
-    [[nodiscard]] std::optional<s32> ParseAmount(std::string_view option);
+public:
+    ChatDialog() = delete;
 
-    [[nodiscard]] std::optional<u16> FindContinue(const InterfaceView& view);
+    // Text as the player reads it: without colour tags, and with line breaks as spaces.
+    [[nodiscard]] static std::string CleanText(std::string_view text);
+    // Such as 5 for "Make 5" or "Smelt 5 @lre@Bronze".
+    [[nodiscard]] static std::optional<s32> ParseAmount(std::string_view option);
+
+    [[nodiscard]] static std::optional<u16> FindContinue(const InterfaceView& view);
     // The chat modal's choices: visible text components with an Ok button and text, in drawing order,
     // leaving out make buttons, which share their rectangle with another button.
-    [[nodiscard]] std::vector<ChatOption_s> GetOptions(const InterfaceView& view);
+    [[nodiscard]] static std::vector<ChatOption_s> GetOptions(const InterfaceView& view);
     // Such as an NPC's name and lines.
-    [[nodiscard]] std::vector<std::string> GetTexts(const InterfaceView& view);
-    [[nodiscard]] std::vector<std::string> GetTexts(const InterfaceView& view, u16 root);
+    [[nodiscard]] static std::vector<std::string> GetTexts(const InterfaceView& view);
+    [[nodiscard]] static std::vector<std::string> GetTexts(const InterfaceView& view, u16 root);
     // In the chat modal, or else in the main modal, such as fletching's or the tanner's.
-    [[nodiscard]] std::vector<MakeProduct_s> GetMakeProducts(const InterfaceView& view);
+    [[nodiscard]] static std::vector<MakeProduct_s> GetMakeProducts(const InterfaceView& view);
     // The products of the main modal's inventories whose options make things, such as the anvil's.
-    [[nodiscard]] std::vector<MakeSlot_s> GetMakePanel(const InterfaceView& view, const GameState_s& state);
-}
+    [[nodiscard]] static std::vector<MakeSlot_s> GetMakePanel(const InterfaceView& view, const GameState_s& state);
+};

@@ -1,6 +1,11 @@
 #pragma once
 
-#include "NavGraph.hpp"
+#include "NavEdge_s.hpp"
+#include "NavPoint_s.hpp"
+#include "NavRect_s.hpp"
+#include "NavState_s.hpp"
+#include "NavTeleport_s.hpp"
+#include "Navigation.hpp"
 
 // rs2b0t's PathPolicy: which kinds of hop a route may use.
 struct NavPolicy_s
@@ -57,7 +62,7 @@ class WorldPathFinder
 public:
     WorldPathFinder() = delete;
 
-    [[nodiscard]] static NavPath_s FindPath(const Navigation_s& navigation, NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options);
+    [[nodiscard]] static NavPath_s FindPath(const Navigation& navigation, NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options);
     // The wilderness level at a tile, 0 outside it.
     [[nodiscard]] static s32 GetWildernessLevel(NavPoint_s tile);
 };

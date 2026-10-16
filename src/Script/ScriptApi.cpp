@@ -10,6 +10,8 @@
 #include "../Game/Map/PathFinder.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Menu/MenuOp.hpp"
+#include "../Game/Nav/NavPoint_s.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/EntityStatus.hpp"
 #include "../Game/State/Entity_s.hpp"
@@ -141,7 +143,7 @@ namespace
     }
 }
 
-ScriptApi::ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username, std::shared_ptr<const Navigation_s> navigation)
+ScriptApi::ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username, std::shared_ptr<const Navigation> navigation)
     : m_state{state}
     , m_map{map}
     , m_actions{actions}
@@ -161,7 +163,7 @@ std::optional<NavPath_s> ScriptApi::FindWorldPath(NavPoint_s from, NavPoint_s to
     return WorldPathFinder::FindPath(*m_navigation, from, to, options);
 }
 
-const Navigation_s* ScriptApi::GetNavigation() const
+const Navigation* ScriptApi::GetNavigation() const
 {
     return m_navigation.get();
 }

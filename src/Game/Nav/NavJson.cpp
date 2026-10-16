@@ -2,6 +2,8 @@
 #include "NavJson.hpp"
 
 #include "../../Utils/StringUtils.hpp"
+#include "NavPoint_s.hpp"
+#include "NavState_s.hpp"
 
 #include <nlohmann/json.hpp>
 

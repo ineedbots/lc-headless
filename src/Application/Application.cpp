@@ -16,6 +16,7 @@
 #include "../Console/LogFile.hpp"
 #include "../Console/LogSinks.hpp"
 #include "../Console/Logger.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "CommandLine.hpp"
 #include "InterruptSignal.hpp"
@@ -40,11 +41,11 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
     m_cache = std::make_shared<const GameCache_s>(CacheLoader::Load(m_config->client.cacheDirectory, *m_logger));
 
     const auto started = std::chrono::steady_clock::now();
-    m_navigation = std::make_shared<const Navigation_s>(*m_cache, m_config->client.navDirectory);
+    m_navigation = std::make_shared<const Navigation>(*m_cache, m_config->client.navDirectory);
 
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
     m_logger->Info("Walking map built and walker graph loaded from {} in {} ms: {:.1f} MB, {} edges",
-                   m_config->client.navDirectory, elapsed.count(), static_cast<double>(m_navigation->map.GetMemoryBytes()) / (1024.0 * 1024.0), m_navigation->graph.GetEdgeCount());
+                   m_config->client.navDirectory, elapsed.count(), static_cast<double>(m_navigation->GetMap().GetMemoryBytes()) / (1024.0 * 1024.0), m_navigation->GetGraph().GetEdgeCount());
 }
 
 int Application::Run()

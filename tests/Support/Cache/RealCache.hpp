@@ -1,6 +1,6 @@
 #pragma once
 
-struct GameCache_s;
+#include "Cache/GameCache_s.hpp"
 
 // The 289 cache from the folder in RS2004_CACHE_DIR, such as ../289server/engine/data/pack, loaded once for
 // every test that reads it; the load's log goes to the test output.

@@ -6,6 +6,8 @@
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Menu/MenuOp.hpp"
+#include "../Game/Nav/NavPoint_s.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "../Game/Nav/WorldPathFinder.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/Entity_s.hpp"
@@ -49,7 +51,7 @@ public:
     // A target's options by slot, as its right-click menu lists them; empty where there's none.
     using Menu = std::array<std::string_view, MenuOp::COUNT>;
 
-    ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {}, std::shared_ptr<const Navigation_s> navigation = nullptr);
+    ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {}, std::shared_ptr<const Navigation> navigation = nullptr);
 
     [[nodiscard]] const GameState_s& GetState() const;
     [[nodiscard]] const WorldMap& GetMap() const;
@@ -123,9 +125,9 @@ public:
 
     // Whether a walk can end on the tile.
     [[nodiscard]] bool IsReachable(s32 x, s32 z) const;
-    // Nullopt when the client has no Navigation_s.
+    // Nullopt when the client has no Navigation.
     [[nodiscard]] std::optional<NavPath_s> FindWorldPath(NavPoint_s from, NavPoint_s to, const NavFindOptions_s& options) const;
-    [[nodiscard]] const Navigation_s* GetNavigation() const;
+    [[nodiscard]] const Navigation* GetNavigation() const;
     // Whether one step between neighbouring tiles on the player's level is open.
     [[nodiscard]] bool CanStep(s32 fromX, s32 fromZ, s32 toX, s32 toZ) const;
     // The waypoints WalkTo would send along a route, or nullopt without one.
@@ -209,7 +211,7 @@ private:
     GameActions& m_actions;
     BotMessenger* m_messenger;
     std::string m_username;
-    std::shared_ptr<const Navigation_s> m_navigation;
+    std::shared_ptr<const Navigation> m_navigation;
     StopRequest_e m_stopRequest = StopRequest_e::None;
     std::optional<std::chrono::seconds> m_relogRequest;
     s64 m_stepTime = 0;

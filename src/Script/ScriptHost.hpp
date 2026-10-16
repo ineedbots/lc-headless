@@ -5,7 +5,7 @@
 #include "../Console/Logger.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/GameClient.hpp"
-#include "../Game/Nav/NavGraph.hpp"
+#include "../Game/Nav/Navigation.hpp"
 #include "../Game/State/GameEvent_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Utils/FileWatcher.hpp"
@@ -47,7 +47,7 @@ struct ScriptHostOptions_s
     bool watchFiles = false;
     bool waitForDebugger = false;
     // Without it, the script can't plan routes beyond the loaded area.
-    std::shared_ptr<const Navigation_s> navigation;
+    std::shared_ptr<const Navigation> navigation;
     // The runtime's upkeep each server tick: the random event guardian, the stall guard (off at zero) and
     // the run manager. Off by default, so tests see only what they ask for.
     bool randomEvents = false;
