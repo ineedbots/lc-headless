@@ -2,6 +2,7 @@
 #include "../Support/Cache/TestCache.hpp"
 #include "../Support/Game/QueryWorld.hpp"
 
+#include "Config/Revision_e.hpp"
 #include "Game/Menu/MenuOp.hpp"
 #include "Game/Menu/Menus.hpp"
 
@@ -28,8 +29,9 @@ TEST_CASE("Menus chooses options by their text", "[Menus]")
     CHECK_THROWS_WITH(Menus::FindNpcOp(state, cache, 14, "Attack"), ContainsSubstring("NPC 900 isn't in the cache"));
     CHECK(Menus::FindLocOp(cache, W::DOOR, "OPEN") == 1);
     CHECK_THROWS_AS(Menus::FindLocOp(cache, W::DOOR, "Close"), std::invalid_argument);
-    CHECK(Menus::FindPlayerOp(state, "follow") == 2);
-    CHECK_THROWS_WITH(Menus::FindPlayerOp(state, "Trade"), "a player has no option 'Trade'; its options are Follow (2)");
+    CHECK(Menus::FindPlayerOp(state, Revision_e::Rev289, "follow") == 2);
+    CHECK_THROWS_WITH(Menus::FindPlayerOp(state, Revision_e::Rev289, "Trade"), "a player has no option 'Trade'; its options are Follow (2)");
+    CHECK(Menus::FindPlayerOp(state, Revision_e::Rev225, "trade with") == 4);
 
     SECTION("ground items offer Take, and inventory items Drop, where their type has no option")
     {
@@ -49,7 +51,9 @@ TEST_CASE("Menus lists each kind of target's menu by slot", "[Menus]")
     CHECK(Menus::GetLocMenu(cache, W::DOOR) == Menus::Menu{"Open", "", "", "", ""});
     CHECK(Menus::GetGroundItemMenu(cache, W::BONES) == Menus::Menu{"", "", "Take", "", ""});
     CHECK(Menus::GetItemMenu(cache, W::BONES) == Menus::Menu{"Bury", "", "", "", "Drop"});
-    CHECK(Menus::GetPlayerMenu(world.state) == Menus::Menu{"", "Follow", "", "", ""});
+    CHECK(Menus::GetPlayerMenu(world.state, Revision_e::Rev289) == Menus::Menu{"", "Follow", "", "", ""});
+    // 225 has no SET_PLAYER_OP, so its menu is the webclient's, whatever the state holds.
+    CHECK(Menus::GetPlayerMenu(world.state, Revision_e::Rev225) == Menus::Menu{"Duel-with", "Attack", "Follow", "Trade with", ""});
 
     SECTION("a type the cache doesn't have has only the options the menu adds")
     {

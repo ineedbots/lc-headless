@@ -220,7 +220,7 @@ An `InvItem` has `id`, `name`, `count`, `slot`, `noted` and `com` (the inventory
 
 | Facade | Functions |
 |---|---|
-| `game` | `ingame()`, `tile()` (`None` before you're placed), `energy()` (run energy, 0 to 100), `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `moving()`, `tick()` (server ticks since the first login; it carries on across reconnects and server restarts, so a tick kept to compare against later stays valid), `my_name()`, `combat_level()`, `appearance_screen_open()`, `set_appearance(female, kits, colours)` |
+| `game` | `ingame()`, `tile()` (`None` before you're placed), `energy()` (run energy, 0 to 100), `run_enabled()`, `set_run(on)`, `weight()`, `in_combat()`, `animating()`, `moving()`, `tick()` (server ticks since the first login; it carries on across reconnects and server restarts, so a tick kept to compare against later stays valid), `revision()` (the server's revision, `225` or `289`, from `login.revision`), `my_name()`, `combat_level()`, `appearance_screen_open()`, `set_appearance(female, kits, colours)` |
 | `skills` | `level(name)` (base), `effective(name)` (boosted or drained), `xp(name)`, `index(name)` (-1 for a name that isn't a skill), `hp_fraction()`. Names are lower-case: `'attack'`, `'woodcutting'`, `'runecraft'`; an unknown one raises `ValueError` |
 | `direct_navigator` | Walking within the loaded area: `walk(dest, run=False)` (one routed walk; `False` when the tile is in view but can't be reached, and a tile beyond the loaded area is walked to in a straight line), `walk_to(dest, radius=2, timeout_ms=45000, run=False)` (a wait: walks, clicking again when it stalls, until within `radius`), `walk_path(points, run=False)` (up to 25 waypoints, each leg straight), `reachable(dest)`, `path(dest)` (the waypoints a walk would send), `destination()` |
 | `chat` | `say(text)`, `send_pm(name, text)`, `command(text)` (a `::command` for staff accounts, such as `command('tele 0,50,51,30,34')`) |
@@ -736,6 +736,7 @@ pocketpy's debugger brings some limits:
 
 - **`direct_navigator` stays in the loaded area.** A tile beyond it is walked to in a straight line. `traversal` walks anywhere.
 - **"Nearest" counts tiles.** A query's `nearest()` measures in tiles, not steps, so with `reachable()` the nearest target that can be reached may still be a long walk round.
+- **Revision 225.** A 225 server doesn't say whether the world is members, so `traversal` plans every walk as on a free world. Its player menu is fixed, `Duel-with`, `Attack`, `Follow` and `Trade with`, so a player's option 5 raises `ValueError`. The catalogs and the walker data were built from 289's content, and an id added after 225 doesn't exist there. Branch on `game.revision()` where content differs.
 
 ## Editor support
 

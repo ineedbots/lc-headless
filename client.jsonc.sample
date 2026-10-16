@@ -10,6 +10,7 @@
         "rsaModulus": "0x0",
         "rsaExponent": "0x0",
         "lowMemory": false,
+        // 289, or 225 for a 225 server. client.cacheDirectory must hold the same revision's cache.
         "revision": 289
     },
     "client": {

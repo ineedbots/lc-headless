@@ -6,6 +6,7 @@
 #include "../Console/Logger.hpp"
 #include "../Io/WebSocketClient.hpp"
 #include "Decode/ServerPacketDecoder.hpp"
+#include "InputTracker.hpp"
 #include "Map/WorldMap.hpp"
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/LoginHandshake.hpp"
@@ -72,6 +73,7 @@ public:
     [[nodiscard]] const Protocol& GetProtocol() const;
     [[nodiscard]] const ClientPackets& GetPackets() const;
 
+    // While a 225 server tracks input, each packet sent here also records the click that would have sent it.
     void Send(ClientPacket_s packet);
     void SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run);
     // A send that fails counts as a dropped connection, as it does in Pump.
@@ -95,6 +97,7 @@ private:
     // Sends what a packet the decoder just read asks for in reply.
     void Reply(ServerProt_e prot);
     void WarnAboutStaleSquares();
+    void SendReports(const std::vector<std::vector<u8>>& reports);
     void SendKeepaliveIfIdle();
     void LogNewMessages();
 
@@ -124,6 +127,7 @@ private:
     u64 m_loggedMessageCount = 0;
     // Keyed by MapSquare::GetId, so each stale square is warned about once.
     std::unordered_set<u16> m_warnedSquares;
+    InputTracker m_tracker;
     u32 m_loginCount = 0;
 
     std::optional<LoginHandshake> m_handshake;

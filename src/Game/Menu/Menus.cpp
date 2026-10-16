@@ -6,6 +6,7 @@
 #include "../../Cache/LocType_s.hpp"
 #include "../../Cache/NpcType_s.hpp"
 #include "../../Cache/ObjType_s.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "../../Utils/StringUtils.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Npc_s.hpp"
@@ -17,6 +18,8 @@ namespace
 
     constexpr auto TAKE_SLOT = MenuOp::GetSlot(MenuOp::TAKE);
     constexpr auto DROP_SLOT = MenuOp::GetSlot(MenuOp::DROP);
+    // The 225 webclient's player menu, by slot: OPPLAYER1 to OPPLAYER4.
+    constexpr auto PLAYER_MENU_225 = Menu{"Duel-with", "Attack", "Follow", "Trade with", ""};
 
     Menu MakeMenu(const GameCache_s& cache, std::span<const u16> ops)
     {
@@ -145,8 +148,14 @@ std::optional<Menu> Menus::GetInventoryMenu(const GameCache_s& cache, u16 com)
     return MakeInventoryMenu(*component);
 }
 
-Menu Menus::GetPlayerMenu(const GameState_s& state)
+Menu Menus::GetPlayerMenu(const GameState_s& state, Revision_e revision)
 {
+    // The server still decides whether an option is allowed where the player is.
+    if (revision < Revision_e::Rev289)
+    {
+        return PLAYER_MENU_225;
+    }
+
     auto menu = Menu{};
     for (auto slot = std::size_t{0}; slot < menu.size() && slot < state.playerOps.size(); ++slot)
     {
@@ -171,9 +180,9 @@ std::optional<u8> Menus::FindNpcOp(const GameState_s& state, const GameCache_s& 
     return ChooseOption(GetNpcMenu(cache, type.id), text, DescribeType("NPC", type.id, type.name));
 }
 
-u8 Menus::FindPlayerOp(const GameState_s& state, std::string_view text)
+u8 Menus::FindPlayerOp(const GameState_s& state, Revision_e revision, std::string_view text)
 {
-    return ChooseOption(GetPlayerMenu(state), text, "a player");
+    return ChooseOption(GetPlayerMenu(state, revision), text, "a player");
 }
 
 u8 Menus::FindLocOp(const GameCache_s& cache, u16 loc, std::string_view text)

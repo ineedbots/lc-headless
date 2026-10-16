@@ -7,7 +7,7 @@
 
 struct LoginSettings_s
 {
-    static constexpr auto SUPPORTED_REVISIONS = std::to_array({Revision_e::Rev289});
+    static constexpr auto SUPPORTED_REVISIONS = std::to_array({Revision_e::Rev225, Revision_e::Rev289});
 
     BigUInt rsaModulus;
     BigUInt rsaExponent;

@@ -25,7 +25,7 @@ Reference sources, beside this repository:
 | Default | `289`, so existing config files keep working |
 | Protocol object | `Protocol` (§2.2), owned by each `GameClient`, holds the revision and that revision's opcode tables. The login, the reader, the writer, the decoders and `ClientPackets` all take it |
 | Opcodes | `ServerProt_e` and `ClientProt_e` become logical packet names with no wire value. Each revision has a full table mapping them to opcodes and sizes, because every revision reshuffles every opcode (Appendix A) |
-| Missing packets | A packet a revision doesn't have isn't in its table. Sending one throws `std::invalid_argument` naming the packet and the revision; receiving an opcode outside the table is a `ProtocolError`, as today |
+| Missing packets | A packet a revision doesn't have isn't in its table. Building one throws `std::invalid_argument` naming the packet and the revision, so an action fails before it walks anywhere; receiving an opcode outside the table is a `ProtocolError`, as today |
 | Cache | `CacheLoader::Load` takes the revision and reads that revision's layout. 225 reads loose JAG files and a `maps/` folder; 289 reads the store, as today (§10). The loaded `GameCache_s` records its revision, and `GameClient` asserts it matches the config |
 | 225 maps | Read from the cache folder, like 289's. The client still answers every `REBUILD_NORMAL` with a `REBUILD_GETMAPS`, as the webclient does, and warns about squares whose CRC differs from the server's. Downloading those squares is the optional phase 6 |
 | 225 input tracking | The 225 server logs out a client that doesn't return an input report when tracking ends. The client keeps a synthetic report and sends it (§9.2) |
@@ -78,7 +78,8 @@ public:
     [[nodiscard]] s32 GetSize(ServerProt_e prot) const;
 
     [[nodiscard]] bool Has(ClientProt_e prot) const;
-    // Throws std::invalid_argument for a packet this revision doesn't have.
+    // These throw std::invalid_argument for a packet this revision doesn't have.
+    void Require(ClientProt_e prot) const;
     [[nodiscard]] u8 GetOpcode(ClientProt_e prot) const;
     [[nodiscard]] s32 GetSize(ClientProt_e prot) const;
 
@@ -287,7 +288,7 @@ Each change goes in the decoder for its packet's area: `UPDATE_PID` and `LAST_LO
 
 ## 8. Client packets
 
-`ClientPackets` becomes a class constructed from a `Protocol`, so every builder can branch without its signature changing. `GameClient::GetPackets()` returns it, and `GameActions` builds with `m_client.GetPackets()`. The builders' signatures stay as they are today.
+`ClientPackets` becomes a class constructed from a `Protocol`, so every builder can branch without its signature changing. Each builder calls `Protocol::Require` on its packet, so one the revision doesn't have throws as it's built. `GameClient::GetPackets()` returns it, and `GameActions` builds with `m_client.GetPackets()`. The builders' signatures stay as they are today.
 
 | Packet | 225 (base) | 289 | Builder change |
 |---|---|---|---|
@@ -322,7 +323,7 @@ case ServerProt_e::RebuildNormal:
     return;
 ```
 
-`WarnAboutStaleSquares` compares each square's CRCs in `m_state.buildArea.squares` with the CRCs of the raw map files the cache read (§10.2), and logs one warning per square per process for a mismatch or a file the cache doesn't have: `Map square 50_50's locs differ from the server's; walks there may route through changed scenery`. A server whose CRC is 0 has no file, and the cache's open ground is right.
+`WarnAboutStaleSquares` compares each square's CRCs in `m_state.buildArea.squares` with the CRCs of the raw map files the cache read (§10.2), and logs one warning per square per client for a mismatch or a file the cache doesn't have: `Map square 50_50's locs differ from the server's; walks there may route through changed scenery`. The client keeps the squares it has warned about, so a warning isn't repeated after a reconnect; keeping them per process would need state shared between accounts for little gain. A server whose CRC is 0 has no file, and the cache's open ground is right.
 
 Phase 6, optional, asks for the stale squares instead, assembles the `DATA_*` chunks by `offset` and `totalLength`, decodes them with the same `MapDecoder`, and lays them over the shared cache in that client's `WorldMap`. The shared `GameCache_s` stays read-only.
 

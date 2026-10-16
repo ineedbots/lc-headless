@@ -13,6 +13,7 @@
 #include "Decode/ServerPacketDecoder.hpp"
 #include "Error/ConnectionLostError.hpp"
 #include "Error/ProtocolError.hpp"
+#include "InputTracker.hpp"
 #include "Map/WorldMap.hpp"
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/Error/LoginError.hpp"
@@ -269,6 +270,12 @@ void GameClient::Send(ClientPacket_s packet)
 
     ClientPacketWriter::Validate(m_protocol, packet);
     m_outgoing.push_back(std::move(packet));
+
+    if (m_tracker.IsActive())
+    {
+        m_tracker.RecordClick(Clock::now());
+        SendReports(m_tracker.TakeFullReports());
+    }
 }
 
 void GameClient::SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run)
@@ -511,6 +518,7 @@ void GameClient::FinishLogin(const LoginResult_s& result)
         // the count coming round to where it was built.
         m_map.Clear();
         m_decoder.Reset();
+        m_tracker = InputTracker{};
     }
 
     m_handshake.reset();
@@ -650,8 +658,31 @@ void GameClient::Reply(ServerProt_e prot)
         }
 
         return;
+    case ServerProt_e::EnableTracking:
+        if (m_protocol.Has(ClientProt_e::EventTracking))
+        {
+            m_tracker.Start(Clock::now());
+        }
+
+        return;
+    case ServerProt_e::FinishTracking:
+        // The server logs out as idle a player that sent no report for the window.
+        if (m_protocol.Has(ClientProt_e::EventTracking))
+        {
+            SendReports(m_tracker.Finish(Clock::now()));
+        }
+
+        return;
     default:
         return;
+    }
+}
+
+void GameClient::SendReports(const std::vector<std::vector<u8>>& reports)
+{
+    for (const auto& report : reports)
+    {
+        m_outgoing.push_back(m_packets.EventTracking(report));
     }
 }
 

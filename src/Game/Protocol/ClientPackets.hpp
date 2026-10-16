@@ -83,6 +83,8 @@ class ClientPackets
 public:
     static constexpr std::size_t MAX_WAYPOINTS = 25;
     static constexpr std::size_t MAX_CHEAT_LENGTH = 80;
+    // The most the 225 engine takes in one input report.
+    static constexpr std::size_t MAX_TRACKING_REPORT = 500;
 
     explicit ClientPackets(Protocol protocol);
 
@@ -92,6 +94,8 @@ public:
     [[nodiscard]] ClientPacket_s EventAppletFocus(bool focused) const;
     [[nodiscard]] ClientPacket_s EventCameraPosition(u16 pitch, u16 yaw) const;
     [[nodiscard]] ClientPacket_s RebuildGetMaps(std::span<const MapRequest_s> requests) const;
+    // The input events recorded while the server tracks input, 1 to MAX_TRACKING_REPORT bytes.
+    [[nodiscard]] ClientPacket_s EventTracking(std::span<const u8> report) const;
 
     [[nodiscard]] ClientPacket_s Move(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run) const;
 
@@ -116,6 +120,7 @@ public:
     [[nodiscard]] ClientPacket_s OpHeldU(const ItemRef_s& item, const ItemRef_s& use) const;
 
     [[nodiscard]] ClientPacket_s InvButton(u8 op, const ItemRef_s& item) const;
+    // 225 has no insert mode, so DragMode_e::Insert throws std::invalid_argument there.
     [[nodiscard]] ClientPacket_s InvButtonD(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode) const;
     [[nodiscard]] ClientPacket_s IfButton(u16 com) const;
     [[nodiscard]] ClientPacket_s ResumePauseButton(u16 com) const;

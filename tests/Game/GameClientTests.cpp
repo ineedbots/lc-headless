@@ -11,6 +11,7 @@
 #include "Console/Logger.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
+#include "Game/InputTracker.hpp"
 #include "Game/Net/Error/LoginError.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
@@ -196,6 +197,104 @@ TEST_CASE("GameClient logs in to a 225 server and answers each rebuild", "[GameC
         client.Pump();
         REQUIRE(server.WaitForPacket(ClientProt_e::OpNpc1));
         CHECK(server.GetPackets(ClientProt_e::OpNpc1)[0].payload == std::vector<u8>{0, 100});
+    }
+
+    CHECK(server.GetErrors().empty());
+}
+
+TEST_CASE("GameClient reports a 225 server's input tracking windows", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev225};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(Revision_e::Rev225), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+
+    client.Login();
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return !client.GetState().messages.empty();
+    }));
+
+    const auto reportCount = [&server]
+    {
+        return server.GetPackets(ClientProt_e::EventTracking).size();
+    };
+
+    SECTION("a window with no actions still reports a move")
+    {
+        server.Send(ServerProt_e::EnableTracking);
+        server.Send(ServerProt_e::FinishTracking);
+        REQUIRE(PumpUntil(client, [&reportCount]
+        {
+            return reportCount() == 1;
+        }));
+
+        const auto report = server.GetPackets(ClientProt_e::EventTracking)[0].payload;
+        REQUIRE(report.size() == 5);
+        CHECK(report[0] == InputTracker::ABSOLUTE_MOVE);
+    }
+
+    SECTION("each action records a click, and keepalives record nothing")
+    {
+        server.Send(ServerProt_e::EnableTracking);
+        REQUIRE(PumpUntil(client, [&server]
+        {
+            return server.GetPackets(ClientProt_e::NoTimeout).size() >= 2;
+        }));
+
+        client.Send(client.GetPackets().CloseModal());
+        client.Send(client.GetPackets().CloseModal());
+        client.Flush();
+        server.Send(ServerProt_e::FinishTracking);
+        REQUIRE(PumpUntil(client, [&reportCount]
+        {
+            return reportCount() == 1;
+        }));
+
+        const auto report = server.GetPackets(ClientProt_e::EventTracking)[0].payload;
+        REQUIRE(report.size() == 24);
+        CHECK(report[0] == InputTracker::ABSOLUTE_MOVE);
+        CHECK(report[5] == InputTracker::LEFT_PRESS);
+        CHECK(report[10] == InputTracker::LEFT_RELEASE);
+        CHECK(report[12] == InputTracker::ABSOLUTE_MOVE);
+    }
+
+    SECTION("a report that fills up is sent before the window finishes")
+    {
+        server.Send(ServerProt_e::EnableTracking);
+        REQUIRE(PumpUntil(client, [&server]
+        {
+            return !server.GetPackets(ClientProt_e::NoTimeout).empty();
+        }));
+
+        for (auto click = 0; click < 45; ++click)
+        {
+            client.Send(client.GetPackets().CloseModal());
+        }
+
+        client.Flush();
+        REQUIRE(server.WaitForPacket(ClientProt_e::EventTracking));
+        CHECK(server.GetPackets(ClientProt_e::EventTracking)[0].payload.size() < InputTracker::MAX_REPORT_SIZE);
+
+        server.Send(ServerProt_e::FinishTracking);
+        REQUIRE(PumpUntil(client, [&reportCount]
+        {
+            return reportCount() == 2;
+        }));
+
+        const auto reports = server.GetPackets(ClientProt_e::EventTracking);
+        CHECK(reports[0].payload.size() + reports[1].payload.size() == 45 * 12);
+    }
+
+    SECTION("a report isn't sent outside a window")
+    {
+        client.Send(client.GetPackets().CloseModal());
+        server.Send(ServerProt_e::FinishTracking);
+        REQUIRE(PumpUntil(client, [&server]
+        {
+            return server.GetPackets(ClientProt_e::NoTimeout).size() >= 2;
+        }));
+
+        CHECK(reportCount() == 0);
     }
 
     CHECK(server.GetErrors().empty());

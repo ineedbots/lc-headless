@@ -2,6 +2,7 @@
 #include "ActionBindings.hpp"
 
 #include "../../Cache/GameCache_s.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "../../Game/Menu/MenuOp.hpp"
 #include "../../Game/Menu/Menus.hpp"
 #include "../../Game/Protocol/ClientPackets.hpp"
@@ -93,7 +94,7 @@ namespace
             const auto index = PyArgs::ToIndex(py_arg(0), "player", PyObjects::PLAYER_CLASS);
             const auto op = BindingSupport::ResolveOp(py_arg(1), [&context](std::string_view text)
             {
-                return Menus::FindPlayerOp(context.GetState(), text);
+                return Menus::FindPlayerOp(context.GetState(), context.GetRevision(), text);
             });
 
             return BindingSupport::ReturnBool(context.GetActions().InteractPlayer(index, op));

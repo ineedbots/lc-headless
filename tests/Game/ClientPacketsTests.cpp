@@ -130,3 +130,43 @@ TEST_CASE("ClientPackets rejects a packet the revision doesn't have", "[ClientPa
     CHECK_THROWS_AS(packets.OpPlayer(5, 1), std::invalid_argument);
     CHECK(packets.OpPlayer(4, 1).prot == ClientProt_e::OpPlayer4);
 }
+
+TEST_CASE("ClientPackets builds 225's drags and camera position", "[ClientPackets]")
+{
+    const auto protocol = Protocol{Revision_e::Rev225};
+    const auto packets = ClientPackets{protocol};
+
+    const auto drag = packets.InvButtonD(5382, 1, 2, DragMode_e::Swap);
+    CHECK(drag.payload == Bytes({0x15, 0x06, 0, 1, 0, 2}));
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, drag));
+    CHECK_THROWS_AS(packets.InvButtonD(5382, 1, 2, DragMode_e::Insert), std::invalid_argument);
+
+    const auto camera = packets.EventCameraPosition(128, 1024);
+    CHECK(camera.payload == Bytes({0, 128, 4, 0, 0, 0}));
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, camera));
+    CheckPacket(PACKETS.EventCameraPosition(128, 1024), ClientProt_e::EventCameraPosition, Bytes({0, 128, 4, 0}));
+}
+
+TEST_CASE("ClientPackets builds 225's map requests and input reports", "[ClientPackets]")
+{
+    const auto protocol = Protocol{Revision_e::Rev225};
+    const auto packets = ClientPackets{protocol};
+
+    const auto requests = std::to_array<MapRequest_s>({{.file = MapFile_e::Land, .x = 50, .z = 51}, {.file = MapFile_e::Locs, .x = 50, .z = 51}});
+    const auto maps = packets.RebuildGetMaps(requests);
+    CHECK(maps.prot == ClientProt_e::RebuildGetMaps);
+    CHECK(maps.payload == Bytes({0, 50, 51, 1, 50, 51}));
+    CHECK(packets.RebuildGetMaps({}).payload.empty());
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, maps));
+
+    const auto report = std::vector<u8>(ClientPackets::MAX_TRACKING_REPORT, 7);
+    const auto tracking = packets.EventTracking(report);
+    CHECK(tracking.prot == ClientProt_e::EventTracking);
+    CHECK(tracking.payload == report);
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, tracking));
+    CHECK_THROWS_AS(packets.EventTracking({}), std::invalid_argument);
+    CHECK_THROWS_AS(packets.EventTracking(std::vector<u8>(ClientPackets::MAX_TRACKING_REPORT + 1)), std::invalid_argument);
+
+    CHECK_THROWS_AS(PACKETS.RebuildGetMaps({}), std::invalid_argument);
+    CHECK_THROWS_AS(PACKETS.EventTracking(report), std::invalid_argument);
+}

@@ -2,6 +2,7 @@
 #include "ClientPackets.hpp"
 
 #include "../../Io/Packet.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "../Menu/MenuOp.hpp"
 #include "../Tile_s.hpp"
 #include "ClientPacket_s.hpp"
@@ -121,6 +122,14 @@ ClientPacket_s ClientPackets::EventCameraPosition(u16 pitch, u16 yaw) const
     auto packet = Packet{};
     packet.P2(pitch);
     packet.P2(yaw);
+
+    // 225 also sends the minimap's angle and zoom, which the engine never reads, so they're zero.
+    if (m_protocol.GetRevision() < Revision_e::Rev289)
+    {
+        packet.P1(0);
+        packet.P1(0);
+    }
+
     return Make(ClientProt_e::EventCameraPosition, packet);
 }
 
@@ -135,6 +144,18 @@ ClientPacket_s ClientPackets::RebuildGetMaps(std::span<const MapRequest_s> reque
     }
 
     return Make(ClientProt_e::RebuildGetMaps, packet);
+}
+
+ClientPacket_s ClientPackets::EventTracking(std::span<const u8> report) const
+{
+    if (report.empty() || report.size() > MAX_TRACKING_REPORT)
+    {
+        throw std::invalid_argument{std::format("An input report must be 1 to {} bytes, not {}", MAX_TRACKING_REPORT, report.size())};
+    }
+
+    auto packet = Packet{};
+    packet.PData(report);
+    return Make(ClientProt_e::EventTracking, packet);
 }
 
 ClientPacket_s ClientPackets::Move(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run) const
@@ -299,11 +320,23 @@ ClientPacket_s ClientPackets::InvButton(u8 op, const ItemRef_s& item) const
 
 ClientPacket_s ClientPackets::InvButtonD(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode) const
 {
+    // 225 only swaps; 289 added the mode.
+    const auto hasMode = m_protocol.GetRevision() >= Revision_e::Rev289;
+    if (!hasMode && mode == DragMode_e::Insert)
+    {
+        throw std::invalid_argument{"Revision 225 can't insert a dragged item, only swap it"};
+    }
+
     auto packet = Packet{};
     packet.P2(com);
     packet.P2(fromSlot);
     packet.P2(toSlot);
-    packet.P1(static_cast<u8>(mode));
+
+    if (hasMode)
+    {
+        packet.P1(static_cast<u8>(mode));
+    }
+
     return Make(ClientProt_e::InvButtonD, packet);
 }
 

@@ -3,6 +3,7 @@
 
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/IfComponent_s.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "../../Game/Interface/ChatDialog.hpp"
 #include "../../Game/Interface/InterfaceView.hpp"
 #include "../../Game/Menu/Menus.hpp"
@@ -269,7 +270,8 @@ namespace
     {
         return BindingSupport::Guard([]
         {
-            const auto menu = Menus::GetPlayerMenu(BindingSupport::GetContext().GetState());
+            const auto& context = BindingSupport::GetContext();
+            const auto menu = Menus::GetPlayerMenu(context.GetState(), context.GetRevision());
             py_newlist(py_retval());
 
             for (const auto option : menu)
