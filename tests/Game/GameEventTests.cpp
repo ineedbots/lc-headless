@@ -1,9 +1,9 @@
 #include "pch.hpp"
-#include "../LogCapture.hpp"
-#include "BitWriter.hpp"
-#include "Fixtures.hpp"
+#include "../Support/Game/BitWriter.hpp"
+#include "../Support/Game/Fixtures.hpp"
+#include "../Support/LogCapture.hpp"
 
-#include "Core/Logger.hpp"
+#include "Console/Logger.hpp"
 #include "Game/Decode/NpcInfoDecoder.hpp"
 #include "Game/Decode/PlayerInfoDecoder.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"

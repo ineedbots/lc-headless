@@ -1,9 +1,9 @@
 #include "pch.hpp"
-#include "../TempFolder.hpp"
-#include "CacheWriter.hpp"
+#include "../Support/Cache/CacheWriter.hpp"
+#include "../Support/TempFolder.hpp"
 
-#include "Cache/CacheError.hpp"
 #include "Cache/CacheStore.hpp"
+#include "Cache/Error/CacheError.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>

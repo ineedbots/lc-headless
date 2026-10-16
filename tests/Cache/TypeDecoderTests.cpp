@@ -1,7 +1,7 @@
 #include "pch.hpp"
-#include "CacheWriter.hpp"
+#include "../Support/Cache/CacheWriter.hpp"
 
-#include "Cache/CacheError.hpp"
+#include "Cache/Error/CacheError.hpp"
 #include "Cache/LocType_s.hpp"
 #include "Cache/NpcType_s.hpp"
 #include "Cache/ObjType_s.hpp"

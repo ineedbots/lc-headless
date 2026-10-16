@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "Packet.hpp"
 
-#include "../Core/BigUInt.hpp"
-#include "../Core/Endian.hpp"
+#include "../Utils/BigUInt.hpp"
+#include "../Utils/Endian.hpp"
 #include "Isaac.hpp"
 
 namespace

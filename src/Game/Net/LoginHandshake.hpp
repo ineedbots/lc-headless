@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Cache/GameCache_s.hpp"
-#include "../../Core/ConfigFile.hpp"
+#include "../../Config/ConfigFile.hpp"
 #include "../../Io/WebSocketClient.hpp"
 
 struct LoginResult_s

@@ -1,9 +1,9 @@
 #include "pch.hpp"
-#include "../LogCapture.hpp"
-#include "ScriptTestRuntime.hpp"
+#include "../Support/LogCapture.hpp"
+#include "../Support/Script/ScriptTestRuntime.hpp"
 
-#include "Core/Logger.hpp"
-#include "Script/ScriptError.hpp"
+#include "Console/Logger.hpp"
+#include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptRuntime.hpp"
 #include "Script/ScriptVm.hpp"
 

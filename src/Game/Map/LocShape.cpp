@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "LocShape.hpp"
 
-#include "../ProtocolError.hpp"
+#include "../Error/ProtocolError.hpp"
 #include "../State/Zone_s.hpp"
 
 LocLayer_e LocShape::GetLayer(u8 shape)

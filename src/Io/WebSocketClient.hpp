@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Core/Logger.hpp"
+#include "../Console/Logger.hpp"
 #include "NetSystem.hpp"
 
 #include <ixwebsocket/IXWebSocket.h>

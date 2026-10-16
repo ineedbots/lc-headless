@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "Compression.hpp"
 
-#include "CacheError.hpp"
 #include "CacheStore.hpp"
+#include "Error/CacheError.hpp"
 
 #include <bzlib.h>
 #include <zlib.h>

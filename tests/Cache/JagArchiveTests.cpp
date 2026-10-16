@@ -1,7 +1,7 @@
 #include "pch.hpp"
-#include "CacheWriter.hpp"
+#include "../Support/Cache/CacheWriter.hpp"
 
-#include "Cache/CacheError.hpp"
+#include "Cache/Error/CacheError.hpp"
 #include "Cache/JagArchive.hpp"
 #include "Io/Packet.hpp"
 

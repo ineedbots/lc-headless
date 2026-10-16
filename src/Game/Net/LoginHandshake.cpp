@@ -2,11 +2,11 @@
 #include "LoginHandshake.hpp"
 
 #include "../../Cache/GameCache_s.hpp"
-#include "../../Core/ConfigFile.hpp"
+#include "../../Config/ConfigFile.hpp"
 #include "../../Io/Packet.hpp"
 #include "../../Io/WebSocketClient.hpp"
 #include "../Protocol/Base37.hpp"
-#include "LoginError.hpp"
+#include "Error/LoginError.hpp"
 
 namespace
 {

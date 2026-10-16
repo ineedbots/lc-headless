@@ -1,6 +1,6 @@
 #include "pch.hpp"
-#include "../Cache/TestCache.hpp"
-#include "Fixtures.hpp"
+#include "../Support/Cache/TestCache.hpp"
+#include "../Support/Game/Fixtures.hpp"
 
 #include "Cache/GameCache_s.hpp"
 #include "Game/Map/CollisionFlag.hpp"

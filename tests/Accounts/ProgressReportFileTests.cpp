@@ -1,8 +1,8 @@
 #include "pch.hpp"
-#include "../TempFolder.hpp"
+#include "../Support/TempFolder.hpp"
 
 #include "Accounts/ProgressReportFile.hpp"
-#include "Script/ProgressReport_s.hpp"
+#include "Accounts/ProgressReport_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

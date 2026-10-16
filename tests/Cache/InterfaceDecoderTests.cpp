@@ -1,8 +1,8 @@
 #include "pch.hpp"
-#include "CacheWriter.hpp"
+#include "../Support/Cache/CacheWriter.hpp"
 
-#include "Cache/CacheError.hpp"
 #include "Cache/ClientCode_e.hpp"
+#include "Cache/Error/CacheError.hpp"
 #include "Cache/InterfaceDecoder.hpp"
 
 #include <catch2/catch_test_macros.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Io/Packet.hpp"
-#include "../ProtocolError.hpp"
+#include "../Error/ProtocolError.hpp"
 #include "../State/Entity_s.hpp"
 
 // Pieces PLAYER_INFO and NPC_INFO share: the tracked-list walk, steps, and common extended blocks.

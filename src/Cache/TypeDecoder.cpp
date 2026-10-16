@@ -2,7 +2,7 @@
 #include "TypeDecoder.hpp"
 
 #include "../Io/Packet.hpp"
-#include "CacheError.hpp"
+#include "Error/CacheError.hpp"
 #include "LocType_s.hpp"
 #include "NpcType_s.hpp"
 #include "ObjType_s.hpp"

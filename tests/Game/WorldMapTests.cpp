@@ -1,9 +1,9 @@
 #include "pch.hpp"
-#include "../Cache/TestCache.hpp"
-#include "Fixtures.hpp"
+#include "../Support/Cache/TestCache.hpp"
+#include "../Support/Game/Fixtures.hpp"
 
 #include "Cache/GameCache_s.hpp"
-#include "Core/Logger.hpp"
+#include "Console/Logger.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"

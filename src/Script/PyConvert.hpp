@@ -4,7 +4,7 @@
 #include "../Cache/LocType_s.hpp"
 #include "../Cache/NpcType_s.hpp"
 #include "../Cache/ObjType_s.hpp"
-#include "../Game/InterfaceView.hpp"
+#include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/State/Player_s.hpp"

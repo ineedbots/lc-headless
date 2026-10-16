@@ -2,7 +2,7 @@
 #include "MapDecoder.hpp"
 
 #include "../Io/Packet.hpp"
-#include "CacheError.hpp"
+#include "Error/CacheError.hpp"
 #include "LocType_s.hpp"
 #include "MapSquare.hpp"
 #include "TextPool.hpp"

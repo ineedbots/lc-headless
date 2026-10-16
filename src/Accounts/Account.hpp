@@ -1,15 +1,15 @@
 #pragma once
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Core/ConfigFile.hpp"
-#include "../Core/Logger.hpp"
+#include "../Config/ConfigFile.hpp"
+#include "../Console/ConsoleCommand_s.hpp"
+#include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Script/BotMessenger.hpp"
-#include "../Script/ConsoleCommand_s.hpp"
-#include "../Script/ProgressReport_s.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "ProgressReportFile.hpp"
+#include "ProgressReport_s.hpp"
 
 struct AccountOptions_s
 {

@@ -1,10 +1,10 @@
 #include "pch.hpp"
-#include "../LogCapture.hpp"
-#include "../TempFolder.hpp"
-#include "ScriptTestRuntime.hpp"
+#include "../Support/LogCapture.hpp"
+#include "../Support/Script/ScriptTestRuntime.hpp"
+#include "../Support/TempFolder.hpp"
 
-#include "Core/Logger.hpp"
-#include "Script/ScriptError.hpp"
+#include "Console/Logger.hpp"
+#include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptVm.hpp"
 
 #include <catch2/catch_test_macros.hpp>

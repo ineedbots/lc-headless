@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "ScriptRuntime.hpp"
 
-#include "ScriptError.hpp"
+#include "Error/ScriptError.hpp"
 
 #include <pocketpy.h>
 

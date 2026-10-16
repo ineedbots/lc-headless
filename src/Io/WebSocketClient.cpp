@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "WebSocketClient.hpp"
 
-#include "../Core/Logger.hpp"
+#include "../Console/Logger.hpp"
+#include "Error/WebSocketClosedError.hpp"
+#include "Error/WebSocketError.hpp"
 #include "NetSystem.hpp"
-#include "WebSocketClosedError.hpp"
-#include "WebSocketError.hpp"
 
 #include <ixwebsocket/IXSocketTLSOptions.h>
 #include <ixwebsocket/IXUrlParser.h>

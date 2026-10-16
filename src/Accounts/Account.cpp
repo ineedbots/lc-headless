@@ -2,18 +2,18 @@
 #include "Account.hpp"
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Core/ConfigFile.hpp"
-#include "../Core/Logger.hpp"
+#include "../Config/ConfigFile.hpp"
+#include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/Tile_s.hpp"
 #include "../Script/BotMessenger.hpp"
-#include "../Script/ProgressReport_s.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "ProgressReportFile.hpp"
+#include "ProgressReport_s.hpp"
 
 namespace
 {

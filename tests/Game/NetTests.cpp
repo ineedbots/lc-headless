@@ -1,10 +1,10 @@
 #include "pch.hpp"
 
 #include "Cache/GameCache_s.hpp"
-#include "Core/BigUInt.hpp"
-#include "Core/ConfigFile.hpp"
+#include "Config/ConfigFile.hpp"
+#include "Game/Error/ProtocolError.hpp"
 #include "Game/Net/ClientPacketWriter.hpp"
-#include "Game/Net/LoginError.hpp"
+#include "Game/Net/Error/LoginError.hpp"
 #include "Game/Net/LoginHandshake.hpp"
 #include "Game/Net/ServerPacketReader.hpp"
 #include "Game/Protocol/Base37.hpp"
@@ -12,8 +12,8 @@
 #include "Game/Protocol/ClientPackets.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
-#include "Game/ProtocolError.hpp"
 #include "Io/Isaac.hpp"
+#include "Utils/BigUInt.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

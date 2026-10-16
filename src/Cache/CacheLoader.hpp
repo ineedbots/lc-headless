@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Core/Logger.hpp"
+#include "../Console/Logger.hpp"
 #include "GameCache_s.hpp"
 
 class CacheLoader

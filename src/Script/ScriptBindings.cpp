@@ -3,6 +3,7 @@
 
 #include "../Cache/GameCache_s.hpp"
 #include "../Game/Map/WorldMap.hpp"
+#include "../Game/Nav/NavJson.hpp"
 #include "../Game/Protocol/Base37.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
@@ -10,7 +11,6 @@
 #include "../Game/State/Social_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
-#include "NavJson.hpp"
 #include "PyConvert.hpp"
 #include "ScriptApi.hpp"
 #include "ScriptRuntime.hpp"

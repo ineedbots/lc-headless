@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Core/ConfigFile.hpp"
-#include "../Core/Logger.hpp"
+#include "../Config/ConfigFile.hpp"
+#include "../Console/Logger.hpp"
 #include "../Io/WebSocketClient.hpp"
 #include "Decode/ServerPacketDecoder.hpp"
 #include "Map/WorldMap.hpp"

@@ -3,7 +3,7 @@
 
 #include "../Cache/GameCache_s.hpp"
 #include "../Cache/LocType_s.hpp"
-#include "../Core/Logger.hpp"
+#include "../Console/Logger.hpp"
 #include "GameClient.hpp"
 #include "Map/LocShape.hpp"
 #include "Map/PathFinder.hpp"

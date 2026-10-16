@@ -1,13 +1,13 @@
 #include "pch.hpp"
-#include "../DefaultLoggerScope.hpp"
-#include "../LogCapture.hpp"
-#include "../LoopbackPort.hpp"
+#include "../Support/DefaultLoggerScope.hpp"
+#include "../Support/LogCapture.hpp"
+#include "../Support/LoopbackPort.hpp"
 
-#include "Core/Logger.hpp"
+#include "Console/Logger.hpp"
+#include "Io/Error/WebSocketClosedError.hpp"
+#include "Io/Error/WebSocketError.hpp"
 #include "Io/NetSystem.hpp"
 #include "Io/WebSocketClient.hpp"
-#include "Io/WebSocketClosedError.hpp"
-#include "Io/WebSocketError.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>

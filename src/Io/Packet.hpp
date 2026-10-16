@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Core/BigUInt.hpp"
+#include "../Utils/BigUInt.hpp"
 #include "Isaac.hpp"
 
 class Packet

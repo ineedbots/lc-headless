@@ -2,8 +2,8 @@
 #include "ServerPacketReader.hpp"
 
 #include "../../Io/Isaac.hpp"
+#include "../Error/ProtocolError.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../ProtocolError.hpp"
 
 ServerPacketReader::ServerPacketReader(std::span<const s32> seed)
     : m_isaac{seed}

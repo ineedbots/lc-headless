@@ -1,8 +1,8 @@
 #include "pch.hpp"
 
-#include "Core/BigUInt.hpp"
 #include "Io/Isaac.hpp"
 #include "Io/Packet.hpp"
+#include "Utils/BigUInt.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

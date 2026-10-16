@@ -1,19 +1,19 @@
 #include "pch.hpp"
-#include "../Game/FakeGameServer.hpp"
-#include "../Game/TestWorld.hpp"
-#include "../LogCapture.hpp"
-#include "../Script/ScriptTestRuntime.hpp"
-#include "../TempFolder.hpp"
+#include "../Support/Game/FakeGameServer.hpp"
+#include "../Support/Game/TestWorld.hpp"
+#include "../Support/LogCapture.hpp"
+#include "../Support/Script/ScriptTestRuntime.hpp"
+#include "../Support/TempFolder.hpp"
 
 #include "Accounts/AccountRunner.hpp"
 #include "Cache/GameCache_s.hpp"
-#include "Core/ConfigFile.hpp"
-#include "Core/ConsoleInput.hpp"
-#include "Core/Logger.hpp"
+#include "Config/ConfigFile.hpp"
+#include "Console/ConsoleInput.hpp"
+#include "Console/Logger.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/WordPack.hpp"
-#include "Script/ScriptError.hpp"
+#include "Script/Error/ScriptError.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

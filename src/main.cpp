@@ -1,7 +1,7 @@
 #include "pch.hpp"
-#include "Application.hpp"
+#include "Application/Application.hpp"
 
-#include "Core/Logger.hpp"
+#include "Console/Logger.hpp"
 
 int main(int argc, char** argv)
 {

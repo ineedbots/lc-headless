@@ -1,9 +1,9 @@
 #pragma once
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Game/ChatDialog.hpp"
 #include "../Game/GameActions.hpp"
-#include "../Game/InterfaceView.hpp"
+#include "../Game/Interface/ChatDialog.hpp"
+#include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Nav/WorldPathFinder.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"

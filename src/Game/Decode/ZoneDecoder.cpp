@@ -2,9 +2,9 @@
 #include "ZoneDecoder.hpp"
 
 #include "../../Io/Packet.hpp"
+#include "../Error/ProtocolError.hpp"
 #include "../Map/LocShape.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../ProtocolError.hpp"
 #include "../State/Entity_s.hpp"
 #include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"

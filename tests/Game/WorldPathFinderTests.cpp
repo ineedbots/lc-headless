@@ -3,8 +3,8 @@
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
 #include "Game/Nav/NavGraph.hpp"
+#include "Game/Nav/NavJson.hpp"
 #include "Game/Nav/WorldPathFinder.hpp"
-#include "Script/NavJson.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>

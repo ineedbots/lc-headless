@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "ScriptVm.hpp"
 
-#include "../Core/Logger.hpp"
-#include "ScriptError.hpp"
+#include "../Console/Logger.hpp"
+#include "Error/ScriptError.hpp"
 #include "ScriptRuntime.hpp"
 #include "Stdlib.hpp"
 

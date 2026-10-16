@@ -2,12 +2,12 @@
 #include "AccountRunner.hpp"
 
 #include "../Cache/GameCache_s.hpp"
-#include "../Core/ConfigFile.hpp"
-#include "../Core/ConsoleInput.hpp"
-#include "../Core/Logger.hpp"
+#include "../Config/ConfigFile.hpp"
+#include "../Console/ConsoleCommand_s.hpp"
+#include "../Console/ConsoleInput.hpp"
+#include "../Console/Logger.hpp"
 #include "../Game/Protocol/WordPack.hpp"
 #include "../Script/BotMessenger.hpp"
-#include "../Script/ConsoleCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "Account.hpp"
 

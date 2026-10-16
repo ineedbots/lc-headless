@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "TextPool.hpp"
 
-#include "CacheError.hpp"
+#include "Error/CacheError.hpp"
 
 TextPool::TextPool()
     : m_options{std::string_view{}}
