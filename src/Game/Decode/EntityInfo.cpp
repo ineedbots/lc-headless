@@ -3,6 +3,7 @@
 
 #include "../../Io/Packet.hpp"
 #include "../State/Entity_s.hpp"
+#include "PacketFields.hpp"
 
 namespace
 {
@@ -45,17 +46,17 @@ std::optional<EntityRef_s> EntityInfo::ToFaceEntity(u16 target)
 
 Animation_s EntityInfo::ReadAnimation(Packet& packet, u64 tick)
 {
-    const auto id = packet.G2();
+    const auto id = PacketFields::ReadId(packet);
     const auto delay = packet.G1();
-    return {.id = id == NO_ID ? -1 : id, .delay = delay, .tick = tick};
+    return {.id = id, .delay = delay, .tick = tick};
 }
 
 SpotAnim_s EntityInfo::ReadSpotAnim(Packet& packet, u64 tick)
 {
-    const auto id = packet.G2();
+    const auto id = PacketFields::ReadId(packet);
     const auto info = packet.G4();
     return {
-        .id = id == NO_ID ? -1 : id,
+        .id = id,
         .height = info >> SPOT_HEIGHT_SHIFT,
         .delay = info & SPOT_DELAY_MASK,
         .tick = tick,

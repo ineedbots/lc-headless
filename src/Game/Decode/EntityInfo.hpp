@@ -18,7 +18,6 @@ public:
     static constexpr s32 MOVE_RUN = 2;
     static constexpr s32 MOVE_REMOVE = 3;
     static constexpr u16 NO_TARGET = 0xFFFF;
-    static constexpr u16 NO_ID = 0xFFFF;
 
     EntityInfo() = delete;
 
