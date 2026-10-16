@@ -15,6 +15,7 @@
 #include "PyConvert.hpp"
 #include "ScriptApi.hpp"
 #include "ScriptBindings.hpp"
+#include "ScriptCommand_s.hpp"
 #include "ScriptRuntime.hpp"
 #include "ScriptVm.hpp"
 

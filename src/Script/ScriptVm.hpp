@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Console/LogLevel_e.hpp"
 #include "../Console/Logger.hpp"
 #include "ScriptRuntime.hpp"
 

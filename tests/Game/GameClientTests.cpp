@@ -6,6 +6,7 @@
 
 #include "Cache/GameCache_s.hpp"
 #include "Config/ConfigFile.hpp"
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"

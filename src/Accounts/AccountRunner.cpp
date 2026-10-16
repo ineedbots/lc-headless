@@ -3,31 +3,22 @@
 
 #include "../Cache/GameCache_s.hpp"
 #include "../Config/ConfigFile.hpp"
+#include "../Console/ConsoleCommandParser.hpp"
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/ConsoleInput.hpp"
+#include "../Console/LogLevelNames.hpp"
+#include "../Console/LogLevel_e.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/Protocol/WordPack.hpp"
 #include "../Script/BotMessenger.hpp"
+#include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "Account.hpp"
 
 namespace
 {
-    constexpr auto TARGET_PREFIX = '@';
-
-    struct LogLevelName_s
-    {
-        LogLevel_e level;
-        std::string_view name;
-    };
-
-    constexpr auto LOG_LEVEL_NAMES = std::array{
-        LogLevelName_s{LogLevel_e::Verbose, "verbose"},
-        LogLevelName_s{LogLevel_e::Info, "info"},
-        LogLevelName_s{LogLevel_e::Warning, "warning"},
-        LogLevelName_s{LogLevel_e::Error, "error"},
-    };
+    constexpr auto TARGET_PREFIX = ConsoleCommandParser::TARGET_PREFIX;
 
     bool HasCommand(const std::vector<ScriptCommand_s>& commands, std::string_view name)
     {
@@ -102,18 +93,17 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
 
 void AccountRunner::HandleCommand(std::string_view line)
 {
-    auto rest = StringUtils::Trim(line);
-    if (rest.empty())
+    const auto parsed = ConsoleCommandParser::Parse(line);
+    if (!parsed)
     {
         return;
     }
 
     Account* target = nullptr;
 
-    if (rest.front() == TARGET_PREFIX)
+    if (const auto& name = parsed->target)
     {
-        const auto [name, after] = StringUtils::SplitFirstWord(rest.substr(1));
-        target = FindAccount(name);
+        target = FindAccount(*name);
         if (target == nullptr)
         {
             auto names = std::vector<std::string>{};
@@ -122,22 +112,18 @@ void AccountRunner::HandleCommand(std::string_view line)
                 names.push_back(account->GetName());
             }
 
-            m_logger->Warning("No account is named {}; the accounts are {}", name, StringUtils::Join(names, ", "));
+            m_logger->Warning("No account is named {}; the accounts are {}", *name, StringUtils::Join(names, ", "));
             return;
         }
 
-        if (after.empty())
+        if (parsed->command.name.empty())
         {
-            m_logger->Warning("{}{} needs a command after it, such as {}{} {}", TARGET_PREFIX, name, TARGET_PREFIX, name, COMMAND_HELP);
+            m_logger->Warning("{}{} needs a command after it, such as {}{} {}", TARGET_PREFIX, *name, TARGET_PREFIX, *name, COMMAND_HELP);
             return;
         }
-
-        rest = after;
     }
 
-    const auto [name, text] = StringUtils::SplitFirstWord(rest);
-    const auto words = StringUtils::SplitWords(text);
-    const auto command = ConsoleCommand_s{.name = StringUtils::ToLower(name), .text = std::string{text}, .args = {words.begin(), words.end()}};
+    const auto& command = parsed->command;
     if (command.name == COMMAND_HELP)
     {
         ShowHelp(target);
@@ -308,21 +294,20 @@ void AccountRunner::SetLogLevel(const Account* target, std::span<const std::stri
 
     if (args.empty())
     {
-        const auto current = std::ranges::find(LOG_LEVEL_NAMES, m_logger->GetLevel(), &LogLevelName_s::level);
-        m_logger->Warning("The log level is {}", current->name);
+        m_logger->Warning("The log level is {}", LogLevelNames::GetName(m_logger->GetLevel()));
         return;
     }
 
-    const auto chosen = std::ranges::find(LOG_LEVEL_NAMES, StringUtils::ToLower(args.front()), &LogLevelName_s::name);
-    if (args.size() > 1 || chosen == LOG_LEVEL_NAMES.end())
+    const auto chosen = LogLevelNames::Find(StringUtils::ToLower(args.front()));
+    if (args.size() > 1 || !chosen)
     {
-        m_logger->Warning("{} takes one of verbose, info, warning or error", COMMAND_LOG_LEVEL);
+        m_logger->Warning("{} takes one of {}", COMMAND_LOG_LEVEL, LogLevelNames::CHOICES);
         return;
     }
 
-    m_logger->SetLevel(chosen->level);
+    m_logger->SetLevel(*chosen);
     // A warning, so it shows at every level but error.
-    m_logger->Warning("The log level is now {}", chosen->name);
+    m_logger->Warning("The log level is now {}", LogLevelNames::GetName(*chosen));
 }
 
 void AccountRunner::Say(Account* target, std::string_view text)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Console/LogEntry_s.hpp"
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 
 struct CapturedLog_s

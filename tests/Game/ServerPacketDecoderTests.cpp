@@ -3,6 +3,7 @@
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/LogCapture.hpp"
 
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
 #include "Game/Error/ProtocolError.hpp"

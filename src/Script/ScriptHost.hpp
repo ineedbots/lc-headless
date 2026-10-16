@@ -11,6 +11,7 @@
 #include "../Utils/FileWatcher.hpp"
 #include "BotMessenger.hpp"
 #include "ScriptApi.hpp"
+#include "ScriptCommand_s.hpp"
 #include "ScriptRuntime.hpp"
 #include "ScriptVm.hpp"
 

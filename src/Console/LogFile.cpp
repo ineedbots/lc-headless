@@ -1,7 +1,8 @@
 #include "pch.hpp"
 #include "LogFile.hpp"
 
-#include "Logger.hpp"
+#include "LogEntry_s.hpp"
+#include "LogFormatter.hpp"
 
 LogFile::LogFile(std::filesystem::path path)
     : m_path{std::move(path)}
@@ -22,7 +23,7 @@ LogFile::LogFile(std::filesystem::path path)
 
 void LogFile::Write(const LogEntry_s& entry)
 {
-    auto line = Logger::FormatLine(entry);
+    auto line = LogFormatter::FormatLine(entry);
     line += '\n';
     m_stream.write(line.data(), static_cast<std::streamsize>(line.size()));
     m_stream.flush();

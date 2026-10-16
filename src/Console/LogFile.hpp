@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Logger.hpp"
+#include "LogEntry_s.hpp"
 
 // Each entry is flushed as it's written, so a crash loses none. Not thread-safe on its own: a Logger's
 // sink is only called under the logger's lock.

@@ -9,11 +9,3 @@ struct ConsoleCommand_s
     // text split at whitespace.
     std::vector<std::string> args;
 };
-
-// As help lists it.
-struct ScriptCommand_s
-{
-    std::string name;
-    // Empty when the script gave none.
-    std::string help;
-};

@@ -2,6 +2,8 @@
 #include "../Support/DefaultLoggerScope.hpp"
 #include "../Support/LogCapture.hpp"
 
+#include "Console/LogEntry_s.hpp"
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -526,43 +528,6 @@ TEST_CASE("Logger GetDefault is safe while another thread sets the default", "[L
 
     CHECK(made > 0);
     CHECK(first.GetEntries().size() + second.GetEntries().size() == made);
-}
-
-TEST_CASE("Logger::FormatLine", "[Logger]")
-{
-    const auto time = GetSampleTime();
-
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Info, time)) == "2026-10-05T18:34:12.345Z INFO    hello");
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Verbose, time)) == "2026-10-05T18:34:12.345Z VERBOSE hello");
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Warning, time)) == "2026-10-05T18:34:12.345Z WARNING hello");
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Error, time)) == "2026-10-05T18:34:12.345Z ERROR   hello");
-
-    const auto wholeSecond = std::chrono::sys_days{2026y / std::chrono::January / 2} + 3h + 4min + 5s;
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Info, wholeSecond)) == "2026-01-02T03:04:05.000Z INFO    hello");
-
-    const auto almostNextMillisecond = std::chrono::sys_days{2026y / std::chrono::October / 5} + 18h + 34min + 12s + 345999us;
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Info, almostNextMillisecond)) == "2026-10-05T18:34:12.345Z INFO    hello");
-
-    const auto location = std::source_location::current();
-    const auto expected = std::format("2026-10-05T18:34:12.345Z INFO    hello [LoggerTests.cpp:{}]", location.line());
-    CHECK(Logger::FormatLine(MakeEntry(LogLevel_e::Info, time, location)) == expected);
-
-    auto named = MakeEntry(LogLevel_e::Warning, time);
-    named.source = "bot1";
-    CHECK(Logger::FormatLine(named) == "2026-10-05T18:34:12.345Z WARNING [bot1] hello");
-}
-
-TEST_CASE("Logger::FormatColoredLine colors each level but info", "[Logger]")
-{
-    const auto time = GetSampleTime();
-
-    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Verbose, time)) == "\x1B[36m2026-10-05T18:34:12.345Z VERBOSE hello\x1B[0m");
-    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Info, time)) == "2026-10-05T18:34:12.345Z INFO    hello");
-    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Warning, time)) == "\x1B[33m2026-10-05T18:34:12.345Z WARNING hello\x1B[0m");
-    CHECK(Logger::FormatColoredLine(MakeEntry(LogLevel_e::Error, time)) == "\x1B[31m2026-10-05T18:34:12.345Z ERROR   hello\x1B[0m");
-
-    CHECK(Logger::GetConsoleStream(LogLevel_e::Info) == stdout);
-    CHECK(Logger::GetConsoleStream(LogLevel_e::Warning) == stderr);
 }
 
 TEST_CASE("Logger never interleaves writes from several threads", "[Logger][threads]")

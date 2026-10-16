@@ -1,70 +1,16 @@
 #pragma once
 
-enum class LogLevel_e : u8
-{
-    Verbose,
-    Info,
-    Warning,
-    Error,
-};
-
-struct LogEntry_s
-{
-    LogLevel_e level;
-    std::chrono::system_clock::time_point time;
-    std::optional<std::source_location> location;
-    std::string_view message;
-    // Empty for an unnamed logger.
-    std::string_view source;
-};
-
-template <typename... TArgs>
-struct LogFormat_s
-{
-    // Implicit, so the format string converts at the call site, which is where
-    // std::source_location::current() is evaluated. Only Debug builds take the location,
-    // the same switch as assert, so a Release binary carries no source paths.
-#ifdef NDEBUG
-    template <typename T>
-        requires std::convertible_to<const T&, std::string_view>
-    consteval LogFormat_s(const T& formatText) noexcept
-        : text{formatText}
-    {
-    }
-#else
-    template <typename T>
-        requires std::convertible_to<const T&, std::string_view>
-    consteval LogFormat_s(const T& formatText, std::source_location callSite = std::source_location::current()) noexcept
-        : text{formatText}
-        , location{callSite}
-        , hasLocation{true}
-    {
-    }
-#endif
-
-    [[nodiscard]] std::optional<std::source_location> GetLocation() const noexcept
-    {
-        if (!hasLocation)
-        {
-            return std::nullopt;
-        }
-
-        return location;
-    }
-
-    std::format_string<TArgs...> text;
-    // Not a std::optional: MSVC 19.44 rejects a consteval conversion to any type with an
-    // optional member (C2440, "invalid aggregate initialization").
-    std::source_location location;
-    bool hasLocation = false;
-};
+#include "ConsoleOutput.hpp"
+#include "LogEntry_s.hpp"
+#include "LogFormat_s.hpp"
+#include "LogLevel_e.hpp"
 
 class Logger
 {
 public:
     using Sink = std::function<void(const LogEntry_s& entry)>;
 
-    explicit Logger(LogLevel_e level = LogLevel_e::Info, Sink sink = WriteToConsole);
+    explicit Logger(LogLevel_e level = LogLevel_e::Info, Sink sink = ConsoleOutput::Write);
 
     template <typename... TArgs>
     void Verbose(LogFormat_s<std::type_identity_t<TArgs>...> format, TArgs&&... args) noexcept
@@ -120,14 +66,6 @@ public:
     [[nodiscard]] static std::shared_ptr<Logger> CreateNamed(std::shared_ptr<Logger> parent, std::string source);
     [[nodiscard]] static std::shared_ptr<Logger> GetDefault() noexcept;
     static std::shared_ptr<Logger> SetDefault(std::shared_ptr<Logger> logger) noexcept;
-
-    static void WriteToConsole(const LogEntry_s& entry);
-    static void WritePlainToConsole(const LogEntry_s& entry);
-    [[nodiscard]] static std::string FormatLine(const LogEntry_s& entry);
-    [[nodiscard]] static std::string FormatColoredLine(const LogEntry_s& entry);
-    // Colored only on a terminal that shows VT100 colors, and only when NO_COLOR isn't set.
-    [[nodiscard]] static std::string FormatConsoleLine(const LogEntry_s& entry);
-    [[nodiscard]] static std::FILE* GetConsoleStream(LogLevel_e level);
 
 private:
     void Write(LogLevel_e level, std::optional<std::source_location> location, std::string_view message);

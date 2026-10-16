@@ -8,7 +8,9 @@
 #include "../Config/ConfigFile.hpp"
 #include "../Config/Error/ConfigError.hpp"
 #include "../Console/ConsoleInput.hpp"
+#include "../Console/ConsoleLogScope.hpp"
 #include "../Console/LogFile.hpp"
+#include "../Console/LogSinks.hpp"
 #include "../Console/Logger.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
@@ -44,36 +46,6 @@ namespace
         std::ranges::sort(files);
         return files;
     }
-
-    class ConsoleLogScope
-    {
-    public:
-        using Install = std::function<void(std::shared_ptr<ConsoleInput>)>;
-
-        ConsoleLogScope(Install install, std::shared_ptr<ConsoleInput> console)
-            : m_install{std::move(install)}
-            , m_console{std::move(console)}
-        {
-            m_install(m_console);
-        }
-
-        ~ConsoleLogScope()
-        {
-            if (m_console)
-            {
-                m_console->Close();
-            }
-
-            m_install(nullptr);
-        }
-
-        ConsoleLogScope(const ConsoleLogScope&) = delete;
-        ConsoleLogScope& operator=(const ConsoleLogScope&) = delete;
-
-    private:
-        Install m_install;
-        std::shared_ptr<ConsoleInput> m_console;
-    };
 
     // The server lets a username log in once, so a second file for the same one would only be kicked.
     void CheckUsernamesAreUnique(const std::vector<AccountConfig_s>& accounts)
@@ -210,31 +182,7 @@ int Application::Run()
 
 void Application::InstallLogSink(std::shared_ptr<ConsoleInput> console)
 {
-    if (console && !console->IsInteractive())
-    {
-        console.reset();
-    }
-
-    m_logger->SetSink([file = m_logFile, console = std::move(console), raw = m_commandLine.rawConsole](const LogEntry_s& entry)
-    {
-        if (file)
-        {
-            file->Write(entry);
-        }
-
-        if (console)
-        {
-            console->Print(Logger::GetConsoleStream(entry.level), Logger::FormatConsoleLine(entry));
-        }
-        else if (raw)
-        {
-            Logger::WritePlainToConsole(entry);
-        }
-        else
-        {
-            Logger::WriteToConsole(entry);
-        }
-    });
+    m_logger->SetSink(LogSinks::Make(m_logFile, std::move(console), m_commandLine.rawConsole));
 }
 
 std::vector<AccountConfig_s> Application::LoadAccounts() const

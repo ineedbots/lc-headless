@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "ConfigFile.hpp"
 
+#include "../Console/LogLevelNames.hpp"
+#include "../Console/LogLevel_e.hpp"
 #include "../Console/Logger.hpp"
 #include "../Io/WebSocketUrl.hpp"
 #include "../Utils/BigUInt.hpp"
@@ -32,19 +34,6 @@ namespace
     constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
     constexpr auto MAX_RUN_ENERGY = 100;
     constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
-
-    struct LogLevelName_s
-    {
-        LogLevel_e level;
-        std::string_view name;
-    };
-
-    constexpr auto LOG_LEVEL_NAMES = std::array{
-        LogLevelName_s{LogLevel_e::Verbose, "verbose"},
-        LogLevelName_s{LogLevel_e::Info, "info"},
-        LogLevelName_s{LogLevel_e::Warning, "warning"},
-        LogLevelName_s{LogLevel_e::Error, "error"},
-    };
 
     struct TextPosition_s
     {
@@ -236,21 +225,18 @@ namespace nlohmann
     {
         static void from_json(const json& value, LogLevel_e& result)
         {
-            const auto name = value.get<std::string>();
-            const auto entry = std::ranges::find(LOG_LEVEL_NAMES, name, &LogLevelName_s::name);
-            if (entry == LOG_LEVEL_NAMES.end())
+            const auto level = LogLevelNames::Find(value.get<std::string>());
+            if (!level)
             {
-                throw json::type_error::create(TYPE_ERROR_ID, "must be verbose, info, warning or error", &value);
+                throw json::type_error::create(TYPE_ERROR_ID, std::format("must be {}", LogLevelNames::CHOICES), &value);
             }
 
-            result = entry->level;
+            result = *level;
         }
 
         static void to_json(ordered_json& value, LogLevel_e level)
         {
-            const auto entry = std::ranges::find(LOG_LEVEL_NAMES, level, &LogLevelName_s::level);
-            assert(entry != LOG_LEVEL_NAMES.end() && "LogLevel_e value missing from LOG_LEVEL_NAMES");
-            value = std::string{entry->name};
+            value = std::string{LogLevelNames::GetName(level)};
         }
     };
 

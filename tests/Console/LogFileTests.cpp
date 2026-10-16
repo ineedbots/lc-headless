@@ -1,7 +1,9 @@
 #include "pch.hpp"
 #include "../Support/TempFolder.hpp"
 
+#include "Console/LogEntry_s.hpp"
 #include "Console/LogFile.hpp"
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 
 #include <catch2/catch_test_macros.hpp>

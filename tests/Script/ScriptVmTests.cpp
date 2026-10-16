@@ -3,6 +3,7 @@
 #include "../Support/Script/ScriptTestRuntime.hpp"
 #include "../Support/TempFolder.hpp"
 
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptVm.hpp"

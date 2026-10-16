@@ -5,6 +5,7 @@
 
 #include "Config/ConfigFile.hpp"
 #include "Config/Error/ConfigError.hpp"
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Utils/BigUInt.hpp"
 

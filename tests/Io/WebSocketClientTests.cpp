@@ -3,6 +3,7 @@
 #include "../Support/LogCapture.hpp"
 #include "../Support/LoopbackPort.hpp"
 
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Io/Error/WebSocketClosedError.hpp"
 #include "Io/Error/WebSocketError.hpp"

@@ -6,6 +6,7 @@
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Script/BotMessenger.hpp"
+#include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "ProgressReportFile.hpp"

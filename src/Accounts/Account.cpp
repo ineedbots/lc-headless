@@ -10,6 +10,7 @@
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/Tile_s.hpp"
 #include "../Script/BotMessenger.hpp"
+#include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"

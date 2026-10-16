@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "LogCapture.hpp"
 
+#include "Console/LogEntry_s.hpp"
+#include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 
 // clang-format off
