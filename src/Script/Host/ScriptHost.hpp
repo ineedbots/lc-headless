@@ -10,8 +10,8 @@
 #include "../../Game/State/GameState_s.hpp"
 #include "../../Utils/FileWatcher.hpp"
 #include "../BotMessenger.hpp"
-#include "../ScriptApi.hpp"
 #include "../ScriptCommand_s.hpp"
+#include "../ScriptContext.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
 
@@ -131,7 +131,7 @@ private:
     ScriptRuntime& m_runtime;
     GameClient& m_client;
     GameActions m_actions;
-    ScriptApi m_api;
+    ScriptContext m_context;
     std::shared_ptr<Logger> m_logger;
     ScriptHostOptions_s m_options;
     // Empty only while a reload is replacing it, or after a reload failed to load.

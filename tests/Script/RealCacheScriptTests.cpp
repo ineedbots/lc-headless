@@ -12,7 +12,7 @@
 #include "Game/Map/WorldMap.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Script/Bindings/ScriptBindings.hpp"
-#include "Script/ScriptApi.hpp"
+#include "Script/ScriptContext.hpp"
 #include "Script/ScriptVm.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -71,7 +71,7 @@ namespace
         WorldMap map;
         GameClient client;
         GameActions actions;
-        ScriptApi api;
+        ScriptContext api;
         ScriptVm vm;
     };
 }

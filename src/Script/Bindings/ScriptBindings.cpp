@@ -3,12 +3,21 @@
 
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/MapSquare.hpp"
+#include "../../Game/Interface/ChatDialog.hpp"
 #include "../../Game/Map/WalkMap.hpp"
 #include "../../Game/Map/WorldMap.hpp"
 #include "../../Game/Menu/MenuOp.hpp"
+#include "../../Game/Menu/Menus.hpp"
 #include "../../Game/Nav/NavJson.hpp"
 #include "../../Game/Nav/Navigation.hpp"
+#include "../../Game/Nav/WorldPathFinder.hpp"
 #include "../../Game/Protocol/Base37.hpp"
+#include "../../Game/Query/EntityQuery.hpp"
+#include "../../Game/Query/InventoryItem_s.hpp"
+#include "../../Game/Query/InventoryQuery.hpp"
+#include "../../Game/Query/PlayerQuery.hpp"
+#include "../../Game/Query/ReachQuery.hpp"
+#include "../../Game/Query/SearchFilter_s.hpp"
 #include "../../Game/State/EntityStatus.hpp"
 #include "../../Game/State/GameState_s.hpp"
 #include "../../Game/State/Npc_s.hpp"
@@ -24,7 +33,9 @@
 #include "../Convert/PyValue.hpp"
 #include "../Error/ScriptRaisedError.hpp"
 #include "../Error/ScriptTypeError.hpp"
-#include "../ScriptApi.hpp"
+#include "../ScriptActions.hpp"
+#include "../ScriptContext.hpp"
+#include "../ScriptControl.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
 #include "../Stdlib.hpp"
@@ -48,7 +59,7 @@ namespace
         "relog",
         "send_bot_message",
     });
-    constexpr auto MAX_RELOG_SECONDS = s64{24 * 60 * 60};
+    constexpr auto MAX_RELOG_SECONDS = s64{ScriptControl::MAX_RELOG.count()};
     constexpr auto SETTINGS_JSON = "_settings_json";
     constexpr auto MAX_COORD = s64{Tile_s::MAX_COORD};
     constexpr auto MAX_LEVEL = s64{MapSquare::LEVELS - 1};
@@ -118,13 +129,13 @@ namespace
         vm.RunSource(*source, path, module);
     }
 
-    std::array<ScriptApi*, ScriptRuntime::MAX_VMS> boundApis{};
+    std::array<ScriptContext*, ScriptRuntime::MAX_VMS> boundContexts{};
 
-    ScriptApi& GetApi()
+    ScriptContext& GetContext()
     {
-        auto* api = boundApis[static_cast<std::size_t>(py_currentvm())];
-        assert(api != nullptr && "A script function ran in a VM with no ScriptApi bound");
-        return *api;
+        auto* context = boundContexts[static_cast<std::size_t>(py_currentvm())];
+        assert(context != nullptr && "A script function ran in a VM with no ScriptContext bound");
+        return *context;
     }
 
     // Script functions are called from pocketpy's C code, so every C++ exception becomes a Python one here.
@@ -239,23 +250,23 @@ namespace
 
     void FromNpc(py_OutRef out, const Npc_s& npc)
     {
-        const auto& api = GetApi();
-        PyObjects::FromNpc(out, npc, api.GetState().tick, api.GetCache());
+        auto& context = GetContext();
+        PyObjects::FromNpc(out, npc, context.GetState().tick, context.GetCache());
     }
 
     void FromGroundItem(py_OutRef out, const GroundItem_s& item)
     {
-        PyObjects::FromGroundItem(out, item, GetApi().GetCache());
+        PyObjects::FromGroundItem(out, item, GetContext().GetCache());
     }
 
     void FromItem(py_OutRef out, const InventoryItem_s& item)
     {
-        PyObjects::FromItem(out, item, GetApi().GetCache());
+        PyObjects::FromItem(out, item, GetContext().GetCache());
     }
 
     void FromLoc(py_OutRef out, const SceneLoc_s& loc)
     {
-        PyObjects::FromLoc(out, loc, GetApi().GetCache());
+        PyObjects::FromLoc(out, loc, GetContext().GetCache());
     }
 
     void FromTile(py_OutRef out, const Tile_s& tile)
@@ -265,7 +276,7 @@ namespace
 
     void FromPlayer(py_OutRef out, const Player_s& player)
     {
-        PyObjects::FromPlayer(out, player, GetApi().GetState().tick);
+        PyObjects::FromPlayer(out, player, GetContext().GetState().tick);
     }
 
     void FromFriend(py_OutRef out, const Friend_s& entry)
@@ -285,7 +296,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(static_cast<s64>(GetApi().GetState().tick));
+            return ReturnInt(static_cast<s64>(GetContext().GetState().tick));
         });
     }
 
@@ -293,7 +304,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().GetState().placed);
+            return ReturnBool(GetContext().GetState().placed);
         });
     }
 
@@ -301,7 +312,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetStepTime());
+            return ReturnInt(GetContext().GetControl().GetStepTime());
         });
     }
 
@@ -309,7 +320,7 @@ namespace
     {
         return Guard([]
         {
-            GetApi().NoteProgress();
+            GetContext().GetControl().NoteProgress();
             return ReturnNone();
         });
     }
@@ -319,7 +330,7 @@ namespace
     {
         return Guard([]
         {
-            const auto last = GetApi().GetLastProgress();
+            const auto last = GetContext().GetControl().GetLastProgress();
             return last ? ReturnInt(*last) : ReturnNone();
         });
     }
@@ -329,7 +340,7 @@ namespace
         return Guard([argv]
         {
             const auto delay = PyValue::ToInt(py_arg(0), "delay_seconds", 0, MAX_RELOG_SECONDS);
-            GetApi().RequestRelog(std::chrono::seconds{delay});
+            GetContext().GetControl().RequestRelog(std::chrono::seconds{delay});
             return ReturnNone();
         });
     }
@@ -338,7 +349,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().CanSetRun());
+            return ReturnBool(GetContext().GetActions().CanSetRun());
         });
     }
 
@@ -346,7 +357,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().IsAppearanceScreenOpen());
+            return ReturnBool(GetContext().GetActions().IsAppearanceScreenOpen());
         });
     }
 
@@ -385,7 +396,7 @@ namespace
                 .kits = ToBytes<IdkDesign_s::KIT_COUNT>(py_arg(1), "kits"),
                 .colours = ToBytes<IdkDesign_s::COLOUR_COUNT>(py_arg(2), "colours"),
             };
-            return ReturnBool(GetApi().SetAppearance(design));
+            return ReturnBool(GetContext().GetActions().SetAppearance(design));
         });
     }
 
@@ -393,7 +404,7 @@ namespace
     {
         return Guard([]
         {
-            GetApi().RequestStop(StopRequest_e::Script);
+            GetContext().GetControl().RequestStop(StopRequest_e::Script);
             return ReturnNone();
         });
     }
@@ -402,7 +413,7 @@ namespace
     {
         return Guard([]
         {
-            GetApi().RequestStop(StopRequest_e::Account);
+            GetContext().GetControl().RequestStop(StopRequest_e::Account);
             return ReturnNone();
         });
     }
@@ -411,7 +422,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetPosition().x);
+            return ReturnInt(GetContext().GetPosition().x);
         });
     }
 
@@ -419,7 +430,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetPosition().z);
+            return ReturnInt(GetContext().GetPosition().z);
         });
     }
 
@@ -427,7 +438,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetPosition().level);
+            return ReturnInt(GetContext().GetPosition().level);
         });
     }
 
@@ -435,7 +446,7 @@ namespace
     {
         return Guard([]
         {
-            const auto position = GetApi().GetPosition();
+            const auto position = GetContext().GetPosition();
             PyValue::FromPoint(py_retval(), position.x, position.z);
             return true;
         });
@@ -445,7 +456,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().pid);
+            return ReturnInt(GetContext().GetState().pid);
         });
     }
 
@@ -453,7 +464,7 @@ namespace
     {
         return Guard([]
         {
-            const auto& appearance = GetApi().GetLocalPlayer().appearance;
+            const auto& appearance = GetContext().GetLocalPlayer().appearance;
             return appearance ? ReturnString(appearance->name) : ReturnNone();
         });
     }
@@ -462,7 +473,7 @@ namespace
     {
         return Guard([]
         {
-            const auto& appearance = GetApi().GetLocalPlayer().appearance;
+            const auto& appearance = GetContext().GetLocalPlayer().appearance;
             return ReturnInt(appearance ? appearance->combatLevel : 0);
         });
     }
@@ -471,7 +482,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().runEnergy);
+            return ReturnInt(GetContext().GetState().runEnergy);
         });
     }
 
@@ -479,7 +490,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().runWeight);
+            return ReturnInt(GetContext().GetState().runWeight);
         });
     }
 
@@ -487,7 +498,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().IsMoving());
+            return ReturnBool(GetContext().GetPlayer().IsMoving());
         });
     }
 
@@ -495,7 +506,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromOptional(py_retval(), GetApi().GetState().walkDestination, [](py_OutRef out, const Tile_s& tile)
+            PyValue::FromOptional(py_retval(), GetContext().GetState().walkDestination, [](py_OutRef out, const Tile_s& tile)
             {
                 PyValue::FromPoint(out, tile.x, tile.z);
             });
@@ -507,7 +518,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().InCombat());
+            return ReturnBool(GetContext().GetPlayer().InCombat());
         });
     }
 
@@ -515,7 +526,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().IsRunning());
+            return ReturnBool(GetContext().GetPlayer().IsRunning());
         });
     }
 
@@ -523,14 +534,14 @@ namespace
     {
         return Guard([]
         {
-            FromPlayer(py_retval(), GetApi().GetLocalPlayer());
+            FromPlayer(py_retval(), GetContext().GetLocalPlayer());
             return true;
         });
     }
 
     const Stat_s& GetStatArgument(py_StackRef argv)
     {
-        return GetApi().GetStat(static_cast<s32>(PyValue::ToInt(py_arg(0), "stat")));
+        return GetContext().GetPlayer().GetStat(static_cast<s32>(PyValue::ToInt(py_arg(0), "stat")));
     }
 
     bool GetCurrentStat(int, py_StackRef argv) noexcept
@@ -561,7 +572,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().GetStat(Stat_e::Hitpoints).level);
+            return ReturnInt(GetContext().GetState().GetStat(Stat_e::Hitpoints).level);
         });
     }
 
@@ -569,7 +580,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().GetStat(Stat_e::Hitpoints).baseLevel);
+            return ReturnInt(GetContext().GetState().GetStat(Stat_e::Hitpoints).baseLevel);
         });
     }
 
@@ -577,7 +588,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().GetStat(Stat_e::Hitpoints).GetPercent());
+            return ReturnInt(GetContext().GetState().GetStat(Stat_e::Hitpoints).GetPercent());
         });
     }
 
@@ -585,8 +596,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& api = GetApi();
-            return ReturnInt(api.GetPosition().GetDistance(api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
+            auto& context = GetContext();
+            return ReturnInt(context.GetPosition().GetDistance(context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
         });
     }
 
@@ -604,9 +615,9 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& api = GetApi();
-            const auto centre = api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
-            return ReturnBool(api.GetPosition().GetDistance(centre) <= PyValue::ToInt(py_arg(2), "radius"));
+            auto& context = GetContext();
+            const auto centre = context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
+            return ReturnBool(context.GetPosition().GetDistance(centre) <= PyValue::ToInt(py_arg(2), "radius"));
         });
     }
 
@@ -618,7 +629,7 @@ namespace
             const auto z = ToCoord(py_arg(1), "z");
             const auto width = PyValue::ToInt(py_arg(2), "width");
             const auto height = PyValue::ToInt(py_arg(3), "height");
-            const auto here = GetApi().GetPosition();
+            const auto here = GetContext().GetPosition();
             return ReturnBool(here.x >= x && here.x < x + width && here.z >= z && here.z < z + height);
         });
     }
@@ -627,8 +638,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& api = GetApi();
-            return ReturnBool(api.GetPosition() == api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
+            auto& context = GetContext();
+            return ReturnBool(context.GetPosition() == context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
         });
     }
 
@@ -636,7 +647,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromList(py_retval(), GetApi().GetNpcs(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromNpc);
+            PyValue::FromList(py_retval(), GetContext().GetEntities().GetNpcs(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromNpc);
             return true;
         });
     }
@@ -647,7 +658,7 @@ namespace
         {
             const auto inCombat = PyValue::ToOptionalBool(py_arg(2), "in_combat");
             const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
-            PyValue::FromOptional(py_retval(), GetApi().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
+            PyValue::FromOptional(py_retval(), GetContext().GetEntities().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
             return true;
         });
     }
@@ -658,7 +669,7 @@ namespace
         {
             const auto inCombat = PyValue::ToOptionalBool(py_arg(2), "in_combat");
             const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
-            PyValue::FromOptional(py_retval(), GetApi().GetNearestNpc(ToNameFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
+            PyValue::FromOptional(py_retval(), GetContext().GetEntities().GetNearestNpc(ToNameFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
             return true;
         });
     }
@@ -667,7 +678,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromOptional(py_retval(), GetApi().GetNpc(PyValue::ToU16(py_arg(0), "index")), FromNpc);
+            PyValue::FromOptional(py_retval(), GetContext().GetEntities().GetNpc(PyValue::ToU16(py_arg(0), "index")), FromNpc);
             return true;
         });
     }
@@ -676,7 +687,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromList(py_retval(), GetApi().GetPlayers(ToRadius(py_arg(0))), FromPlayer);
+            PyValue::FromList(py_retval(), GetContext().GetEntities().GetPlayers(ToRadius(py_arg(0))), FromPlayer);
             return true;
         });
     }
@@ -685,7 +696,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromOptional(py_retval(), GetApi().GetPlayerByName(PyValue::ToString(py_arg(0), "name")), FromPlayer);
+            PyValue::FromOptional(py_retval(), GetContext().GetEntities().GetPlayerByName(PyValue::ToString(py_arg(0), "name")), FromPlayer);
             return true;
         });
     }
@@ -694,7 +705,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromList(py_retval(), GetApi().GetGroundItems(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromGroundItem);
+            PyValue::FromList(py_retval(), GetContext().GetEntities().GetGroundItems(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromGroundItem);
             return true;
         });
     }
@@ -704,7 +715,7 @@ namespace
         return Guard([argv]
         {
             const auto reachable = PyValue::ToBool(py_arg(2), "reachable");
-            PyValue::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
+            PyValue::FromOptional(py_retval(), GetContext().GetEntities().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
             return true;
         });
     }
@@ -714,7 +725,7 @@ namespace
         return Guard([argv]
         {
             const auto reachable = PyValue::ToBool(py_arg(2), "reachable");
-            PyValue::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToNameFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
+            PyValue::FromOptional(py_retval(), GetContext().GetEntities().GetNearestGroundItem(ToNameFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
             return true;
         });
     }
@@ -723,7 +734,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto loc = GetApi().GetLocAt(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), ToLayer(py_arg(2)));
+            auto& context = GetContext();
+            const auto loc = context.GetEntities().GetLocAt(context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")), ToLayer(py_arg(2)));
             PyValue::FromOptional(py_retval(), loc, FromLoc);
             return true;
         });
@@ -733,7 +745,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromList(py_retval(), GetApi().GetLocs(ToSearch(py_arg(0), py_arg(1), py_arg(3)), ToLayer(py_arg(2))), FromLoc);
+            PyValue::FromList(py_retval(), GetContext().GetEntities().GetLocs(ToSearch(py_arg(0), py_arg(1), py_arg(3)), ToLayer(py_arg(2))), FromLoc);
             return true;
         });
     }
@@ -743,7 +755,7 @@ namespace
         return Guard([argv]
         {
             const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
-            const auto loc = GetApi().GetNearestLoc(ToFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
+            const auto loc = GetContext().GetEntities().GetNearestLoc(ToFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
             PyValue::FromOptional(py_retval(), loc, FromLoc);
             return true;
         });
@@ -754,7 +766,7 @@ namespace
         return Guard([argv]
         {
             const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
-            const auto loc = GetApi().GetNearestLoc(ToNameFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
+            const auto loc = GetContext().GetEntities().GetNearestLoc(ToNameFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
             PyValue::FromOptional(py_retval(), loc, FromLoc);
             return true;
         });
@@ -764,7 +776,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& cache = GetApi().GetCache();
+            const auto& cache = GetContext().GetCache();
             const auto* const type = cache.FindNpc(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (type == nullptr)
             {
@@ -781,7 +793,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& cache = GetApi().GetCache();
+            const auto& cache = GetContext().GetCache();
             const auto kind = PyValue::ToString(py_arg(0), "kind");
             const auto name = PyValue::ToString(py_arg(1), "name");
             auto ids = std::vector<s64>{};
@@ -825,7 +837,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& cache = GetApi().GetCache();
+            const auto& cache = GetContext().GetCache();
             const auto* const type = cache.FindObj(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (type == nullptr)
             {
@@ -841,7 +853,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& cache = GetApi().GetCache();
+            const auto& cache = GetContext().GetCache();
             const auto* const type = cache.FindLoc(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (type == nullptr)
             {
@@ -857,7 +869,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyValue::FromList(py_retval(), GetApi().GetInventory(PyValue::ToU16(py_arg(0), "com")), FromItem);
+            PyValue::FromList(py_retval(), GetContext().GetInventories().GetInventory(PyValue::ToU16(py_arg(0), "com")), FromItem);
             return true;
         });
     }
@@ -866,7 +878,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetInventory(GetApi().GetCache().equipmentComponent), FromItem);
+            PyValue::FromList(py_retval(), GetContext().GetInventories().GetInventory(GetContext().GetCache().equipmentComponent), FromItem);
             return true;
         });
     }
@@ -876,7 +888,7 @@ namespace
         return Guard([argv]
         {
             const auto filter = SearchFilter_s{.ids = PyArgs::ToIds(py_arg(0), "ids")};
-            return ReturnInt(GetApi().CountItems(filter, PyValue::ToU16(py_arg(1), "com")));
+            return ReturnInt(GetContext().GetInventories().CountItems(filter, PyValue::ToU16(py_arg(1), "com")));
         });
     }
 
@@ -885,7 +897,7 @@ namespace
         return Guard([argv]
         {
             const auto filter = SearchFilter_s{.ids = PyArgs::ToIds(py_arg(0), "ids")};
-            PyValue::FromOptional(py_retval(), GetApi().FindItem(filter, PyValue::ToU16(py_arg(1), "com")), FromItem);
+            PyValue::FromOptional(py_retval(), GetContext().GetInventories().FindItem(filter, PyValue::ToU16(py_arg(1), "com")), FromItem);
             return true;
         });
     }
@@ -895,7 +907,7 @@ namespace
         return Guard([argv]
         {
             const auto filter = SearchFilter_s{.names = PyArgs::ToNames(py_arg(0), "names")};
-            return ReturnInt(GetApi().CountItems(filter, PyValue::ToU16(py_arg(1), "com")));
+            return ReturnInt(GetContext().GetInventories().CountItems(filter, PyValue::ToU16(py_arg(1), "com")));
         });
     }
 
@@ -904,7 +916,7 @@ namespace
         return Guard([argv]
         {
             const auto filter = SearchFilter_s{.names = PyArgs::ToNames(py_arg(0), "names")};
-            PyValue::FromOptional(py_retval(), GetApi().FindItem(filter, PyValue::ToU16(py_arg(1), "com")), FromItem);
+            PyValue::FromOptional(py_retval(), GetContext().GetInventories().FindItem(filter, PyValue::ToU16(py_arg(1), "com")), FromItem);
             return true;
         });
     }
@@ -913,7 +925,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetEmptySlots());
+            return ReturnInt(GetContext().GetInventories().GetEmptySlots());
         });
     }
 
@@ -921,7 +933,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().GetEmptySlots() == 0);
+            return ReturnBool(GetContext().GetInventories().GetEmptySlots() == 0);
         });
     }
 
@@ -929,7 +941,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().interfaces.mainModal);
+            return ReturnInt(GetContext().GetState().interfaces.mainModal);
         });
     }
 
@@ -937,7 +949,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().interfaces.sideModal);
+            return ReturnInt(GetContext().GetState().interfaces.sideModal);
         });
     }
 
@@ -945,7 +957,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().interfaces.chatModal);
+            return ReturnInt(GetContext().GetState().interfaces.chatModal);
         });
     }
 
@@ -953,7 +965,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().IsInterfaceOpen(static_cast<s32>(PyValue::ToInt(py_arg(0), "id"))));
+            return ReturnBool(GetContext().GetPlayer().IsInterfaceOpen(static_cast<s32>(PyValue::ToInt(py_arg(0), "id"))));
         });
     }
 
@@ -961,7 +973,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto text = GetApi().GetComponentText(PyValue::ToU16(py_arg(0), "com"));
+            const auto text = GetContext().GetPlayer().GetComponentText(PyValue::ToU16(py_arg(0), "com"));
             return text ? ReturnString(*text) : ReturnNone();
         });
     }
@@ -970,7 +982,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().IsCountDialogOpen());
+            return ReturnBool(GetContext().GetActions().IsCountDialogOpen());
         });
     }
 
@@ -978,7 +990,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnInt(GetApi().GetState().GetVarp(PyValue::ToU16(py_arg(0), "id")));
+            return ReturnInt(GetContext().GetState().GetVarp(PyValue::ToU16(py_arg(0), "id")));
         });
     }
 
@@ -986,7 +998,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetState().social.friends, FromFriend);
+            PyValue::FromList(py_retval(), GetContext().GetState().social.friends, FromFriend);
             return true;
         });
     }
@@ -995,7 +1007,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetState().social.ignores, FromName);
+            PyValue::FromList(py_retval(), GetContext().GetState().social.ignores, FromName);
             return true;
         });
     }
@@ -1004,7 +1016,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().GetState().inventories.contains(PyValue::ToU16(py_arg(0), "com")));
+            return ReturnBool(GetContext().GetState().inventories.contains(PyValue::ToU16(py_arg(0), "com")));
         });
     }
 
@@ -1012,7 +1024,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto texts = ChatDialog::GetTexts(GetApi().GetInterfaces(), PyValue::ToU16(py_arg(0), "root"));
+            const auto texts = ChatDialog::GetTexts(GetContext().GetInterfaces(), PyValue::ToU16(py_arg(0), "root"));
             PyValue::FromList(py_retval(), texts, [](py_OutRef out, const std::string& text)
             {
                 PyValue::FromString(out, text);
@@ -1027,7 +1039,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto view = GetApi().GetInterfaces();
+            const auto view = GetContext().GetInterfaces();
             auto inventories = std::vector<const IfComponent_s*>{};
             for (const auto* const component : view.GetTree(PyValue::ToU16(py_arg(0), "root")))
             {
@@ -1072,7 +1084,8 @@ namespace
                 return static_cast<s32>(PyValue::ToInt(py_arg(index), name, 0, MAX_COORD));
             };
 
-            return ReturnBool(GetApi().CanStep(coord(0, "from_x"), coord(1, "from_z"), coord(2, "to_x"), coord(3, "to_z")));
+            const auto& context = GetContext();
+            return ReturnBool(context.GetReach().CanStep(context.ToTile(coord(0, "from_x"), coord(1, "from_z")), context.ToTile(coord(2, "to_x"), coord(3, "to_z"))));
         });
     }
 
@@ -1081,7 +1094,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(static_cast<s64>(GetApi().GetState().messageCount));
+            return ReturnInt(static_cast<s64>(GetContext().GetState().messageCount));
         });
     }
 
@@ -1092,7 +1105,7 @@ namespace
         {
             const auto mark = PyValue::ToInt(py_arg(0), "mark");
             auto found = std::vector<const ChatMessage_s*>{};
-            for (const auto& message : GetApi().GetState().messages)
+            for (const auto& message : GetContext().GetState().messages)
             {
                 if (message.type == MessageType_e::Game && static_cast<s64>(message.sequence) > mark)
                 {
@@ -1119,7 +1132,8 @@ namespace
             const auto request = NavJson::ParseRequest(PyValue::ToString(py_arg(0), "request"));
             const auto path = ScriptVm::GetCurrent().RunRouteSearch([&request]
             {
-                return GetApi().FindWorldPath(request.from, request.to, request.options);
+                const auto* const navigation = GetContext().GetNavigation();
+                return navigation == nullptr ? std::nullopt : std::optional{WorldPathFinder::FindPath(*navigation, request.from, request.to, request.options)};
             });
             if (!path)
             {
@@ -1136,7 +1150,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto* const navigation = GetApi().GetNavigation();
+            const auto* const navigation = GetContext().GetNavigation();
             const auto name = PyValue::ToString(py_arg(0), "name");
             const auto text = navigation != nullptr ? navigation->GetData(name) : std::nullopt;
             if (!text)
@@ -1154,7 +1168,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto* const navigation = GetApi().GetNavigation();
+            const auto* const navigation = GetContext().GetNavigation();
             const auto x = static_cast<s32>(PyValue::ToInt(py_arg(0), "x", 0, MAX_COORD));
             const auto z = static_cast<s32>(PyValue::ToInt(py_arg(1), "z", 0, MAX_COORD));
             const auto level = static_cast<s32>(PyValue::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
@@ -1173,7 +1187,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& cache = GetApi().GetCache();
+            const auto& cache = GetContext().GetCache();
             const auto* const square = cache.FindSquare(static_cast<s32>(PyValue::ToInt(py_arg(0), "x", 0, MAX_SQUARE)), static_cast<s32>(PyValue::ToInt(py_arg(1), "z", 0, MAX_SQUARE)));
             const auto level = static_cast<s32>(PyValue::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
             auto locs = std::vector<MapLoc_s>{};
@@ -1207,9 +1221,9 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& api = GetApi();
+            auto& context = GetContext();
             const auto ticks = static_cast<u64>(PyValue::ToInt(py_arg(0), "ticks", 0, MAX_DAMAGE_TICKS));
-            return ReturnBool(EntityStatus::TookDamage(api.GetLocalPlayer(), api.GetState().tick, ticks));
+            return ReturnBool(EntityStatus::TookDamage(context.GetLocalPlayer(), context.GetState().tick, ticks));
         });
     }
 
@@ -1217,7 +1231,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().GetState().members);
+            return ReturnBool(GetContext().GetState().members);
         });
     }
 
@@ -1226,10 +1240,10 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             const auto x = static_cast<s32>(PyValue::ToInt(py_arg(0), "x", 0, MAX_COORD));
             const auto z = static_cast<s32>(PyValue::ToInt(py_arg(1), "z", 0, MAX_COORD));
-            return ReturnBool(api.GetMap().Contains(api.ToTile(x, z)));
+            return ReturnBool(context.GetMap().Contains(context.ToTile(x, z)));
         });
     }
 
@@ -1237,7 +1251,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetState().interfaces.modalChanges);
+            return ReturnInt(GetContext().GetState().interfaces.modalChanges);
         });
     }
 
@@ -1245,7 +1259,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromOptional(py_retval(), GetApi().FindContinue(), [](py_OutRef out, u16 com)
+            PyValue::FromOptional(py_retval(), GetContext().GetActions().FindContinue(), [](py_OutRef out, u16 com)
             {
                 py_newint(out, com);
             });
@@ -1257,7 +1271,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetChatOptions(), [](py_OutRef out, const ChatOption_s& option)
+            PyValue::FromList(py_retval(), ChatDialog::GetOptions(GetContext().GetInterfaces()), [](py_OutRef out, const ChatOption_s& option)
             {
                 py_newtuple(out, 2);
                 py_newint(py_tuple_getitem(out, 0), option.com);
@@ -1272,7 +1286,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetChatTexts(), [](py_OutRef out, const std::string& text)
+            PyValue::FromList(py_retval(), ChatDialog::GetTexts(GetContext().GetInterfaces()), [](py_OutRef out, const std::string& text)
             {
                 PyValue::FromString(out, text);
             });
@@ -1285,7 +1299,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetMakeProducts(), [](py_OutRef out, const MakeProduct_s& product)
+            PyValue::FromList(py_retval(), ChatDialog::GetMakeProducts(GetContext().GetInterfaces()), [](py_OutRef out, const MakeProduct_s& product)
             {
                 py_newtuple(out, 3);
                 py_newnone(py_tuple_getitem(out, 0));
@@ -1306,16 +1320,16 @@ namespace
     {
         return Guard([]
         {
-            const auto& api = GetApi();
-            const auto& state = api.GetState();
-            PyValue::FromList(py_retval(), api.GetMakePanel(), [&api, &state](py_OutRef out, const MakeSlot_s& slot)
+            auto& context = GetContext();
+            const auto& state = context.GetState();
+            PyValue::FromList(py_retval(), ChatDialog::GetMakePanel(context.GetInterfaces(), state), [&context, &state](py_OutRef out, const MakeSlot_s& slot)
             {
                 const auto& items = state.inventories.at(slot.com).slots;
                 const auto item = InventoryItem_s{.com = slot.com, .slot = slot.slot, .id = slot.id, .count = items[slot.slot].count};
                 py_newtuple(out, 2);
                 py_newnone(py_tuple_getitem(out, 0));
                 py_newint(py_tuple_getitem(out, 1), slot.product);
-                PyObjects::FromItem(py_tuple_getitem(out, 0), item, api.GetCache());
+                PyObjects::FromItem(py_tuple_getitem(out, 0), item, context.GetCache());
             });
             return true;
         });
@@ -1343,7 +1357,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto view = GetApi().GetInterfaces();
+            const auto view = GetContext().GetInterfaces();
             const auto* const component = view.Find(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (component == nullptr)
             {
@@ -1359,7 +1373,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto view = GetApi().GetInterfaces();
+            const auto view = GetContext().GetInterfaces();
             FromComponents(py_retval(), view.GetTree(PyValue::ToU16(py_arg(0), "root")), view);
             return true;
         });
@@ -1371,7 +1385,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto view = GetApi().GetInterfaces();
+            const auto view = GetContext().GetInterfaces();
             const auto text = py_isnone(py_arg(0)) ? std::nullopt : std::optional{PyValue::ToString(py_arg(0), "text")};
             const auto button = py_isnone(py_arg(1)) ? std::nullopt : std::optional{PyValue::ToString(py_arg(1), "button")};
             const auto root = ToRoot(py_arg(2));
@@ -1408,7 +1422,7 @@ namespace
     {
         return Guard([]
         {
-            PyValue::FromList(py_retval(), GetApi().GetInterfaces().GetOpenRoots(), [](py_OutRef item, u16 root)
+            PyValue::FromList(py_retval(), GetContext().GetInterfaces().GetOpenRoots(), [](py_OutRef item, u16 root)
             {
                 py_newint(item, root);
             });
@@ -1420,7 +1434,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto& tabs = GetApi().GetState().interfaces.tabs;
+            const auto& tabs = GetContext().GetState().interfaces.tabs;
             const auto tab = PyValue::ToInt(py_arg(0), "tab", 0, static_cast<s64>(tabs.size()) - 1);
             return ReturnInt(tabs[static_cast<std::size_t>(tab)]);
         });
@@ -1430,7 +1444,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ClickComponent(PyValue::ToU16(py_arg(0), "id")));
+            return ReturnBool(GetContext().GetActions().ClickComponent(PyValue::ToU16(py_arg(0), "id")));
         });
     }
 
@@ -1438,7 +1452,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ClickText(PyValue::ToString(py_arg(0), "text"), ToRoot(py_arg(1))));
+            return ReturnBool(GetContext().GetActions().ClickText(PyValue::ToString(py_arg(0), "text"), ToRoot(py_arg(1))));
         });
     }
 
@@ -1446,7 +1460,7 @@ namespace
     {
         return Guard([]
         {
-            const auto menu = GetApi().GetPlayerMenu();
+            const auto menu = Menus::GetPlayerMenu(GetContext().GetState());
             py_newlist(py_retval());
 
             for (const auto option : menu)
@@ -1468,8 +1482,8 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
-            return ReturnBool(api.CanReachEntity(api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
+            auto& context = GetContext();
+            return ReturnBool(context.GetReach().CanReachEntity(context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
         });
     }
 
@@ -1477,8 +1491,8 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
-            return ReturnBool(api.CanReachGroundItem(api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
+            auto& context = GetContext();
+            return ReturnBool(context.GetReach().CanReachGroundItem(context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
         });
     }
 
@@ -1486,8 +1500,8 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
-            return ReturnBool(api.CanReachLoc(api.ToTile(ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z")), PyValue::ToU16(py_arg(0), "id")));
+            auto& context = GetContext();
+            return ReturnBool(context.GetReach().CanReachLoc(context.ToTile(ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z")), PyValue::ToU16(py_arg(0), "id")));
         });
     }
 
@@ -1495,7 +1509,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyValue::ToBool(py_arg(2), "run")));
+            return ReturnBool(GetContext().GetActions().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyValue::ToBool(py_arg(2), "run")));
         });
     }
 
@@ -1503,7 +1517,8 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().IsReachable(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
+            const auto& context = GetContext();
+            return ReturnBool(context.GetReach().IsReachable(context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"))));
         });
     }
 
@@ -1511,7 +1526,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto path = GetApi().FindPath(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
+            const auto& context = GetContext();
+            const auto path = context.GetReach().FindPath(context.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z")));
             PyValue::FromOptional(py_retval(), path, [](py_OutRef out, const std::vector<Tile_s>& waypoints)
             {
                 PyValue::FromList(out, waypoints, FromTile);
@@ -1524,9 +1540,9 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
-            const auto points = PyArgs::ToPoints(py_arg(0), api.GetPosition().level, "points");
-            api.WalkPath(points, PyValue::ToBool(py_arg(1), "run"));
+            auto& context = GetContext();
+            const auto points = PyArgs::ToPoints(py_arg(0), context.GetPosition().level, "points");
+            context.GetActions().WalkPath(points, PyValue::ToBool(py_arg(1), "run"));
             return ReturnNone();
         });
     }
@@ -1535,14 +1551,14 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             const auto index = PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS);
-            const auto op = ResolveOp(py_arg(1), [&api, index](std::string_view text)
+            const auto op = ResolveOp(py_arg(1), [&context, index](std::string_view text)
             {
-                return api.FindNpcOp(index, text);
+                return Menus::FindNpcOp(context.GetState(), context.GetCache(), index, text);
             });
 
-            return ReturnBool(op && api.InteractNpc(index, *op));
+            return ReturnBool(op && context.GetActions().InteractNpc(index, *op));
         });
     }
 
@@ -1550,7 +1566,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().InteractNpc(PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS), MenuOp::TALK));
+            return ReturnBool(GetContext().GetActions().InteractNpc(PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS), MenuOp::TALK));
         });
     }
 
@@ -1558,7 +1574,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().InteractNpc(PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS), MenuOp::ATTACK));
+            return ReturnBool(GetContext().GetActions().InteractNpc(PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS), MenuOp::ATTACK));
         });
     }
 
@@ -1566,14 +1582,14 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             const auto index = PyArgs::ToIndex(py_arg(0), "player", PyObjects::PLAYER_CLASS);
-            const auto op = ResolveOp(py_arg(1), [&api](std::string_view text)
+            const auto op = ResolveOp(py_arg(1), [&context](std::string_view text)
             {
-                return api.FindPlayerOp(text);
+                return Menus::FindPlayerOp(context.GetState(), text);
             });
 
-            return ReturnBool(api.InteractPlayer(index, op));
+            return ReturnBool(context.GetActions().InteractPlayer(index, op));
         });
     }
 
@@ -1582,7 +1598,7 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             auto loc = LocRef_s{};
             auto opArgument = py_arg(3);
             if (PyArgs::IsLoc(py_arg(0)))
@@ -1600,12 +1616,12 @@ namespace
                 loc = LocRef_s{.id = PyValue::ToU16(py_arg(0), "id"), .x = ToCoord(py_arg(1), "x"), .z = ToCoord(py_arg(2), "z")};
             }
 
-            const auto op = ResolveOp(opArgument, [&api, &loc](std::string_view text)
+            const auto op = ResolveOp(opArgument, [&context, &loc](std::string_view text)
             {
-                return api.FindLocOp(loc.id, text);
+                return Menus::FindLocOp(context.GetCache(), loc.id, text);
             });
 
-            api.InteractLoc(loc.id, loc.x, loc.z, op);
+            context.GetActions().InteractLoc(loc.id, loc.x, loc.z, op);
             return ReturnBool(true);
         });
     }
@@ -1614,15 +1630,15 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
-            const auto points = PyArgs::ToPoints(py_arg(0), api.GetPosition().level, "points");
+            auto& context = GetContext();
+            const auto points = PyArgs::ToPoints(py_arg(0), context.GetPosition().level, "points");
             const auto id = PyValue::ToU16(py_arg(1), "id");
-            const auto op = ResolveOp(py_arg(4), [&api, id](std::string_view text)
+            const auto op = ResolveOp(py_arg(4), [&context, id](std::string_view text)
             {
-                return api.FindLocOp(id, text);
+                return Menus::FindLocOp(context.GetCache(), id, text);
             });
 
-            api.InteractLocVia(points, id, ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"), op);
+            context.GetActions().InteractLocVia(points, id, ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"), op);
             return ReturnBool(true);
         });
     }
@@ -1631,14 +1647,14 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             const auto item = PyArgs::ToGroundItem(py_arg(0), "item");
-            const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
+            const auto op = ResolveOp(py_arg(1), [&context, &item](std::string_view text)
             {
-                return api.FindGroundItemOp(item.id, text);
+                return Menus::FindGroundItemOp(context.GetCache(), item.id, text);
             });
 
-            return ReturnBool(api.InteractGroundItem(item.id, item.x, item.z, op));
+            return ReturnBool(context.GetActions().InteractGroundItem(item.id, item.x, item.z, op));
         });
     }
 
@@ -1647,7 +1663,7 @@ namespace
         return Guard([argv]
         {
             const auto item = PyArgs::ToGroundItem(py_arg(0), "item");
-            return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, MenuOp::TAKE));
+            return ReturnBool(GetContext().GetActions().InteractGroundItem(item.id, item.x, item.z, MenuOp::TAKE));
         });
     }
 
@@ -1655,14 +1671,14 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             const auto item = PyArgs::ToItem(py_arg(0), "item");
-            const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
+            const auto op = ResolveOp(py_arg(1), [&context, &item](std::string_view text)
             {
-                return api.FindItemOp(item.id, text);
+                return Menus::FindItemOp(context.GetCache(), item.id, text);
             });
 
-            return ReturnBool(api.ItemOp(item, op));
+            return ReturnBool(context.GetActions().ItemOp(item, op));
         });
     }
 
@@ -1670,14 +1686,14 @@ namespace
     {
         return Guard([argv]
         {
-            auto& api = GetApi();
+            auto& context = GetContext();
             const auto item = PyArgs::ToItem(py_arg(0), "item");
-            const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
+            const auto op = ResolveOp(py_arg(1), [&context, &item](std::string_view text)
             {
-                return api.FindInventoryOption(item.com, text);
+                return Menus::FindInventoryOption(context.GetCache(), item.com, text);
             });
 
-            return ReturnBool(api.InventoryButton(item, op));
+            return ReturnBool(context.GetActions().InventoryButton(item, op));
         });
     }
 
@@ -1685,7 +1701,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ItemOp(PyArgs::ToItem(py_arg(0), "item"), MenuOp::DROP));
+            return ReturnBool(GetContext().GetActions().ItemOp(PyArgs::ToItem(py_arg(0), "item"), MenuOp::DROP));
         });
     }
 
@@ -1693,7 +1709,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().MoveItem(PyValue::ToU16(py_arg(0), "com"), PyValue::ToU16(py_arg(1), "from_slot"), PyValue::ToU16(py_arg(2), "to_slot"));
+            GetContext().GetActions().MoveItem(PyValue::ToU16(py_arg(0), "com"), PyValue::ToU16(py_arg(1), "from_slot"), PyValue::ToU16(py_arg(2), "to_slot"));
             return ReturnNone();
         });
     }
@@ -1703,7 +1719,7 @@ namespace
         return Guard([argv]
         {
             const auto item = PyArgs::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnNpc(item, PyArgs::ToIndex(py_arg(1), "npc", PyObjects::NPC_CLASS)));
+            return ReturnBool(GetContext().GetActions().UseItemOnNpc(item, PyArgs::ToIndex(py_arg(1), "npc", PyObjects::NPC_CLASS)));
         });
     }
 
@@ -1712,7 +1728,7 @@ namespace
         return Guard([argv]
         {
             const auto item = PyArgs::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnPlayer(item, PyArgs::ToIndex(py_arg(1), "player", PyObjects::PLAYER_CLASS)));
+            return ReturnBool(GetContext().GetActions().UseItemOnPlayer(item, PyArgs::ToIndex(py_arg(1), "player", PyObjects::PLAYER_CLASS)));
         });
     }
 
@@ -1721,7 +1737,7 @@ namespace
         return Guard([argv]
         {
             const auto item = PyArgs::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnLoc(item, PyValue::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z")));
+            return ReturnBool(GetContext().GetActions().UseItemOnLoc(item, PyValue::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z")));
         });
     }
 
@@ -1731,7 +1747,7 @@ namespace
         {
             const auto item = PyArgs::ToItem(py_arg(0), "item");
             const auto target = PyArgs::ToGroundItem(py_arg(1), "ground_item");
-            return ReturnBool(GetApi().UseItemOnGroundItem(item, target.id, target.x, target.z));
+            return ReturnBool(GetContext().GetActions().UseItemOnGroundItem(item, target.id, target.x, target.z));
         });
     }
 
@@ -1740,7 +1756,7 @@ namespace
         return Guard([argv]
         {
             const auto item = PyArgs::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnItem(item, PyArgs::ToItem(py_arg(1), "target")));
+            return ReturnBool(GetContext().GetActions().UseItemOnItem(item, PyArgs::ToItem(py_arg(1), "target")));
         });
     }
 
@@ -1749,7 +1765,7 @@ namespace
         return Guard([argv]
         {
             const auto spell = PyValue::ToU16(py_arg(0), "spell");
-            return ReturnBool(GetApi().CastOnNpc(spell, PyArgs::ToIndex(py_arg(1), "npc", PyObjects::NPC_CLASS)));
+            return ReturnBool(GetContext().GetActions().CastOnNpc(spell, PyArgs::ToIndex(py_arg(1), "npc", PyObjects::NPC_CLASS)));
         });
     }
 
@@ -1758,7 +1774,7 @@ namespace
         return Guard([argv]
         {
             const auto spell = PyValue::ToU16(py_arg(0), "spell");
-            return ReturnBool(GetApi().CastOnPlayer(spell, PyArgs::ToIndex(py_arg(1), "player", PyObjects::PLAYER_CLASS)));
+            return ReturnBool(GetContext().GetActions().CastOnPlayer(spell, PyArgs::ToIndex(py_arg(1), "player", PyObjects::PLAYER_CLASS)));
         });
     }
 
@@ -1766,7 +1782,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().CastOnLoc(PyValue::ToU16(py_arg(0), "spell"), PyValue::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"));
+            GetContext().GetActions().CastOnLoc(PyValue::ToU16(py_arg(0), "spell"), PyValue::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"));
             return ReturnNone();
         });
     }
@@ -1777,7 +1793,7 @@ namespace
         {
             const auto spell = PyValue::ToU16(py_arg(0), "spell");
             const auto target = PyArgs::ToGroundItem(py_arg(1), "ground_item");
-            return ReturnBool(GetApi().CastOnGroundItem(spell, target.id, target.x, target.z));
+            return ReturnBool(GetContext().GetActions().CastOnGroundItem(spell, target.id, target.x, target.z));
         });
     }
 
@@ -1786,7 +1802,7 @@ namespace
         return Guard([argv]
         {
             const auto spell = PyValue::ToU16(py_arg(0), "spell");
-            return ReturnBool(GetApi().CastOnItem(spell, PyArgs::ToItem(py_arg(1), "item")));
+            return ReturnBool(GetContext().GetActions().CastOnItem(spell, PyArgs::ToItem(py_arg(1), "item")));
         });
     }
 
@@ -1794,7 +1810,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().ClickButton(PyValue::ToU16(py_arg(0), "com"));
+            GetContext().GetActions().ClickButton(PyValue::ToU16(py_arg(0), "com"));
             return ReturnNone();
         });
     }
@@ -1803,7 +1819,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnBool(GetApi().ContinueDialogue());
+            return ReturnBool(GetContext().GetActions().ContinueDialogue());
         });
     }
 
@@ -1812,7 +1828,7 @@ namespace
         return Guard([argv]
         {
             const auto value = PyValue::ToInt(py_arg(0), "value", 0, std::numeric_limits<s32>::max());
-            return ReturnBool(GetApi().AnswerCountDialog(static_cast<s32>(value)));
+            return ReturnBool(GetContext().GetActions().AnswerCountDialog(static_cast<s32>(value)));
         });
     }
 
@@ -1820,7 +1836,7 @@ namespace
     {
         return Guard([]
         {
-            GetApi().CloseInterfaces();
+            GetContext().GetActions().CloseInterfaces();
             return ReturnNone();
         });
     }
@@ -1829,7 +1845,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().SetRun(PyValue::ToBool(py_arg(0), "run"));
+            GetContext().GetActions().SetRun(PyValue::ToBool(py_arg(0), "run"));
             return ReturnNone();
         });
     }
@@ -1838,7 +1854,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().Say(PyValue::ToString(py_arg(0), "text"));
+            GetContext().GetActions().Say(PyValue::ToString(py_arg(0), "text"));
             return ReturnNone();
         });
     }
@@ -1847,7 +1863,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().SendPrivateMessage(PyValue::ToString(py_arg(0), "name"), PyValue::ToString(py_arg(1), "text"));
+            GetContext().GetActions().SendPrivateMessage(PyValue::ToString(py_arg(0), "name"), PyValue::ToString(py_arg(1), "text"));
             return ReturnNone();
         });
     }
@@ -1856,7 +1872,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().SendCommand(PyValue::ToString(py_arg(0), "text"));
+            GetContext().GetActions().SendCommand(PyValue::ToString(py_arg(0), "text"));
             return ReturnNone();
         });
     }
@@ -1872,7 +1888,7 @@ namespace
                 return false;
             }
 
-            const auto sent = GetApi().SendBotMessage(username, PyValue::ToString(py_retval(), "message"));
+            const auto sent = GetContext().SendBotMessage(username, PyValue::ToString(py_retval(), "message"));
             if (!sent)
             {
                 throw std::invalid_argument{std::format("No account in this process has the username {}", username)};
@@ -1882,12 +1898,12 @@ namespace
         });
     }
 
-    template <void (ScriptApi::*TCall)(std::string_view)>
+    template <void (ScriptActions::*TCall)(std::string_view)>
     bool CallWithName(int, py_StackRef argv) noexcept
     {
         return Guard([argv]
         {
-            (GetApi().*TCall)(PyValue::ToString(py_arg(0), "name"));
+            (GetContext().GetActions().*TCall)(PyValue::ToString(py_arg(0), "name"));
             return ReturnNone();
         });
     }
@@ -2037,24 +2053,24 @@ namespace
             {"say(text)", Say},
             {"send_pm(name, text)", SendPm},
             {"command(text)", Command},
-            {"add_friend(name)", CallWithName<&ScriptApi::AddFriend>},
-            {"remove_friend(name)", CallWithName<&ScriptApi::RemoveFriend>},
-            {"add_ignore(name)", CallWithName<&ScriptApi::AddIgnore>},
-            {"remove_ignore(name)", CallWithName<&ScriptApi::RemoveIgnore>},
+            {"add_friend(name)", CallWithName<&ScriptActions::AddFriend>},
+            {"remove_friend(name)", CallWithName<&ScriptActions::RemoveFriend>},
+            {"add_ignore(name)", CallWithName<&ScriptActions::AddIgnore>},
+            {"remove_ignore(name)", CallWithName<&ScriptActions::RemoveIgnore>},
         };
     }
 }
 
-void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
+void ScriptBindings::Bind(ScriptVm& vm, ScriptContext& context)
 {
     const auto slot = static_cast<std::size_t>(vm.GetSlot());
-    assert(boundApis[slot] == nullptr && "The VM already has a ScriptApi bound");
-    boundApis[slot] = &api;
+    assert(boundContexts[slot] == nullptr && "The VM already has a ScriptContext bound");
+    boundContexts[slot] = &context;
 
     try
     {
         const auto builtins = vm.GetBuiltins();
-        const auto& cache = api.GetCache();
+        const auto& cache = context.GetCache();
         for (const auto& constant : CONSTANTS)
         {
             SetConstant(builtins, constant);
@@ -2090,7 +2106,7 @@ void ScriptBindings::Bind(ScriptVm& vm, ScriptApi& api)
 
 void ScriptBindings::Unbind(const ScriptVm& vm) noexcept
 {
-    boundApis[static_cast<std::size_t>(vm.GetSlot())] = nullptr;
+    boundContexts[static_cast<std::size_t>(vm.GetSlot())] = nullptr;
 }
 
 void ScriptBindings::SetSettings(ScriptVm& vm, std::string_view settingsJson)

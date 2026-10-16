@@ -17,8 +17,9 @@
 #include "../Convert/PyObjects.hpp"
 #include "../Convert/PyValue.hpp"
 #include "../Error/ScriptError.hpp"
-#include "../ScriptApi.hpp"
 #include "../ScriptCommand_s.hpp"
+#include "../ScriptContext.hpp"
+#include "../ScriptControl.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
 
@@ -85,7 +86,7 @@ ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOpt
     : m_runtime{runtime}
     , m_client{client}
     , m_actions{client}
-    , m_api{client.GetState(), client.GetMap(), m_actions, options.messenger, options.username, options.navigation}
+    , m_context{client.GetState(), client.GetMap(), m_actions, options.messenger, options.username, options.navigation}
     , m_logger{std::move(logger)}
     , m_options{std::move(options)}
 {
@@ -111,7 +112,7 @@ ScriptHost::~ScriptHost()
 
 void ScriptHost::Step(Clock::time_point now)
 {
-    m_api.SetStepTime(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
+    m_context.GetControl().SetStepTime(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
     CheckForChanges(now);
 
     if (m_status != ScriptStatus_e::Running)
@@ -204,7 +205,7 @@ void ScriptHost::Finish(std::string_view reason)
     }
 
     // A stop asked for while stopping changes nothing.
-    static_cast<void>(m_api.TakeStopRequest());
+    static_cast<void>(m_context.GetControl().TakeStopRequest());
 }
 
 bool ScriptHost::HandlesKillSignal() const
@@ -284,7 +285,7 @@ ScriptStatus_e ScriptHost::GetStatus() const
 
 std::optional<std::chrono::seconds> ScriptHost::TakeRelogRequest()
 {
-    return m_api.TakeRelogRequest();
+    return m_context.GetControl().TakeRelogRequest();
 }
 
 std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
@@ -306,7 +307,7 @@ std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
 void ScriptHost::Load()
 {
     m_vm.emplace(m_runtime, ScriptVmOptions_s{.scriptsDirectory = m_options.scriptsDirectory, .callTimeout = m_options.callTimeout}, m_logger);
-    ScriptBindings::Bind(*m_vm, m_api);
+    ScriptBindings::Bind(*m_vm, m_context);
 
     try
     {
@@ -405,7 +406,7 @@ void ScriptHost::Reload()
     m_status = ScriptStatus_e::Running;
     m_started = false;
     m_finished = false;
-    static_cast<void>(m_api.TakeStopRequest());
+    static_cast<void>(m_context.GetControl().TakeStopRequest());
 
     auto files = std::vector<std::filesystem::path>{};
     try
@@ -1028,7 +1029,7 @@ void ScriptHost::Stop(ScriptStatus_e status, std::string_view reason)
 
 void ScriptHost::ApplyStopRequest()
 {
-    switch (m_api.TakeStopRequest())
+    switch (m_context.GetControl().TakeStopRequest())
     {
     case StopRequest_e::None:
         return;
