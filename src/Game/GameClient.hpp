@@ -9,6 +9,7 @@
 #include "Map/WorldMap.hpp"
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/LoginHandshake.hpp"
+#include "Net/RetrySchedule.hpp"
 #include "Net/ServerPacketReader.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
@@ -115,10 +116,9 @@ private:
 
     std::optional<LoginHandshake> m_handshake;
     bool m_reconnecting = false;
-    u32 m_attempt = 0;
+    RetrySchedule m_retries;
     std::string m_lostReason;
     Clock::time_point m_attemptDeadline;
-    std::optional<Clock::time_point> m_retryAt;
 
     std::chrono::milliseconds m_logoutTimeout{};
     Clock::time_point m_logoutDeadline;

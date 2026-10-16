@@ -14,6 +14,7 @@
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/Error/LoginError.hpp"
 #include "Net/LoginHandshake.hpp"
+#include "Net/RetrySchedule.hpp"
 #include "Net/ServerPacketReader.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
@@ -69,18 +70,6 @@ namespace
             return true;
         }
     }
-
-    // The wait before a reconnect attempt: none before the first, then the delay, doubling each time up to the cap.
-    std::chrono::milliseconds GetRetryDelay(const GameClientOptions_s& options, u32 failedAttempts)
-    {
-        auto delay = options.retryDelay;
-        for (auto i = u32{1}; i < failedAttempts && delay < options.maxRetryDelay; ++i)
-        {
-            delay *= 2;
-        }
-
-        return std::min(delay, options.maxRetryDelay);
-    }
 }
 
 GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger, GameClientOptions_s options)
@@ -92,6 +81,7 @@ GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<c
     , m_socket{std::make_unique<WebSocketClient>(m_logger)}
     , m_decoder{m_logger}
     , m_map{m_cache}
+    , m_retries{options.connectAttempts, options.retryDelay, options.maxRetryDelay}
 {
     assert(m_config && "GameClient needs a config");
     assert(m_cache && "GameClient needs a cache");
@@ -102,8 +92,7 @@ void GameClient::BeginLogin()
 {
     assert((m_status == ClientStatus_e::Disconnected || m_status == ClientStatus_e::LoggedOut) && "BeginLogin called during a session");
     m_reconnecting = false;
-    m_attempt = 0;
-    m_retryAt.reset();
+    m_retries.Reset();
     m_status = ClientStatus_e::Connecting;
 
     try
@@ -375,15 +364,16 @@ bool GameClient::ContinueLogout()
 
 void GameClient::StartAttempt()
 {
-    ++m_attempt;
+    m_retries.BeginAttempt();
+    const auto attempt = m_retries.GetAttempt();
 
     if (m_reconnecting)
     {
-        m_logger->Info("Reconnecting as {} (attempt {} of {})", m_account.username, m_attempt, m_options.connectAttempts);
+        m_logger->Info("Reconnecting as {} (attempt {} of {})", m_account.username, attempt, m_retries.GetMaxAttempts());
     }
-    else if (m_attempt > 1)
+    else if (attempt > 1)
     {
-        m_logger->Info("Logging in as {} (attempt {} of {})", m_account.username, m_attempt, m_options.connectAttempts);
+        m_logger->Info("Logging in as {} (attempt {} of {})", m_account.username, attempt, m_retries.GetMaxAttempts());
     }
     else
     {
@@ -401,16 +391,15 @@ void GameClient::StartAttempt()
 
 void GameClient::PumpConnecting(std::chrono::milliseconds maxWait)
 {
-    if (m_retryAt)
+    if (const auto retryAt = m_retries.GetScheduled())
     {
-        const auto remaining = GetRemaining(*m_retryAt);
+        const auto remaining = GetRemaining(*retryAt);
         if (remaining > 0ms)
         {
             std::this_thread::sleep_for(std::min(maxWait, remaining));
             return;
         }
 
-        m_retryAt.reset();
         StartAttempt();
     }
 
@@ -495,7 +484,7 @@ void GameClient::FinishLogin(const LoginResult_s& result)
     m_reader.emplace(LoginHandshake::GetInboundSeed(result.seed));
     m_status = ClientStatus_e::InGame;
     m_reconnecting = false;
-    m_attempt = 0;
+    m_retries.Reset();
     ++m_loginCount;
     m_lastReceive = Clock::now();
     m_lastSend = m_lastReceive;
@@ -521,8 +510,8 @@ void GameClient::BeginReconnect(std::string_view reason)
 
     m_lostReason = reason;
     m_reconnecting = true;
-    m_attempt = 0;
-    m_retryAt = Clock::now();
+    m_retries.Reset();
+    m_retries.ScheduleAt(Clock::now());
     m_status = ClientStatus_e::Connecting;
 }
 
@@ -530,34 +519,35 @@ void GameClient::BeginReconnect(std::string_view reason)
 // gives up throws ConnectionLostError instead, because the session it was restoring is gone.
 bool GameClient::ScheduleRetry(std::string_view error, bool retryable)
 {
-    const auto attemptsLeft = m_attempt < m_options.connectAttempts;
+    const auto attempt = m_retries.GetAttempt();
+    const auto maxAttempts = m_retries.GetMaxAttempts();
     if (m_reconnecting)
     {
-        m_logger->Warning("Reconnect attempt {} of {} failed: {}", m_attempt, m_options.connectAttempts, error);
+        m_logger->Warning("Reconnect attempt {} of {} failed: {}", attempt, maxAttempts, error);
 
         if (!retryable)
         {
             throw ConnectionLostError{std::format("Connection lost ({}), and reconnecting failed: {}", m_lostReason, error)};
         }
 
-        if (!attemptsLeft)
+        if (!m_retries.HasAttemptsLeft())
         {
-            throw ConnectionLostError{std::format("Connection lost ({}), and {} reconnect attempts failed", m_lostReason, m_options.connectAttempts)};
+            throw ConnectionLostError{std::format("Connection lost ({}), and {} reconnect attempts failed", m_lostReason, maxAttempts)};
         }
     }
     else
     {
-        if (!retryable || !attemptsLeft)
+        if (!retryable || !m_retries.HasAttemptsLeft())
         {
             return false;
         }
 
-        m_logger->Warning("Login attempt {} of {} failed: {}", m_attempt, m_options.connectAttempts, error);
+        m_logger->Warning("Login attempt {} of {} failed: {}", attempt, maxAttempts, error);
     }
 
-    const auto delay = GetRetryDelay(m_options, m_attempt);
+    const auto delay = m_retries.GetDelay();
     m_logger->Info("Trying again in {} ms", delay.count());
-    m_retryAt = Clock::now() + delay;
+    m_retries.ScheduleAt(Clock::now() + delay);
     m_status = ClientStatus_e::Connecting;
     return true;
 }
