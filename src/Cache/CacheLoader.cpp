@@ -10,9 +10,12 @@
 #include "GameCache_s.hpp"
 #include "InterfaceDecoder.hpp"
 #include "JagArchive.hpp"
+#include "LocTypeDecoder.hpp"
 #include "MapDecoder.hpp"
 #include "MapSquare.hpp"
-#include "TypeDecoder.hpp"
+#include "NpcTypeDecoder.hpp"
+#include "ObjTypeDecoder.hpp"
+#include "VarpTypeDecoder.hpp"
 #include "VarpType_s.hpp"
 
 namespace
@@ -100,19 +103,19 @@ namespace
             const auto config = JagArchive{std::move(data)};
             const auto locDat = ReadEntry(config, "loc.dat");
             const auto locIdx = ReadEntry(config, "loc.idx");
-            cache.locs = TypeDecoder::DecodeLocs(locDat, locIdx, cache.text);
+            cache.locs = LocTypeDecoder::Decode(locDat, locIdx, cache.text);
 
             const auto npcDat = ReadEntry(config, "npc.dat");
             const auto npcIdx = ReadEntry(config, "npc.idx");
-            cache.npcs = TypeDecoder::DecodeNpcs(npcDat, npcIdx, cache.text);
+            cache.npcs = NpcTypeDecoder::Decode(npcDat, npcIdx, cache.text);
 
             const auto objDat = ReadEntry(config, "obj.dat");
             const auto objIdx = ReadEntry(config, "obj.idx");
-            cache.objs = TypeDecoder::DecodeObjs(objDat, objIdx, cache.text);
+            cache.objs = ObjTypeDecoder::Decode(objDat, objIdx, cache.text);
 
             const auto varpDat = ReadEntry(config, "varp.dat");
             const auto varpIdx = ReadEntry(config, "varp.idx");
-            cache.runVarp = FindRunVarp(TypeDecoder::DecodeVarps(varpDat, varpIdx));
+            cache.runVarp = FindRunVarp(VarpTypeDecoder::Decode(varpDat, varpIdx));
         });
     }
 

@@ -2,11 +2,15 @@
 #include "../Support/Cache/CacheWriter.hpp"
 
 #include "Cache/Error/CacheError.hpp"
+#include "Cache/LocTypeDecoder.hpp"
 #include "Cache/LocType_s.hpp"
+#include "Cache/NpcTypeDecoder.hpp"
 #include "Cache/NpcType_s.hpp"
+#include "Cache/ObjTypeDecoder.hpp"
 #include "Cache/ObjType_s.hpp"
 #include "Cache/TextPool.hpp"
-#include "Cache/TypeDecoder.hpp"
+#include "Cache/VarpTypeDecoder.hpp"
+#include "Cache/VarpType_s.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -145,19 +149,19 @@ namespace
     std::vector<LocType_s> DecodeLocs(const std::vector<std::vector<u8>>& definitions, TextPool& text)
     {
         const auto files = CacheWriter::MakeTypeFiles(definitions);
-        return TypeDecoder::DecodeLocs(files.dat, files.idx, text);
+        return LocTypeDecoder::Decode(files.dat, files.idx, text);
     }
 
     std::vector<NpcType_s> DecodeNpcs(const std::vector<std::vector<u8>>& definitions, TextPool& text)
     {
         const auto files = CacheWriter::MakeTypeFiles(definitions);
-        return TypeDecoder::DecodeNpcs(files.dat, files.idx, text);
+        return NpcTypeDecoder::Decode(files.dat, files.idx, text);
     }
 
     std::vector<ObjType_s> DecodeObjs(const std::vector<std::vector<u8>>& definitions, TextPool& text)
     {
         const auto files = CacheWriter::MakeTypeFiles(definitions);
-        return TypeDecoder::DecodeObjs(files.dat, files.idx, text);
+        return ObjTypeDecoder::Decode(files.dat, files.idx, text);
     }
 
     bool IsActive(std::vector<u8> opcodes)
@@ -173,7 +177,7 @@ namespace
         auto text = TextPool{};
         try
         {
-            static_cast<void>(TypeDecoder::DecodeLocs(files.dat, files.idx, text));
+            static_cast<void>(LocTypeDecoder::Decode(files.dat, files.idx, text));
         }
         catch (const CacheError& e)
         {
@@ -369,4 +373,30 @@ TEST_CASE("TypeDecoder rejects definitions that don't decode to their size", "[T
         const auto files = CacheWriter::MakeTypeFiles({std::vector<u8>{2, 'T', 'r', 'e', 'e'}});
         CHECK(DecodeLocsError(files) == "loc 0: a string runs past the end without its newline");
     }
+}
+
+TEST_CASE("VarpTypeDecoder keeps each varp's client code and drops its other opcodes", "[TypeDecoder]")
+{
+    auto packet = Packet{};
+    PutValues(packet, {1, 2}, 1);
+    PutValues(packet, {3, 4, 6, 8, 11, 13}, 0);
+    PutValues(packet, {7, 12}, 4);
+    packet.P1(5);
+    packet.P2(173);
+    PutString(packet, 10, "debug name");
+    packet.P1(0);
+
+    const auto files = CacheWriter::MakeTypeFiles({ToBytes(packet), std::vector<u8>{0}});
+    const auto varps = VarpTypeDecoder::Decode(files.dat, files.idx);
+    REQUIRE(varps.size() == 2);
+    CHECK(varps[0].id == 0);
+    CHECK(varps[0].clientCode == 173);
+    CHECK(varps[1].id == 1);
+    CHECK(varps[1].clientCode == 0);
+}
+
+TEST_CASE("VarpTypeDecoder rejects an unknown opcode", "[TypeDecoder]")
+{
+    const auto files = CacheWriter::MakeTypeFiles({std::vector<u8>{9, 0}});
+    CHECK_THROWS_WITH(VarpTypeDecoder::Decode(files.dat, files.idx), "varp 0: unknown opcode 9");
 }
