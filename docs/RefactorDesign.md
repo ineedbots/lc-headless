@@ -752,3 +752,19 @@ Docs that name a moved file, to update in the phase that moves it:
 - Its config tests go in `tests/Config/`.
 
 Whichever lands first, the other's plan gets these paths before its work starts.
+
+---
+
+## 14. As built
+
+Phases 1 to 9 and 11 are done. Phase 10 is not started. Where the code differs from the plan above:
+
+| Plan | As built |
+|---|---|
+| §8.2's query classes | Two more: `PlayerQuery` (moving, in combat, running, a stat, an open interface, a component's text) and `ReachQuery` (`CanReachEntity`, `CanReachGroundItem`, `CanReachLoc`, `IsReachable`, `CanStep`, `FindPath`). `ScriptContext` makes each query on demand with `GetEntities`, `GetInventories`, `GetPlayer`, `GetReach` and `GetInterfaces` |
+| §6.4: `<nlohmann/json.hpp>` only in `ConfigJson.cpp` and `JsoncEditor.cpp` | `JsoncScanner.cpp` includes it too, to decode the escapes in a member's key |
+| §8.3: `Navigation` | It reads every nav file itself, and `NavGraph` takes the JSON text rather than a path |
+| §9.3: the argument helpers | `ToRoot` is in `PyArgs`, since both `InterfaceBindings` and `ActionBindings` use it |
+| §8.1: constants | Three more: `Tile_s::MAX_COORD` with `Tile_s::IsInRect`, `MapSquare::MAX_SQUARE`, and the name and id lookups on `GameCache_s` (`FindLocName`, `FindLocIds` and the NPC and object ones) that several bindings had written out |
+| §2's test helpers | `tests/Support/Game/QueryWorld` builds the state the `Game/Query` tests search, and `tests/Support/Script/HostFixture` is shared by the host, progress and account tests |
+| §12: docs in the phase that moves a file | Every doc was updated in phase 11. The plans not yet built, [RevisionDesign.md](RevisionDesign.md) and [ProxyDesign.md](ProxyDesign.md), now use §13's paths. The other designs' change records keep the names they had at the time, under a note that points here |

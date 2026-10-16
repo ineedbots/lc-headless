@@ -38,7 +38,7 @@ Reference sources, beside this repository:
 
 ### 2.1 `Revision_e`
 
-`src/Core/Revision_e.hpp`, in `Core` because `ConfigFile` and the cache need it and neither may depend on `Game`:
+`src/Config/Revision_e.hpp`, in `Config/` because the revision is a setting, read with the rest of `login`. The cache loader and `Protocol` include it from there:
 
 ```cpp
 #pragma once
@@ -60,7 +60,7 @@ The values are the revision numbers, so `static_cast<u16>(revision)` is what the
 ```cpp
 #pragma once
 
-#include "../../Core/Revision_e.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "ClientProt.hpp"
 #include "ServerProt.hpp"
 
@@ -142,7 +142,7 @@ client.jsonc login.revision
     -> GameClient: Protocol{config.login.revision}, asserts it equals cache.revision
         -> LoginHandshake, ServerPacketReader, ClientPacketWriter, ServerPacketDecoder
            (PlayerInfoDecoder, NpcInfoDecoder, ZoneDecoder), ClientPackets, InputTracker
-        -> GameActions::GetProtocol() -> ScriptApi::GetRevision() -> _core.get_revision()
+        -> GameActions::GetProtocol() -> ScriptContext::GetRevision() -> _core.get_revision()
 ```
 
 `GameClient` declares `m_protocol` before every member that's constructed from it, so the members can hold it by value or by reference safely.
@@ -165,7 +165,7 @@ struct LoginSettings_s
 };
 ```
 
-nlohmann converts a scoped enum to and from its underlying integer, so `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` keeps working and the file still says `"revision": 289`. `Validate` checks the value is in `SUPPORTED_REVISIONS` and otherwise fails with `login.revision: must be 225 or 289`, built from the list. A string, a boolean or a number outside `u16` fails as it does today.
+nlohmann converts a scoped enum to and from its underlying integer, so `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` in `ConfigJson.cpp` keeps working and the file still says `"revision": 289`. `ConfigValidator::Validate` checks the value is in `SUPPORTED_REVISIONS` and otherwise fails with `login.revision: must be 225 or 289`, built from the list. A string, a boolean or a number outside `u16` fails as it does today.
 
 That's the finished list. Until phase 4 it holds only `Rev289`, so a half-built 225 can't be selected.
 
@@ -401,11 +401,11 @@ The optional real-cache test (§12) checks each one resolves to the component th
 | Piece | Change |
 |---|---|
 | `GameActions` | `GetProtocol()`, forwarding `m_client.GetProtocol()` |
-| `ScriptApi` | `GetRevision()`, from `GameActions` |
-| `ScriptBindings` | `{"get_revision()", GetRevision}`, returning `static_cast<u16>(revision)` as an int |
+| `ScriptContext` | `GetRevision()`, from `GameActions` |
+| `ControlBindings` | `{"get_revision()", GetRevision}`, returning `static_cast<u16>(revision)` as an int |
 | `rs2004/game.py` | `_Game.revision()`: `"""The server revision this client speaks: 225 or 289."""` |
 | Typings | `def revision(self) -> int: ...` in `__builtins__.pyi` and `rs2004/__init__.pyi` |
-| `ScriptApi::GetPlayerMenu` | 225 has no `SET_PLAYER_OP`; its webclient's player menu is fixed. For 225 the menu is `Duel-with`, `Attack`, `Follow`, `Trade with` (ops 1 to 4); for 289 it comes from `playerOps`, as today. The server still decides whether an op is allowed where the player is |
+| `Menus::GetPlayerMenu` | 225 has no `SET_PLAYER_OP`; its webclient's player menu is fixed. For 225 the menu is `Duel-with`, `Attack`, `Follow`, `Trade with` (ops 1 to 4); for 289 it comes from `playerOps`, as today. The server still decides whether an op is allowed where the player is |
 | `ScriptingApi.md` | `revision()` in the `game` row; a note that `members` is always false on 225 and that ops 5 and drag-insert raise there |
 
 ---
@@ -423,7 +423,7 @@ The optional real-cache test (§12) checks each one resolves to the component th
 | `Cache/CacheLoaderTests.cpp`, `CacheWriter` | `CacheWriter` learns the 225 layout. A 225 folder loads with the right CRCs, maps and components; a missing file shifts the CRCs as `makeCrcs` does; each layout given the other revision fails with the message in §10.1 |
 | `Cache/TypeDecoderTests.cpp`, `InterfaceDecoderTests.cpp` | Each opcode and field in §10.3 and §10.4, in the revision that has it and as an error in the one that doesn't |
 | `Cache/RealCache.cpp` | `RequireShared(Revision_e)`, with `RS2004_CACHE_DIR_225` beside today's variable, skipping when it's unset. `RealCacheTests` checks the 225 components resolve to the ids in the 225 content |
-| `Core/ConfigFileTests.cpp` | 225 and 289 load; 224, 226, 288 and 290 fail with the message from §3 |
+| `Config/ConfigFileTests.cpp` | 225 and 289 load; 224, 226, 288 and 290 fail with the message from §3 |
 | Script tests | `game.revision()` returns the configured revision |
 
 ---

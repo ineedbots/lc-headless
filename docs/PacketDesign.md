@@ -32,9 +32,9 @@ Reference sources:
 |---|---|
 | `io/Packet.ts` | `src/Io/Packet.hpp` / `.cpp` |
 | `io/Isaac.ts` | `src/Io/Isaac.hpp` / `.cpp` |
-| `util/JsUtil.ts` RSA helpers | `src/Core/BigUInt.hpp` / `.cpp` |
-| (convention) | `src/Core/Endian.hpp`, verbatim from CONVENTIONS §9 |
-| (logging) | `src/Core/Logger.hpp` / `.cpp`, specified in [LoggerDesign.md](LoggerDesign.md) |
+| `util/JsUtil.ts` RSA helpers | `src/Utils/BigUInt.hpp` / `.cpp` |
+| (convention) | `src/Utils/Endian.hpp`, verbatim from CONVENTIONS §9 |
+| (logging) | `src/Console/Logger.hpp` / `.cpp`, specified in [LoggerDesign.md](LoggerDesign.md) |
 
 ```
 rs2004-headless/
@@ -47,28 +47,32 @@ rs2004-headless/
 ├── src/
 │   ├── pch.hpp
 │   ├── main.cpp
-│   ├── Application.hpp
-│   ├── Application.cpp
-│   ├── Core/
-│   │   ├── BigUInt.hpp
-│   │   ├── BigUInt.cpp
-│   │   ├── Endian.hpp
+│   ├── Application/
+│   │   ├── Application.hpp
+│   │   └── Application.cpp
+│   ├── Console/
 │   │   ├── Logger.hpp
 │   │   └── Logger.cpp
-│   └── Io/
-│       ├── Isaac.hpp
-│       ├── Isaac.cpp
-│       ├── Packet.hpp
-│       └── Packet.cpp
+│   ├── Io/
+│   │   ├── Isaac.hpp
+│   │   ├── Isaac.cpp
+│   │   ├── Packet.hpp
+│   │   └── Packet.cpp
+│   └── Utils/
+│       ├── BigUInt.hpp
+│       ├── BigUInt.cpp
+│       └── Endian.hpp
 └── tests/
-    ├── LogCapture.hpp
-    ├── LogCapture.cpp
-    ├── Core/
-    │   ├── BigUIntTests.cpp
+    ├── Console/
     │   └── LoggerTests.cpp
-    └── Io/
-        ├── IsaacTests.cpp
-        └── PacketTests.cpp
+    ├── Io/
+    │   ├── IsaacTests.cpp
+    │   └── PacketTests.cpp
+    ├── Support/
+    │   ├── LogCapture.hpp
+    │   └── LogCapture.cpp
+    └── Utils/
+        └── BigUIntTests.cpp
 ```
 
 `Logger`, `LogCapture` and `LoggerTests.cpp` are specified in [LoggerDesign.md](LoggerDesign.md) and implemented right after the project setup (§8).
@@ -86,7 +90,7 @@ Not ported: the `Linkable2` base (it only served the pool) and the rest of `JsUt
 ```cpp
 #pragma once
 
-#include "../Core/BigUInt.hpp"
+#include "../Utils/BigUInt.hpp"
 #include "Isaac.hpp"
 
 class Packet
@@ -180,8 +184,8 @@ private:
 - **Copies.**
     - Rule of zero. Copying a reader copies the view; copying a writer copies its bytes.
 - **Includes.**
-    - `Packet.hpp` includes `Isaac.hpp`, since `Isaac` appears in `P1Enc`'s and `G1Enc`'s prototypes, and `../Core/BigUInt.hpp`, since `BigUInt` appears in `RsaEnc`'s prototype.
-    - `Packet.cpp` uses both, so it includes them again, plus `../Core/Endian.hpp`.
+    - `Packet.hpp` includes `Isaac.hpp`, since `Isaac` appears in `P1Enc`'s and `G1Enc`'s prototypes, and `../Utils/BigUInt.hpp`, since `BigUInt` appears in `RsaEnc`'s prototype.
+    - `Packet.cpp` uses both, so it includes them again, plus `../Utils/Endian.hpp`.
 - **Byte order.**
     - Big-endian, except `IP2`/`IP4`, which are little-endian.
     - All multi-byte access goes through `Endian::ToBig`/`FromBig`/`ToLittle`/`FromLittle` plus `std::memcpy`, using template helpers in `Packet.cpp`'s anonymous namespace.
@@ -645,7 +649,7 @@ For each pair:
 
 1. **Project setup:**
     - Create `CMakeLists.txt` (library, app and test targets), `CMakePresets.json` (including test presets), `vcpkg.json` (with Catch2), `.clang-format`, `.editorconfig` and `.gitattributes`.
-    - Create `pch.hpp` (with `<compare>`), `main.cpp`, `Application`, and `Core/Endian.hpp`.
+    - Create `pch.hpp` (with `<compare>`), `main.cpp`, `Application`, and `Utils/Endian.hpp`.
 2. **`Logger`:** implement it and `LogCapture` per [LoggerDesign.md](LoggerDesign.md) §7, plus their tests.
 3. **`BigUInt`:** implement it, plus its tests.
 4. **`Isaac`:** implement it, plus its tests.

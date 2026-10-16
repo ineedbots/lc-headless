@@ -2,6 +2,8 @@
 
 Plan for running Python scripts that drive the headless client, modelled on plutonium-rsc's scripting. A script defines `loop()`, which returns how many milliseconds to wait before it is called again, plus optional `on_*` hooks for things that happen in game. It reads the game through a flat set of global functions and acts through them too. One process runs several accounts, each with its own client and its own isolated interpreter. Code style follows [CONVENTIONS.md](CONVENTIONS.md).
 
+> The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
+
 Reference sources:
 
 - `plutonium-rsc/script.go`: gpython embedding, hook lookup, the `settings` object, progress reports
@@ -70,30 +72,34 @@ rs2004-headless/
 │   ├── Script/
 │   │   ├── ScriptRuntime.hpp/.cpp  py_initialize/py_finalize, the 16 VM slots, the import and print callbacks
 │   │   ├── ScriptVm.hpp/.cpp       owns one VM slot: run a module, call a function under the watchdog
-│   │   ├── ScriptError.hpp         a script failed: compile error, exception, timeout, bad return
-│   │   ├── PyConvert.hpp/.cpp      static: C++ values to Python objects, and argument parsing
-│   │   ├── ScriptApi.hpp/.cpp      binding-neutral queries and actions over GameState_s and GameActions
-│   │   ├── ScriptBindings.hpp/.cpp static: the prelude, constants and functions in a VM's builtins
-│   │   ├── ScriptHost.hpp/.cpp     one account's script: load, schedule loop(), dispatch events, handle errors
+│   │   ├── Error/ScriptError.hpp   a script failed: compile error, exception, timeout, bad return
+│   │   ├── Convert/                PyValue, PyArgs, PyObjects: values both ways, arguments, the stdlib's objects
+│   │   ├── ScriptContext.hpp/.cpp  what a VM's bindings reach: the state, the Game queries, the actions, the control
+│   │   ├── ScriptActions.hpp/.cpp  the actions, checked against the tracked state
+│   │   ├── ScriptControl.hpp/.cpp  stop and relog requests, step time, progress notes
+│   │   ├── Bindings/               ScriptBindings, and one class per area of the _core functions
+│   │   ├── Host/                   ScriptHost, with its LoopSchedule, ScriptHooks and EventDispatcher
 │   │   └── BotMessenger.hpp/.cpp   messages between the scripts in one process (§12)
-│   ├── Core/
-│   │   ├── ConfigFile.hpp/.cpp     also loads and validates accounts/*.jsonc
+│   ├── Config/
+│   │   └── AccountFile.hpp/.cpp    loads and validates accounts/*.jsonc
+│   ├── Utils/
 │   │   └── FileWatcher.hpp/.cpp    notices when a script's files change, for --watch (§12)
 │   ├── Accounts/
 │   │   ├── Account.hpp/.cpp        GameClient + ScriptHost + named logger, and its lifecycle
 │   │   ├── AccountRunner.hpp/.cpp  the main loop over every account, and Ctrl+C
+│   │   ├── ProgressReporter.hpp/.cpp  when a progress report is due (§12)
 │   │   └── ProgressReportFile.hpp/.cpp  writes progress reports (§12)
 │   └── Game/State/
 │       └── GameEvent_s.hpp         new: the event variant
 └── tests/
-    ├── Game/TestWorld.hpp/.cpp     the world the fake server sends on login, shared by client, host and account tests
+    ├── Support/Game/TestWorld.hpp/.cpp  the world the fake server sends on login, shared by client, host and account tests
     ├── Script/                     runtime, API, bindings and host tests, and a check that the examples load
     └── Accounts/                   account and runner tests
 ```
 
-- `ScriptApi` holds all game logic the API needs, such as nearest-NPC filters and inventory counts, in plain C++. `ScriptBindings` only converts arguments and results. A later control server or another language binds the same `ScriptApi`.
+- The game logic the API needs, such as nearest-NPC filters and inventory counts, is plain C++ in `Game/` (`EntityQuery`, `InventoryQuery`, `Menus` and the rest) and in `ScriptActions`. The bindings only convert arguments and results, so a later control server or another language can bind the same classes.
 - Each `py_CFunction` thunk catches every C++ exception and turns it into a Python exception. A C++ exception must never unwind through pocketpy's C frames.
-- A thunk finds its `ScriptApi` in a table indexed by the current VM slot, which `ScriptBindings::Bind` fills and `Unbind` clears. `py_getvmctx()` holds the `ScriptVm`, for the print and import callbacks.
+- A thunk finds its `ScriptContext` in a table indexed by the current VM slot (`BindingSupport::GetContext`), which `ScriptBindings::Bind` fills and `Unbind` clears. `py_getvmctx()` holds the `ScriptVm`, for the print and import callbacks.
 
 ---
 

@@ -2,6 +2,8 @@
 
 Plan for a script API with the abilities of rs2b0t's bot API, written the way Python is: rs2b0t's facades, query builder, bot classes, world walker, random-event guardian and catalogs, with snake_case names, and generators where rs2b0t awaits. The client hasn't been released, so this replaces today's flat API ([ScriptingApi.md](ScriptingApi.md)) outright; nothing keeps the old names. plutonium-rsc's abilities are a subset of rs2b0t's, and its scripts port through a table in ScriptingApi.md. rs2b0t's quest and clue engines are left for a later project. The work comes in nine phases after a docs fix (§14). Code style follows [CONVENTIONS.md](CONVENTIONS.md). It extends the interface decoding in [CacheDesign.md](CacheDesign.md) §6, the paths in CacheDesign §10–11, and the runtime, events and API in [ScriptingDesign.md](ScriptingDesign.md) §3–6, whose naming rule it replaces.
 
+> The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
+
 Reference sources:
 
 - `rs2b0t/packages/rs2b0t-api/index.d.ts`: the public API, every facade, class and catalog this design mirrors
@@ -25,7 +27,7 @@ Reference sources:
 | Shape | rs2b0t's: facades named after game nouns (`npcs`, `inventory`, `bank`, `chat_dialog`, `traversal`), a chainable `query()` for entities, and entities with methods (`npc.interact('Attack')`, `item.use_on(range)`). An rs2b0t bot translates to Python mostly by renaming (§3) |
 | Names | camelCase becomes snake_case. A facade object is lower-case (`Npcs` is `npcs`, `ChatDialog` is `chat_dialog`, `GroundItems` is `ground_items`); classes keep CapWords (`Tile`, `LoopingBot`). A name that's a Python keyword gains a trailing underscore, as PEP 8 suggests (`chat_dialog.continue_()`) |
 | Waiting | Where rs2b0t `await`s, a script writes `yield from`. A call that waits is a generator, and its result is the generator's return value: `ok = yield from bank.withdraw_x('Feather', 100)`. pocketpy has no `send`, so results come back by `return` only |
-| Two layers | A C++ core (`ScriptApi`, bound as the private `_core` module) holds the state, fast searches, the interface model, packets and path search. A Python standard library, embedded in the executable, holds the facades, waits, bots, walker, random-event solvers and catalogs. Those are mostly sequencing (open, wait, check, retry), which reads best as generators and ports from rs2b0t's TypeScript line by line. This replaces ScriptingDesign §2's rule that all game logic is C++ |
+| Two layers | A C++ core (`ScriptContext` and the `Game/` queries it reaches, bound as the private `_core` module) holds the state, fast searches, the interface model, packets and path search. A Python standard library, embedded in the executable, holds the facades, waits, bots, walker, random-event solvers and catalogs. Those are mostly sequencing (open, wait, check, retry), which reads best as generators and ports from rs2b0t's TypeScript line by line. This replaces ScriptingDesign §2's rule that all game logic is C++ |
 | Bots | rs2b0t's `LoopingBot`, `TaskBot` and `TreeBot`. A script that only defines `loop()` and hooks is a `LoopingBot` |
 | Settings | rs2b0t's typed schema. A script declares types, defaults, ranges and options, and the account file's settings are checked against it before login |
 | Events | rs2b0t's event bus (`events.on`, `bot.on`), with its events and ours under one set of names. A hook is a bot method or module function named `on_<event>` |
@@ -50,9 +52,9 @@ Rejected:
 ```
 src/
 ├── Script/
-│   ├── ScriptApi.hpp/.cpp      the core: state, searches, interfaces, packets, path search (bound as _core)
-│   ├── ScriptBindings.cpp      binds _core and loads the stdlib into builtins; the prelude shrinks phase by phase
-│   ├── ScriptHost.cpp          drives a bot: steps, waits, events, the random-event guardian, stall guard
+│   ├── ScriptContext.hpp/.cpp  the core a VM reaches: state, the Game queries, actions, control (bound as _core)
+│   ├── Bindings/               binds _core, one class per area, and loads the stdlib into builtins
+│   ├── Host/ScriptHost.cpp     drives a bot: steps, waits, events, the random-event guardian, stall guard
 │   ├── Stdlib.hpp/.cpp         finds an embedded stdlib file by path
 │   └── Stdlib/rs2004/          the Python standard library, embedded at build time
 │       ├── _prelude.py         run into builtins first: helpers the host calls, such as _report_rows
@@ -231,7 +233,7 @@ Kept from before because rs2b0t has nothing public for them:
 - `friends` and `ignores`, with `list()`, `add(name)` and `remove(name)`;
 - `send_bot_message`, `stop_script`, `stop_account`, `log` and `debug`.
 
-Until phases 3 and 4 replace them, scripts keep the interface and magic functions that take component ids, bound in builtins as well as `_core` (`BUILTIN_FUNCTIONS` in `ScriptBindings.cpp`):
+Until phases 3 and 4 replace them, scripts keep the interface and magic functions that take component ids, bound in builtins as well as `_core` (`BUILTIN_FUNCTIONS` in `Bindings/ScriptBindings.cpp`):
 - `click_button`, `continue_dialogue`, `answer_count` and `close_interfaces`;
 - `inv_button` and `move_item`;
 - the five `cast_on_*`.

@@ -44,20 +44,28 @@ rs2004-headless/
 │   └── LoggerDesign.md
 ├── src/
 │   ├── main.cpp
-│   └── Core/
+│   └── Console/
+│       ├── LogEntry_s.hpp
+│       ├── LogFormat_s.hpp
+│       ├── LogFormatter.hpp / .cpp
+│       ├── LogLevel_e.hpp
+│       ├── ConsoleOutput.hpp / .cpp
+│       ├── Terminal.hpp / .cpp
 │       ├── Logger.hpp
 │       └── Logger.cpp
 └── tests/
-    ├── DefaultLoggerScope.hpp
-    ├── DefaultLoggerScope.cpp
-    ├── LogCapture.hpp
-    ├── LogCapture.cpp
-    └── Core/
-        └── LoggerTests.cpp
+    ├── Console/
+    │   ├── LogFormatterTests.cpp
+    │   └── LoggerTests.cpp
+    └── Support/
+        ├── DefaultLoggerScope.hpp
+        ├── DefaultLoggerScope.cpp
+        ├── LogCapture.hpp
+        └── LogCapture.cpp
 ```
 
-- `LogLevel_e`, `LogEntry_s` and `LogFormat_s` live in `Logger.hpp`, the header of the class that owns them.
-- `Logger` lives in `Core/`, because every subsystem uses it. A class that logs includes `../Core/Logger.hpp` in its header, because `Logger` appears in its constructor's prototype and its members, and again in its `.cpp` (CONVENTIONS §5).
+- `LogLevel_e`, `LogEntry_s` and `LogFormat_s` each have a header of their own, since the sinks, the formatter and the config use them without the logger. `LogFormatter` formats an entry as a line, `ConsoleOutput` writes it to stdout or stderr, and `Terminal` holds the platform calls that decide whether the console shows colors ([RefactorDesign.md](RefactorDesign.md) §5).
+- `Logger` lives in `Console/`, with everything else that writes to the console. A class that logs includes `../Console/Logger.hpp` in its header, because `Logger` appears in its constructor's prototype and its members, and again in its `.cpp` (CONVENTIONS §5).
 - `pch.hpp` gains `<atomic>` and `<mutex>` for the logger's members, `<source_location>` and `<type_traits>` for `LogFormat_s`, and `<thread>` for the threading tests.
 - `main.cpp` creates the logger, makes it the default, and passes it to `Application`, which passes it on (see Usage).
 - `LogCapture` is the test fixture every test file uses to check logging (§6.1). `DefaultLoggerScope` swaps the default logger for the length of a test. Both sit at the root of `tests/` because they aren't tied to one subsystem.
@@ -262,9 +270,9 @@ catch (const WebSocketError& e)
 
 ```cpp
 #include "pch.hpp"
-#include "Application.hpp"
+#include "Application/Application.hpp"
 
-#include "Core/Logger.hpp"
+#include "Console/Logger.hpp"
 
 int main()
 {
@@ -420,12 +428,12 @@ Out of scope:
 - A sink that logs through its own logger, which deadlocks.
 - A null logger passed to a constructor. That is an `assert`, so it's a bug, not an input.
 
-**`LogCapture`** (`tests/LogCapture.hpp` / `.cpp`) is shared by every test file that checks logging:
+**`LogCapture`** (`tests/Support/LogCapture.hpp` / `.cpp`) is shared by every test file that checks logging:
 
 ```cpp
 #pragma once
 
-#include "Core/Logger.hpp"
+#include "Console/Logger.hpp"
 
 struct CapturedLog_s
 {

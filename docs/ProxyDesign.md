@@ -57,8 +57,13 @@ rs2004-headless/
 │       ├── portfile.cmake               upstream's, plus PATCHES
 │       └── connect-function.patch
 ├── src/
-│   ├── Accounts/Account.cpp             WithServer becomes WithAccountOverrides
-│   ├── Core/ConfigFile.hpp / .cpp       ProxySettings_s, its rules, the account key
+│   ├── Config/
+│   │   ├── ProxySettings_s.hpp          ProxySettings_s
+│   │   ├── Config_s.hpp                 Config_s::proxy
+│   │   ├── AccountConfig_s.hpp          the account key
+│   │   ├── ConfigJson.cpp               the macros
+│   │   ├── ConfigValidator.cpp          its rules
+│   │   └── ConfigOverrides.cpp          ForAccount applies the proxy override too
 │   ├── Game/GameClient.cpp              passes the proxy to Connect
 │   └── Io/
 │       ├── Socks5Handshake.hpp / .cpp   messages built and parsed; no I/O
@@ -66,20 +71,22 @@ rs2004-headless/
 │       ├── TcpConnection.hpp / .cpp     an owned socket with cancellable sends and receives
 │       └── WebSocketClient.hpp / .cpp   WebSocketOptions_s::proxy, and the hook
 └── tests/
+    ├── Support/Io/FakeSocks5Proxy.hpp / .cpp
     ├── Io/
-    │   ├── FakeSocks5Proxy.hpp / .cpp
     │   ├── Socks5HandshakeTests.cpp
     │   └── WebSocketClientTests.cpp     proxy cases
-    ├── Core/ConfigFileTests.cpp         proxy cases
+    ├── Config/
+    │   ├── ConfigFileTests.cpp          proxy cases
+    │   └── ConfigOverridesTests.cpp     the account override
     ├── Game/GameClientTests.cpp         a login through the proxy
-    └── Accounts/AccountTests.cpp        the account override
+    └── Accounts/AccountTests.cpp        an account through its own proxy
 ```
 
 - `vcpkg-configuration.json` already lists `ports` as an overlay folder, so `ports/ixwebsocket` takes the place of the registry's port with no other change.
 - The overlay copies `ports/ixwebsocket/` from microsoft/vcpkg at the `builtin-baseline` in `vcpkg.json` (`3cbc1db4d867ec83c89fba4c461321c11f78b5e3`), version 12.0.1, with the same features. The patch is part of the port's ABI hash, so the binary cache builds it afresh.
 - The patch is a `.patch` file applied through `vcpkg_from_github(... PATCHES connect-function.patch)`, not `vcpkg_replace_string` as in `ports/pocketpy`. Pocketpy's edits each swap one line. This one adds declarations to three headers and their definitions, which a diff shows in context. A comment in `portfile.cmake` says why the patch exists.
 - `Socks5Proxy_s` lives in `Socks5Connector.hpp`, the header of the class that uses it. `WebSocketClient.hpp` includes that header, because `WebSocketOptions_s` has a `Socks5Proxy_s` member.
-- `ProxySettings_s` lives in `ConfigFile.hpp` with the other sections, and has the member names of `Socks5Proxy_s`, as `ServerSettings_s` mirrors `WebSocketOptions_s`.
+- `ProxySettings_s` has a header of its own in `Config/`, since both `Config_s` and `AccountConfig_s` hold one, as with `ServerSettings_s`. It has the member names of `Socks5Proxy_s`, as `ServerSettings_s` mirrors `WebSocketOptions_s`.
 
 ---
 
@@ -111,7 +118,7 @@ A new section after `server`. The default serialization ([ConfigDesign.md](Confi
 - **255** is the length limit of RFC 1929's fields. The same limit on the host keeps the rule simple, although only the server's host goes into a SOCKS5 field.
 - **Unused keys are still checked.** With an empty host, `port`, `username` and `password` are unused, but their rules still apply, as `server.tlsCaFile`'s does with a `ws` URL.
 - **Printable ASCII** for the credentials, as for the account's own. RFC 1929 allows any bytes, but the symbols proxy providers use are all printable ASCII.
-- `ConfigFile.cpp` gains `MAX_PROXY_FIELD_LENGTH = 255` and `MAX_PORT = 65535`, and a `ValidateProxy(const ProxySettings_s&)` beside `ValidateServer`. `Validate` and `ValidateAccount` both call it, with the paths `proxy.host` and so on, as both call `ValidateServer` with `server.url`.
+- `ConfigValidator` gains `MAX_PROXY_FIELD_LENGTH = 255` and `MAX_PORT = 65535`, and a `ValidateProxy(const ProxySettings_s&)` beside `ValidateServer`. `Validate` and `ValidateAccount` both call it, with the paths `proxy.host` and so on, as both call `ValidateServer` with `server.url`.
 
 ```cpp
 struct ProxySettings_s
@@ -157,10 +164,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, proxy, login, 
 
 ### Applying the override
 
-`Account.cpp`'s `WithServer` becomes `WithAccountOverrides`, which applies both overrides with one copy of the config:
+`ConfigOverrides::ForAccount` applies both overrides with one copy of the config:
 
 ```cpp
-std::shared_ptr<const Config_s> WithAccountOverrides(std::shared_ptr<const Config_s> config, const AccountConfig_s& account)
+std::shared_ptr<const Config_s> ConfigOverrides::ForAccount(std::shared_ptr<const Config_s> config, const AccountConfig_s& account)
 {
     if (!account.server && !account.proxy)
     {
@@ -477,13 +484,13 @@ These run against the existing loopback WebSocket server, through `FakeSocks5Pro
     - `{"host": "", ...}` is accepted.
     - A bad `proxy.port` in an account file throws containing `proxy.port`.
 
-### 9.5 GameClientTests and AccountTests
+### 9.5 GameClientTests, ConfigOverridesTests and AccountTests
 
 - **GameClient.** A login to `FakeGameServer` through `FakeSocks5Proxy` reaches the game. The proxy saw exactly one connection.
 - **Proxy from `client.jsonc`.** An account with no override goes through `client.jsonc`'s proxy.
 - **The account's own proxy.** An account with its own proxy goes through that one, and the `client.jsonc` proxy sees nothing.
 - **Direct override.** An account with `{"host": ""}` connects directly while `client.jsonc` has a proxy.
-- **Both overrides.** An account with both a `server` and a `proxy` override gets both.
+- **Both overrides.** `ConfigOverrides::ForAccount` with both a `server` and a `proxy` override gives a config with both, and with neither returns the same config.
 
 ### 9.6 Done when
 
@@ -506,7 +513,7 @@ These run against the existing loopback WebSocket server, through `FakeSocks5Pro
     - `ProxySettings_s`, the macros, `ValidateProxy`, and the account key.
     - The samples, with the §9.4 tests.
 5. **Wiring.**
-    - `MakeProxy` in `GameClient` and `WithAccountOverrides` in `Account`, with the §9.5 tests.
+    - `MakeProxy` in `GameClient` and the proxy in `ConfigOverrides::ForAccount`, with the §9.5 tests.
 6. **Docs.** README, ConfigDesign and WebSocketDesign, as in §8. Then the live run in §9.6.
 
 This plan doesn't depend on [RevisionDesign.md](RevisionDesign.md). Both add to `Config_s`, so whichever lands second updates the default serialization and the sample once more.

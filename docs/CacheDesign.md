@@ -2,6 +2,8 @@
 
 Plan for loading the revision-289 game cache once per process and sharing it, read-only, with every account. The client computes the nine login CRCs from the cache, so `login.crcs` leaves `client.jsonc`. The cache also lifts the packet-only limits in [ScriptingDesign.md](ScriptingDesign.md) §10: scripts get names and options for NPCs, items and scenery, they see scenery the server never changed, and walks route around walls. The work ships in four phases, plus an optional fifth that lets several processes share one copy (§16, §17). Code style follows [CONVENTIONS.md](CONVENTIONS.md). It reads bytes and computes CRCs with `Packet` ([PacketDesign.md](PacketDesign.md) §3), adds a key to `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)), and extends the script API ([ScriptingDesign.md](ScriptingDesign.md) §6).
 
+> The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
+
 Reference sources, in `289server/` beside this repository:
 
 - `engine/src/io/FileStream.ts`: the store, `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`
@@ -68,11 +70,12 @@ rs2004-headless/
 │   └── CacheDesign.md                  this file
 ├── src/
 │   ├── pch.hpp                         gains <unordered_set> and <bitset>
-│   ├── Application.hpp/.cpp            loads the cache after the config
-│   ├── Core/
+│   ├── Application/
+│   │   └── Application.hpp/.cpp        loads the cache after the config
+│   ├── Utils/
 │   │   └── MappedFile.hpp/.cpp         phase 5: a whole file, mapped read-only
 │   ├── Cache/
-│   │   ├── CacheError.hpp
+│   │   ├── Error/CacheError.hpp
 │   │   ├── CacheStore.hpp/.cpp         reads files out of main_file_cache.dat by way of the idx files
 │   │   ├── Compression.hpp/.cpp        static: headerless bzip2, gzip
 │   │   ├── JagArchive.hpp/.cpp         the named entries of a JAG archive
@@ -101,7 +104,7 @@ rs2004-headless/
     └── Game/                           CollisionMapTests, WorldMapTests, PathFinderTests
 ```
 
-- `Cache/` depends on `Io/` (`Packet`) and `Core/` (`Logger`), never on `Game/` or `Script/`. `Game/` and `Script/` read it.
+- `Cache/` depends on `Io/` (`Packet`), `Console/` (`Logger`) and `Utils/`, never on `Game/` or `Script/`. `Game/` and `Script/` read it.
 - The structs each get their own header, because the decoders, `GameCache_s` and the script API all use them (CONVENTIONS §6).
 - `MapSquare` is a class, not a struct. Code outside `Cache/` reads it only through its functions, so phase 5 can change how it's stored without touching its readers (§17).
 - `CacheError.hpp` is header-only, like `ConfigError.hpp`.
@@ -759,7 +762,7 @@ struct GameCache_s
 // src/Cache/CacheLoader.hpp
 #pragma once
 
-#include "../Core/Logger.hpp"
+#include "../Console/Logger.hpp"
 #include "GameCache_s.hpp"
 
 class CacheLoader
@@ -1303,7 +1306,7 @@ pocketpy's 16 interpreter slots cap a process at 16 accounts, so more accounts t
 | File | `client.decodedCacheFile`, default `"cache.bin"`, relative to the working directory and git-ignored. It's derived data, so deleting it only costs the next start a full decode |
 | Key | The header holds a magic number, a format version and the nine CRCs. Everything the file is built from is in store 0: `config` holds the types, and `versionlist` holds `map_index` and the CRC of every map file, so a changed map file changes `versionlist` and its CRC. The nine CRCs therefore identify the contents, and a file whose header doesn't match the store is rebuilt |
 | Startup | Compute the CRCs, which reads only store 0 (about 750 KB). When the file's header matches, map it. Otherwise decode the store as phases 1 to 4 do, write the file under a temporary name in the same folder (`cache.bin.<process id>.tmp`), rename it into place, and map it |
-| Mapping | `MappedFile`, in `Core/`: a whole file, mapped read-only and unmapped by its destructor. `CreateFileMappingW` and `MapViewOfFile` on Windows; `mmap` with `PROT_READ` and `MAP_SHARED` on Linux. The platform code stays in `MappedFile.cpp`, behind `#ifdef _WIN32` (CONVENTIONS §9) |
+| Mapping | `MappedFile`, in `Utils/`: a whole file, mapped read-only and unmapped by its destructor. `CreateFileMappingW` and `MapViewOfFile` on Windows; `mmap` with `PROT_READ` and `MAP_SHARED` on Linux. The platform code stays in `MappedFile.cpp`, behind `#ifdef _WIN32` (CONVENTIONS §9) |
 | Format | Little-endian, written field by field through `Endian` (CONVENTIONS §9): a header with a table of sections, then the text, the option table, the three type tables, a sorted index of squares, and for each square its bitset and its 6-byte loc records |
 | Mapped | The map squares and the text, almost 90% of the data. The types are decoded from the file into ordinary structs at startup, about 0.7 MB per process, so `FindLoc` and the others still return `const LocType_s*`. Their names point into the mapped text, and `GameCache_s` owns the `MappedFile` that keeps it there |
 | Reading | No struct is laid over the mapped bytes, which CONVENTIONS §9 rules out. `MapSquare` keeps its functions; inside, it holds a pointer into the mapping and reads each record through `Endian`. `GetLocsAt` and `GetLocs` return a small range that yields `MapLoc_s` by value, instead of a span |

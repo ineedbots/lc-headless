@@ -244,20 +244,30 @@ Before you write one, know these limits:
 
 ```
 src/
-├── main.cpp, Application     command line, config loading, Ctrl+C
-├── Accounts/                 each account's lifecycle, the main loop over all accounts, progress report files
-├── Script/                   pocketpy runtime and interpreters, the Python API and its bindings, messages between scripts
+├── main.cpp
+├── Application/              startup, the command line, Ctrl+C
+├── Accounts/                 each account's lifecycle, the main loop over all accounts, console commands, progress reports
+├── Config/                   client.jsonc and the account files: the structs, parsing, rules, the JSONC editor
+├── Console/                  the logger, log files and console output, console input and its commands
+├── Script/
+│   ├── (root)                pocketpy runtime and interpreters, what the bindings reach, messages between scripts
+│   ├── Bindings/             the _core functions, one class per area
+│   ├── Convert/              Python values to and from C++
+│   └── Host/                 one account's script: its schedule, hooks and events
 ├── Cache/                    reading the server's cache: the store, archives, definitions, map squares, login CRCs, the logout button
 ├── Game/
 │   ├── GameClient            login, reconnects, logout, polling the connection
 │   ├── Map/                  each account's collision map and scenery, and the route search
+│   ├── Nav/                  the world graph and the long-distance walker's data
+│   ├── Query/                searches over the game state: entities, inventories, the player, reachability
+│   ├── Menu/, Interface/     menu ops, interfaces and dialogue
 │   ├── Net/                  login handshake, reading and writing packets
 │   ├── Protocol/             opcodes, client packet builders, text encodings
 │   ├── Decode/               turns server packets (including player, NPC and zone updates) into game state
 │   └── State/                the game state, and the event log that script hooks receive
 ├── Io/                       WebSocket transport, packet buffer, ISAAC cipher
-└── Core/                     config files, logger, big integers for RSA, file watcher
-tests/                        Catch2 tests in the same folders as src/, plus a fake game server
+└── Utils/                    shared helpers: strings, files, big integers for RSA, file watcher
+tests/                        Catch2 tests in the same folders as src/; Support/ holds the fake game server and other helpers
 scripts/                      bot scripts: examples/, lib/ for shared modules, typings/ for editors
 accounts/                     account files (ignored by git) and the sample file
 ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0

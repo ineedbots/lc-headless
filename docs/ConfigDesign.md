@@ -20,7 +20,7 @@ Reference sources:
 | Sample | `client.jsonc.sample` is committed next to it. When the file doesn't exist, `Load` throws a `ConfigError` that says to copy the sample there and fill it in. Nothing is written |
 | Shape | `ConfigFile` is a non-instantiable class with static `Load`, `Parse` and `Serialize`, like `StringUtils` in CONVENTIONS §5. `Load` and `Parse` return a `Config_s`: plain data, one struct per section. Values come out already converted to the types the client uses (`BigUInt`, `LogLevel_e`, `std::chrono::seconds`), so no code downstream parses or validates anything |
 | Ownership | `Application` holds the loaded config in a `std::shared_ptr<const Config_s>` and passes it to any class that needs it. A class that keeps it stores its own copy of the pointer, so ownership is genuinely shared (CONVENTIONS §8) and no class can outlive the config it reads. The `const` keeps the settings read-only after loading, for every holder |
-| Conversion | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` generates `from_json` and `to_json` for `Config_s` and the four section structs. Each type nlohmann can't convert by itself (`BigUInt`, `LogLevel_e` and `std::chrono::seconds`) gets an `nlohmann::adl_serializer` specialization with both directions. All of it lives in `ConfigFile.cpp` |
+| Conversion | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` generates `from_json` and `to_json` for `Config_s` and the four section structs. Each type nlohmann can't convert by itself (`BigUInt`, `LogLevel_e` and `std::chrono::seconds`) gets an `nlohmann::adl_serializer` specialization with both directions. All of it lives in `ConfigJson.cpp` |
 | Macros | A deliberate exception to CONVENTIONS §6. The macros generate a `from_json` and a `to_json` per struct that would otherwise have to be written, and kept in step with the struct, by hand |
 | Keys | The JSON keys are the C++ member names, because the macro uses each member's name as its key. They are camelCase (CONVENTIONS §6), and a key's path in the file is its path in code: `login.rsaModulus` in the file is `config.login.rsaModulus` |
 | Key order | Reading uses `nlohmann::json`. Writing uses `nlohmann::ordered_json`, so a written file lists sections and keys in declaration order, the order of §3, instead of alphabetically |
@@ -31,7 +31,7 @@ Reference sources:
 | Errors | Everything `ConfigFile` throws for a missing, unreadable or invalid file is a `ConfigError`, the type in CONVENTIONS §8. Messages start with the dotted path of the key (`scripting.callTimeoutMs: ...`), and `Load` puts the file path in front. `JSON_DIAGNOSTICS` makes nlohmann's own conversion errors carry the path |
 | Secrets | No message or log line contains a value from the file. Syntax errors give a line and a column, but no excerpt. nlohmann's conversion errors name types and keys, never values |
 | Logging | A warning when TLS verification is turned off, logged through the `Logger&` that `Load` and `Parse` take. Loading logs nothing else |
-| Dependency | nlohmann/json is used only in `ConfigFile.cpp`. No header exposes it |
+| Dependency | For the config, nlohmann/json is used only in `ConfigJson.cpp`, and by the JSONC editor that adds settings to account files. No header exposes it |
 | Threading | `ConfigFile` has no state. A loaded `Config_s` is `const` behind its `shared_ptr`, so any thread can read it, and copying or releasing the pointer is thread-safe |
 
 Rejected:
@@ -61,21 +61,32 @@ rs2004-headless/
 │   └── ConfigDesign.md
 ├── src/
 │   ├── main.cpp
-│   ├── Application.hpp
-│   ├── Application.cpp
-│   └── Core/
-│       ├── ConfigError.hpp
-│       ├── ConfigFile.hpp
-│       └── ConfigFile.cpp
+│   ├── Application/
+│   │   ├── Application.hpp
+│   │   └── Application.cpp
+│   └── Config/
+│       ├── Error/ConfigError.hpp
+│       ├── Config_s.hpp                 Config_s and its sections
+│       ├── ServerSettings_s.hpp
+│       ├── AccountConfig_s.hpp          AccountConfig_s, AccountSettings_s, ScriptConfig_s
+│       ├── ConfigFile.hpp / .cpp        client.jsonc: Load, Parse, Serialize
+│       ├── AccountFile.hpp / .cpp       an account file: Load, Parse, AddScriptSettings
+│       ├── AccountDirectory.hpp / .cpp  every enabled account in the accounts folder
+│       ├── ConfigJson.hpp / .cpp        every nlohmann conversion
+│       ├── ConfigValidator.hpp / .cpp   every rule and limit
+│       └── ConfigOverrides.hpp / .cpp   an account's server over client.jsonc's
 └── tests/
-    └── Core/
-        └── ConfigFileTests.cpp
+    └── Config/
+        ├── ConfigFileTests.cpp
+        └── AccountFileTests.cpp
 ```
 
-- `Config_s` and the four section structs live in `ConfigFile.hpp`, the header of the class that reads and writes them.
-- `ConfigFile.hpp` includes `BigUInt.hpp`, because `BigUInt` is a member of `LoginSettings_s`, and `Logger.hpp`, because `LogLevel_e` is a member of `ClientSettings_s` and `Logger` appears in `Load`'s and `Parse`'s prototypes.
-- `ConfigError.hpp` is header-only, exactly as in CONVENTIONS §8. `ConfigFile.hpp` doesn't include it, because no prototype in it uses it. `ConfigFile.cpp` throws it, so it includes it, and so does any code that catches it.
-- `ConfigFile.cpp` includes `BigUInt.hpp`, `ConfigError.hpp` and `Logger.hpp` itself, as CONVENTIONS §5 requires, then `<ixwebsocket/IXUrlParser.h>` and `<nlohmann/json.hpp>`. IXWebSocket is already a dependency ([WebSocketDesign.md](WebSocketDesign.md) §2).
+The single `ConfigFile` this section first described was split by job ([RefactorDesign.md](RefactorDesign.md) §6); the rules and messages below are unchanged.
+
+- `Config_s` and its section structs live in `Config_s.hpp`, the account's structs in `AccountConfig_s.hpp`, and `ServerSettings_s`, which both use, in a header of its own.
+- `Config_s.hpp` includes `../Utils/BigUInt.hpp`, because `BigUInt` is a member of `LoginSettings_s`, and `../Console/LogLevel_e.hpp`, because `LogLevel_e` is a member of `ClientSettings_s`. `ConfigFile.hpp` includes `../Console/Logger.hpp`, because `Logger` appears in `Load`'s and `Parse`'s prototypes.
+- `ConfigError.hpp` is header-only, exactly as in CONVENTIONS §8, and sits in `Config/Error/`. No header includes it, because no prototype uses it. The files that throw it include it, as does any code that catches it.
+- `ConfigJson.cpp` is the only file that includes `<nlohmann/json.hpp>` for the config, and `WebSocketUrl` (in `Io/`) checks the URL with `<ixwebsocket/IXUrlParser.h>`. IXWebSocket is already a dependency ([WebSocketDesign.md](WebSocketDesign.md) §2).
 - `vcpkg.json` gains `"nlohmann-json"`.
 - CMake:
     - `find_package(nlohmann_json CONFIG REQUIRED)`. The library target links `nlohmann_json::nlohmann_json` privately, because no public header includes it. The test executable links it too, because the tests build their inputs with it (§6.1).
@@ -212,7 +223,7 @@ rs2004-headless/
 
 ### Account files
 
-Each account has its own file in `scripting.accountsDirectory`, read by `ConfigFile::LoadAccount` with the same syntax rules, error paths and secret handling as `client.jsonc`. The file name without `.jsonc` is the account's name. A missing file is an error; no sample is written, and `accounts/example.jsonc.sample` is the template instead. Account files are git-ignored.
+Each account has its own file in `scripting.accountsDirectory`, read by `AccountFile::Load` with the same syntax rules, error paths and secret handling as `client.jsonc`. The file name without `.jsonc` is the account's name. A missing file is an error; no sample is written, and `accounts/example.jsonc.sample` is the template instead. Account files are git-ignored.
 
 ```jsonc
 {
@@ -247,6 +258,8 @@ Each account has its own file in `scripting.accountsDirectory`, read by `ConfigF
 ---
 
 ## 4. ConfigFile
+
+This section shows `ConfigFile` as it was first written, as one class. [RefactorDesign.md](RefactorDesign.md) §6 split it by job without changing what it does: the parsing and conversions below are in `ConfigJson`, `Validate` and the TLS warning in `ConfigValidator`, the account functions in `AccountFile` (`LoadAccount` became `AccountFile::Load`, `ParseAccount` `AccountFile::Parse`, and `ACCOUNT_EXTENSION` `AccountFile::EXTENSION`), and `ConfigFile` keeps `Load`, `Parse` and `Serialize` for `client.jsonc`.
 
 ### Interface
 
@@ -391,7 +404,7 @@ Application::Application(const std::filesystem::path& configPath, std::shared_pt
 - `std::make_shared` moves the loaded `Config_s` into its one allocation, so nothing is copied.
 - The config is loaded in the body, after the `assert`, so `Load` never gets a null logger, and nothing depends on the order the members are declared in.
 - `Application` passes `m_logger` on to every class it builds that logs, such as `WebSocketClient` ([LoggerDesign.md](LoggerDesign.md) §3 Usage).
-- `Application.hpp` includes `Core/ConfigFile.hpp`, because `Config_s` appears in a member's type, and `Core/Logger.hpp`, because `Logger` appears in the constructor and a member.
+- `Application.hpp` includes `../Config/Config_s.hpp`, because `Config_s` appears in a member's type, and `../Console/Logger.hpp`, because `Logger` appears in the constructor and a member.
 
 `main.cpp` creates the logger, as in [LoggerDesign.md](LoggerDesign.md) §3 Usage, and passes it and the optional path to `Application`. A `ConfigError` reaches the last-resort catch like any other failure at startup, and the message says which file and key are wrong. On a first run, the message says to copy `client.jsonc.sample` into place.
 
@@ -487,7 +500,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     }
     ```
 
-    - `ParseJson`, `DescribeConversionError`, `Validate` and `WarnIfTlsVerificationDisabled` are in the anonymous namespace of `ConfigFile.cpp`.
+    - `ParseJson` and `DescribeConversionError` are in the anonymous namespace of `ConfigJson.cpp`; `Validate` and the TLS warning are `ConfigValidator::Validate` and `ConfigValidator::Warn`.
     - `get_to` runs the macro-generated `from_json` for `Config_s`, which reads each section, and each section reads each member, with `value(name, default)`. A missing key keeps the default; a present one is converted, and a wrong type throws. A missing section is a section of defaults.
     - The first wrong type throws, and `Validate` stops at the first broken rule, so a file with several problems reports them one at a time.
     - Converting nlohmann's exceptions into `ConfigError` where they leave the third-party code follows CONVENTIONS §8.

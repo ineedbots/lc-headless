@@ -24,7 +24,7 @@ Reference sources:
 | Errors | `WebSocketError` reports failures and `WebSocketClosedError` (derived from it) reports a clean close. A timeout returns `false` and never throws. A short `Peek` or `Read` throws `std::out_of_range`, as `Packet` does |
 | Logging | Through the `std::shared_ptr<Logger>` passed to the constructor ([LoggerDesign.md](LoggerDesign.md)). The connection's lifecycle (connecting, open, closing, closed) is `Info`; traffic and IXWebSocket errors are `Verbose`. Nothing is logged at `Warning` or `Error`: every problem reaches the caller as an exception or a state, and the caller logs it where it handles it |
 | Network startup | A `NetSystem` RAII member wraps `ix::initNetSystem` (Winsock on Windows), so there is no global init call to forget |
-| Header | `WebSocketClient.hpp` includes `../Core/Logger.hpp`, `<ixwebsocket/IXWebSocket.h>` and `<ixwebsocket/IXWebSocketMessage.h>`, because `Logger`, `ix::WebSocket` and `ix::WebSocketMessage` appear in its declarations |
+| Header | `WebSocketClient.hpp` includes `../Console/Logger.hpp`, `<ixwebsocket/IXWebSocket.h>` and `<ixwebsocket/IXWebSocketMessage.h>`, because `Logger`, `ix::WebSocket` and `ix::WebSocketMessage` appear in its declarations |
 
 Rejected:
 
@@ -77,7 +77,7 @@ rs2004-headless/
 ```cpp
 #pragma once
 
-#include "../Core/Logger.hpp"
+#include "../Console/Logger.hpp"
 #include "NetSystem.hpp"
 
 #include <ixwebsocket/IXWebSocket.h>
@@ -851,7 +851,7 @@ When the server ends the connection as soon as it opens, the client calls `Conne
 
 - The test executable gets IXWebSocket through the library for the server fixtures.
 - Tags are `[WebSocketClient]`, plus `[network]` on the §6.4 cases.
-- The logging cases use `LogCapture` from `tests/LogCapture.hpp`. The other cases' console loggers print as usual, and ctest shows that output only for a failing test, which is where it helps.
+- The logging cases use `LogCapture` from `tests/Support/LogCapture.hpp`. The other cases' console loggers print as usual, and ctest shows that output only for a failing test, which is where it helps.
 - Each test gets a 60 s ctest `TIMEOUT`, as a backstop for the waits with no timeout.
 
 ### 6.6 Done when
