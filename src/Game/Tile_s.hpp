@@ -15,4 +15,10 @@ struct Tile_s
     {
         return std::max(std::abs(x - other.x), std::abs(z - other.z));
     }
+
+    // In the rectangle whose south-west corner is (minX, minZ), on any level.
+    [[nodiscard]] bool IsInRect(s32 minX, s32 minZ, s64 width, s64 height) const
+    {
+        return x >= minX && x < minX + width && z >= minZ && z < minZ + height;
+    }
 };

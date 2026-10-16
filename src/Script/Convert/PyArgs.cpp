@@ -3,6 +3,8 @@
 
 #include "../../Game/Menu/MenuOp.hpp"
 #include "../../Game/Query/InventoryItem_s.hpp"
+#include "../../Game/Query/SearchFilter_s.hpp"
+#include "../../Game/State/Zone_s.hpp"
 #include "../../Game/Tile_s.hpp"
 #include "../Error/ScriptTypeError.hpp"
 #include "PyObjects.hpp"
@@ -175,4 +177,61 @@ std::vector<Tile_s> PyArgs::ToPoints(py_Ref value, s32 level, std::string_view n
     }
 
     return points;
+}
+
+s32 PyArgs::ToCoord(py_Ref value, std::string_view name)
+{
+    return static_cast<s32>(PyValue::ToInt(value, name, 0, Tile_s::MAX_COORD));
+}
+
+std::optional<s32> PyArgs::ToRadius(py_Ref value)
+{
+    const auto radius = PyValue::ToOptionalInt(value, "radius");
+    if (!radius)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<s32>(PyValue::ToInt(value, "radius", 0, Tile_s::MAX_COORD));
+}
+
+SearchFilter_s PyArgs::ToFilter(py_Ref ids, py_Ref radius)
+{
+    return {.ids = PyArgs::ToIds(ids, "ids"), .radius = ToRadius(radius)};
+}
+
+SearchFilter_s PyArgs::ToSearch(py_Ref ids, py_Ref radius, py_Ref names)
+{
+    auto filter = ToFilter(ids, radius);
+    if (!py_isnone(names))
+    {
+        filter.names = PyArgs::ToNames(names, "names");
+    }
+
+    return filter;
+}
+
+SearchFilter_s PyArgs::ToNameFilter(py_Ref names, py_Ref radius)
+{
+    return {.names = PyArgs::ToNames(names, "names"), .radius = ToRadius(radius)};
+}
+
+std::optional<LocLayer_e> PyArgs::ToLayer(py_Ref value)
+{
+    if (py_isnone(value))
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<LocLayer_e>(PyValue::ToInt(value, "layer", 0, static_cast<s64>(LocLayer_e::GroundDecor)));
+}
+
+std::optional<u16> PyArgs::ToRoot(py_Ref value)
+{
+    if (py_isnone(value))
+    {
+        return std::nullopt;
+    }
+
+    return PyValue::ToU16(value, "root");
 }
