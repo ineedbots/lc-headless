@@ -20,7 +20,7 @@
 #include "Io/Packet.hpp"
 #include "Script/BotMessenger.hpp"
 #include "Script/Error/ScriptError.hpp"
-#include "Script/ScriptHost.hpp"
+#include "Script/Host/ScriptHost.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

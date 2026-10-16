@@ -9,9 +9,9 @@
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"
 #include "Game/State/GameState_s.hpp"
+#include "Script/Bindings/ScriptBindings.hpp"
 #include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptApi.hpp"
-#include "Script/ScriptBindings.hpp"
 #include "Script/ScriptVm.hpp"
 #include "Script/Stdlib.hpp"
 

@@ -1,17 +1,17 @@
 #pragma once
 
-#include "../Cache/GameCache_s.hpp"
-#include "../Cache/LocType_s.hpp"
-#include "../Cache/NpcType_s.hpp"
-#include "../Cache/ObjType_s.hpp"
-#include "../Game/Interface/InterfaceView.hpp"
-#include "../Game/Map/WorldMap.hpp"
-#include "../Game/Menu/Menus.hpp"
-#include "../Game/State/Npc_s.hpp"
-#include "../Game/State/Player_s.hpp"
-#include "../Game/State/Zone_s.hpp"
-#include "../Game/Tile_s.hpp"
-#include "ScriptApi.hpp"
+#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/LocType_s.hpp"
+#include "../../Cache/NpcType_s.hpp"
+#include "../../Cache/ObjType_s.hpp"
+#include "../../Game/Interface/InterfaceView.hpp"
+#include "../../Game/Map/WorldMap.hpp"
+#include "../../Game/Menu/Menus.hpp"
+#include "../../Game/State/Npc_s.hpp"
+#include "../../Game/State/Player_s.hpp"
+#include "../../Game/State/Zone_s.hpp"
+#include "../../Game/Tile_s.hpp"
+#include "../ScriptApi.hpp"
 
 #include <pocketpy.h>
 

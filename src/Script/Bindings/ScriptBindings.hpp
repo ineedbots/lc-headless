@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ScriptApi.hpp"
-#include "ScriptVm.hpp"
+#include "../ScriptApi.hpp"
+#include "../ScriptVm.hpp"
 
 // Functions find their ScriptApi by the VM they run in, so a VM must be unbound before its ScriptApi goes away.
 class ScriptBindings

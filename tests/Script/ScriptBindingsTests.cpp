@@ -16,9 +16,9 @@
 #include "Game/State/Player_s.hpp"
 #include "Game/State/Zone_s.hpp"
 #include "Game/Tile_s.hpp"
+#include "Script/Bindings/ScriptBindings.hpp"
 #include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptApi.hpp"
-#include "Script/ScriptBindings.hpp"
 #include "Script/ScriptVm.hpp"
 
 #include <catch2/catch_test_macros.hpp>

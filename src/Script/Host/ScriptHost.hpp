@@ -1,19 +1,19 @@
 #pragma once
 
-#include "../Accounts/ProgressReport_s.hpp"
-#include "../Console/ConsoleCommand_s.hpp"
-#include "../Console/Logger.hpp"
-#include "../Game/GameActions.hpp"
-#include "../Game/GameClient.hpp"
-#include "../Game/Nav/Navigation.hpp"
-#include "../Game/State/GameEvent_s.hpp"
-#include "../Game/State/GameState_s.hpp"
-#include "../Utils/FileWatcher.hpp"
-#include "BotMessenger.hpp"
-#include "ScriptApi.hpp"
-#include "ScriptCommand_s.hpp"
-#include "ScriptRuntime.hpp"
-#include "ScriptVm.hpp"
+#include "../../Accounts/ProgressReport_s.hpp"
+#include "../../Console/ConsoleCommand_s.hpp"
+#include "../../Console/Logger.hpp"
+#include "../../Game/GameActions.hpp"
+#include "../../Game/GameClient.hpp"
+#include "../../Game/Nav/Navigation.hpp"
+#include "../../Game/State/GameEvent_s.hpp"
+#include "../../Game/State/GameState_s.hpp"
+#include "../../Utils/FileWatcher.hpp"
+#include "../BotMessenger.hpp"
+#include "../ScriptApi.hpp"
+#include "../ScriptCommand_s.hpp"
+#include "../ScriptRuntime.hpp"
+#include "../ScriptVm.hpp"
 
 #include <pocketpy.h>
 
