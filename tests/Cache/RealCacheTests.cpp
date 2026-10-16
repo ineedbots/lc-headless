@@ -5,6 +5,7 @@
 #include "Cache/CacheLoader.hpp"
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Interface/ChatDialog.hpp"
 #include "Game/Interface/InterfaceView.hpp"
 #include "Game/Map/CollisionFlag.hpp"
@@ -21,12 +22,12 @@ namespace
 {
     const GameCache_s& RequireRealCache()
     {
-        return RealCache::Require();
+        return RealCache::Require(Revision_e::Rev289);
     }
 
     std::shared_ptr<const GameCache_s> GetRealCache()
     {
-        return RealCache::RequireShared();
+        return RealCache::RequireShared(Revision_e::Rev289);
     }
 
     std::vector<std::string_view> GetOptions(const GameCache_s& cache, std::span<const u16> ops)
@@ -63,6 +64,51 @@ TEST_CASE("The real cache gives the server's components and run varp", "[RealCac
     CHECK(cache.runOffButton == 152);
     CHECK(cache.runOnButton == 153);
     CHECK(cache.runVarp == 173);
+}
+
+// These read the 225 cache from the folder in RS2004_CACHE_DIR_225, and skip when it isn't set. The ids are the
+// ones 225server's content/pack/interface.pack and varp.pack name.
+TEST_CASE("The real 225 cache gives the server's CRCs, components and run varp", "[RealCache]")
+{
+    const auto& cache = RealCache::Require(Revision_e::Rev225);
+    CHECK(cache.revision == Revision_e::Rev225);
+
+    const auto expected = std::array<u32, GameCache_s::CRC_COUNT>{0x00000000, 0x2ec1c189, 0xa6ea3ba6, 0x6034f970, 0x11766907, 0x88bb4c4e, 0xed4bc331, 0x5da3453b, 0xa4a649eb};
+    for (auto i = std::size_t{0}; i < expected.size(); ++i)
+    {
+        CHECK(std::bit_cast<u32>(cache.crcs[i]) == expected[i]);
+    }
+
+    // logout:try_logout, inventory:inv, wornitems:wear, bank_side:inv, and bank_main:inv ahead of the
+    // party room chest, which also withdraws.
+    CHECK(cache.logoutComponent == 2458);
+    CHECK(cache.inventoryComponent == 3214);
+    CHECK(cache.inventorySize == 28);
+    CHECK(cache.equipmentComponent == 1688);
+    CHECK(cache.bankComponent == 5382);
+    CHECK(cache.bankInventoryComponent == 2006);
+    // controls:com_4 and com_5, which set option_run.
+    CHECK(cache.runOffButton == 152);
+    CHECK(cache.runOnButton == 153);
+    CHECK(cache.runVarp == 173);
+}
+
+TEST_CASE("The real 225 cache has its map squares and their files' CRCs", "[RealCache]")
+{
+    const auto& cache = RealCache::Require(Revision_e::Rev225);
+    CHECK(cache.squares.size() == 414);
+    CHECK(cache.mapCrcs.size() == 414);
+
+    const auto lumbridge = MapSquare::GetId(50, 50);
+    REQUIRE(cache.FindSquare(50, 50) != nullptr);
+    CHECK_FALSE(cache.FindSquare(50, 50)->GetLocs().empty());
+    REQUIRE(cache.mapCrcs.contains(lumbridge));
+    CHECK(std::bit_cast<u32>(*cache.mapCrcs.at(lumbridge).land) == 0x7576b6fa);
+    CHECK(std::bit_cast<u32>(*cache.mapCrcs.at(lumbridge).locs) == 0xe9689645);
+
+    CHECK_FALSE(cache.FindNpcIds("Man").empty());
+    CHECK_FALSE(cache.FindObjIds("Bronze axe").empty());
+    CHECK_FALSE(cache.FindLocIds("Bank booth").empty());
 }
 
 TEST_CASE("The real cache has every type and square", "[RealCache]")

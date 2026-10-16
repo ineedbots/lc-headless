@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "InterfaceDecoder.hpp"
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "ClientCode_e.hpp"
 #include "Error/CacheError.hpp"
@@ -30,8 +31,10 @@ namespace
     constexpr auto TARGET_MASK_SIZE = sizeof(u16);
 
     constexpr auto INV_BACKGROUND_COUNT = 20;
-    // A rect or text component's colour, then its active and hover colours, which aren't kept.
-    constexpr auto OTHER_COLOUR_COUNT = std::size_t{3};
+    // A rect or text component's colour comes first, then its active and hover colours, which aren't kept.
+    // 289 added an active hover colour.
+    constexpr auto OTHER_COLOUR_COUNT_225 = std::size_t{2};
+    constexpr auto OTHER_COLOUR_COUNT_289 = std::size_t{3};
     constexpr auto GRAPHIC_STRING_COUNT = std::size_t{2};
     constexpr auto MODEL_REFERENCE_COUNT = 4;
     constexpr auto INV_BACKGROUND_STRING_COUNT = std::size_t{1};
@@ -94,12 +97,17 @@ namespace
         }
     }
 
-    void ReadInv(Packet& packet, IfComponent_s& component)
+    void ReadInv(Packet& packet, IfComponent_s& component, Revision_e revision)
     {
         Skip(packet, OBJ_SWAP_SIZE);
         component.objOps = packet.G1() == ENABLED;
         component.objUse = packet.G1() == ENABLED;
-        Skip(packet, OBJ_REPLACE_SIZE);
+
+        if (revision >= Revision_e::Rev289)
+        {
+            Skip(packet, OBJ_REPLACE_SIZE);
+        }
+
         component.marginX = packet.G1();
         component.marginY = packet.G1();
         for (auto i = 0; i < INV_BACKGROUND_COUNT; ++i)
@@ -130,11 +138,14 @@ namespace
         Skip(packet, MODEL_ZOOM_ANGLES_SIZE);
     }
 
-    void ReadLayer(Packet& packet, IfComponent_s& component)
+    void ReadLayer(Packet& packet, IfComponent_s& component, Revision_e revision)
     {
         Skip(packet, SCROLL_HEIGHT_SIZE);
         component.hidden = packet.G1() == ENABLED;
-        component.children.resize(packet.G2());
+
+        // 225 counts the children in a byte; 289 widened it.
+        const auto childCount = revision >= Revision_e::Rev289 ? packet.G2() : packet.G1();
+        component.children.resize(childCount);
         for (auto& child : component.children)
         {
             child.id = packet.G2();
@@ -150,24 +161,25 @@ namespace
 
     // IfType.init reads these in a run of ifs that some types share; each case here is one type's path
     // through them.
-    void ReadTypeFields(Packet& packet, IfComponent_s& component)
+    void ReadTypeFields(Packet& packet, IfComponent_s& component, Revision_e revision)
     {
+        const auto otherColourCount = revision >= Revision_e::Rev289 ? OTHER_COLOUR_COUNT_289 : OTHER_COLOUR_COUNT_225;
         switch (component.type)
         {
         case ComponentType_e::Layer:
-            ReadLayer(packet, component);
+            ReadLayer(packet, component, revision);
             return;
         case ComponentType_e::Unused:
             Skip(packet, UNUSED_TYPE_SIZE + CENTRE_FONT_SHADOW_SIZE);
             component.colour = ReadColour(packet);
             return;
         case ComponentType_e::Inv:
-            ReadInv(packet, component);
+            ReadInv(packet, component, revision);
             return;
         case ComponentType_e::Rect:
             Skip(packet, FILL_SIZE);
             component.colour = ReadColour(packet);
-            Skip(packet, OTHER_COLOUR_COUNT * COLOUR_SIZE);
+            Skip(packet, otherColourCount * COLOUR_SIZE);
             return;
         case ComponentType_e::Text:
             Skip(packet, CENTRE_FONT_SHADOW_SIZE);
@@ -175,7 +187,7 @@ namespace
             // The active text, shown while a script's condition holds, isn't kept.
             static_cast<void>(ReadString(packet));
             component.colour = ReadColour(packet);
-            Skip(packet, OTHER_COLOUR_COUNT * COLOUR_SIZE);
+            Skip(packet, otherColourCount * COLOUR_SIZE);
             return;
         case ComponentType_e::Graphic:
             SkipStrings(packet, GRAPHIC_STRING_COUNT);
@@ -236,7 +248,7 @@ namespace
     }
 
     // From just after its id.
-    IfComponent_s ReadComponent(Packet& packet, u16 id, u16 root)
+    IfComponent_s ReadComponent(Packet& packet, u16 id, u16 root, Revision_e revision)
     {
         auto component = IfComponent_s{.id = id, .root = root};
         component.type = static_cast<ComponentType_e>(packet.G1());
@@ -244,10 +256,15 @@ namespace
         component.clientCode = static_cast<ClientCode_e>(packet.G2());
         component.width = packet.G2();
         component.height = packet.G2();
-        Skip(packet, TRANS_SIZE);
+
+        if (revision >= Revision_e::Rev289)
+        {
+            Skip(packet, TRANS_SIZE);
+        }
+
         SkipOptionalId(packet);
         ReadScripts(packet, component);
-        ReadTypeFields(packet, component);
+        ReadTypeFields(packet, component, revision);
         ReadButtonFields(packet, component);
         return component;
     }
@@ -275,7 +292,7 @@ namespace
     }
 }
 
-std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data)
+std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data, Revision_e revision)
 {
     if (data.size() < COUNT_SIZE)
     {
@@ -293,7 +310,7 @@ std::vector<IfComponent_s> InterfaceDecoder::Decode(std::span<const u8> data)
         const auto id = ReadId(packet, previous, root);
         try
         {
-            components.push_back(ReadComponent(packet, id, root));
+            components.push_back(ReadComponent(packet, id, root, revision));
         }
         catch (const CacheError& e)
         {

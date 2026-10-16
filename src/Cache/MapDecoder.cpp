@@ -48,6 +48,11 @@ namespace
     Land_s DecodeLand(std::span<const u8> land)
     {
         auto decoded = Land_s{};
+        if (land.empty())
+        {
+            return decoded;
+        }
+
         auto& flags = decoded.flags;
         auto packet = Packet{land};
         for (auto level = 0; level < MapSquare::LEVELS; ++level)
@@ -155,6 +160,11 @@ namespace
     std::vector<MapLoc_s> DecodeLocs(std::span<const u8> data, const TileFlags& flags, std::span<const LocType_s> types)
     {
         auto locs = std::vector<MapLoc_s>{};
+        if (data.empty())
+        {
+            return locs;
+        }
+
         auto packet = Packet{data};
         auto id = -1;
         while (true)

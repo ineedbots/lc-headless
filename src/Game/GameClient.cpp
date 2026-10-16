@@ -4,6 +4,7 @@
 #include "../Cache/GameCache_s.hpp"
 #include "../Config/AccountConfig_s.hpp"
 #include "../Config/Config_s.hpp"
+#include "../Config/Revision_e.hpp"
 #include "../Console/Logger.hpp"
 #include "../Io/Error/WebSocketError.hpp"
 #include "../Io/WebSocketClient.hpp"
@@ -88,6 +89,7 @@ GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<c
 {
     assert(m_config && "GameClient needs a config");
     assert(m_cache && "GameClient needs a cache");
+    assert(m_cache->revision == m_protocol.GetRevision() && "The cache must be read in the protocol's revision");
     assert(m_logger && "GameClient needs a logger");
 }
 

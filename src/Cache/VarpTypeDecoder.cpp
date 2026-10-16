@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "VarpTypeDecoder.hpp"
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "TypeDecoder.hpp"
@@ -40,7 +41,10 @@ namespace
         Dropped::Drop(CODE13, NO_VALUE),
     });
 
-    void DecodeVarp(Packet& packet, VarpType_s& type)
+    constexpr auto REMOVED_IN_289 = std::array<u8, 0>{};
+    constexpr auto ADDED_IN_289 = std::to_array({CODE11, CODE12, CODE13});
+
+    void DecodeVarp(Packet& packet, VarpType_s& type, Revision_e revision)
     {
         while (true)
         {
@@ -48,6 +52,11 @@ namespace
             if (opcode == TypeDecoder::END_OPCODE)
             {
                 break;
+            }
+
+            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            {
+                TypeDecoder::ThrowUnknown(opcode);
             }
 
             if (TypeDecoder::SkipDropped(packet, opcode, DROPPED))
@@ -70,10 +79,10 @@ namespace
     }
 }
 
-std::vector<VarpType_s> VarpTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx)
+std::vector<VarpType_s> VarpTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, Revision_e revision)
 {
-    return TypeDecoder::DecodeAll<VarpType_s>("varp", dat, idx, [](Packet& packet, VarpType_s& type)
+    return TypeDecoder::DecodeAll<VarpType_s>("varp", dat, idx, [revision](Packet& packet, VarpType_s& type)
     {
-        DecodeVarp(packet, type);
+        DecodeVarp(packet, type, revision);
     });
 }

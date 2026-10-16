@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "LocTypeDecoder.hpp"
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "LocType_s.hpp"
@@ -26,6 +27,7 @@ namespace
     constexpr auto SHARELIGHT = u8{22};
     constexpr auto OCCLUDE = u8{23};
     constexpr auto ANIM = u8{24};
+    constexpr auto ANIMATE_TRANSPARENCIES = u8{25};
     constexpr auto WALL_WIDTH = u8{28};
     constexpr auto AMBIENT = u8{29};
     constexpr auto FIRST_OP = u8{30};
@@ -52,6 +54,7 @@ namespace
         Dropped::Drop(SHARELIGHT, NO_VALUE),
         Dropped::Drop(OCCLUDE, NO_VALUE),
         Dropped::Drop(ANIM, sizeof(u16)),
+        Dropped::Drop(ANIMATE_TRANSPARENCIES, NO_VALUE),
         Dropped::Drop(WALL_WIDTH, sizeof(u8)),
         Dropped::Drop(AMBIENT, sizeof(u8)),
         Dropped::Drop(CONTRAST, sizeof(u8)),
@@ -69,6 +72,9 @@ namespace
         Dropped::Drop(FORCE_DECOR, NO_VALUE),
         Dropped::Drop(RAISE_OBJECT, sizeof(u8)),
     });
+
+    constexpr auto REMOVED_IN_289 = std::to_array({ANIMATE_TRANSPARENCIES});
+    constexpr auto ADDED_IN_289 = std::to_array({MODELS, BREAK_ROUTE_FINDING, RAISE_OBJECT, MULTILOC});
 
     // What a loc's model opcodes said, which decides whether it's active when opcode 19 doesn't.
     struct LocModels_s
@@ -113,7 +119,7 @@ namespace
         TypeDecoder::Skip(packet, (count + 1) * sizeof(u16));
     }
 
-    void DecodeLoc(Packet& packet, LocType_s& type, TextPool& text)
+    void DecodeLoc(Packet& packet, LocType_s& type, TextPool& text, Revision_e revision)
     {
         auto models = LocModels_s{};
         auto activeGiven = false;
@@ -125,6 +131,11 @@ namespace
             if (opcode == TypeDecoder::END_OPCODE)
             {
                 break;
+            }
+
+            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            {
+                TypeDecoder::ThrowUnknown(opcode);
             }
 
             if (TypeDecoder::SkipDropped(packet, opcode, DROPPED))
@@ -202,10 +213,10 @@ namespace
     }
 }
 
-std::vector<LocType_s> LocTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text)
+std::vector<LocType_s> LocTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text, Revision_e revision)
 {
-    return TypeDecoder::DecodeAll<LocType_s>("loc", dat, idx, [&text](Packet& packet, LocType_s& type)
+    return TypeDecoder::DecodeAll<LocType_s>("loc", dat, idx, [&text, revision](Packet& packet, LocType_s& type)
     {
-        DecodeLoc(packet, type, text);
+        DecodeLoc(packet, type, text, revision);
     });
 }

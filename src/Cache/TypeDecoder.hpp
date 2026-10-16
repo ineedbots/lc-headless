@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
@@ -86,6 +87,9 @@ public:
         return types;
     }
 
+    // Whether the revision has the opcode, given the opcodes 289 removed and added. A cache decoded as the
+    // wrong revision then fails on an unknown opcode rather than reading garbage.
+    [[nodiscard]] static bool HasOpcode(Revision_e revision, u8 opcode, std::span<const u8> removedIn289, std::span<const u8> addedIn289);
     static void Skip(Packet& packet, std::size_t count);
     // Reads and drops the value of an opcode in the table, or returns false for an opcode that isn't.
     [[nodiscard]] static bool SkipDropped(Packet& packet, u8 opcode, std::span<const DroppedOpcodes_s> table);

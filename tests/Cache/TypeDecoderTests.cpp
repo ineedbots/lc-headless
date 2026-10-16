@@ -11,6 +11,7 @@
 #include "Cache/TextPool.hpp"
 #include "Cache/VarpTypeDecoder.hpp"
 #include "Cache/VarpType_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -146,30 +147,36 @@ namespace
         return ToBytes(packet);
     }
 
-    std::vector<LocType_s> DecodeLocs(const std::vector<std::vector<u8>>& definitions, TextPool& text)
+    std::vector<LocType_s> DecodeLocs(const std::vector<std::vector<u8>>& definitions, TextPool& text, Revision_e revision = Revision_e::Rev289)
     {
         const auto files = CacheWriter::MakeTypeFiles(definitions);
-        return LocTypeDecoder::Decode(files.dat, files.idx, text);
+        return LocTypeDecoder::Decode(files.dat, files.idx, text, revision);
     }
 
-    std::vector<NpcType_s> DecodeNpcs(const std::vector<std::vector<u8>>& definitions, TextPool& text)
+    std::vector<NpcType_s> DecodeNpcs(const std::vector<std::vector<u8>>& definitions, TextPool& text, Revision_e revision = Revision_e::Rev289)
     {
         const auto files = CacheWriter::MakeTypeFiles(definitions);
-        return NpcTypeDecoder::Decode(files.dat, files.idx, text);
+        return NpcTypeDecoder::Decode(files.dat, files.idx, text, revision);
     }
 
-    std::vector<ObjType_s> DecodeObjs(const std::vector<std::vector<u8>>& definitions, TextPool& text)
+    std::vector<ObjType_s> DecodeObjs(const std::vector<std::vector<u8>>& definitions, TextPool& text, Revision_e revision = Revision_e::Rev289)
     {
         const auto files = CacheWriter::MakeTypeFiles(definitions);
-        return ObjTypeDecoder::Decode(files.dat, files.idx, text);
+        return ObjTypeDecoder::Decode(files.dat, files.idx, text, revision);
     }
 
-    bool IsActive(std::vector<u8> opcodes)
+    std::vector<VarpType_s> DecodeVarps(const std::vector<std::vector<u8>>& definitions, Revision_e revision = Revision_e::Rev289)
+    {
+        const auto files = CacheWriter::MakeTypeFiles(definitions);
+        return VarpTypeDecoder::Decode(files.dat, files.idx, revision);
+    }
+
+    bool IsActive(std::vector<u8> opcodes, Revision_e revision = Revision_e::Rev289)
     {
         opcodes.push_back(0);
 
         auto text = TextPool{};
-        return DecodeLocs({opcodes}, text)[0].active;
+        return DecodeLocs({opcodes}, text, revision)[0].active;
     }
 
     std::string DecodeLocsError(const TypeFiles_s& files)
@@ -177,7 +184,7 @@ namespace
         auto text = TextPool{};
         try
         {
-            static_cast<void>(LocTypeDecoder::Decode(files.dat, files.idx, text));
+            static_cast<void>(LocTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289));
         }
         catch (const CacheError& e)
         {
@@ -386,8 +393,7 @@ TEST_CASE("VarpTypeDecoder keeps each varp's client code and drops its other opc
     PutString(packet, 10, "debug name");
     packet.P1(0);
 
-    const auto files = CacheWriter::MakeTypeFiles({ToBytes(packet), std::vector<u8>{0}});
-    const auto varps = VarpTypeDecoder::Decode(files.dat, files.idx);
+    const auto varps = DecodeVarps({ToBytes(packet), std::vector<u8>{0}});
     REQUIRE(varps.size() == 2);
     CHECK(varps[0].id == 0);
     CHECK(varps[0].clientCode == 173);
@@ -397,6 +403,64 @@ TEST_CASE("VarpTypeDecoder keeps each varp's client code and drops its other opc
 
 TEST_CASE("VarpTypeDecoder rejects an unknown opcode", "[TypeDecoder]")
 {
-    const auto files = CacheWriter::MakeTypeFiles({std::vector<u8>{9, 0}});
-    CHECK_THROWS_WITH(VarpTypeDecoder::Decode(files.dat, files.idx), "varp 0: unknown opcode 9");
+    CHECK_THROWS_WITH(DecodeVarps({std::vector<u8>{9, 0}}), "varp 0: unknown opcode 9");
+}
+
+TEST_CASE("TypeDecoder reads the flags only 225 has, and 289 rejects them", "[TypeDecoder]")
+{
+    const auto flag = [](u8 opcode)
+    {
+        return std::vector<std::vector<u8>>{CacheWriter::MakeDefinition("Rock", {}, std::vector<u8>{opcode})};
+    };
+
+    auto text = TextPool{};
+    CHECK(DecodeLocs(flag(25), text, Revision_e::Rev225)[0].name == "Rock");
+    CHECK(DecodeNpcs(flag(16), text, Revision_e::Rev225)[0].name == "Rock");
+    CHECK(DecodeObjs(flag(9), text, Revision_e::Rev225)[0].name == "Rock");
+
+    CHECK_THROWS_WITH(DecodeLocs(flag(25), text), "loc 0: unknown opcode 25");
+    CHECK_THROWS_WITH(DecodeNpcs(flag(16), text), "npc 0: unknown opcode 16");
+    CHECK_THROWS_WITH(DecodeObjs(flag(9), text), "obj 0: unknown opcode 9");
+}
+
+TEST_CASE("TypeDecoder rejects the opcodes 289 added when it reads 225", "[TypeDecoder]")
+{
+    const auto opcode = [](u8 value)
+    {
+        return std::vector<std::vector<u8>>{std::vector<u8>{value, 0, 0, 0, 0}};
+    };
+
+    auto text = TextPool{};
+    for (const auto value : {u8{5}, u8{74}, u8{75}, u8{77}})
+    {
+        CAPTURE(value);
+        CHECK_THROWS_WITH(DecodeLocs(opcode(value), text, Revision_e::Rev225), std::format("loc 0: unknown opcode {}", value));
+    }
+
+    for (const auto value : {u8{99}, u8{100}, u8{101}, u8{102}, u8{103}})
+    {
+        CAPTURE(value);
+        CHECK_THROWS_WITH(DecodeNpcs(opcode(value), text, Revision_e::Rev225), std::format("npc 0: unknown opcode {}", value));
+    }
+
+    for (const auto value : {u8{110}, u8{111}, u8{112}, u8{113}, u8{114}, u8{115}})
+    {
+        CAPTURE(value);
+        CHECK_THROWS_WITH(DecodeObjs(opcode(value), text, Revision_e::Rev225), std::format("obj 0: unknown opcode {}", value));
+    }
+
+    for (const auto value : {u8{11}, u8{12}, u8{13}})
+    {
+        CAPTURE(value);
+        CHECK_THROWS_WITH(DecodeVarps(opcode(value), Revision_e::Rev225), std::format("varp 0: unknown opcode {}", value));
+    }
+}
+
+TEST_CASE("TypeDecoder works out whether a 225 loc is active from its shaped models", "[TypeDecoder]")
+{
+    CHECK_FALSE(IsActive({}, Revision_e::Rev225));
+    CHECK(IsActive({1, 1, 0, 7, 10}, Revision_e::Rev225));
+    CHECK_FALSE(IsActive({1, 1, 0, 7, 22}, Revision_e::Rev225));
+    CHECK_FALSE(IsActive({1, 0}, Revision_e::Rev225));
+    CHECK(IsActive({30, 'O', 'p', 'e', 'n', '\n'}, Revision_e::Rev225));
 }

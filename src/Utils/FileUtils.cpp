@@ -24,6 +24,17 @@ std::optional<std::string> FileUtils::ReadText(const std::filesystem::path& path
     return text;
 }
 
+std::optional<std::vector<u8>> FileUtils::ReadBytes(const std::filesystem::path& path)
+{
+    const auto text = ReadText(path);
+    if (!text)
+    {
+        return std::nullopt;
+    }
+
+    return std::vector<u8>{text->begin(), text->end()};
+}
+
 void FileUtils::ReplaceFile(const std::filesystem::path& path, std::string_view text)
 {
     auto temporary = path;

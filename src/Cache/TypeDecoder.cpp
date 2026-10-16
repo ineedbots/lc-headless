@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "TypeDecoder.hpp"
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "DroppedOpcodes_s.hpp"
@@ -11,6 +12,16 @@ namespace
 {
     constexpr auto STRING_TERMINATOR = u8{'\n'};
     constexpr auto HIDDEN_OPTION = "hidden"sv;
+}
+
+bool TypeDecoder::HasOpcode(Revision_e revision, u8 opcode, std::span<const u8> removedIn289, std::span<const u8> addedIn289)
+{
+    if (revision >= Revision_e::Rev289)
+    {
+        return std::ranges::find(removedIn289, opcode) == removedIn289.end();
+    }
+
+    return std::ranges::find(addedIn289, opcode) == addedIn289.end();
 }
 
 void TypeDecoder::Skip(Packet& packet, std::size_t count)

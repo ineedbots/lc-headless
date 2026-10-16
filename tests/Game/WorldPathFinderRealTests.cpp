@@ -2,6 +2,7 @@
 #include "../Support/Cache/RealCache.hpp"
 
 #include "Cache/GameCache_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Nav/NavPoint_s.hpp"
 #include "Game/Nav/NavState_s.hpp"
 #include "Game/Nav/Navigation.hpp"
@@ -16,7 +17,7 @@ namespace
         static const auto navigation = []
         {
             const auto started = std::chrono::steady_clock::now();
-            auto loaded = std::make_unique<Navigation>(RealCache::Require(), std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
+            auto loaded = std::make_unique<Navigation>(RealCache::Require(Revision_e::Rev289), std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
             const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
             UNSCOPED_INFO(std::format("Navigation built in {} ms: {} edges ({} doors), {} teleports", elapsed.count(), loaded->GetGraph().GetEdgeCount(), loaded->GetGraph().GetDoorCount(), loaded->GetGraph().GetTeleports().size()));
             return loaded;

@@ -8,6 +8,7 @@
 #include "Cache/Error/CacheError.hpp"
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
+#include "Config/Revision_e.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Io/Packet.hpp"
 
@@ -51,6 +52,7 @@ namespace
     constexpr auto BRIGHTNESS_BUTTON = u16{40};
     constexpr auto RUN_OFF_BUTTON = u16{41};
     constexpr auto RUN_ON_BUTTON = u16{42};
+    constexpr auto PARTY_CHEST = u16{50};
 
     // A select button as the webclient reads one: its first script pushes the varp, and its first
     // condition's operand is the value a click sets.
@@ -132,7 +134,7 @@ namespace
 
             try
             {
-                static_cast<void>(CacheLoader::Load(folder.GetPath(), *capture.GetLogger()));
+                static_cast<void>(CacheLoader::Load(folder.GetPath(), Revision_e::Rev289, *capture.GetLogger()));
             }
             catch (const CacheError& e)
             {
@@ -166,7 +168,7 @@ TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
     auto fixture = LoaderFixture{};
     static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
 
-    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), *fixture.capture.GetLogger());
+    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger());
 
     CHECK(cache.crcs[0] == 0);
 
@@ -214,12 +216,203 @@ TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
     CHECK(fixture.HasLog(LogLevel_e::Warning, "1 map square in map_index has no files; it loads as open ground"));
 }
 
+namespace
+{
+    class FolderFixture
+    {
+    public:
+        FolderFixture()
+            : folder{"rs2004-cache-loader-225-tests"}
+            , files{CacheWriter::MakeFolder(MakeContents())}
+        {
+        }
+
+        [[nodiscard]] GameCache_s Load()
+        {
+            CacheWriter::WriteFolder(folder.GetPath(), files);
+            return CacheLoader::Load(folder.GetPath(), Revision_e::Rev225, *capture.GetLogger());
+        }
+
+        [[nodiscard]] std::string LoadError()
+        {
+            try
+            {
+                static_cast<void>(Load());
+            }
+            catch (const CacheError& e)
+            {
+                return e.what();
+            }
+
+            return "no error";
+        }
+
+        [[nodiscard]] std::string Prefix() const
+        {
+            return folder.GetPath().string() + ": ";
+        }
+
+        [[nodiscard]] s32 GetCrc(const std::string& name) const
+        {
+            return Packet::GetCrc(files.at(name));
+        }
+
+        LogCapture capture;
+        TempFolder folder;
+        FolderFiles files;
+    };
+}
+
+TEST_CASE("CacheLoader loads a 225 folder", "[CacheLoader]")
+{
+    auto fixture = FolderFixture{};
+    const auto cache = fixture.Load();
+
+    CHECK(cache.revision == Revision_e::Rev225);
+    const auto names = std::to_array<std::string>({"title", "config", "interface", "media", "models", "textures", "wordenc", "sounds"});
+    CHECK(cache.crcs[0] == 0);
+
+    for (auto i = std::size_t{0}; i < names.size(); ++i)
+    {
+        CHECK(cache.crcs[i + 1] == fixture.GetCrc(names[i]));
+    }
+
+    CHECK(cache.logoutComponent == LOGOUT_BUTTON);
+    CHECK(cache.bankComponent == BANK);
+    CHECK(cache.bankInventoryComponent == BANK_INVENTORY);
+    CHECK(cache.inventoryComponent == INVENTORY);
+    CHECK(cache.equipmentComponent == EQUIPMENT);
+    CHECK(cache.runOffButton == RUN_OFF_BUTTON);
+    CHECK(cache.runOnButton == RUN_ON_BUTTON);
+    CHECK(cache.FindLoc(2)->name == "Tree");
+    CHECK(cache.GetOption(cache.FindNpc(1)->ops[1]) == "Attack");
+
+    const auto* const square = cache.FindSquare(50, 50);
+    REQUIRE(square != nullptr);
+    CHECK(square->IsBlocked(0, 10, 11));
+    CHECK(square->GetLocs().size() == 2);
+    CHECK(cache.FindSquare(51, 50) == nullptr);
+
+    REQUIRE(cache.mapCrcs.size() == 1);
+    CHECK(cache.mapCrcs.at(SQUARE).land == fixture.GetCrc("maps/m50_50"));
+    CHECK(cache.mapCrcs.at(SQUARE).locs == fixture.GetCrc("maps/l50_50"));
+    CHECK(fixture.capture.GetEntries().size() == 1);
+    CHECK(fixture.capture.GetEntries().front().message.starts_with("Revision 225 cache loaded from"));
+}
+
+TEST_CASE("CacheLoader shifts a 225 folder's CRCs past a missing file, as makeCrcs does", "[CacheLoader]")
+{
+    auto fixture = FolderFixture{};
+    fixture.files.erase("media");
+
+    const auto cache = fixture.Load();
+    const auto names = std::to_array<std::string>({"title", "config", "interface", "models", "textures", "wordenc", "sounds"});
+    for (auto i = std::size_t{0}; i < names.size(); ++i)
+    {
+        CHECK(cache.crcs[i + 1] == fixture.GetCrc(names[i]));
+    }
+
+    CHECK(cache.crcs.back() == 0);
+}
+
+TEST_CASE("CacheLoader finds a 225 bank by its content", "[CacheLoader]")
+{
+    auto contents = MakeContents();
+    FindComponent(contents, BANK).clientCode = 0;
+    contents.interfaces.push_back({.id = PARTY_CHEST, .layer = PARTY_CHEST, .type = IF_INV, .width = 8, .height = 4, .options = {"Withdraw 1"}});
+
+    auto fixture = FolderFixture{};
+    fixture.files = CacheWriter::MakeFolder(contents);
+    CHECK(fixture.Load().bankComponent == BANK);
+
+    SECTION("and fails without one")
+    {
+        FindComponent(contents, BANK).options = {"Take"};
+        FindComponent(contents, PARTY_CHEST).options = {"Take"};
+        fixture.files = CacheWriter::MakeFolder(contents);
+        CHECK(fixture.LoadError() == fixture.Prefix() + "interface: no inventory has a Withdraw option, which marks the bank");
+    }
+}
+
+TEST_CASE("CacheLoader loads a 225 square with one file, the other empty", "[CacheLoader]")
+{
+    auto fixture = FolderFixture{};
+    fixture.files.erase("maps/l50_50");
+
+    const auto cache = fixture.Load();
+    const auto* const square = cache.FindSquare(50, 50);
+    REQUIRE(square != nullptr);
+    CHECK(square->IsBlocked(0, 10, 11));
+    CHECK(square->GetLocs().empty());
+    CHECK(cache.mapCrcs.at(SQUARE).land.has_value());
+    CHECK_FALSE(cache.mapCrcs.at(SQUARE).locs.has_value());
+    CHECK(fixture.capture.GetEntries().back().message == "1 map square has only a land or a loc file; the other loads empty");
+}
+
+TEST_CASE("CacheLoader names the 225 file that failed", "[CacheLoader]")
+{
+    auto fixture = FolderFixture{};
+
+    SECTION("a missing config")
+    {
+        fixture.files.erase("config");
+        CHECK(fixture.LoadError() == fixture.Prefix() + "config not found; for revision 225, set client.cacheDirectory to the 225 engine's data/pack/client folder");
+    }
+
+    SECTION("a missing maps folder")
+    {
+        std::erase_if(fixture.files, [](const auto& file)
+        {
+            return file.first.starts_with("maps/");
+        });
+
+        CHECK(fixture.LoadError() == fixture.Prefix() + "maps folder not found; for revision 225, set client.cacheDirectory to the 225 engine's data/pack/client folder");
+    }
+
+    SECTION("a damaged map file")
+    {
+        fixture.files.at("maps/l50_50") = {0, 0, 0, 9, 1, 2, 3};
+        CHECK_THAT(fixture.LoadError(), ContainsSubstring(fixture.Prefix() + "maps/l50_50: "));
+    }
+
+    SECTION("a map file too short for its size")
+    {
+        fixture.files.at("maps/m50_50") = {0, 0};
+        CHECK(fixture.LoadError() == fixture.Prefix() + "maps/m50_50: map file is 2 bytes, too short for its size");
+    }
+
+    SECTION("a map file that claims too much")
+    {
+        fixture.files.at("maps/m50_50") = {0xFF, 0xFF, 0xFF, 0xFF, 1};
+        CHECK(fixture.LoadError() == fixture.Prefix() + "maps/m50_50: map file claims 4294967295 bytes unpacked, more than 2000000");
+    }
+}
+
+TEST_CASE("CacheLoader tells each layout given the other revision what it expects", "[CacheLoader]")
+{
+    SECTION("a 289 store read as 225")
+    {
+        auto fixture = LoaderFixture{};
+        static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
+        CHECK_THROWS_WITH(CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev225, *fixture.capture.GetLogger()),
+                          fixture.Prefix() + "config not found; for revision 225, set client.cacheDirectory to the 225 engine's data/pack/client folder");
+    }
+
+    SECTION("a 225 folder read as 289")
+    {
+        auto fixture = FolderFixture{};
+        CacheWriter::WriteFolder(fixture.folder.GetPath(), fixture.files);
+        CHECK_THROWS_WITH(CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger()),
+                          fixture.Prefix() + "main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache");
+    }
+}
+
 TEST_CASE("CacheLoader's cache keeps its text when moved", "[CacheLoader]")
 {
     auto fixture = LoaderFixture{};
     static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
 
-    auto loaded = CacheLoader::Load(fixture.folder.GetPath(), *fixture.capture.GetLogger());
+    auto loaded = CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger());
     const auto shared = std::make_shared<const GameCache_s>(std::move(loaded));
     CHECK(shared->FindLoc(0)->name == "Door");
     CHECK(shared->GetOption(shared->FindLoc(0)->ops[0]) == "Open");
@@ -232,8 +425,8 @@ TEST_CASE("CacheLoader names the folder and file that failed", "[CacheLoader]")
     SECTION("a folder without a store")
     {
         const auto missing = fixture.folder.GetPath() / "missing";
-        CHECK_THROWS_WITH(CacheLoader::Load(missing, *fixture.capture.GetLogger()),
-                          missing.string() + ": main_file_cache.dat not found; set client.cacheDirectory to the folder that holds the server's cache");
+        CHECK_THROWS_WITH(CacheLoader::Load(missing, Revision_e::Rev289, *fixture.capture.GetLogger()),
+                          missing.string() + ": main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache");
     }
 
     SECTION("a missing config archive")

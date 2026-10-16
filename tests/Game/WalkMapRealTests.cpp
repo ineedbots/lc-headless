@@ -2,6 +2,7 @@
 #include "../Support/Cache/RealCache.hpp"
 
 #include "Cache/GameCache_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Map/WalkMap.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -46,7 +47,7 @@ namespace
 
 TEST_CASE("WalkMap builds the real cache's world, doors shut", "[RealCache]")
 {
-    const auto& cache = RealCache::Require();
+    const auto& cache = RealCache::Require(Revision_e::Rev289);
     const auto started = std::chrono::steady_clock::now();
     const auto map = WalkMap{cache};
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);

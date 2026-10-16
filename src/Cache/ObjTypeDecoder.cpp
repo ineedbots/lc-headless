@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "ObjTypeDecoder.hpp"
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
@@ -12,6 +13,7 @@ namespace
 {
     using Dropped = DroppedOpcodes_s;
 
+    constexpr auto NO_VALUE = DroppedOpcodes_s::NO_VALUE;
     constexpr auto VOWELS = "aeiou"sv;
     // A model and its offset.
     constexpr auto WEAR_SIZE = sizeof(u16) + sizeof(u8);
@@ -24,6 +26,8 @@ namespace
     constexpr auto YAN_2D = u8{6};
     constexpr auto XOF_2D = u8{7};
     constexpr auto YOF_2D = u8{8};
+    // A flag in 225 that the webclient reads without a name.
+    constexpr auto CODE9 = u8{9};
     // The webclient skips it without a name; the engine calls it code10.
     constexpr auto CODE10 = u8{10};
     constexpr auto STACKABLE = u8{11};
@@ -61,6 +65,7 @@ namespace
         Dropped::Drop(YAN_2D, sizeof(u16)),
         Dropped::Drop(XOF_2D, sizeof(u16)),
         Dropped::Drop(YOF_2D, sizeof(u16)),
+        Dropped::Drop(CODE9, NO_VALUE),
         Dropped::Drop(CODE10, sizeof(u16)),
         Dropped::Drop(MAN_WEAR, WEAR_SIZE),
         Dropped::Drop(MAN_WEAR_2, sizeof(u16)),
@@ -83,6 +88,9 @@ namespace
         Dropped::Drop(TEAM, sizeof(u8)),
     });
 
+    constexpr auto REMOVED_IN_289 = std::to_array({CODE9});
+    constexpr auto ADDED_IN_289 = std::to_array({RESIZE_X, RESIZE_Y, RESIZE_Z, AMBIENT, CONTRAST, TEAM});
+
     // A banknote's links, resolved once every obj is decoded.
     struct CertLinks_s
     {
@@ -90,7 +98,7 @@ namespace
         std::optional<u16> templateId;
     };
 
-    void DecodeObj(Packet& packet, ObjType_s& type, TextPool& text, CertLinks_s& cert)
+    void DecodeObj(Packet& packet, ObjType_s& type, TextPool& text, CertLinks_s& cert, Revision_e revision)
     {
         while (true)
         {
@@ -98,6 +106,11 @@ namespace
             if (opcode == TypeDecoder::END_OPCODE)
             {
                 break;
+            }
+
+            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            {
+                TypeDecoder::ThrowUnknown(opcode);
             }
 
             if (TypeDecoder::SkipDropped(packet, opcode, DROPPED))
@@ -186,12 +199,12 @@ namespace
     }
 }
 
-std::vector<ObjType_s> ObjTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text)
+std::vector<ObjType_s> ObjTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text, Revision_e revision)
 {
     auto certs = std::vector<CertLinks_s>{};
-    auto objs = TypeDecoder::DecodeAll<ObjType_s>("obj", dat, idx, [&text, &certs](Packet& packet, ObjType_s& type)
+    auto objs = TypeDecoder::DecodeAll<ObjType_s>("obj", dat, idx, [&text, &certs, revision](Packet& packet, ObjType_s& type)
     {
-        DecodeObj(packet, type, text, certs.emplace_back());
+        DecodeObj(packet, type, text, certs.emplace_back(), revision);
     });
 
     MakeNotes(objs, certs, text);

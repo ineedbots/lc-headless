@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Cache/CacheStore.hpp"
+#include "Config/Revision_e.hpp"
 
 struct WrittenStore_s
 {
@@ -95,6 +96,9 @@ struct StoreContents_s
     std::vector<u16> squaresWithoutFiles;
 };
 
+// A 225 cache folder's files, by their path inside it.
+using FolderFiles = std::map<std::string, std::vector<u8>>;
+
 // Writes caches for the tests in the formats the engine's FileStream and the webclient read, on its own
 // rather than through the reader, so a mistake in one shows up as a failure instead of hiding in both.
 class CacheWriter
@@ -113,6 +117,8 @@ public:
 
     [[nodiscard]] static std::vector<u8> Bzip2Headerless(std::span<const u8> data);
     [[nodiscard]] static std::vector<u8> Gzip(std::span<const u8> data, u16 version = MAP_VERSION);
+    // A 225 map file: its unpacked size, then headerless bzip2.
+    [[nodiscard]] static std::vector<u8> Bzip2MapFile(std::span<const u8> data);
     [[nodiscard]] static std::vector<u8> MakeArchive(const std::vector<ArchiveEntry_s>& entries, bool compressWhole);
     [[nodiscard]] static TypeFiles_s MakeTypeFiles(const std::vector<std::vector<u8>>& definitions);
     // A definition with a name (opcode 2) unless it's empty, op i for each non-empty ops[i] (opcode 30 + i),
@@ -121,11 +127,15 @@ public:
     [[nodiscard]] static std::vector<u8> MakeLand(std::span<const LandFlags_s> flags = {});
     [[nodiscard]] static std::vector<u8> MakeLocFile(std::span<const LocPlacement_s> locs);
     [[nodiscard]] static std::vector<u8> MakeMapIndex(std::span<const u16> squares);
-    // The interface archive's data entry: the count, then the components in the order given.
-    [[nodiscard]] static std::vector<u8> MakeInterfaces(const std::vector<InterfaceComponent_s>& components);
+    // The interface archive's data entry, in the revision's format: the count, then the components in the order given.
+    [[nodiscard]] static std::vector<u8> MakeInterfaces(const std::vector<InterfaceComponent_s>& components, Revision_e revision);
     // Archives 1 to 8, with filler where nothing is decoded, and the squares' files in store 4. Square
     // i in map_index has land file 2i and loc file 2i + 1.
     [[nodiscard]] static CacheWriter MakeStore(const StoreContents_s& contents);
+    // The 225 engine's data/pack/client: its archive files, with filler where nothing is decoded, and
+    // maps/m{x}_{z} and maps/l{x}_{z} for each square. 225 has no map index, so squaresWithoutFiles are left out.
+    [[nodiscard]] static FolderFiles MakeFolder(const StoreContents_s& contents);
+    static void WriteFolder(const std::filesystem::path& directory, const FolderFiles& files);
 
     static void PutSmart(std::vector<u8>& bytes, s32 value);
     static void WriteFile(const std::filesystem::path& path, std::span<const u8> bytes);

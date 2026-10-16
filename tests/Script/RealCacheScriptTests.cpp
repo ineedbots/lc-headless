@@ -7,6 +7,7 @@
 
 #include "Cache/GameCache_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"
@@ -34,7 +35,7 @@ namespace
     {
     public:
         RealCacheFixture()
-            : cache{RealCache::RequireShared()}
+            : cache{RealCache::RequireShared(Revision_e::Rev289)}
             , map{cache}
             , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}

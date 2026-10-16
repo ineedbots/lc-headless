@@ -4,6 +4,7 @@
 #include "Cache/CacheStore.hpp"
 #include "Cache/JagArchive.hpp"
 #include "Cache/MapSquare.hpp"
+#include "Config/Revision_e.hpp"
 #include "Io/Packet.hpp"
 
 #include <bzlib.h>
@@ -26,7 +27,10 @@ namespace
     constexpr auto FIRST_OP_OPCODE = 30;
     constexpr auto END_OPCODE = 0;
     constexpr auto FILLER_ARCHIVES = std::to_array<u32>({1, 4, 6, 7, 8});
+    constexpr auto CONFIG_ARCHIVE = u32{2};
     constexpr auto INTERFACE_ARCHIVE = u32{3};
+    constexpr auto FOLDER_FILLER_FILES = std::to_array<std::string_view>({"title", "media", "models", "textures", "wordenc", "sounds"});
+    constexpr auto SQUARE_COORD_MASK = 0xFF;
 
     constexpr auto NEW_LAYER = 0xFFFF;
     constexpr auto NO_ID = 0;
@@ -50,7 +54,8 @@ namespace
     constexpr auto OBJ_REPLACE_COUNT = 1;
     constexpr auto INV_BACKGROUND_COUNT = 20;
     constexpr auto INV_OPTION_COUNT = std::size_t{5};
-    constexpr auto RECT_TEXT_COLOUR_COUNT = 4;
+    constexpr auto RECT_TEXT_COLOUR_COUNT_225 = 3;
+    constexpr auto RECT_TEXT_COLOUR_COUNT_289 = 4;
     constexpr auto MODEL_VIEW_COUNT = 3;
     constexpr auto SAMPLE_SIZE = 32;
     constexpr auto SAMPLE_OFFSET = -4;
@@ -117,11 +122,21 @@ namespace
         }
     }
 
-    void PutLayer(Packet& packet, const InterfaceComponent_s& component)
+    void PutLayer(Packet& packet, const InterfaceComponent_s& component, Revision_e revision)
     {
         packet.P2(SAMPLE_SIZE);
         packet.P1(component.hidden ? 1 : 0);
-        packet.P2(static_cast<s32>(component.children.size()));
+
+        const auto childCount = static_cast<s32>(component.children.size());
+        if (revision >= Revision_e::Rev289)
+        {
+            packet.P2(childCount);
+        }
+        else
+        {
+            packet.P1(childCount);
+        }
+
         for (auto i = std::size_t{0}; i < component.children.size(); ++i)
         {
             packet.P2(component.children[i]);
@@ -133,12 +148,17 @@ namespace
     }
 
     // Only the first slot can have a background graphic, so with one, both forms of slot are written.
-    void PutInv(Packet& packet, const InterfaceComponent_s& component)
+    void PutInv(Packet& packet, const InterfaceComponent_s& component, Revision_e revision)
     {
         PutFlags(packet, OBJ_SWAP_COUNT);
         packet.P1(component.objOps ? 1 : 0);
         packet.P1(component.objUse ? 1 : 0);
-        PutFlags(packet, OBJ_REPLACE_COUNT);
+
+        if (revision >= Revision_e::Rev289)
+        {
+            PutFlags(packet, OBJ_REPLACE_COUNT);
+        }
+
         packet.P1(component.marginX);
         packet.P1(component.marginY);
         for (auto slot = 0; slot < INV_BACKGROUND_COUNT; ++slot)
@@ -172,12 +192,13 @@ namespace
         }
     }
 
-    void PutTypeFields(Packet& packet, const InterfaceComponent_s& component)
+    void PutTypeFields(Packet& packet, const InterfaceComponent_s& component, Revision_e revision)
     {
+        const auto colourCount = revision >= Revision_e::Rev289 ? RECT_TEXT_COLOUR_COUNT_289 : RECT_TEXT_COLOUR_COUNT_225;
         switch (component.type)
         {
         case IF_LAYER:
-            PutLayer(packet, component);
+            PutLayer(packet, component, revision);
             return;
         case IF_UNUSED:
             packet.PData(std::array<u8, UNUSED_TYPE_SIZE>{});
@@ -185,17 +206,17 @@ namespace
             PutColours(packet, 1, component.colour);
             return;
         case IF_INV:
-            PutInv(packet, component);
+            PutInv(packet, component, revision);
             return;
         case IF_RECT:
             packet.P1(1);
-            PutColours(packet, RECT_TEXT_COLOUR_COUNT, component.colour);
+            PutColours(packet, colourCount, component.colour);
             return;
         case IF_TEXT:
             PutCentreFontShadow(packet);
             packet.PJStr(component.text.value_or("Click here to logout"));
             packet.PJStr("");
-            PutColours(packet, RECT_TEXT_COLOUR_COUNT, component.colour);
+            PutColours(packet, colourCount, component.colour);
             return;
         case IF_GRAPHIC:
             packet.PJStr(SAMPLE_GRAPHIC);
@@ -253,7 +274,7 @@ namespace
         }
     }
 
-    void PutComponent(Packet& packet, const InterfaceComponent_s& component)
+    void PutComponent(Packet& packet, const InterfaceComponent_s& component, Revision_e revision)
     {
         if (component.layer)
         {
@@ -267,11 +288,47 @@ namespace
         packet.P2(component.clientCode);
         packet.P2(component.width);
         packet.P2(component.height);
-        packet.P1(0);
+
+        if (revision >= Revision_e::Rev289)
+        {
+            packet.P1(0);
+        }
+
         PutOptionalId(packet, component.hoverLayer);
         PutScripts(packet, component);
-        PutTypeFields(packet, component);
+        PutTypeFields(packet, component, revision);
         PutButtonFields(packet, component);
+    }
+
+    std::vector<u8> MakeFiller(std::string_view name)
+    {
+        const auto entry = ArchiveEntry_s{.name = "filler.dat", .data = ToBytes(std::format("{} filler", name))};
+        return CacheWriter::MakeArchive({entry}, false);
+    }
+
+    std::vector<u8> MakeConfigArchive(const StoreContents_s& contents)
+    {
+        const auto locs = CacheWriter::MakeTypeFiles(contents.locs);
+        const auto npcs = CacheWriter::MakeTypeFiles(contents.npcs);
+        const auto objs = CacheWriter::MakeTypeFiles(contents.objs);
+        const auto varps = CacheWriter::MakeTypeFiles(contents.varps);
+        // clang-format off
+        return CacheWriter::MakeArchive({
+            {.name = "loc.dat", .data = locs.dat},
+            {.name = "loc.idx", .data = locs.idx},
+            {.name = "npc.dat", .data = npcs.dat},
+            {.name = "npc.idx", .data = npcs.idx},
+            {.name = "obj.dat", .data = objs.dat},
+            {.name = "obj.idx", .data = objs.idx},
+            {.name = "varp.dat", .data = varps.dat},
+            {.name = "varp.idx", .data = varps.idx},
+        }, false);
+        // clang-format on
+    }
+
+    std::vector<u8> MakeInterfaceArchive(const StoreContents_s& contents, Revision_e revision)
+    {
+        return CacheWriter::MakeArchive({{.name = "data", .data = CacheWriter::MakeInterfaces(contents.interfaces, revision)}}, false);
     }
 
     void PutEntryTable(Packet& packet, const std::vector<ArchiveEntry_s>& entries, std::span<const std::vector<u8>> packed)
@@ -409,6 +466,14 @@ std::vector<u8> CacheWriter::Gzip(std::span<const u8> data, u16 version)
     const auto trailerBytes = trailer.GetData();
     packed.insert(packed.end(), trailerBytes.begin(), trailerBytes.end());
     return packed;
+}
+
+std::vector<u8> CacheWriter::Bzip2MapFile(std::span<const u8> data)
+{
+    auto file = Packet{};
+    file.P4(static_cast<s32>(data.size()));
+    file.PData(Bzip2Headerless(data));
+    return ToBytes(file);
 }
 
 std::vector<u8> CacheWriter::MakeArchive(const std::vector<ArchiveEntry_s>& entries, bool compressWhole)
@@ -554,7 +619,7 @@ std::vector<u8> CacheWriter::MakeMapIndex(std::span<const u16> squares)
     return ToBytes(index);
 }
 
-std::vector<u8> CacheWriter::MakeInterfaces(const std::vector<InterfaceComponent_s>& components)
+std::vector<u8> CacheWriter::MakeInterfaces(const std::vector<InterfaceComponent_s>& components, Revision_e revision)
 {
     auto count = 0;
     for (const auto& component : components)
@@ -566,7 +631,7 @@ std::vector<u8> CacheWriter::MakeInterfaces(const std::vector<InterfaceComponent
     packet.P2(count);
     for (const auto& component : components)
     {
-        PutComponent(packet, component);
+        PutComponent(packet, component, revision);
     }
 
     return ToBytes(packet);
@@ -581,24 +646,8 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
         writer.Put(CacheStore::ARCHIVES, archive, MakeArchive({entry}, archive % 2 == 0));
     }
 
-    const auto locs = MakeTypeFiles(contents.locs);
-    const auto npcs = MakeTypeFiles(contents.npcs);
-    const auto objs = MakeTypeFiles(contents.objs);
-    const auto varps = MakeTypeFiles(contents.varps);
-    // clang-format off
-    writer.Put(CacheStore::ARCHIVES, 2, MakeArchive({
-        {.name = "loc.dat", .data = locs.dat},
-        {.name = "loc.idx", .data = locs.idx},
-        {.name = "npc.dat", .data = npcs.dat},
-        {.name = "npc.idx", .data = npcs.idx},
-        {.name = "obj.dat", .data = objs.dat},
-        {.name = "obj.idx", .data = objs.idx},
-        {.name = "varp.dat", .data = varps.dat},
-        {.name = "varp.idx", .data = varps.idx},
-    }, false));
-    // clang-format on
-
-    writer.Put(CacheStore::ARCHIVES, INTERFACE_ARCHIVE, MakeArchive({{.name = "data", .data = MakeInterfaces(contents.interfaces)}}, false));
+    writer.Put(CacheStore::ARCHIVES, CONFIG_ARCHIVE, MakeConfigArchive(contents));
+    writer.Put(CacheStore::ARCHIVES, INTERFACE_ARCHIVE, MakeInterfaceArchive(contents, Revision_e::Rev289));
 
     auto squares = std::vector<u16>{};
     for (const auto& square : contents.squares)
@@ -615,6 +664,36 @@ CacheWriter CacheWriter::MakeStore(const StoreContents_s& contents)
     }
 
     return writer;
+}
+
+FolderFiles CacheWriter::MakeFolder(const StoreContents_s& contents)
+{
+    auto files = FolderFiles{};
+    for (const auto name : FOLDER_FILLER_FILES)
+    {
+        files.insert_or_assign(std::string{name}, MakeFiller(name));
+    }
+
+    files.insert_or_assign("config", MakeConfigArchive(contents));
+    files.insert_or_assign("interface", MakeInterfaceArchive(contents, Revision_e::Rev225));
+    for (const auto& square : contents.squares)
+    {
+        const auto name = std::format("{}_{}", square.square >> MapSquare::ID_SHIFT, square.square & SQUARE_COORD_MASK);
+        files.insert_or_assign(std::format("maps/m{}", name), Bzip2MapFile(square.land));
+        files.insert_or_assign(std::format("maps/l{}", name), Bzip2MapFile(square.locs));
+    }
+
+    return files;
+}
+
+void CacheWriter::WriteFolder(const std::filesystem::path& directory, const FolderFiles& files)
+{
+    for (const auto& [name, bytes] : files)
+    {
+        const auto path = directory / name;
+        std::filesystem::create_directories(path.parent_path());
+        WriteFile(path, bytes);
+    }
 }
 
 void CacheWriter::PutSmart(std::vector<u8>& bytes, s32 value)

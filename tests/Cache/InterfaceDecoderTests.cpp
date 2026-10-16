@@ -4,8 +4,10 @@
 #include "Cache/ClientCode_e.hpp"
 #include "Cache/Error/CacheError.hpp"
 #include "Cache/InterfaceDecoder.hpp"
+#include "Config/Revision_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
@@ -44,11 +46,17 @@ namespace
             {.id = 2458, .layer = 2449, .type = TEXT, .buttonType = BUTTON_OK, .clientCode = LOGOUT},
         };
     }
+
+    std::vector<IfComponent_s> Decode(const std::vector<InterfaceComponent_s>& components, Revision_e revision)
+    {
+        return InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(components, revision), revision);
+    }
 }
 
 TEST_CASE("InterfaceDecoder reads every component in order", "[InterfaceDecoder]")
 {
-    const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(MakeComponents()));
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto components = Decode(MakeComponents(), revision);
     const auto ids = std::vector<u16>{0, 1, 2, 3, 10, 11, 12, 13, 2458};
     REQUIRE(components.size() == ids.size());
 
@@ -64,12 +72,13 @@ TEST_CASE("InterfaceDecoder reads every component in order", "[InterfaceDecoder]
     CHECK(components[5].clientCode == ClientCode_e::AddFriend);
     CHECK(components[8].clientCode == ClientCode_e::Logout);
     CHECK(components[1].clientCode == ClientCode_e::None);
-    CHECK(InterfaceDecoder::Decode(CacheWriter::MakeInterfaces({})).empty());
+    CHECK(Decode({}, revision).empty());
 }
 
 TEST_CASE("InterfaceDecoder reads conditions and scripts", "[InterfaceDecoder]")
 {
-    const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(MakeComponents()));
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto components = Decode(MakeComponents(), revision);
     const auto& toggle = components[4];
     CHECK(toggle.operands == std::vector<u16>{5, 70});
     REQUIRE(toggle.scripts.size() == 2);
@@ -81,7 +90,8 @@ TEST_CASE("InterfaceDecoder reads conditions and scripts", "[InterfaceDecoder]")
 
 TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks components by", "[InterfaceDecoder]")
 {
-    const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces({
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto written = std::vector<InterfaceComponent_s>{
         {.id = 100, .layer = 100, .type = LAYER, .children = {101, 102, 103}, .childOffsets = {{10, -5}, {-3, 7}}},
         {.id = 101, .type = LAYER, .children = {104}, .hidden = true},
         {.id = 102, .type = TEXT, .buttonType = BUTTON_OK, .text = "Accept", .colour = 0x00C000, .buttonText = ""},
@@ -89,7 +99,8 @@ TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks compon
         {.id = 104, .type = GRAPHIC, .buttonType = BUTTON_TARGET},
         {.id = 105, .layer = 200, .type = TEXT, .buttonType = BUTTON_TOGGLE, .buttonText = ""},
         {.id = 106, .type = RECT, .buttonType = BUTTON_SELECT, .buttonText = "Punch"},
-    }));
+    };
+    const auto components = Decode(written, revision);
     REQUIRE(components.size() == 7);
 
     const auto& [screen, layer, accept, resume, spell, toggle, select] = std::tie(components[0], components[1], components[2], components[3], components[4], components[5], components[6]);
@@ -118,10 +129,12 @@ TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks compon
 
 TEST_CASE("InterfaceDecoder reads an inventory's size, use, backgrounds and options", "[InterfaceDecoder]")
 {
-    const auto components = InterfaceDecoder::Decode(CacheWriter::MakeInterfaces({
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto written = std::vector<InterfaceComponent_s>{
         {.id = 2, .type = INV, .width = 4, .height = 7, .objUse = true, .slotBackground = true, .options = {"Use", "", "Drop"}},
         {.id = 3, .type = INV, .width = 3, .height = 5},
-    }));
+    };
+    const auto components = Decode(written, revision);
 
     REQUIRE(components.size() == 2);
 
@@ -142,37 +155,44 @@ TEST_CASE("InterfaceDecoder names the component that doesn't decode", "[Interfac
 {
     SECTION("data too short for its count")
     {
-        CHECK_THROWS_WITH(InterfaceDecoder::Decode(std::vector<u8>(1)), "data is too short for its count");
+        CHECK_THROWS_WITH(InterfaceDecoder::Decode(std::vector<u8>(1), Revision_e::Rev289), "data is too short for its count");
     }
 
     SECTION("an unknown type")
     {
         auto components = MakeComponents();
         components[5].type = UNKNOWN_TYPE;
-        CHECK_THROWS_WITH(InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(components)), "component 11: unknown type 8");
+        CHECK_THROWS_WITH(Decode(components, Revision_e::Rev289), "component 11: unknown type 8");
     }
 
     SECTION("fields that run past the end")
     {
-        auto data = CacheWriter::MakeInterfaces({{.id = 4, .type = RECT}});
+        auto data = CacheWriter::MakeInterfaces({{.id = 4, .type = RECT}}, Revision_e::Rev289);
         data.pop_back();
-        CHECK_THROWS_WITH(InterfaceDecoder::Decode(data), "component 4: runs past the end of the data");
+        CHECK_THROWS_WITH(InterfaceDecoder::Decode(data, Revision_e::Rev289), "component 4: runs past the end of the data");
     }
 
     SECTION("a string without its newline")
     {
-        auto data = CacheWriter::MakeInterfaces({{.id = 4, .type = GRAPHIC}});
+        auto data = CacheWriter::MakeInterfaces({{.id = 4, .type = GRAPHIC}}, Revision_e::Rev289);
         data.pop_back();
-        CHECK_THROWS_WITH(InterfaceDecoder::Decode(data), "component 4: a string runs past the end without its newline");
+        CHECK_THROWS_WITH(InterfaceDecoder::Decode(data, Revision_e::Rev289), "component 4: a string runs past the end without its newline");
     }
 
     SECTION("an id cut short")
     {
-        auto data = CacheWriter::MakeInterfaces({{.id = 4, .type = RECT}});
+        auto data = CacheWriter::MakeInterfaces({{.id = 4, .type = RECT}}, Revision_e::Rev289);
         data.push_back(0);
-        CHECK_THROWS_WITH(InterfaceDecoder::Decode(data), "data ends inside the id of the component after 4");
+        CHECK_THROWS_WITH(InterfaceDecoder::Decode(data, Revision_e::Rev289), "data ends inside the id of the component after 4");
 
         const auto layerCutShort = std::to_array<u8>({0, 1, 0xFF, 0xFF, 0});
-        CHECK_THROWS_WITH(InterfaceDecoder::Decode(layerCutShort), "data ends inside the id of the first component");
+        CHECK_THROWS_WITH(InterfaceDecoder::Decode(layerCutShort, Revision_e::Rev289), "data ends inside the id of the first component");
     }
+}
+
+TEST_CASE("InterfaceDecoder fails on components written for the other revision", "[InterfaceDecoder]")
+{
+    const auto [written, read] = GENERATE(std::pair{Revision_e::Rev225, Revision_e::Rev289}, std::pair{Revision_e::Rev289, Revision_e::Rev225});
+    CAPTURE(static_cast<u16>(written), static_cast<u16>(read));
+    CHECK_THROWS_AS(InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(MakeComponents(), written), read), CacheError);
 }

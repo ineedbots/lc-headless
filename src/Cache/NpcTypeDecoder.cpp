@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "NpcTypeDecoder.hpp"
 
+#include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "NpcType_s.hpp"
@@ -20,6 +21,7 @@ namespace
     constexpr auto SIZE = u8{12};
     constexpr auto READY_ANIM = u8{13};
     constexpr auto WALK_ANIM = u8{14};
+    constexpr auto ANIMATE_TRANSPARENCIES = u8{16};
     constexpr auto WALK_ANIMS = u8{17};
     constexpr auto FIRST_OP = u8{30};
     constexpr auto LAST_OP = u8{39};
@@ -41,6 +43,7 @@ namespace
         Dropped::DropCounted(MODELS, sizeof(u16)),
         Dropped::Drop(READY_ANIM, sizeof(u16)),
         Dropped::Drop(WALK_ANIM, sizeof(u16)),
+        Dropped::Drop(ANIMATE_TRANSPARENCIES, NO_VALUE),
         Dropped::Drop(WALK_ANIMS, WALK_ANIMS_SIZE),
         Dropped::DropCounted(TypeDecoder::RECOLOUR, TypeDecoder::RECOLOUR_SIZE),
         Dropped::DropCounted(HEADS, sizeof(u16)),
@@ -57,7 +60,10 @@ namespace
         Dropped::Drop(TURN_SPEED, sizeof(u16)),
     });
 
-    void DecodeNpc(Packet& packet, NpcType_s& type, TextPool& text)
+    constexpr auto REMOVED_IN_289 = std::to_array({ANIMATE_TRANSPARENCIES});
+    constexpr auto ADDED_IN_289 = std::to_array({ALWAYS_ON_TOP, AMBIENT, CONTRAST, HEAD_ICON, TURN_SPEED});
+
+    void DecodeNpc(Packet& packet, NpcType_s& type, TextPool& text, Revision_e revision)
     {
         while (true)
         {
@@ -65,6 +71,11 @@ namespace
             if (opcode == TypeDecoder::END_OPCODE)
             {
                 break;
+            }
+
+            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            {
+                TypeDecoder::ThrowUnknown(opcode);
             }
 
             if (TypeDecoder::SkipDropped(packet, opcode, DROPPED))
@@ -102,10 +113,10 @@ namespace
     }
 }
 
-std::vector<NpcType_s> NpcTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text)
+std::vector<NpcType_s> NpcTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text, Revision_e revision)
 {
-    return TypeDecoder::DecodeAll<NpcType_s>("npc", dat, idx, [&text](Packet& packet, NpcType_s& type)
+    return TypeDecoder::DecodeAll<NpcType_s>("npc", dat, idx, [&text, revision](Packet& packet, NpcType_s& type)
     {
-        DecodeNpc(packet, type, text);
+        DecodeNpc(packet, type, text, revision);
     });
 }

@@ -10,6 +10,7 @@
 #include "../Config/AccountDirectory.hpp"
 #include "../Config/AccountFile.hpp"
 #include "../Config/ConfigFile.hpp"
+#include "../Config/Revision_e.hpp"
 #include "../Config/Config_s.hpp"
 #include "../Config/Error/ConfigError.hpp"
 #include "../Console/ConsoleInput.hpp"
@@ -39,7 +40,7 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
     }
 
     m_logger->Info("Config loaded from {}", m_commandLine.configPath.string());
-    m_cache = std::make_shared<const GameCache_s>(CacheLoader::Load(m_config->client.cacheDirectory, *m_logger));
+    m_cache = std::make_shared<const GameCache_s>(CacheLoader::Load(m_config->client.cacheDirectory, m_config->login.revision, *m_logger));
 
     const auto started = std::chrono::steady_clock::now();
     m_navigation = std::make_shared<const Navigation>(*m_cache, m_config->client.navDirectory);

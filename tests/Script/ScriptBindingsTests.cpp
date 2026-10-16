@@ -35,9 +35,10 @@ namespace
         return {.x = Fixtures::HOME + dx, .z = Fixtures::HOME + dz, .level = 0};
     }
 
-    std::shared_ptr<const GameCache_s> MakeCache()
+    std::shared_ptr<const GameCache_s> MakeCache(Revision_e revision)
     {
         auto cache = GameCache_s{};
+        cache.revision = revision;
         TestCache::SetComponents(cache);
         TestCache::AddNpc(cache, 41, "Chicken", {"", "Attack"}).combatLevel = 1;
         TestCache::AddNpc(cache, 81, "Cow", {"", "Attack"});
@@ -63,7 +64,8 @@ namespace
     {
     public:
         explicit BindingFixture(Revision_e revision = Revision_e::Rev289)
-            : map{cache}
+            : cache{MakeCache(revision)}
+            , map{cache}
             , client{MakeConfig(revision), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
             , api{state, map, actions}
@@ -88,7 +90,7 @@ namespace
         }
 
         LogCapture capture;
-        std::shared_ptr<const GameCache_s> cache = MakeCache();
+        std::shared_ptr<const GameCache_s> cache;
         GameState_s state = Fixtures::PlacedState();
         WorldMap map;
         GameClient client;
