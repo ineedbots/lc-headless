@@ -17,69 +17,8 @@
 #include "../Console/LogSinks.hpp"
 #include "../Console/Logger.hpp"
 #include "../Script/ScriptRuntime.hpp"
-
-namespace
-{
-    std::atomic<u32> interruptCount{0};
-
-    void SignalHandler(int signalNum)
-    {
-        if (signalNum == SIGINT)
-        {
-            ++interruptCount;
-        }
-    }
-}
-
-CommandLine_s Application::ParseCommandLine(std::span<char* const> args)
-{
-    auto commandLine = CommandLine_s{};
-    for (auto i = std::size_t{0}; i < args.size(); ++i)
-    {
-        const auto arg = std::string_view{args[i]};
-        if (arg == ACCOUNT_OPTION)
-        {
-            if (i + 1 >= args.size())
-            {
-                throw std::invalid_argument{std::format("{} needs an account file path", ACCOUNT_OPTION)};
-            }
-
-            commandLine.accountPath = args[++i];
-        }
-        else if (arg == WATCH_OPTION)
-        {
-            commandLine.watch = true;
-        }
-        else if (arg == DEBUGGER_OPTION)
-        {
-            commandLine.debugger = true;
-        }
-        else if (arg == RAW_CONSOLE_OPTION)
-        {
-            commandLine.rawConsole = true;
-        }
-        else if (arg.starts_with("--"))
-        {
-            throw std::invalid_argument{std::format("Unknown option {}; {}", arg, USAGE)};
-        }
-        else
-        {
-            commandLine.configPath = arg;
-        }
-    }
-
-    if (commandLine.watch && commandLine.debugger)
-    {
-        throw std::invalid_argument{std::format("{} and {} can't be combined: a reload would replace the script the debugger is attached to", WATCH_OPTION, DEBUGGER_OPTION)};
-    }
-
-    if (commandLine.debugger && !commandLine.accountPath)
-    {
-        throw std::invalid_argument{std::format("{} needs {}: a script paused in the debugger pauses every account in the process", DEBUGGER_OPTION, ACCOUNT_OPTION)};
-    }
-
-    return commandLine;
-}
+#include "CommandLine.hpp"
+#include "InterruptSignal.hpp"
 
 Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
     : m_logger{std::move(logger)}
@@ -127,7 +66,7 @@ int Application::Run()
     }
 
     // Installed only once the scripts have loaded, so Ctrl+C still ends the process while it waits for the debugger.
-    std::signal(SIGINT, SignalHandler);
+    InterruptSignal::Install();
 
     const auto console = m_commandLine.rawConsole ? nullptr : ConsoleInput::ReadStdin();
     const auto consoleLog = ConsoleLogScope{[this](std::shared_ptr<ConsoleInput> current)
@@ -140,10 +79,7 @@ int Application::Run()
         m_logger->Info("Type {} for the console commands", AccountRunner::COMMAND_HELP);
     }
 
-    const auto succeeded = runner.Run([]
-    {
-        return interruptCount.load();
-    }, console.get());
+    const auto succeeded = runner.Run(InterruptSignal::GetCount, console.get());
 
     return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -161,7 +97,7 @@ std::vector<AccountConfig_s> Application::LoadAccounts() const
         accounts.push_back(AccountFile::Load(*m_commandLine.accountPath));
         if (m_commandLine.debugger && !accounts.front().script)
         {
-            throw ConfigError{std::format("{}: {} needs an account with a script", m_commandLine.accountPath->string(), DEBUGGER_OPTION)};
+            throw ConfigError{std::format("{}: {} needs an account with a script", m_commandLine.accountPath->string(), CommandLine::DEBUGGER_OPTION)};
         }
 
         return accounts;
@@ -170,7 +106,7 @@ std::vector<AccountConfig_s> Application::LoadAccounts() const
     const auto directory = std::filesystem::path{m_config->scripting.accountsDirectory};
     if (!std::filesystem::is_directory(directory))
     {
-        throw ConfigError{std::format("{}: no accounts folder; add one file per account (see accounts/example.jsonc.sample), or pass {} <file>", directory.string(), ACCOUNT_OPTION)};
+        throw ConfigError{std::format("{}: no accounts folder; add one file per account (see accounts/example.jsonc.sample), or pass {} <file>", directory.string(), CommandLine::ACCOUNT_OPTION)};
     }
 
     return AccountDirectory::LoadEnabled(directory);

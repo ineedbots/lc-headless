@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "Application/Application.hpp"
+#include "Application/CommandLine.hpp"
 
 #include "Console/Logger.hpp"
 
@@ -11,7 +12,7 @@ int main(int argc, char** argv)
     try
     {
         const auto args = std::span<char* const>{argv, static_cast<std::size_t>(argc)}.subspan(1);
-        auto app = Application{Application::ParseCommandLine(args), logger};
+        auto app = Application{CommandLine::Parse(args), logger};
         return app.Run();
     }
     catch (const std::exception& e)

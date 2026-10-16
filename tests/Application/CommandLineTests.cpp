@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Application/Application.hpp"
+#include "Application/CommandLine.hpp"
 #include "Config/ConfigFile.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -18,11 +18,11 @@ namespace
             pointers.push_back(arg.data());
         }
 
-        return Application::ParseCommandLine(pointers);
+        return CommandLine::Parse(pointers);
     }
 }
 
-TEST_CASE("Application reads its command line", "[Application]")
+TEST_CASE("CommandLine reads its command line", "[CommandLine]")
 {
     const auto defaults = Parse({});
     CHECK(defaults.configPath == ConfigFile::DEFAULT_PATH);
@@ -41,7 +41,7 @@ TEST_CASE("Application reads its command line", "[Application]")
     CHECK(Parse({"--watch", "--account", "accounts/bot1.jsonc"}).watch);
 }
 
-TEST_CASE("Application rejects a command line it can't use", "[Application]")
+TEST_CASE("CommandLine rejects a command line it can't use", "[CommandLine]")
 {
     CHECK_THROWS_WITH(Parse({"--account"}), ContainsSubstring("needs an account file path"));
     CHECK_THROWS_WITH(Parse({"--wtach"}), ContainsSubstring("Unknown option --wtach") && ContainsSubstring("usage:"));
