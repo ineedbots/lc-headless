@@ -37,6 +37,14 @@ struct GameCache_s
     [[nodiscard]] const LocType_s* FindLoc(s32 id) const;
     [[nodiscard]] const NpcType_s* FindNpc(s32 id) const;
     [[nodiscard]] const ObjType_s* FindObj(s32 id) const;
+    // Empty when the cache has no such type, or it has no name.
+    [[nodiscard]] std::string_view FindLocName(s32 id) const;
+    [[nodiscard]] std::string_view FindNpcName(s32 id) const;
+    [[nodiscard]] std::string_view FindObjName(s32 id) const;
+    // The types with the name, matched without regard to case.
+    [[nodiscard]] std::vector<s32> FindLocIds(std::string_view name) const;
+    [[nodiscard]] std::vector<s32> FindNpcIds(std::string_view name) const;
+    [[nodiscard]] std::vector<s32> FindObjIds(std::string_view name) const;
     // Empty for TextPool::NO_OPTION.
     [[nodiscard]] std::string_view GetOption(u16 id) const;
     [[nodiscard]] const MapSquare* FindSquare(s32 squareX, s32 squareZ) const;

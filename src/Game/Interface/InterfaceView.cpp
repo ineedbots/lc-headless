@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "InterfaceView.hpp"
 
+#include "../../Cache/ClientCode_e.hpp"
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/IfComponent_s.hpp"
 #include "../../Utils/StringUtils.hpp"
@@ -168,6 +169,19 @@ std::vector<const IfComponent_s*> InterfaceView::GetTree(u16 root) const
     }
 
     return tree;
+}
+
+const IfComponent_s* InterfaceView::FindClientCode(u16 root, ClientCode_e code) const
+{
+    for (const auto* const component : GetTree(root))
+    {
+        if (component->clientCode == code)
+        {
+            return component;
+        }
+    }
+
+    return nullptr;
 }
 
 std::vector<const IfComponent_s*> InterfaceView::FindText(std::string_view text, std::optional<u16> root) const

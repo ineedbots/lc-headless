@@ -8,6 +8,7 @@
 #include "../Cache/TextPool.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Menu/MenuOp.hpp"
+#include "../Game/Menu/Menus.hpp"
 #include "../Game/State/EntityStatus.hpp"
 #include "../Game/State/Entity_s.hpp"
 #include "../Game/State/Npc_s.hpp"
@@ -30,7 +31,7 @@ void PyConvert::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCac
     const auto object = NewInstance(out, NPC_CLASS);
     SetInt(object, "id", npc.type);
     SetEntity(object, npc, tick);
-    SetMenu(object, ScriptApi::GetNpcMenu(cache, npc.type));
+    SetMenu(object, Menus::GetNpcMenu(cache, npc.type));
 
     const auto* const type = cache.FindNpc(npc.type);
     if (type == nullptr)
@@ -71,7 +72,7 @@ void PyConvert::FromGroundItem(py_OutRef out, const GroundItem_s& item, const Ga
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetInt(object, "count", item.count);
     SetTile(object, item.tile);
-    SetMenu(object, ScriptApi::GetGroundItemMenu(cache, item.id));
+    SetMenu(object, Menus::GetGroundItemMenu(cache, item.id));
 }
 
 void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s& cache)
@@ -86,7 +87,7 @@ void PyConvert::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s&
     SetInt(object, "shape", loc.shape);
     SetInt(object, "angle", loc.angle);
     SetInt(object, "layer", static_cast<s64>(loc.layer));
-    SetMenu(object, ScriptApi::GetLocMenu(cache, loc.id));
+    SetMenu(object, Menus::GetLocMenu(cache, loc.id));
 }
 
 void PyConvert::FromProjectile(py_OutRef out, const Projectile_s& projectile)
@@ -116,8 +117,8 @@ void PyConvert::FromItem(py_OutRef out, const InventoryItem_s& item, const GameC
     SetInt(object, "com", item.com);
     SetBool(object, "noted", type != nullptr && type->noteOf.has_value());
 
-    const auto inventoryMenu = ScriptApi::GetInventoryMenu(cache, item.com);
-    SetMenu(object, inventoryMenu.value_or(ScriptApi::GetItemMenu(cache, item.id)));
+    const auto inventoryMenu = Menus::GetInventoryMenu(cache, item.com);
+    SetMenu(object, inventoryMenu.value_or(Menus::GetItemMenu(cache, item.id)));
     SetBool(object, BUTTON_FIELD, inventoryMenu.has_value());
 }
 
@@ -646,7 +647,7 @@ void PyConvert::SetTile(py_Ref object, const Tile_s& tile)
     SetInt(object, PLANE_FIELD, tile.level);
 }
 
-void PyConvert::SetMenu(py_Ref object, const ScriptApi::Menu& menu)
+void PyConvert::SetMenu(py_Ref object, const Menus::Menu& menu)
 {
     // As SetOptions: the list stays on the value stack until the object holds it.
     const auto list = py_pushtmp();

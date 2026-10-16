@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "GameCache_s.hpp"
 
+#include "../Utils/StringUtils.hpp"
 #include "LocType_s.hpp"
 #include "MapSquare.hpp"
 #include "NpcType_s.hpp"
@@ -9,8 +10,6 @@
 
 namespace
 {
-    constexpr auto MAX_SQUARE_COORD = 0xFF;
-
     template <typename T>
     const T* FindType(const std::vector<T>& types, s32 id)
     {
@@ -20,6 +19,28 @@ namespace
         }
 
         return &types[static_cast<std::size_t>(id)];
+    }
+
+    template <typename T>
+    std::string_view FindName(const std::vector<T>& types, s32 id)
+    {
+        const auto* const type = FindType(types, id);
+        return type == nullptr ? std::string_view{} : type->name;
+    }
+
+    template <typename T>
+    std::vector<s32> FindIds(const std::vector<T>& types, std::string_view name)
+    {
+        auto ids = std::vector<s32>{};
+        for (const auto& type : types)
+        {
+            if (!type.name.empty() && StringUtils::EqualsIgnoringCase(type.name, name))
+            {
+                ids.push_back(type.id);
+            }
+        }
+
+        return ids;
     }
 }
 
@@ -36,6 +57,36 @@ const NpcType_s* GameCache_s::FindNpc(s32 id) const
 const ObjType_s* GameCache_s::FindObj(s32 id) const
 {
     return FindType(objs, id);
+}
+
+std::string_view GameCache_s::FindLocName(s32 id) const
+{
+    return FindName(locs, id);
+}
+
+std::string_view GameCache_s::FindNpcName(s32 id) const
+{
+    return FindName(npcs, id);
+}
+
+std::string_view GameCache_s::FindObjName(s32 id) const
+{
+    return FindName(objs, id);
+}
+
+std::vector<s32> GameCache_s::FindLocIds(std::string_view name) const
+{
+    return FindIds(locs, name);
+}
+
+std::vector<s32> GameCache_s::FindNpcIds(std::string_view name) const
+{
+    return FindIds(npcs, name);
+}
+
+std::vector<s32> GameCache_s::FindObjIds(std::string_view name) const
+{
+    return FindIds(objs, name);
 }
 
 const IfComponent_s* GameCache_s::FindComponent(s32 id) const
@@ -56,7 +107,7 @@ std::string_view GameCache_s::GetOption(u16 id) const
 
 const MapSquare* GameCache_s::FindSquare(s32 squareX, s32 squareZ) const
 {
-    if (squareX < 0 || squareX > MAX_SQUARE_COORD || squareZ < 0 || squareZ > MAX_SQUARE_COORD)
+    if (squareX < 0 || squareX > MapSquare::MAX_SQUARE || squareZ < 0 || squareZ > MapSquare::MAX_SQUARE)
     {
         return nullptr;
     }

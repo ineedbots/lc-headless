@@ -6,6 +6,7 @@
 #include "../Cache/ObjType_s.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
+#include "../Game/Menu/Menus.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/State/Player_s.hpp"
 #include "../Game/State/Zone_s.hpp"
@@ -142,7 +143,7 @@ private:
     static void SetOptionalString(py_Ref object, const char* name, std::string_view text);
     static void SetOptions(py_Ref object, const char* name, std::span<const u16> ops, const GameCache_s& cache);
     static void SetTile(py_Ref object, const Tile_s& tile);
-    static void SetMenu(py_Ref object, const ScriptApi::Menu& menu);
+    static void SetMenu(py_Ref object, const Menus::Menu& menu);
     static void SetEntity(py_Ref object, const Entity_s& entity, u64 tick);
     // ('npc' or 'player', index), or None.
     static void SetTarget(py_Ref object, const std::optional<EntityRef_s>& target);

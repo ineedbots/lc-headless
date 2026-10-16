@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../Cache/ClientCode_e.hpp"
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/IfComponent_s.hpp"
 #include "../State/Interfaces_s.hpp"
@@ -36,6 +37,8 @@ public:
 
     // In drawing order; empty for an id the cache doesn't have.
     [[nodiscard]] std::vector<const IfComponent_s*> GetTree(u16 root) const;
+    // The first component in root's tree, in drawing order, whose client code is code.
+    [[nodiscard]] const IfComponent_s* FindClientCode(u16 root, ClientCode_e code) const;
     // Visible text components whose text matches, without regard to case, in the open interfaces or
     // only in root's.
     [[nodiscard]] std::vector<const IfComponent_s*> FindText(std::string_view text, std::optional<u16> root = std::nullopt) const;

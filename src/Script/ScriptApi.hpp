@@ -1,15 +1,19 @@
 #pragma once
 
 #include "../Cache/GameCache_s.hpp"
+#include "../Cache/IfComponent_s.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/Interface/ChatDialog.hpp"
+#include "../Game/Interface/DialogueTracker.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
-#include "../Game/Menu/MenuOp.hpp"
+#include "../Game/Menu/Menus.hpp"
 #include "../Game/Nav/NavPoint_s.hpp"
 #include "../Game/Nav/Navigation.hpp"
 #include "../Game/Nav/WorldPathFinder.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
+#include "../Game/Query/InventoryItem_s.hpp"
+#include "../Game/Query/SearchFilter_s.hpp"
 #include "../Game/State/Entity_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
@@ -18,23 +22,6 @@
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
 #include "BotMessenger.hpp"
-
-struct InventoryItem_s
-{
-    u16 com = 0;
-    u16 slot = 0;
-    s32 id = -1;
-    s32 count = 0;
-};
-
-// Empty id and name lists match anything. Names match a type's name without regard to case, and a type
-// with no name never matches one. A radius counts tiles from the local player, on its level.
-struct SearchFilter_s
-{
-    std::vector<s32> ids;
-    std::vector<std::string> names;
-    std::optional<s32> radius;
-};
 
 enum class StopRequest_e : u8
 {
@@ -49,7 +36,7 @@ class ScriptApi
 {
 public:
     // A target's options by slot, as its right-click menu lists them; empty where there's none.
-    using Menu = std::array<std::string_view, MenuOp::COUNT>;
+    using Menu = Menus::Menu;
 
     ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {}, std::shared_ptr<const Navigation> navigation = nullptr);
 
@@ -198,13 +185,10 @@ public:
     [[nodiscard]] std::optional<s64> GetLastProgress() const;
 
 private:
-    [[nodiscard]] bool Matches(const Tile_s& tile, const SearchFilter_s& filter, s32 id, std::string_view name) const;
-    [[nodiscard]] std::string_view GetNpcName(s32 type) const;
-    [[nodiscard]] std::string_view GetObjName(s32 obj) const;
-    [[nodiscard]] std::string_view GetLocName(s32 loc) const;
     [[nodiscard]] bool HasItem(const InventoryItem_s& item) const;
     [[nodiscard]] bool HasGroundItem(u16 obj, const Tile_s& tile) const;
     [[nodiscard]] static ItemRef_s ToItemRef(const InventoryItem_s& item);
+    [[nodiscard]] const IfComponent_s* FindAcceptDesign() const;
 
     const GameState_s& m_state;
     const WorldMap& m_map;
@@ -216,7 +200,5 @@ private:
     std::optional<std::chrono::seconds> m_relogRequest;
     s64 m_stepTime = 0;
     std::optional<s64> m_lastProgress;
-    // The modal change in which the dialogue was continued or the count dialog answered.
-    std::optional<u32> m_continuedAt;
-    std::optional<u32> m_answeredAt;
+    DialogueTracker m_dialogue;
 };

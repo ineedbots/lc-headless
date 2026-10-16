@@ -2,7 +2,6 @@
 
 #include "../Cache/IfComponent_s.hpp"
 #include "GameClient.hpp"
-#include "Map/PathFinder.hpp"
 #include "Map/WorldMap.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
@@ -62,21 +61,12 @@ public:
 
     [[nodiscard]] std::optional<ItemRef_s> FindItem(u16 com, u16 obj) const;
 
-    // By the webclient's rules for each kind of target.
-    [[nodiscard]] static std::optional<std::vector<Tile_s>> FindWalkRoute(const WorldMap& map, const Tile_s& start, const Tile_s& destination);
-    [[nodiscard]] static std::optional<std::vector<Tile_s>> FindEntityRoute(const WorldMap& map, const Tile_s& start, const Tile_s& tile);
-    [[nodiscard]] static std::optional<std::vector<Tile_s>> FindGroundItemRoute(const WorldMap& map, const Tile_s& start, const Tile_s& tile);
-    // Also nullopt when the map has no loc with that id on the tile.
-    [[nodiscard]] static std::optional<std::vector<Tile_s>> FindLocRoute(const WorldMap& map, const Tile_s& start, const Tile_s& tile, u16 loc);
-
 private:
     void Approach(const std::optional<std::vector<Tile_s>>& route, const Tile_s& destination, ClientPacket_s action);
     void ApproachVia(std::span<const Tile_s> waypoints, ClientPacket_s action);
     void ApproachLoc(const Tile_s& tile, u16 loc, ClientPacket_s action);
     [[nodiscard]] const WorldMap& GetMap() const;
     [[nodiscard]] const Tile_s& GetStart() const;
-    [[nodiscard]] static std::optional<std::vector<Tile_s>> FindRoute(const WorldMap& map, const Tile_s& start, std::initializer_list<RouteTarget_s> targets);
-    [[nodiscard]] static std::optional<RouteTarget_s> GetLocTarget(const WorldMap& map, const Tile_s& tile, u16 loc);
     void LogNoRoute(const Tile_s& destination, std::string_view instead) const;
     [[nodiscard]] Tile_s GetNpcTile(u16 npcIndex) const;
     [[nodiscard]] Tile_s GetPlayerTile(u16 playerIndex) const;
