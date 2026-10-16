@@ -7,6 +7,8 @@
 #include "../Cache/ObjType_s.hpp"
 #include "../Cache/TextPool.hpp"
 #include "../Game/Map/WorldMap.hpp"
+#include "../Game/Menu/MenuOp.hpp"
+#include "../Game/State/EntityStatus.hpp"
 #include "../Game/State/Entity_s.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/State/Player_s.hpp"
@@ -19,8 +21,6 @@
 namespace
 {
     constexpr auto BUILTINS_MODULE = "builtins";
-    constexpr auto MIN_OP = 1;
-    constexpr auto MAX_OP = 5;
     constexpr auto NPC_TARGET = "npc"sv;
     constexpr auto PLAYER_TARGET = "player"sv;
 }
@@ -405,7 +405,7 @@ u16 PyConvert::ToU16(py_Ref value, std::string_view name)
 
 u8 PyConvert::ToOp(py_Ref value)
 {
-    return static_cast<u8>(ToInt(value, "op", MIN_OP, MAX_OP));
+    return static_cast<u8>(ToInt(value, "op", MenuOp::MIN, MenuOp::MAX));
 }
 
 OpChoice PyConvert::ToOpChoice(py_Ref value)
@@ -672,8 +672,8 @@ void PyConvert::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
     SetInt(object, "index", entity.index);
     SetTile(object, entity.tile);
     SetInt(object, "animation", entity.animation.id);
-    SetBool(object, "moving", ScriptApi::IsMoving(entity, tick));
-    SetBool(object, "in_combat", ScriptApi::InCombat(entity, tick));
+    SetBool(object, "moving", EntityStatus::IsMoving(entity, tick));
+    SetBool(object, "in_combat", EntityStatus::InCombat(entity, tick));
 
     // As rs2b0t's health, 0 until a hit shows it.
     const auto* const hit = entity.hits.empty() ? nullptr : &entity.hits.back();

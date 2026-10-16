@@ -2,6 +2,7 @@
 #include "ClientPackets.hpp"
 
 #include "../../Io/Packet.hpp"
+#include "../Menu/MenuOp.hpp"
 #include "../Tile_s.hpp"
 #include "ClientPacket_s.hpp"
 #include "ClientProt.hpp"
@@ -16,7 +17,7 @@ namespace
     constexpr auto OPHELD = std::to_array({ClientProt_e::OpHeld1, ClientProt_e::OpHeld2, ClientProt_e::OpHeld3, ClientProt_e::OpHeld4, ClientProt_e::OpHeld5});
     constexpr auto INV_BUTTON = std::to_array({ClientProt_e::InvButton1, ClientProt_e::InvButton2, ClientProt_e::InvButton3, ClientProt_e::InvButton4, ClientProt_e::InvButton5});
 
-    constexpr auto MAX_COORD = 0xFFFF;
+    constexpr auto MAX_WIRE_COORD = 0xFFFF;
     constexpr auto MAX_CHAT_COLOUR = static_cast<u8>(ChatColour_e::Glow3);
     constexpr auto MAX_CHAT_EFFECT = static_cast<u8>(ChatEffect_e::Slide);
     constexpr auto MAX_PUBLIC_CHAT_MODE = 3;
@@ -33,21 +34,21 @@ namespace
         return {.prot = prot, .payload = {data.begin(), data.end()}};
     }
 
-    ClientProt_e SelectOp(u8 op, const std::array<ClientProt_e, ClientPackets::MAX_OP>& prots, std::string_view kind)
+    ClientProt_e SelectOp(u8 op, const std::array<ClientProt_e, MenuOp::COUNT>& prots, std::string_view kind)
     {
-        if (op < ClientPackets::MIN_OP || op > ClientPackets::MAX_OP)
+        if (op < MenuOp::MIN || op > MenuOp::MAX)
         {
-            throw std::invalid_argument{std::format("{} option must be from {} to {}, not {}", kind, ClientPackets::MIN_OP, ClientPackets::MAX_OP, op)};
+            throw std::invalid_argument{std::format("{} option must be from {} to {}, not {}", kind, MenuOp::MIN, MenuOp::MAX, op)};
         }
 
-        return prots[op - ClientPackets::MIN_OP];
+        return prots[MenuOp::GetSlot(op)];
     }
 
     void PutCoord(Packet& packet, s32 coord)
     {
-        if (coord < 0 || coord > MAX_COORD)
+        if (coord < 0 || coord > MAX_WIRE_COORD)
         {
-            throw std::invalid_argument{std::format("Coordinate {} is outside 0 to {}", coord, MAX_COORD)};
+            throw std::invalid_argument{std::format("Coordinate {} is outside 0 to {}", coord, MAX_WIRE_COORD)};
         }
 
         packet.P2(coord);

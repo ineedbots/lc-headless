@@ -1,12 +1,14 @@
 #pragma once
 
+#include "../State/BuildArea_s.hpp"
+
 // One level of the 104x104 build area, indexed by local tile: absolute minus the build area's base, or of
 // another square grid, such as the one WalkMap builds a map square on. Angles are the webclient's: 0 west,
 // 1 north, 2 east, 3 south.
 class CollisionMap
 {
 public:
-    static constexpr s32 SIZE = 104;
+    static constexpr s32 SIZE = BuildArea_s::SIZE;
 
     explicit CollisionMap(s32 size = SIZE);
 

@@ -5,10 +5,12 @@
 #include "../Cache/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
+#include "../Game/GameTick.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/State/GameEvent_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Social_s.hpp"
+#include "../Game/State/Stat_e.hpp"
 #include "../Utils/FileWatcher.hpp"
 #include "BotMessenger.hpp"
 #include "Error/ScriptError.hpp"
@@ -43,9 +45,6 @@ namespace
     constexpr auto INVENTORY_CHANGED = "inventory_changed"sv;
     constexpr auto WAIT_MS = "ms"sv;
     constexpr auto WAIT_UPDATE = "update"sv;
-    constexpr auto MILLISECONDS_PER_TICK = 600;
-    constexpr auto HITPOINTS = u8{3};
-    constexpr auto MILLISECONDS_PER_SECOND = 1000;
 
     // rs2b0t's ChatLine type, as names rather than the webclient's numbers.
     std::optional<std::string_view> DescribeChatType(MessageType_e type)
@@ -637,7 +636,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     else if (const auto* stat = std::get_if<StatChanged_s>(&data))
     {
         // death.rs2 empties hitpoints before it says "Oh dear you are dead!"; the stat is the surer sign.
-        if (stat->stat == HITPOINTS && stat->previous.level > 0 && stat->current.level == 0)
+        if (stat->stat == static_cast<u8>(Stat_e::Hitpoints) && stat->previous.level > 0 && stat->current.level == 0)
         {
             CallHook("death");
             m_vm->Activate();
@@ -673,7 +672,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     }
     else if (const auto* reboot = std::get_if<RebootStarted_s>(&data); reboot && HasHook("system_update"))
     {
-        py_newint(py_r0(), reboot->ticks * MILLISECONDS_PER_TICK / MILLISECONDS_PER_SECOND);
+        py_newint(py_r0(), std::chrono::duration_cast<std::chrono::seconds>(reboot->ticks * GameTick::DURATION).count());
         CallHook("system_update", one);
     }
 }

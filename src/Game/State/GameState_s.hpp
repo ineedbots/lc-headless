@@ -1,26 +1,16 @@
 #pragma once
 
 #include "../Tile_s.hpp"
+#include "BuildArea_s.hpp"
 #include "Entity_s.hpp"
 #include "GameEvent_s.hpp"
 #include "Interfaces_s.hpp"
 #include "Npc_s.hpp"
 #include "Player_s.hpp"
 #include "Social_s.hpp"
+#include "Stat_e.hpp"
 #include "Stat_s.hpp"
 #include "Zone_s.hpp"
-
-// The 104x104-tile area the server builds around the player. Local coordinates are absolute minus base.
-struct BuildArea_s
-{
-    static constexpr s32 SIZE = 104;
-
-    bool loaded = false;
-    s32 centreZoneX = 0;
-    s32 centreZoneZ = 0;
-    s32 baseX = 0;
-    s32 baseZ = 0;
-};
 
 struct Item_s
 {
@@ -161,6 +151,7 @@ struct GameState_s
     [[nodiscard]] const Player_s* FindPlayerByName(std::string_view name) const;
     [[nodiscard]] const Inventory_s* FindInventory(u16 com) const;
     [[nodiscard]] s32 GetVarp(u16 varp) const;
+    [[nodiscard]] const Stat_s& GetStat(Stat_e stat) const;
     [[nodiscard]] std::vector<const GroundItem_s*> GetGroundItemsAt(const Tile_s& tile) const;
     [[nodiscard]] std::vector<const ChatMessage_s*> GetMessagesAfter(u64 sequence) const;
     [[nodiscard]] std::vector<const GameEvent_s*> GetEventsAfter(u64 sequence) const;

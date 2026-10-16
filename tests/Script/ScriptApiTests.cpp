@@ -9,6 +9,8 @@
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"
+#include "Game/Menu/MenuOp.hpp"
+#include "Game/State/EntityStatus.hpp"
 #include "Game/State/Entity_s.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Game/State/Npc_s.hpp"
@@ -166,10 +168,10 @@ TEST_CASE("ScriptApi finds NPCs by id and radius", "[ScriptApi]")
 
     SECTION("in combat means hit within the last few ticks")
     {
-        fixture.state.npcs[0].hits.push_back({.damage = 1, .health = 2, .maxHealth = 3, .tick = 100 - ScriptApi::COMBAT_TICKS});
-        fixture.state.npcs[2].hits.push_back({.damage = 1, .tick = 100 - ScriptApi::COMBAT_TICKS - 1});
-        CHECK(ScriptApi::InCombat(fixture.state.npcs[0], fixture.state.tick));
-        CHECK_FALSE(ScriptApi::InCombat(fixture.state.npcs[2], fixture.state.tick));
+        fixture.state.npcs[0].hits.push_back({.damage = 1, .health = 2, .maxHealth = 3, .tick = 100 - EntityStatus::COMBAT_TICKS});
+        fixture.state.npcs[2].hits.push_back({.damage = 1, .tick = 100 - EntityStatus::COMBAT_TICKS - 1});
+        CHECK(EntityStatus::InCombat(fixture.state.npcs[0], fixture.state.tick));
+        CHECK_FALSE(EntityStatus::InCombat(fixture.state.npcs[2], fixture.state.tick));
         CHECK(api.GetNearestNpc({.ids = {CHICKEN}}, false)->index == 12);
         CHECK(api.GetNearestNpc({.ids = {CHICKEN}}, true)->index == 10);
     }
@@ -222,16 +224,16 @@ TEST_CASE("ScriptApi actions report targets that are gone", "[ScriptApi]")
     auto& api = fixture.api;
     const auto bones = InventoryItem_s{.com = TestCache::INVENTORY, .slot = 2, .id = BONES, .count = 1};
 
-    CHECK_FALSE(api.InteractNpc(99, ScriptApi::OP_ATTACK));
+    CHECK_FALSE(api.InteractNpc(99, MenuOp::ATTACK));
     CHECK_FALSE(api.InteractPlayer(99, 1));
-    CHECK_FALSE(api.InteractGroundItem(BONES, Fixtures::HOME, Fixtures::HOME, ScriptApi::OP_TAKE));
-    CHECK_FALSE(api.ItemOp({.com = TestCache::INVENTORY, .slot = 1, .id = BONES}, ScriptApi::OP_DROP));
-    CHECK_FALSE(api.ItemOp({.com = TestCache::INVENTORY, .slot = 40, .id = BONES}, ScriptApi::OP_DROP));
+    CHECK_FALSE(api.InteractGroundItem(BONES, Fixtures::HOME, Fixtures::HOME, MenuOp::TAKE));
+    CHECK_FALSE(api.ItemOp({.com = TestCache::INVENTORY, .slot = 1, .id = BONES}, MenuOp::DROP));
+    CHECK_FALSE(api.ItemOp({.com = TestCache::INVENTORY, .slot = 40, .id = BONES}, MenuOp::DROP));
     CHECK_FALSE(api.UseItemOnNpc(bones, 99));
 
     // The targets exist, so these get as far as sending, which needs a session.
-    CHECK_THROWS_AS(api.InteractGroundItem(BONES, Fixtures::HOME + 2, Fixtures::HOME + 2, ScriptApi::OP_TAKE), std::runtime_error);
-    CHECK_THROWS_AS(api.ItemOp(bones, ScriptApi::OP_DROP), std::runtime_error);
+    CHECK_THROWS_AS(api.InteractGroundItem(BONES, Fixtures::HOME + 2, Fixtures::HOME + 2, MenuOp::TAKE), std::runtime_error);
+    CHECK_THROWS_AS(api.ItemOp(bones, MenuOp::DROP), std::runtime_error);
 }
 
 TEST_CASE("ScriptApi keeps the strongest stop request until it's taken", "[ScriptApi]")
@@ -279,9 +281,9 @@ TEST_CASE("ScriptApi chooses options by their text", "[ScriptApi]")
 
     SECTION("ground items offer Take, and inventory items Drop, where their type has no option")
     {
-        CHECK(api.FindGroundItemOp(BONES, "take") == ScriptApi::OP_TAKE);
+        CHECK(api.FindGroundItemOp(BONES, "take") == MenuOp::TAKE);
         CHECK(api.FindItemOp(BONES, "Bury") == 1);
-        CHECK(api.FindItemOp(BONES, "drop") == ScriptApi::OP_DROP);
+        CHECK(api.FindItemOp(BONES, "drop") == MenuOp::DROP);
         CHECK_THROWS_WITH(api.FindItemOp(COINS, "Bury"), "Coins (item 995) has no option 'Bury'; its options are Drop (5)");
     }
 }

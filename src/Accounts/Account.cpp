@@ -11,6 +11,8 @@
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
+#include "../Game/State/Stat_e.hpp"
+#include "../Game/State/Stat_s.hpp"
 #include "../Game/Tile_s.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptCommand_s.hpp"
@@ -22,7 +24,6 @@
 
 namespace
 {
-    constexpr auto HITPOINTS_STAT = std::size_t{3};
     constexpr auto NEAREST_NPC_COUNT = std::size_t{5};
     constexpr auto PROGRESS_EXTENSION = ".txt";
 
@@ -57,7 +58,7 @@ namespace
     void LogSummary(Logger& logger, const GameState_s& state)
     {
         const auto& tile = state.localPlayer.tile;
-        const auto& hitpoints = state.stats[HITPOINTS_STAT];
+        const auto& hitpoints = state.GetStat(Stat_e::Hitpoints);
         logger.Info("Tick {}: player {} at ({}, {}, {}), hitpoints {}/{}, run energy {}%, weight {} kg",
                     state.tick, state.pid, tile.x, tile.z, tile.level, hitpoints.level, hitpoints.baseLevel, state.runEnergy, state.runWeight);
         logger.Info("In view: {} players, {} NPCs, {} ground items, {} changed locs; {} inventories, {} varps",

@@ -21,7 +21,6 @@ namespace
     constexpr auto ANGLE_SOUTH = u8{3};
     constexpr auto SIDE_COUNT = 4;
     constexpr auto SIDE_MASK = 0xF;
-    constexpr auto LAYERS = std::to_array<LocLayer_e>({LocLayer_e::Wall, LocLayer_e::WallDecor, LocLayer_e::Ground, LocLayer_e::GroundDecor});
 
     RouteTarget_s MakeAreaTarget(const Tile_s& tile, u8 width = 1, u8 length = 1, u8 forceApproach = 0)
     {
@@ -375,7 +374,7 @@ std::optional<std::vector<Tile_s>> GameActions::FindRoute(const WorldMap& map, c
 
 std::optional<RouteTarget_s> GameActions::GetLocTarget(const WorldMap& map, const Tile_s& tile, u16 loc)
 {
-    for (const auto layer : LAYERS)
+    for (const auto layer : WorldMap::LOC_LAYERS)
     {
         const auto scene = map.GetLoc(tile, layer);
         if (scene && scene->id == loc)

@@ -7,6 +7,8 @@
 #include "Npc_s.hpp"
 #include "Player_s.hpp"
 #include "Social_s.hpp"
+#include "Stat_e.hpp"
+#include "Stat_s.hpp"
 #include "Zone_s.hpp"
 
 namespace
@@ -96,6 +98,13 @@ s32 GameState_s::GetVarp(u16 varp) const
     }
 
     return found->second;
+}
+
+const Stat_s& GameState_s::GetStat(Stat_e stat) const
+{
+    const auto slot = static_cast<std::size_t>(stat);
+    assert(slot < stats.size() && "Stat_e value outside the stats the server sends");
+    return stats[slot];
 }
 
 std::vector<const GroundItem_s*> GameState_s::GetGroundItemsAt(const Tile_s& tile) const

@@ -7,7 +7,6 @@
 class WalkMap
 {
 public:
-    static constexpr s32 LEVELS = 4;
     static constexpr s32 DIRECTIONS = 8;
     // Each direction's step, as rs2b0t orders them: north, east, south, west, then the diagonals clockwise
     // from north-east. Bit d of a tile's exits is direction d.

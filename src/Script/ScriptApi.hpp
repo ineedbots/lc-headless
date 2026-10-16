@@ -5,6 +5,7 @@
 #include "../Game/Interface/ChatDialog.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
+#include "../Game/Menu/MenuOp.hpp"
 #include "../Game/Nav/WorldPathFinder.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/State/Entity_s.hpp"
@@ -45,17 +46,8 @@ enum class StopRequest_e : u8
 class ScriptApi
 {
 public:
-    static constexpr u64 COMBAT_TICKS = 8;
-    static constexpr u8 OP_TALK = 1;
-    static constexpr u8 OP_ATTACK = 2;
-    static constexpr u8 OP_TAKE = 3;
-    static constexpr u8 OP_DROP = 5;
-    static constexpr std::string_view TAKE_OPTION = "Take";
-    static constexpr std::string_view DROP_OPTION = "Drop";
-    static constexpr std::size_t MENU_SIZE = 5;
-
     // A target's options by slot, as its right-click menu lists them; empty where there's none.
-    using Menu = std::array<std::string_view, MENU_SIZE>;
+    using Menu = std::array<std::string_view, MenuOp::COUNT>;
 
     ScriptApi(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {}, std::shared_ptr<const Navigation_s> navigation = nullptr);
 
@@ -202,9 +194,6 @@ public:
     // The script reports progress the stall guard can't see, such as a finished trade.
     void NoteProgress();
     [[nodiscard]] std::optional<s64> GetLastProgress() const;
-
-    [[nodiscard]] static bool IsMoving(const Entity_s& entity, u64 tick);
-    [[nodiscard]] static bool InCombat(const Entity_s& entity, u64 tick);
 
 private:
     [[nodiscard]] bool Matches(const Tile_s& tile, const SearchFilter_s& filter, s32 id, std::string_view name) const;

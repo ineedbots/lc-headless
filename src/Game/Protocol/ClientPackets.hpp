@@ -65,8 +65,6 @@ class ClientPackets
 {
 public:
     static constexpr std::size_t MAX_WAYPOINTS = 25;
-    static constexpr u8 MIN_OP = 1;
-    static constexpr u8 MAX_OP = 5;
     static constexpr std::size_t MAX_CHEAT_LENGTH = 80;
 
     ClientPackets() = delete;

@@ -9,7 +9,9 @@
 #include "../Game/GameActions.hpp"
 #include "../Game/Map/PathFinder.hpp"
 #include "../Game/Map/WorldMap.hpp"
+#include "../Game/Menu/MenuOp.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
+#include "../Game/State/EntityStatus.hpp"
 #include "../Game/State/Entity_s.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
@@ -22,9 +24,8 @@
 
 namespace
 {
-    constexpr auto TAKE_SLOT = std::size_t{2};
-    constexpr auto DROP_SLOT = std::size_t{4};
-    constexpr auto LAYERS = std::to_array<LocLayer_e>({LocLayer_e::Wall, LocLayer_e::WallDecor, LocLayer_e::Ground, LocLayer_e::GroundDecor});
+    constexpr auto TAKE_SLOT = MenuOp::GetSlot(MenuOp::TAKE);
+    constexpr auto DROP_SLOT = MenuOp::GetSlot(MenuOp::DROP);
 
     using Menu = ScriptApi::Menu;
 
@@ -208,7 +209,7 @@ ScriptApi::Menu ScriptApi::GetGroundItemMenu(const GameCache_s& cache, s32 obj)
     auto menu = type == nullptr ? Menu{} : MakeMenu(cache, type->ops);
     if (menu[TAKE_SLOT].empty())
     {
-        menu[TAKE_SLOT] = TAKE_OPTION;
+        menu[TAKE_SLOT] = MenuOp::TAKE_OPTION;
     }
 
     return menu;
@@ -220,7 +221,7 @@ ScriptApi::Menu ScriptApi::GetItemMenu(const GameCache_s& cache, s32 obj)
     auto menu = type == nullptr ? Menu{} : MakeMenu(cache, type->inventoryOps);
     if (menu[DROP_SLOT].empty())
     {
-        menu[DROP_SLOT] = DROP_OPTION;
+        menu[DROP_SLOT] = MenuOp::DROP_OPTION;
     }
 
     return menu;
@@ -279,12 +280,12 @@ Tile_s ScriptApi::ToTile(s32 x, s32 z) const
 
 bool ScriptApi::IsMoving() const
 {
-    return m_state.walkDestination.has_value() || IsMoving(m_state.localPlayer, m_state.tick);
+    return m_state.walkDestination.has_value() || EntityStatus::IsMoving(m_state.localPlayer, m_state.tick);
 }
 
 bool ScriptApi::InCombat() const
 {
-    return InCombat(m_state.localPlayer, m_state.tick);
+    return EntityStatus::InCombat(m_state.localPlayer, m_state.tick);
 }
 
 bool ScriptApi::IsRunning() const
@@ -380,7 +381,7 @@ std::optional<Npc_s> ScriptApi::GetNearestNpc(const SearchFilter_s& filter, std:
     {
         std::erase_if(candidates, [this, &inCombat](const Npc_s& npc)
         {
-            return InCombat(npc, m_state.tick) != *inCombat;
+            return EntityStatus::InCombat(npc, m_state.tick) != *inCombat;
         });
     }
 
@@ -470,7 +471,7 @@ std::optional<SceneLoc_s> ScriptApi::GetLocAt(s32 x, s32 z, std::optional<LocLay
     }
 
     auto removed = std::optional<SceneLoc_s>{};
-    for (const auto each : LAYERS)
+    for (const auto each : WorldMap::LOC_LAYERS)
     {
         const auto loc = m_map.GetLoc(tile, each);
         if (!loc)
@@ -611,7 +612,7 @@ u8 ScriptApi::FindGroundItemOp(u16 obj, std::string_view text) const
     auto menu = MakeMenu(GetCache(), type.ops);
     if (menu[TAKE_SLOT].empty())
     {
-        menu[TAKE_SLOT] = TAKE_OPTION;
+        menu[TAKE_SLOT] = MenuOp::TAKE_OPTION;
     }
 
     return ChooseOption(menu, text, DescribeType("item", type.id, type.name));
@@ -640,7 +641,7 @@ u8 ScriptApi::FindItemOp(s32 obj, std::string_view text) const
     auto menu = MakeMenu(GetCache(), type.inventoryOps);
     if (menu[DROP_SLOT].empty())
     {
-        menu[DROP_SLOT] = DROP_OPTION;
+        menu[DROP_SLOT] = MenuOp::DROP_OPTION;
     }
 
     return ChooseOption(menu, text, DescribeType("item", type.id, type.name));
@@ -1063,16 +1064,6 @@ void ScriptApi::NoteProgress()
 std::optional<s64> ScriptApi::GetLastProgress() const
 {
     return m_lastProgress;
-}
-
-bool ScriptApi::IsMoving(const Entity_s& entity, u64 tick)
-{
-    return entity.lastMovement != Movement_e::None && entity.movedTick == tick;
-}
-
-bool ScriptApi::InCombat(const Entity_s& entity, u64 tick)
-{
-    return !entity.hits.empty() && tick - entity.hits.back().tick <= COMBAT_TICKS;
 }
 
 bool ScriptApi::Matches(const Tile_s& tile, const SearchFilter_s& filter, s32 id, std::string_view name) const

@@ -43,7 +43,7 @@ WalkMap::WalkMap(const GameCache_s& cache)
 {
     for (const auto& [id, square] : cache.squares)
     {
-        for (auto level = 0; level < LEVELS; ++level)
+        for (auto level = 0; level < MapSquare::LEVELS; ++level)
         {
             if (HasAnyFloor(square, level))
             {
@@ -134,7 +134,7 @@ u32 WalkMap::GetKey(s32 x, s32 z, s32 level)
 
 const WalkMap::LevelSquare_s* WalkMap::Find(s32 x, s32 z, s32 level) const
 {
-    if (x < 0 || z < 0 || level < 0 || level >= LEVELS)
+    if (x < 0 || z < 0 || level < 0 || level >= MapSquare::LEVELS)
     {
         return nullptr;
     }

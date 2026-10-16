@@ -24,7 +24,8 @@ struct SceneLoc_s
 class WorldMap
 {
 public:
-    static constexpr s32 LEVELS = 4;
+    // In the order a tile's locs are looked through.
+    static constexpr auto LOC_LAYERS = std::to_array<LocLayer_e>({LocLayer_e::Wall, LocLayer_e::WallDecor, LocLayer_e::Ground, LocLayer_e::GroundDecor});
 
     explicit WorldMap(std::shared_ptr<const GameCache_s> cache);
 
@@ -54,6 +55,6 @@ private:
     std::shared_ptr<const GameCache_s> m_cache;
     BuildArea_s m_area;
     std::optional<u64> m_builtAt;
-    std::array<CollisionMap, LEVELS> m_collision;
+    std::array<CollisionMap, MapSquare::LEVELS> m_collision;
     std::vector<LocChange_s> m_changes;
 };

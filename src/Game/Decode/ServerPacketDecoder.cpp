@@ -13,6 +13,7 @@
 #include "../State/Interfaces_s.hpp"
 #include "../State/Social_s.hpp"
 #include "../State/Stat_s.hpp"
+#include "../State/Zone_s.hpp"
 #include "../Tile_s.hpp"
 #include "NpcInfoDecoder.hpp"
 #include "PlayerInfoDecoder.hpp"
@@ -24,7 +25,6 @@ namespace
     constexpr auto NONE = u16{0xFFFF};
     constexpr auto ITEM_COUNT_ESCAPE = u8{255};
     constexpr auto BUILD_AREA_RADIUS_ZONES = 6;
-    constexpr auto ZONE_SIZE = 8;
     constexpr auto NAME37_SIZE = std::size_t{8};
     constexpr auto MAX_BASE_LEVEL_INDEX = std::size_t{98};
     constexpr auto RGB555_CHANNEL_MASK = 0x1F;
@@ -348,8 +348,8 @@ namespace
             .loaded = true,
             .centreZoneX = zoneX,
             .centreZoneZ = zoneZ,
-            .baseX = (zoneX - BUILD_AREA_RADIUS_ZONES) * ZONE_SIZE,
-            .baseZ = (zoneZ - BUILD_AREA_RADIUS_ZONES) * ZONE_SIZE,
+            .baseX = (zoneX - BUILD_AREA_RADIUS_ZONES) * Zone_s::SIZE,
+            .baseZ = (zoneZ - BUILD_AREA_RADIUS_ZONES) * Zone_s::SIZE,
         };
 
         // The server resends every zone in view after a rebuild.

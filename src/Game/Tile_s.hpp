@@ -2,6 +2,9 @@
 
 struct Tile_s
 {
+    // The largest coordinate a script may name.
+    static constexpr s32 MAX_COORD = 32767;
+
     s32 x = 0;
     s32 z = 0;
     s32 level = 0;

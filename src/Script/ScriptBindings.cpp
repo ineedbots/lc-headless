@@ -2,13 +2,18 @@
 #include "ScriptBindings.hpp"
 
 #include "../Cache/GameCache_s.hpp"
+#include "../Cache/MapSquare.hpp"
 #include "../Game/Map/WorldMap.hpp"
+#include "../Game/Menu/MenuOp.hpp"
 #include "../Game/Nav/NavJson.hpp"
 #include "../Game/Protocol/Base37.hpp"
+#include "../Game/State/EntityStatus.hpp"
 #include "../Game/State/GameState_s.hpp"
 #include "../Game/State/Npc_s.hpp"
 #include "../Game/State/Player_s.hpp"
 #include "../Game/State/Social_s.hpp"
+#include "../Game/State/Stat_e.hpp"
+#include "../Game/State/Stat_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
 #include "../Utils/StringUtils.hpp"
@@ -39,9 +44,10 @@ namespace
     });
     constexpr auto MAX_RELOG_SECONDS = s64{24 * 60 * 60};
     constexpr auto SETTINGS_JSON = "_settings_json";
-    constexpr auto MAX_COORD = s64{32767};
-    constexpr auto PERCENT = 100;
-    constexpr auto HITPOINTS = 3;
+    constexpr auto MAX_COORD = s64{Tile_s::MAX_COORD};
+    constexpr auto MAX_LEVEL = s64{MapSquare::LEVELS - 1};
+    constexpr auto MAX_SQUARE = s64{MapSquare::MAX_SQUARE};
+    constexpr auto MAX_DAMAGE_TICKS = 1000;
 
     struct Constant_s
     {
@@ -49,27 +55,32 @@ namespace
         s64 value;
     };
 
+    constexpr s64 StatValue(Stat_e stat)
+    {
+        return static_cast<s64>(stat);
+    }
+
     constexpr auto CONSTANTS = std::to_array<Constant_s>({
-        {"COMBAT_TICKS", static_cast<s64>(ScriptApi::COMBAT_TICKS)},
-        {"ATTACK", 0},
-        {"DEFENCE", 1},
-        {"STRENGTH", 2},
-        {"HITPOINTS", HITPOINTS},
-        {"RANGED", 4},
-        {"PRAYER", 5},
-        {"MAGIC", 6},
-        {"COOKING", 7},
-        {"WOODCUTTING", 8},
-        {"FLETCHING", 9},
-        {"FISHING", 10},
-        {"FIREMAKING", 11},
-        {"CRAFTING", 12},
-        {"SMITHING", 13},
-        {"MINING", 14},
-        {"HERBLORE", 15},
-        {"AGILITY", 16},
-        {"THIEVING", 17},
-        {"RUNECRAFT", 20},
+        {"COMBAT_TICKS", static_cast<s64>(EntityStatus::COMBAT_TICKS)},
+        {"ATTACK", StatValue(Stat_e::Attack)},
+        {"DEFENCE", StatValue(Stat_e::Defence)},
+        {"STRENGTH", StatValue(Stat_e::Strength)},
+        {"HITPOINTS", StatValue(Stat_e::Hitpoints)},
+        {"RANGED", StatValue(Stat_e::Ranged)},
+        {"PRAYER", StatValue(Stat_e::Prayer)},
+        {"MAGIC", StatValue(Stat_e::Magic)},
+        {"COOKING", StatValue(Stat_e::Cooking)},
+        {"WOODCUTTING", StatValue(Stat_e::Woodcutting)},
+        {"FLETCHING", StatValue(Stat_e::Fletching)},
+        {"FISHING", StatValue(Stat_e::Fishing)},
+        {"FIREMAKING", StatValue(Stat_e::Firemaking)},
+        {"CRAFTING", StatValue(Stat_e::Crafting)},
+        {"SMITHING", StatValue(Stat_e::Smithing)},
+        {"MINING", StatValue(Stat_e::Mining)},
+        {"HERBLORE", StatValue(Stat_e::Herblore)},
+        {"AGILITY", StatValue(Stat_e::Agility)},
+        {"THIEVING", StatValue(Stat_e::Thieving)},
+        {"RUNECRAFT", StatValue(Stat_e::Runecraft)},
         {"LAYER_WALL", static_cast<s64>(LocLayer_e::Wall)},
         {"LAYER_WALL_DECOR", static_cast<s64>(LocLayer_e::WallDecor)},
         {"LAYER_GROUND", static_cast<s64>(LocLayer_e::Ground)},
@@ -353,7 +364,7 @@ namespace
         for (auto i = 0; i < count; ++i)
         {
             const auto item = isList ? py_list_getitem(value, i) : py_tuple_getitem(value, i);
-            bytes[static_cast<std::size_t>(i)] = static_cast<u8>(PyConvert::ToInt(item, name, 0, 255));
+            bytes[static_cast<std::size_t>(i)] = static_cast<u8>(PyConvert::ToInt(item, name, 0, std::numeric_limits<u8>::max()));
         }
 
         return bytes;
@@ -544,7 +555,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetStat(HITPOINTS).level);
+            return ReturnInt(GetApi().GetState().GetStat(Stat_e::Hitpoints).level);
         });
     }
 
@@ -552,7 +563,7 @@ namespace
     {
         return Guard([]
         {
-            return ReturnInt(GetApi().GetStat(HITPOINTS).baseLevel);
+            return ReturnInt(GetApi().GetState().GetStat(Stat_e::Hitpoints).baseLevel);
         });
     }
 
@@ -560,8 +571,7 @@ namespace
     {
         return Guard([]
         {
-            const auto& hitpoints = GetApi().GetStat(HITPOINTS);
-            return ReturnInt(hitpoints.baseLevel == 0 ? 0 : hitpoints.level * PERCENT / hitpoints.baseLevel);
+            return ReturnInt(GetApi().GetState().GetStat(Stat_e::Hitpoints).GetPercent());
         });
     }
 
@@ -1141,7 +1151,7 @@ namespace
             const auto* const navigation = GetApi().GetNavigation();
             const auto x = static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_COORD));
             const auto z = static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_COORD));
-            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, 3));
+            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
             if (navigation == nullptr)
             {
                 return ReturnNone();
@@ -1158,8 +1168,8 @@ namespace
         return Guard([argv]
         {
             const auto& cache = GetApi().GetCache();
-            const auto* const square = cache.FindSquare(static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, 255)), static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, 255)));
-            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, 3));
+            const auto* const square = cache.FindSquare(static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_SQUARE)), static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_SQUARE)));
+            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
             auto locs = std::vector<MapLoc_s>{};
             if (square != nullptr)
             {
@@ -1192,14 +1202,8 @@ namespace
         return Guard([argv]
         {
             const auto& api = GetApi();
-            const auto& state = api.GetState();
-            const auto ticks = static_cast<u64>(PyConvert::ToInt(py_arg(0), "ticks", 0, 1000));
-            const auto hurt = std::ranges::any_of(api.GetLocalPlayer().hits, [&state, ticks](const Hit_s& hit)
-            {
-                return hit.damage > 0 && hit.tick + ticks >= state.tick;
-            });
-
-            return ReturnBool(hurt);
+            const auto ticks = static_cast<u64>(PyConvert::ToInt(py_arg(0), "ticks", 0, MAX_DAMAGE_TICKS));
+            return ReturnBool(EntityStatus::TookDamage(api.GetLocalPlayer(), api.GetState().tick, ticks));
         });
     }
 
@@ -1540,7 +1544,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_TALK));
+            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), MenuOp::TALK));
         });
     }
 
@@ -1548,7 +1552,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), ScriptApi::OP_ATTACK));
+            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), MenuOp::ATTACK));
         });
     }
 
@@ -1637,7 +1641,7 @@ namespace
         return Guard([argv]
         {
             const auto item = PyConvert::ToGroundItem(py_arg(0), "item");
-            return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, ScriptApi::OP_TAKE));
+            return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, MenuOp::TAKE));
         });
     }
 
@@ -1675,7 +1679,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), ScriptApi::OP_DROP));
+            return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), MenuOp::DROP));
         });
     }
 

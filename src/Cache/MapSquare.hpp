@@ -56,6 +56,8 @@ public:
     static constexpr s32 SIZE = 64;
     static constexpr s32 LEVELS = 4;
     static constexpr s32 ID_SHIFT = 8;
+    // A square's x and z are each a byte of its id.
+    static constexpr s32 MAX_SQUARE = (1 << ID_SHIFT) - 1;
 
     using BlockedTiles = std::bitset<LEVELS * SIZE * SIZE>;
     using GroundTiles = std::bitset<LEVELS * SIZE * SIZE>;

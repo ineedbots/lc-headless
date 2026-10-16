@@ -26,7 +26,7 @@ namespace
 
     bool IsLevel(s32 level)
     {
-        return level >= 0 && level < WorldMap::LEVELS;
+        return level >= 0 && level < MapSquare::LEVELS;
     }
 }
 
@@ -181,7 +181,7 @@ void WorldMap::Rebuild(const GameState_s& state)
     {
         const auto originX = square->GetX() * MapSquare::SIZE - m_area.baseX;
         const auto originZ = square->GetZ() * MapSquare::SIZE - m_area.baseZ;
-        for (auto level = 0; level < LEVELS; ++level)
+        for (auto level = 0; level < MapSquare::LEVELS; ++level)
         {
             for (auto x = 0; x < MapSquare::SIZE; ++x)
             {
