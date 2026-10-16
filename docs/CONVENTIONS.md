@@ -48,28 +48,34 @@ ProjectName/
 └── src/
     ├── pch.hpp
     ├── main.cpp
-    ├── Application.hpp
-    ├── Application.cpp
-    ├── Core/
+    ├── Application/
+    │   ├── Application.hpp
+    │   └── Application.cpp
+    ├── Config/
+    │   ├── Error/
+    │   │   └── ConfigError.hpp
     │   ├── ConfigFile.hpp
-    │   ├── ConfigFile.cpp
-    │   ├── Endian.hpp
-    │   ├── StringHash_s.hpp
-    │   ├── StringUtils.hpp
-    │   └── StringUtils.cpp
-    └── Graphics/
-        ├── BlendMode_e.hpp
-        ├── Renderer.hpp
-        ├── Renderer.cpp
-        ├── TextureCache.hpp
-        ├── TextureCache.cpp
-        └── Vertex_s.hpp
+    │   └── ConfigFile.cpp
+    ├── Graphics/
+    │   ├── BlendMode_e.hpp
+    │   ├── Renderer.hpp
+    │   ├── Renderer.cpp
+    │   ├── TextureCache.hpp
+    │   ├── TextureCache.cpp
+    │   └── Vertex_s.hpp
+    └── Utils/
+        ├── Endian.hpp
+        ├── StringHash_s.hpp
+        ├── StringUtils.hpp
+        └── StringUtils.cpp
 ```
 
 - File names match class names exactly: `class TextureCache` lives in `TextureCache.hpp` / `TextureCache.cpp`.
 - `pch.hpp` and `main.cpp` are the only files that don't follow the class-name rule.
-- `pch.hpp`, `main.cpp`, and `Application.hpp` / `Application.cpp` always stay at the root of `src/`. They are the entry points to the codebase and should be found instantly.
-- Everything else may live in subfolders of `src/` that group related files by feature or subsystem (`Core/`, `Graphics/`). Nothing is required to sit at the root. Nest folders when it helps, but keep the tree shallow.
+- `pch.hpp` and `main.cpp` always stay at the root of `src/`. They are the entry points to the codebase and should be found instantly. `Application.hpp` / `Application.cpp`, the class `main` hands off to, live in `src/Application/` with the classes that support it, such as the command line parser.
+- Everything else lives in subfolders of `src/` that group related files by feature or subsystem (`Config/`, `Graphics/`). Nest folders when it helps, but keep the tree shallow.
+- Helpers that several subsystems share go in `Utils/`, as static members of one class per kind (`StringUtils`; see section 5), rather than as copies in each file that needs them.
+- A subsystem's exception types go in an `Error/` subfolder of its folder (see Error handling in section 8).
 - Folder names are PascalCase.
 - A header and its `.cpp` always sit side by side in the same folder.
 - Build output goes in `build/`, which is git-ignored.
@@ -286,9 +292,9 @@ A header includes another header only when the header itself requires it: a clas
 // src/Graphics/Renderer.hpp
 #pragma once
 
-#include "../Core/ConfigFile.hpp"   // required: ConfigFile is in the constructor's prototype
-#include "BlendMode_e.hpp"          // required: BlendMode_e is a data member and a parameter
-#include "Vertex_s.hpp"             // required: Vertex_s is in Draw's prototype
+#include "../Config/ConfigFile.hpp"   // required: ConfigFile is in the constructor's prototype
+#include "BlendMode_e.hpp"            // required: BlendMode_e is a data member and a parameter
+#include "Vertex_s.hpp"               // required: Vertex_s is in Draw's prototype
 
 class Renderer
 {
@@ -308,8 +314,8 @@ private:
 #include "pch.hpp"
 #include "Renderer.hpp"
 
-#include "../Core/ConfigFile.hpp"   // the implementation uses ConfigFile, so it's included even though Renderer.hpp has it
-#include "TextureCache.hpp"         // only the implementation uses TextureCache
+#include "../Config/ConfigFile.hpp"   // the implementation uses ConfigFile, so it's included even though Renderer.hpp has it
+#include "TextureCache.hpp"           // only the implementation uses TextureCache
 ```
 
 ### Source files (`.cpp`)
@@ -319,19 +325,19 @@ A `.cpp` includes every header it uses, even when its own header or another incl
 Include order is always (shown for `src/Graphics/TextureCache.cpp`):
 
 ```cpp
-#include "pch.hpp"                  // 1. the PCH, always first
-#include "TextureCache.hpp"         // 2. this file's own header, if it exists
+#include "pch.hpp"                    // 1. the PCH, always first
+#include "TextureCache.hpp"           // 2. this file's own header, if it exists
 
-#include "../Core/ConfigFile.hpp"   // 3. other project headers
+#include "../Config/ConfigFile.hpp"   // 3. other project headers
 #include "Renderer.hpp"
 
-#include <spdlog/spdlog.h>          // 4. third-party headers
+#include <spdlog/spdlog.h>            // 4. third-party headers
 ```
 
 ### Include paths
 
-- Project includes may be written relative to the file doing the including: `#include "Renderer.hpp"` for a header in the same folder, `#include "../Core/ConfigFile.hpp"` for one in another folder. `../` is allowed.
-- A path from `src/` also works, because `src/` is an include directory: `#include "Core/ConfigFile.hpp"`. Use whichever reads more clearly.
+- Project includes may be written relative to the file doing the including: `#include "Renderer.hpp"` for a header in the same folder, `#include "../Config/ConfigFile.hpp"` for one in another folder. `../` is allowed.
+- A path from `src/` also works, because `src/` is an include directory: `#include "Config/ConfigFile.hpp"`. Use whichever reads more clearly.
 - In a header, relative paths resolve from the header's own folder, not from the `.cpp` that includes it.
 - A file's own header is included by bare name, since it sits in the same folder.
 - `pch.hpp` is always included by bare name. It resolves from any folder through the `src/` include directory.
@@ -360,7 +366,7 @@ namespace
 Each `.cpp` file implements exactly one class, named after the file. If the file only holds utility functions, they become static members of a non-instantiable class:
 
 ```cpp
-// src/Core/StringUtils.hpp
+// src/Utils/StringUtils.hpp
 #pragma once
 
 class StringUtils
@@ -377,7 +383,7 @@ The only exception is `main.cpp`, which stays tiny, hands off to a class, and ac
 
 ```cpp
 #include "pch.hpp"
-#include "Application.hpp"
+#include "Application/Application.hpp"
 
 int main()
 {
@@ -736,10 +742,10 @@ Failures are reported by throwing exceptions. Functions don't return `bool` or e
 - Mark move constructors, move assignment operators, and `swap` as `noexcept` so standard containers move instead of copy.
 - RAII is what makes this safe: when every resource is owned by an object, a thrown exception leaks nothing.
 
-Create a custom exception type only when callers need to catch that specific failure. Name it with an `Error` suffix and inherit the base constructors:
+Create a custom exception type only when callers need to catch that specific failure. Name it with an `Error` suffix, inherit the base constructors, and put it in an `Error/` subfolder of the folder whose code throws it:
 
 ```cpp
-// src/Core/ConfigError.hpp
+// src/Config/Error/ConfigError.hpp
 #pragma once
 
 class ConfigError : public std::runtime_error
@@ -792,7 +798,7 @@ Use the preprocessor for what C++ can't do:
 Even then, keep the preprocessor at the edge. When a condition only picks a value, turn it into a `constexpr` once and use that everywhere else:
 
 ```cpp
-// src/Core/Platform.hpp
+// src/Utils/Platform.hpp
 #pragma once
 
 class Platform
@@ -856,7 +862,7 @@ Always `nullptr`. Never `0` or `NULL` for pointers.
 - Floats are serialized through their bit pattern: `Endian::ToLittle(std::bit_cast<u32>(value))`.
 - Never `memcpy`/`fwrite` a struct directly to or from disk; padding and byte order are not portable. Serialize field by field.
 
-### `src/Core/Endian.hpp`
+### `src/Utils/Endian.hpp`
 
 ```cpp
 #pragma once
@@ -925,7 +931,7 @@ public:
 
 ## 10. Complete example
 
-`src/Core/StringHash_s.hpp`:
+`src/Utils/StringHash_s.hpp`:
 
 ```cpp
 #pragma once
@@ -941,12 +947,12 @@ struct StringHash_s
 };
 ```
 
-`src/Core/ConfigFile.hpp`:
+`src/Config/ConfigFile.hpp`:
 
 ```cpp
 #pragma once
 
-#include "StringHash_s.hpp"
+#include "../Utils/StringHash_s.hpp"
 
 class ConfigFile
 {
@@ -962,7 +968,7 @@ private:
 };
 ```
 
-`src/Core/ConfigFile.cpp`:
+`src/Config/ConfigFile.cpp`:
 
 ```cpp
 #include "pch.hpp"
@@ -1042,6 +1048,6 @@ std::optional<std::string_view> ConfigFile::GetValue(std::string_view key) const
 - [ ] Copy `CONVENTIONS.md`, `.clang-format`, `.editorconfig`, `.gitattributes`, and `CMakePresets.json` into the new repo.
 - [ ] Create `vcpkg.json` with the project name, then run `vcpkg x-update-baseline --add-initial-baseline`.
 - [ ] Create `CMakeLists.txt` from the template and set the project name.
-- [ ] Create `src/pch.hpp`, `src/main.cpp`, and `src/Application.hpp` / `.cpp`.
+- [ ] Create `src/pch.hpp`, `src/main.cpp`, and `src/Application/Application.hpp` / `.cpp`.
 - [ ] Add `build/` to `.gitignore`.
 - [ ] Configure and build with both presets (`windows-msvc` and `linux-clang`) with zero warnings.
