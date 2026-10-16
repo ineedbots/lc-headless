@@ -57,11 +57,6 @@ ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOpt
 {
     Load();
 
-    if (m_options.progressInterval > std::chrono::minutes::zero() && !HasHook(PROGRESS_REPORT))
-    {
-        m_logger->Warning("{} has no on_progress_report(), so progressReportMinutes has no effect", m_options.file.generic_string());
-    }
-
     if (m_options.watchFiles)
     {
         m_watcher.emplace(m_vm->GetFiles());
@@ -135,12 +130,6 @@ void ScriptHost::Step(Clock::time_point now)
         {
             RunUpkeep(now);
         }
-    }
-
-    if (m_nextReport && now >= *m_nextReport)
-    {
-        m_nextReport = now + m_options.progressInterval;
-        RunProgressReport(now);
     }
 
     if (m_status == ScriptStatus_e::Running && m_schedule.IsDue(now, state))
@@ -220,6 +209,21 @@ bool ScriptHost::ReceiveCommand(ConsoleCommand_s command)
 ScriptStatus_e ScriptHost::GetStatus() const
 {
     return m_status;
+}
+
+bool ScriptHost::IsActive() const
+{
+    return m_started && m_status == ScriptStatus_e::Running && m_client.IsInGame() && m_client.GetState().IsSettled();
+}
+
+std::optional<ScriptHost::Clock::time_point> ScriptHost::GetStartTime() const
+{
+    return m_startTime;
+}
+
+bool ScriptHost::HasProgressReport() const
+{
+    return HasHook(PROGRESS_REPORT);
 }
 
 std::optional<std::chrono::seconds> ScriptHost::TakeRelogRequest()
@@ -422,11 +426,6 @@ void ScriptHost::Start(Clock::time_point now)
     if (!m_startTime)
     {
         m_startTime = now;
-
-        if (m_options.progressInterval > std::chrono::minutes::zero())
-        {
-            m_nextReport = now + m_options.progressInterval;
-        }
     }
 
     // An on_start that's a generator runs as the bot's first step.
@@ -504,17 +503,17 @@ void ScriptHost::DispatchCommands()
     }
 }
 
-void ScriptHost::RunProgressReport(Clock::time_point now)
+std::optional<ProgressReport_s> ScriptHost::RunProgressReport(Clock::time_point now)
 {
     if (m_status != ScriptStatus_e::Running || !HasHook(PROGRESS_REPORT))
     {
-        return;
+        return std::nullopt;
     }
 
     const auto result = Dispatch(PROGRESS_REPORT);
     if (!result)
     {
-        return;
+        return std::nullopt;
     }
 
     auto report = ProgressReport_s{.runTime = std::chrono::floor<std::chrono::seconds>(now - *m_startTime)};
@@ -534,13 +533,10 @@ void ScriptHost::RunProgressReport(Clock::time_point now)
     catch (const ScriptError& e)
     {
         Fail("on_progress_report()", e.what());
-        return;
+        return std::nullopt;
     }
 
-    if (m_options.onProgressReport)
-    {
-        m_options.onProgressReport(report);
-    }
+    return report;
 }
 
 // Once a server tick: when the random event guardian or the stall guard takes over, it has dropped the bot's

@@ -5,6 +5,7 @@
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/LogCapture.hpp"
+#include "../Support/Script/HostFixture.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 #include "../Support/TempFolder.hpp"
 
@@ -33,155 +34,11 @@ namespace
 {
     using Clock = ScriptHost::Clock;
 
-    constexpr auto WAIT = 5s;
-    constexpr auto PUMP_STEP = 20ms;
-
     // A component id as a packet carries it.
     std::vector<u8> ComBytes(u16 com)
     {
         return {static_cast<u8>(com >> 8), static_cast<u8>(com & 0xFF)};
     }
-
-    GameClientOptions_s FastOptions()
-    {
-        return {.retryDelay = 50ms, .loginTimeout = 5s, .keepaliveInterval = 50ms};
-    }
-
-    using Files = std::vector<std::pair<std::string, std::string>>;
-
-    // A logged-in client with a script loaded from a temporary scripts folder, as main.py beside any other
-    // files given. Steps take explicit times, so the tests control when loop() is due.
-    class HostFixture
-    {
-    public:
-        explicit HostFixture(std::string_view script, std::string settings = "{}")
-            : HostFixture{script, ScriptHostOptions_s{.settings = std::move(settings)}}
-        {
-        }
-
-        HostFixture(std::string_view script, ScriptHostOptions_s options, const Files& otherFiles = {})
-            : server{TestWorld::Send}
-            , folder{"rs2004-script-host-tests"}
-            , client{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()}
-        {
-            folder.WriteFile("main.py", script);
-            for (const auto& [name, text] : otherFiles)
-            {
-                folder.WriteFile(name, text);
-            }
-
-            options.scriptsDirectory = folder.GetPath();
-            options.file = "main.py";
-            host.emplace(ScriptTestRuntime::Get(), client, std::move(options), capture.GetLogger());
-            client.Login();
-
-            const auto deadline = Clock::now() + WAIT;
-            while (Clock::now() < deadline && !client.GetState().IsSettled())
-            {
-                client.Pump(PUMP_STEP);
-            }
-
-            REQUIRE(client.GetState().IsSettled());
-        }
-
-        [[nodiscard]] std::vector<std::string> GetScriptLines() const
-        {
-            auto lines = std::vector<std::string>{};
-            for (const auto& entry : capture.GetEntries())
-            {
-                if (entry.message.starts_with("> "))
-                {
-                    lines.push_back(entry.message.substr(2));
-                }
-            }
-
-            return lines;
-        }
-
-        // Sends a PLAYER_INFO, which is a server tick, and pumps until the client has it.
-        void SendTick()
-        {
-            const auto tick = client.GetState().tick;
-            server.Send(ServerProt_e::PlayerInfo, Fixtures::PlaceLocalPlayer());
-
-            const auto deadline = Clock::now() + WAIT;
-            while (Clock::now() < deadline && client.GetState().tick == tick)
-            {
-                client.Pump(PUMP_STEP);
-            }
-
-            REQUIRE(client.GetState().tick == tick + 1);
-        }
-
-        void Send(ServerProt_e prot, const Packet& packet)
-        {
-            server.Send(prot, Fixtures::ToBytes(packet));
-        }
-
-        void SendInventory(u16 com, const std::vector<std::pair<u16, u8>>& items)
-        {
-            auto packet = Packet{};
-            packet.P2(com);
-            packet.P2(static_cast<s32>(items.size()));
-            for (const auto& [id, count] : items)
-            {
-                packet.P2(id + 1);
-                packet.P1(count);
-            }
-
-            Send(ServerProt_e::UpdateInvFull, packet);
-        }
-
-        void OpenMainSide(u16 main, u16 side)
-        {
-            auto packet = Packet{};
-            packet.P2(main);
-            packet.P2(side);
-            Send(ServerProt_e::IfOpenMainSide, packet);
-            PumpUntil([this, main]
-            {
-                return client.GetState().interfaces.mainModal == main;
-            });
-        }
-
-        template <typename TCondition>
-        void PumpUntil(TCondition condition)
-        {
-            const auto deadline = Clock::now() + WAIT;
-            while (Clock::now() < deadline && !condition())
-            {
-                client.Pump(PUMP_STEP);
-            }
-
-            REQUIRE(condition());
-        }
-
-        // Runs the script's step now and sends what it queued.
-        void Step()
-        {
-            host->Step(Clock::now());
-            client.Flush();
-        }
-
-        [[nodiscard]] std::vector<u8> LastPayload(ClientProt_e prot) const
-        {
-            return server.GetPackets(prot).back().payload;
-        }
-
-        [[nodiscard]] bool HasLog(LogLevel_e level, std::string_view text) const
-        {
-            return std::ranges::any_of(capture.GetEntries(), [level, text](const CapturedLog_s& entry)
-            {
-                return entry.level == level && entry.message.find(text) != std::string::npos;
-            });
-        }
-
-        LogCapture capture{LogLevel_e::Info};
-        FakeGameServer server;
-        TempFolder folder;
-        GameClient client;
-        std::optional<ScriptHost> host;
-    };
 
     constexpr auto RECORDER = R"python(
 def on_start():
@@ -242,10 +99,10 @@ TEST_CASE("ScriptHost starts the script, then passes it what arrived, then calls
     {
         fixture.server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("You catch a shrimp."));
 
-        const auto deadline = Clock::now() + WAIT;
+        const auto deadline = Clock::now() + HostFixture::WAIT;
         while (Clock::now() < deadline && fixture.client.GetState().messages.size() < 2)
         {
-            fixture.client.Pump(PUMP_STEP);
+            fixture.client.Pump(HostFixture::PUMP_STEP);
         }
 
         fixture.host->Step(start + 1ms);
@@ -449,10 +306,10 @@ TEST_CASE("ScriptHost calls on_reconnect after a dropped connection", "[ScriptHo
     fixture.server.SetLoginStatus(15);
     fixture.server.Close();
 
-    const auto deadline = Clock::now() + WAIT;
+    const auto deadline = Clock::now() + HostFixture::WAIT;
     while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
     {
-        fixture.client.Pump(PUMP_STEP);
+        fixture.client.Pump(HostFixture::PUMP_STEP);
     }
 
     REQUIRE(fixture.client.GetLoginCount() == 2);
@@ -475,10 +332,10 @@ def loop():
     fixture.server.SetLoginStatus(2);
     fixture.server.Close();
 
-    const auto deadline = Clock::now() + WAIT;
+    const auto deadline = Clock::now() + HostFixture::WAIT;
     while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
     {
-        fixture.client.Pump(PUMP_STEP);
+        fixture.client.Pump(HostFixture::PUMP_STEP);
         fixture.host->Step(Clock::now());
     }
 
@@ -486,7 +343,7 @@ def loop():
 
     while (Clock::now() < deadline && !fixture.client.GetState().IsSettled())
     {
-        fixture.client.Pump(PUMP_STEP);
+        fixture.client.Pump(HostFixture::PUMP_STEP);
         fixture.host->Step(Clock::now());
     }
 
@@ -514,10 +371,10 @@ def loop():
     fixture.server.SetLoginStatus(2);
     fixture.server.Close();
 
-    const auto deadline = Clock::now() + WAIT;
+    const auto deadline = Clock::now() + HostFixture::WAIT;
     while (Clock::now() < deadline && fixture.client.GetLoginCount() < 2)
     {
-        fixture.client.Pump(PUMP_STEP);
+        fixture.client.Pump(HostFixture::PUMP_STEP);
         fixture.host->Step(Clock::now());
     }
 
@@ -525,7 +382,7 @@ def loop():
 
     while (Clock::now() < deadline && !fixture.client.GetState().IsSettled())
     {
-        fixture.client.Pump(PUMP_STEP);
+        fixture.client.Pump(HostFixture::PUMP_STEP);
         fixture.host->Step(Clock::now());
     }
 
@@ -560,9 +417,8 @@ TEST_CASE("ScriptHost rejects a script it can't run before login", "[ScriptHost]
     }
 }
 
-TEST_CASE("ScriptHost asks for progress reports", "[ScriptHost]")
+TEST_CASE("ScriptHost runs on_progress_report and reads its rows as text", "[ScriptHost]")
 {
-    auto reports = std::vector<ProgressReport_s>{};
     // clang-format off
     auto fixture = HostFixture{R"python(
 kills = 0
@@ -574,44 +430,41 @@ def on_progress_report():
 
 def loop():
     return 600
-)python", ScriptHostOptions_s{.progressInterval = 1min, .onProgressReport = [&reports](const ProgressReport_s& report)
-    {
-        reports.push_back(report);
-    }}};
+)python"};
     // clang-format on
 
     const auto start = Clock::now();
+    CHECK_FALSE(fixture.host->IsActive());
     fixture.host->Step(start);
-    fixture.host->Step(start + 59s);
-    CHECK(reports.empty());
+    REQUIRE(fixture.host->IsActive());
+    CHECK(fixture.host->GetStartTime() == start);
+    CHECK(fixture.host->HasProgressReport());
 
-    fixture.host->Step(start + 60s);
-    REQUIRE(reports.size() == 1);
-    CHECK(reports[0].runTime == 60s);
-    CHECK(reports[0].rows == std::vector<std::pair<std::string, std::string>>{{"Kills", "1"}, {"Area", "chickens"}, {"Rate", "1.5"}});
-
-    fixture.host->Step(start + 119s);
-    CHECK(reports.size() == 1);
-    fixture.host->Step(start + 120s);
-    REQUIRE(reports.size() == 2);
-    CHECK(reports[1].runTime == 120s);
-    CHECK(reports[1].rows.front() == std::pair<std::string, std::string>{"Kills", "2"});
+    const auto report = fixture.host->RunProgressReport(start + 60s);
+    REQUIRE(report.has_value());
+    CHECK(report->runTime == 60s);
+    CHECK(report->rows == std::vector<std::pair<std::string, std::string>>{{"Kills", "1"}, {"Area", "chickens"}, {"Rate", "1.5"}});
+    CHECK(fixture.host->RunProgressReport(start + 61s)->rows.front() == std::pair<std::string, std::string>{"Kills", "2"});
 }
 
 TEST_CASE("ScriptHost stops a script whose progress report isn't a dict", "[ScriptHost]")
 {
-    auto fixture = HostFixture{"def on_progress_report():\n    return [1]\n\ndef loop():\n    return 600\n", ScriptHostOptions_s{.progressInterval = 1min}};
+    auto fixture = HostFixture{"def on_progress_report():\n    return [1]\n\ndef loop():\n    return 600\n"};
     const auto start = Clock::now();
     fixture.host->Step(start);
-    fixture.host->Step(start + 1min);
+    CHECK_FALSE(fixture.host->RunProgressReport(start + 1min).has_value());
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
     CHECK(fixture.HasLog(LogLevel_e::Error, "on_progress_report() must return a dict, not list"));
 }
 
-TEST_CASE("ScriptHost warns when reports are asked for but the script makes none", "[ScriptHost]")
+TEST_CASE("ScriptHost has no progress report without on_progress_report", "[ScriptHost]")
 {
-    auto fixture = HostFixture{"def loop():\n    return 600\n", ScriptHostOptions_s{.progressInterval = 1min}};
-    CHECK(fixture.HasLog(LogLevel_e::Warning, "main.py has no on_progress_report()"));
+    auto fixture = HostFixture{"def loop():\n    return 600\n"};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    CHECK_FALSE(fixture.host->HasProgressReport());
+    CHECK_FALSE(fixture.host->RunProgressReport(start + 1min).has_value());
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
 }
 
 TEST_CASE("ScriptHost sends and receives bot messages", "[ScriptHost]")
@@ -758,7 +611,7 @@ def on_npc_spawned(npc):
 
 def loop():
     return 1000
-)python", ScriptHostOptions_s{.watchFiles = true}, Files{{"helper.py", "NAME = 'one'\n"}}};
+)python", ScriptHostOptions_s{.watchFiles = true}, HostFixture::Files{{"helper.py", "NAME = 'one'\n"}}};
     // clang-format on
 
     const auto start = Clock::now();
@@ -1045,10 +898,10 @@ def loop():
     openMain.P2(TestCache::TRADE_SCREEN);
     fixture.server.Send(ServerProt_e::IfOpenMain, Fixtures::ToBytes(openMain));
 
-    const auto deadline = Clock::now() + WAIT;
+    const auto deadline = Clock::now() + HostFixture::WAIT;
     while (Clock::now() < deadline && fixture.client.GetState().interfaces.mainModal != TestCache::TRADE_SCREEN)
     {
-        fixture.client.Pump(PUMP_STEP);
+        fixture.client.Pump(HostFixture::PUMP_STEP);
     }
 
     fixture.host->Step(Clock::now());
@@ -1092,10 +945,10 @@ def loop():
     };
     const auto pumpUntil = [&client](auto condition)
     {
-        const auto deadline = Clock::now() + WAIT;
+        const auto deadline = Clock::now() + HostFixture::WAIT;
         while (Clock::now() < deadline && !condition())
         {
-            client.Pump(PUMP_STEP);
+            client.Pump(HostFixture::PUMP_STEP);
         }
 
         REQUIRE(condition());
@@ -1201,10 +1054,10 @@ def loop():
     };
     const auto pumpUntil = [&client](auto condition)
     {
-        const auto deadline = Clock::now() + WAIT;
+        const auto deadline = Clock::now() + HostFixture::WAIT;
         while (Clock::now() < deadline && !condition())
         {
-            client.Pump(PUMP_STEP);
+            client.Pump(HostFixture::PUMP_STEP);
         }
 
         REQUIRE(condition());

@@ -11,8 +11,7 @@
 #include "../Script/Host/ScriptHost.hpp"
 #include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
-#include "ProgressReportFile.hpp"
-#include "ProgressReport_s.hpp"
+#include "ProgressReporter.hpp"
 
 struct AccountOptions_s
 {
@@ -73,7 +72,6 @@ private:
     [[nodiscard]] std::chrono::milliseconds GetWait(std::chrono::milliseconds maxWait) const;
     void StepScript(Clock::time_point now);
     void StepIdle(Clock::time_point now);
-    void WriteProgressReport(const ProgressReport_s& report);
     void AddSettingDefaults(std::string_view botName, std::string_view settingsJson);
     void LogOut(std::string_view reason);
     void BeginRelog(std::chrono::seconds delay);
@@ -92,7 +90,7 @@ private:
     AccountOptions_s m_options;
     BotMessenger* m_messenger;
     GameClient m_client;
-    ProgressReportFile m_progressFile;
+    ProgressReporter m_progress;
     std::optional<ScriptHost> m_script;
     bool m_started = false;
     bool m_finished = false;

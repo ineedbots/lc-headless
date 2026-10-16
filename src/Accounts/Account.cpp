@@ -19,8 +19,7 @@
 #include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
-#include "ProgressReportFile.hpp"
-#include "ProgressReport_s.hpp"
+#include "ProgressReporter.hpp"
 
 namespace
 {
@@ -77,7 +76,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     , m_options{options}
     , m_messenger{messenger}
     , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client}
-    , m_progressFile{std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION)}
+    , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger}
 {
     if (m_account.script)
     {
@@ -94,11 +93,6 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                     AddSettingDefaults(botName, settingsJson);
                 },
                 .callTimeout = scripting.callTimeoutMs,
-                .progressInterval = script.progressReportMinutes,
-                .onProgressReport = [this](const ProgressReport_s& report)
-                {
-                    WriteProgressReport(report);
-                },
                 .messenger = m_messenger,
                 .username = m_account.credentials.username,
                 .watchFiles = m_options.watchScripts,
@@ -111,6 +105,11 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
             },
             m_logger);
         // clang-format on
+
+        if (script.progressReportMinutes > std::chrono::minutes{0} && !m_script->HasProgressReport())
+        {
+            m_logger->Warning("{} has no on_progress_report(), so progressReportMinutes has no effect", std::filesystem::path{script.file}.generic_string());
+        }
     }
     else if (m_account.idleSeconds > 0s)
     {
@@ -457,6 +456,7 @@ std::chrono::milliseconds Account::GetWait(std::chrono::milliseconds maxWait) co
 void Account::StepScript(Clock::time_point now)
 {
     m_script->Step(now);
+    m_progress.Step(now, *m_script);
     m_client.Flush();
 
     switch (m_script->GetStatus())
@@ -507,20 +507,6 @@ void Account::StepIdle(Clock::time_point now)
 
     LogSummary(*m_logger, m_client.GetState());
     m_nextSummary = now + SUMMARY_INTERVAL;
-}
-
-void Account::WriteProgressReport(const ProgressReport_s& report)
-{
-    m_logger->Info("Progress: {}", ProgressReportFile::Summarize(report));
-
-    try
-    {
-        m_progressFile.Write(report, std::chrono::system_clock::now());
-    }
-    catch (const std::exception& e)
-    {
-        m_logger->Warning("The progress report wasn't saved: {}", e.what());
-    }
 }
 
 void Account::AddSettingDefaults(std::string_view botName, std::string_view settingsJson)

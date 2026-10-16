@@ -178,6 +178,28 @@ TEST_CASE("An account adds its define_bot script's default settings to its file"
     }
 }
 
+TEST_CASE("An account warns when it asks for progress reports and its script makes none", "[Account]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{};
+    const auto folder = TempFolder{"rs2004-account-tests"};
+    folder.WriteFile("main.py", "def loop():\n    return 600\n");
+
+    auto config = server.MakeConfig();
+    config.scripting.scriptsDirectory = folder.GetPath().string();
+    auto settings = AccountConfig_s{
+        .name = "bot1",
+        .credentials = FakeGameServer::MakeAccount(),
+        .script = ScriptConfig_s{.file = "main.py", .progressReportMinutes = std::chrono::minutes{1}},
+    };
+
+    const auto account = Account{std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger()};
+    CHECK(std::ranges::any_of(capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.level == LogLevel_e::Warning && entry.message == "main.py has no on_progress_report(), so progressReportMinutes has no effect";
+    }));
+}
+
 TEST_CASE("An account logs out when its script stops it", "[Account]")
 {
     auto fixture = AccountFixture{"def loop():\n    if npcs.query().id(50).exists():\n        stop_account()\n    return 100\n"};

@@ -40,9 +40,6 @@ struct ScriptHostOptions_s
     // loads, so the account file can gain the settings it lacks.
     std::function<void(std::string_view botName, std::string_view settingsJson)> onSettingDefaults;
     std::chrono::milliseconds callTimeout = 1000ms;
-    // How often on_progress_report is called, with what it returns going to onProgressReport; zero for never.
-    std::chrono::minutes progressInterval{0};
-    std::function<void(const ProgressReport_s&)> onProgressReport;
     // Where send_bot_message sends, and the username it sends under.
     BotMessenger* messenger = nullptr;
     std::string username;
@@ -90,6 +87,14 @@ public:
     // running, hasn't added the command, or already has MAX_COMMANDS waiting.
     [[nodiscard]] bool ReceiveCommand(ConsoleCommand_s command);
     [[nodiscard]] ScriptStatus_e GetStatus() const;
+    // Started and running, with the player placed and settled: when the loop and the hooks run.
+    [[nodiscard]] bool IsActive() const;
+    // When on_start first ran; a reload doesn't reset it.
+    [[nodiscard]] std::optional<Clock::time_point> GetStartTime() const;
+    [[nodiscard]] bool HasProgressReport() const;
+    // What on_progress_report returns, with the run time from GetStartTime. Nullopt without the hook, or when it
+    // raised, which fails the script.
+    [[nodiscard]] std::optional<ProgressReport_s> RunProgressReport(Clock::time_point now);
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;
     // The script's relog(delay) since the last call, for the account to carry out.
     [[nodiscard]] std::optional<std::chrono::seconds> TakeRelogRequest();
@@ -105,7 +110,6 @@ private:
     void Start(Clock::time_point now);
     void DispatchBotMessages();
     void DispatchCommands();
-    void RunProgressReport(Clock::time_point now);
     void RunLoop(Clock::time_point now);
     void RunUpkeep(Clock::time_point now);
     void ScheduleLoop(Clock::time_point now, py_Ref wait);
@@ -143,5 +147,4 @@ private:
     Clock::time_point m_nextWatch;
     // When on_start first ran, which progress reports count from.
     std::optional<Clock::time_point> m_startTime;
-    std::optional<Clock::time_point> m_nextReport;
 };
