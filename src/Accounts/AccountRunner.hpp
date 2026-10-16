@@ -9,6 +9,7 @@
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "Account.hpp"
+#include "AccountCommands.hpp"
 
 // Every account's script loads on construction, so a broken script stops everything before the first login.
 class AccountRunner
@@ -23,13 +24,6 @@ public:
     AccountRunner(const AccountRunner&) = delete;
     AccountRunner& operator=(const AccountRunner&) = delete;
 
-    static constexpr auto COMMAND_HELP = "help"sv;
-    static constexpr auto COMMAND_STATUS = "status"sv;
-    static constexpr auto COMMAND_QUIT = "quit"sv;
-    static constexpr auto COMMAND_EXIT = "exit"sv;
-    static constexpr auto COMMAND_LOG_LEVEL = "loglevel"sv;
-    static constexpr auto COMMAND_SAY = "say"sv;
-
     // After an interrupt, accounts not yet started never are. True when every started account logged out cleanly.
     [[nodiscard]] bool Run(const InterruptCount& interrupts, ConsoleInput* console = nullptr);
     // help, status, quit (or exit, which is a Ctrl+C), loglevel and say are the runner's own; any other command
@@ -43,13 +37,7 @@ public:
 private:
     void StartNextLogin(Clock::time_point now);
     void InterruptAll();
-    [[nodiscard]] Account* FindAccount(std::string_view name) const;
-    void ShowHelp(const Account* target) const;
-    void ShowStatus(const Account* target) const;
     void Quit(Account* target);
-    void SetLogLevel(const Account* target, std::span<const std::string> args);
-    void Say(Account* target, std::string_view text);
-    void SendToScripts(Account* target, const ConsoleCommand_s& command);
     void Wait(Clock::time_point now, ConsoleInput* console) const;
     [[nodiscard]] bool LogOutcomes() const;
 
@@ -59,6 +47,7 @@ private:
     // Declared before the accounts, which unregister from it as they go.
     BotMessenger m_messenger;
     std::vector<std::unique_ptr<Account>> m_accounts;
+    AccountCommands m_commands;
     // How many of the accounts have had their turn to log in, and when the next one does.
     std::size_t m_loginTurns = 0;
     std::optional<Clock::time_point> m_nextLogin;

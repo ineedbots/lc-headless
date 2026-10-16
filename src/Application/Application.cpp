@@ -2,6 +2,7 @@
 #include "Application.hpp"
 
 #include "../Accounts/Account.hpp"
+#include "../Accounts/AccountCommands.hpp"
 #include "../Accounts/AccountRunner.hpp"
 #include "../Cache/CacheLoader.hpp"
 #include "../Cache/GameCache_s.hpp"
@@ -77,7 +78,7 @@ int Application::Run()
 
     if (console)
     {
-        m_logger->Info("Type {} for the console commands", AccountRunner::COMMAND_HELP);
+        m_logger->Info("Type {} for the console commands", AccountCommands::HELP);
     }
 
     const auto succeeded = runner.Run(InterruptSignal::GetCount, console.get());
