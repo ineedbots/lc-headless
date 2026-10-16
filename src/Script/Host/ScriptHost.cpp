@@ -14,7 +14,8 @@
 #include "../../Utils/FileWatcher.hpp"
 #include "../Bindings/ScriptBindings.hpp"
 #include "../BotMessenger.hpp"
-#include "../Convert/PyConvert.hpp"
+#include "../Convert/PyObjects.hpp"
+#include "../Convert/PyValue.hpp"
 #include "../Error/ScriptError.hpp"
 #include "../ScriptApi.hpp"
 #include "../ScriptCommand_s.hpp"
@@ -76,7 +77,7 @@ namespace
             return;
         }
 
-        PyConvert::FromString(out, text);
+        PyValue::FromString(out, text);
     }
 }
 
@@ -191,7 +192,7 @@ void ScriptHost::Finish(std::string_view reason)
 
     m_finished = true;
     m_vm->Activate();
-    PyConvert::FromString(py_r0(), reason);
+    PyValue::FromString(py_r0(), reason);
 
     try
     {
@@ -345,7 +346,7 @@ void ScriptHost::LoadBot()
         const auto result = m_vm->CallBuiltin(LOAD_BOT, std::array{py_r0(), py_r1()});
         for (auto i = 0; i < py_list_len(result); ++i)
         {
-            warnings.push_back(PyConvert::ToString(py_list_getitem(result, i), "warning"));
+            warnings.push_back(PyValue::ToString(py_list_getitem(result, i), "warning"));
         }
     }
     catch (const ScriptError& e)
@@ -365,8 +366,8 @@ void ScriptHost::LoadBot()
         const auto defaults = m_vm->CallBuiltin(SETTING_DEFAULTS);
         if (!py_isnone(defaults))
         {
-            const auto botName = PyConvert::ToString(py_list_getitem(defaults, 0), "the bot's name");
-            const auto settingsJson = PyConvert::ToString(py_list_getitem(defaults, 1), "the default settings");
+            const auto botName = PyValue::ToString(py_list_getitem(defaults, 0), "the bot's name");
+            const auto settingsJson = PyValue::ToString(py_list_getitem(defaults, 1), "the default settings");
             m_options.onSettingDefaults(botName, settingsJson);
         }
     }
@@ -532,12 +533,12 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     if (const auto* added = std::get_if<NpcAdded_s>(&data); added && HasHook("npc_spawned"))
     {
         const auto* current = state.FindNpc(added->npc.index);
-        PyConvert::FromNpc(py_r0(), current ? *current : added->npc, tick, cache);
+        PyObjects::FromNpc(py_r0(), current ? *current : added->npc, tick, cache);
         CallHook("npc_spawned", one);
     }
     else if (const auto* removed = std::get_if<NpcRemoved_s>(&data); removed && HasHook("npc_despawned"))
     {
-        PyConvert::FromNpc(py_r0(), removed->npc, tick, cache);
+        PyObjects::FromNpc(py_r0(), removed->npc, tick, cache);
         CallHook("npc_despawned", one);
     }
     else if (const auto* npcHit = std::get_if<NpcHit_s>(&data); npcHit && HasHook("npc_damaged"))
@@ -549,7 +550,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
         }
         else
         {
-            PyConvert::FromNpc(py_r0(), *npc, tick, cache);
+            PyObjects::FromNpc(py_r0(), *npc, tick, cache);
         }
 
         py_newint(py_r1(), npcHit->hit.damage);
@@ -558,12 +559,12 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     else if (const auto* playerAdded = std::get_if<PlayerAdded_s>(&data); playerAdded && HasHook("player_spawned"))
     {
         const auto* current = state.FindPlayer(playerAdded->player.index);
-        PyConvert::FromPlayer(py_r0(), current ? *current : playerAdded->player, tick);
+        PyObjects::FromPlayer(py_r0(), current ? *current : playerAdded->player, tick);
         CallHook("player_spawned", one);
     }
     else if (const auto* playerRemoved = std::get_if<PlayerRemoved_s>(&data); playerRemoved && HasHook("player_despawned"))
     {
-        PyConvert::FromPlayer(py_r0(), playerRemoved->player, tick);
+        PyObjects::FromPlayer(py_r0(), playerRemoved->player, tick);
         CallHook("player_despawned", one);
     }
     else if (const auto* playerHit = std::get_if<PlayerHit_s>(&data); playerHit && HasHook("player_damaged"))
@@ -575,7 +576,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
         }
         else
         {
-            PyConvert::FromPlayer(py_r0(), *player, tick);
+            PyObjects::FromPlayer(py_r0(), *player, tick);
         }
 
         py_newint(py_r1(), playerHit->hit.damage);
@@ -588,17 +589,17 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     }
     else if (const auto* itemAdded = std::get_if<GroundItemAdded_s>(&data); itemAdded && HasHook("ground_item_spawned"))
     {
-        PyConvert::FromGroundItem(py_r0(), itemAdded->item, cache);
+        PyObjects::FromGroundItem(py_r0(), itemAdded->item, cache);
         CallHook("ground_item_spawned", one);
     }
     else if (const auto* itemRemoved = std::get_if<GroundItemRemoved_s>(&data); itemRemoved && HasHook("ground_item_despawned"))
     {
-        PyConvert::FromGroundItem(py_r0(), itemRemoved->item, cache);
+        PyObjects::FromGroundItem(py_r0(), itemRemoved->item, cache);
         CallHook("ground_item_despawned", one);
     }
     else if (const auto* itemCount = std::get_if<GroundItemCountChanged_s>(&data); itemCount && HasHook("ground_item_changed"))
     {
-        PyConvert::FromGroundItem(py_r0(), itemCount->item, cache);
+        PyObjects::FromGroundItem(py_r0(), itemCount->item, cache);
         py_newint(py_r1(), itemCount->previousCount);
         CallHook("ground_item_changed", two);
     }
@@ -606,7 +607,7 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
     {
         const auto& change = loc->change;
         const auto scene = SceneLoc_s{.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true};
-        PyConvert::FromLoc(py_r0(), scene, cache);
+        PyObjects::FromLoc(py_r0(), scene, cache);
         CallHook("loc_changed", one);
     }
     else if (const auto* inventory = std::get_if<InventoryChanged_s>(&data); inventory && inventory->com == cache.inventoryComponent)
@@ -622,15 +623,15 @@ void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& stat
         }
         else
         {
-            PyConvert::FromNpc(py_r0(), *npc, tick, cache);
+            PyObjects::FromNpc(py_r0(), *npc, tick, cache);
         }
 
-        PyConvert::FromString(py_r1(), said->text);
+        PyValue::FromString(py_r1(), said->text);
         CallHook("npc_say", two);
     }
     else if (const auto* projectile = std::get_if<ProjectileLaunched_s>(&data); projectile && HasHook("projectile"))
     {
-        PyConvert::FromProjectile(py_r0(), projectile->projectile);
+        PyObjects::FromProjectile(py_r0(), projectile->projectile);
         CallHook("projectile", one);
     }
     else if (const auto* stat = std::get_if<StatChanged_s>(&data))
@@ -727,15 +728,15 @@ void ScriptHost::DispatchMessages(const GameState_s& state)
         if (HasHook("chat_message"))
         {
             m_vm->Activate();
-            PyConvert::FromString(py_r0(), *type);
+            PyValue::FromString(py_r0(), *type);
             FromOptionalString(py_r1(), message->sender);
-            PyConvert::FromString(py_r2(), message->text);
+            PyValue::FromString(py_r2(), message->text);
             CallHook("chat_message", std::array{py_r0(), py_r1(), py_r2()});
         }
 
         m_vm->Activate();
-        PyConvert::FromString(py_r0(), message->sender);
-        PyConvert::FromString(py_r1(), message->text);
+        PyValue::FromString(py_r0(), message->sender);
+        PyValue::FromString(py_r1(), message->text);
 
         switch (message->type)
         {
@@ -782,7 +783,7 @@ void ScriptHost::DispatchBotMessages()
         }
 
         py_assign(py_r1(), value);
-        PyConvert::FromString(py_r0(), message.sender);
+        PyValue::FromString(py_r0(), message.sender);
         CallHook(BOT_MESSAGE, std::array{py_r0(), py_r1()});
     }
 }
@@ -799,13 +800,13 @@ void ScriptHost::DispatchCommands()
         }
 
         m_vm->Activate();
-        PyConvert::FromString(py_r0(), command.name);
-        PyConvert::FromString(py_r1(), command.text);
+        PyValue::FromString(py_r0(), command.name);
+        PyValue::FromString(py_r1(), command.text);
         py_newlist(py_r2());
 
         for (const auto& arg : command.args)
         {
-            PyConvert::FromString(py_r3(), arg);
+            PyValue::FromString(py_r3(), arg);
             py_list_append(py_r2(), py_r3());
         }
 
@@ -845,7 +846,7 @@ void ScriptHost::RunProgressReport(Clock::time_point now)
         for (auto i = 0; i < py_list_len(rows); ++i)
         {
             const auto row = py_list_getitem(rows, i);
-            report.rows.emplace_back(PyConvert::ToString(py_list_getitem(row, 0), "name"), PyConvert::ToString(py_list_getitem(row, 1), "value"));
+            report.rows.emplace_back(PyValue::ToString(py_list_getitem(row, 0), "name"), PyValue::ToString(py_list_getitem(row, 1), "value"));
         }
     }
     catch (const ScriptError& e)
@@ -925,7 +926,7 @@ void ScriptHost::RunLoop(Clock::time_point now)
 
 void ScriptHost::ScheduleLoop(Clock::time_point now, py_Ref wait)
 {
-    const auto kind = PyConvert::ToString(py_tuple_getitem(wait, 0), "wait");
+    const auto kind = PyValue::ToString(py_tuple_getitem(wait, 0), "wait");
     const auto value = py_toint(py_tuple_getitem(wait, 1));
     const auto& state = m_client.GetState();
     if (kind == WAIT_MS)
@@ -988,7 +989,7 @@ std::optional<py_GlobalRef> ScriptHost::Dispatch(std::string_view name, std::spa
 {
     // The event's name goes first, in a register the arguments don't use.
     m_vm->Activate();
-    PyConvert::FromString(py_r7(), name);
+    PyValue::FromString(py_r7(), name);
 
     auto all = std::vector<py_Ref>{py_r7()};
     all.insert(all.end(), args.begin(), args.end());

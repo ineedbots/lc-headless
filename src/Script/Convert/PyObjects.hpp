@@ -1,53 +1,24 @@
 #pragma once
 
 #include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/IfComponent_s.hpp"
 #include "../../Cache/LocType_s.hpp"
 #include "../../Cache/NpcType_s.hpp"
 #include "../../Cache/ObjType_s.hpp"
 #include "../../Game/Interface/InterfaceView.hpp"
 #include "../../Game/Map/WorldMap.hpp"
 #include "../../Game/Menu/Menus.hpp"
+#include "../../Game/Query/InventoryItem_s.hpp"
+#include "../../Game/State/Entity_s.hpp"
 #include "../../Game/State/Npc_s.hpp"
 #include "../../Game/State/Player_s.hpp"
 #include "../../Game/State/Zone_s.hpp"
 #include "../../Game/Tile_s.hpp"
-#include "../ScriptApi.hpp"
 
 #include <pocketpy.h>
 
-// The binding raises it as TypeError.
-class ScriptTypeError : public std::runtime_error
-{
-public:
-    using std::runtime_error::runtime_error;
-};
-
-// The binding leaves Python's exception in place.
-class ScriptRaisedError : public std::runtime_error
-{
-public:
-    using std::runtime_error::runtime_error;
-};
-
-struct GroundItemRef_s
-{
-    u16 id = 0;
-    s32 x = 0;
-    s32 z = 0;
-};
-
-struct LocRef_s
-{
-    u16 id = 0;
-    s32 x = 0;
-    s32 z = 0;
-};
-
-using OpChoice = std::variant<u8, std::string>;
-
-// Game objects become instances of the classes the standard library puts in builtins. Out-of-range numbers
-// throw std::invalid_argument, which the binding raises as ValueError.
-class PyConvert
+// Game values become instances of the classes the standard library puts in builtins.
+class PyObjects
 {
 public:
     static constexpr auto NPC_CLASS = "Npc";
@@ -68,7 +39,7 @@ public:
     // Whether an item's options are its inventory's, used with INV_BUTTON, rather than its own.
     static constexpr auto BUTTON_FIELD = "_button";
 
-    PyConvert() = delete;
+    PyObjects() = delete;
 
     static void FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCache_s& cache);
     static void FromPlayer(py_OutRef out, const Player_s& player, u64 tick);
@@ -83,55 +54,6 @@ public:
     // In lower case, as the webclient names them.
     [[nodiscard]] static std::string_view GetTypeName(ComponentType_e type);
     [[nodiscard]] static std::optional<std::string_view> GetButtonName(ButtonType_e button);
-    static void FromString(py_OutRef out, std::string_view text);
-    static void FromPoint(py_OutRef out, s32 x, s32 z);
-
-    // Each item is set to None as it's appended and converted in place, so the list never holds an
-    // uninitialized value when a conversion allocates and the collector runs.
-    template <typename T, typename TConvert>
-    static void FromList(py_OutRef out, const std::vector<T>& values, TConvert convert)
-    {
-        py_newlist(out);
-
-        for (const auto& value : values)
-        {
-            const auto item = py_list_emplace(out);
-            py_newnone(item);
-            convert(item, value);
-        }
-    }
-
-    template <typename T, typename TConvert>
-    static void FromOptional(py_OutRef out, const std::optional<T>& value, TConvert convert)
-    {
-        if (!value)
-        {
-            py_newnone(out);
-            return;
-        }
-
-        convert(out, *value);
-    }
-
-    [[nodiscard]] static s64 ToInt(py_Ref value, std::string_view name);
-    [[nodiscard]] static s64 ToInt(py_Ref value, std::string_view name, s64 min, s64 max);
-    [[nodiscard]] static bool ToBool(py_Ref value, std::string_view name);
-    [[nodiscard]] static std::string ToString(py_Ref value, std::string_view name);
-    [[nodiscard]] static std::optional<s64> ToOptionalInt(py_Ref value, std::string_view name);
-    [[nodiscard]] static std::optional<bool> ToOptionalBool(py_Ref value, std::string_view name);
-    [[nodiscard]] static u16 ToU16(py_Ref value, std::string_view name);
-    [[nodiscard]] static u8 ToOp(py_Ref value);
-    // An int from 1 to 5, or a str.
-    [[nodiscard]] static OpChoice ToOpChoice(py_Ref value);
-    [[nodiscard]] static std::vector<s32> ToIds(py_Ref value, std::string_view name);
-    // One str or a list of them, at least one.
-    [[nodiscard]] static std::vector<std::string> ToNames(py_Ref value, std::string_view name);
-    [[nodiscard]] static u16 ToIndex(py_Ref value, std::string_view name, std::string_view className);
-    [[nodiscard]] static InventoryItem_s ToItem(py_Ref value, std::string_view name);
-    [[nodiscard]] static GroundItemRef_s ToGroundItem(py_Ref value, std::string_view name);
-    [[nodiscard]] static bool IsLoc(py_Ref value);
-    [[nodiscard]] static LocRef_s ToLoc(py_Ref value, std::string_view name);
-    [[nodiscard]] static std::vector<Tile_s> ToPoints(py_Ref value, s32 level, std::string_view name);
 
 private:
     static py_Ref NewInstance(py_OutRef out, const char* className);
@@ -147,7 +69,4 @@ private:
     static void SetEntity(py_Ref object, const Entity_s& entity, u64 tick);
     // ('npc' or 'player', index), or None.
     static void SetTarget(py_Ref object, const std::optional<EntityRef_s>& target);
-    [[nodiscard]] static bool IsInstance(py_Ref value, std::string_view className);
-    [[nodiscard]] static py_Ref GetField(py_Ref object, const char* name);
-    [[nodiscard]] static std::string_view GetTypeName(py_Ref value);
 };

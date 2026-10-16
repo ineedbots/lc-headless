@@ -19,7 +19,11 @@
 #include "../../Game/State/Zone_s.hpp"
 #include "../../Game/Tile_s.hpp"
 #include "../../Utils/StringUtils.hpp"
-#include "../Convert/PyConvert.hpp"
+#include "../Convert/PyArgs.hpp"
+#include "../Convert/PyObjects.hpp"
+#include "../Convert/PyValue.hpp"
+#include "../Error/ScriptRaisedError.hpp"
+#include "../Error/ScriptTypeError.hpp"
 #include "../ScriptApi.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
@@ -169,29 +173,29 @@ namespace
 
     bool ReturnString(std::string_view text)
     {
-        PyConvert::FromString(py_retval(), text);
+        PyValue::FromString(py_retval(), text);
         return true;
     }
 
     s32 ToCoord(py_Ref value, std::string_view name)
     {
-        return static_cast<s32>(PyConvert::ToInt(value, name, 0, MAX_COORD));
+        return static_cast<s32>(PyValue::ToInt(value, name, 0, MAX_COORD));
     }
 
     std::optional<s32> ToRadius(py_Ref value)
     {
-        const auto radius = PyConvert::ToOptionalInt(value, "radius");
+        const auto radius = PyValue::ToOptionalInt(value, "radius");
         if (!radius)
         {
             return std::nullopt;
         }
 
-        return static_cast<s32>(PyConvert::ToInt(value, "radius", 0, MAX_COORD));
+        return static_cast<s32>(PyValue::ToInt(value, "radius", 0, MAX_COORD));
     }
 
     SearchFilter_s ToFilter(py_Ref ids, py_Ref radius)
     {
-        return {.ids = PyConvert::ToIds(ids, "ids"), .radius = ToRadius(radius)};
+        return {.ids = PyArgs::ToIds(ids, "ids"), .radius = ToRadius(radius)};
     }
 
     SearchFilter_s ToSearch(py_Ref ids, py_Ref radius, py_Ref names)
@@ -199,7 +203,7 @@ namespace
         auto filter = ToFilter(ids, radius);
         if (!py_isnone(names))
         {
-            filter.names = PyConvert::ToNames(names, "names");
+            filter.names = PyArgs::ToNames(names, "names");
         }
 
         return filter;
@@ -207,7 +211,7 @@ namespace
 
     SearchFilter_s ToNameFilter(py_Ref names, py_Ref radius)
     {
-        return {.names = PyConvert::ToNames(names, "names"), .radius = ToRadius(radius)};
+        return {.names = PyArgs::ToNames(names, "names"), .radius = ToRadius(radius)};
     }
 
     std::optional<LocLayer_e> ToLayer(py_Ref value)
@@ -217,14 +221,14 @@ namespace
             return std::nullopt;
         }
 
-        return static_cast<LocLayer_e>(PyConvert::ToInt(value, "layer", 0, static_cast<s64>(LocLayer_e::GroundDecor)));
+        return static_cast<LocLayer_e>(PyValue::ToInt(value, "layer", 0, static_cast<s64>(LocLayer_e::GroundDecor)));
     }
 
     // A number is used as it is, and text is looked up in the target's menu by find.
     template <typename TFind>
     auto ResolveOp(py_Ref value, TFind find) -> decltype(find(std::string_view{}))
     {
-        const auto choice = PyConvert::ToOpChoice(value);
+        const auto choice = PyArgs::ToOpChoice(value);
         if (const auto* const number = std::get_if<u8>(&choice))
         {
             return *number;
@@ -236,32 +240,32 @@ namespace
     void FromNpc(py_OutRef out, const Npc_s& npc)
     {
         const auto& api = GetApi();
-        PyConvert::FromNpc(out, npc, api.GetState().tick, api.GetCache());
+        PyObjects::FromNpc(out, npc, api.GetState().tick, api.GetCache());
     }
 
     void FromGroundItem(py_OutRef out, const GroundItem_s& item)
     {
-        PyConvert::FromGroundItem(out, item, GetApi().GetCache());
+        PyObjects::FromGroundItem(out, item, GetApi().GetCache());
     }
 
     void FromItem(py_OutRef out, const InventoryItem_s& item)
     {
-        PyConvert::FromItem(out, item, GetApi().GetCache());
+        PyObjects::FromItem(out, item, GetApi().GetCache());
     }
 
     void FromLoc(py_OutRef out, const SceneLoc_s& loc)
     {
-        PyConvert::FromLoc(out, loc, GetApi().GetCache());
+        PyObjects::FromLoc(out, loc, GetApi().GetCache());
     }
 
     void FromTile(py_OutRef out, const Tile_s& tile)
     {
-        PyConvert::FromPoint(out, tile.x, tile.z);
+        PyValue::FromPoint(out, tile.x, tile.z);
     }
 
     void FromPlayer(py_OutRef out, const Player_s& player)
     {
-        PyConvert::FromPlayer(out, player, GetApi().GetState().tick);
+        PyObjects::FromPlayer(out, player, GetApi().GetState().tick);
     }
 
     void FromFriend(py_OutRef out, const Friend_s& entry)
@@ -269,12 +273,12 @@ namespace
         py_newtuple(out, 2);
         py_newnone(py_tuple_getitem(out, 0));
         py_newint(py_tuple_getitem(out, 1), entry.world);
-        PyConvert::FromString(py_tuple_getitem(out, 0), entry.name);
+        PyValue::FromString(py_tuple_getitem(out, 0), entry.name);
     }
 
     void FromName(py_OutRef out, u64 name37)
     {
-        PyConvert::FromString(out, Base37::DecodeDisplayName(name37));
+        PyValue::FromString(out, Base37::DecodeDisplayName(name37));
     }
 
     bool GetTick(int, py_StackRef) noexcept
@@ -324,7 +328,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto delay = PyConvert::ToInt(py_arg(0), "delay_seconds", 0, MAX_RELOG_SECONDS);
+            const auto delay = PyValue::ToInt(py_arg(0), "delay_seconds", 0, MAX_RELOG_SECONDS);
             GetApi().RequestRelog(std::chrono::seconds{delay});
             return ReturnNone();
         });
@@ -366,7 +370,7 @@ namespace
         for (auto i = 0; i < count; ++i)
         {
             const auto item = isList ? py_list_getitem(value, i) : py_tuple_getitem(value, i);
-            bytes[static_cast<std::size_t>(i)] = static_cast<u8>(PyConvert::ToInt(item, name, 0, std::numeric_limits<u8>::max()));
+            bytes[static_cast<std::size_t>(i)] = static_cast<u8>(PyValue::ToInt(item, name, 0, std::numeric_limits<u8>::max()));
         }
 
         return bytes;
@@ -377,7 +381,7 @@ namespace
         return Guard([argv]
         {
             const auto design = IdkDesign_s{
-                .female = PyConvert::ToBool(py_arg(0), "female"),
+                .female = PyValue::ToBool(py_arg(0), "female"),
                 .kits = ToBytes<IdkDesign_s::KIT_COUNT>(py_arg(1), "kits"),
                 .colours = ToBytes<IdkDesign_s::COLOUR_COUNT>(py_arg(2), "colours"),
             };
@@ -432,7 +436,7 @@ namespace
         return Guard([]
         {
             const auto position = GetApi().GetPosition();
-            PyConvert::FromPoint(py_retval(), position.x, position.z);
+            PyValue::FromPoint(py_retval(), position.x, position.z);
             return true;
         });
     }
@@ -491,9 +495,9 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromOptional(py_retval(), GetApi().GetState().walkDestination, [](py_OutRef out, const Tile_s& tile)
+            PyValue::FromOptional(py_retval(), GetApi().GetState().walkDestination, [](py_OutRef out, const Tile_s& tile)
             {
-                PyConvert::FromPoint(out, tile.x, tile.z);
+                PyValue::FromPoint(out, tile.x, tile.z);
             });
             return true;
         });
@@ -526,7 +530,7 @@ namespace
 
     const Stat_s& GetStatArgument(py_StackRef argv)
     {
-        return GetApi().GetStat(static_cast<s32>(PyConvert::ToInt(py_arg(0), "stat")));
+        return GetApi().GetStat(static_cast<s32>(PyValue::ToInt(py_arg(0), "stat")));
     }
 
     bool GetCurrentStat(int, py_StackRef argv) noexcept
@@ -602,7 +606,7 @@ namespace
         {
             const auto& api = GetApi();
             const auto centre = api.ToTile(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
-            return ReturnBool(api.GetPosition().GetDistance(centre) <= PyConvert::ToInt(py_arg(2), "radius"));
+            return ReturnBool(api.GetPosition().GetDistance(centre) <= PyValue::ToInt(py_arg(2), "radius"));
         });
     }
 
@@ -612,8 +616,8 @@ namespace
         {
             const auto x = ToCoord(py_arg(0), "x");
             const auto z = ToCoord(py_arg(1), "z");
-            const auto width = PyConvert::ToInt(py_arg(2), "width");
-            const auto height = PyConvert::ToInt(py_arg(3), "height");
+            const auto width = PyValue::ToInt(py_arg(2), "width");
+            const auto height = PyValue::ToInt(py_arg(3), "height");
             const auto here = GetApi().GetPosition();
             return ReturnBool(here.x >= x && here.x < x + width && here.z >= z && here.z < z + height);
         });
@@ -632,7 +636,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetNpcs(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromNpc);
+            PyValue::FromList(py_retval(), GetApi().GetNpcs(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromNpc);
             return true;
         });
     }
@@ -641,9 +645,9 @@ namespace
     {
         return Guard([argv]
         {
-            const auto inCombat = PyConvert::ToOptionalBool(py_arg(2), "in_combat");
-            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
-            PyConvert::FromOptional(py_retval(), GetApi().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
+            const auto inCombat = PyValue::ToOptionalBool(py_arg(2), "in_combat");
+            const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
+            PyValue::FromOptional(py_retval(), GetApi().GetNearestNpc(ToFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
             return true;
         });
     }
@@ -652,9 +656,9 @@ namespace
     {
         return Guard([argv]
         {
-            const auto inCombat = PyConvert::ToOptionalBool(py_arg(2), "in_combat");
-            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
-            PyConvert::FromOptional(py_retval(), GetApi().GetNearestNpc(ToNameFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
+            const auto inCombat = PyValue::ToOptionalBool(py_arg(2), "in_combat");
+            const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
+            PyValue::FromOptional(py_retval(), GetApi().GetNearestNpc(ToNameFilter(py_arg(0), py_arg(1)), inCombat, reachable), FromNpc);
             return true;
         });
     }
@@ -663,7 +667,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromOptional(py_retval(), GetApi().GetNpc(PyConvert::ToU16(py_arg(0), "index")), FromNpc);
+            PyValue::FromOptional(py_retval(), GetApi().GetNpc(PyValue::ToU16(py_arg(0), "index")), FromNpc);
             return true;
         });
     }
@@ -672,7 +676,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetPlayers(ToRadius(py_arg(0))), FromPlayer);
+            PyValue::FromList(py_retval(), GetApi().GetPlayers(ToRadius(py_arg(0))), FromPlayer);
             return true;
         });
     }
@@ -681,7 +685,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromOptional(py_retval(), GetApi().GetPlayerByName(PyConvert::ToString(py_arg(0), "name")), FromPlayer);
+            PyValue::FromOptional(py_retval(), GetApi().GetPlayerByName(PyValue::ToString(py_arg(0), "name")), FromPlayer);
             return true;
         });
     }
@@ -690,7 +694,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetGroundItems(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromGroundItem);
+            PyValue::FromList(py_retval(), GetApi().GetGroundItems(ToSearch(py_arg(0), py_arg(1), py_arg(2))), FromGroundItem);
             return true;
         });
     }
@@ -699,8 +703,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto reachable = PyConvert::ToBool(py_arg(2), "reachable");
-            PyConvert::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
+            const auto reachable = PyValue::ToBool(py_arg(2), "reachable");
+            PyValue::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
             return true;
         });
     }
@@ -709,8 +713,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto reachable = PyConvert::ToBool(py_arg(2), "reachable");
-            PyConvert::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToNameFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
+            const auto reachable = PyValue::ToBool(py_arg(2), "reachable");
+            PyValue::FromOptional(py_retval(), GetApi().GetNearestGroundItem(ToNameFilter(py_arg(0), py_arg(1)), reachable), FromGroundItem);
             return true;
         });
     }
@@ -720,7 +724,7 @@ namespace
         return Guard([argv]
         {
             const auto loc = GetApi().GetLocAt(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), ToLayer(py_arg(2)));
-            PyConvert::FromOptional(py_retval(), loc, FromLoc);
+            PyValue::FromOptional(py_retval(), loc, FromLoc);
             return true;
         });
     }
@@ -729,7 +733,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetLocs(ToSearch(py_arg(0), py_arg(1), py_arg(3)), ToLayer(py_arg(2))), FromLoc);
+            PyValue::FromList(py_retval(), GetApi().GetLocs(ToSearch(py_arg(0), py_arg(1), py_arg(3)), ToLayer(py_arg(2))), FromLoc);
             return true;
         });
     }
@@ -738,9 +742,9 @@ namespace
     {
         return Guard([argv]
         {
-            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
+            const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
             const auto loc = GetApi().GetNearestLoc(ToFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
-            PyConvert::FromOptional(py_retval(), loc, FromLoc);
+            PyValue::FromOptional(py_retval(), loc, FromLoc);
             return true;
         });
     }
@@ -749,9 +753,9 @@ namespace
     {
         return Guard([argv]
         {
-            const auto reachable = PyConvert::ToBool(py_arg(3), "reachable");
+            const auto reachable = PyValue::ToBool(py_arg(3), "reachable");
             const auto loc = GetApi().GetNearestLoc(ToNameFilter(py_arg(0), py_arg(1)), ToLayer(py_arg(2)), reachable);
-            PyConvert::FromOptional(py_retval(), loc, FromLoc);
+            PyValue::FromOptional(py_retval(), loc, FromLoc);
             return true;
         });
     }
@@ -761,13 +765,13 @@ namespace
         return Guard([argv]
         {
             const auto& cache = GetApi().GetCache();
-            const auto* const type = cache.FindNpc(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            const auto* const type = cache.FindNpc(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (type == nullptr)
             {
                 return ReturnNone();
             }
 
-            PyConvert::FromNpcType(py_retval(), *type, cache);
+            PyObjects::FromNpcType(py_retval(), *type, cache);
             return true;
         });
     }
@@ -778,8 +782,8 @@ namespace
         return Guard([argv]
         {
             const auto& cache = GetApi().GetCache();
-            const auto kind = PyConvert::ToString(py_arg(0), "kind");
-            const auto name = PyConvert::ToString(py_arg(1), "name");
+            const auto kind = PyValue::ToString(py_arg(0), "kind");
+            const auto name = PyValue::ToString(py_arg(1), "name");
             auto ids = std::vector<s64>{};
             const auto collect = [&ids, &name](const auto& types)
             {
@@ -809,7 +813,7 @@ namespace
                 throw std::invalid_argument{std::format("kind must be 'item', 'npc' or 'loc', not '{}'", kind)};
             }
 
-            PyConvert::FromList(py_retval(), ids, [](py_OutRef out, s64 id)
+            PyValue::FromList(py_retval(), ids, [](py_OutRef out, s64 id)
             {
                 py_newint(out, id);
             });
@@ -822,13 +826,13 @@ namespace
         return Guard([argv]
         {
             const auto& cache = GetApi().GetCache();
-            const auto* const type = cache.FindObj(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            const auto* const type = cache.FindObj(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (type == nullptr)
             {
                 return ReturnNone();
             }
 
-            PyConvert::FromItemType(py_retval(), *type, cache);
+            PyObjects::FromItemType(py_retval(), *type, cache);
             return true;
         });
     }
@@ -838,13 +842,13 @@ namespace
         return Guard([argv]
         {
             const auto& cache = GetApi().GetCache();
-            const auto* const type = cache.FindLoc(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            const auto* const type = cache.FindLoc(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (type == nullptr)
             {
                 return ReturnNone();
             }
 
-            PyConvert::FromLocType(py_retval(), *type, cache);
+            PyObjects::FromLocType(py_retval(), *type, cache);
             return true;
         });
     }
@@ -853,7 +857,7 @@ namespace
     {
         return Guard([argv]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetInventory(PyConvert::ToU16(py_arg(0), "com")), FromItem);
+            PyValue::FromList(py_retval(), GetApi().GetInventory(PyValue::ToU16(py_arg(0), "com")), FromItem);
             return true;
         });
     }
@@ -862,7 +866,7 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetInventory(GetApi().GetCache().equipmentComponent), FromItem);
+            PyValue::FromList(py_retval(), GetApi().GetInventory(GetApi().GetCache().equipmentComponent), FromItem);
             return true;
         });
     }
@@ -871,8 +875,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto filter = SearchFilter_s{.ids = PyConvert::ToIds(py_arg(0), "ids")};
-            return ReturnInt(GetApi().CountItems(filter, PyConvert::ToU16(py_arg(1), "com")));
+            const auto filter = SearchFilter_s{.ids = PyArgs::ToIds(py_arg(0), "ids")};
+            return ReturnInt(GetApi().CountItems(filter, PyValue::ToU16(py_arg(1), "com")));
         });
     }
 
@@ -880,8 +884,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto filter = SearchFilter_s{.ids = PyConvert::ToIds(py_arg(0), "ids")};
-            PyConvert::FromOptional(py_retval(), GetApi().FindItem(filter, PyConvert::ToU16(py_arg(1), "com")), FromItem);
+            const auto filter = SearchFilter_s{.ids = PyArgs::ToIds(py_arg(0), "ids")};
+            PyValue::FromOptional(py_retval(), GetApi().FindItem(filter, PyValue::ToU16(py_arg(1), "com")), FromItem);
             return true;
         });
     }
@@ -890,8 +894,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto filter = SearchFilter_s{.names = PyConvert::ToNames(py_arg(0), "names")};
-            return ReturnInt(GetApi().CountItems(filter, PyConvert::ToU16(py_arg(1), "com")));
+            const auto filter = SearchFilter_s{.names = PyArgs::ToNames(py_arg(0), "names")};
+            return ReturnInt(GetApi().CountItems(filter, PyValue::ToU16(py_arg(1), "com")));
         });
     }
 
@@ -899,8 +903,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto filter = SearchFilter_s{.names = PyConvert::ToNames(py_arg(0), "names")};
-            PyConvert::FromOptional(py_retval(), GetApi().FindItem(filter, PyConvert::ToU16(py_arg(1), "com")), FromItem);
+            const auto filter = SearchFilter_s{.names = PyArgs::ToNames(py_arg(0), "names")};
+            PyValue::FromOptional(py_retval(), GetApi().FindItem(filter, PyValue::ToU16(py_arg(1), "com")), FromItem);
             return true;
         });
     }
@@ -949,7 +953,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().IsInterfaceOpen(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id"))));
+            return ReturnBool(GetApi().IsInterfaceOpen(static_cast<s32>(PyValue::ToInt(py_arg(0), "id"))));
         });
     }
 
@@ -957,7 +961,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto text = GetApi().GetComponentText(PyConvert::ToU16(py_arg(0), "com"));
+            const auto text = GetApi().GetComponentText(PyValue::ToU16(py_arg(0), "com"));
             return text ? ReturnString(*text) : ReturnNone();
         });
     }
@@ -974,7 +978,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnInt(GetApi().GetState().GetVarp(PyConvert::ToU16(py_arg(0), "id")));
+            return ReturnInt(GetApi().GetState().GetVarp(PyValue::ToU16(py_arg(0), "id")));
         });
     }
 
@@ -982,7 +986,7 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetState().social.friends, FromFriend);
+            PyValue::FromList(py_retval(), GetApi().GetState().social.friends, FromFriend);
             return true;
         });
     }
@@ -991,7 +995,7 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetState().social.ignores, FromName);
+            PyValue::FromList(py_retval(), GetApi().GetState().social.ignores, FromName);
             return true;
         });
     }
@@ -1000,7 +1004,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().GetState().inventories.contains(PyConvert::ToU16(py_arg(0), "com")));
+            return ReturnBool(GetApi().GetState().inventories.contains(PyValue::ToU16(py_arg(0), "com")));
         });
     }
 
@@ -1008,10 +1012,10 @@ namespace
     {
         return Guard([argv]
         {
-            const auto texts = ChatDialog::GetTexts(GetApi().GetInterfaces(), PyConvert::ToU16(py_arg(0), "root"));
-            PyConvert::FromList(py_retval(), texts, [](py_OutRef out, const std::string& text)
+            const auto texts = ChatDialog::GetTexts(GetApi().GetInterfaces(), PyValue::ToU16(py_arg(0), "root"));
+            PyValue::FromList(py_retval(), texts, [](py_OutRef out, const std::string& text)
             {
-                PyConvert::FromString(out, text);
+                PyValue::FromString(out, text);
             });
             return true;
         });
@@ -1025,7 +1029,7 @@ namespace
         {
             const auto view = GetApi().GetInterfaces();
             auto inventories = std::vector<const IfComponent_s*>{};
-            for (const auto* const component : view.GetTree(PyConvert::ToU16(py_arg(0), "root")))
+            for (const auto* const component : view.GetTree(PyValue::ToU16(py_arg(0), "root")))
             {
                 if (component->type == ComponentType_e::Inv || component->type == ComponentType_e::InvText)
                 {
@@ -1033,7 +1037,7 @@ namespace
                 }
             }
 
-            PyConvert::FromList(py_retval(), inventories, [&view](py_OutRef out, const IfComponent_s* component)
+            PyValue::FromList(py_retval(), inventories, [&view](py_OutRef out, const IfComponent_s* component)
             {
                 constexpr auto FIELDS = 4;
                 py_newtuple(out, FIELDS);
@@ -1041,10 +1045,10 @@ namespace
                 py_newnone(py_tuple_getitem(out, 1));
                 py_newint(py_tuple_getitem(out, 2), view.GetPosition(*component).x);
                 py_newnone(py_tuple_getitem(out, 3));
-                PyConvert::FromString(py_tuple_getitem(out, 1), PyConvert::GetTypeName(component->type));
+                PyValue::FromString(py_tuple_getitem(out, 1), PyObjects::GetTypeName(component->type));
 
                 const auto options = std::vector<std::string>{component->options.begin(), component->options.end()};
-                PyConvert::FromList(py_tuple_getitem(out, 3), options, [](py_OutRef option, const std::string& text)
+                PyValue::FromList(py_tuple_getitem(out, 3), options, [](py_OutRef option, const std::string& text)
                 {
                     if (text.empty())
                     {
@@ -1052,7 +1056,7 @@ namespace
                         return;
                     }
 
-                    PyConvert::FromString(option, text);
+                    PyValue::FromString(option, text);
                 });
             });
             return true;
@@ -1065,7 +1069,7 @@ namespace
         {
             const auto coord = [argv](int index, std::string_view name)
             {
-                return static_cast<s32>(PyConvert::ToInt(py_arg(index), name, 0, MAX_COORD));
+                return static_cast<s32>(PyValue::ToInt(py_arg(index), name, 0, MAX_COORD));
             };
 
             return ReturnBool(GetApi().CanStep(coord(0, "from_x"), coord(1, "from_z"), coord(2, "to_x"), coord(3, "to_z")));
@@ -1086,7 +1090,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto mark = PyConvert::ToInt(py_arg(0), "mark");
+            const auto mark = PyValue::ToInt(py_arg(0), "mark");
             auto found = std::vector<const ChatMessage_s*>{};
             for (const auto& message : GetApi().GetState().messages)
             {
@@ -1096,12 +1100,12 @@ namespace
                 }
             }
 
-            PyConvert::FromList(py_retval(), found, [](py_OutRef out, const ChatMessage_s* message)
+            PyValue::FromList(py_retval(), found, [](py_OutRef out, const ChatMessage_s* message)
             {
                 py_newtuple(out, 2);
                 py_newint(py_tuple_getitem(out, 0), static_cast<s64>(message->sequence));
                 py_newnone(py_tuple_getitem(out, 1));
-                PyConvert::FromString(py_tuple_getitem(out, 1), message->text);
+                PyValue::FromString(py_tuple_getitem(out, 1), message->text);
             });
             return true;
         });
@@ -1112,7 +1116,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto request = NavJson::ParseRequest(PyConvert::ToString(py_arg(0), "request"));
+            const auto request = NavJson::ParseRequest(PyValue::ToString(py_arg(0), "request"));
             const auto path = ScriptVm::GetCurrent().RunRouteSearch([&request]
             {
                 return GetApi().FindWorldPath(request.from, request.to, request.options);
@@ -1122,7 +1126,7 @@ namespace
                 return ReturnNone();
             }
 
-            PyConvert::FromString(py_retval(), NavJson::ToJson(*path));
+            PyValue::FromString(py_retval(), NavJson::ToJson(*path));
             return true;
         });
     }
@@ -1133,14 +1137,14 @@ namespace
         return Guard([argv]
         {
             const auto* const navigation = GetApi().GetNavigation();
-            const auto name = PyConvert::ToString(py_arg(0), "name");
+            const auto name = PyValue::ToString(py_arg(0), "name");
             const auto text = navigation != nullptr ? navigation->GetData(name) : std::nullopt;
             if (!text)
             {
                 return ReturnNone();
             }
 
-            PyConvert::FromString(py_retval(), *text);
+            PyValue::FromString(py_retval(), *text);
             return true;
         });
     }
@@ -1151,15 +1155,15 @@ namespace
         return Guard([argv]
         {
             const auto* const navigation = GetApi().GetNavigation();
-            const auto x = static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_COORD));
-            const auto z = static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_COORD));
-            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
+            const auto x = static_cast<s32>(PyValue::ToInt(py_arg(0), "x", 0, MAX_COORD));
+            const auto z = static_cast<s32>(PyValue::ToInt(py_arg(1), "z", 0, MAX_COORD));
+            const auto level = static_cast<s32>(PyValue::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
             if (navigation == nullptr)
             {
                 return ReturnNone();
             }
 
-            PyConvert::FromPoint(py_retval(), navigation->GetMap().IsWalkable(x, z, level) ? 1 : 0, navigation->GetMap().GetExits(x, z, level));
+            PyValue::FromPoint(py_retval(), navigation->GetMap().IsWalkable(x, z, level) ? 1 : 0, navigation->GetMap().GetExits(x, z, level));
             return true;
         });
     }
@@ -1170,8 +1174,8 @@ namespace
         return Guard([argv]
         {
             const auto& cache = GetApi().GetCache();
-            const auto* const square = cache.FindSquare(static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_SQUARE)), static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_SQUARE)));
-            const auto level = static_cast<s32>(PyConvert::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
+            const auto* const square = cache.FindSquare(static_cast<s32>(PyValue::ToInt(py_arg(0), "x", 0, MAX_SQUARE)), static_cast<s32>(PyValue::ToInt(py_arg(1), "z", 0, MAX_SQUARE)));
+            const auto level = static_cast<s32>(PyValue::ToInt(py_arg(2), "level", 0, MAX_LEVEL));
             auto locs = std::vector<MapLoc_s>{};
             if (square != nullptr)
             {
@@ -1184,7 +1188,7 @@ namespace
                 }
             }
 
-            PyConvert::FromList(py_retval(), locs, [](py_OutRef out, const MapLoc_s& loc)
+            PyValue::FromList(py_retval(), locs, [](py_OutRef out, const MapLoc_s& loc)
             {
                 constexpr auto FIELDS = 5;
                 py_newtuple(out, FIELDS);
@@ -1204,7 +1208,7 @@ namespace
         return Guard([argv]
         {
             const auto& api = GetApi();
-            const auto ticks = static_cast<u64>(PyConvert::ToInt(py_arg(0), "ticks", 0, MAX_DAMAGE_TICKS));
+            const auto ticks = static_cast<u64>(PyValue::ToInt(py_arg(0), "ticks", 0, MAX_DAMAGE_TICKS));
             return ReturnBool(EntityStatus::TookDamage(api.GetLocalPlayer(), api.GetState().tick, ticks));
         });
     }
@@ -1223,8 +1227,8 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto x = static_cast<s32>(PyConvert::ToInt(py_arg(0), "x", 0, MAX_COORD));
-            const auto z = static_cast<s32>(PyConvert::ToInt(py_arg(1), "z", 0, MAX_COORD));
+            const auto x = static_cast<s32>(PyValue::ToInt(py_arg(0), "x", 0, MAX_COORD));
+            const auto z = static_cast<s32>(PyValue::ToInt(py_arg(1), "z", 0, MAX_COORD));
             return ReturnBool(api.GetMap().Contains(api.ToTile(x, z)));
         });
     }
@@ -1241,7 +1245,7 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromOptional(py_retval(), GetApi().FindContinue(), [](py_OutRef out, u16 com)
+            PyValue::FromOptional(py_retval(), GetApi().FindContinue(), [](py_OutRef out, u16 com)
             {
                 py_newint(out, com);
             });
@@ -1253,12 +1257,12 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetChatOptions(), [](py_OutRef out, const ChatOption_s& option)
+            PyValue::FromList(py_retval(), GetApi().GetChatOptions(), [](py_OutRef out, const ChatOption_s& option)
             {
                 py_newtuple(out, 2);
                 py_newint(py_tuple_getitem(out, 0), option.com);
                 py_newnone(py_tuple_getitem(out, 1));
-                PyConvert::FromString(py_tuple_getitem(out, 1), option.text);
+                PyValue::FromString(py_tuple_getitem(out, 1), option.text);
             });
             return true;
         });
@@ -1268,9 +1272,9 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetChatTexts(), [](py_OutRef out, const std::string& text)
+            PyValue::FromList(py_retval(), GetApi().GetChatTexts(), [](py_OutRef out, const std::string& text)
             {
-                PyConvert::FromString(out, text);
+                PyValue::FromString(out, text);
             });
             return true;
         });
@@ -1281,16 +1285,16 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetMakeProducts(), [](py_OutRef out, const MakeProduct_s& product)
+            PyValue::FromList(py_retval(), GetApi().GetMakeProducts(), [](py_OutRef out, const MakeProduct_s& product)
             {
                 py_newtuple(out, 3);
                 py_newnone(py_tuple_getitem(out, 0));
                 py_newint(py_tuple_getitem(out, 1), product.item);
                 py_newnone(py_tuple_getitem(out, 2));
-                PyConvert::FromString(py_tuple_getitem(out, 0), product.name);
-                PyConvert::FromList(py_tuple_getitem(out, 2), product.buttons, [](py_OutRef button, const MakeButton_s& value)
+                PyValue::FromString(py_tuple_getitem(out, 0), product.name);
+                PyValue::FromList(py_tuple_getitem(out, 2), product.buttons, [](py_OutRef button, const MakeButton_s& value)
                 {
-                    PyConvert::FromPoint(button, value.amount, value.com);
+                    PyValue::FromPoint(button, value.amount, value.com);
                 });
             });
             return true;
@@ -1304,14 +1308,14 @@ namespace
         {
             const auto& api = GetApi();
             const auto& state = api.GetState();
-            PyConvert::FromList(py_retval(), api.GetMakePanel(), [&api, &state](py_OutRef out, const MakeSlot_s& slot)
+            PyValue::FromList(py_retval(), api.GetMakePanel(), [&api, &state](py_OutRef out, const MakeSlot_s& slot)
             {
                 const auto& items = state.inventories.at(slot.com).slots;
                 const auto item = InventoryItem_s{.com = slot.com, .slot = slot.slot, .id = slot.id, .count = items[slot.slot].count};
                 py_newtuple(out, 2);
                 py_newnone(py_tuple_getitem(out, 0));
                 py_newint(py_tuple_getitem(out, 1), slot.product);
-                PyConvert::FromItem(py_tuple_getitem(out, 0), item, api.GetCache());
+                PyObjects::FromItem(py_tuple_getitem(out, 0), item, api.GetCache());
             });
             return true;
         });
@@ -1324,14 +1328,14 @@ namespace
             return std::nullopt;
         }
 
-        return PyConvert::ToU16(value, "root");
+        return PyValue::ToU16(value, "root");
     }
 
     void FromComponents(py_OutRef out, const std::vector<const IfComponent_s*>& components, const InterfaceView& view)
     {
-        PyConvert::FromList(out, components, [&view](py_OutRef item, const IfComponent_s* component)
+        PyValue::FromList(out, components, [&view](py_OutRef item, const IfComponent_s* component)
         {
-            PyConvert::FromComponent(item, *component, view);
+            PyObjects::FromComponent(item, *component, view);
         });
     }
 
@@ -1340,13 +1344,13 @@ namespace
         return Guard([argv]
         {
             const auto view = GetApi().GetInterfaces();
-            const auto* const component = view.Find(static_cast<s32>(PyConvert::ToInt(py_arg(0), "id")));
+            const auto* const component = view.Find(static_cast<s32>(PyValue::ToInt(py_arg(0), "id")));
             if (component == nullptr)
             {
                 return ReturnNone();
             }
 
-            PyConvert::FromComponent(py_retval(), *component, view);
+            PyObjects::FromComponent(py_retval(), *component, view);
             return true;
         });
     }
@@ -1356,7 +1360,7 @@ namespace
         return Guard([argv]
         {
             const auto view = GetApi().GetInterfaces();
-            FromComponents(py_retval(), view.GetTree(PyConvert::ToU16(py_arg(0), "root")), view);
+            FromComponents(py_retval(), view.GetTree(PyValue::ToU16(py_arg(0), "root")), view);
             return true;
         });
     }
@@ -1368,8 +1372,8 @@ namespace
         return Guard([argv]
         {
             const auto view = GetApi().GetInterfaces();
-            const auto text = py_isnone(py_arg(0)) ? std::nullopt : std::optional{PyConvert::ToString(py_arg(0), "text")};
-            const auto button = py_isnone(py_arg(1)) ? std::nullopt : std::optional{PyConvert::ToString(py_arg(1), "button")};
+            const auto text = py_isnone(py_arg(0)) ? std::nullopt : std::optional{PyValue::ToString(py_arg(0), "text")};
+            const auto button = py_isnone(py_arg(1)) ? std::nullopt : std::optional{PyValue::ToString(py_arg(1), "button")};
             const auto root = ToRoot(py_arg(2));
             const auto roots = root ? std::vector<u16>{*root} : view.GetOpenRoots();
             auto found = std::vector<const IfComponent_s*>{};
@@ -1383,7 +1387,7 @@ namespace
                         continue;
                     }
 
-                    if (button && PyConvert::GetButtonName(component->buttonType).value_or("") != *button)
+                    if (button && PyObjects::GetButtonName(component->buttonType).value_or("") != *button)
                     {
                         continue;
                     }
@@ -1404,7 +1408,7 @@ namespace
     {
         return Guard([]
         {
-            PyConvert::FromList(py_retval(), GetApi().GetInterfaces().GetOpenRoots(), [](py_OutRef item, u16 root)
+            PyValue::FromList(py_retval(), GetApi().GetInterfaces().GetOpenRoots(), [](py_OutRef item, u16 root)
             {
                 py_newint(item, root);
             });
@@ -1417,7 +1421,7 @@ namespace
         return Guard([argv]
         {
             const auto& tabs = GetApi().GetState().interfaces.tabs;
-            const auto tab = PyConvert::ToInt(py_arg(0), "tab", 0, static_cast<s64>(tabs.size()) - 1);
+            const auto tab = PyValue::ToInt(py_arg(0), "tab", 0, static_cast<s64>(tabs.size()) - 1);
             return ReturnInt(tabs[static_cast<std::size_t>(tab)]);
         });
     }
@@ -1426,7 +1430,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ClickComponent(PyConvert::ToU16(py_arg(0), "id")));
+            return ReturnBool(GetApi().ClickComponent(PyValue::ToU16(py_arg(0), "id")));
         });
     }
 
@@ -1434,7 +1438,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ClickText(PyConvert::ToString(py_arg(0), "text"), ToRoot(py_arg(1))));
+            return ReturnBool(GetApi().ClickText(PyValue::ToString(py_arg(0), "text"), ToRoot(py_arg(1))));
         });
     }
 
@@ -1452,7 +1456,7 @@ namespace
 
                 if (!option.empty())
                 {
-                    PyConvert::FromString(item, option);
+                    PyValue::FromString(item, option);
                 }
             }
 
@@ -1483,7 +1487,7 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            return ReturnBool(api.CanReachLoc(api.ToTile(ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z")), PyConvert::ToU16(py_arg(0), "id")));
+            return ReturnBool(api.CanReachLoc(api.ToTile(ToCoord(py_arg(1), "x"), ToCoord(py_arg(2), "z")), PyValue::ToU16(py_arg(0), "id")));
         });
     }
 
@@ -1491,7 +1495,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyConvert::ToBool(py_arg(2), "run")));
+            return ReturnBool(GetApi().WalkTo(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"), PyValue::ToBool(py_arg(2), "run")));
         });
     }
 
@@ -1508,9 +1512,9 @@ namespace
         return Guard([argv]
         {
             const auto path = GetApi().FindPath(ToCoord(py_arg(0), "x"), ToCoord(py_arg(1), "z"));
-            PyConvert::FromOptional(py_retval(), path, [](py_OutRef out, const std::vector<Tile_s>& waypoints)
+            PyValue::FromOptional(py_retval(), path, [](py_OutRef out, const std::vector<Tile_s>& waypoints)
             {
-                PyConvert::FromList(out, waypoints, FromTile);
+                PyValue::FromList(out, waypoints, FromTile);
             });
             return true;
         });
@@ -1521,8 +1525,8 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto points = PyConvert::ToPoints(py_arg(0), api.GetPosition().level, "points");
-            api.WalkPath(points, PyConvert::ToBool(py_arg(1), "run"));
+            const auto points = PyArgs::ToPoints(py_arg(0), api.GetPosition().level, "points");
+            api.WalkPath(points, PyValue::ToBool(py_arg(1), "run"));
             return ReturnNone();
         });
     }
@@ -1532,7 +1536,7 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto index = PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS);
+            const auto index = PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS);
             const auto op = ResolveOp(py_arg(1), [&api, index](std::string_view text)
             {
                 return api.FindNpcOp(index, text);
@@ -1546,7 +1550,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), MenuOp::TALK));
+            return ReturnBool(GetApi().InteractNpc(PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS), MenuOp::TALK));
         });
     }
 
@@ -1554,7 +1558,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().InteractNpc(PyConvert::ToIndex(py_arg(0), "npc", PyConvert::NPC_CLASS), MenuOp::ATTACK));
+            return ReturnBool(GetApi().InteractNpc(PyArgs::ToIndex(py_arg(0), "npc", PyObjects::NPC_CLASS), MenuOp::ATTACK));
         });
     }
 
@@ -1563,7 +1567,7 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto index = PyConvert::ToIndex(py_arg(0), "player", PyConvert::PLAYER_CLASS);
+            const auto index = PyArgs::ToIndex(py_arg(0), "player", PyObjects::PLAYER_CLASS);
             const auto op = ResolveOp(py_arg(1), [&api](std::string_view text)
             {
                 return api.FindPlayerOp(text);
@@ -1581,19 +1585,19 @@ namespace
             auto& api = GetApi();
             auto loc = LocRef_s{};
             auto opArgument = py_arg(3);
-            if (PyConvert::IsLoc(py_arg(0)))
+            if (PyArgs::IsLoc(py_arg(0)))
             {
                 if (!py_isnone(py_arg(2)) || (!py_isnone(py_arg(1)) && !py_isnone(py_arg(3))))
                 {
                     throw ScriptTypeError{"interact_loc takes a Loc and an op, or id, x, z and op"};
                 }
 
-                loc = PyConvert::ToLoc(py_arg(0), "loc");
+                loc = PyArgs::ToLoc(py_arg(0), "loc");
                 opArgument = py_isnone(py_arg(3)) ? py_arg(1) : py_arg(3);
             }
             else
             {
-                loc = LocRef_s{.id = PyConvert::ToU16(py_arg(0), "id"), .x = ToCoord(py_arg(1), "x"), .z = ToCoord(py_arg(2), "z")};
+                loc = LocRef_s{.id = PyValue::ToU16(py_arg(0), "id"), .x = ToCoord(py_arg(1), "x"), .z = ToCoord(py_arg(2), "z")};
             }
 
             const auto op = ResolveOp(opArgument, [&api, &loc](std::string_view text)
@@ -1611,8 +1615,8 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto points = PyConvert::ToPoints(py_arg(0), api.GetPosition().level, "points");
-            const auto id = PyConvert::ToU16(py_arg(1), "id");
+            const auto points = PyArgs::ToPoints(py_arg(0), api.GetPosition().level, "points");
+            const auto id = PyValue::ToU16(py_arg(1), "id");
             const auto op = ResolveOp(py_arg(4), [&api, id](std::string_view text)
             {
                 return api.FindLocOp(id, text);
@@ -1628,7 +1632,7 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto item = PyConvert::ToGroundItem(py_arg(0), "item");
+            const auto item = PyArgs::ToGroundItem(py_arg(0), "item");
             const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
             {
                 return api.FindGroundItemOp(item.id, text);
@@ -1642,7 +1646,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto item = PyConvert::ToGroundItem(py_arg(0), "item");
+            const auto item = PyArgs::ToGroundItem(py_arg(0), "item");
             return ReturnBool(GetApi().InteractGroundItem(item.id, item.x, item.z, MenuOp::TAKE));
         });
     }
@@ -1652,7 +1656,7 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
             const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
             {
                 return api.FindItemOp(item.id, text);
@@ -1667,7 +1671,7 @@ namespace
         return Guard([argv]
         {
             auto& api = GetApi();
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
             const auto op = ResolveOp(py_arg(1), [&api, &item](std::string_view text)
             {
                 return api.FindInventoryOption(item.com, text);
@@ -1681,7 +1685,7 @@ namespace
     {
         return Guard([argv]
         {
-            return ReturnBool(GetApi().ItemOp(PyConvert::ToItem(py_arg(0), "item"), MenuOp::DROP));
+            return ReturnBool(GetApi().ItemOp(PyArgs::ToItem(py_arg(0), "item"), MenuOp::DROP));
         });
     }
 
@@ -1689,7 +1693,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().MoveItem(PyConvert::ToU16(py_arg(0), "com"), PyConvert::ToU16(py_arg(1), "from_slot"), PyConvert::ToU16(py_arg(2), "to_slot"));
+            GetApi().MoveItem(PyValue::ToU16(py_arg(0), "com"), PyValue::ToU16(py_arg(1), "from_slot"), PyValue::ToU16(py_arg(2), "to_slot"));
             return ReturnNone();
         });
     }
@@ -1698,8 +1702,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnNpc(item, PyConvert::ToIndex(py_arg(1), "npc", PyConvert::NPC_CLASS)));
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnNpc(item, PyArgs::ToIndex(py_arg(1), "npc", PyObjects::NPC_CLASS)));
         });
     }
 
@@ -1707,8 +1711,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnPlayer(item, PyConvert::ToIndex(py_arg(1), "player", PyConvert::PLAYER_CLASS)));
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnPlayer(item, PyArgs::ToIndex(py_arg(1), "player", PyObjects::PLAYER_CLASS)));
         });
     }
 
@@ -1716,8 +1720,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnLoc(item, PyConvert::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z")));
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnLoc(item, PyValue::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z")));
         });
     }
 
@@ -1725,8 +1729,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
-            const auto target = PyConvert::ToGroundItem(py_arg(1), "ground_item");
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
+            const auto target = PyArgs::ToGroundItem(py_arg(1), "ground_item");
             return ReturnBool(GetApi().UseItemOnGroundItem(item, target.id, target.x, target.z));
         });
     }
@@ -1735,8 +1739,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto item = PyConvert::ToItem(py_arg(0), "item");
-            return ReturnBool(GetApi().UseItemOnItem(item, PyConvert::ToItem(py_arg(1), "target")));
+            const auto item = PyArgs::ToItem(py_arg(0), "item");
+            return ReturnBool(GetApi().UseItemOnItem(item, PyArgs::ToItem(py_arg(1), "target")));
         });
     }
 
@@ -1744,8 +1748,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
-            return ReturnBool(GetApi().CastOnNpc(spell, PyConvert::ToIndex(py_arg(1), "npc", PyConvert::NPC_CLASS)));
+            const auto spell = PyValue::ToU16(py_arg(0), "spell");
+            return ReturnBool(GetApi().CastOnNpc(spell, PyArgs::ToIndex(py_arg(1), "npc", PyObjects::NPC_CLASS)));
         });
     }
 
@@ -1753,8 +1757,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
-            return ReturnBool(GetApi().CastOnPlayer(spell, PyConvert::ToIndex(py_arg(1), "player", PyConvert::PLAYER_CLASS)));
+            const auto spell = PyValue::ToU16(py_arg(0), "spell");
+            return ReturnBool(GetApi().CastOnPlayer(spell, PyArgs::ToIndex(py_arg(1), "player", PyObjects::PLAYER_CLASS)));
         });
     }
 
@@ -1762,7 +1766,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().CastOnLoc(PyConvert::ToU16(py_arg(0), "spell"), PyConvert::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"));
+            GetApi().CastOnLoc(PyValue::ToU16(py_arg(0), "spell"), PyValue::ToU16(py_arg(1), "id"), ToCoord(py_arg(2), "x"), ToCoord(py_arg(3), "z"));
             return ReturnNone();
         });
     }
@@ -1771,8 +1775,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
-            const auto target = PyConvert::ToGroundItem(py_arg(1), "ground_item");
+            const auto spell = PyValue::ToU16(py_arg(0), "spell");
+            const auto target = PyArgs::ToGroundItem(py_arg(1), "ground_item");
             return ReturnBool(GetApi().CastOnGroundItem(spell, target.id, target.x, target.z));
         });
     }
@@ -1781,8 +1785,8 @@ namespace
     {
         return Guard([argv]
         {
-            const auto spell = PyConvert::ToU16(py_arg(0), "spell");
-            return ReturnBool(GetApi().CastOnItem(spell, PyConvert::ToItem(py_arg(1), "item")));
+            const auto spell = PyValue::ToU16(py_arg(0), "spell");
+            return ReturnBool(GetApi().CastOnItem(spell, PyArgs::ToItem(py_arg(1), "item")));
         });
     }
 
@@ -1790,7 +1794,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().ClickButton(PyConvert::ToU16(py_arg(0), "com"));
+            GetApi().ClickButton(PyValue::ToU16(py_arg(0), "com"));
             return ReturnNone();
         });
     }
@@ -1807,7 +1811,7 @@ namespace
     {
         return Guard([argv]
         {
-            const auto value = PyConvert::ToInt(py_arg(0), "value", 0, std::numeric_limits<s32>::max());
+            const auto value = PyValue::ToInt(py_arg(0), "value", 0, std::numeric_limits<s32>::max());
             return ReturnBool(GetApi().AnswerCountDialog(static_cast<s32>(value)));
         });
     }
@@ -1825,7 +1829,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().SetRun(PyConvert::ToBool(py_arg(0), "run"));
+            GetApi().SetRun(PyValue::ToBool(py_arg(0), "run"));
             return ReturnNone();
         });
     }
@@ -1834,7 +1838,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().Say(PyConvert::ToString(py_arg(0), "text"));
+            GetApi().Say(PyValue::ToString(py_arg(0), "text"));
             return ReturnNone();
         });
     }
@@ -1843,7 +1847,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().SendPrivateMessage(PyConvert::ToString(py_arg(0), "name"), PyConvert::ToString(py_arg(1), "text"));
+            GetApi().SendPrivateMessage(PyValue::ToString(py_arg(0), "name"), PyValue::ToString(py_arg(1), "text"));
             return ReturnNone();
         });
     }
@@ -1852,7 +1856,7 @@ namespace
     {
         return Guard([argv]
         {
-            GetApi().SendCommand(PyConvert::ToString(py_arg(0), "text"));
+            GetApi().SendCommand(PyValue::ToString(py_arg(0), "text"));
             return ReturnNone();
         });
     }
@@ -1861,14 +1865,14 @@ namespace
     {
         return Guard([argv]
         {
-            const auto username = PyConvert::ToString(py_arg(0), "username");
+            const auto username = PyValue::ToString(py_arg(0), "username");
 
             if (!py_json_dumps(py_arg(1), 0))
             {
                 return false;
             }
 
-            const auto sent = GetApi().SendBotMessage(username, PyConvert::ToString(py_retval(), "message"));
+            const auto sent = GetApi().SendBotMessage(username, PyValue::ToString(py_retval(), "message"));
             if (!sent)
             {
                 throw std::invalid_argument{std::format("No account in this process has the username {}", username)};
@@ -1883,7 +1887,7 @@ namespace
     {
         return Guard([argv]
         {
-            (GetApi().*TCall)(PyConvert::ToString(py_arg(0), "name"));
+            (GetApi().*TCall)(PyValue::ToString(py_arg(0), "name"));
             return ReturnNone();
         });
     }
@@ -2092,7 +2096,7 @@ void ScriptBindings::Unbind(const ScriptVm& vm) noexcept
 void ScriptBindings::SetSettings(ScriptVm& vm, std::string_view settingsJson)
 {
     const auto builtins = vm.GetBuiltins();
-    PyConvert::FromString(py_r0(), settingsJson);
+    PyValue::FromString(py_r0(), settingsJson);
     py_setdict(builtins, py_name(SETTINGS_JSON), py_r0());
     vm.RunSource(LOAD_SETTINGS, "<settings>", builtins);
 }
