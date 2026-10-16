@@ -14,6 +14,9 @@
 #include "../ScriptContext.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
+#include "EventDispatcher.hpp"
+#include "LoopSchedule.hpp"
+#include "ScriptHooks.hpp"
 
 #include <pocketpy.h>
 
@@ -92,30 +95,17 @@ public:
     [[nodiscard]] std::optional<std::chrono::seconds> TakeRelogRequest();
 
 private:
-    enum class LoopWait_e : u8
-    {
-        Time,
-        Update,
-        Ticks,
-    };
-
     void Load();
     void LoadBot();
     void Unload();
     void Reload();
     void CheckForChanges(Clock::time_point now);
     void SkipToPresent();
-    void FindHooks();
     void SyncLogin();
     void Start(Clock::time_point now);
-    void DispatchEvents(const GameState_s& state);
-    void DispatchEvent(const GameEvent_s& event, const GameState_s& state);
-    void DispatchBackpack(const GameState_s& state);
-    void DispatchMessages(const GameState_s& state);
     void DispatchBotMessages();
     void DispatchCommands();
     void RunProgressReport(Clock::time_point now);
-    [[nodiscard]] bool IsLoopDue(Clock::time_point now, const GameState_s& state) const;
     void RunLoop(Clock::time_point now);
     void RunUpkeep(Clock::time_point now);
     void ScheduleLoop(Clock::time_point now, py_Ref wait);
@@ -134,13 +124,14 @@ private:
     ScriptContext m_context;
     std::shared_ptr<Logger> m_logger;
     ScriptHostOptions_s m_options;
-    // Empty only while a reload is replacing it, or after a reload failed to load.
+    // Empty only while a reload is replacing it, or after a reload failed to load. The hooks go with it.
     std::optional<ScriptVm> m_vm;
+    std::optional<ScriptHooks> m_hooks;
+    EventDispatcher m_events;
+    LoopSchedule m_schedule;
     std::optional<FileWatcher> m_watcher;
     std::deque<BotMessage_s> m_botMessages;
     std::deque<ConsoleCommand_s> m_commands;
-    // The backpack as the bot last saw it, which inventory_changed reports changes to, slot by slot.
-    std::vector<Item_s> m_backpack;
     ScriptStatus_e m_status = ScriptStatus_e::Running;
     bool m_started = false;
     bool m_finished = false;
@@ -148,16 +139,7 @@ private:
     // Set by a reconnect and cleared once the player is placed again, when on_reconnect is called.
     bool m_reconnectPending = false;
     u32 m_loginCount = 0;
-    u64 m_lastEvent = 0;
-    u64 m_lastMessage = 0;
     u64 m_lastTick = 0;
-    // What the loop waits for: until m_nextLoop; for an update after m_waitUpdateCount, or until
-    // m_nextLoop when m_waitHasTimeout; or for the tick to reach m_waitTick.
-    LoopWait_e m_wait = LoopWait_e::Time;
-    Clock::time_point m_nextLoop;
-    u64 m_waitUpdateCount = 0;
-    bool m_waitHasTimeout = false;
-    u64 m_waitTick = 0;
     Clock::time_point m_nextWatch;
     // When on_start first ran, which progress reports count from.
     std::optional<Clock::time_point> m_startTime;

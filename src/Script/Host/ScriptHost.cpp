@@ -22,6 +22,9 @@
 #include "../ScriptControl.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
+#include "EventDispatcher.hpp"
+#include "LoopSchedule.hpp"
+#include "ScriptHooks.hpp"
 
 #include <pocketpy.h>
 
@@ -31,55 +34,17 @@ namespace
     constexpr auto LOAD_BOT = "_rt_load"sv;
     constexpr auto SETTING_DEFAULTS = "_rt_setting_defaults"sv;
     constexpr auto START_BOT = "_rt_start"sv;
-    constexpr auto DISPATCH = "_rt_dispatch"sv;
     constexpr auto STEP = "_rt_step"sv;
     constexpr auto CONFIGURE = "_rt_configure"sv;
     constexpr auto UPKEEP = "_rt_upkeep"sv;
     constexpr auto FINISH = "_rt_finish"sv;
     constexpr auto RUN_COMMAND = "_rt_command"sv;
-    constexpr auto LISTENING = "_listening";
-    constexpr auto COMMANDS = "_commands";
     constexpr auto SETTINGS = "settings";
     constexpr auto REPORT_ROWS = "_report_rows"sv;
 
     constexpr auto PROGRESS_REPORT = "progress_report"sv;
     constexpr auto BOT_MESSAGE = "bot_message"sv;
-    constexpr auto INVENTORY_CHANGED = "inventory_changed"sv;
-    constexpr auto WAIT_MS = "ms"sv;
-    constexpr auto WAIT_UPDATE = "update"sv;
 
-    // rs2b0t's ChatLine type, as names rather than the webclient's numbers.
-    std::optional<std::string_view> DescribeChatType(MessageType_e type)
-    {
-        switch (type)
-        {
-        case MessageType_e::Game:
-            return "game"sv;
-        case MessageType_e::Public:
-            return "public"sv;
-        case MessageType_e::Private:
-            return "private"sv;
-        case MessageType_e::TradeRequest:
-            return "trade_request"sv;
-        case MessageType_e::DuelRequest:
-            return "duel_request"sv;
-        case MessageType_e::Say:
-            return std::nullopt;
-        }
-
-        return std::nullopt;
-    }
-
-    void FromOptionalString(py_OutRef out, std::string_view text)
-    {
-        if (text.empty())
-        {
-            py_newnone(out);
-            return;
-        }
-
-        PyValue::FromString(out, text);
-    }
 }
 
 ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOptions_s options, std::shared_ptr<Logger> logger)
@@ -150,8 +115,8 @@ void ScriptHost::Step(Clock::time_point now)
         CallHook("reconnect");
     }
 
-    DispatchEvents(state);
-    DispatchMessages(state);
+    m_events.DispatchEvents(state, m_client.GetCache(), *m_hooks, *m_logger);
+    m_events.DispatchMessages(state, *m_hooks);
     DispatchBotMessages();
     DispatchCommands();
 
@@ -178,7 +143,7 @@ void ScriptHost::Step(Clock::time_point now)
         RunProgressReport(now);
     }
 
-    if (m_status == ScriptStatus_e::Running && IsLoopDue(now, state))
+    if (m_status == ScriptStatus_e::Running && m_schedule.IsDue(now, state))
     {
         RunLoop(now);
     }
@@ -231,38 +196,12 @@ bool ScriptHost::ReceiveBotMessage(BotMessage_s message)
 
 std::vector<ScriptCommand_s> ScriptHost::GetCommands() const
 {
-    auto commands = std::vector<ScriptCommand_s>{};
-    if (!m_vm || m_status != ScriptStatus_e::Running)
+    if (!m_hooks || m_status != ScriptStatus_e::Running)
     {
-        return commands;
+        return {};
     }
 
-    // Like HasHook, this may be asked from inside another VM, which is current again afterward.
-    const auto previous = py_currentvm();
-    const auto found = py_getdict(m_vm->GetBuiltins(), py_name(COMMANDS));
-    if (found != nullptr && py_isdict(found))
-    {
-        // The console module keeps every name and help a str.
-        const auto added = py_dict_apply(found, [](py_Ref name, py_Ref help, void* context)
-        {
-            if (!py_isstr(name) || !py_isstr(help))
-            {
-                return true;
-            }
-
-            static_cast<std::vector<ScriptCommand_s>*>(context)->push_back(ScriptCommand_s{.name = py_tostr(name), .help = py_tostr(help)});
-            return true;
-        }, &commands);
-
-        if (!added)
-        {
-            py_clearexc(nullptr);
-        }
-    }
-
-    py_switchvm(previous);
-    std::ranges::sort(commands, {}, &ScriptCommand_s::name);
-    return commands;
+    return m_hooks->GetCommands();
 }
 
 bool ScriptHost::ReceiveCommand(ConsoleCommand_s command)
@@ -296,17 +235,22 @@ std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
     }
 
     // A wait for the server has no time, unless it has a timeout too.
-    if (m_wait == LoopWait_e::Ticks || (m_wait == LoopWait_e::Update && !m_waitHasTimeout))
-    {
-        return std::nullopt;
-    }
-
-    return m_nextLoop;
+    return m_schedule.GetNextTime();
 }
 
 void ScriptHost::Load()
 {
     m_vm.emplace(m_runtime, ScriptVmOptions_s{.scriptsDirectory = m_options.scriptsDirectory, .callTimeout = m_options.callTimeout}, m_logger);
+    m_hooks.emplace(*m_vm, [this]
+    {
+        return m_status == ScriptStatus_e::Running;
+    }, [this](std::string_view where, std::string_view message)
+    {
+        Fail(where, message);
+    }, [this]
+    {
+        ApplyStopRequest();
+    });
     ScriptBindings::Bind(*m_vm, m_context);
 
     try
@@ -389,6 +333,7 @@ void ScriptHost::Unload()
     }
 
     ScriptBindings::Unbind(*m_vm);
+    m_hooks.reset();
     m_vm.reset();
 }
 
@@ -444,15 +389,11 @@ void ScriptHost::CheckForChanges(Clock::time_point now)
 void ScriptHost::SkipToPresent()
 {
     const auto& state = m_client.GetState();
-    m_lastEvent = state.eventCount;
-    m_lastMessage = state.messageCount;
+    m_events.SkipToPresent(state, m_client.GetCache());
     m_lastTick = state.tick;
     m_loginCount = m_client.GetLoginCount();
     m_connected = false;
     m_reconnectPending = false;
-
-    const auto* backpack = state.FindInventory(m_client.GetCache().inventoryComponent);
-    m_backpack = backpack ? backpack->slots : std::vector<Item_s>{};
 }
 
 void ScriptHost::SyncLogin()
@@ -476,8 +417,7 @@ void ScriptHost::SyncLogin()
 void ScriptHost::Start(Clock::time_point now)
 {
     m_started = true;
-    m_wait = LoopWait_e::Time;
-    m_nextLoop = now;
+    m_schedule.RunAt(now);
 
     if (!m_startTime)
     {
@@ -498,265 +438,6 @@ void ScriptHost::Start(Clock::time_point now)
     catch (const ScriptError& e)
     {
         Fail("on_start()", e.what());
-    }
-}
-
-void ScriptHost::DispatchEvents(const GameState_s& state)
-{
-    const auto events = state.GetEventsAfter(m_lastEvent);
-    if (!events.empty() && events.front()->sequence != m_lastEvent + 1)
-    {
-        m_logger->Warning("{} game events were dropped before the script saw them", events.front()->sequence - m_lastEvent - 1);
-    }
-
-    for (const auto* event : events)
-    {
-        m_lastEvent = event->sequence;
-
-        if (m_status == ScriptStatus_e::Running)
-        {
-            DispatchEvent(*event, state);
-        }
-    }
-}
-
-void ScriptHost::DispatchEvent(const GameEvent_s& event, const GameState_s& state)
-{
-    const auto& data = event.data;
-    const auto tick = state.tick;
-    const auto& cache = m_client.GetCache();
-    m_vm->Activate();
-
-    const auto one = std::array{py_r0()};
-    const auto two = std::array{py_r0(), py_r1()};
-    const auto three = std::array{py_r0(), py_r1(), py_r2()};
-
-    if (const auto* added = std::get_if<NpcAdded_s>(&data); added && HasHook("npc_spawned"))
-    {
-        const auto* current = state.FindNpc(added->npc.index);
-        PyObjects::FromNpc(py_r0(), current ? *current : added->npc, tick, cache);
-        CallHook("npc_spawned", one);
-    }
-    else if (const auto* removed = std::get_if<NpcRemoved_s>(&data); removed && HasHook("npc_despawned"))
-    {
-        PyObjects::FromNpc(py_r0(), removed->npc, tick, cache);
-        CallHook("npc_despawned", one);
-    }
-    else if (const auto* npcHit = std::get_if<NpcHit_s>(&data); npcHit && HasHook("npc_damaged"))
-    {
-        const auto* npc = state.FindNpc(npcHit->index);
-        if (npc == nullptr)
-        {
-            py_newnone(py_r0());
-        }
-        else
-        {
-            PyObjects::FromNpc(py_r0(), *npc, tick, cache);
-        }
-
-        py_newint(py_r1(), npcHit->hit.damage);
-        CallHook("npc_damaged", two);
-    }
-    else if (const auto* playerAdded = std::get_if<PlayerAdded_s>(&data); playerAdded && HasHook("player_spawned"))
-    {
-        const auto* current = state.FindPlayer(playerAdded->player.index);
-        PyObjects::FromPlayer(py_r0(), current ? *current : playerAdded->player, tick);
-        CallHook("player_spawned", one);
-    }
-    else if (const auto* playerRemoved = std::get_if<PlayerRemoved_s>(&data); playerRemoved && HasHook("player_despawned"))
-    {
-        PyObjects::FromPlayer(py_r0(), playerRemoved->player, tick);
-        CallHook("player_despawned", one);
-    }
-    else if (const auto* playerHit = std::get_if<PlayerHit_s>(&data); playerHit && HasHook("player_damaged"))
-    {
-        const auto* player = state.FindPlayer(playerHit->index);
-        if (player == nullptr)
-        {
-            py_newnone(py_r0());
-        }
-        else
-        {
-            PyObjects::FromPlayer(py_r0(), *player, tick);
-        }
-
-        py_newint(py_r1(), playerHit->hit.damage);
-        CallHook("player_damaged", two);
-    }
-    else if (const auto* localHit = std::get_if<LocalHit_s>(&data); localHit && HasHook("damaged"))
-    {
-        py_newint(py_r0(), localHit->hit.damage);
-        CallHook("damaged", one);
-    }
-    else if (const auto* itemAdded = std::get_if<GroundItemAdded_s>(&data); itemAdded && HasHook("ground_item_spawned"))
-    {
-        PyObjects::FromGroundItem(py_r0(), itemAdded->item, cache);
-        CallHook("ground_item_spawned", one);
-    }
-    else if (const auto* itemRemoved = std::get_if<GroundItemRemoved_s>(&data); itemRemoved && HasHook("ground_item_despawned"))
-    {
-        PyObjects::FromGroundItem(py_r0(), itemRemoved->item, cache);
-        CallHook("ground_item_despawned", one);
-    }
-    else if (const auto* itemCount = std::get_if<GroundItemCountChanged_s>(&data); itemCount && HasHook("ground_item_changed"))
-    {
-        PyObjects::FromGroundItem(py_r0(), itemCount->item, cache);
-        py_newint(py_r1(), itemCount->previousCount);
-        CallHook("ground_item_changed", two);
-    }
-    else if (const auto* loc = std::get_if<LocChanged_s>(&data); loc && HasHook("loc_changed"))
-    {
-        const auto& change = loc->change;
-        const auto scene = SceneLoc_s{.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true};
-        PyObjects::FromLoc(py_r0(), scene, cache);
-        CallHook("loc_changed", one);
-    }
-    else if (const auto* inventory = std::get_if<InventoryChanged_s>(&data); inventory && inventory->com == cache.inventoryComponent)
-    {
-        DispatchBackpack(state);
-    }
-    else if (const auto* said = std::get_if<NpcSaid_s>(&data); said && HasHook("npc_say"))
-    {
-        const auto* npc = state.FindNpc(said->index);
-        if (npc == nullptr)
-        {
-            py_newnone(py_r0());
-        }
-        else
-        {
-            PyObjects::FromNpc(py_r0(), *npc, tick, cache);
-        }
-
-        PyValue::FromString(py_r1(), said->text);
-        CallHook("npc_say", two);
-    }
-    else if (const auto* projectile = std::get_if<ProjectileLaunched_s>(&data); projectile && HasHook("projectile"))
-    {
-        PyObjects::FromProjectile(py_r0(), projectile->projectile);
-        CallHook("projectile", one);
-    }
-    else if (const auto* stat = std::get_if<StatChanged_s>(&data))
-    {
-        // death.rs2 empties hitpoints before it says "Oh dear you are dead!"; the stat is the surer sign.
-        if (stat->stat == static_cast<u8>(Stat_e::Hitpoints) && stat->previous.level > 0 && stat->current.level == 0)
-        {
-            CallHook("death");
-            m_vm->Activate();
-        }
-
-        if (stat->current.xp != stat->previous.xp && HasHook("skill_xp"))
-        {
-            py_newint(py_r0(), stat->stat);
-            py_newint(py_r1(), stat->current.xp);
-            py_newint(py_r2(), stat->current.xp - stat->previous.xp);
-            CallHook("skill_xp", three);
-        }
-
-        if (stat->current.baseLevel != stat->previous.baseLevel && HasHook("skill_level"))
-        {
-            m_vm->Activate();
-            py_newint(py_r0(), stat->stat);
-            py_newint(py_r1(), stat->current.baseLevel);
-            py_newint(py_r2(), stat->previous.baseLevel);
-            CallHook("skill_level", three);
-        }
-    }
-    else if (const auto* varp = std::get_if<VarpChanged_s>(&data); varp && HasHook("varp_changed"))
-    {
-        py_newint(py_r0(), varp->varp);
-        py_newint(py_r1(), varp->value);
-        py_newint(py_r2(), varp->previous);
-        CallHook("varp_changed", three);
-    }
-    else if (std::holds_alternative<ModalChanged_s>(data))
-    {
-        CallHook("interface_changed");
-    }
-    else if (const auto* reboot = std::get_if<RebootStarted_s>(&data); reboot && HasHook("system_update"))
-    {
-        py_newint(py_r0(), std::chrono::duration_cast<std::chrono::seconds>(reboot->ticks * GameTick::DURATION).count());
-        CallHook("system_update", one);
-    }
-}
-
-// The backpack's changes since the bot last saw it, one call per slot, as rs2b0t's inventory.changed.
-void ScriptHost::DispatchBackpack(const GameState_s& state)
-{
-    const auto& cache = m_client.GetCache();
-    const auto* inventory = state.FindInventory(cache.inventoryComponent);
-    const auto previous = std::exchange(m_backpack, inventory ? inventory->slots : std::vector<Item_s>{});
-
-    if (!HasHook(INVENTORY_CHANGED))
-    {
-        return;
-    }
-
-    const auto& current = m_backpack;
-    const auto size = std::max(current.size(), previous.size());
-    for (auto slot = std::size_t{0}; slot < size && m_status == ScriptStatus_e::Running; ++slot)
-    {
-        const auto now = slot < current.size() ? current[slot] : Item_s{};
-        const auto before = slot < previous.size() ? previous[slot] : Item_s{};
-        if (now.id == before.id && now.count == before.count)
-        {
-            continue;
-        }
-
-        const auto* type = cache.FindObj(now.id);
-        m_vm->Activate();
-        py_newint(py_r0(), static_cast<s64>(slot));
-        py_newint(py_r1(), now.id);
-        FromOptionalString(py_r2(), type ? type->name : std::string_view{});
-        py_newint(py_r3(), now.count);
-        py_newint(py_r4(), before.id);
-        py_newint(py_r5(), before.count);
-        CallHook(INVENTORY_CHANGED, std::array{py_r0(), py_r1(), py_r2(), py_r3(), py_r4(), py_r5()});
-    }
-}
-
-void ScriptHost::DispatchMessages(const GameState_s& state)
-{
-    for (const auto* message : state.GetMessagesAfter(m_lastMessage))
-    {
-        m_lastMessage = message->sequence;
-
-        const auto type = DescribeChatType(message->type);
-        if (m_status != ScriptStatus_e::Running || !type)
-        {
-            continue;
-        }
-
-        if (HasHook("chat_message"))
-        {
-            m_vm->Activate();
-            PyValue::FromString(py_r0(), *type);
-            FromOptionalString(py_r1(), message->sender);
-            PyValue::FromString(py_r2(), message->text);
-            CallHook("chat_message", std::array{py_r0(), py_r1(), py_r2()});
-        }
-
-        m_vm->Activate();
-        PyValue::FromString(py_r0(), message->sender);
-        PyValue::FromString(py_r1(), message->text);
-
-        switch (message->type)
-        {
-        case MessageType_e::Game:
-            CallHook("server_message", std::array{py_r1()});
-            break;
-        case MessageType_e::Private:
-            CallHook("private_message", std::array{py_r0(), py_r1()});
-            break;
-        case MessageType_e::TradeRequest:
-            CallHook("trade_request", std::array{py_r0()});
-            break;
-        case MessageType_e::DuelRequest:
-            CallHook("duel_request", std::array{py_r0()});
-            break;
-        case MessageType_e::Public:
-        case MessageType_e::Say:
-            break;
-        }
     }
 }
 
@@ -862,21 +543,6 @@ void ScriptHost::RunProgressReport(Clock::time_point now)
     }
 }
 
-bool ScriptHost::IsLoopDue(Clock::time_point now, const GameState_s& state) const
-{
-    switch (m_wait)
-    {
-    case LoopWait_e::Time:
-        return now >= m_nextLoop;
-    case LoopWait_e::Update:
-        return state.updateCount != m_waitUpdateCount || (m_waitHasTimeout && now >= m_nextLoop);
-    case LoopWait_e::Ticks:
-        return state.tick >= m_waitTick;
-    }
-
-    return true;
-}
-
 // Once a server tick: when the random event guardian or the stall guard takes over, it has dropped the bot's
 // step in progress for its own, which runs from the next step, now.
 void ScriptHost::RunUpkeep(Clock::time_point now)
@@ -888,8 +554,7 @@ void ScriptHost::RunUpkeep(Clock::time_point now)
 
         if (py_isbool(took) && py_tobool(took))
         {
-            m_wait = LoopWait_e::Time;
-            m_nextLoop = now;
+            m_schedule.RunAt(now);
         }
 
         ApplyStopRequest();
@@ -928,83 +593,25 @@ void ScriptHost::RunLoop(Clock::time_point now)
 void ScriptHost::ScheduleLoop(Clock::time_point now, py_Ref wait)
 {
     const auto kind = PyValue::ToString(py_tuple_getitem(wait, 0), "wait");
-    const auto value = py_toint(py_tuple_getitem(wait, 1));
-    const auto& state = m_client.GetState();
-    if (kind == WAIT_MS)
-    {
-        m_wait = LoopWait_e::Time;
-        m_nextLoop = now + std::chrono::milliseconds{value};
-        return;
-    }
-
-    if (kind == WAIT_UPDATE)
-    {
-        m_wait = LoopWait_e::Update;
-        m_waitUpdateCount = state.updateCount;
-        m_waitHasTimeout = value >= 0;
-        m_nextLoop = now + std::chrono::milliseconds{std::max<s64>(value, 0)};
-        return;
-    }
-
-    m_wait = LoopWait_e::Ticks;
-    m_waitTick = state.tick + static_cast<u64>(value);
+    m_schedule.Schedule(now, kind, py_toint(py_tuple_getitem(wait, 1)), m_client.GetState());
 }
 
-// Another account's script can ask this from inside its own VM, through send_bot_message, so the VM that
-// was current is current again afterward.
 bool ScriptHost::HasHook(std::string_view name) const
 {
-    if (!m_vm)
-    {
-        return false;
-    }
-
-    const auto previous = py_currentvm();
-    const auto listening = py_getdict(m_vm->GetBuiltins(), py_name(LISTENING));
-    auto found = 0;
-    if (listening != nullptr)
-    {
-        const auto key = std::string{name};
-        found = py_dict_getitem_by_str(listening, key.c_str());
-        if (found < 0)
-        {
-            py_clearexc(nullptr);
-        }
-    }
-
-    py_switchvm(previous);
-    return found == 1;
+    return m_hooks && m_hooks->Has(name);
 }
 
 void ScriptHost::CallHook(std::string_view name, std::span<const py_Ref> args)
 {
-    if (m_status != ScriptStatus_e::Running || !HasHook(name))
+    if (m_hooks)
     {
-        return;
+        m_hooks->Call(name, args);
     }
-
-    static_cast<void>(Dispatch(name, args));
 }
 
 std::optional<py_GlobalRef> ScriptHost::Dispatch(std::string_view name, std::span<const py_Ref> args)
 {
-    // The event's name goes first, in a register the arguments don't use.
-    m_vm->Activate();
-    PyValue::FromString(py_r7(), name);
-
-    auto all = std::vector<py_Ref>{py_r7()};
-    all.insert(all.end(), args.begin(), args.end());
-    try
-    {
-        const auto result = m_vm->CallBuiltin(DISPATCH, all);
-        ApplyStopRequest();
-        return result;
-    }
-    catch (const ScriptError& e)
-    {
-        Fail(std::format("on_{}()", name), e.what());
-        return std::nullopt;
-    }
+    return m_hooks->Dispatch(name, args);
 }
 
 void ScriptHost::Fail(std::string_view where, std::string_view message)
