@@ -3,6 +3,7 @@
 
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/IfComponent_s.hpp"
+#include "../../Utils/StringUtils.hpp"
 
 namespace
 {
@@ -18,34 +19,6 @@ namespace
 
         bool operator==(const Rect_s&) const = default;
     };
-
-    std::string Lower(std::string_view text)
-    {
-        auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c)
-        {
-            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        });
-        return result;
-    }
-
-    std::vector<std::string_view> SplitWords(std::string_view text)
-    {
-        auto words = std::vector<std::string_view>{};
-        auto start = std::size_t{0};
-        while (start < text.size())
-        {
-            const auto end = std::min(text.find(' ', start), text.size());
-            if (end > start)
-            {
-                words.push_back(text.substr(start, end - start));
-            }
-
-            start = end + 1;
-        }
-
-        return words;
-    }
 
     Rect_s GetRect(const InterfaceView& view, const IfComponent_s& component)
     {
@@ -116,7 +89,7 @@ namespace
     std::string GetOptionSubject(std::string_view option)
     {
         const auto cleaned = ChatDialog::CleanText(option);
-        const auto words = SplitWords(cleaned);
+        const auto words = StringUtils::SplitWords(cleaned);
         auto subject = std::string{};
         for (auto i = std::size_t{2}; i < words.size(); ++i)
         {
@@ -186,7 +159,7 @@ std::string ChatDialog::CleanText(std::string_view text)
     }
 
     auto cleaned = std::string{};
-    for (const auto word : SplitWords(spaced))
+    for (const auto word : StringUtils::SplitWords(spaced))
     {
         cleaned += cleaned.empty() ? "" : " ";
         cleaned += word;
@@ -197,8 +170,8 @@ std::string ChatDialog::CleanText(std::string_view text)
 
 std::optional<s32> ChatDialog::ParseAmount(std::string_view option)
 {
-    const auto cleaned = Lower(CleanText(option));
-    const auto words = SplitWords(cleaned);
+    const auto cleaned = StringUtils::ToLower(CleanText(option));
+    const auto words = StringUtils::SplitWords(cleaned);
     if (words.size() < 2)
     {
         return std::nullopt;
@@ -340,7 +313,7 @@ std::vector<MakeSlot_s> ChatDialog::GetMakePanel(const InterfaceView& view, cons
     {
         const auto makes = std::ranges::any_of(component->options, [](const std::string& option)
         {
-            return Lower(option).starts_with("make");
+            return StringUtils::ToLower(option).starts_with("make");
         });
         if (component->type != ComponentType_e::Inv || !makes || component->width == 0 || !view.IsVisible(*component))
         {

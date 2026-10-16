@@ -3,18 +3,11 @@
 
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/IfComponent_s.hpp"
+#include "../../Utils/StringUtils.hpp"
 #include "../State/Interfaces_s.hpp"
 
 namespace
 {
-    bool EqualsIgnoringCase(std::string_view left, std::string_view right)
-    {
-        return std::ranges::equal(left, right, [](char a, char b)
-        {
-            return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-        });
-    }
-
     bool Contains(const ComponentPoint_s& corner, const IfComponent_s& component, const ComponentPoint_s& point)
     {
         return point.x >= corner.x && point.y >= corner.y && point.x < corner.x + component.width && point.y < corner.y + component.height;
@@ -185,7 +178,7 @@ std::vector<const IfComponent_s*> InterfaceView::FindText(std::string_view text,
     {
         for (const auto* const component : GetTree(id))
         {
-            if (component->type == ComponentType_e::Text && EqualsIgnoringCase(GetText(*component), text) && IsVisible(*component))
+            if (component->type == ComponentType_e::Text && StringUtils::EqualsIgnoringCase(GetText(*component), text) && IsVisible(*component))
             {
                 found.push_back(component);
             }

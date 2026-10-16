@@ -3,6 +3,7 @@
 
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
+#include "../../Utils/StringUtils.hpp"
 #include "../Error/ProtocolError.hpp"
 #include "../Protocol/Base37.hpp"
 #include "../Protocol/ServerProt.hpp"
@@ -81,14 +82,6 @@ namespace
         const auto green = static_cast<u32>((rgb555 >> 5) & RGB555_CHANNEL_MASK);
         const auto blue = static_cast<u32>(rgb555 & RGB555_CHANNEL_MASK);
         return (red << 19) + (green << 11) + (blue << 3);
-    }
-
-    bool EqualsIgnoringCase(std::string_view left, std::string_view right)
-    {
-        return std::ranges::equal(left, right, [](char a, char b)
-        {
-            return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-        });
     }
 
     u64 ReadName37(Packet& packet)
@@ -338,7 +331,7 @@ namespace
         }
 
         auto& slot = state.playerOps[op - 1];
-        if (EqualsIgnoringCase(text, REMOVED_PLAYER_OP))
+        if (StringUtils::EqualsIgnoringCase(text, REMOVED_PLAYER_OP))
         {
             slot.reset();
             return;

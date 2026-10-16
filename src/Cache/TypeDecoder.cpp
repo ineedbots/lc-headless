@@ -2,6 +2,7 @@
 #include "TypeDecoder.hpp"
 
 #include "../Io/Packet.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "Error/CacheError.hpp"
 #include "LocType_s.hpp"
 #include "NpcType_s.hpp"
@@ -305,14 +306,6 @@ namespace
         return packet.GJStr();
     }
 
-    bool EqualsIgnoringCase(std::string_view left, std::string_view right)
-    {
-        return std::ranges::equal(left, right, [](char a, char b)
-        {
-            return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-        });
-    }
-
     // Slots past the array's end are read and dropped, and "hidden", which the menu leaves out, can be
     // stored as NO_OPTION.
     void ReadOption(Packet& packet, std::size_t slot, std::span<u16> ops, TextPool& text, bool dropHidden)
@@ -324,7 +317,7 @@ namespace
             return;
         }
 
-        if (dropHidden && EqualsIgnoringCase(option, HIDDEN_OPTION))
+        if (dropHidden && StringUtils::EqualsIgnoringCase(option, HIDDEN_OPTION))
         {
             ops[slot] = TextPool::NO_OPTION;
             return;

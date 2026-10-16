@@ -129,6 +129,28 @@ std::vector<u8> BigUInt::ToBytesBigEndian() const
     return bytes;
 }
 
+std::string BigUInt::ToHexString() const
+{
+    const auto bytes = ToBytesBigEndian();
+    const auto first = std::ranges::find_if(bytes, [](u8 byte)
+    {
+        return byte != 0;
+    });
+
+    if (first == bytes.end())
+    {
+        return "0x0";
+    }
+
+    auto text = std::format("0x{:x}", *first);
+    for (auto byte = std::next(first); byte != bytes.end(); ++byte)
+    {
+        std::format_to(std::back_inserter(text), "{:02x}", *byte);
+    }
+
+    return text;
+}
+
 std::strong_ordering BigUInt::operator<=>(const BigUInt& other) const
 {
     if (m_limbs.size() != other.m_limbs.size())

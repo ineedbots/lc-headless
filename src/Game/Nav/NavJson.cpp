@@ -1,21 +1,13 @@
 #include "pch.hpp"
 #include "NavJson.hpp"
 
+#include "../../Utils/StringUtils.hpp"
+
 #include <nlohmann/json.hpp>
 
 namespace
 {
     using Json = nlohmann::json;
-
-    std::string Lower(std::string_view text)
-    {
-        auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c)
-        {
-            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        });
-        return result;
-    }
 
     NavPoint_s ReadPoint(const Json& json)
     {
@@ -34,7 +26,7 @@ namespace
         {
             for (const auto& [name, count] : found->items())
             {
-                counts[Lower(name)] += count.get<s32>();
+                counts[StringUtils::ToLower(name)] += count.get<s32>();
             }
         }
 
@@ -69,7 +61,7 @@ namespace
         {
             for (const auto& [name, status] : quests->items())
             {
-                state.quests[Lower(name)] = status.get<std::string>();
+                state.quests[StringUtils::ToLower(name)] = status.get<std::string>();
             }
         }
 

@@ -2,11 +2,13 @@
 #include "ConfigFile.hpp"
 
 #include "../Console/Logger.hpp"
+#include "../Io/WebSocketUrl.hpp"
 #include "../Utils/BigUInt.hpp"
+#include "../Utils/FileUtils.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "Error/ConfigError.hpp"
 #include "JsoncEditor.hpp"
 
-#include <ixwebsocket/IXUrlParser.h>
 #include <nlohmann/json.hpp>
 
 namespace
@@ -29,11 +31,7 @@ namespace
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
     constexpr auto MAX_RUN_ENERGY = 100;
-    constexpr auto FIRST_PRINTABLE = '\x20';
-    constexpr auto LAST_PRINTABLE = '\x7E';
-    constexpr auto SECURE_SCHEME = "wss"sv;
     constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
-    constexpr auto TEMPORARY_EXTENSION = ".tmp";
 
     struct LogLevelName_s
     {
@@ -53,28 +51,6 @@ namespace
         std::size_t line;
         std::size_t column;
     };
-
-    std::string FormatHex(const BigUInt& value)
-    {
-        const auto bytes = value.ToBytesBigEndian();
-        const auto first = std::ranges::find_if(bytes, [](u8 byte)
-        {
-            return byte != 0;
-        });
-
-        if (first == bytes.end())
-        {
-            return "0x0";
-        }
-
-        auto text = std::format("0x{:x}", *first);
-        for (auto byte = std::next(first); byte != bytes.end(); ++byte)
-        {
-            std::format_to(std::back_inserter(text), "{:02x}", *byte);
-        }
-
-        return text;
-    }
 
     TextPosition_s GetTextPosition(std::string_view text, std::size_t byte)
     {
@@ -136,44 +112,15 @@ namespace
         throw ConfigError{std::format("{}: {}", path, rule)};
     }
 
-    bool IsPrintableAscii(std::string_view text)
-    {
-        return std::ranges::all_of(text, [](char character)
-        {
-            return character >= FIRST_PRINTABLE && character <= LAST_PRINTABLE;
-        });
-    }
-
     bool IsCredential(std::string_view text, std::size_t maxLength)
     {
-        return !text.empty() && text.size() <= maxLength && IsPrintableAscii(text);
-    }
-
-    std::optional<std::string> GetUrlScheme(const std::string& url)
-    {
-        auto protocol = std::string{};
-        auto host = std::string{};
-        auto path = std::string{};
-        auto query = std::string{};
-        auto port = 0;
-        if (!ix::UrlParser::parse(url, protocol, host, path, query, port))
-        {
-            return std::nullopt;
-        }
-
-        return protocol;
-    }
-
-    bool IsWebSocketUrl(const std::string& url)
-    {
-        const auto scheme = GetUrlScheme(url);
-        return scheme == "ws" || scheme == SECURE_SCHEME;
+        return !text.empty() && text.size() <= maxLength && StringUtils::IsPrintableAscii(text);
     }
 
     void ValidateServer(const ServerSettings_s& server)
     {
-        Check(IsWebSocketUrl(server.url), "server.url", "must be a ws:// or wss:// URL");
-        Check(server.origin.empty() || IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
+        Check(WebSocketUrl::IsValid(server.url), "server.url", "must be a ws:// or wss:// URL");
+        Check(server.origin.empty() || StringUtils::IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
         Check(!server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
     }
 
@@ -228,7 +175,7 @@ namespace
 
     void WarnIfTlsVerificationDisabled(const Config_s& config, Logger& logger)
     {
-        if (GetUrlScheme(config.server.url) != SECURE_SCHEME || config.server.tlsCaFile != NO_TLS_VERIFICATION)
+        if (WebSocketUrl::GetScheme(config.server.url) != WebSocketUrl::SECURE_SCHEME || config.server.tlsCaFile != NO_TLS_VERIFICATION)
         {
             return;
         }
@@ -247,48 +194,18 @@ namespace
         return root;
     }
 
-    std::string ReadFile(const std::filesystem::path& path)
+    // kind names the file in the error, such as "config" or "account".
+    std::string ReadFile(const std::filesystem::path& path, std::string_view kind)
     {
-        auto file = std::ifstream{path, std::ios::binary};
-        if (!file)
+        auto text = FileUtils::ReadText(path);
+        if (!text)
         {
-            throw ConfigError{std::format("Failed to open config file {}", path.string())};
+            throw ConfigError{std::format("Failed to read {} file {}", kind, path.string())};
         }
 
-        auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
-
-        if (file.bad())
-        {
-            throw ConfigError{std::format("Failed to read config file {}", path.string())};
-        }
-
-        return text;
+        return std::move(*text);
     }
 
-    // Through a temporary file, so the file is never left half written.
-    void ReplaceFile(const std::filesystem::path& path, std::string_view text)
-    {
-        auto temporary = path;
-        temporary += TEMPORARY_EXTENSION;
-        {
-            auto file = std::ofstream{temporary, std::ios::binary | std::ios::trunc};
-            file << text;
-            file.flush();
-            if (!file)
-            {
-                throw ConfigError{std::format("{}: couldn't be written", temporary.string())};
-            }
-        }
-
-        auto error = std::error_code{};
-        std::filesystem::rename(temporary, path, error);
-
-        if (error)
-        {
-            std::filesystem::remove(temporary, error);
-            throw ConfigError{std::format("{}: couldn't be replaced", path.string())};
-        }
-    }
 }
 
 namespace nlohmann
@@ -310,7 +227,7 @@ namespace nlohmann
 
         static void to_json(ordered_json& value, const BigUInt& source)
         {
-            value = FormatHex(source);
+            value = source.ToHexString();
         }
     };
 
@@ -449,7 +366,7 @@ Config_s ConfigFile::Load(const std::filesystem::path& path, Logger& logger)
         throw ConfigError{std::format("{}: not found; copy client.jsonc.sample there and fill it in", path.string())};
     }
 
-    const auto text = ReadFile(path);
+    const auto text = ReadFile(path, "config");
     try
     {
         return Parse(text, logger);
@@ -492,7 +409,7 @@ AccountConfig_s ConfigFile::LoadAccount(const std::filesystem::path& path)
         throw ConfigError{std::format("{}: account file not found", path.string())};
     }
 
-    const auto text = ReadFile(path);
+    const auto text = ReadFile(path, "account");
     try
     {
         auto account = ParseAccount(text, path.stem().string());
@@ -525,7 +442,7 @@ AccountConfig_s ConfigFile::ParseAccount(std::string_view text, std::string name
 
 std::vector<std::string> ConfigFile::AddScriptSettings(const std::filesystem::path& path, std::string_view botName, std::string_view settingsJson)
 {
-    const auto text = ReadFile(path);
+    const auto text = ReadFile(path, "account");
     auto edit = JsoncEdit_s{};
     try
     {
@@ -542,7 +459,7 @@ std::vector<std::string> ConfigFile::AddScriptSettings(const std::filesystem::pa
 
     if (!edit.added.empty())
     {
-        ReplaceFile(path, edit.text);
+        FileUtils::ReplaceFile(path, edit.text);
     }
 
     return std::move(edit.added);

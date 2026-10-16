@@ -117,3 +117,11 @@ TEST_CASE("BigUInt::ModPow rejects operands the server couldn't decrypt", "[BigU
     CHECK_THROWS_AS(BigUInt::ModPow(BigUInt::Parse("7"), two, BigUInt::Parse("7")), std::invalid_argument);
     CHECK_THROWS_AS(BigUInt::ModPow(BigUInt::Parse("8"), two, BigUInt::Parse("7")), std::invalid_argument);
 }
+
+TEST_CASE("BigUInt::ToHexString writes lower-case hex without leading zeros", "[BigUInt]")
+{
+    CHECK(BigUInt{}.ToHexString() == "0x0");
+    CHECK(BigUInt::Parse("255").ToHexString() == "0xff");
+    CHECK(BigUInt::Parse("256").ToHexString() == "0x100");
+    CHECK(BigUInt::Parse("0x0102030405060708090A").ToHexString() == "0x102030405060708090a");
+}

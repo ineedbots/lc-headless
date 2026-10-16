@@ -11,6 +11,7 @@
 #include "../Console/LogFile.hpp"
 #include "../Console/Logger.hpp"
 #include "../Script/ScriptRuntime.hpp"
+#include "../Utils/StringUtils.hpp"
 
 namespace
 {
@@ -42,17 +43,6 @@ namespace
 
         std::ranges::sort(files);
         return files;
-    }
-
-    std::string ToLower(std::string_view text)
-    {
-        auto lower = std::string{text};
-        std::ranges::transform(lower, lower.begin(), [](char character)
-        {
-            return static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-        });
-
-        return lower;
     }
 
     class ConsoleLogScope
@@ -92,7 +82,7 @@ namespace
         {
             for (auto j = i + 1; j < accounts.size(); ++j)
             {
-                if (ToLower(accounts[i].credentials.username) == ToLower(accounts[j].credentials.username))
+                if (StringUtils::EqualsIgnoringCase(accounts[i].credentials.username, accounts[j].credentials.username))
                 {
                     throw ConfigError{std::format("Accounts {} and {} have the same username", accounts[i].name, accounts[j].name)};
                 }

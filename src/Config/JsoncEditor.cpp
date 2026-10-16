@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "JsoncEditor.hpp"
 
+#include "../Utils/StringUtils.hpp"
 #include "Error/ConfigError.hpp"
 
 #include <nlohmann/json.hpp>
@@ -452,17 +453,6 @@ namespace
 
         return nullptr;
     }
-
-    std::string JoinPath(std::span<const std::string> path)
-    {
-        auto text = std::string{};
-        for (const auto& key : path)
-        {
-            text += text.empty() ? key : "." + key;
-        }
-
-        return text;
-    }
 }
 
 JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::string> path, std::string_view membersJson)
@@ -494,7 +484,7 @@ JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::
 
         if (!member->value.isObject)
         {
-            throw ConfigError{std::format("{}: must be an object", JoinPath(path.first(depth + 1)))};
+            throw ConfigError{std::format("{}: must be an object", StringUtils::Join(path.first(depth + 1), "."))};
         }
 
         object = &member->value;

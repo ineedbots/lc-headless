@@ -1,11 +1,12 @@
 #include "pch.hpp"
 #include "Base37.hpp"
 
+#include "../../Utils/StringUtils.hpp"
+
 namespace
 {
     constexpr auto RADIX = u64{37};
     constexpr auto ALPHABET = "_abcdefghijklmnopqrstuvwxyz0123456789"sv;
-    constexpr auto WHITESPACE = " \t\n\v\f\r"sv;
     constexpr auto FIRST_DIGIT_CODE = u64{27};
 
     constexpr auto LIMIT = []
@@ -18,18 +19,6 @@ namespace
 
         return limit;
     }();
-
-    std::string_view Trim(std::string_view text)
-    {
-        const auto first = text.find_first_not_of(WHITESPACE);
-        if (first == std::string_view::npos)
-        {
-            return {};
-        }
-
-        const auto last = text.find_last_not_of(WHITESPACE);
-        return text.substr(first, last - first + 1);
-    }
 
     u64 GetCode(char character)
     {
@@ -64,7 +53,7 @@ namespace
 
 u64 Base37::Encode(std::string_view name)
 {
-    const auto trimmed = Trim(name).substr(0, MAX_LENGTH);
+    const auto trimmed = StringUtils::Trim(name).substr(0, MAX_LENGTH);
     auto value = u64{0};
     for (const auto character : trimmed)
     {

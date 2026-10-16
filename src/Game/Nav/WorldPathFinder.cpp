@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "WorldPathFinder.hpp"
 
+#include "../../Utils/StringUtils.hpp"
+
 #include <queue>
 
 namespace
@@ -67,16 +69,6 @@ namespace
     bool Contains(const std::vector<std::string>& values, std::string_view value)
     {
         return std::ranges::find(values, value) != values.end();
-    }
-
-    std::string Lower(std::string_view text)
-    {
-        auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c)
-        {
-            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        });
-        return result;
     }
 
     bool KindAllowed(std::string_view kind, const NavPolicy_s& policy)
@@ -394,7 +386,7 @@ namespace
             {
                 for (const auto& part : teleport.itemNameMatch)
                 {
-                    if (count > 0 && name.find(Lower(part)) != std::string::npos)
+                    if (count > 0 && name.find(StringUtils::ToLower(part)) != std::string::npos)
                     {
                         return true;
                     }

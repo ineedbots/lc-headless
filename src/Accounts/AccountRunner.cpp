@@ -9,12 +9,12 @@
 #include "../Game/Protocol/WordPack.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "Account.hpp"
 
 namespace
 {
     constexpr auto TARGET_PREFIX = '@';
-    constexpr auto WHITESPACE = " \t"sv;
 
     struct LogLevelName_s
     {
@@ -28,54 +28,6 @@ namespace
         LogLevelName_s{LogLevel_e::Warning, "warning"},
         LogLevelName_s{LogLevel_e::Error, "error"},
     };
-
-    std::string ToLower(std::string_view text)
-    {
-        auto lower = std::string{text};
-        std::ranges::transform(lower, lower.begin(), [](char character)
-        {
-            return static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-        });
-
-        return lower;
-    }
-
-    std::string_view Trim(std::string_view text)
-    {
-        const auto first = text.find_first_not_of(WHITESPACE);
-        if (first == std::string_view::npos)
-        {
-            return {};
-        }
-
-        return text.substr(first, text.find_last_not_of(WHITESPACE) - first + 1);
-    }
-
-    std::pair<std::string_view, std::string_view> SplitFirstWord(std::string_view text)
-    {
-        text = Trim(text);
-
-        const auto end = text.find_first_of(WHITESPACE);
-        if (end == std::string_view::npos)
-        {
-            return {text, {}};
-        }
-
-        return {text.substr(0, end), Trim(text.substr(end))};
-    }
-
-    std::vector<std::string> SplitWords(std::string_view text)
-    {
-        auto words = std::vector<std::string>{};
-        while (!text.empty())
-        {
-            const auto [word, rest] = SplitFirstWord(text);
-            words.emplace_back(word);
-            text = rest;
-        }
-
-        return words;
-    }
 
     bool HasCommand(const std::vector<ScriptCommand_s>& commands, std::string_view name)
     {
@@ -150,7 +102,7 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
 
 void AccountRunner::HandleCommand(std::string_view line)
 {
-    auto rest = Trim(line);
+    auto rest = StringUtils::Trim(line);
     if (rest.empty())
     {
         return;
@@ -160,17 +112,17 @@ void AccountRunner::HandleCommand(std::string_view line)
 
     if (rest.front() == TARGET_PREFIX)
     {
-        const auto [name, after] = SplitFirstWord(rest.substr(1));
+        const auto [name, after] = StringUtils::SplitFirstWord(rest.substr(1));
         target = FindAccount(name);
         if (target == nullptr)
         {
-            auto names = std::string{};
+            auto names = std::vector<std::string>{};
             for (const auto& account : m_accounts)
             {
-                names += names.empty() ? account->GetName() : ", " + account->GetName();
+                names.push_back(account->GetName());
             }
 
-            m_logger->Warning("No account is named {}; the accounts are {}", name, names);
+            m_logger->Warning("No account is named {}; the accounts are {}", name, StringUtils::Join(names, ", "));
             return;
         }
 
@@ -183,8 +135,9 @@ void AccountRunner::HandleCommand(std::string_view line)
         rest = after;
     }
 
-    const auto [name, text] = SplitFirstWord(rest);
-    const auto command = ConsoleCommand_s{.name = ToLower(name), .text = std::string{text}, .args = SplitWords(text)};
+    const auto [name, text] = StringUtils::SplitFirstWord(rest);
+    const auto words = StringUtils::SplitWords(text);
+    const auto command = ConsoleCommand_s{.name = StringUtils::ToLower(name), .text = std::string{text}, .args = {words.begin(), words.end()}};
     if (command.name == COMMAND_HELP)
     {
         ShowHelp(target);
@@ -257,10 +210,9 @@ void AccountRunner::InterruptAll()
 
 Account* AccountRunner::FindAccount(std::string_view name) const
 {
-    const auto lower = ToLower(name);
     for (const auto& account : m_accounts)
     {
-        if (ToLower(account->GetName()) == lower || ToLower(account->GetUsername()) == lower)
+        if (StringUtils::EqualsIgnoringCase(account->GetName(), name) || StringUtils::EqualsIgnoringCase(account->GetUsername(), name))
         {
             return account.get();
         }
@@ -361,7 +313,7 @@ void AccountRunner::SetLogLevel(const Account* target, std::span<const std::stri
         return;
     }
 
-    const auto chosen = std::ranges::find(LOG_LEVEL_NAMES, ToLower(args.front()), &LogLevelName_s::name);
+    const auto chosen = std::ranges::find(LOG_LEVEL_NAMES, StringUtils::ToLower(args.front()), &LogLevelName_s::name);
     if (args.size() > 1 || chosen == LOG_LEVEL_NAMES.end())
     {
         m_logger->Warning("{} takes one of verbose, info, warning or error", COMMAND_LOG_LEVEL);

@@ -1,21 +1,14 @@
 #include "pch.hpp"
 #include "NavGraph.hpp"
 
+#include "../../Utils/FileUtils.hpp"
+#include "../../Utils/StringUtils.hpp"
+
 #include <nlohmann/json.hpp>
 
 namespace
 {
     using Json = nlohmann::json;
-
-    std::string Lower(std::string_view text)
-    {
-        auto result = std::string{text};
-        std::ranges::transform(result, result.begin(), [](char c)
-        {
-            return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        });
-        return result;
-    }
 
     s32 QuestRank(std::string_view status)
     {
@@ -29,7 +22,7 @@ namespace
 
     s32 Count(const std::unordered_map<std::string, s32>& counts, std::string_view name)
     {
-        const auto found = counts.find(Lower(name));
+        const auto found = counts.find(StringUtils::ToLower(name));
         return found == counts.end() ? 0 : found->second;
     }
 
@@ -99,13 +92,13 @@ namespace
 
     std::string ReadFile(const std::filesystem::path& path)
     {
-        auto file = std::ifstream{path, std::ios::binary};
-        if (!file)
+        auto text = FileUtils::ReadText(path);
+        if (!text)
         {
             throw std::runtime_error{std::format("{}: can't be read", path.string())};
         }
 
-        return {std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+        return std::move(*text);
     }
 
     template <typename TRead>
@@ -155,7 +148,7 @@ std::optional<std::string> NavRequires_s::Check(const NavState_s& state) const
 
     const auto waived = !questWaivesItems.empty() && [&]
     {
-        const auto found = state.quests.find(Lower(questWaivesItems));
+        const auto found = state.quests.find(StringUtils::ToLower(questWaivesItems));
         return found != state.quests.end() && found->second == "complete";
     }();
 
@@ -192,7 +185,7 @@ std::optional<std::string> NavRequires_s::Check(const NavState_s& state) const
 
     for (const auto& quest : quests)
     {
-        const auto found = state.quests.find(Lower(quest.quest));
+        const auto found = state.quests.find(StringUtils::ToLower(quest.quest));
         const auto status = found == state.quests.end() ? std::string{"unknown"} : found->second;
         if (status == "unknown" && !quest.maxStatus.empty())
         {

@@ -10,6 +10,8 @@ public:
     [[nodiscard]] static BigUInt ModPow(const BigUInt& base, const BigUInt& exponent, const BigUInt& modulus);
 
     [[nodiscard]] std::vector<u8> ToBytesBigEndian() const;
+    // Lower-case, with a 0x prefix and no leading zeros: 0x0 for zero.
+    [[nodiscard]] std::string ToHexString() const;
 
     [[nodiscard]] std::strong_ordering operator<=>(const BigUInt& other) const;
     [[nodiscard]] bool operator==(const BigUInt& other) const = default;

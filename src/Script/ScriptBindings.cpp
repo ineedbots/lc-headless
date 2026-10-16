@@ -11,6 +11,7 @@
 #include "../Game/State/Social_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "PyConvert.hpp"
 #include "ScriptApi.hpp"
 #include "ScriptRuntime.hpp"
@@ -759,14 +760,6 @@ namespace
         });
     }
 
-    bool SameText(std::string_view a, std::string_view b)
-    {
-        return std::ranges::equal(a, b, [](char x, char y)
-        {
-            return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
-        });
-    }
-
     // The ids of the cache's types of that kind ('item', 'npc' or 'loc') with the name, matched without regard to case.
     bool FindTypeIds(int, py_StackRef argv) noexcept
     {
@@ -780,7 +773,7 @@ namespace
             {
                 for (const auto& type : types)
                 {
-                    if (!type.name.empty() && SameText(type.name, name))
+                    if (!type.name.empty() && StringUtils::EqualsIgnoringCase(type.name, name))
                     {
                         ids.push_back(type.id);
                     }
@@ -1374,21 +1367,12 @@ namespace
             const auto root = ToRoot(py_arg(2));
             const auto roots = root ? std::vector<u16>{*root} : view.GetOpenRoots();
             auto found = std::vector<const IfComponent_s*>{};
-            const auto lower = [](std::string_view value)
-            {
-                auto result = std::string{value};
-                std::ranges::transform(result, result.begin(), [](char c)
-                {
-                    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                });
-                return result;
-            };
 
             for (const auto id : roots)
             {
                 for (const auto* const component : view.GetTree(id))
                 {
-                    if (text && lower(view.GetText(*component)) != lower(*text))
+                    if (text && !StringUtils::EqualsIgnoringCase(view.GetText(*component), *text))
                     {
                         continue;
                     }

@@ -5,9 +5,9 @@
 #include "Error/WebSocketClosedError.hpp"
 #include "Error/WebSocketError.hpp"
 #include "NetSystem.hpp"
+#include "WebSocketUrl.hpp"
 
 #include <ixwebsocket/IXSocketTLSOptions.h>
-#include <ixwebsocket/IXUrlParser.h>
 #include <ixwebsocket/IXWebSocket.h>
 #include <ixwebsocket/IXWebSocketCloseInfo.h>
 #include <ixwebsocket/IXWebSocketErrorInfo.h>
@@ -22,21 +22,6 @@ namespace
     constexpr auto TRAILING_WHITESPACE = "\r\n "sv;
 
     using SteadyTime = std::chrono::steady_clock::time_point;
-
-    bool IsWebSocketUrl(const std::string& url)
-    {
-        auto protocol = std::string{};
-        auto host = std::string{};
-        auto path = std::string{};
-        auto query = std::string{};
-        auto port = 0;
-        if (!ix::UrlParser::parse(url, protocol, host, path, query, port))
-        {
-            return false;
-        }
-
-        return protocol == "ws" || protocol == "wss";
-    }
 
     std::optional<SteadyTime> MakeDeadline(std::chrono::milliseconds timeout)
     {
@@ -122,7 +107,7 @@ WebSocketClient::~WebSocketClient()
 
 void WebSocketClient::Connect(const WebSocketOptions_s& options)
 {
-    if (!IsWebSocketUrl(options.url))
+    if (!WebSocketUrl::IsValid(options.url))
     {
         throw std::invalid_argument{"WebSocket options: url must be a ws:// or wss:// URL"};
     }

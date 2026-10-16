@@ -12,6 +12,7 @@
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptHost.hpp"
 #include "../Script/ScriptRuntime.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "ProgressReportFile.hpp"
 #include "ProgressReport_s.hpp"
 
@@ -544,13 +545,7 @@ void Account::AddSettingDefaults(std::string_view botName, std::string_view sett
             return;
         }
 
-        auto keys = std::string{};
-        for (const auto& key : added)
-        {
-            keys += keys.empty() ? key : ", " + key;
-        }
-
-        m_logger->Info("Added {}'s default settings to {}: {}", botName, m_account.file.string(), keys);
+        m_logger->Info("Added {}'s default settings to {}: {}", botName, m_account.file.string(), StringUtils::Join(added, ", "));
     }
     catch (const std::exception& e)
     {

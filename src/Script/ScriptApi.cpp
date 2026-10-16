@@ -17,6 +17,7 @@
 #include "../Game/State/Stat_s.hpp"
 #include "../Game/State/Zone_s.hpp"
 #include "../Game/Tile_s.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "BotMessenger.hpp"
 
 namespace
@@ -32,14 +33,6 @@ namespace
         return ids.empty() || std::ranges::find(ids, id) != ids.end();
     }
 
-    bool EqualsIgnoringCase(std::string_view left, std::string_view right)
-    {
-        return std::ranges::equal(left, right, [](char a, char b)
-        {
-            return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-        });
-    }
-
     bool MatchesName(std::span<const std::string> names, std::string_view name)
     {
         if (names.empty())
@@ -49,7 +42,7 @@ namespace
 
         return !name.empty() && std::ranges::any_of(names, [name](const std::string& wanted)
         {
-            return EqualsIgnoringCase(wanted, name);
+            return StringUtils::EqualsIgnoringCase(wanted, name);
         });
     }
 
@@ -114,7 +107,7 @@ namespace
     {
         const auto found = std::ranges::find_if(menu, [text](std::string_view option)
         {
-            return !option.empty() && EqualsIgnoringCase(option, text);
+            return !option.empty() && StringUtils::EqualsIgnoringCase(option, text);
         });
 
         if (found == menu.end())

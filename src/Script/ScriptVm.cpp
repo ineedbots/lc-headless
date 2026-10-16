@@ -2,6 +2,8 @@
 #include "ScriptVm.hpp"
 
 #include "../Console/Logger.hpp"
+#include "../Utils/FileUtils.hpp"
+#include "../Utils/StringUtils.hpp"
 #include "Error/ScriptError.hpp"
 #include "ScriptRuntime.hpp"
 #include "Stdlib.hpp"
@@ -23,30 +25,6 @@ namespace
         return c11_sv{text.data(), static_cast<int>(text.size())};
     }
 
-    std::optional<std::string> ReadText(const std::filesystem::path& path)
-    {
-        auto file = std::ifstream{path, std::ios::binary};
-        if (!file)
-        {
-            return std::nullopt;
-        }
-
-        return std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
-    }
-
-    bool IsInsideFolder(const std::filesystem::path& relative)
-    {
-        if (relative.empty() || relative.has_root_name() || relative.has_root_directory())
-        {
-            return false;
-        }
-
-        return std::ranges::none_of(relative, [](const std::filesystem::path& part)
-        {
-            return part == "..";
-        });
-    }
-
     // pocketpy frees what an import callback returns, so it's copied into pocketpy's allocator.
     char* CopyForPocketpy(std::string_view source, int* size)
     {
@@ -60,16 +38,6 @@ namespace
         }
 
         return data;
-    }
-
-    std::string TrimTrailingNewlines(std::string text)
-    {
-        while (!text.empty() && (text.back() == '\n' || text.back() == '\r'))
-        {
-            text.pop_back();
-        }
-
-        return text;
     }
 }
 
@@ -107,7 +75,7 @@ ScriptVm::~ScriptVm()
 
 void ScriptVm::RunFile(const std::filesystem::path& relativePath)
 {
-    if (!IsInsideFolder(relativePath))
+    if (!FileUtils::IsInsideFolder(relativePath))
     {
         throw ScriptError{std::format("Script path {} must be relative to the scripts directory", relativePath.generic_string())};
     }
@@ -115,7 +83,7 @@ void ScriptVm::RunFile(const std::filesystem::path& relativePath)
     const auto path = m_options.scriptsDirectory / relativePath;
     m_files.push_back(path);
 
-    const auto source = ReadText(path);
+    const auto source = FileUtils::ReadText(path);
     if (!source)
     {
         throw ScriptError{std::format("Can't read script {}", path.generic_string())};
@@ -282,7 +250,7 @@ void ScriptVm::ThrowPythonError(py_StackRef unwindPoint)
     const auto traceback = PyText{py_formatexc(), &py_free};
     if (traceback != nullptr)
     {
-        message = TrimTrailingNewlines(traceback.get());
+        message = StringUtils::TrimTrailingNewlines(traceback.get());
     }
 
     py_clearexc(unwindPoint);
@@ -292,7 +260,7 @@ void ScriptVm::ThrowPythonError(py_StackRef unwindPoint)
 std::optional<std::filesystem::path> ScriptVm::ResolveImport(std::string_view request) const
 {
     const auto relative = std::filesystem::path{request};
-    if (relative.extension() != SOURCE_EXTENSION || !IsInsideFolder(relative))
+    if (relative.extension() != SOURCE_EXTENSION || !FileUtils::IsInsideFolder(relative))
     {
         return std::nullopt;
     }
@@ -394,7 +362,7 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
 
         vm.m_files.push_back(*file);
 
-        const auto source = ReadText(*file);
+        const auto source = FileUtils::ReadText(*file);
         if (!source)
         {
             return nullptr;
