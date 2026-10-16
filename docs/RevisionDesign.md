@@ -141,7 +141,8 @@ client.jsonc login.revision
     -> Application: CacheLoader::Load(cacheDirectory, revision)   -> GameCache_s::revision
     -> GameClient: Protocol{config.login.revision}, asserts it equals cache.revision
         -> LoginHandshake, ServerPacketReader, ClientPacketWriter, ServerPacketDecoder
-           (PlayerInfoDecoder, NpcInfoDecoder, ZoneDecoder), ClientPackets, InputTracker
+           (PlayerInfoDecoder, NpcInfoDecoder, ZoneDecoder, and the area decoders: InterfacePacketDecoder,
+           InventoryDecoder, PlayerStateDecoder, SocialDecoder, SceneDecoder), ClientPackets, InputTracker
         -> GameActions::GetProtocol() -> ScriptContext::GetRevision() -> _core.get_revision()
 ```
 
@@ -249,6 +250,8 @@ Every payload not listed is byte-for-byte the same in both revisions. Diffing th
 | `MIDI_JINGLE` | `u16 delay`, then bzip2 MIDI bytes to the end | `u16 jingle`, `u16 delay` | 225 consumes it; `audio.jingle` stays -1 |
 | `MESSAGE_PRIVATE` | Same bytes; the engine sends a staff level of 1 or more as one higher | Capped at 3 | 225 subtracts one from a staff level above 0, so `ChatMessage_s::rights` means the same in both |
 
+Each change goes in the decoder for its packet's area: `UPDATE_PID` and `LAST_LOGIN_INFO` in `PlayerStateDecoder`, the two inventory packets in `InventoryDecoder`, `REBUILD_NORMAL`, `MIDI_SONG` and `MIDI_JINGLE` in `SceneDecoder`, and `MESSAGE_PRIVATE` in `SocialDecoder`. `ServerPacketDecoder` holds the `Protocol` and passes it to each area decoder's `Decode`, as it passes the logger to those that warn.
+
 ### Packets one revision doesn't have
 
 | Packet | Revision | Payload | Handling |
@@ -259,7 +262,7 @@ Every payload not listed is byte-for-byte the same in both revisions. Diffing th
 | `IF_SETRECOL` | 225 | `u16 com`, `u16 from`, `u16 to` | Consumed. It recolours a model, which only rendering needs |
 | `FRIENDLIST_LOADED`, `IF_OPENOVERLAY`, `IF_SETSCROLLPOS`, `MINIMAP_TOGGLE`, `SET_PLAYER_OP` | 289 | as today | Unchanged. Their state keeps its default on 225 |
 
-The decoder learns about these packets through `switch (prot)` on the logical enum as today, so a case for a packet a revision never sends is simply never reached. No revision check is needed in those cases.
+`ServerPacketDecoder`'s `switch (prot)` lists every logical packet, as today, and hands each to its area's decoder: `DATA_LAND`, `DATA_LOC` and their `_DONE` packets to `SceneDecoder`, and `IF_SETRECOL` to `InterfacePacketDecoder`. The tracking packets change no state, since `GameClient::Reply` acts on them (§9), so they join `LOGOUT` among the cases that decode nothing. A case for a packet a revision never sends is simply never reached, so no revision check is needed in those cases.
 
 ---
 
@@ -364,7 +367,7 @@ For 225 the loader also keeps each square's raw-file CRCs, for §9.1: a `std::un
 
 ### 10.3 Definitions
 
-`TypeDecoder`'s functions take the revision. Each opcode one revision lacks is a branch, so a cache decoded as the wrong revision still fails on an unknown opcode rather than reading garbage.
+Each type's decoder takes the revision in its `Decode`: `LocTypeDecoder`, `NpcTypeDecoder`, `ObjTypeDecoder` and `VarpTypeDecoder`. `TypeDecoder`'s shared framing and readers are the same in both. Each opcode one revision lacks is a branch in its type's opcode loop, so a cache decoded as the wrong revision still fails on an unknown opcode rather than reading garbage.
 
 | Type | 225 only | 289 only |
 |---|---|---|
@@ -422,7 +425,7 @@ The optional real-cache test (§12) checks each one resolves to the component th
 | `Game/GameClientTests.cpp` | Against `FakeGameServer{Revision_e::Rev225}`: login, a `REBUILD_GETMAPS` after each `REBUILD_NORMAL`, an `EVENT_TRACKING` after `FINISH_TRACKING` both with and without actions in the window, and a report split when it passes 500 bytes |
 | `Cache/CacheLoaderTests.cpp`, `CacheWriter` | `CacheWriter` learns the 225 layout. A 225 folder loads with the right CRCs, maps and components; a missing file shifts the CRCs as `makeCrcs` does; each layout given the other revision fails with the message in §10.1 |
 | `Cache/TypeDecoderTests.cpp`, `InterfaceDecoderTests.cpp` | Each opcode and field in §10.3 and §10.4, in the revision that has it and as an error in the one that doesn't |
-| `Cache/RealCache.cpp` | `RequireShared(Revision_e)`, with `RS2004_CACHE_DIR_225` beside today's variable, skipping when it's unset. `RealCacheTests` checks the 225 components resolve to the ids in the 225 content |
+| `Support/Cache/RealCache.cpp` | `RequireShared(Revision_e)`, with `RS2004_CACHE_DIR_225` beside today's variable, skipping when it's unset. `RealCacheTests` checks the 225 components resolve to the ids in the 225 content |
 | `Config/ConfigFileTests.cpp` | 225 and 289 load; 224, 226, 288 and 290 fail with the message from §3 |
 | Script tests | `game.revision()` returns the configured revision |
 
@@ -436,7 +439,7 @@ Each phase builds and passes every test on both presets before the next starts.
 
 - `Revision_e`; `LoginSettings_s::revision` as `Revision_e`, with only 289 supported.
 - `Protocol`; logical `ServerProt_e` and `ClientProt_e`; the 225 and 289 tables as data; `ClientProt::VAR_SHORT`.
-- `ServerPacketReader`, `ClientPacketWriter`, `ZoneDecoder`, `ServerPacketDecoder`, the entity decoders, `ClientPackets` and `FakeGameServer` take the protocol.
+- `ServerPacketReader`, `ClientPacketWriter`, `ServerPacketDecoder` and the area decoders it hands packets to, `ZoneDecoder`, the entity decoders, `ClientPackets` and `FakeGameServer` take the protocol.
 - `get_revision()` and `game.revision()`.
 - `ProtocolTests` for both tables. Every existing test passes untouched apart from construction.
 
