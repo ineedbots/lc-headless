@@ -1,139 +1,307 @@
 #include "pch.hpp"
 #include "ClientProt.hpp"
 
+#include "../../Config/Revision_e.hpp"
+#include "ProtTableBuilder.hpp"
+#include "WireProt_s.hpp"
+
 namespace
 {
     struct ClientProtInfo_s
     {
         ClientProt_e prot;
-        s32 size;
         std::string_view name;
     };
 
-    constexpr auto CLIENT_PROTS = std::to_array<ClientProtInfo_s>({
-        {ClientProt_e::OpObj2, 6, "OPOBJ2"},
-        {ClientProt_e::OpLoc1, 6, "OPLOC1"},
-        {ClientProt_e::OpPlayer3, 2, "OPPLAYER3"},
-        {ClientProt_e::OpPlayerU, 8, "OPPLAYERU"},
-        {ClientProt_e::OpNpc2, 2, "OPNPC2"},
-        {ClientProt_e::OpObj5, 6, "OPOBJ5"},
-        {ClientProt_e::IdkSaveDesign, 13, "IDK_SAVEDESIGN"},
-        {ClientProt_e::OpNpc4, 2, "OPNPC4"},
-        {ClientProt_e::ClientCheat, ClientProt::VAR_BYTE, "CLIENT_CHEAT"},
-        {ClientProt_e::OpHeld3, 6, "OPHELD3"},
-        {ClientProt_e::InvButton1, 6, "INV_BUTTON1"},
-        {ClientProt_e::OpLoc2, 6, "OPLOC2"},
-        {ClientProt_e::AnticheatOpLogic5, 1, "ANTICHEAT_OPLOGIC5"},
-        {ClientProt_e::AnticheatOpLogic4, 1, "ANTICHEAT_OPLOGIC4"},
-        {ClientProt_e::OpPlayer2, 2, "OPPLAYER2"},
-        {ClientProt_e::OpLoc4, 6, "OPLOC4"},
-        {ClientProt_e::OpObjU, 12, "OPOBJU"},
-        {ClientProt_e::MoveOpClick, ClientProt::VAR_BYTE, "MOVE_OPCLICK"},
-        {ClientProt_e::OpPlayer5, 2, "OPPLAYER5"},
-        {ClientProt_e::AnticheatOpLogic6, 2, "ANTICHEAT_OPLOGIC6"},
-        {ClientProt_e::OpHeld1, 6, "OPHELD1"},
-        {ClientProt_e::OpHeld5, 6, "OPHELD5"},
-        {ClientProt_e::AnticheatOpLogic2, 2, "ANTICHEAT_OPLOGIC2"},
-        {ClientProt_e::AnticheatCycleLogic5, 0, "ANTICHEAT_CYCLELOGIC5"},
-        {ClientProt_e::IfButton, 2, "IF_BUTTON"},
-        {ClientProt_e::AnticheatOpLogic9, 3, "ANTICHEAT_OPLOGIC9"},
-        {ClientProt_e::CloseModal, 0, "CLOSE_MODAL"},
-        {ClientProt_e::ReportAbuse, 10, "REPORT_ABUSE"},
-        {ClientProt_e::OpObj1, 6, "OPOBJ1"},
-        {ClientProt_e::MessagePrivate, ClientProt::VAR_BYTE, "MESSAGE_PRIVATE"},
-        {ClientProt_e::OpNpcT, 4, "OPNPCT"},
-        {ClientProt_e::OpObj3, 6, "OPOBJ3"},
-        {ClientProt_e::InvButton2, 6, "INV_BUTTON2"},
-        {ClientProt_e::OpHeldT, 8, "OPHELDT"},
-        {ClientProt_e::AnticheatOpLogic3, 4, "ANTICHEAT_OPLOGIC3"},
-        {ClientProt_e::InvButton3, 6, "INV_BUTTON3"},
-        {ClientProt_e::AnticheatCycleLogic3, 1, "ANTICHEAT_CYCLELOGIC3"},
-        {ClientProt_e::OpLoc5, 6, "OPLOC5"},
-        {ClientProt_e::AnticheatCycleLogic1, ClientProt::VAR_BYTE, "ANTICHEAT_CYCLELOGIC1"},
-        {ClientProt_e::AnticheatOpLogic7, 4, "ANTICHEAT_OPLOGIC7"},
-        {ClientProt_e::AnticheatCycleLogic4, 1, "ANTICHEAT_CYCLELOGIC4"},
-        {ClientProt_e::OpPlayerT, 4, "OPPLAYERT"},
-        {ClientProt_e::IdleTimer, 0, "IDLE_TIMER"},
-        {ClientProt_e::TutClickSide, 1, "TUT_CLICKSIDE"},
-        {ClientProt_e::OpObj4, 6, "OPOBJ4"},
-        {ClientProt_e::EventAppletFocus, 1, "EVENT_APPLET_FOCUS"},
-        {ClientProt_e::AnticheatCycleLogic2, ClientProt::VAR_BYTE, "ANTICHEAT_CYCLELOGIC2"},
-        {ClientProt_e::MessagePublic, ClientProt::VAR_BYTE, "MESSAGE_PUBLIC"},
-        {ClientProt_e::OpNpcU, 8, "OPNPCU"},
-        {ClientProt_e::ChatSetMode, 3, "CHAT_SETMODE"},
-        {ClientProt_e::ResumePauseButton, 2, "RESUME_PAUSEBUTTON"},
-        {ClientProt_e::AnticheatOpLogic8, 1, "ANTICHEAT_OPLOGIC8"},
-        {ClientProt_e::OpHeld2, 6, "OPHELD2"},
-        {ClientProt_e::OpNpc3, 2, "OPNPC3"},
-        {ClientProt_e::ResumePCountDialog, 4, "RESUME_P_COUNTDIALOG"},
-        {ClientProt_e::NoTimeout, 0, "NO_TIMEOUT"},
-        {ClientProt_e::OpLocU, 12, "OPLOCU"},
-        {ClientProt_e::OpPlayer4, 2, "OPPLAYER4"},
-        {ClientProt_e::OpHeld4, 6, "OPHELD4"},
-        {ClientProt_e::IgnoreListAdd, 8, "IGNORELIST_ADD"},
-        {ClientProt_e::EventCameraPosition, 4, "EVENT_CAMERA_POSITION"},
-        {ClientProt_e::AnticheatOpLogic1, 4, "ANTICHEAT_OPLOGIC1"},
-        {ClientProt_e::OpLoc3, 6, "OPLOC3"},
-        {ClientProt_e::OpHeldU, 12, "OPHELDU"},
-        {ClientProt_e::FriendListDel, 8, "FRIENDLIST_DEL"},
-        {ClientProt_e::MapBuildComplete, 0, "MAP_BUILD_COMPLETE"},
-        {ClientProt_e::OpLocT, 8, "OPLOCT"},
-        {ClientProt_e::OpPlayer1, 2, "OPPLAYER1"},
-        {ClientProt_e::EventMouseClick, 4, "EVENT_MOUSE_CLICK"},
-        {ClientProt_e::InvButton5, 6, "INV_BUTTON5"},
-        {ClientProt_e::EventMouseMove, ClientProt::VAR_BYTE, "EVENT_MOUSE_MOVE"},
-        {ClientProt_e::AnticheatCycleLogic7, 0, "ANTICHEAT_CYCLELOGIC7"},
-        {ClientProt_e::MoveGameClick, ClientProt::VAR_BYTE, "MOVE_GAMECLICK"},
-        {ClientProt_e::FriendListAdd, 8, "FRIENDLIST_ADD"},
-        {ClientProt_e::MoveMinimapClick, ClientProt::VAR_BYTE, "MOVE_MINIMAPCLICK"},
-        {ClientProt_e::OpObjT, 8, "OPOBJT"},
-        {ClientProt_e::OpNpc5, 2, "OPNPC5"},
-        {ClientProt_e::InvButton4, 6, "INV_BUTTON4"},
-        {ClientProt_e::IgnoreListDel, 8, "IGNORELIST_DEL"},
-        {ClientProt_e::OpNpc1, 2, "OPNPC1"},
-        {ClientProt_e::InvButtonD, 7, "INV_BUTTOND"},
-        {ClientProt_e::AnticheatCycleLogic6, 1, "ANTICHEAT_CYCLELOGIC6"},
+    struct ClientProtRow_s
+    {
+        ClientProt_e prot;
+        u8 opcode;
+        s32 size;
+    };
+
+    constexpr auto CLIENT_PROT_INFOS = std::to_array<ClientProtInfo_s>({
+        {ClientProt_e::AnticheatCycleLogic1, "ANTICHEAT_CYCLELOGIC1"},
+        {ClientProt_e::AnticheatCycleLogic2, "ANTICHEAT_CYCLELOGIC2"},
+        {ClientProt_e::AnticheatCycleLogic3, "ANTICHEAT_CYCLELOGIC3"},
+        {ClientProt_e::AnticheatCycleLogic4, "ANTICHEAT_CYCLELOGIC4"},
+        {ClientProt_e::AnticheatCycleLogic5, "ANTICHEAT_CYCLELOGIC5"},
+        {ClientProt_e::AnticheatCycleLogic6, "ANTICHEAT_CYCLELOGIC6"},
+        {ClientProt_e::AnticheatCycleLogic7, "ANTICHEAT_CYCLELOGIC7"},
+        {ClientProt_e::AnticheatOpLogic1, "ANTICHEAT_OPLOGIC1"},
+        {ClientProt_e::AnticheatOpLogic2, "ANTICHEAT_OPLOGIC2"},
+        {ClientProt_e::AnticheatOpLogic3, "ANTICHEAT_OPLOGIC3"},
+        {ClientProt_e::AnticheatOpLogic4, "ANTICHEAT_OPLOGIC4"},
+        {ClientProt_e::AnticheatOpLogic5, "ANTICHEAT_OPLOGIC5"},
+        {ClientProt_e::AnticheatOpLogic6, "ANTICHEAT_OPLOGIC6"},
+        {ClientProt_e::AnticheatOpLogic7, "ANTICHEAT_OPLOGIC7"},
+        {ClientProt_e::AnticheatOpLogic8, "ANTICHEAT_OPLOGIC8"},
+        {ClientProt_e::AnticheatOpLogic9, "ANTICHEAT_OPLOGIC9"},
+        {ClientProt_e::ChatSetMode, "CHAT_SETMODE"},
+        {ClientProt_e::ClientCheat, "CLIENT_CHEAT"},
+        {ClientProt_e::CloseModal, "CLOSE_MODAL"},
+        {ClientProt_e::EventAppletFocus, "EVENT_APPLET_FOCUS"},
+        {ClientProt_e::EventCameraPosition, "EVENT_CAMERA_POSITION"},
+        {ClientProt_e::EventMouseClick, "EVENT_MOUSE_CLICK"},
+        {ClientProt_e::EventMouseMove, "EVENT_MOUSE_MOVE"},
+        {ClientProt_e::EventTracking, "EVENT_TRACKING"},
+        {ClientProt_e::FriendListAdd, "FRIENDLIST_ADD"},
+        {ClientProt_e::FriendListDel, "FRIENDLIST_DEL"},
+        {ClientProt_e::IdkSaveDesign, "IDK_SAVEDESIGN"},
+        {ClientProt_e::IdleTimer, "IDLE_TIMER"},
+        {ClientProt_e::IfButton, "IF_BUTTON"},
+        {ClientProt_e::IgnoreListAdd, "IGNORELIST_ADD"},
+        {ClientProt_e::IgnoreListDel, "IGNORELIST_DEL"},
+        {ClientProt_e::InvButton1, "INV_BUTTON1"},
+        {ClientProt_e::InvButton2, "INV_BUTTON2"},
+        {ClientProt_e::InvButton3, "INV_BUTTON3"},
+        {ClientProt_e::InvButton4, "INV_BUTTON4"},
+        {ClientProt_e::InvButton5, "INV_BUTTON5"},
+        {ClientProt_e::InvButtonD, "INV_BUTTOND"},
+        {ClientProt_e::MapBuildComplete, "MAP_BUILD_COMPLETE"},
+        {ClientProt_e::MessagePrivate, "MESSAGE_PRIVATE"},
+        {ClientProt_e::MessagePublic, "MESSAGE_PUBLIC"},
+        {ClientProt_e::MoveGameClick, "MOVE_GAMECLICK"},
+        {ClientProt_e::MoveMinimapClick, "MOVE_MINIMAPCLICK"},
+        {ClientProt_e::MoveOpClick, "MOVE_OPCLICK"},
+        {ClientProt_e::NoTimeout, "NO_TIMEOUT"},
+        {ClientProt_e::OpHeld1, "OPHELD1"},
+        {ClientProt_e::OpHeld2, "OPHELD2"},
+        {ClientProt_e::OpHeld3, "OPHELD3"},
+        {ClientProt_e::OpHeld4, "OPHELD4"},
+        {ClientProt_e::OpHeld5, "OPHELD5"},
+        {ClientProt_e::OpHeldT, "OPHELDT"},
+        {ClientProt_e::OpHeldU, "OPHELDU"},
+        {ClientProt_e::OpLoc1, "OPLOC1"},
+        {ClientProt_e::OpLoc2, "OPLOC2"},
+        {ClientProt_e::OpLoc3, "OPLOC3"},
+        {ClientProt_e::OpLoc4, "OPLOC4"},
+        {ClientProt_e::OpLoc5, "OPLOC5"},
+        {ClientProt_e::OpLocT, "OPLOCT"},
+        {ClientProt_e::OpLocU, "OPLOCU"},
+        {ClientProt_e::OpNpc1, "OPNPC1"},
+        {ClientProt_e::OpNpc2, "OPNPC2"},
+        {ClientProt_e::OpNpc3, "OPNPC3"},
+        {ClientProt_e::OpNpc4, "OPNPC4"},
+        {ClientProt_e::OpNpc5, "OPNPC5"},
+        {ClientProt_e::OpNpcT, "OPNPCT"},
+        {ClientProt_e::OpNpcU, "OPNPCU"},
+        {ClientProt_e::OpObj1, "OPOBJ1"},
+        {ClientProt_e::OpObj2, "OPOBJ2"},
+        {ClientProt_e::OpObj3, "OPOBJ3"},
+        {ClientProt_e::OpObj4, "OPOBJ4"},
+        {ClientProt_e::OpObj5, "OPOBJ5"},
+        {ClientProt_e::OpObjT, "OPOBJT"},
+        {ClientProt_e::OpObjU, "OPOBJU"},
+        {ClientProt_e::OpPlayer1, "OPPLAYER1"},
+        {ClientProt_e::OpPlayer2, "OPPLAYER2"},
+        {ClientProt_e::OpPlayer3, "OPPLAYER3"},
+        {ClientProt_e::OpPlayer4, "OPPLAYER4"},
+        {ClientProt_e::OpPlayer5, "OPPLAYER5"},
+        {ClientProt_e::OpPlayerT, "OPPLAYERT"},
+        {ClientProt_e::OpPlayerU, "OPPLAYERU"},
+        {ClientProt_e::RebuildGetMaps, "REBUILD_GETMAPS"},
+        {ClientProt_e::ReportAbuse, "REPORT_ABUSE"},
+        {ClientProt_e::ResumePauseButton, "RESUME_PAUSEBUTTON"},
+        {ClientProt_e::ResumePCountDialog, "RESUME_P_COUNTDIALOG"},
+        {ClientProt_e::TutClickSide, "TUT_CLICKSIDE"},
     });
 
-    static_assert(CLIENT_PROTS.size() == ClientProt::COUNT, "The client opcode table must list every opcode");
+    static_assert(CLIENT_PROT_INFOS.size() == ClientProtTable_s::PROT_COUNT, "Every client packet needs a name");
+    static_assert(ProtTableBuilder::IsInProtOrder(CLIENT_PROT_INFOS), "Client packet names must be in ClientProt_e's order");
 
-    constexpr auto INFO_BY_OPCODE = []
-    {
-        auto table = std::array<const ClientProtInfo_s*, 256>{};
-        for (const auto& info : CLIENT_PROTS)
-        {
-            table[static_cast<u8>(info.prot)] = &info;
-        }
+    constexpr auto CLIENT_PROTS_225 = std::to_array<ClientProtRow_s>({
+        {ClientProt_e::AnticheatCycleLogic1, 233, 1},
+        {ClientProt_e::AnticheatCycleLogic2, 146, ClientProt::VAR_BYTE},
+        {ClientProt_e::AnticheatCycleLogic3, 215, 3},
+        {ClientProt_e::AnticheatCycleLogic4, 236, 4},
+        {ClientProt_e::AnticheatCycleLogic5, 85, 0},
+        {ClientProt_e::AnticheatCycleLogic6, 219, ClientProt::VAR_BYTE},
+        {ClientProt_e::AnticheatOpLogic1, 7, 4},
+        {ClientProt_e::AnticheatOpLogic2, 88, 4},
+        {ClientProt_e::AnticheatOpLogic3, 30, 3},
+        {ClientProt_e::AnticheatOpLogic4, 176, 2},
+        {ClientProt_e::AnticheatOpLogic5, 220, 0},
+        {ClientProt_e::AnticheatOpLogic6, 66, 4},
+        {ClientProt_e::AnticheatOpLogic7, 17, 4},
+        {ClientProt_e::AnticheatOpLogic8, 2, 2},
+        {ClientProt_e::AnticheatOpLogic9, 238, 1},
+        {ClientProt_e::ChatSetMode, 244, 3},
+        {ClientProt_e::ClientCheat, 4, ClientProt::VAR_BYTE},
+        {ClientProt_e::CloseModal, 231, 0},
+        {ClientProt_e::EventCameraPosition, 189, 6},
+        {ClientProt_e::EventTracking, 81, ClientProt::VAR_SHORT},
+        {ClientProt_e::FriendListAdd, 118, 8},
+        {ClientProt_e::FriendListDel, 11, 8},
+        {ClientProt_e::IdkSaveDesign, 52, 13},
+        {ClientProt_e::IdleTimer, 70, 0},
+        {ClientProt_e::IfButton, 155, 2},
+        {ClientProt_e::IgnoreListAdd, 79, 8},
+        {ClientProt_e::IgnoreListDel, 171, 8},
+        {ClientProt_e::InvButton1, 31, 6},
+        {ClientProt_e::InvButton2, 59, 6},
+        {ClientProt_e::InvButton3, 212, 6},
+        {ClientProt_e::InvButton4, 38, 6},
+        {ClientProt_e::InvButton5, 6, 6},
+        {ClientProt_e::InvButtonD, 159, 6},
+        {ClientProt_e::MessagePrivate, 148, ClientProt::VAR_BYTE},
+        {ClientProt_e::MessagePublic, 158, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveGameClick, 181, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveMinimapClick, 165, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveOpClick, 93, ClientProt::VAR_BYTE},
+        {ClientProt_e::NoTimeout, 108, 0},
+        {ClientProt_e::OpHeld1, 195, 6},
+        {ClientProt_e::OpHeld2, 71, 6},
+        {ClientProt_e::OpHeld3, 133, 6},
+        {ClientProt_e::OpHeld4, 157, 6},
+        {ClientProt_e::OpHeld5, 211, 6},
+        {ClientProt_e::OpHeldT, 48, 8},
+        {ClientProt_e::OpHeldU, 130, 12},
+        {ClientProt_e::OpLoc1, 245, 6},
+        {ClientProt_e::OpLoc2, 172, 6},
+        {ClientProt_e::OpLoc3, 96, 6},
+        {ClientProt_e::OpLoc4, 97, 6},
+        {ClientProt_e::OpLoc5, 116, 6},
+        {ClientProt_e::OpLocT, 9, 8},
+        {ClientProt_e::OpLocU, 75, 12},
+        {ClientProt_e::OpNpc1, 194, 2},
+        {ClientProt_e::OpNpc2, 8, 2},
+        {ClientProt_e::OpNpc3, 27, 2},
+        {ClientProt_e::OpNpc4, 113, 2},
+        {ClientProt_e::OpNpc5, 100, 2},
+        {ClientProt_e::OpNpcT, 134, 4},
+        {ClientProt_e::OpNpcU, 202, 8},
+        {ClientProt_e::OpObj1, 140, 6},
+        {ClientProt_e::OpObj2, 40, 6},
+        {ClientProt_e::OpObj3, 200, 6},
+        {ClientProt_e::OpObj4, 178, 6},
+        {ClientProt_e::OpObj5, 247, 6},
+        {ClientProt_e::OpObjT, 138, 8},
+        {ClientProt_e::OpObjU, 239, 12},
+        {ClientProt_e::OpPlayer1, 164, 2},
+        {ClientProt_e::OpPlayer2, 53, 2},
+        {ClientProt_e::OpPlayer3, 185, 2},
+        {ClientProt_e::OpPlayer4, 206, 2},
+        {ClientProt_e::OpPlayerT, 177, 4},
+        {ClientProt_e::OpPlayerU, 248, 8},
+        {ClientProt_e::RebuildGetMaps, 150, ClientProt::VAR_BYTE},
+        {ClientProt_e::ReportAbuse, 190, 10},
+        {ClientProt_e::ResumePauseButton, 235, 2},
+        {ClientProt_e::ResumePCountDialog, 237, 4},
+        {ClientProt_e::TutClickSide, 175, 1},
+    });
 
-        return table;
-    }();
+    constexpr auto CLIENT_PROTS_289 = std::to_array<ClientProtRow_s>({
+        {ClientProt_e::AnticheatCycleLogic1, 130, ClientProt::VAR_BYTE},
+        {ClientProt_e::AnticheatCycleLogic2, 154, ClientProt::VAR_BYTE},
+        {ClientProt_e::AnticheatCycleLogic3, 125, 1},
+        {ClientProt_e::AnticheatCycleLogic4, 137, 1},
+        {ClientProt_e::AnticheatCycleLogic5, 85, 0},
+        {ClientProt_e::AnticheatCycleLogic6, 255, 1},
+        {ClientProt_e::AnticheatCycleLogic7, 232, 0},
+        {ClientProt_e::AnticheatOpLogic1, 195, 4},
+        {ClientProt_e::AnticheatOpLogic2, 81, 2},
+        {ClientProt_e::AnticheatOpLogic3, 122, 4},
+        {ClientProt_e::AnticheatOpLogic4, 49, 1},
+        {ClientProt_e::AnticheatOpLogic5, 46, 1},
+        {ClientProt_e::AnticheatOpLogic6, 73, 2},
+        {ClientProt_e::AnticheatOpLogic7, 133, 4},
+        {ClientProt_e::AnticheatOpLogic8, 168, 1},
+        {ClientProt_e::AnticheatOpLogic9, 88, 3},
+        {ClientProt_e::ChatSetMode, 161, 3},
+        {ClientProt_e::ClientCheat, 34, ClientProt::VAR_BYTE},
+        {ClientProt_e::CloseModal, 93, 0},
+        {ClientProt_e::EventAppletFocus, 149, 1},
+        {ClientProt_e::EventCameraPosition, 193, 4},
+        {ClientProt_e::EventMouseClick, 224, 4},
+        {ClientProt_e::EventMouseMove, 229, ClientProt::VAR_BYTE},
+        {ClientProt_e::FriendListAdd, 235, 8},
+        {ClientProt_e::FriendListDel, 203, 8},
+        {ClientProt_e::IdkSaveDesign, 27, 13},
+        {ClientProt_e::IdleTimer, 145, 0},
+        {ClientProt_e::IfButton, 86, 2},
+        {ClientProt_e::IgnoreListAdd, 192, 8},
+        {ClientProt_e::IgnoreListDel, 251, 8},
+        {ClientProt_e::InvButton1, 44, 6},
+        {ClientProt_e::InvButton2, 111, 6},
+        {ClientProt_e::InvButton3, 124, 6},
+        {ClientProt_e::InvButton4, 248, 6},
+        {ClientProt_e::InvButton5, 227, 6},
+        {ClientProt_e::InvButtonD, 253, 7},
+        {ClientProt_e::MapBuildComplete, 214, 0},
+        {ClientProt_e::MessagePrivate, 107, ClientProt::VAR_BYTE},
+        {ClientProt_e::MessagePublic, 156, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveGameClick, 234, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveMinimapClick, 236, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveOpClick, 67, ClientProt::VAR_BYTE},
+        {ClientProt_e::NoTimeout, 181, 0},
+        {ClientProt_e::OpHeld1, 76, 6},
+        {ClientProt_e::OpHeld2, 177, 6},
+        {ClientProt_e::OpHeld3, 40, 6},
+        {ClientProt_e::OpHeld4, 191, 6},
+        {ClientProt_e::OpHeld5, 79, 6},
+        {ClientProt_e::OpHeldT, 112, 8},
+        {ClientProt_e::OpHeldU, 200, 12},
+        {ClientProt_e::OpLoc1, 10, 6},
+        {ClientProt_e::OpLoc2, 45, 6},
+        {ClientProt_e::OpLoc3, 196, 6},
+        {ClientProt_e::OpLoc4, 53, 6},
+        {ClientProt_e::OpLoc5, 126, 6},
+        {ClientProt_e::OpLocT, 218, 8},
+        {ClientProt_e::OpLocU, 184, 12},
+        {ClientProt_e::OpNpc1, 252, 2},
+        {ClientProt_e::OpNpc2, 21, 2},
+        {ClientProt_e::OpNpc3, 178, 2},
+        {ClientProt_e::OpNpc4, 30, 2},
+        {ClientProt_e::OpNpc5, 247, 2},
+        {ClientProt_e::OpNpcT, 108, 4},
+        {ClientProt_e::OpNpcU, 160, 8},
+        {ClientProt_e::OpObj1, 97, 6},
+        {ClientProt_e::OpObj2, 4, 6},
+        {ClientProt_e::OpObj3, 110, 6},
+        {ClientProt_e::OpObj4, 147, 6},
+        {ClientProt_e::OpObj5, 22, 6},
+        {ClientProt_e::OpObjT, 241, 8},
+        {ClientProt_e::OpObjU, 55, 12},
+        {ClientProt_e::OpPlayer1, 220, 2},
+        {ClientProt_e::OpPlayer2, 51, 2},
+        {ClientProt_e::OpPlayer3, 13, 2},
+        {ClientProt_e::OpPlayer4, 189, 2},
+        {ClientProt_e::OpPlayer5, 69, 2},
+        {ClientProt_e::OpPlayerT, 138, 4},
+        {ClientProt_e::OpPlayerU, 16, 8},
+        {ClientProt_e::ReportAbuse, 94, 10},
+        {ClientProt_e::ResumePauseButton, 166, 2},
+        {ClientProt_e::ResumePCountDialog, 180, 4},
+        {ClientProt_e::TutClickSide, 146, 1},
+    });
+
+    static_assert(CLIENT_PROTS_225.size() == 78, "Revision 225 has 78 client packets");
+    static_assert(CLIENT_PROTS_289.size() == 82, "Revision 289 has 82 client packets");
+    static_assert(ProtTableBuilder::HasUniqueRows(CLIENT_PROTS_225), "A 225 client opcode or packet is listed twice");
+    static_assert(ProtTableBuilder::HasUniqueRows(CLIENT_PROTS_289), "A 289 client opcode or packet is listed twice");
+
+    constexpr auto TABLE_225 = ProtTableBuilder::Build<ClientProtTable_s>(CLIENT_PROTS_225);
+    constexpr auto TABLE_289 = ProtTableBuilder::Build<ClientProtTable_s>(CLIENT_PROTS_289);
 }
 
-std::optional<s32> ClientProt::GetSize(u8 opcode)
+std::string_view ClientProt::GetName(ClientProt_e prot)
 {
-    const auto* const info = INFO_BY_OPCODE[opcode];
-    if (info == nullptr)
+    const auto index = static_cast<std::size_t>(prot);
+    assert(index < CLIENT_PROT_INFOS.size() && "ClientProt_e value out of range");
+    return CLIENT_PROT_INFOS[index].name;
+}
+
+const ClientProtTable_s& ClientProt::GetTable(Revision_e revision)
+{
+    switch (revision)
     {
-        return std::nullopt;
+    case Revision_e::Rev225:
+        return TABLE_225;
+    case Revision_e::Rev289:
+        return TABLE_289;
     }
 
-    return info->size;
-}
-
-s32 ClientProt::GetSize(ClientProt_e prot)
-{
-    const auto* const info = INFO_BY_OPCODE[static_cast<u8>(prot)];
-    assert(info != nullptr && "ClientProt_e value missing from the opcode table");
-    return info->size;
-}
-
-std::string_view ClientProt::GetName(u8 opcode)
-{
-    const auto* const info = INFO_BY_OPCODE[opcode];
-    if (info == nullptr)
-    {
-        return "UNKNOWN";
-    }
-
-    return info->name;
+    assert(false && "Unhandled Revision_e");
+    return TABLE_225;
 }

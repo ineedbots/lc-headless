@@ -19,6 +19,7 @@
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
 #include "Protocol/ClientProt.hpp"
+#include "Protocol/Protocol.hpp"
 #include "Protocol/ServerProt.hpp"
 #include "State/GameState_s.hpp"
 #include "State/Social_s.hpp"
@@ -78,8 +79,10 @@ GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<c
     , m_account{std::move(account)}
     , m_logger{std::move(logger)}
     , m_options{options}
+    , m_protocol{m_config->login.revision}
+    , m_packets{m_protocol}
     , m_socket{std::make_unique<WebSocketClient>(m_logger)}
-    , m_decoder{m_logger}
+    , m_decoder{m_protocol, m_logger}
     , m_map{m_cache}
     , m_retries{options.connectAttempts, options.retryDelay, options.maxRetryDelay}
 {
@@ -152,7 +155,7 @@ void GameClient::RequestLogout(std::chrono::milliseconds timeout)
     }
 
     m_logger->Info("Logging out");
-    Send(ClientPackets::IfButton(m_cache->logoutComponent));
+    Send(m_packets.IfButton(m_cache->logoutComponent));
     m_status = ClientStatus_e::LoggingOut;
     m_logoutTimeout = timeout;
     m_logoutDeadline = Clock::now() + timeout;
@@ -225,20 +228,30 @@ Logger& GameClient::GetLogger() const
     return *m_logger;
 }
 
+const Protocol& GameClient::GetProtocol() const
+{
+    return m_protocol;
+}
+
+const ClientPackets& GameClient::GetPackets() const
+{
+    return m_packets;
+}
+
 void GameClient::Send(ClientPacket_s packet)
 {
     if (m_status != ClientStatus_e::InGame)
     {
-        throw std::runtime_error{std::format("Can't send {} while not in game", ClientProt::GetName(static_cast<u8>(packet.prot)))};
+        throw std::runtime_error{std::format("Can't send {} while not in game", ClientProt::GetName(packet.prot))};
     }
 
-    ClientPacketWriter::Validate(packet);
+    ClientPacketWriter::Validate(m_protocol, packet);
     m_outgoing.push_back(std::move(packet));
 }
 
 void GameClient::SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run)
 {
-    Send(ClientPackets::Move(kind, waypoints, run));
+    Send(m_packets.Move(kind, waypoints, run));
 
     auto destination = waypoints.back();
     destination.level = m_state.localPlayer.tile.level;
@@ -257,7 +270,7 @@ void GameClient::Flush()
     for (const auto& packet : m_outgoing)
     {
         m_writer->Write(packet, bytes);
-        m_logger->Verbose("Sending {} ({} bytes)", ClientProt::GetName(static_cast<u8>(packet.prot)), packet.payload.size());
+        m_logger->Verbose("Sending {} ({} bytes)", ClientProt::GetName(packet.prot), packet.payload.size());
     }
 
     m_outgoing.clear();
@@ -355,7 +368,7 @@ bool GameClient::ContinueLogout()
 
     if (now >= m_nextLogoutClick)
     {
-        m_outgoing.push_back(ClientPackets::IfButton(m_cache->logoutComponent));
+        m_outgoing.push_back(m_packets.IfButton(m_cache->logoutComponent));
         m_nextLogoutClick = now + LOGOUT_RETRY;
     }
 
@@ -480,8 +493,8 @@ void GameClient::FinishLogin(const LoginResult_s& result)
 
     m_handshake.reset();
     m_state.walkDestination.reset();
-    m_writer.emplace(result.seed);
-    m_reader.emplace(LoginHandshake::GetInboundSeed(result.seed));
+    m_writer.emplace(result.seed, m_protocol);
+    m_reader.emplace(LoginHandshake::GetInboundSeed(result.seed), m_protocol);
     m_status = ClientStatus_e::InGame;
     m_reconnecting = false;
     m_retries.Reset();
@@ -585,7 +598,7 @@ void GameClient::ProcessInput()
     while (const auto packet = m_reader->Next())
     {
         m_lastReceive = Clock::now();
-        m_logger->Verbose("Received {} ({} bytes)", ServerProt::GetName(static_cast<u8>(packet->prot)), packet->payload.size());
+        m_logger->Verbose("Received {} ({} bytes)", ServerProt::GetName(packet->prot), packet->payload.size());
         if (packet->prot == ServerProt_e::Logout)
         {
             m_logger->Info("The server ended the session");
@@ -607,7 +620,7 @@ void GameClient::SendKeepaliveIfIdle()
         return;
     }
 
-    m_outgoing.push_back(ClientPackets::NoTimeout());
+    m_outgoing.push_back(m_packets.NoTimeout());
 }
 
 void GameClient::LogNewMessages()

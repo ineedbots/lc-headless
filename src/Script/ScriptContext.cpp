@@ -2,10 +2,12 @@
 #include "ScriptContext.hpp"
 
 #include "../Cache/GameCache_s.hpp"
+#include "../Config/Revision_e.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Nav/Navigation.hpp"
+#include "../Game/Protocol/Protocol.hpp"
 #include "../Game/Query/EntityQuery.hpp"
 #include "../Game/Query/InventoryQuery.hpp"
 #include "../Game/Query/PlayerQuery.hpp"
@@ -23,6 +25,7 @@ ScriptContext::ScriptContext(const GameState_s& state, const WorldMap& map, Game
     , m_messenger{messenger}
     , m_username{std::move(username)}
     , m_navigation{std::move(navigation)}
+    , m_revision{actions.GetProtocol().GetRevision()}
     , m_actions{state, map, actions}
 {
 }
@@ -40,6 +43,11 @@ const WorldMap& ScriptContext::GetMap() const
 const GameCache_s& ScriptContext::GetCache() const
 {
     return m_map.GetCache();
+}
+
+Revision_e ScriptContext::GetRevision() const
+{
+    return m_revision;
 }
 
 const Player_s& ScriptContext::GetLocalPlayer() const

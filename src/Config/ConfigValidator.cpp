@@ -8,6 +8,7 @@
 #include "AccountConfig_s.hpp"
 #include "Config_s.hpp"
 #include "Error/ConfigError.hpp"
+#include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
 
 namespace
@@ -43,6 +44,30 @@ namespace
         return !text.empty() && text.size() <= maxLength && StringUtils::IsPrintableAscii(text);
     }
 
+    bool IsSupported(Revision_e revision)
+    {
+        const auto& revisions = LoginSettings_s::SUPPORTED_REVISIONS;
+        return std::ranges::find(revisions, revision) != revisions.end();
+    }
+
+    // "must be 225 or 289", from the supported list.
+    std::string DescribeSupportedRevisions()
+    {
+        const auto& revisions = LoginSettings_s::SUPPORTED_REVISIONS;
+        auto text = "must be "s;
+        for (auto i = std::size_t{0}; i < revisions.size(); ++i)
+        {
+            if (i > 0)
+            {
+                text += i + 1 == revisions.size() ? " or " : ", ";
+            }
+
+            text += std::to_string(static_cast<u16>(revisions[i]));
+        }
+
+        return text;
+    }
+
     void ValidateServer(const ServerSettings_s& server)
     {
         Check(WebSocketUrl::IsValid(server.url), "server.url", "must be a ws:// or wss:// URL");
@@ -59,7 +84,7 @@ void ConfigValidator::Validate(const Config_s& config)
     const auto one = BigUInt::Parse("1");
     Check(login.rsaModulus > one, "login.rsaModulus", "must be greater than 1");
     Check(login.rsaExponent > BigUInt{}, "login.rsaExponent", "must be greater than 0");
-    Check(login.revision == LoginSettings_s::SUPPORTED_REVISION, "login.revision", std::format("must be {}", LoginSettings_s::SUPPORTED_REVISION));
+    Check(IsSupported(login.revision), "login.revision", DescribeSupportedRevisions());
 
     const auto& client = config.client;
     Check(!client.cacheDirectory.empty(), "client.cacheDirectory", "must not be empty");

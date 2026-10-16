@@ -4,49 +4,54 @@
 #include "../../Io/Isaac.hpp"
 #include "../Protocol/ClientPacket_s.hpp"
 #include "../Protocol/ClientProt.hpp"
+#include "../Protocol/Protocol.hpp"
 
 namespace
 {
-    constexpr auto MAX_VAR_BYTE_SIZE = std::size_t{255};
+    constexpr auto MAX_VAR_BYTE_SIZE = std::size_t{0xFF};
+    constexpr auto MAX_VAR_SHORT_SIZE = std::size_t{0xFFFF};
 }
 
-ClientPacketWriter::ClientPacketWriter(std::span<const s32> seed)
+ClientPacketWriter::ClientPacketWriter(std::span<const s32> seed, Protocol protocol)
     : m_isaac{seed}
+    , m_protocol{protocol}
 {
 }
 
-void ClientPacketWriter::Validate(const ClientPacket_s& packet)
+void ClientPacketWriter::Validate(const Protocol& protocol, const ClientPacket_s& packet)
 {
-    const auto opcode = static_cast<u8>(packet.prot);
-    const auto size = ClientProt::GetSize(opcode);
-    if (!size)
+    const auto size = protocol.GetSize(packet.prot);
+    const auto name = ClientProt::GetName(packet.prot);
+    if (size == ClientProt::VAR_BYTE || size == ClientProt::VAR_SHORT)
     {
-        throw std::invalid_argument{std::format("Client opcode {} doesn't exist, and the server would close the socket", opcode)};
-    }
-
-    const auto name = ClientProt::GetName(opcode);
-    if (*size == ClientProt::VAR_BYTE)
-    {
-        if (packet.payload.size() > MAX_VAR_BYTE_SIZE)
+        const auto maxSize = size == ClientProt::VAR_BYTE ? MAX_VAR_BYTE_SIZE : MAX_VAR_SHORT_SIZE;
+        if (packet.payload.size() > maxSize)
         {
-            throw std::invalid_argument{std::format("{} payload is {} bytes, more than a 1-byte length can hold", name, packet.payload.size())};
+            throw std::invalid_argument{std::format("{} payload is {} bytes, more than its length prefix can hold", name, packet.payload.size())};
         }
 
         return;
     }
 
-    if (packet.payload.size() != static_cast<std::size_t>(*size))
+    if (packet.payload.size() != static_cast<std::size_t>(size))
     {
-        throw std::invalid_argument{std::format("{} payload must be {} bytes, not {}", name, *size, packet.payload.size())};
+        throw std::invalid_argument{std::format("{} payload must be {} bytes, not {}", name, size, packet.payload.size())};
     }
 }
 
 void ClientPacketWriter::Write(const ClientPacket_s& packet, std::vector<u8>& out)
 {
-    Validate(packet);
+    Validate(m_protocol, packet);
 
-    out.push_back(static_cast<u8>(static_cast<u32>(packet.prot) + static_cast<u32>(m_isaac.NextInt())));
-    if (ClientProt::GetSize(packet.prot) == ClientProt::VAR_BYTE)
+    out.push_back(static_cast<u8>(u32{m_protocol.GetOpcode(packet.prot)} + static_cast<u32>(m_isaac.NextInt())));
+
+    const auto size = m_protocol.GetSize(packet.prot);
+    if (size == ClientProt::VAR_SHORT)
+    {
+        out.push_back(static_cast<u8>(packet.payload.size() >> 8));
+    }
+
+    if (size == ClientProt::VAR_BYTE || size == ClientProt::VAR_SHORT)
     {
         out.push_back(static_cast<u8>(packet.payload.size()));
     }

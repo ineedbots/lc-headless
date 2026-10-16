@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
+#include "../Protocol/ServerProt.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Zone_s.hpp"
 #include "../Tile_s.hpp"
@@ -11,9 +13,11 @@ public:
     static constexpr s32 ACTIVE_ZONE_RADIUS = 3;
     static constexpr s32 BUILD_AREA_ZONES = 13;
 
+    explicit ZoneDecoder(Protocol protocol);
+
     void SetZone(Packet& packet);
     void ResetZone(GameState_s& state) const;
-    void DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state) const;
+    void DecodeSubPacket(ServerProt_e prot, Packet& packet, GameState_s& state) const;
     void DecodeEnclosed(Packet& packet, GameState_s& state) const;
 
     [[nodiscard]] static bool IsActive(const GameState_s& state, const Tile_s& tile);
@@ -27,6 +31,7 @@ private:
     static void DeleteObj(GameState_s& state, const Tile_s& tile, u16 obj);
     static void CountObj(GameState_s& state, const Tile_s& tile, u16 obj, u16 oldCount, u16 newCount);
 
+    Protocol m_protocol;
     s32 m_localX = 0;
     s32 m_localZ = 0;
 };

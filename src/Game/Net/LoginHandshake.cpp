@@ -188,7 +188,7 @@ std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& accou
 
     const auto bodyStart = packet.GetPos();
     packet.P1(REVISION_MARKER);
-    packet.P2(login.revision);
+    packet.P2(static_cast<u16>(login.revision));
     packet.P1(login.lowMemory ? 1 : 0);
     for (const auto crc : crcs)
     {

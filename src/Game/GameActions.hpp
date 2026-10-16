@@ -5,6 +5,7 @@
 #include "Map/WorldMap.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
+#include "Protocol/Protocol.hpp"
 #include "Tile_s.hpp"
 
 // The server walks each waypoint in a straight line, so walks and interactions route around obstacles first, as
@@ -60,6 +61,7 @@ public:
     void RemoveIgnore(std::string_view name);
 
     [[nodiscard]] std::optional<ItemRef_s> FindItem(u16 com, u16 obj) const;
+    [[nodiscard]] const Protocol& GetProtocol() const;
 
 private:
     void Approach(const std::optional<std::vector<Tile_s>>& route, const Tile_s& destination, ClientPacket_s action);

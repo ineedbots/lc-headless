@@ -3,10 +3,12 @@
 #include "../Support/Game/Fixtures.hpp"
 
 #include "Cache/GameCache_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"
+#include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Game/State/Zone_s.hpp"
@@ -182,7 +184,7 @@ TEST_CASE("WorldMap puts the server's changes in place of the cache's locs", "[W
 TEST_CASE("WorldMap follows the decoders' zone resets", "[WorldMap]")
 {
     auto fixture = MapFixture{};
-    auto decoder = ServerPacketDecoder{};
+    auto decoder = ServerPacketDecoder{Protocol{Revision_e::Rev289}};
     const auto zone = Fixtures::Zone(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL);
     const auto doorPos = static_cast<u8>(1 << 4);
 

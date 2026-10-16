@@ -284,12 +284,12 @@ struct AccountSettings_s
 
 struct LoginSettings_s
 {
-    static constexpr u16 SUPPORTED_REVISION = 289;
+    static constexpr auto SUPPORTED_REVISIONS = std::to_array({Revision_e::Rev289});
 
     BigUInt rsaModulus;
     BigUInt rsaExponent;
     bool lowMemory = false;
-    u16 revision = SUPPORTED_REVISION;
+    Revision_e revision = Revision_e::Rev289;
 };
 
 struct ClientSettings_s
@@ -610,7 +610,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     - `Check(valid, path, rule)` throws `ConfigError{std::format("{}: {}", path, rule)}` when `valid` is false.
     - `Validate` is also where a key that can't do without a value fails when it's missing: its default breaks the rule. It can't tell a missing key from one set to the same value, so the message gives the rule, not "missing".
     - `IsWebSocketUrl` calls `ix::UrlParser::parse` and requires the protocol it returns to be `ws` or `wss`.
-    - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_CALL_TIMEOUT`, `MAX_CALL_TIMEOUT`, ...). The revision check uses `LoginSettings_s::SUPPORTED_REVISION`.
+    - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_CALL_TIMEOUT`, `MAX_CALL_TIMEOUT`, ...). The revision check looks the value up in `LoginSettings_s::SUPPORTED_REVISIONS` and builds its message from that list. `Revision_e`'s values are the revision numbers, and nlohmann converts a scoped enum to and from its underlying integer, so the file still says `"revision": 289` ([RevisionDesign.md](RevisionDesign.md) §3).
     - `lowMemory` has no rule beyond its type.
     - The paths in `Validate` are written out by hand. A test for each rule (§6.5) catches a path that no longer matches its member after a rename.
 - **TLS.** `tlsCaFile` matters only for `wss`. With a `ws` URL it's stored as written and unused, without a warning, so switching `url` between a local `ws` server and a remote `wss` one stays a one-line edit, as in `client.ini`. With a `wss` URL and `NONE`, `Parse` logs `Warning` through the logger it was given: `Config disables TLS certificate verification (server.tlsCaFile is NONE)`.

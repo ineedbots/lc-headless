@@ -4,6 +4,7 @@
 #include "../../Io/Packet.hpp"
 #include "../Error/ProtocolError.hpp"
 #include "../Map/LocShape.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/Entity_s.hpp"
 #include "../State/GameEvent_s.hpp"
@@ -83,7 +84,12 @@ void ZoneDecoder::ResetZone(GameState_s& state) const
     }
 }
 
-void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state) const
+ZoneDecoder::ZoneDecoder(Protocol protocol)
+    : m_protocol{protocol}
+{
+}
+
+void ZoneDecoder::DecodeSubPacket(ServerProt_e prot, Packet& packet, GameState_s& state) const
 {
     const auto pos = packet.G1();
     const auto localX = m_localX + ((pos >> POS_X_SHIFT) & POS_MASK);
@@ -95,7 +101,7 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         .level = state.localPlayer.tile.level,
     };
 
-    switch (static_cast<ServerProt_e>(opcode))
+    switch (prot)
     {
     case ServerProt_e::LocAddChange:
     {
@@ -231,7 +237,8 @@ void ZoneDecoder::DecodeSubPacket(u8 opcode, Packet& packet, GameState_s& state)
         return;
     }
     default:
-        throw ProtocolError{std::format("Opcode {} ({}) is not a zone sub-packet", opcode, ServerProt::GetName(opcode))};
+        assert(false && "Not a zone sub-packet");
+        return;
     }
 }
 
@@ -240,12 +247,13 @@ void ZoneDecoder::DecodeEnclosed(Packet& packet, GameState_s& state) const
     while (packet.GetAvailable() > 0)
     {
         const auto opcode = packet.G1();
-        if (!ServerProt::IsZoneProt(opcode))
+        const auto prot = m_protocol.FindServerProt(opcode);
+        if (!prot || !ServerProt::IsZoneProt(*prot))
         {
             throw ProtocolError{std::format("UPDATE_ZONE_PARTIAL_ENCLOSED holds opcode {}, which is not a zone sub-packet", opcode)};
         }
 
-        DecodeSubPacket(opcode, packet, state);
+        DecodeSubPacket(*prot, packet, state);
     }
 }
 

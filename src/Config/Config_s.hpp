@@ -2,16 +2,17 @@
 
 #include "../Console/LogLevel_e.hpp"
 #include "../Utils/BigUInt.hpp"
+#include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
 
 struct LoginSettings_s
 {
-    static constexpr u16 SUPPORTED_REVISION = 289;
+    static constexpr auto SUPPORTED_REVISIONS = std::to_array({Revision_e::Rev289});
 
     BigUInt rsaModulus;
     BigUInt rsaExponent;
     bool lowMemory = false;
-    u16 revision = SUPPORTED_REVISION;
+    Revision_e revision = Revision_e::Rev289;
 };
 
 struct ClientSettings_s

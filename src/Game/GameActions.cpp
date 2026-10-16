@@ -9,6 +9,7 @@
 #include "Protocol/Base37.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
+#include "Protocol/Protocol.hpp"
 #include "State/GameState_s.hpp"
 #include "State/Zone_s.hpp"
 #include "Tile_s.hpp"
@@ -45,107 +46,107 @@ void GameActions::WalkPath(std::span<const Tile_s> waypoints, bool run)
 void GameActions::InteractNpc(u16 npcIndex, u8 op)
 {
     const auto tile = GetNpcTile(npcIndex);
-    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpNpc(op, npcIndex));
+    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpNpc(op, npcIndex));
 }
 
 void GameActions::InteractPlayer(u16 playerIndex, u8 op)
 {
     const auto tile = GetPlayerTile(playerIndex);
-    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpPlayer(op, playerIndex));
+    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpPlayer(op, playerIndex));
 }
 
 void GameActions::InteractLoc(const Tile_s& tile, u16 loc, u8 op)
 {
-    ApproachLoc(tile, loc, ClientPackets::OpLoc(op, tile, loc));
+    ApproachLoc(tile, loc, m_client.GetPackets().OpLoc(op, tile, loc));
 }
 
 void GameActions::InteractLocVia(std::span<const Tile_s> waypoints, const Tile_s& tile, u16 loc, u8 op)
 {
-    ApproachVia(waypoints, ClientPackets::OpLoc(op, tile, loc));
+    ApproachVia(waypoints, m_client.GetPackets().OpLoc(op, tile, loc));
 }
 
 void GameActions::InteractGroundItem(const Tile_s& tile, u16 obj, u8 op)
 {
-    Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpObj(op, tile, obj));
+    Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpObj(op, tile, obj));
 }
 
 void GameActions::InteractGroundItemVia(std::span<const Tile_s> waypoints, const Tile_s& tile, u16 obj, u8 op)
 {
-    ApproachVia(waypoints, ClientPackets::OpObj(op, tile, obj));
+    ApproachVia(waypoints, m_client.GetPackets().OpObj(op, tile, obj));
 }
 
 void GameActions::UseItemOnNpc(const ItemRef_s& item, u16 npcIndex)
 {
     const auto tile = GetNpcTile(npcIndex);
-    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpNpcU(npcIndex, item));
+    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpNpcU(npcIndex, item));
 }
 
 void GameActions::UseItemOnPlayer(const ItemRef_s& item, u16 playerIndex)
 {
     const auto tile = GetPlayerTile(playerIndex);
-    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpPlayerU(playerIndex, item));
+    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpPlayerU(playerIndex, item));
 }
 
 void GameActions::UseItemOnLoc(const ItemRef_s& item, const Tile_s& tile, u16 loc)
 {
-    ApproachLoc(tile, loc, ClientPackets::OpLocU(tile, loc, item));
+    ApproachLoc(tile, loc, m_client.GetPackets().OpLocU(tile, loc, item));
 }
 
 void GameActions::UseItemOnGroundItem(const ItemRef_s& item, const Tile_s& tile, u16 obj)
 {
-    Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpObjU(tile, obj, item));
+    Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpObjU(tile, obj, item));
 }
 
 void GameActions::UseItemOnItem(const ItemRef_s& item, const ItemRef_s& target)
 {
-    m_client.Send(ClientPackets::OpHeldU(target, item));
+    m_client.Send(m_client.GetPackets().OpHeldU(target, item));
 }
 
 void GameActions::CastOnNpc(u16 spellCom, u16 npcIndex)
 {
     const auto tile = GetNpcTile(npcIndex);
-    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpNpcT(npcIndex, spellCom));
+    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpNpcT(npcIndex, spellCom));
 }
 
 void GameActions::CastOnPlayer(u16 spellCom, u16 playerIndex)
 {
     const auto tile = GetPlayerTile(playerIndex);
-    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpPlayerT(playerIndex, spellCom));
+    Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpPlayerT(playerIndex, spellCom));
 }
 
 void GameActions::CastOnLoc(u16 spellCom, const Tile_s& tile, u16 loc)
 {
-    ApproachLoc(tile, loc, ClientPackets::OpLocT(tile, loc, spellCom));
+    ApproachLoc(tile, loc, m_client.GetPackets().OpLocT(tile, loc, spellCom));
 }
 
 void GameActions::CastOnGroundItem(u16 spellCom, const Tile_s& tile, u16 obj)
 {
-    Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, ClientPackets::OpObjT(tile, obj, spellCom));
+    Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpObjT(tile, obj, spellCom));
 }
 
 void GameActions::CastOnItem(u16 spellCom, const ItemRef_s& item)
 {
-    m_client.Send(ClientPackets::OpHeldT(item, spellCom));
+    m_client.Send(m_client.GetPackets().OpHeldT(item, spellCom));
 }
 
 void GameActions::OperateItem(const ItemRef_s& item, u8 op)
 {
-    m_client.Send(ClientPackets::OpHeld(op, item));
+    m_client.Send(m_client.GetPackets().OpHeld(op, item));
 }
 
 void GameActions::InventoryButton(const ItemRef_s& item, u8 op)
 {
-    m_client.Send(ClientPackets::InvButton(op, item));
+    m_client.Send(m_client.GetPackets().InvButton(op, item));
 }
 
 void GameActions::MoveItem(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode)
 {
-    m_client.Send(ClientPackets::InvButtonD(com, fromSlot, toSlot, mode));
+    m_client.Send(m_client.GetPackets().InvButtonD(com, fromSlot, toSlot, mode));
 }
 
 void GameActions::ClickButton(u16 com)
 {
-    m_client.Send(ClientPackets::IfButton(com));
+    m_client.Send(m_client.GetPackets().IfButton(com));
 }
 
 void GameActions::ClickComponent(u16 com, ButtonType_e buttonType)
@@ -155,13 +156,13 @@ void GameActions::ClickComponent(u16 com, ButtonType_e buttonType)
     case ButtonType_e::Ok:
     case ButtonType_e::Toggle:
     case ButtonType_e::Select:
-        m_client.Send(ClientPackets::IfButton(com));
+        m_client.Send(m_client.GetPackets().IfButton(com));
         return;
     case ButtonType_e::Continue:
-        m_client.Send(ClientPackets::ResumePauseButton(com));
+        m_client.Send(m_client.GetPackets().ResumePauseButton(com));
         return;
     case ButtonType_e::Close:
-        m_client.Send(ClientPackets::CloseModal());
+        m_client.Send(m_client.GetPackets().CloseModal());
         return;
     case ButtonType_e::None:
     case ButtonType_e::Target:
@@ -171,57 +172,57 @@ void GameActions::ClickComponent(u16 com, ButtonType_e buttonType)
 
 void GameActions::ContinueDialogue(u16 com)
 {
-    m_client.Send(ClientPackets::ResumePauseButton(com));
+    m_client.Send(m_client.GetPackets().ResumePauseButton(com));
 }
 
 void GameActions::AnswerCountDialog(s32 value)
 {
-    m_client.Send(ClientPackets::ResumePCountDialog(value));
+    m_client.Send(m_client.GetPackets().ResumePCountDialog(value));
 }
 
 void GameActions::CloseInterfaces()
 {
-    m_client.Send(ClientPackets::CloseModal());
+    m_client.Send(m_client.GetPackets().CloseModal());
 }
 
 void GameActions::SaveDesign(const IdkDesign_s& design)
 {
-    m_client.Send(ClientPackets::IdkSaveDesign(design));
+    m_client.Send(m_client.GetPackets().IdkSaveDesign(design));
 }
 
 void GameActions::Say(std::string_view text, ChatColour_e colour, ChatEffect_e effect)
 {
-    m_client.Send(ClientPackets::MessagePublic(text, colour, effect));
+    m_client.Send(m_client.GetPackets().MessagePublic(text, colour, effect));
 }
 
 void GameActions::SendPrivateMessage(std::string_view name, std::string_view text)
 {
-    m_client.Send(ClientPackets::MessagePrivate(Base37::Encode(name), text));
+    m_client.Send(m_client.GetPackets().MessagePrivate(Base37::Encode(name), text));
 }
 
 void GameActions::SendCommand(std::string_view command)
 {
-    m_client.Send(ClientPackets::ClientCheat(command));
+    m_client.Send(m_client.GetPackets().ClientCheat(command));
 }
 
 void GameActions::AddFriend(std::string_view name)
 {
-    m_client.Send(ClientPackets::FriendListAdd(Base37::Encode(name)));
+    m_client.Send(m_client.GetPackets().FriendListAdd(Base37::Encode(name)));
 }
 
 void GameActions::RemoveFriend(std::string_view name)
 {
-    m_client.Send(ClientPackets::FriendListDel(Base37::Encode(name)));
+    m_client.Send(m_client.GetPackets().FriendListDel(Base37::Encode(name)));
 }
 
 void GameActions::AddIgnore(std::string_view name)
 {
-    m_client.Send(ClientPackets::IgnoreListAdd(Base37::Encode(name)));
+    m_client.Send(m_client.GetPackets().IgnoreListAdd(Base37::Encode(name)));
 }
 
 void GameActions::RemoveIgnore(std::string_view name)
 {
-    m_client.Send(ClientPackets::IgnoreListDel(Base37::Encode(name)));
+    m_client.Send(m_client.GetPackets().IgnoreListDel(Base37::Encode(name)));
 }
 
 std::optional<ItemRef_s> GameActions::FindItem(u16 com, u16 obj) const
@@ -240,6 +241,11 @@ std::optional<ItemRef_s> GameActions::FindItem(u16 com, u16 obj) const
     }
 
     return ItemRef_s{.obj = obj, .slot = static_cast<u16>(found - slots.begin()), .com = com};
+}
+
+const Protocol& GameActions::GetProtocol() const
+{
+    return m_client.GetProtocol();
 }
 
 void GameActions::Approach(const std::optional<std::vector<Tile_s>>& route, const Tile_s& destination, ClientPacket_s action)

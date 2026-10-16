@@ -3,10 +3,12 @@
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/LogCapture.hpp"
 
+#include "Config/Revision_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/Decode/NpcInfoDecoder.hpp"
 #include "Game/Decode/PlayerInfoDecoder.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
+#include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/State/Entity_s.hpp"
 #include "Game/State/GameEvent_s.hpp"
@@ -181,7 +183,7 @@ namespace
     {
     public:
         DecoderFixture()
-            : decoder{capture.GetLogger()}
+            : decoder{Protocol{Revision_e::Rev289}, capture.GetLogger()}
             , state{Fixtures::PlacedState()}
         {
         }

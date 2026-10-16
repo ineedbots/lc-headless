@@ -6,6 +6,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Config/AccountConfig_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"
@@ -44,8 +45,9 @@ namespace
     }
 }
 
-FakeGameServer::FakeGameServer(Script onLogin)
+FakeGameServer::FakeGameServer(Script onLogin, Revision_e revision)
     : m_onLogin{std::move(onLogin)}
+    , m_revision{revision}
 {
     for (auto port = FIRST_PORT; port <= LAST_PORT; ++port)
     {
@@ -97,6 +99,7 @@ Config_s FakeGameServer::MakeConfig() const
     config.server.url = Url();
     config.login.rsaModulus = BigUInt::Parse("0x" + std::string(RSA_MODULUS_HEX_DIGITS, 'f'));
     config.login.rsaExponent = BigUInt::Parse("1");
+    config.login.revision = m_revision;
     return config;
 }
 
@@ -285,7 +288,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
     auto packet = Packet{bytes};
     const auto opcode = packet.G1();
     const auto bodySize = packet.G1();
-    if (bytes.size() != LOGIN_HEADER_SIZE + bodySize || packet.G1() != 0xFF || packet.G2() != LoginSettings_s::SUPPORTED_REVISION)
+    if (bytes.size() != LOGIN_HEADER_SIZE + bodySize || packet.G1() != 0xFF || packet.G2() != static_cast<u16>(m_revision))
     {
         AddError("The login request's length, marker or revision is wrong");
         return;
@@ -355,19 +358,30 @@ void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<cons
         auto packet = Packet{bytes};
         while (packet.GetAvailable() > 0)
         {
+            const auto& table = ClientProt::GetTable(m_revision);
             const auto opcode = static_cast<u8>(packet.G1() - static_cast<u32>(m_fromClient->NextInt()));
-            const auto size = ClientProt::GetSize(opcode);
-            if (!size)
+            const auto found = table.byOpcode[opcode];
+            if (!found)
             {
                 m_errors.push_back(std::format("Client sent unknown opcode {}", opcode));
                 break;
             }
 
-            const auto length = *size == ClientProt::VAR_BYTE ? std::size_t{packet.G1()} : static_cast<std::size_t>(*size);
+            const auto prot = *found;
+            const auto size = table.byProt[static_cast<std::size_t>(prot)]->size;
+            auto length = static_cast<std::size_t>(size);
+            if (size == ClientProt::VAR_BYTE)
+            {
+                length = packet.G1();
+            }
+            else if (size == ClientProt::VAR_SHORT)
+            {
+                length = packet.G2();
+            }
+
             auto payload = std::vector<u8>(length);
             packet.GData(payload);
 
-            const auto prot = static_cast<ClientProt_e>(opcode);
             loggedOut = loggedOut || (!m_ignoreLogout && prot == ClientProt_e::IfButton && Packet{payload}.G2() == LOGOUT_COMPONENT);
             m_packets.push_back({.prot = prot, .payload = std::move(payload)});
         }
@@ -390,14 +404,21 @@ void FakeGameServer::SendLocked(ServerProt_e prot, std::span<const u8> payload)
 {
     if (m_connection == nullptr || !m_toClient)
     {
-        m_errors.push_back(std::format("Send of {} with no client in game", ServerProt::GetName(static_cast<u8>(prot))));
+        m_errors.push_back(std::format("Send of {} with no client in game", ServerProt::GetName(prot)));
+        return;
+    }
+
+    const auto& wire = ServerProt::GetTable(m_revision).byProt[static_cast<std::size_t>(prot)];
+    if (!wire)
+    {
+        m_errors.push_back(std::format("Send of {}, which revision {} doesn't have", ServerProt::GetName(prot), static_cast<u16>(m_revision)));
         return;
     }
 
     auto packet = Packet{};
-    packet.P1(static_cast<s32>(static_cast<u32>(prot) + static_cast<u32>(m_toClient->NextInt())));
+    packet.P1(static_cast<s32>(u32{wire->opcode} + static_cast<u32>(m_toClient->NextInt())));
 
-    const auto size = ServerProt::GetSize(static_cast<u8>(prot));
+    const auto size = wire->size;
     if (size == ServerProt::VAR_BYTE)
     {
         packet.P1(static_cast<s32>(payload.size()));

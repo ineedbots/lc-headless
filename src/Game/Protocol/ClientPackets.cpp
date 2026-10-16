@@ -6,6 +6,7 @@
 #include "../Tile_s.hpp"
 #include "ClientPacket_s.hpp"
 #include "ClientProt.hpp"
+#include "Protocol.hpp"
 #include "WordPack.hpp"
 
 namespace
@@ -27,12 +28,6 @@ namespace
     // Any 14 bytes are accepted. These are the webclient's constant fields, with its mouse,
     // camera and scene fields left at zero.
     constexpr auto MINIMAP_TRAILER = std::to_array<u8>({0, 0, 0, 0, 57, 0, 0, 89, 0, 0, 0, 0, 0, 63});
-
-    ClientPacket_s Make(ClientProt_e prot, const Packet& payload)
-    {
-        const auto data = payload.GetData();
-        return {.prot = prot, .payload = {data.begin(), data.end()}};
-    }
 
     ClientProt_e SelectOp(u8 op, const std::array<ClientProt_e, MenuOp::COUNT>& prots, std::string_view kind)
     {
@@ -77,13 +72,6 @@ namespace
         packet.P1(offset);
     }
 
-    ClientPacket_s MakeName(ClientProt_e prot, u64 name)
-    {
-        auto packet = Packet{};
-        packet.P8(std::bit_cast<s64>(name));
-        return Make(prot, packet);
-    }
-
     ClientProt_e GetMoveProt(MoveKind_e kind)
     {
         switch (kind)
@@ -101,29 +89,34 @@ namespace
     }
 }
 
-ClientPacket_s ClientPackets::NoTimeout()
+ClientPackets::ClientPackets(Protocol protocol)
+    : m_protocol{protocol}
 {
-    return {.prot = ClientProt_e::NoTimeout};
 }
 
-ClientPacket_s ClientPackets::IdleTimer()
+ClientPacket_s ClientPackets::NoTimeout() const
 {
-    return {.prot = ClientProt_e::IdleTimer};
+    return Make(ClientProt_e::NoTimeout);
 }
 
-ClientPacket_s ClientPackets::MapBuildComplete()
+ClientPacket_s ClientPackets::IdleTimer() const
 {
-    return {.prot = ClientProt_e::MapBuildComplete};
+    return Make(ClientProt_e::IdleTimer);
 }
 
-ClientPacket_s ClientPackets::EventAppletFocus(bool focused)
+ClientPacket_s ClientPackets::MapBuildComplete() const
+{
+    return Make(ClientProt_e::MapBuildComplete);
+}
+
+ClientPacket_s ClientPackets::EventAppletFocus(bool focused) const
 {
     auto packet = Packet{};
     packet.P1(focused ? 1 : 0);
     return Make(ClientProt_e::EventAppletFocus, packet);
 }
 
-ClientPacket_s ClientPackets::EventCameraPosition(u16 pitch, u16 yaw)
+ClientPacket_s ClientPackets::EventCameraPosition(u16 pitch, u16 yaw) const
 {
     auto packet = Packet{};
     packet.P2(pitch);
@@ -131,7 +124,7 @@ ClientPacket_s ClientPackets::EventCameraPosition(u16 pitch, u16 yaw)
     return Make(ClientProt_e::EventCameraPosition, packet);
 }
 
-ClientPacket_s ClientPackets::Move(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run)
+ClientPacket_s ClientPackets::Move(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run) const
 {
     if (waypoints.empty() || waypoints.size() > MAX_WAYPOINTS)
     {
@@ -157,7 +150,7 @@ ClientPacket_s ClientPackets::Move(MoveKind_e kind, std::span<const Tile_s> wayp
     return Make(GetMoveProt(kind), packet);
 }
 
-ClientPacket_s ClientPackets::OpObj(u8 op, const Tile_s& tile, u16 obj)
+ClientPacket_s ClientPackets::OpObj(u8 op, const Tile_s& tile, u16 obj) const
 {
     const auto prot = SelectOp(op, OPOBJ, "OPOBJ");
     auto packet = Packet{};
@@ -166,7 +159,7 @@ ClientPacket_s ClientPackets::OpObj(u8 op, const Tile_s& tile, u16 obj)
     return Make(prot, packet);
 }
 
-ClientPacket_s ClientPackets::OpObjT(const Tile_s& tile, u16 obj, u16 spellCom)
+ClientPacket_s ClientPackets::OpObjT(const Tile_s& tile, u16 obj, u16 spellCom) const
 {
     auto packet = Packet{};
     PutTile(packet, tile);
@@ -175,7 +168,7 @@ ClientPacket_s ClientPackets::OpObjT(const Tile_s& tile, u16 obj, u16 spellCom)
     return Make(ClientProt_e::OpObjT, packet);
 }
 
-ClientPacket_s ClientPackets::OpObjU(const Tile_s& tile, u16 obj, const ItemRef_s& use)
+ClientPacket_s ClientPackets::OpObjU(const Tile_s& tile, u16 obj, const ItemRef_s& use) const
 {
     auto packet = Packet{};
     PutTile(packet, tile);
@@ -184,7 +177,7 @@ ClientPacket_s ClientPackets::OpObjU(const Tile_s& tile, u16 obj, const ItemRef_
     return Make(ClientProt_e::OpObjU, packet);
 }
 
-ClientPacket_s ClientPackets::OpNpc(u8 op, u16 npcIndex)
+ClientPacket_s ClientPackets::OpNpc(u8 op, u16 npcIndex) const
 {
     const auto prot = SelectOp(op, OPNPC, "OPNPC");
     auto packet = Packet{};
@@ -192,7 +185,7 @@ ClientPacket_s ClientPackets::OpNpc(u8 op, u16 npcIndex)
     return Make(prot, packet);
 }
 
-ClientPacket_s ClientPackets::OpNpcT(u16 npcIndex, u16 spellCom)
+ClientPacket_s ClientPackets::OpNpcT(u16 npcIndex, u16 spellCom) const
 {
     auto packet = Packet{};
     packet.P2(npcIndex);
@@ -200,7 +193,7 @@ ClientPacket_s ClientPackets::OpNpcT(u16 npcIndex, u16 spellCom)
     return Make(ClientProt_e::OpNpcT, packet);
 }
 
-ClientPacket_s ClientPackets::OpNpcU(u16 npcIndex, const ItemRef_s& use)
+ClientPacket_s ClientPackets::OpNpcU(u16 npcIndex, const ItemRef_s& use) const
 {
     auto packet = Packet{};
     packet.P2(npcIndex);
@@ -208,7 +201,7 @@ ClientPacket_s ClientPackets::OpNpcU(u16 npcIndex, const ItemRef_s& use)
     return Make(ClientProt_e::OpNpcU, packet);
 }
 
-ClientPacket_s ClientPackets::OpLoc(u8 op, const Tile_s& tile, u16 loc)
+ClientPacket_s ClientPackets::OpLoc(u8 op, const Tile_s& tile, u16 loc) const
 {
     const auto prot = SelectOp(op, OPLOC, "OPLOC");
     auto packet = Packet{};
@@ -217,7 +210,7 @@ ClientPacket_s ClientPackets::OpLoc(u8 op, const Tile_s& tile, u16 loc)
     return Make(prot, packet);
 }
 
-ClientPacket_s ClientPackets::OpLocT(const Tile_s& tile, u16 loc, u16 spellCom)
+ClientPacket_s ClientPackets::OpLocT(const Tile_s& tile, u16 loc, u16 spellCom) const
 {
     auto packet = Packet{};
     PutTile(packet, tile);
@@ -226,7 +219,7 @@ ClientPacket_s ClientPackets::OpLocT(const Tile_s& tile, u16 loc, u16 spellCom)
     return Make(ClientProt_e::OpLocT, packet);
 }
 
-ClientPacket_s ClientPackets::OpLocU(const Tile_s& tile, u16 loc, const ItemRef_s& use)
+ClientPacket_s ClientPackets::OpLocU(const Tile_s& tile, u16 loc, const ItemRef_s& use) const
 {
     auto packet = Packet{};
     PutTile(packet, tile);
@@ -235,7 +228,7 @@ ClientPacket_s ClientPackets::OpLocU(const Tile_s& tile, u16 loc, const ItemRef_
     return Make(ClientProt_e::OpLocU, packet);
 }
 
-ClientPacket_s ClientPackets::OpPlayer(u8 op, u16 playerIndex)
+ClientPacket_s ClientPackets::OpPlayer(u8 op, u16 playerIndex) const
 {
     const auto prot = SelectOp(op, OPPLAYER, "OPPLAYER");
     auto packet = Packet{};
@@ -243,7 +236,7 @@ ClientPacket_s ClientPackets::OpPlayer(u8 op, u16 playerIndex)
     return Make(prot, packet);
 }
 
-ClientPacket_s ClientPackets::OpPlayerT(u16 playerIndex, u16 spellCom)
+ClientPacket_s ClientPackets::OpPlayerT(u16 playerIndex, u16 spellCom) const
 {
     auto packet = Packet{};
     packet.P2(playerIndex);
@@ -251,7 +244,7 @@ ClientPacket_s ClientPackets::OpPlayerT(u16 playerIndex, u16 spellCom)
     return Make(ClientProt_e::OpPlayerT, packet);
 }
 
-ClientPacket_s ClientPackets::OpPlayerU(u16 playerIndex, const ItemRef_s& use)
+ClientPacket_s ClientPackets::OpPlayerU(u16 playerIndex, const ItemRef_s& use) const
 {
     auto packet = Packet{};
     packet.P2(playerIndex);
@@ -259,7 +252,7 @@ ClientPacket_s ClientPackets::OpPlayerU(u16 playerIndex, const ItemRef_s& use)
     return Make(ClientProt_e::OpPlayerU, packet);
 }
 
-ClientPacket_s ClientPackets::OpHeld(u8 op, const ItemRef_s& item)
+ClientPacket_s ClientPackets::OpHeld(u8 op, const ItemRef_s& item) const
 {
     const auto prot = SelectOp(op, OPHELD, "OPHELD");
     auto packet = Packet{};
@@ -267,7 +260,7 @@ ClientPacket_s ClientPackets::OpHeld(u8 op, const ItemRef_s& item)
     return Make(prot, packet);
 }
 
-ClientPacket_s ClientPackets::OpHeldT(const ItemRef_s& item, u16 spellCom)
+ClientPacket_s ClientPackets::OpHeldT(const ItemRef_s& item, u16 spellCom) const
 {
     auto packet = Packet{};
     PutItem(packet, item);
@@ -275,7 +268,7 @@ ClientPacket_s ClientPackets::OpHeldT(const ItemRef_s& item, u16 spellCom)
     return Make(ClientProt_e::OpHeldT, packet);
 }
 
-ClientPacket_s ClientPackets::OpHeldU(const ItemRef_s& item, const ItemRef_s& use)
+ClientPacket_s ClientPackets::OpHeldU(const ItemRef_s& item, const ItemRef_s& use) const
 {
     auto packet = Packet{};
     PutItem(packet, item);
@@ -283,7 +276,7 @@ ClientPacket_s ClientPackets::OpHeldU(const ItemRef_s& item, const ItemRef_s& us
     return Make(ClientProt_e::OpHeldU, packet);
 }
 
-ClientPacket_s ClientPackets::InvButton(u8 op, const ItemRef_s& item)
+ClientPacket_s ClientPackets::InvButton(u8 op, const ItemRef_s& item) const
 {
     const auto prot = SelectOp(op, INV_BUTTON, "INV_BUTTON");
     auto packet = Packet{};
@@ -291,7 +284,7 @@ ClientPacket_s ClientPackets::InvButton(u8 op, const ItemRef_s& item)
     return Make(prot, packet);
 }
 
-ClientPacket_s ClientPackets::InvButtonD(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode)
+ClientPacket_s ClientPackets::InvButtonD(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode) const
 {
     auto packet = Packet{};
     packet.P2(com);
@@ -301,40 +294,40 @@ ClientPacket_s ClientPackets::InvButtonD(u16 com, u16 fromSlot, u16 toSlot, Drag
     return Make(ClientProt_e::InvButtonD, packet);
 }
 
-ClientPacket_s ClientPackets::IfButton(u16 com)
+ClientPacket_s ClientPackets::IfButton(u16 com) const
 {
     auto packet = Packet{};
     packet.P2(com);
     return Make(ClientProt_e::IfButton, packet);
 }
 
-ClientPacket_s ClientPackets::ResumePauseButton(u16 com)
+ClientPacket_s ClientPackets::ResumePauseButton(u16 com) const
 {
     auto packet = Packet{};
     packet.P2(com);
     return Make(ClientProt_e::ResumePauseButton, packet);
 }
 
-ClientPacket_s ClientPackets::ResumePCountDialog(s32 value)
+ClientPacket_s ClientPackets::ResumePCountDialog(s32 value) const
 {
     auto packet = Packet{};
     packet.P4(value);
     return Make(ClientProt_e::ResumePCountDialog, packet);
 }
 
-ClientPacket_s ClientPackets::CloseModal()
+ClientPacket_s ClientPackets::CloseModal() const
 {
-    return {.prot = ClientProt_e::CloseModal};
+    return Make(ClientProt_e::CloseModal);
 }
 
-ClientPacket_s ClientPackets::TutClickSide(u8 tab)
+ClientPacket_s ClientPackets::TutClickSide(u8 tab) const
 {
     auto packet = Packet{};
     packet.P1(tab);
     return Make(ClientProt_e::TutClickSide, packet);
 }
 
-ClientPacket_s ClientPackets::IdkSaveDesign(const IdkDesign_s& design)
+ClientPacket_s ClientPackets::IdkSaveDesign(const IdkDesign_s& design) const
 {
     auto packet = Packet{};
     packet.P1(design.female ? 1 : 0);
@@ -343,7 +336,7 @@ ClientPacket_s ClientPackets::IdkSaveDesign(const IdkDesign_s& design)
     return Make(ClientProt_e::IdkSaveDesign, packet);
 }
 
-ClientPacket_s ClientPackets::MessagePublic(std::string_view text, ChatColour_e colour, ChatEffect_e effect)
+ClientPacket_s ClientPackets::MessagePublic(std::string_view text, ChatColour_e colour, ChatEffect_e effect) const
 {
     if (static_cast<u8>(colour) > MAX_CHAT_COLOUR || static_cast<u8>(effect) > MAX_CHAT_EFFECT)
     {
@@ -357,7 +350,7 @@ ClientPacket_s ClientPackets::MessagePublic(std::string_view text, ChatColour_e 
     return Make(ClientProt_e::MessagePublic, packet);
 }
 
-ClientPacket_s ClientPackets::MessagePrivate(u64 to, std::string_view text)
+ClientPacket_s ClientPackets::MessagePrivate(u64 to, std::string_view text) const
 {
     auto packet = Packet{};
     packet.P8(std::bit_cast<s64>(to));
@@ -365,7 +358,7 @@ ClientPacket_s ClientPackets::MessagePrivate(u64 to, std::string_view text)
     return Make(ClientProt_e::MessagePrivate, packet);
 }
 
-ClientPacket_s ClientPackets::ClientCheat(std::string_view command)
+ClientPacket_s ClientPackets::ClientCheat(std::string_view command) const
 {
     if (command.size() > MAX_CHEAT_LENGTH || command.find('\n') != std::string_view::npos)
     {
@@ -377,7 +370,7 @@ ClientPacket_s ClientPackets::ClientCheat(std::string_view command)
     return Make(ClientProt_e::ClientCheat, packet);
 }
 
-ClientPacket_s ClientPackets::ChatSetMode(u8 publicMode, u8 privateMode, u8 tradeMode)
+ClientPacket_s ClientPackets::ChatSetMode(u8 publicMode, u8 privateMode, u8 tradeMode) const
 {
     if (publicMode > MAX_PUBLIC_CHAT_MODE || privateMode > MAX_PRIVATE_CHAT_MODE || tradeMode > MAX_PRIVATE_CHAT_MODE)
     {
@@ -391,27 +384,27 @@ ClientPacket_s ClientPackets::ChatSetMode(u8 publicMode, u8 privateMode, u8 trad
     return Make(ClientProt_e::ChatSetMode, packet);
 }
 
-ClientPacket_s ClientPackets::FriendListAdd(u64 name)
+ClientPacket_s ClientPackets::FriendListAdd(u64 name) const
 {
     return MakeName(ClientProt_e::FriendListAdd, name);
 }
 
-ClientPacket_s ClientPackets::FriendListDel(u64 name)
+ClientPacket_s ClientPackets::FriendListDel(u64 name) const
 {
     return MakeName(ClientProt_e::FriendListDel, name);
 }
 
-ClientPacket_s ClientPackets::IgnoreListAdd(u64 name)
+ClientPacket_s ClientPackets::IgnoreListAdd(u64 name) const
 {
     return MakeName(ClientProt_e::IgnoreListAdd, name);
 }
 
-ClientPacket_s ClientPackets::IgnoreListDel(u64 name)
+ClientPacket_s ClientPackets::IgnoreListDel(u64 name) const
 {
     return MakeName(ClientProt_e::IgnoreListDel, name);
 }
 
-ClientPacket_s ClientPackets::ReportAbuse(u64 offender, u8 rule, bool mute)
+ClientPacket_s ClientPackets::ReportAbuse(u64 offender, u8 rule, bool mute) const
 {
     if (rule > MAX_REPORT_RULE)
     {
@@ -423,4 +416,19 @@ ClientPacket_s ClientPackets::ReportAbuse(u64 offender, u8 rule, bool mute)
     packet.P1(rule);
     packet.P1(mute ? 1 : 0);
     return Make(ClientProt_e::ReportAbuse, packet);
+}
+
+ClientPacket_s ClientPackets::Make(ClientProt_e prot, const Packet& payload) const
+{
+    m_protocol.Require(prot);
+
+    const auto data = payload.GetData();
+    return {.prot = prot, .payload = {data.begin(), data.end()}};
+}
+
+ClientPacket_s ClientPackets::MakeName(ClientProt_e prot, u64 name) const
+{
+    auto packet = Packet{};
+    packet.P8(std::bit_cast<s64>(name));
+    return Make(prot, packet);
 }

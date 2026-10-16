@@ -367,7 +367,7 @@ bool Account::Say(std::string_view text)
         return false;
     }
 
-    m_client.Send(ClientPackets::MessagePublic(text));
+    m_client.Send(m_client.GetPackets().MessagePublic(text));
     return true;
 }
 

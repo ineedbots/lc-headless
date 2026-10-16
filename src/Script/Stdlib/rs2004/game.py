@@ -68,6 +68,10 @@ class _Game:
         """Server ticks since the first login; they carry on across reconnects and server restarts."""
         return _core.get_tick()
 
+    def revision(self):
+        """The server revision this client speaks: 225 or 289."""
+        return _core.get_revision()
+
     def my_name(self):
         return _core.get_name()
 

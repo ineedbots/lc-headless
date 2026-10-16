@@ -7,6 +7,7 @@
 
 #include "Cache/GameCache_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"
@@ -22,6 +23,7 @@
 #include "Script/ScriptVm.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
@@ -49,13 +51,20 @@ namespace
         return std::make_shared<const GameCache_s>(std::move(cache));
     }
 
+    std::shared_ptr<const Config_s> MakeConfig(Revision_e revision)
+    {
+        auto config = Config_s{};
+        config.login.revision = revision;
+        return std::make_shared<const Config_s>(std::move(config));
+    }
+
     // Python asserts check the values, so a failure's traceback names the line that failed.
     class BindingFixture
     {
     public:
-        BindingFixture()
+        explicit BindingFixture(Revision_e revision = Revision_e::Rev289)
             : map{cache}
-            , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
+            , client{MakeConfig(revision), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
             , api{state, map, actions}
             , vm{ScriptTestRuntime::Get(), {}, capture.GetLogger()}
@@ -125,6 +134,13 @@ namespace
             state.social.ignores = {Base37::Encode("spammer")};
         }
     };
+}
+
+TEST_CASE("Script bindings report the configured revision", "[ScriptBindings]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    auto fixture = BindingFixture{revision};
+    fixture.Run(std::format("assert game.revision() == {}\n", static_cast<u16>(revision)));
 }
 
 TEST_CASE("Script bindings read you and the game", "[ScriptBindings]")

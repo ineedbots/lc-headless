@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Io/Isaac.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 
 struct ServerPacket_s
@@ -13,7 +14,7 @@ struct ServerPacket_s
 class ServerPacketReader
 {
 public:
-    explicit ServerPacketReader(std::span<const s32> seed);
+    ServerPacketReader(std::span<const s32> seed, Protocol protocol);
 
     void Append(std::span<const u8> bytes);
     [[nodiscard]] std::optional<ServerPacket_s> Next();
@@ -26,8 +27,9 @@ private:
     void Compact();
 
     Isaac m_isaac;
+    Protocol m_protocol;
     std::vector<u8> m_buffer;
     std::size_t m_readOffset = 0;
-    std::optional<u8> m_opcode;
+    std::optional<ServerProt_e> m_prot;
     s32 m_size = 0;
 };

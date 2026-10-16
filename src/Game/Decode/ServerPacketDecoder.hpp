@@ -2,6 +2,7 @@
 
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/GameState_s.hpp"
 #include "PlayerInfoDecoder.hpp"
@@ -12,7 +13,7 @@
 class ServerPacketDecoder
 {
 public:
-    explicit ServerPacketDecoder(std::shared_ptr<Logger> logger = Logger::GetDefault());
+    explicit ServerPacketDecoder(Protocol protocol, std::shared_ptr<Logger> logger = Logger::GetDefault());
 
     void Decode(ServerProt_e prot, std::span<const u8> payload, GameState_s& state);
     void Reset();

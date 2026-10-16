@@ -91,6 +91,14 @@ void SceneDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state)
         return;
     }
 
+    case ServerProt_e::DataLand:
+    case ServerProt_e::DataLandDone:
+    case ServerProt_e::DataLoc:
+    case ServerProt_e::DataLocDone:
+        // TODO: assemble the map files sent over the wire (RevisionDesign 9.1, phase 6).
+        packet.SetPos(packet.GetLength());
+        return;
+
     default:
         assert(false && "Not a scene packet");
         return;

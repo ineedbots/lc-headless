@@ -211,6 +211,10 @@ void InterfacePacketDecoder::Decode(ServerProt_e prot, Packet& packet, GameState
     case ServerProt_e::IfSetPlayerHead:
         DecodeSetModel(packet, state, ComponentModelKind_e::PlayerHead);
         return;
+    case ServerProt_e::IfSetRecol:
+        // Recolours a component's model, which only rendering needs.
+        packet.SetPos(packet.GetLength());
+        return;
 
     default:
         assert(false && "Not an interface packet");

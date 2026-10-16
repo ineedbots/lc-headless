@@ -3,6 +3,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Config/AccountConfig_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"
@@ -30,7 +31,7 @@ public:
     static constexpr auto USERNAME = "bot";
     static constexpr auto PASSWORD = "secret";
 
-    explicit FakeGameServer(Script onLogin = {});
+    explicit FakeGameServer(Script onLogin = {}, Revision_e revision = Revision_e::Rev289);
     ~FakeGameServer();
 
     FakeGameServer(const FakeGameServer&) = delete;
@@ -76,6 +77,7 @@ private:
 
     NetSystem m_netSystem;
     Script m_onLogin;
+    Revision_e m_revision;
 
     // Recursive because IXWebSocket can deliver a connection's Close on the thread that's sending to
     // it, inside sendBinary, and SendLocked holds the lock to keep the connection alive while it sends.

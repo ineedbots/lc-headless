@@ -4,6 +4,7 @@
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Error/ProtocolError.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/GameState_s.hpp"
 #include "../Tile_s.hpp"
@@ -23,15 +24,16 @@ namespace
     constexpr auto WALK_START_TICKS = u64{3};
 }
 
-ServerPacketDecoder::ServerPacketDecoder(std::shared_ptr<Logger> logger)
+ServerPacketDecoder::ServerPacketDecoder(Protocol protocol, std::shared_ptr<Logger> logger)
     : m_logger{std::move(logger)}
+    , m_zone{protocol}
 {
     assert(m_logger && "ServerPacketDecoder needs a logger");
 }
 
 void ServerPacketDecoder::Decode(ServerProt_e prot, std::span<const u8> payload, GameState_s& state)
 {
-    const auto name = ServerProt::GetName(static_cast<u8>(prot));
+    const auto name = ServerProt::GetName(prot);
     auto packet = Packet{payload};
     try
     {
@@ -54,7 +56,8 @@ void ServerPacketDecoder::Reset()
     m_social.Reset();
 }
 
-// Every opcode is listed with no default, so GCC and Clang (-Wswitch) warn about one with no decoder.
+// Every packet is listed with no default, so GCC and Clang (-Wswitch) warn about one with no decoder. A case
+// for a packet this revision never sends is never reached.
 void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameState_s& state)
 {
     switch (prot)
@@ -88,7 +91,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::LocMerge:
     case ServerProt_e::MapAnim:
     case ServerProt_e::MapProjAnim:
-        m_zone.DecodeSubPacket(static_cast<u8>(prot), packet, state);
+        m_zone.DecodeSubPacket(prot, packet, state);
         return;
 
     case ServerProt_e::RebuildNormal:
@@ -100,6 +103,10 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::MidiSong:
     case ServerProt_e::MidiJingle:
     case ServerProt_e::SynthSound:
+    case ServerProt_e::DataLand:
+    case ServerProt_e::DataLandDone:
+    case ServerProt_e::DataLoc:
+    case ServerProt_e::DataLocDone:
         SceneDecoder::Decode(prot, packet, state);
         return;
 
@@ -124,6 +131,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::IfSetModel:
     case ServerProt_e::IfSetNpcHead:
     case ServerProt_e::IfSetPlayerHead:
+    case ServerProt_e::IfSetRecol:
         InterfacePacketDecoder::Decode(prot, packet, state, *m_logger);
         return;
 
@@ -160,10 +168,12 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
 
     case ServerProt_e::ResetClientVarCache:
     case ServerProt_e::Logout:
+    case ServerProt_e::EnableTracking:
+    case ServerProt_e::FinishTracking:
         return;
     }
 
-    throw ProtocolError{std::format("No decoder for server opcode {}", static_cast<u8>(prot))};
+    throw ProtocolError{std::format("No decoder for server packet {}", static_cast<u8>(prot))};
 }
 
 void ServerPacketDecoder::DecodePlayerInfo(Packet& packet, GameState_s& state)

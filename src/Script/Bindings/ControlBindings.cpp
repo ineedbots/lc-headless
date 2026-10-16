@@ -2,6 +2,7 @@
 #include "ControlBindings.hpp"
 
 #include "../../Accounts/Account.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "../Convert/PyValue.hpp"
 #include "../ScriptContext.hpp"
 #include "../ScriptControl.hpp"
@@ -18,6 +19,14 @@ namespace
         return BindingSupport::Guard([]
         {
             return BindingSupport::ReturnInt(BindingSupport::GetContext().GetControl().GetStepTime());
+        });
+    }
+
+    bool GetRevision(int, py_StackRef) noexcept
+    {
+        return BindingSupport::Guard([]
+        {
+            return BindingSupport::ReturnInt(static_cast<u16>(BindingSupport::GetContext().GetRevision()));
         });
     }
 
@@ -94,6 +103,7 @@ void ControlBindings::Add(std::vector<BoundFunction_s>& functions)
 {
     functions.insert(functions.end(), {
                                           {"step_time()", GetStepTime},
+                                          {"get_revision()", GetRevision},
                                           {"note_progress()", NoteProgress},
                                           {"last_progress()", GetLastProgress},
                                           {"relog(delay_seconds=0)", Relog},

@@ -189,7 +189,7 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
     }
 
     CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
-    CHECK_THROWS_AS(client.Send(ClientPackets::NoTimeout()), std::runtime_error);
+    CHECK_THROWS_AS(client.Send(client.GetPackets().NoTimeout()), std::runtime_error);
 }
 
 TEST_CASE("GameClient ends the session when the server logs it out", "[GameClient]")
@@ -347,7 +347,7 @@ TEST_CASE("GameClient reconnects when a send meets a dropped connection", "[Game
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && client.IsInGame())
     {
-        client.Send(ClientPackets::NoTimeout());
+        client.Send(client.GetPackets().NoTimeout());
         REQUIRE_NOTHROW(client.Flush());
         std::this_thread::sleep_for(10ms);
     }

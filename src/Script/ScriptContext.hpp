@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Cache/GameCache_s.hpp"
+#include "../Config/Revision_e.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
@@ -29,6 +30,7 @@ public:
     [[nodiscard]] const GameState_s& GetState() const;
     [[nodiscard]] const WorldMap& GetMap() const;
     [[nodiscard]] const GameCache_s& GetCache() const;
+    [[nodiscard]] Revision_e GetRevision() const;
     [[nodiscard]] const Player_s& GetLocalPlayer() const;
     [[nodiscard]] Tile_s GetPosition() const;
     // On the local player's level.
@@ -54,6 +56,7 @@ private:
     BotMessenger* m_messenger;
     std::string m_username;
     std::shared_ptr<const Navigation> m_navigation;
+    Revision_e m_revision;
     ScriptActions m_actions;
     ScriptControl m_control;
 };

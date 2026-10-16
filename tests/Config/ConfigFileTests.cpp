@@ -7,6 +7,7 @@
 #include "Config/ConfigFile.hpp"
 #include "Config/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
+#include "Config/Revision_e.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Utils/BigUInt.hpp"
@@ -254,7 +255,7 @@ namespace
         CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
         CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
         CHECK_FALSE(config.login.lowMemory);
-        CHECK(config.login.revision == 289);
+        CHECK(config.login.revision == Revision_e::Rev289);
         CHECK(config.client.logLevel == LogLevel_e::Verbose);
         CHECK(config.client.cacheDirectory == "../289server/engine/data/pack");
         CHECK(config.client.logFile == "logs/bots.log");
@@ -287,7 +288,7 @@ namespace
         CHECK(config.server.origin.empty());
         CHECK(config.server.tlsCaFile == "SYSTEM");
         CHECK_FALSE(config.login.lowMemory);
-        CHECK(config.login.revision == 289);
+        CHECK(config.login.revision == Revision_e::Rev289);
         CHECK(config.client.logLevel == LogLevel_e::Info);
         CHECK(config.client.cacheDirectory == "data/cache");
         CheckScriptingDefaults(config.scripting);
@@ -401,7 +402,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             }
             else if (key.key == "revision")
             {
-                CHECK(config.login.revision == 289);
+                CHECK(config.login.revision == Revision_e::Rev289);
             }
             else if (key.key == "logLevel")
             {
@@ -643,7 +644,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
     {
         CHECK(ParseAccepted(SetKey({"login", "lowMemory"}, true)).login.lowMemory);
         CHECK_FALSE(ParseAccepted(SetKey({"login", "lowMemory"}, false)).login.lowMemory);
-        CHECK(ParseAccepted(SetKey({"login", "revision"}, 289)).login.revision == 289);
+        CHECK(ParseAccepted(SetKey({"login", "revision"}, 289)).login.revision == Revision_e::Rev289);
     }
 
     SECTION("client")

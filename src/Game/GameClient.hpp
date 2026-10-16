@@ -13,6 +13,7 @@
 #include "Net/ServerPacketReader.hpp"
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
+#include "Protocol/Protocol.hpp"
 #include "State/GameState_s.hpp"
 #include "Tile_s.hpp"
 
@@ -67,6 +68,8 @@ public:
     [[nodiscard]] const GameCache_s& GetCache() const;
     [[nodiscard]] const WorldMap& GetMap() const;
     [[nodiscard]] Logger& GetLogger() const;
+    [[nodiscard]] const Protocol& GetProtocol() const;
+    [[nodiscard]] const ClientPackets& GetPackets() const;
 
     void Send(ClientPacket_s packet);
     void SendMove(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run);
@@ -96,6 +99,9 @@ private:
     AccountSettings_s m_account;
     std::shared_ptr<Logger> m_logger;
     GameClientOptions_s m_options;
+    // Declared before every member built from it.
+    Protocol m_protocol;
+    ClientPackets m_packets;
 
     std::unique_ptr<WebSocketClient> m_socket;
     // Connections being closed. IXWebSocket waits up to about 300 ms for a peer's close reply, so a

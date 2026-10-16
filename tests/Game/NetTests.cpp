@@ -3,6 +3,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Config/AccountConfig_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Error/ProtocolError.hpp"
 #include "Game/Net/ClientPacketWriter.hpp"
 #include "Game/Net/Error/LoginError.hpp"
@@ -12,6 +13,7 @@
 #include "Game/Protocol/ClientPacket_s.hpp"
 #include "Game/Protocol/ClientPackets.hpp"
 #include "Game/Protocol/ClientProt.hpp"
+#include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"
 #include "Utils/BigUInt.hpp"
@@ -22,6 +24,8 @@ namespace
 {
     constexpr auto SEED = std::array<s32, 4>{1, 2, 3, 4};
     constexpr auto CRCS = std::array<s32, GameCache_s::CRC_COUNT>{1, 2, 3, 4, 5, 6, 7, 8, 9};
+    const auto PROTOCOL = Protocol{Revision_e::Rev289};
+    const auto PACKETS = ClientPackets{PROTOCOL};
 
     // Frames server packets the way the engine does: ISAAC on the opcode, then any length prefix.
     class ServerFramer
@@ -35,7 +39,8 @@ namespace
         std::vector<u8> Frame(u8 opcode, const std::vector<u8>& payload)
         {
             auto bytes = std::vector<u8>{static_cast<u8>(opcode + static_cast<u32>(m_isaac.NextInt()))};
-            const auto size = ServerProt::GetSize(opcode);
+            const auto prot = PROTOCOL.FindServerProt(opcode);
+            const auto size = prot ? PROTOCOL.GetSize(*prot) : 0;
             if (size == ServerProt::VAR_BYTE)
             {
                 bytes.push_back(static_cast<u8>(payload.size()));
@@ -84,7 +89,7 @@ namespace
 TEST_CASE("ServerPacketReader frames each size kind", "[ServerPacketReader]")
 {
     auto framer = ServerFramer{};
-    auto reader = ServerPacketReader{SEED};
+    auto reader = ServerPacketReader{SEED, PROTOCOL};
     reader.Append(Join({
         framer.Frame(195, {77}),
         framer.Frame(23, {}),
@@ -108,7 +113,7 @@ TEST_CASE("ServerPacketReader waits for split frames and decrypts each opcode on
         framer.Frame(154, {3, 0, 0, 4, 0x82, 10}),
     });
 
-    auto reader = ServerPacketReader{SEED};
+    auto reader = ServerPacketReader{SEED, PROTOCOL};
     auto packets = std::vector<ServerPacket_s>{};
     for (const auto byte : stream)
     {
@@ -129,7 +134,7 @@ TEST_CASE("ServerPacketReader waits for split frames and decrypts each opcode on
 TEST_CASE("ServerPacketReader rejects an opcode the server never sends", "[ServerPacketReader]")
 {
     auto framer = ServerFramer{};
-    auto reader = ServerPacketReader{SEED};
+    auto reader = ServerPacketReader{SEED, PROTOCOL};
     reader.Append(framer.Frame(0, {}));
     CHECK_THROWS_AS(reader.Next(), ProtocolError);
 }
@@ -137,11 +142,11 @@ TEST_CASE("ServerPacketReader rejects an opcode the server never sends", "[Serve
 TEST_CASE("ClientPacketWriter encrypts opcodes and adds length bytes", "[ClientPacketWriter]")
 {
     auto twin = Isaac{SEED};
-    auto writer = ClientPacketWriter{SEED};
+    auto writer = ClientPacketWriter{SEED, PROTOCOL};
     auto bytes = std::vector<u8>{};
-    writer.Write(ClientPackets::NoTimeout(), bytes);
-    writer.Write(ClientPackets::ClientCheat("hi"), bytes);
-    writer.Write(ClientPackets::OpNpc(1, 7), bytes);
+    writer.Write(PACKETS.NoTimeout(), bytes);
+    writer.Write(PACKETS.ClientCheat("hi"), bytes);
+    writer.Write(PACKETS.OpNpc(1, 7), bytes);
 
     const auto first = static_cast<u8>(181 + static_cast<u32>(twin.NextInt()));
     const auto second = static_cast<u8>(34 + static_cast<u32>(twin.NextInt()));
@@ -152,16 +157,29 @@ TEST_CASE("ClientPacketWriter encrypts opcodes and adds length bytes", "[ClientP
 TEST_CASE("ClientPacketWriter rejects bad packets before using the cipher", "[ClientPacketWriter]")
 {
     auto twin = Isaac{SEED};
-    auto writer = ClientPacketWriter{SEED};
+    auto writer = ClientPacketWriter{SEED, PROTOCOL};
     auto bytes = std::vector<u8>{};
 
     CHECK_THROWS_AS(writer.Write({.prot = ClientProt_e::OpNpc1, .payload = {1, 2, 3}}, bytes), std::invalid_argument);
-    CHECK_THROWS_AS(writer.Write({.prot = static_cast<ClientProt_e>(0)}, bytes), std::invalid_argument);
+    CHECK_THROWS_AS(writer.Write({.prot = ClientProt_e::EventTracking}, bytes), std::invalid_argument);
     CHECK_THROWS_AS(writer.Write({.prot = ClientProt_e::ClientCheat, .payload = std::vector<u8>(256)}, bytes), std::invalid_argument);
     CHECK(bytes.empty());
 
-    writer.Write(ClientPackets::CloseModal(), bytes);
+    writer.Write(PACKETS.CloseModal(), bytes);
     CHECK(bytes == std::vector<u8>{static_cast<u8>(93 + static_cast<u32>(twin.NextInt()))});
+}
+
+TEST_CASE("ClientPacketWriter puts a 2-byte length before a VAR_SHORT payload", "[ClientPacketWriter]")
+{
+    auto twin = Isaac{SEED};
+    auto writer = ClientPacketWriter{SEED, Protocol{Revision_e::Rev225}};
+    auto bytes = std::vector<u8>{};
+    writer.Write({.prot = ClientProt_e::EventTracking, .payload = std::vector<u8>(300, 7)}, bytes);
+
+    REQUIRE(bytes.size() == 3 + 300);
+    CHECK(bytes[0] == static_cast<u8>(81 + static_cast<u32>(twin.NextInt())));
+    CHECK(bytes[1] == 0x01);
+    CHECK(bytes[2] == 0x2C);
 }
 
 TEST_CASE("LoginHandshake builds the seed request", "[LoginHandshake]")

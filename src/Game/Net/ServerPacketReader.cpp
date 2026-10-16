@@ -3,10 +3,12 @@
 
 #include "../../Io/Isaac.hpp"
 #include "../Error/ProtocolError.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 
-ServerPacketReader::ServerPacketReader(std::span<const s32> seed)
+ServerPacketReader::ServerPacketReader(std::span<const s32> seed, Protocol protocol)
     : m_isaac{seed}
+    , m_protocol{protocol}
 {
 }
 
@@ -17,7 +19,7 @@ void ServerPacketReader::Append(std::span<const u8> bytes)
 
 std::optional<ServerPacket_s> ServerPacketReader::Next()
 {
-    if (!m_opcode)
+    if (!m_prot)
     {
         if (GetBuffered() < 1)
         {
@@ -25,14 +27,14 @@ std::optional<ServerPacket_s> ServerPacketReader::Next()
         }
 
         const auto opcode = static_cast<u8>(Take(1)[0] - static_cast<u32>(m_isaac.NextInt()));
-        const auto size = ServerProt::GetSize(opcode);
-        if (!size)
+        const auto prot = m_protocol.FindServerProt(opcode);
+        if (!prot)
         {
-            throw ProtocolError{std::format("Server sent opcode {}, which this revision never sends", opcode)};
+            throw ProtocolError{std::format("Server sent opcode {}, which revision {} never sends", opcode, static_cast<u16>(m_protocol.GetRevision()))};
         }
 
-        m_opcode = opcode;
-        m_size = *size;
+        m_prot = prot;
+        m_size = m_protocol.GetSize(*prot);
     }
 
     if (m_size == ServerProt::VAR_BYTE)
@@ -62,8 +64,8 @@ std::optional<ServerPacket_s> ServerPacketReader::Next()
     }
 
     const auto payload = Take(size);
-    auto packet = ServerPacket_s{.prot = static_cast<ServerProt_e>(*m_opcode), .payload = {payload.begin(), payload.end()}};
-    m_opcode.reset();
+    auto packet = ServerPacket_s{.prot = *m_prot, .payload = {payload.begin(), payload.end()}};
+    m_prot.reset();
     Compact();
     return packet;
 }
