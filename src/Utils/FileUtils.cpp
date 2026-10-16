@@ -8,20 +8,34 @@ namespace
 
 std::optional<std::string> FileUtils::ReadText(const std::filesystem::path& path)
 {
+    // Linux opens a directory fine and only fails on the first read, with an exception
+    auto error = std::error_code{};
+    if (std::filesystem::is_directory(path, error))
+    {
+        return std::nullopt;
+    }
+
     auto file = std::ifstream{path, std::ios::binary};
     if (!file)
     {
         return std::nullopt;
     }
 
-    auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+    try
+    {
+        auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
 
-    if (file.bad())
+        if (file.bad())
+        {
+            return std::nullopt;
+        }
+
+        return text;
+    }
+    catch (const std::ios_base::failure&)
     {
         return std::nullopt;
     }
-
-    return text;
 }
 
 std::optional<std::vector<u8>> FileUtils::ReadBytes(const std::filesystem::path& path)
