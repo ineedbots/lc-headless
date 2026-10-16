@@ -25,7 +25,10 @@ namespace
 }
 
 ServerPacketDecoder::ServerPacketDecoder(Protocol protocol, std::shared_ptr<Logger> logger)
-    : m_logger{std::move(logger)}
+    : m_protocol{protocol}
+    , m_logger{std::move(logger)}
+    , m_playerInfo{protocol}
+    , m_npcInfo{protocol}
     , m_zone{protocol}
 {
     assert(m_logger && "ServerPacketDecoder needs a logger");
@@ -66,7 +69,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
         DecodePlayerInfo(packet, state);
         return;
     case ServerProt_e::NpcInfo:
-        NpcInfoDecoder::Decode(packet.GetData(), state);
+        m_npcInfo.Decode(packet.GetData(), state);
         packet.SetPos(packet.GetLength());
         return;
 
@@ -107,7 +110,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::DataLandDone:
     case ServerProt_e::DataLoc:
     case ServerProt_e::DataLocDone:
-        SceneDecoder::Decode(prot, packet, state);
+        SceneDecoder::Decode(prot, packet, state, m_protocol);
         return;
 
     case ServerProt_e::IfOpenMain:
@@ -138,7 +141,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::UpdateInvFull:
     case ServerProt_e::UpdateInvPartial:
     case ServerProt_e::UpdateInvStopTransmit:
-        InventoryDecoder::Decode(prot, packet, state);
+        InventoryDecoder::Decode(prot, packet, state, m_protocol);
         return;
 
     case ServerProt_e::VarpSmall:
@@ -154,7 +157,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::SetMultiway:
     case ServerProt_e::MinimapToggle:
     case ServerProt_e::UnsetMapFlag:
-        PlayerStateDecoder::Decode(prot, packet, state, *m_logger);
+        PlayerStateDecoder::Decode(prot, packet, state, m_protocol, *m_logger);
         return;
 
     case ServerProt_e::MessageGame:
@@ -163,7 +166,7 @@ void ServerPacketDecoder::DecodePacket(ServerProt_e prot, Packet& packet, GameSt
     case ServerProt_e::UpdateIgnoreList:
     case ServerProt_e::FriendListLoaded:
     case ServerProt_e::ChatFilterSettings:
-        m_social.Decode(prot, packet, state);
+        m_social.Decode(prot, packet, state, m_protocol);
         return;
 
     case ServerProt_e::ResetClientVarCache:

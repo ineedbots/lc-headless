@@ -22,6 +22,8 @@
 
 namespace
 {
+    const auto PROTOCOL_289 = Protocol{Revision_e::Rev289};
+
     constexpr auto INVENTORY = u16{3214};
     constexpr auto HOME_ZONE_LOCAL = Fixtures::HOME_LOCAL & ~7;
 
@@ -226,7 +228,7 @@ TEST_CASE("NPC_INFO reports removals, then additions, then hits, then speech", "
     PutHit(extended, 2, 8);
     extended.P2(808);
     extended.P1(0);
-    NpcInfoDecoder::Decode(Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(extended)), state);
+    NpcInfoDecoder{PROTOCOL_289}.Decode(Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(extended)), state);
 
     // clang-format off
     CHECK(DescribeEventsAfter(state, before) == std::vector<std::string>{
@@ -263,7 +265,7 @@ TEST_CASE("PLAYER_INFO reports players, and hits on the local player apart from 
     state.players = {MakePlayer(7, Offset(1, 1)), MakePlayer(8, Offset(2, 2))};
 
     const auto before = state.eventCount;
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
 
     auto bits = BitWriter{};
     bits.Put(1, 1).Put(2, 0);

@@ -7,6 +7,7 @@
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"
+#include "Io/Packet.hpp"
 #include "Io/NetSystem.hpp"
 
 #include <ixwebsocket/IXWebSocket.h>
@@ -19,8 +20,9 @@ struct ReceivedPacket_s
     std::vector<u8> payload;
 };
 
-// A scripted game server on loopback. The test config uses RSA exponent 1, so the login block
-// arrives as plaintext and the server can seed both ISAAC streams the way the engine does.
+// A scripted game server on loopback, speaking one revision. The test config uses RSA exponent 1, so the
+// login block arrives as plaintext and the server can seed both ISAAC streams the way the engine does.
+// Like the 225 engine, a 225 server sends its seed as soon as the connection opens.
 class FakeGameServer
 {
 public:
@@ -38,13 +40,15 @@ public:
     FakeGameServer& operator=(const FakeGameServer&) = delete;
 
     [[nodiscard]] std::string Url() const;
+    [[nodiscard]] Revision_e GetRevision() const;
     [[nodiscard]] Config_s MakeConfig() const;
     [[nodiscard]] static AccountSettings_s MakeAccount();
     // An empty cache but for the logout button this server answers.
-    [[nodiscard]] static std::shared_ptr<const GameCache_s> MakeCache();
+    [[nodiscard]] static std::shared_ptr<const GameCache_s> MakeCache(Revision_e revision = Revision_e::Rev289);
 
+    // 225 also logs a staff account in, with 18.
     void SetLoginStatus(u8 status);
-    // A stalled server accepts the connection but never answers the seed request.
+    // A stalled server accepts the connection but never sends the seed.
     void SetStalled(bool stalled);
     // Clicks on the logout button are recorded but not answered, as during combat.
     void SetIgnoreLogout(bool ignore);
@@ -67,6 +71,9 @@ private:
 
     void OnMessage(ix::WebSocket& connection, const ix::WebSocketMessage& message);
     void HandleSeedRequest(ix::WebSocket& connection, std::span<const u8> bytes);
+    void SendSeed(ix::WebSocket& connection, bool withHeader);
+    [[nodiscard]] bool ReadRevision(Packet& packet) const;
+    [[nodiscard]] bool IsLoggedIn(u8 status) const;
     void HandleLogin(ix::WebSocket& connection, std::span<const u8> bytes);
     void HandleGamePackets(ix::WebSocket& connection, std::span<const u8> bytes);
     void SendLocked(ServerProt_e prot, std::span<const u8> payload);

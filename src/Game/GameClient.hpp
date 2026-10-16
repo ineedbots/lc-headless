@@ -14,6 +14,7 @@
 #include "Protocol/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
 #include "Protocol/Protocol.hpp"
+#include "Protocol/ServerProt.hpp"
 #include "State/GameState_s.hpp"
 #include "Tile_s.hpp"
 
@@ -91,6 +92,9 @@ private:
     void ReleaseSocket() noexcept;
     void FreeClosedSockets() noexcept;
     void ProcessInput();
+    // Sends what a packet the decoder just read asks for in reply.
+    void Reply(ServerProt_e prot);
+    void WarnAboutStaleSquares();
     void SendKeepaliveIfIdle();
     void LogNewMessages();
 
@@ -118,6 +122,8 @@ private:
     Clock::time_point m_lastReceive;
     Clock::time_point m_lastSend;
     u64 m_loggedMessageCount = 0;
+    // Keyed by MapSquare::GetId, so each stale square is warned about once.
+    std::unordered_set<u16> m_warnedSquares;
     u32 m_loginCount = 0;
 
     std::optional<LoginHandshake> m_handshake;

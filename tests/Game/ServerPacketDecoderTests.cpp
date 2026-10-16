@@ -13,6 +13,7 @@
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/Protocol/WordPack.hpp"
 #include "Game/State/GameState_s.hpp"
+#include "Game/State/BuildArea_s.hpp"
 #include "Game/State/Social_s.hpp"
 #include "Game/State/Zone_s.hpp"
 #include "Game/Tile_s.hpp"
@@ -28,8 +29,8 @@ namespace
     class DecoderFixture
     {
     public:
-        DecoderFixture()
-            : decoder{Protocol{Revision_e::Rev289}, capture.GetLogger()}
+        explicit DecoderFixture(Revision_e revision = Revision_e::Rev289)
+            : decoder{Protocol{revision}, capture.GetLogger()}
             , state{Fixtures::PlacedState()}
         {
         }
@@ -57,6 +58,31 @@ namespace
     u8 ToPos(s32 dx, s32 dz)
     {
         return static_cast<u8>((dx << 4) | dz);
+    }
+
+    Packet MakeLastLogin(bool withWarnMembers)
+    {
+        auto packet = Packet{};
+        packet.P4(0x7F000001);
+        packet.P2(3);
+        packet.P1(200);
+        packet.P2(1);
+        if (withWarnMembers)
+        {
+            packet.P1(1);
+        }
+
+        return packet;
+    }
+
+    Packet MakePrivateMessage(s32 messageId, u8 staffLevel)
+    {
+        auto packet = Packet{};
+        packet.P8(std::bit_cast<s64>(Base37::Encode("zezima")));
+        packet.P4(messageId);
+        packet.P1(staffLevel);
+        packet.PData(WordPack::Pack("hi"));
+        return packet;
     }
 
     void PutItem(Packet& packet, s32 id, s32 count)
@@ -569,4 +595,159 @@ TEST_CASE("ServerPacketDecoder ends a walk the server never starts", "[ServerPac
         fixture.Decode(ServerProt_e::PlayerInfo, stepEast.GetBytes());
         CHECK_FALSE(state.walkDestination.has_value());
     }
+}
+
+TEST_CASE("ServerPacketDecoder reads UPDATE_PID and LAST_LOGIN_INFO in each revision", "[ServerPacketDecoder]")
+{
+    SECTION("225 has no members flags")
+    {
+        auto fixture = DecoderFixture{Revision_e::Rev225};
+        fixture.Decode(ServerProt_e::UpdatePid, Fixtures::UpdatePid(9, true, Revision_e::Rev225));
+        fixture.Decode(ServerProt_e::LastLoginInfo, MakeLastLogin(false));
+
+        CHECK(fixture.state.pid == 9);
+        CHECK(fixture.state.localPlayer.index == 9);
+        CHECK_FALSE(fixture.state.members);
+        REQUIRE(fixture.state.lastLogin.has_value());
+        CHECK(fixture.state.lastLogin->lastIp == 0x7F000001);
+        CHECK(fixture.state.lastLogin->daysSinceLogin == 3);
+        CHECK(fixture.state.lastLogin->daysSinceRecoveryChange == 200);
+        CHECK(fixture.state.lastLogin->unreadMessages == 1);
+        CHECK_FALSE(fixture.state.lastLogin->warnMembers);
+    }
+
+    SECTION("289 sends them")
+    {
+        auto fixture = DecoderFixture{Revision_e::Rev289};
+        fixture.Decode(ServerProt_e::UpdatePid, Fixtures::UpdatePid(9, true, Revision_e::Rev289));
+        fixture.Decode(ServerProt_e::LastLoginInfo, MakeLastLogin(true));
+
+        CHECK(fixture.state.members);
+        REQUIRE(fixture.state.lastLogin.has_value());
+        CHECK(fixture.state.lastLogin->unreadMessages == 1);
+        CHECK(fixture.state.lastLogin->warnMembers);
+    }
+}
+
+TEST_CASE("ServerPacketDecoder reads 225's inventory sizes and slots in a byte", "[ServerPacketDecoder]")
+{
+    auto fixture = DecoderFixture{Revision_e::Rev225};
+
+    const auto items = std::to_array<std::pair<u16, s32>>({{995, 100000}, {1511, 1}, {0, 0}});
+    fixture.Decode(ServerProt_e::UpdateInvFull, Fixtures::UpdateInvFull(INVENTORY, items, Revision_e::Rev225));
+
+    const auto* inventory = fixture.state.FindInventory(INVENTORY);
+    REQUIRE(inventory != nullptr);
+    REQUIRE(inventory->slots.size() == 3);
+    CHECK(inventory->slots[0].count == 100000);
+    CHECK(inventory->slots[1].id == 1511);
+
+    auto partial = Packet{};
+    partial.P2(INVENTORY);
+    partial.P1(2);
+    PutItem(partial, 1512, 5);
+    partial.P1(200);
+    PutItem(partial, 4151, 1);
+    fixture.Decode(ServerProt_e::UpdateInvPartial, partial);
+
+    REQUIRE(inventory->slots.size() == 201);
+    CHECK(inventory->slots[2].id == 1512);
+    CHECK(inventory->slots[200].id == 4151);
+}
+
+TEST_CASE("ServerPacketDecoder keeps the map squares a 225 rebuild lists", "[ServerPacketDecoder]")
+{
+    auto fixture = DecoderFixture{Revision_e::Rev225};
+    const auto squares = std::to_array<BuildSquare_s>({
+        {.x = 49, .z = 50, .landCrc = 11, .locCrc = -12},
+        {.x = 50, .z = 50, .landCrc = 13, .locCrc = 0},
+        {.x = 51, .z = 50, .landCrc = 0, .locCrc = 0},
+    });
+    fixture.Decode(ServerProt_e::RebuildNormal, Fixtures::Rebuild225(squares, 401, 399));
+
+    const auto& area = fixture.state.buildArea;
+    CHECK(area.centreZoneX == 401);
+    CHECK(area.centreZoneZ == 399);
+    REQUIRE(area.squares.size() == 3);
+    CHECK((area.squares[0].x == 49 && area.squares[0].z == 50 && area.squares[0].landCrc == 11 && area.squares[0].locCrc == -12));
+    CHECK((area.squares[1].landCrc == 13 && area.squares[1].locCrc == 0));
+    CHECK(area.squares[2].x == 51);
+
+    SECTION("a 289 rebuild lists none")
+    {
+        auto later = DecoderFixture{Revision_e::Rev289};
+        later.Decode(ServerProt_e::RebuildNormal, Fixtures::Rebuild(401, 399));
+        CHECK(later.state.buildArea.squares.empty());
+        CHECK(later.state.buildArea.centreZoneX == 401);
+    }
+}
+
+TEST_CASE("ServerPacketDecoder reads music in each revision", "[ServerPacketDecoder]")
+{
+    SECTION("225 sends a song by name and a jingle as MIDI, which are read and dropped")
+    {
+        auto fixture = DecoderFixture{Revision_e::Rev225};
+
+        auto song = Packet{};
+        song.PJStr("harmony");
+        song.P4(0x12345678);
+        song.P4(4000);
+        fixture.Decode(ServerProt_e::MidiSong, song);
+
+        auto jingle = Packet{};
+        jingle.P2(80);
+        jingle.PData(std::to_array<u8>({0x42, 0x5A, 0x68, 0x39}));
+        fixture.Decode(ServerProt_e::MidiJingle, jingle);
+
+        CHECK(fixture.state.audio.song == -1);
+        CHECK(fixture.state.audio.jingle == -1);
+    }
+
+    SECTION("289 sends their ids")
+    {
+        auto fixture = DecoderFixture{Revision_e::Rev289};
+        fixture.Decode(ServerProt_e::MidiSong, std::vector<u8>{0, 62});
+        fixture.Decode(ServerProt_e::MidiJingle, std::vector<u8>{0, 9, 0, 80});
+        CHECK(fixture.state.audio.song == 62);
+        CHECK(fixture.state.audio.jingle == 9);
+    }
+}
+
+TEST_CASE("ServerPacketDecoder gives a private message's staff level the same meaning in each revision", "[ServerPacketDecoder]")
+{
+    auto fixture225 = DecoderFixture{Revision_e::Rev225};
+    fixture225.Decode(ServerProt_e::MessagePrivate, MakePrivateMessage(1, 0));
+    fixture225.Decode(ServerProt_e::MessagePrivate, MakePrivateMessage(2, 3));
+
+    REQUIRE(fixture225.state.messages.size() == 2);
+    CHECK(fixture225.state.messages[0].rights == 0);
+    CHECK(fixture225.state.messages[1].rights == 2);
+
+    auto fixture289 = DecoderFixture{Revision_e::Rev289};
+    fixture289.Decode(ServerProt_e::MessagePrivate, MakePrivateMessage(1, 2));
+    REQUIRE(fixture289.state.messages.size() == 1);
+    CHECK(fixture289.state.messages[0].rights == 2);
+}
+
+TEST_CASE("ServerPacketDecoder consumes the packets only 225 sends", "[ServerPacketDecoder]")
+{
+    auto fixture = DecoderFixture{Revision_e::Rev225};
+    const auto before = fixture.state;
+
+    auto chunk = Packet{};
+    chunk.P1(50);
+    chunk.P1(50);
+    chunk.P2(0);
+    chunk.P2(3);
+    chunk.PData(std::to_array<u8>({1, 2, 3}));
+    fixture.Decode(ServerProt_e::DataLand, chunk);
+    fixture.Decode(ServerProt_e::DataLoc, chunk);
+    fixture.Decode(ServerProt_e::DataLandDone, std::vector<u8>{50, 50});
+    fixture.Decode(ServerProt_e::DataLocDone, std::vector<u8>{50, 50});
+    fixture.Decode(ServerProt_e::EnableTracking);
+    fixture.Decode(ServerProt_e::FinishTracking);
+    fixture.Decode(ServerProt_e::IfSetRecol, std::vector<u8>{0x0C, 0x80, 0, 1, 0, 2});
+
+    CHECK(fixture.state.eventCount == before.eventCount);
+    CHECK(fixture.state.interfaces.components.size() == before.interfaces.components.size());
 }

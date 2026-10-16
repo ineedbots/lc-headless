@@ -6,6 +6,7 @@
 
 #include "Cache/GameCache_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/Revision_e.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/GameActions.hpp"
@@ -136,6 +137,80 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
         CHECK(Packet{buttons[0].payload}.G2() == FakeGameServer::LOGOUT_COMPONENT);
     }
 
+    CHECK(server.GetErrors().empty());
+}
+
+TEST_CASE("GameClient logs in to a 225 server and answers each rebuild", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev225};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(Revision_e::Rev225), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+
+    client.Login();
+    REQUIRE(client.IsInGame());
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return !client.GetState().messages.empty();
+    }));
+
+    const auto& state = client.GetState();
+    CHECK(state.staffLevel == 0);
+    CHECK(state.pid == Fixtures::PID);
+    CHECK_FALSE(state.members);
+    CHECK(state.localPlayer.tile == Tile_s{.x = Fixtures::HOME, .z = Fixtures::HOME, .level = 0});
+    REQUIRE(state.localPlayer.appearance.has_value());
+    CHECK(state.localPlayer.appearance->name == "Bot");
+    REQUIRE(state.npcs.size() == 1);
+    CHECK(state.npcs[0].tile == Tile_s{.x = Fixtures::HOME + 2, .z = Fixtures::HOME, .level = 0});
+    REQUIRE(state.FindInventory(INVENTORY) != nullptr);
+    CHECK(state.FindInventory(INVENTORY)->slots[0].id == TestWorld::LOGS);
+    REQUIRE(state.buildArea.squares.size() == 1);
+
+    // The square's CRCs are ones the empty cache doesn't have, so it's warned about once.
+    REQUIRE(server.WaitForPacket(ClientProt_e::RebuildGetMaps));
+    CHECK(server.GetPackets(ClientProt_e::RebuildGetMaps)[0].payload.empty());
+    const auto warnings = std::ranges::count_if(capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.level == LogLevel_e::Warning && entry.message == "Map square 50_50's land and locs differ from the server's; walks there may route through changed scenery";
+    });
+    CHECK(warnings == 1);
+
+    SECTION("another rebuild is answered too, without warning again")
+    {
+        const auto square = TestWorld::SQUARE_225;
+        server.Send(ServerProt_e::RebuildNormal, Fixtures::Rebuild225(std::span{&square, 1}));
+        REQUIRE(PumpUntil(client, [&server]
+        {
+            return server.GetPackets(ClientProt_e::RebuildGetMaps).size() == 2;
+        }));
+        CHECK(std::ranges::count_if(capture.GetEntries(), [](const CapturedLog_s& entry)
+        {
+            return entry.level == LogLevel_e::Warning;
+        }) == 1);
+    }
+
+    SECTION("an action is sent with 225's opcodes")
+    {
+        auto actions = GameActions{client};
+        actions.InteractNpc(TestWorld::NPC_INDEX, 1);
+        client.Pump();
+        REQUIRE(server.WaitForPacket(ClientProt_e::OpNpc1));
+        CHECK(server.GetPackets(ClientProt_e::OpNpc1)[0].payload == std::vector<u8>{0, 100});
+    }
+
+    CHECK(server.GetErrors().empty());
+}
+
+TEST_CASE("GameClient logs a 225 staff account in with status 18", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev225};
+    server.SetLoginStatus(18);
+
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(Revision_e::Rev225), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(client.IsInGame());
+    CHECK(client.GetState().staffLevel == 1);
     CHECK(server.GetErrors().empty());
 }
 

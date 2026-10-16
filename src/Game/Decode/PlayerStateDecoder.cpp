@@ -1,9 +1,11 @@
 #include "pch.hpp"
 #include "PlayerStateDecoder.hpp"
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
 #include "../../Utils/StringUtils.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
@@ -118,19 +120,24 @@ namespace
         slot = PlayerOp_s{.text = std::move(text), .deprioritised = priority == 0};
     }
 
-    void DecodeLastLogin(Packet& packet, GameState_s& state)
+    void DecodeLastLogin(Packet& packet, GameState_s& state, const Protocol& protocol)
     {
         auto lastLogin = LastLogin_s{};
         lastLogin.lastIp = std::bit_cast<u32>(packet.G4());
         lastLogin.daysSinceLogin = packet.G2();
         lastLogin.daysSinceRecoveryChange = packet.G1();
         lastLogin.unreadMessages = packet.G2();
-        lastLogin.warnMembers = packet.G1() == 1;
+
+        if (protocol.GetRevision() >= Revision_e::Rev289)
+        {
+            lastLogin.warnMembers = packet.G1() == 1;
+        }
+
         state.lastLogin = lastLogin;
     }
 }
 
-void PlayerStateDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state, Logger& logger)
+void PlayerStateDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state, const Protocol& protocol, Logger& logger)
 {
     switch (prot)
     {
@@ -158,15 +165,20 @@ void PlayerStateDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& 
         return;
     case ServerProt_e::UpdatePid:
         state.pid = packet.G2();
-        state.members = packet.G1() == 1;
         state.localPlayer.index = state.pid;
+
+        if (protocol.GetRevision() >= Revision_e::Rev289)
+        {
+            state.members = packet.G1() == 1;
+        }
+
         return;
     case ServerProt_e::UpdateRebootTimer:
         state.rebootTimer = RebootTimer_s{.ticks = packet.G2(), .tick = state.tick};
         StateLog::AddEvent(state, RebootStarted_s{.ticks = state.rebootTimer->ticks});
         return;
     case ServerProt_e::LastLoginInfo:
-        DecodeLastLogin(packet, state);
+        DecodeLastLogin(packet, state, protocol);
         return;
     case ServerProt_e::HintArrow:
         DecodeHintArrow(packet, state);

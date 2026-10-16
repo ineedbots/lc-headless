@@ -30,6 +30,8 @@ namespace
     constexpr auto LOGIN_HEADER_SIZE = std::size_t{2};
     constexpr auto CRC_BYTES = std::size_t{36};
     constexpr auto LOGGED_IN = u8{2};
+    constexpr auto LOGGED_IN_STAFF_225 = u8{18};
+    constexpr auto REVISION_MARKER = u8{0xFF};
     constexpr auto RECONNECTED = u8{15};
     constexpr auto SERVER_SEED_OFFSET = u32{50};
     constexpr auto RSA_MODULUS_HEX_DIGITS = std::size_t{128};
@@ -93,6 +95,11 @@ std::string FakeGameServer::Url() const
     return std::format("ws://{}:{}/", LOOPBACK_HOST, m_server->getPort());
 }
 
+Revision_e FakeGameServer::GetRevision() const
+{
+    return m_revision;
+}
+
 Config_s FakeGameServer::MakeConfig() const
 {
     auto config = Config_s{};
@@ -108,9 +115,10 @@ AccountSettings_s FakeGameServer::MakeAccount()
     return {.username = USERNAME, .password = PASSWORD};
 }
 
-std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache()
+std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache(Revision_e revision)
 {
     auto cache = GameCache_s{};
+    cache.revision = revision;
     TestCache::SetComponents(cache);
     cache.logoutComponent = LOGOUT_COMPONENT;
     // The NPC TestWorld sends, so scripts can use its options by name.
@@ -208,11 +216,19 @@ void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMes
 {
     if (message.type == ix::WebSocketMessageType::Open)
     {
-        const auto lock = std::scoped_lock{m_mutex};
-        m_connection = &connection;
-        m_stage = Stage_e::SeedRequest;
-        m_fromClient.reset();
-        m_toClient.reset();
+        {
+            const auto lock = std::scoped_lock{m_mutex};
+            m_connection = &connection;
+            m_stage = Stage_e::SeedRequest;
+            m_fromClient.reset();
+            m_toClient.reset();
+        }
+
+        if (m_revision < Revision_e::Rev289)
+        {
+            SendSeed(connection, false);
+        }
+
         return;
     }
 
@@ -259,15 +275,31 @@ void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMes
 
 void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<const u8> bytes)
 {
+    if (m_revision < Revision_e::Rev289)
+    {
+        AddError("A 225 client sent something before its seed arrived");
+        return;
+    }
+
     if (bytes.size() != SEED_REQUEST_SIZE || bytes[0] != 14)
     {
         AddError("The first message wasn't a 2-byte seed request");
         return;
     }
 
+    SendSeed(connection, true);
+}
+
+// 289 puts 8 zero bytes and a status of 0 before the seed.
+void FakeGameServer::SendSeed(ix::WebSocket& connection, bool withHeader)
+{
     auto response = Packet{};
-    response.P8(0);
-    response.P1(0);
+    if (withHeader)
+    {
+        response.P8(0);
+        response.P1(0);
+    }
+
     response.P8(SERVER_SEED);
     {
         const auto lock = std::scoped_lock{m_mutex};
@@ -288,7 +320,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
     auto packet = Packet{bytes};
     const auto opcode = packet.G1();
     const auto bodySize = packet.G1();
-    if (bytes.size() != LOGIN_HEADER_SIZE + bodySize || packet.G1() != 0xFF || packet.G2() != static_cast<u16>(m_revision))
+    if (bytes.size() != LOGIN_HEADER_SIZE + bodySize || !ReadRevision(packet))
     {
         AddError("The login request's length, marker or revision is wrong");
         return;
@@ -327,7 +359,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
 
         auto response = Packet{};
         response.P1(status);
-        if (status == LOGGED_IN)
+        if (status == LOGGED_IN && m_revision >= Revision_e::Rev289)
         {
             response.P1(0);
             response.P1(1);
@@ -338,7 +370,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
 
     m_changed.notify_all();
 
-    if (status != LOGGED_IN && status != RECONNECTED)
+    if (!IsLoggedIn(status) && status != RECONNECTED)
     {
         connection.close();
         return;
@@ -348,6 +380,22 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
     {
         m_onLogin(*this, opcode == 18);
     }
+}
+
+bool FakeGameServer::ReadRevision(Packet& packet) const
+{
+    const auto revision = static_cast<u16>(m_revision);
+    if (m_revision < Revision_e::Rev289)
+    {
+        return packet.G1() == revision;
+    }
+
+    return packet.G1() == REVISION_MARKER && packet.G2() == revision;
+}
+
+bool FakeGameServer::IsLoggedIn(u8 status) const
+{
+    return status == LOGGED_IN || (m_revision < Revision_e::Rev289 && status == LOGGED_IN_STAFF_225);
 }
 
 void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<const u8> bytes)

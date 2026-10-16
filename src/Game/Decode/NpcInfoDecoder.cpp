@@ -1,8 +1,10 @@
 #include "pch.hpp"
 #include "NpcInfoDecoder.hpp"
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Error/ProtocolError.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../State/Entity_s.hpp"
 #include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
@@ -21,9 +23,31 @@ namespace
     constexpr auto MASK_SPOT_ANIM = 0x40u;
     constexpr auto MASK_FACE_COORD = 0x80u;
     constexpr auto BITS_PER_BYTE = std::size_t{8};
+
+    // 289 widened the index from 13 bits to 14, so each list ends with that many set bits.
+    struct NpcIndexBits_s
+    {
+        u32 bits = 0;
+        s32 endOfList = 0;
+    };
+
+    NpcIndexBits_s GetIndexBits(Revision_e revision)
+    {
+        if (revision >= Revision_e::Rev289)
+        {
+            return {.bits = 14, .endOfList = 16383};
+        }
+
+        return {.bits = 13, .endOfList = 8191};
+    }
 }
 
-void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
+NpcInfoDecoder::NpcInfoDecoder(Protocol protocol)
+    : m_protocol{protocol}
+{
+}
+
+void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state) const
 {
     auto packet = Packet{payload};
     auto extended = std::vector<std::size_t>{};
@@ -70,13 +94,14 @@ void NpcInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
     }
 }
 
-void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vector<Npc_s>& npcs, std::vector<std::size_t>& extended)
+void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vector<Npc_s>& npcs, std::vector<std::size_t>& extended) const
 {
     const auto bitLength = packet.GetLength() * BITS_PER_BYTE;
+    const auto indexBits = GetIndexBits(m_protocol.GetRevision());
     while (packet.GetBitPos() + MIN_NEW_NPC_BITS <= bitLength)
     {
-        const auto index = packet.GBit(INDEX_BITS);
-        if (index == END_OF_LIST)
+        const auto index = packet.GBit(indexBits.bits);
+        if (index == indexBits.endOfList)
         {
             break;
         }
@@ -84,7 +109,14 @@ void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vect
         const auto type = packet.GBit(TYPE_BITS);
         const auto dx = EntityInfo::ReadDelta(packet);
         const auto dz = EntityInfo::ReadDelta(packet);
-        const auto jump = packet.GBit(EntityInfo::UPDATE_BITS) == 1;
+
+        // 225 has no jump bit, so every new NPC is placed as a walk.
+        auto jump = false;
+        if (m_protocol.GetRevision() >= Revision_e::Rev289)
+        {
+            jump = packet.GBit(EntityInfo::UPDATE_BITS) == 1;
+        }
+
         const auto hasExtended = packet.GBit(EntityInfo::UPDATE_BITS) == 1;
 
         if (std::ranges::find(npcs, static_cast<u16>(index), &Npc_s::index) != npcs.end())
@@ -110,10 +142,16 @@ void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vect
     }
 }
 
-void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits, std::vector<NpcSaid_s>& said)
+void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc, std::vector<NpcHit_s>& hits, std::vector<NpcSaid_s>& said) const
 {
     const auto tick = state.tick;
     const auto mask = u32{packet.G1()};
+
+    // 225 has no second hit, so its bit means the decoder is out of step with the server.
+    if (m_protocol.GetRevision() < Revision_e::Rev289 && (mask & MASK_DAMAGE2) != 0)
+    {
+        throw ProtocolError{std::format("NPC_INFO mask {:#x} has DAMAGE2, which revision 225 doesn't send", mask)};
+    }
 
     if ((mask & MASK_DAMAGE2) != 0)
     {

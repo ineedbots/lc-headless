@@ -1,7 +1,9 @@
 #include "pch.hpp"
 #include "SceneDecoder.hpp"
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/BuildArea_s.hpp"
 #include "../State/GameState_s.hpp"
@@ -13,7 +15,23 @@ namespace
 {
     constexpr auto BUILD_AREA_RADIUS_ZONES = 6;
 
-    void DecodeRebuild(Packet& packet, GameState_s& state)
+    // 225 lists each map square in the area, with the CRCs of the server's files for it.
+    std::vector<BuildSquare_s> ReadBuildSquares(Packet& packet)
+    {
+        auto squares = std::vector<BuildSquare_s>{};
+        while (packet.GetAvailable() > 0)
+        {
+            auto& square = squares.emplace_back();
+            square.x = packet.G1();
+            square.z = packet.G1();
+            square.landCrc = packet.G4();
+            square.locCrc = packet.G4();
+        }
+
+        return squares;
+    }
+
+    void DecodeRebuild(Packet& packet, GameState_s& state, const Protocol& protocol)
     {
         const auto zoneX = packet.G2();
         const auto zoneZ = packet.G2();
@@ -24,6 +42,11 @@ namespace
             .baseX = (zoneX - BUILD_AREA_RADIUS_ZONES) * Zone_s::SIZE,
             .baseZ = (zoneZ - BUILD_AREA_RADIUS_ZONES) * Zone_s::SIZE,
         };
+
+        if (protocol.GetRevision() < Revision_e::Rev289)
+        {
+            state.buildArea.squares = ReadBuildSquares(packet);
+        }
 
         // The server resends every zone in view after a rebuild.
         state.groundItems.clear();
@@ -52,12 +75,14 @@ namespace
     }
 }
 
-void SceneDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state)
+// 225 sends a song by name and a jingle as its MIDI bytes, which the state has no id for, so they're read and
+// dropped.
+void SceneDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state, const Protocol& protocol)
 {
     switch (prot)
     {
     case ServerProt_e::RebuildNormal:
-        DecodeRebuild(packet, state);
+        DecodeRebuild(packet, state, protocol);
         return;
     case ServerProt_e::ResetAnims:
         ResetAnimations(state);
@@ -75,9 +100,21 @@ void SceneDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state)
         return;
 
     case ServerProt_e::MidiSong:
+        if (protocol.GetRevision() < Revision_e::Rev289)
+        {
+            packet.SetPos(packet.GetLength());
+            return;
+        }
+
         state.audio.song = PacketFields::ReadId(packet);
         return;
     case ServerProt_e::MidiJingle:
+        if (protocol.GetRevision() < Revision_e::Rev289)
+        {
+            packet.SetPos(packet.GetLength());
+            return;
+        }
+
         state.audio.jingle = packet.G2();
         packet.G2();
         return;

@@ -2,7 +2,9 @@
 #include "Fixtures.hpp"
 
 #include "BitWriter.hpp"
+#include "Config/Revision_e.hpp"
 #include "Game/Protocol/Base37.hpp"
+#include "Game/State/BuildArea_s.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Io/Packet.hpp"
 
@@ -27,7 +29,7 @@ std::vector<u8> Fixtures::Concat(std::span<const u8> first, std::span<const u8> 
     return bytes;
 }
 
-std::vector<u8> Fixtures::Appearance(std::string_view name, std::optional<u16> npcTransform)
+std::vector<u8> Fixtures::Appearance(std::string_view name, std::optional<u16> npcTransform, Revision_e revision)
 {
     auto packet = Packet{};
     packet.P1(1);
@@ -68,7 +70,12 @@ std::vector<u8> Fixtures::Appearance(std::string_view name, std::optional<u16> n
 
     packet.P8(std::bit_cast<s64>(Base37::Encode(name)));
     packet.P1(3);
-    packet.P2(32);
+
+    if (revision >= Revision_e::Rev289)
+    {
+        packet.P2(32);
+    }
+
     return ToBytes(packet);
 }
 
@@ -80,11 +87,32 @@ std::vector<u8> Fixtures::Rebuild(s32 zoneX, s32 zoneZ)
     return ToBytes(packet);
 }
 
-std::vector<u8> Fixtures::UpdatePid(u16 pid, bool members)
+std::vector<u8> Fixtures::Rebuild225(std::span<const BuildSquare_s> squares, s32 zoneX, s32 zoneZ)
+{
+    auto packet = Packet{};
+    packet.P2(zoneX);
+    packet.P2(zoneZ);
+    for (const auto& square : squares)
+    {
+        packet.P1(square.x);
+        packet.P1(square.z);
+        packet.P4(square.landCrc);
+        packet.P4(square.locCrc);
+    }
+
+    return ToBytes(packet);
+}
+
+std::vector<u8> Fixtures::UpdatePid(u16 pid, bool members, Revision_e revision)
 {
     auto packet = Packet{};
     packet.P2(pid);
-    packet.P1(members ? 1 : 0);
+
+    if (revision >= Revision_e::Rev289)
+    {
+        packet.P1(members ? 1 : 0);
+    }
+
     return ToBytes(packet);
 }
 
@@ -108,11 +136,48 @@ std::vector<u8> Fixtures::PlaceLocalPlayer(s32 localX, s32 localZ, s32 level, st
     return Concat(bits.GetBytes(), ToBytes(extended));
 }
 
-std::vector<u8> Fixtures::AddNpc(u16 index, u16 type, s32 dx, s32 dz)
+std::vector<u8> Fixtures::AddNpc(u16 index, u16 type, s32 dx, s32 dz, Revision_e revision)
 {
     auto bits = BitWriter{};
-    bits.Put(8, 0).Put(14, index).Put(11, type).Put(5, dx).Put(5, dz).Put(1, 1).Put(1, 0);
+    if (revision >= Revision_e::Rev289)
+    {
+        bits.Put(8, 0).Put(14, index).Put(11, type).Put(5, dx).Put(5, dz).Put(1, 1).Put(1, 0);
+        return bits.GetBytes();
+    }
+
+    bits.Put(8, 0).Put(13, index).Put(11, type).Put(5, dx).Put(5, dz).Put(1, 0);
     return bits.GetBytes();
+}
+
+std::vector<u8> Fixtures::UpdateInvFull(u16 com, std::span<const std::pair<u16, s32>> items, Revision_e revision)
+{
+    auto packet = Packet{};
+    packet.P2(com);
+
+    const auto size = static_cast<s32>(items.size());
+    if (revision >= Revision_e::Rev289)
+    {
+        packet.P2(size);
+    }
+    else
+    {
+        packet.P1(size);
+    }
+
+    for (const auto& [obj, count] : items)
+    {
+        packet.P2(obj + 1);
+        if (count >= 255)
+        {
+            packet.P1(255);
+            packet.P4(count);
+            continue;
+        }
+
+        packet.P1(count);
+    }
+
+    return ToBytes(packet);
 }
 
 std::vector<u8> Fixtures::Zone(s32 localX, s32 localZ)

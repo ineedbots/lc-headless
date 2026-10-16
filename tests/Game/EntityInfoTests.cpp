@@ -2,10 +2,12 @@
 #include "../Support/Game/BitWriter.hpp"
 #include "../Support/Game/Fixtures.hpp"
 
+#include "Config/Revision_e.hpp"
 #include "Game/Decode/NpcInfoDecoder.hpp"
 #include "Game/Decode/PlayerInfoDecoder.hpp"
 #include "Game/Error/ProtocolError.hpp"
 #include "Game/Protocol/Base37.hpp"
+#include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/WordPack.hpp"
 #include "Game/State/Entity_s.hpp"
 #include "Game/State/GameState_s.hpp"
@@ -19,6 +21,9 @@
 
 namespace
 {
+    const auto PROTOCOL_225 = Protocol{Revision_e::Rev225};
+    const auto PROTOCOL_289 = Protocol{Revision_e::Rev289};
+
     constexpr auto HOME = Tile_s{.x = Fixtures::HOME, .z = Fixtures::HOME, .level = 0};
 
     Tile_s Offset(s32 dx, s32 dz)
@@ -66,7 +71,7 @@ TEST_CASE("PLAYER_INFO places the local player", "[PlayerInfoDecoder]")
     state.buildArea = BuildArea_s{.loaded = true, .baseX = Fixtures::BASE, .baseZ = Fixtures::BASE};
     state.pid = Fixtures::PID;
 
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
     decoder.Decode(Fixtures::PlaceLocalPlayer(48, 52, 1, Fixtures::Appearance("bot")), state);
 
     CHECK(state.tick == 1);
@@ -95,7 +100,7 @@ TEST_CASE("PLAYER_INFO places the local player", "[PlayerInfoDecoder]")
 TEST_CASE("PLAYER_INFO moves the local player", "[PlayerInfoDecoder]")
 {
     auto state = Fixtures::PlacedState();
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
 
     SECTION("a walk step")
     {
@@ -131,7 +136,7 @@ TEST_CASE("PLAYER_INFO keeps the tracked list in server order", "[PlayerInfoDeco
     auto state = Fixtures::PlacedState();
     state.players = {MakePlayer(7, Offset(1, 1)), MakePlayer(8, Offset(2, 2)), MakePlayer(9, Offset(3, 3))};
 
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
 
     SECTION("unchanged, removed and walking entries")
     {
@@ -165,7 +170,7 @@ TEST_CASE("PLAYER_INFO keeps the tracked list in server order", "[PlayerInfoDeco
 TEST_CASE("PLAYER_INFO adds new players relative to the local player", "[PlayerInfoDecoder]")
 {
     auto state = Fixtures::PlacedState();
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
 
     const auto appearance = Fixtures::Appearance("zezima");
     auto bits = BitWriter{};
@@ -231,9 +236,9 @@ TEST_CASE("PLAYER_INFO reads extended blocks", "[PlayerInfoDecoder]")
 {
     auto state = Fixtures::PlacedState();
     state.players = {MakePlayer(7, Offset(1, 1))};
-    state.players[0].appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("zezima"));
+    state.players[0].appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("zezima"), Revision_e::Rev289);
 
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
 
     auto bits = BitWriter{};
     bits.Put(1, 1).Put(2, 0).Put(8, 1).Put(1, 1).Put(2, 0).Put(11, 2047);
@@ -322,7 +327,7 @@ TEST_CASE("PLAYER_INFO reads extended blocks", "[PlayerInfoDecoder]")
 
 TEST_CASE("PLAYER_INFO reads an NPC-transformed appearance", "[PlayerInfoDecoder]")
 {
-    const auto appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("frog", 18));
+    const auto appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("frog", 18), Revision_e::Rev289);
     REQUIRE(appearance.npcTransform.has_value());
     CHECK(*appearance.npcTransform == 18);
     CHECK(std::ranges::all_of(appearance.wear, [](const WearSlot_s& slot)
@@ -338,7 +343,7 @@ TEST_CASE("PLAYER_INFO reads an NPC-transformed appearance", "[PlayerInfoDecoder
 TEST_CASE("PLAYER_INFO hits from a later tick replace the earlier ones", "[PlayerInfoDecoder]")
 {
     auto state = Fixtures::PlacedState();
-    auto decoder = PlayerInfoDecoder{};
+    auto decoder = PlayerInfoDecoder{PROTOCOL_289};
     const auto hitLocal = [&decoder, &state](u8 damage)
     {
         auto bits = BitWriter{};
@@ -364,7 +369,7 @@ TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
 {
     auto state = Fixtures::PlacedState();
 
-    NpcInfoDecoder::Decode(Fixtures::AddNpc(100, 50, 2, -1), state);
+    NpcInfoDecoder{PROTOCOL_289}.Decode(Fixtures::AddNpc(100, 50, 2, -1), state);
     REQUIRE(state.npcs.size() == 1);
     CHECK(state.npcs[0].index == 100);
     CHECK(state.npcs[0].type == 50);
@@ -375,12 +380,12 @@ TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
     {
         auto walk = BitWriter{};
         walk.Put(8, 1).Put(1, 1).Put(2, 1).Put(3, 2).Put(1, 0);
-        NpcInfoDecoder::Decode(walk.GetBytes(), state);
+        NpcInfoDecoder{PROTOCOL_289}.Decode(walk.GetBytes(), state);
         CHECK(state.npcs[0].tile == Offset(3, 0));
 
         auto remove = BitWriter{};
         remove.Put(8, 1).Put(1, 1).Put(2, 3);
-        NpcInfoDecoder::Decode(remove.GetBytes(), state);
+        NpcInfoDecoder{PROTOCOL_289}.Decode(remove.GetBytes(), state);
         CHECK(state.npcs.empty());
     }
 
@@ -389,7 +394,7 @@ TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
         auto teleport = BitWriter{};
         teleport.Put(8, 1).Put(1, 1).Put(2, 3);
         teleport.Put(14, 100).Put(11, 50).Put(5, -10).Put(5, 10).Put(1, 1).Put(1, 0);
-        NpcInfoDecoder::Decode(teleport.GetBytes(), state);
+        NpcInfoDecoder{PROTOCOL_289}.Decode(teleport.GetBytes(), state);
         REQUIRE(state.npcs.size() == 1);
         CHECK(state.npcs[0].tile == Offset(-10, 10));
         CHECK(state.npcs[0].lastMovement == Movement_e::Teleport);
@@ -427,7 +432,7 @@ TEST_CASE("NPC_INFO reads extended blocks in mask order", "[NpcInfoDecoder]")
     extended.P2(6403);
     extended.P2(6405);
 
-    NpcInfoDecoder::Decode(WithExtended(bits, extended), state);
+    NpcInfoDecoder{PROTOCOL_289}.Decode(WithExtended(bits, extended), state);
 
     const auto& first = state.npcs[0];
     REQUIRE(first.hits.size() == 2);
@@ -446,4 +451,95 @@ TEST_CASE("NPC_INFO reads extended blocks in mask order", "[NpcInfoDecoder]")
     CHECK(second.spotAnim.id == -1);
     REQUIRE(second.faceCoord.has_value());
     CHECK(second.faceCoord->x == 6403);
+}
+
+TEST_CASE("NPC_INFO reads 225's 13-bit indexes, with no jump bit", "[NpcInfoDecoder]")
+{
+    auto state = Fixtures::PlacedState();
+    const auto decoder = NpcInfoDecoder{PROTOCOL_225};
+
+    // The list's end is only read while an index and an NPC's fields would still fit, so it comes before an
+    // extended block here, as in a real update.
+    auto bits = BitWriter{};
+    bits.Put(8, 0);
+    bits.Put(13, 8000).Put(11, 50).Put(5, 2).Put(5, -1).Put(1, 0);
+    bits.Put(13, 101).Put(11, 51).Put(5, 0).Put(5, 3).Put(1, 1);
+    bits.Put(13, 8191);
+
+    auto extended = Packet{};
+    extended.P1(0x02);
+    extended.P2(808);
+    extended.P1(0);
+    decoder.Decode(WithExtended(bits, extended), state);
+
+    REQUIRE(state.npcs.size() == 2);
+    CHECK(state.npcs[0].index == 8000);
+    CHECK(state.npcs[0].type == 50);
+    CHECK(state.npcs[0].tile == Offset(2, -1));
+    CHECK(state.npcs[0].lastMovement == Movement_e::Walk);
+    CHECK(state.npcs[1].index == 101);
+    CHECK(state.npcs[1].tile == Offset(0, 3));
+    CHECK(state.npcs[1].animation.id == 808);
+
+    SECTION("the fixture's 225 NPC decodes the same way")
+    {
+        auto fresh = Fixtures::PlacedState();
+        decoder.Decode(Fixtures::AddNpc(100, 50, 2, 0, Revision_e::Rev225), fresh);
+        REQUIRE(fresh.npcs.size() == 1);
+        CHECK(fresh.npcs[0].tile == Offset(2, 0));
+    }
+}
+
+TEST_CASE("PLAYER_INFO reads a 225 appearance, which ends after the combat level", "[PlayerInfoDecoder]")
+{
+    const auto appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("zezima", std::nullopt, Revision_e::Rev225), Revision_e::Rev225);
+    CHECK(appearance.name == "Zezima");
+    CHECK(appearance.combatLevel == 3);
+    CHECK(appearance.totalLevel == 0);
+    CHECK_FALSE(appearance.npcTransform.has_value());
+    CHECK(appearance.wear[3].kind == WearKind_e::Object);
+    CHECK(appearance.wear[3].id == Fixtures::WEAPON);
+
+    SECTION("slot 0's 0xFFFF is a wear slot, not a transform")
+    {
+        auto bytes = Fixtures::Appearance("zezima", std::nullopt, Revision_e::Rev225);
+        bytes[2] = 0xFF;
+        bytes.insert(bytes.begin() + 3, 0xFF);
+        const auto worn = PlayerInfoDecoder::ReadAppearance(bytes, Revision_e::Rev225);
+        CHECK_FALSE(worn.npcTransform.has_value());
+        CHECK(worn.wear[0].kind == WearKind_e::Object);
+        CHECK(worn.name == "Zezima");
+    }
+
+    SECTION("PLAYER_INFO places the local player with it")
+    {
+        auto state = GameState_s{};
+        state.buildArea = BuildArea_s{.loaded = true, .baseX = Fixtures::BASE, .baseZ = Fixtures::BASE};
+        auto decoder = PlayerInfoDecoder{PROTOCOL_225};
+        decoder.Decode(Fixtures::PlaceLocalPlayer(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL, 0, Fixtures::Appearance("bot", std::nullopt, Revision_e::Rev225)), state);
+        REQUIRE(state.localPlayer.appearance.has_value());
+        CHECK(state.localPlayer.appearance->name == "Bot");
+    }
+}
+
+TEST_CASE("A 225 mask with DAMAGE2's bit is out of step with the server", "[PlayerInfoDecoder][NpcInfoDecoder]")
+{
+    auto state = Fixtures::PlacedState();
+    state.npcs = {MakeNpc(100, 50, Offset(1, 0))};
+
+    auto npcBits = BitWriter{};
+    npcBits.Put(8, 1).Put(1, 1).Put(2, 0).Put(13, 8191);
+    auto npcExtended = Packet{};
+    npcExtended.P1(0x01);
+    npcExtended.PData(std::to_array<u8>({1, 0, 9, 10}));
+    CHECK_THROWS_AS(NpcInfoDecoder{PROTOCOL_225}.Decode(WithExtended(npcBits, npcExtended), state), ProtocolError);
+
+    auto playerBits = BitWriter{};
+    playerBits.Put(1, 1).Put(2, 0).Put(8, 0).Put(11, 2047);
+    auto playerExtended = Packet{};
+    playerExtended.P1(0x80);
+    playerExtended.P1(0x04);
+    playerExtended.PData(std::to_array<u8>({1, 0, 9, 10}));
+    auto decoder = PlayerInfoDecoder{PROTOCOL_225};
+    CHECK_THROWS_AS(decoder.Decode(WithExtended(playerBits, playerExtended), state), ProtocolError);
 }

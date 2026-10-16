@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/GameState_s.hpp"
 
@@ -9,13 +10,13 @@
 class SocialDecoder
 {
 public:
-    void Decode(ServerProt_e prot, Packet& packet, GameState_s& state);
+    void Decode(ServerProt_e prot, Packet& packet, GameState_s& state, const Protocol& protocol);
     void Reset();
 
 private:
     static constexpr std::size_t MAX_REMEMBERED_MESSAGE_IDS = 100;
 
-    void DecodePrivateMessage(Packet& packet, GameState_s& state);
+    void DecodePrivateMessage(Packet& packet, GameState_s& state, const Protocol& protocol);
 
     std::deque<s32> m_privateMessageIds;
 };

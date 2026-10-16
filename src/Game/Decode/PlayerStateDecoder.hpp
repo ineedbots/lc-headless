@@ -2,6 +2,7 @@
 
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/GameState_s.hpp"
 
@@ -12,5 +13,5 @@ class PlayerStateDecoder
 public:
     PlayerStateDecoder() = delete;
 
-    static void Decode(ServerProt_e prot, Packet& packet, GameState_s& state, Logger& logger);
+    static void Decode(ServerProt_e prot, Packet& packet, GameState_s& state, const Protocol& protocol, Logger& logger);
 };

@@ -124,6 +124,19 @@ ClientPacket_s ClientPackets::EventCameraPosition(u16 pitch, u16 yaw) const
     return Make(ClientProt_e::EventCameraPosition, packet);
 }
 
+ClientPacket_s ClientPackets::RebuildGetMaps(std::span<const MapRequest_s> requests) const
+{
+    auto packet = Packet{};
+    for (const auto& request : requests)
+    {
+        packet.P1(static_cast<u8>(request.file));
+        packet.P1(request.x);
+        packet.P1(request.z);
+    }
+
+    return Make(ClientProt_e::RebuildGetMaps, packet);
+}
+
 ClientPacket_s ClientPackets::Move(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run) const
 {
     if (waypoints.empty() || waypoints.size() > MAX_WAYPOINTS)

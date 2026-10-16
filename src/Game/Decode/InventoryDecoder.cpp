@@ -1,7 +1,9 @@
 #include "pch.hpp"
 #include "InventoryDecoder.hpp"
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
@@ -28,10 +30,11 @@ namespace
         return {.id = id - 1, .count = count};
     }
 
-    void DecodeFull(Packet& packet, GameState_s& state)
+    void DecodeFull(Packet& packet, GameState_s& state, const Protocol& protocol)
     {
         const auto com = packet.G2();
-        const auto size = packet.G2();
+        // 225 sends the inventory's whole capacity in a byte; 289 sends up to the last used slot in two.
+        const auto size = protocol.GetRevision() >= Revision_e::Rev289 ? packet.G2() : packet.G1();
         auto inventory = Inventory_s{.com = com, .tick = state.tick};
         inventory.slots.reserve(size);
         for (auto slot = 0; slot < size; ++slot)
@@ -43,7 +46,7 @@ namespace
         StateLog::AddEvent(state, InventoryChanged_s{.com = com});
     }
 
-    void DecodePartial(Packet& packet, GameState_s& state)
+    void DecodePartial(Packet& packet, GameState_s& state, const Protocol& protocol)
     {
         const auto com = packet.G2();
         auto& inventory = state.inventories[com];
@@ -51,7 +54,8 @@ namespace
         inventory.tick = state.tick;
         while (packet.GetAvailable() > 0)
         {
-            const auto slot = static_cast<std::size_t>(packet.GSmart());
+            // 225 sends each slot in a byte; 289 widened it to a smart.
+            const auto slot = static_cast<std::size_t>(protocol.GetRevision() >= Revision_e::Rev289 ? packet.GSmart() : packet.G1());
             const auto item = ReadItem(packet);
             if (slot >= inventory.slots.size())
             {
@@ -72,15 +76,15 @@ namespace
     }
 }
 
-void InventoryDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state)
+void InventoryDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state, const Protocol& protocol)
 {
     switch (prot)
     {
     case ServerProt_e::UpdateInvFull:
-        DecodeFull(packet, state);
+        DecodeFull(packet, state, protocol);
         return;
     case ServerProt_e::UpdateInvPartial:
-        DecodePartial(packet, state);
+        DecodePartial(packet, state, protocol);
         return;
     case ServerProt_e::UpdateInvStopTransmit:
         DecodeStopTransmit(packet, state);

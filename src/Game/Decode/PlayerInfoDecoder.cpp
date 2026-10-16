@@ -1,9 +1,11 @@
 #include "pch.hpp"
 #include "PlayerInfoDecoder.hpp"
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Error/ProtocolError.hpp"
 #include "../Protocol/Base37.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/WordPack.hpp"
 #include "../State/Entity_s.hpp"
 #include "../State/GameEvent_s.hpp"
@@ -75,6 +77,11 @@ namespace
     }
 }
 
+PlayerInfoDecoder::PlayerInfoDecoder(Protocol protocol)
+    : m_protocol{protocol}
+{
+}
+
 void PlayerInfoDecoder::Decode(std::span<const u8> payload, GameState_s& state)
 {
     ++state.tick;
@@ -131,7 +138,7 @@ void PlayerInfoDecoder::Reset()
     m_appearances.clear();
 }
 
-Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes)
+Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes, Revision_e revision)
 {
     auto packet = Packet{bytes};
     auto appearance = Appearance_s{};
@@ -146,9 +153,9 @@ Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes)
             continue;
         }
 
-        // A transformed player sends the NPC type instead of the rest of the wear slots.
+        // A transformed player sends the NPC type instead of the rest of the wear slots. 225 has no transforms.
         const auto value = (high << 8) | packet.G1();
-        if (slot == 0 && value == TRANSFORM_MARKER)
+        if (revision >= Revision_e::Rev289 && slot == 0 && value == TRANSFORM_MARKER)
         {
             appearance.npcTransform = packet.G2();
             break;
@@ -172,7 +179,12 @@ Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes)
     appearance.name37 = std::bit_cast<u64>(packet.G8());
     appearance.name = Base37::DecodeDisplayName(appearance.name37);
     appearance.combatLevel = packet.G1();
-    appearance.totalLevel = packet.G2();
+
+    if (revision >= Revision_e::Rev289)
+    {
+        appearance.totalLevel = packet.G2();
+    }
+
     return appearance;
 }
 
@@ -275,12 +287,18 @@ void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_
         mask |= u32{packet.G1()} << 8;
     }
 
+    // 225 has no second hit, so its bit means the decoder is out of step with the server.
+    if (m_protocol.GetRevision() < Revision_e::Rev289 && (mask & MASK_DAMAGE2) != 0)
+    {
+        throw ProtocolError{std::format("PLAYER_INFO mask {:#x} has DAMAGE2, which revision 225 doesn't send", mask)};
+    }
+
     if ((mask & MASK_APPEARANCE) != 0)
     {
         auto bytes = std::vector<u8>(packet.G1());
         packet.GData(bytes);
 
-        auto appearance = ReadAppearance(bytes);
+        auto appearance = ReadAppearance(bytes, m_protocol.GetRevision());
         if (!isLocal)
         {
             m_appearances.insert_or_assign(player.index, appearance);

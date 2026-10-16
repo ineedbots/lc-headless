@@ -4,6 +4,7 @@
 #include "../../Config/AccountConfig_s.hpp"
 #include "../../Config/Config_s.hpp"
 #include "../../Io/WebSocketClient.hpp"
+#include "../Protocol/Protocol.hpp"
 
 struct LoginResult_s
 {
@@ -16,7 +17,8 @@ struct LoginResult_s
 };
 
 // Never waits, so the caller owns the timeout. Bytes after the login response stay in the socket. The
-// account, the login settings and the CRCs must outlive the handshake.
+// account, the login settings and the CRCs must outlive the handshake. A 225 server sends its seed as soon as
+// the connection opens; 289 waits for a seed request.
 class LoginHandshake
 {
 public:
@@ -25,18 +27,20 @@ public:
     static constexpr u8 RECONNECT_LOGIN = 18;
     static constexpr u8 STATUS_SEED_OK = 0;
     static constexpr u8 STATUS_LOGGED_IN = 2;
+    // 225's success for a staff account, with nothing after it.
+    static constexpr u8 STATUS_LOGGED_IN_STAFF = 18;
     static constexpr u8 STATUS_RECONNECTED = 15;
     static constexpr u8 STATUS_HOP_TIMER = 21;
     static constexpr u32 SERVER_SEED_OFFSET = 50;
 
-    LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect);
+    LoginHandshake(Protocol protocol, const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect);
 
     // Nullopt while a response is still on its way.
     [[nodiscard]] std::optional<LoginResult_s> Advance(WebSocketClient& socket);
     [[nodiscard]] std::string_view GetWaitingFor() const;
 
     [[nodiscard]] static std::vector<u8> BuildSeedRequest(std::string_view username);
-    [[nodiscard]] static std::vector<u8> BuildLoginRequest(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect);
+    [[nodiscard]] static std::vector<u8> BuildLoginRequest(const Protocol& protocol, const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect);
     [[nodiscard]] static std::array<s32, LoginResult_s::SEED_SIZE> MakeSeed(s64 serverSeed);
     // The server-to-client cipher's seed: each word of the login seed plus 50.
     [[nodiscard]] static std::array<s32, LoginResult_s::SEED_SIZE> GetInboundSeed(std::span<const s32, LoginResult_s::SEED_SIZE> seed);
@@ -54,11 +58,13 @@ private:
     };
 
     [[nodiscard]] static std::optional<std::vector<u8>> TryReceive(WebSocketClient& socket, std::size_t count);
+    [[nodiscard]] std::optional<LoginResult_s> ReadResponse(u8 status);
 
+    Protocol m_protocol;
     const AccountSettings_s& m_account;
     const LoginSettings_s& m_login;
     std::span<const s32, GameCache_s::CRC_COUNT> m_crcs;
     bool m_reconnect;
-    Stage_e m_stage = Stage_e::SendSeedRequest;
+    Stage_e m_stage;
     LoginResult_s m_result;
 };

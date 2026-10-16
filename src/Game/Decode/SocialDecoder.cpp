@@ -1,8 +1,10 @@
 #include "pch.hpp"
 #include "SocialDecoder.hpp"
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Base37.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../Protocol/WordPack.hpp"
 #include "../State/GameState_s.hpp"
@@ -71,7 +73,7 @@ namespace
     }
 }
 
-void SocialDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state)
+void SocialDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state, const Protocol& protocol)
 {
     switch (prot)
     {
@@ -79,7 +81,7 @@ void SocialDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state
         DecodeMessageGame(packet, state);
         return;
     case ServerProt_e::MessagePrivate:
-        DecodePrivateMessage(packet, state);
+        DecodePrivateMessage(packet, state, protocol);
         return;
     case ServerProt_e::UpdateFriendList:
         DecodeFriend(packet, state);
@@ -107,11 +109,18 @@ void SocialDecoder::Reset()
     m_privateMessageIds.clear();
 }
 
-void SocialDecoder::DecodePrivateMessage(Packet& packet, GameState_s& state)
+void SocialDecoder::DecodePrivateMessage(Packet& packet, GameState_s& state, const Protocol& protocol)
 {
     const auto from = PacketFields::ReadName37(packet);
     const auto messageId = packet.G4();
-    const auto staffLevel = packet.G1();
+    auto staffLevel = packet.G1();
+
+    // The 225 engine sends a staff level of 1 or more as one higher, so it's taken back down to mean what 289's does.
+    if (protocol.GetRevision() < Revision_e::Rev289 && staffLevel > 0)
+    {
+        --staffLevel;
+    }
+
     auto packed = std::vector<u8>(packet.GetAvailable());
     packet.GData(packed);
 

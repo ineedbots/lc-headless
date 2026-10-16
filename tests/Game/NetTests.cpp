@@ -19,6 +19,7 @@
 #include "Utils/BigUInt.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
 {
@@ -31,16 +32,17 @@ namespace
     class ServerFramer
     {
     public:
-        ServerFramer()
+        explicit ServerFramer(Protocol protocol = PROTOCOL)
             : m_isaac{SEED}
+            , m_protocol{protocol}
         {
         }
 
         std::vector<u8> Frame(u8 opcode, const std::vector<u8>& payload)
         {
             auto bytes = std::vector<u8>{static_cast<u8>(opcode + static_cast<u32>(m_isaac.NextInt()))};
-            const auto prot = PROTOCOL.FindServerProt(opcode);
-            const auto size = prot ? PROTOCOL.GetSize(*prot) : 0;
+            const auto prot = m_protocol.FindServerProt(opcode);
+            const auto size = prot ? m_protocol.GetSize(*prot) : 0;
             if (size == ServerProt::VAR_BYTE)
             {
                 bytes.push_back(static_cast<u8>(payload.size()));
@@ -57,6 +59,7 @@ namespace
 
     private:
         Isaac m_isaac;
+        Protocol m_protocol;
     };
 
     std::vector<u8> Join(std::initializer_list<std::vector<u8>> parts)
@@ -131,6 +134,25 @@ TEST_CASE("ServerPacketReader waits for split frames and decrypts each opcode on
     CHECK(packets[1].payload == std::vector<u8>{3, 0, 0, 4, 0x82, 10});
 }
 
+TEST_CASE("ServerPacketReader reads each revision's opcodes and rejects the other's", "[ServerPacketReader]")
+{
+    // 1 is 225's NPC_INFO and 60 is 289's OBJ_ADD; neither revision uses the other's.
+    const auto protocol225 = Protocol{Revision_e::Rev225};
+    auto framer = ServerFramer{protocol225};
+    auto reader = ServerPacketReader{SEED, protocol225};
+    reader.Append(Join({framer.Frame(1, {77}), framer.Frame(139, {0, 9})}));
+    CheckPacket(reader.Next(), ServerProt_e::NpcInfo, {77});
+    CheckPacket(reader.Next(), ServerProt_e::UpdatePid, {0, 9});
+
+    auto later = ServerPacketReader{SEED, PROTOCOL};
+    later.Append(ServerFramer{}.Frame(1, {}));
+    CHECK_THROWS_WITH(later.Next(), "Server sent opcode 1, which revision 289 never sends");
+
+    auto earlier = ServerPacketReader{SEED, protocol225};
+    earlier.Append(ServerFramer{protocol225}.Frame(60, {}));
+    CHECK_THROWS_WITH(earlier.Next(), "Server sent opcode 60, which revision 225 never sends");
+}
+
 TEST_CASE("ServerPacketReader rejects an opcode the server never sends", "[ServerPacketReader]")
 {
     auto framer = ServerFramer{};
@@ -192,7 +214,7 @@ TEST_CASE("LoginHandshake builds the login request", "[LoginHandshake]")
 {
     const auto account = AccountSettings_s{.username = "bot", .password = "pw"};
     const auto login = MakeLoginSettings();
-    const auto request = LoginHandshake::BuildLoginRequest(account, login, CRCS, SEED, false);
+    const auto request = LoginHandshake::BuildLoginRequest(PROTOCOL, account, login, CRCS, SEED, false);
 
     // clang-format off
     const auto block = std::vector<u8>{
@@ -213,8 +235,24 @@ TEST_CASE("LoginHandshake builds the login request", "[LoginHandshake]")
 
     SECTION("a reconnect uses opcode 18")
     {
-        CHECK(LoginHandshake::BuildLoginRequest(account, login, CRCS, SEED, true).front() == LoginHandshake::RECONNECT_LOGIN);
+        CHECK(LoginHandshake::BuildLoginRequest(PROTOCOL, account, login, CRCS, SEED, true).front() == LoginHandshake::RECONNECT_LOGIN);
     }
+}
+
+TEST_CASE("LoginHandshake builds a 225 login request with a one-byte revision", "[LoginHandshake]")
+{
+    const auto account = AccountSettings_s{.username = "bot", .password = "pw"};
+    auto login = MakeLoginSettings();
+    login.revision = Revision_e::Rev225;
+    const auto request = LoginHandshake::BuildLoginRequest(Protocol{Revision_e::Rev225}, account, login, CRCS, SEED, false);
+    const auto request289 = LoginHandshake::BuildLoginRequest(PROTOCOL, account, login, CRCS, SEED, false);
+
+    REQUIRE(request.size() == request289.size() - 2);
+    CHECK(request[0] == LoginHandshake::NORMAL_LOGIN);
+    CHECK(request[1] == request.size() - 2);
+    CHECK(request[2] == 225);
+    CHECK(request[3] == 0);
+    CHECK(std::ranges::equal(std::span{request}.subspan(4), std::span{request289}.subspan(6)));
 }
 
 TEST_CASE("LoginHandshake seeds", "[LoginHandshake]")
@@ -240,5 +278,5 @@ TEST_CASE("LoginError describes the status", "[LoginError]")
 
     CHECK(LoginError{16}.IsRetryable());
     CHECK(LoginError::Describe(99) == "unexpected response");
-    CHECK(LoginError::Describe(6) == "revision, cache CRC or RSA key mismatch; is client.cacheDirectory this server's cache?");
+    CHECK(LoginError::Describe(6) == "revision, cache CRC or RSA key mismatch; do login.revision and client.cacheDirectory match this server?");
 }

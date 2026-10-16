@@ -4,9 +4,11 @@
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Config/AccountConfig_s.hpp"
 #include "../../Config/Config_s.hpp"
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../../Io/WebSocketClient.hpp"
 #include "../Protocol/Base37.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "Error/LoginError.hpp"
 
 namespace
@@ -29,11 +31,13 @@ namespace
     }
 }
 
-LoginHandshake::LoginHandshake(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect)
-    : m_account{account}
+LoginHandshake::LoginHandshake(Protocol protocol, const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect)
+    : m_protocol{protocol}
+    , m_account{account}
     , m_login{login}
     , m_crcs{crcs}
     , m_reconnect{reconnect}
+    , m_stage{protocol.GetRevision() >= Revision_e::Rev289 ? Stage_e::SendSeedRequest : Stage_e::ServerSeed}
 {
 }
 
@@ -72,7 +76,7 @@ std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
             }
 
             m_result.seed = MakeSeed(Packet{*serverSeed}.G8());
-            socket.Send(BuildLoginRequest(m_account, m_login, m_crcs, m_result.seed, m_reconnect));
+            socket.Send(BuildLoginRequest(m_protocol, m_account, m_login, m_crcs, m_result.seed, m_reconnect));
             m_stage = Stage_e::LoginResponse;
             break;
         }
@@ -84,27 +88,12 @@ std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
                 return std::nullopt;
             }
 
-            const auto status = response->front();
-            if (status == STATUS_RECONNECTED)
+            if (const auto result = ReadResponse(response->front()))
             {
-                m_result.reconnected = true;
-                m_stage = Stage_e::Done;
-                return m_result;
+                return result;
             }
 
-            if (status == STATUS_LOGGED_IN)
-            {
-                m_stage = Stage_e::LoginDetails;
-                break;
-            }
-
-            if (status == STATUS_HOP_TIMER)
-            {
-                m_stage = Stage_e::HopTimer;
-                break;
-            }
-
-            throw LoginError{status};
+            break;
         }
         case Stage_e::LoginDetails:
         {
@@ -168,7 +157,7 @@ std::vector<u8> LoginHandshake::BuildSeedRequest(std::string_view username)
     return ToVector(packet.GetData());
 }
 
-std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect)
+std::vector<u8> LoginHandshake::BuildLoginRequest(const Protocol& protocol, const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, std::span<const s32, LoginResult_s::SEED_SIZE> seed, bool reconnect)
 {
     auto block = Packet{};
     block.P1(RSA_MARKER);
@@ -187,8 +176,19 @@ std::vector<u8> LoginHandshake::BuildLoginRequest(const AccountSettings_s& accou
     packet.P1(0);
 
     const auto bodyStart = packet.GetPos();
-    packet.P1(REVISION_MARKER);
-    packet.P2(static_cast<u16>(login.revision));
+    const auto revision = static_cast<u16>(protocol.GetRevision());
+
+    // 225 fits its revision in a byte; 289 doesn't, so it sends a marker and two bytes.
+    if (protocol.GetRevision() >= Revision_e::Rev289)
+    {
+        packet.P1(REVISION_MARKER);
+        packet.P2(revision);
+    }
+    else
+    {
+        packet.P1(revision);
+    }
+
     packet.P1(login.lowMemory ? 1 : 0);
     for (const auto crc : crcs)
     {
@@ -225,6 +225,39 @@ std::array<s32, LoginResult_s::SEED_SIZE> LoginHandshake::GetInboundSeed(std::sp
     }
 
     return inbound;
+}
+
+// Nullopt while there's more to read.
+std::optional<LoginResult_s> LoginHandshake::ReadResponse(u8 status)
+{
+    if (status == STATUS_RECONNECTED)
+    {
+        m_result.reconnected = true;
+        m_stage = Stage_e::Done;
+        return m_result;
+    }
+
+    // 225 tells a staff account by its status, and sends nothing after either success.
+    if (m_protocol.GetRevision() < Revision_e::Rev289 && (status == STATUS_LOGGED_IN || status == STATUS_LOGGED_IN_STAFF))
+    {
+        m_result.staffLevel = status == STATUS_LOGGED_IN_STAFF ? 1 : 0;
+        m_stage = Stage_e::Done;
+        return m_result;
+    }
+
+    if (status == STATUS_LOGGED_IN)
+    {
+        m_stage = Stage_e::LoginDetails;
+        return std::nullopt;
+    }
+
+    if (status == STATUS_HOP_TIMER && m_protocol.GetRevision() >= Revision_e::Rev289)
+    {
+        m_stage = Stage_e::HopTimer;
+        return std::nullopt;
+    }
+
+    throw LoginError{status};
 }
 
 std::optional<std::vector<u8>> LoginHandshake::TryReceive(WebSocketClient& socket, std::size_t count)

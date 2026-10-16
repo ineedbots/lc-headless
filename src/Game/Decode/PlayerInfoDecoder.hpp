@@ -1,6 +1,8 @@
 #pragma once
 
+#include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
+#include "../Protocol/Protocol.hpp"
 #include "../State/GameEvent_s.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Player_s.hpp"
@@ -8,10 +10,12 @@
 class PlayerInfoDecoder
 {
 public:
+    explicit PlayerInfoDecoder(Protocol protocol);
+
     void Decode(std::span<const u8> payload, GameState_s& state);
     void Reset();
 
-    [[nodiscard]] static Appearance_s ReadAppearance(std::span<const u8> bytes);
+    [[nodiscard]] static Appearance_s ReadAppearance(std::span<const u8> bytes, Revision_e revision);
 
 private:
     static constexpr u32 INDEX_BITS = 11;
@@ -31,6 +35,7 @@ private:
     void ReadExtended(Packet& packet, GameState_s& state, Player_s& player, bool isLocal, std::vector<GameEventData>& hits);
     static void ReadChat(Packet& packet, GameState_s& state, Player_s& player);
 
+    Protocol m_protocol;
     // Kept across removals: the server skips APPEARANCE for a player whose current look this viewer has seen.
     std::unordered_map<u16, Appearance_s> m_appearances;
 };

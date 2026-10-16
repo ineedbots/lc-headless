@@ -2,6 +2,8 @@
 #include "GameClient.hpp"
 
 #include "../Cache/GameCache_s.hpp"
+#include "../Cache/MapDecoder.hpp"
+#include "../Cache/MapSquare.hpp"
 #include "../Config/AccountConfig_s.hpp"
 #include "../Config/Config_s.hpp"
 #include "../Config/Revision_e.hpp"
@@ -22,6 +24,7 @@
 #include "Protocol/ClientProt.hpp"
 #include "Protocol/Protocol.hpp"
 #include "Protocol/ServerProt.hpp"
+#include "State/BuildArea_s.hpp"
 #include "State/GameState_s.hpp"
 #include "State/Social_s.hpp"
 #include "Tile_s.hpp"
@@ -52,6 +55,23 @@ namespace
 
         assert(false && "Unhandled MessageType_e");
         return "message";
+    }
+
+    // Whether the cache's copy of a file differs from the server's. A server CRC of 0 means it has no file,
+    // and the cache's open ground is right.
+    bool IsStale(s32 serverCrc, std::optional<s32> cacheCrc)
+    {
+        return serverCrc != 0 && cacheCrc != serverCrc;
+    }
+
+    std::string_view DescribeStaleFiles(bool land, bool locs)
+    {
+        if (land && locs)
+        {
+            return "land and locs differ";
+        }
+
+        return land ? "land differs" : "locs differ";
     }
 
     std::chrono::milliseconds GetRemaining(std::chrono::steady_clock::time_point deadline)
@@ -400,7 +420,7 @@ void GameClient::StartAttempt()
     m_writer.reset();
     m_outgoing.clear();
     m_socket->Connect({.url = server.url, .origin = server.origin, .tlsCaFile = server.tlsCaFile});
-    m_handshake.emplace(m_account, m_config->login, m_cache->crcs, m_reconnecting);
+    m_handshake.emplace(m_protocol, m_account, m_config->login, m_cache->crcs, m_reconnecting);
     m_attemptDeadline = Clock::now() + m_options.loginTimeout;
 }
 
@@ -610,9 +630,47 @@ void GameClient::ProcessInput()
 
         m_decoder.Decode(packet->prot, packet->payload, m_state);
         ++m_state.updateCount;
+        Reply(packet->prot);
     }
 
     LogNewMessages();
+}
+
+void GameClient::Reply(ServerProt_e prot)
+{
+    switch (prot)
+    {
+    case ServerProt_e::RebuildNormal:
+        // The webclient asks for each map file it doesn't have stored, and the server sends them as DATA_LAND
+        // and DATA_LOC. This client reads every square from its cache, so it asks for none.
+        if (m_protocol.Has(ClientProt_e::RebuildGetMaps))
+        {
+            WarnAboutStaleSquares();
+            m_outgoing.push_back(m_packets.RebuildGetMaps({}));
+        }
+
+        return;
+    default:
+        return;
+    }
+}
+
+void GameClient::WarnAboutStaleSquares()
+{
+    for (const auto& square : m_state.buildArea.squares)
+    {
+        const auto id = MapSquare::GetId(square.x, square.z);
+        const auto found = m_cache->mapCrcs.find(id);
+        const auto cached = found == m_cache->mapCrcs.end() ? MapCrcs_s{} : found->second;
+        const auto staleLand = IsStale(square.landCrc, cached.land);
+        const auto staleLocs = IsStale(square.locCrc, cached.locs);
+        if ((!staleLand && !staleLocs) || !m_warnedSquares.insert(id).second)
+        {
+            continue;
+        }
+
+        m_logger->Warning("Map square {}'s {} from the server's; walks there may route through changed scenery", MapDecoder::DescribeSquare(id), DescribeStaleFiles(staleLand, staleLocs));
+    }
 }
 
 void GameClient::SendKeepaliveIfIdle()

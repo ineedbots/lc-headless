@@ -45,6 +45,20 @@ enum class ChatEffect_e : u8
     Slide,
 };
 
+enum class MapFile_e : u8
+{
+    Land,
+    Locs,
+};
+
+// One of a map square's files, which a 225 client asks the server for when its own copy is stale.
+struct MapRequest_s
+{
+    MapFile_e file = MapFile_e::Land;
+    u8 x = 0;
+    u8 z = 0;
+};
+
 // An item in an interface inventory: its object ID, its slot, and the component that shows it.
 struct ItemRef_s
 {
@@ -77,6 +91,7 @@ public:
     [[nodiscard]] ClientPacket_s MapBuildComplete() const;
     [[nodiscard]] ClientPacket_s EventAppletFocus(bool focused) const;
     [[nodiscard]] ClientPacket_s EventCameraPosition(u16 pitch, u16 yaw) const;
+    [[nodiscard]] ClientPacket_s RebuildGetMaps(std::span<const MapRequest_s> requests) const;
 
     [[nodiscard]] ClientPacket_s Move(MoveKind_e kind, std::span<const Tile_s> waypoints, bool run) const;
 
