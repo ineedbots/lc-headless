@@ -63,11 +63,16 @@ class ChickenKiller(TaskBot):
             self.target = None
             return False
 
-        if npc.in_combat and npc.health == 0:
-            self.dying_targets.add(self.target)
+        if npc.in_combat:
+            if npc.health == 0:
+                self.dying_targets.add(self.target)
 
-            self.target = None
-            return False
+                self.target = None
+                return False
+
+            if npc.targets_another_player():
+                self.target = None
+                return False
 
         if game.in_combat():
             self.attack_tick = game.tick()
