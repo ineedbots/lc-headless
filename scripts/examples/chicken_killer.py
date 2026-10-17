@@ -1,125 +1,264 @@
-# Kills chickens and picks up their bones, then logs out: a TaskBot that fights, loots and waits on
-# what it did. The settings are in SETTINGS below; an account file overrides any of them in its
-# script.settings["Chicken killer"], which the client fills in with these defaults when the script loads.
-
+# Account settings: script.settings["Chicken Killer"].
 SETTINGS = {
-    'npcs': SettingDef('string[]', ['Chicken'], label='NPCs to attack'),
-    'loot': SettingDef('string[]', ['Bones'], label='Items to pick up'),
-    'loot_goal': SettingDef('number', 3, min=1, label='Log out once the backpack holds this much loot'),
-    'centre': SettingDef('tile', [3230, 3298], label='Where to fight: the chicken pen east of Lumbridge'),
-    'radius': SettingDef('number', 8, min=1, max=30, label='How far from the centre to fight'),
-    'teleport': SettingDef('string', '', help='A ::tele argument for staff accounts, used on start when the centre is far away, such as "0,50,51,30,34"'),
+    'combat_style': SettingDef('string', 'strength', label='Combat style', options=COMBAT_STYLE_OPTIONS),
+    'start_location': SettingDef('tile', [3230, 3298, 0], label='Start location (Lumbridge east chicken pen by default)'),
+    'radius': SettingDef('number', 8, min=0, label='Fight and loot radius (tiles)'),
+    'bury_bones': SettingDef('boolean', False, label='Pick up and bury bones'),
 }
 
-# A target that neither side has hit for this many ticks after the attack is given up on.
 GIVE_UP_TICKS = 15
-# An item that hasn't been picked up after this many tries is left, as it's probably behind a fence.
-MAX_PICKUP_TRIES = 3
-
+SKIP_TICKS = 50
+POLL_TICKS = 1
+CHICKEN_NAME = 'Chicken'
+LOOT_EXTRA_DIST = 3
 
 class ChickenKiller(TaskBot):
     def on_start(self):
         self.kills = 0
+        self.buried = 0
         self.target = None
         self.attack_tick = 0
-        self.pickup_tries = {}
-        log('Starting at', game.tile())
-        if self.settings.teleport and game.tile().distance_to(self.settings.centre) > 50:
-            log('Teleporting to', self.settings.teleport)
-            chat.command('tele ' + self.settings.teleport)
+        self.loot_skip = {}
+        self.npc_skip = {}
+        self.npc_spawns = {}
+        self.npc_despawn_times = {}
+        log('Killing', CHICKEN_NAME, 'around', self.settings.start_location, ', starting at', game.tile(), ', pid', players.local().index)
 
-        # Highest priority first: each loop runs the first task whose check passes.
         self.add(
-            Task(self.is_fighting, lambda: None, label='fight'),
-            Task(self.has_enough_loot, self.finish, label='finish'),
+            Task(self.is_fighting_target, lambda: execution.delay_ticks(POLL_TICKS), label='fight'),
+            Task(lambda: not game.has_combat_style(self.settings.combat_style), self.set_style, label='style'),
+            Task(self.away_from_start, self.walk_to_start, label='return'),
+            Task(lambda: self.settings.bury_bones and inventory.contains('Bones') and inventory.is_full(), self.bury, label='bury'),
             Task(lambda: self.next_loot() is not None, self.pick_up, label='loot'),
             Task(lambda: True, self.attack, label='attack'),
         )
 
-    def count_loot(self):
-        return sum([inventory.count(name) for name in self.settings.loot])
+    def ensure_reachable(self, tile, force=False):
+        if not force and direct_navigator.reachable(tile):
+            return True
 
-    def is_fighting(self):
+        yield from traversal.walk_resilient(
+            tile, radius=1, timeout_ms=120000,
+            use_teleport_catalog=False, log=lambda msg: log(msg))
+
+        return direct_navigator.reachable(tile)
+
+    def key_for_npc(self, npc):
+        return npc.index
+
+    def is_fighting_target(self):
         if self.target is None:
             return False
+
+        targetting = players.local().target
+        if targetting is None or targetting[0] != 'npc' or targetting[1] != self.target:
+            self.target = None
+            return False
+
         npc = npcs.get(self.target)
-        if npc is not None and (game.in_combat() or npc.in_combat or game.tick() - self.attack_tick < GIVE_UP_TICKS):
+        if npc is None:
+            self.target = None
+            return False
+
+        if npc.in_combat and npc.health == 0:
+            self.kills += 1
+            log('Killed', npc, ', total:', self.kills)
+            self.target = None
+            return False
+
+        if not game.in_combat() and game.tick() - self.attack_tick >= GIVE_UP_TICKS:
+            self.npc_skip[self.key_for_npc(npc)] = game.tick() + SKIP_TICKS
+            log('Could not attack', npc, '- leaving it for a while')
+            self.target = None
+            return False
+
+        return True
+
+    def away_from_start(self):
+        here = game.tile()
+        if here is None:
             return True
-        self.target = None
+
+        start = self.settings.start_location
+        if here.level != start.level or here.distance_to(start) > self.settings.radius:
+            return True
+
         return False
 
-    def has_enough_loot(self):
-        return self.count_loot() >= self.settings.loot_goal or inventory.is_full()
+    def walk_to_start(self):
+        self.target = None
+        log('Walking to', self.settings.start_location)
 
-    def finish(self):
-        if game.in_combat():
-            return
-        log('Holding', self.count_loot(), 'loot after', self.kills, 'kills; done')
-        stop_account()
+        reachable = yield from self.ensure_reachable(self.settings.start_location, True)
+        if not reachable:
+            log('Could not reach the start location; retrying shortly')
+            yield from execution.delay(5000)
+
+    def set_style(self):
+        log('Setting combat style', self.settings.combat_style)
+        self.target = None
+        game.set_combat_style(self.settings.combat_style)
+        yield from execution.delay_until(lambda: game.has_combat_style(self.settings.combat_style), 3000)
+
+    def key_for_item(self, item):
+        tile = item.tile()
+        return (item.id, tile.x, tile.z, tile.level)
 
     def next_loot(self):
-        if game.in_combat():
-            return None
-        return (ground_items.query()
-                .name(self.settings.loot)
-                .within_of(self.settings.centre, self.settings.radius)
-                .where(lambda item: self.pickup_tries.get(self.key(item), 0) < MAX_PICKUP_TRIES)
-                .nearest())
+        names = []
+        if not inventory.is_full() or inventory.contains('Feather'):
+            names.append('Feather')
 
-    def key(self, item):
-        tile = item.tile()
-        return (item.id, tile.x, tile.z)
+        if self.settings.bury_bones and not inventory.is_full():
+            names.append('Bones')
+
+        if not names:
+            return None
+
+        now = game.tick()
+        self.loot_skip = {key: until for key, until in self.loot_skip.items() if until > now}
+        return (ground_items.query()
+                .name(names)
+                .within_of(self.settings.start_location, self.settings.radius + LOOT_EXTRA_DIST)
+                .where(lambda item: self.key_for_item(item) not in self.loot_skip)
+                .reachable()
+                .nearest())
 
     def pick_up(self):
         loot = self.next_loot()
-        key = self.key(loot)
-        self.pickup_tries[key] = self.pickup_tries.get(key, 0) + 1
-        before = self.count_loot()
-        log('Picking up', loot)
-        loot.interact('Take')
-        # Waits for the backpack to change, or gives the item up for this try after 5 seconds.
-        picked = yield from execution.delay_until(lambda: self.count_loot() > before, 5000)
-        if not picked and self.pickup_tries[key] >= MAX_PICKUP_TRIES:
-            log("Can't reach", loot, '- leaving it')
-
-    def attack(self):
-        centre = self.settings.centre
-        npc = (npcs.query()
-               .name(self.settings.npcs)
-               .within_of(centre, self.settings.radius)
-               .where(lambda npc: not npc.in_combat)
-               .nearest())
-        if npc is None:
-            if game.tile().distance_to(centre) > 2:
-                direct_navigator.walk(centre)
-            yield from execution.delay(1200)
+        if loot is None:
+            yield from execution.delay_ticks(POLL_TICKS)
             return
 
-        if npc.interact('Attack'):
-            self.target = npc.index
-            self.attack_tick = game.tick()
-            log('Attacking', npc)
-        yield from execution.delay_ticks(2)
+        name = loot.name
+        if name is None:
+            yield from execution.delay_ticks(POLL_TICKS)
+            return
+
+        reachable = yield from self.ensure_reachable(loot.tile())
+        if not reachable:
+            yield from execution.delay_ticks(POLL_TICKS)
+            return
+
+        before = inventory.count(name)
+        log('Picking up', name)
+        self.target = None
+
+        if loot.interact('Take'):
+            yield from execution.delay_ticks(POLL_TICKS)
+            yield from execution.delay_until(lambda: inventory.count(name) != before or not game.moving(), 10000)
+
+        if inventory.count(name) == before:
+            self.loot_skip[self.key_for_item(loot)] = game.tick() + SKIP_TICKS
+            log('Could not pick up', loot, '- leaving it for a while')
+
+    def bury(self):
+        while inventory.contains('Bones'):
+            bones = inventory.first('Bones')
+            if bones is None:
+                return
+
+            self.target = None
+            log('Burying bone')
+            before = inventory.count('Bones')
+            if bones.interact('Bury'):
+                buried = yield from execution.delay_until(lambda: inventory.count('Bones') < before, 3000)
+                if buried:
+                    self.buried += 1
+
+    def next_target(self):
+        if game.in_combat():
+            npc = npcs.query().where(lambda npc: npc.targets_me()).nearest()
+            if not npc is None:
+                return npc
+
+        now = game.tick()
+        self.npc_skip = {key: until for key, until in self.npc_skip.items() if until > now}
+        return (npcs.query()
+                       .name(CHICKEN_NAME).action('Attack')
+                       .within_of(self.settings.start_location, self.settings.radius)
+                       .where(lambda npc: self.key_for_npc(npc) not in self.npc_skip)
+                       .where(lambda npc: not npc.in_combat or npc.targets_me())
+                       .nearest())
+
+    def finish_waiting_for_attack(self):
+        if self.target is None:
+            return True
+
+        npc = npcs.get(self.target)
+        if npc is None or npc.in_combat:
+            return True
+
+        return False
+
+    def attack(self):
+        self.target = None
+        npc = self.next_target()
+
+        if npc is None:
+            next_spawn = None
+            for key, despawn_tick in self.npc_despawn_times.items():
+                if key not in self.npc_spawns:
+                    continue
+
+                spawn = self.npc_spawns[key]
+                if spawn.distance_to(self.settings.start_location) <= self.settings.radius and (next_spawn is None or despawn_tick < next_spawn[1]):
+                    next_spawn = (spawn, despawn_tick)
+
+            if next_spawn is not None and next_spawn[0].distance_to(game.tile()) > 1:
+                reachable = yield from self.ensure_reachable(next_spawn[0])
+                if not reachable:
+                    yield from execution.delay_ticks(POLL_TICKS)
+                    return
+
+                yield from traversal.walk_to(next_spawn[0], radius=1, timeout_ms=20000)
+
+            yield from execution.delay_ticks(POLL_TICKS)
+            return
+
+        reachable = yield from self.ensure_reachable(npc.tile())
+        if not reachable:
+            yield from execution.delay_ticks(POLL_TICKS)
+            return
+
+        log('Attacking', npc)
+        if not npc.interact('Attack'):
+            yield from execution.delay_ticks(POLL_TICKS)
+            return
+
+        self.target = npc.index
+        self.attack_tick = game.tick()
+        yield from execution.delay_until(self.finish_waiting_for_attack, 5000)
+
+    def on_npc_spawned(self, npc):
+        if npc.name == CHICKEN_NAME:
+            key = self.key_for_npc(npc)
+            self.npc_despawn_times.pop(key, None)
+            self.npc_spawns[key] = npc.tile()
 
     def on_npc_despawned(self, npc):
-        if npc.index == self.target and npc.health == 0:
-            self.kills += 1
-            log('Killed', npc, '- kills so far:', self.kills)
+        if npc.name == CHICKEN_NAME:
+            self.npc_despawn_times[self.key_for_npc(npc)] = game.tick()
+
+        if npc.index == self.target:
             self.target = None
 
     def on_server_message(self, msg):
         if msg.startswith("I can't reach"):
-            log('Unreachable; picking another target')
+            log('Unreachable')
             self.target = None
+            self.walk_to_start()
+        elif msg.startswith("Oh dear"):
+            log('You have died')
 
     def on_progress_report(self):
-        return {'Kills': self.kills, 'Loot held': self.count_loot(), 'Loot goal': self.settings.loot_goal}
+        return {'Kills': self.kills, 'Feathers held': inventory.count('Feather'), 'Bones buried': self.buried}
 
 
 BOT = define_bot(
-    name='Chicken killer',
+    name='Chicken Killer',
     create=ChickenKiller,
-    description='Kills chickens, picks up their bones and logs out at a goal',
+    description='Kills chickens, collects feathers and optionally buries bones near a chosen start location',
     category='Combat',
     settings_schema=SETTINGS,
 )

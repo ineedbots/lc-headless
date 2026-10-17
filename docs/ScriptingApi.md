@@ -55,7 +55,7 @@ BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': Setting
 ```
 
 `scripts/examples/` has complete scripts:
-- `chicken_killer.py` is a `TaskBot` that fights, loots and logs out.
+- `chicken_killer.py` is a `TaskBot` that kills chickens, collects feathers and optionally buries bones. Set `combat_style`, `start_location` and `bury_bones` under `script.settings["Chicken killer"]`; `radius` controls the fighting area, and the bot walks back when outside it.
 - `power_miner.py` is a `LoopingBot` that mines and drops the ore.
 - `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Its console commands pause it and change the number of laps.
 
