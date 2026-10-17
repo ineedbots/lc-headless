@@ -4,6 +4,7 @@ SETTINGS = {
     'start_location': SettingDef('tile', [3230, 3298, 0], label='Start location (Lumbridge east chicken pen by default)'),
     'radius': SettingDef('number', 8, min=0, label='Fight and loot radius (tiles)'),
     'bury_bones': SettingDef('boolean', False, label='Pick up and bury bones'),
+    'kill_over_loot': SettingDef('boolean', False, label='Only loots when theres no targets'),
 }
 
 GIVE_UP_TICKS = 15
@@ -22,14 +23,16 @@ class ChickenKiller(TaskBot):
         self.npc_skip = {}
         self.npc_spawns = {}
         self.npc_despawn_times = {}
+        self.dying_targets = set()
         log('Killing', CHICKEN_NAME, 'around', self.settings.start_location, ', starting at', game.tile(), ', pid', players.local().index)
 
         self.add(
             Task(self.is_fighting_target, lambda: execution.delay_ticks(POLL_TICKS), label='fight'),
             Task(lambda: not game.has_combat_style(self.settings.combat_style), self.set_style, label='style'),
             Task(self.away_from_start, self.walk_to_start, label='return'),
+            Task(lambda: self.next_loot(True) is not None, lambda: self.pick_up(True), label='loot'), # prio feathers
             Task(lambda: self.settings.bury_bones and inventory.contains('Bones') and inventory.is_full(), self.bury, label='bury'),
-            Task(lambda: self.next_loot() is not None, self.pick_up, label='loot'),
+            Task(lambda: self.next_loot() is not None and (not self.settings.kill_over_loot or self.next_target() is None), self.pick_up, label='loot'),
             Task(lambda: True, self.attack, label='attack'),
         )
 
@@ -61,14 +64,17 @@ class ChickenKiller(TaskBot):
             return False
 
         if npc.in_combat and npc.health == 0:
-            self.kills += 1
-            log('Killed', npc, ', total:', self.kills)
+            self.dying_targets.add(self.target)
+
             self.target = None
             return False
 
-        if not game.in_combat() and game.tick() - self.attack_tick >= GIVE_UP_TICKS:
+        if game.in_combat():
+            self.attack_tick = game.tick()
+        elif game.tick() - self.attack_tick >= GIVE_UP_TICKS:
             self.npc_skip[self.key_for_npc(npc)] = game.tick() + SKIP_TICKS
             log('Could not attack', npc, '- leaving it for a while')
+
             self.target = None
             return False
 
@@ -95,8 +101,9 @@ class ChickenKiller(TaskBot):
             yield from execution.delay(5000)
 
     def set_style(self):
-        log('Setting combat style', self.settings.combat_style)
         self.target = None
+        log('Setting combat style', self.settings.combat_style)
+
         game.set_combat_style(self.settings.combat_style)
         yield from execution.delay_until(lambda: game.has_combat_style(self.settings.combat_style), 3000)
 
@@ -104,12 +111,12 @@ class ChickenKiller(TaskBot):
         tile = item.tile()
         return (item.id, tile.x, tile.z, tile.level)
 
-    def next_loot(self):
+    def next_loot(self, feather_only=False):
         names = []
         if not inventory.is_full() or inventory.contains('Feather'):
             names.append('Feather')
 
-        if self.settings.bury_bones and not inventory.is_full():
+        if self.settings.bury_bones and not inventory.is_full() and not feather_only:
             names.append('Bones')
 
         if not names:
@@ -124,29 +131,30 @@ class ChickenKiller(TaskBot):
                 .reachable()
                 .nearest())
 
-    def pick_up(self):
-        loot = self.next_loot()
+    def pick_up(self, feather_only=False):
+        loot = self.next_loot(feather_only)
         if loot is None:
-            yield from execution.delay_ticks(POLL_TICKS)
             return
 
         name = loot.name
         if name is None:
-            yield from execution.delay_ticks(POLL_TICKS)
             return
 
         reachable = yield from self.ensure_reachable(loot.tile())
         if not reachable:
-            yield from execution.delay_ticks(POLL_TICKS)
             return
 
-        before = inventory.count(name)
-        log('Picking up', name)
         self.target = None
+        log('Picking up', name)
 
+        going_to_move = loot.tile().distance_to(game.tile()) > 0
+        before = inventory.count(name)
         if loot.interact('Take'):
-            yield from execution.delay_ticks(POLL_TICKS)
-            yield from execution.delay_until(lambda: inventory.count(name) != before or not game.moving(), 10000)
+            if going_to_move:
+                yield from execution.delay_ticks(POLL_TICKS * 2)
+                yield from execution.delay_until(lambda: inventory.count(name) != before or not game.moving(), 10000)
+            else:
+                yield from execution.delay_until(lambda: inventory.count(name) != before, 10000)
 
         if inventory.count(name) == before:
             self.loot_skip[self.key_for_item(loot)] = game.tick() + SKIP_TICKS
@@ -160,11 +168,14 @@ class ChickenKiller(TaskBot):
 
             self.target = None
             log('Burying bone')
+
             before = inventory.count('Bones')
-            if bones.interact('Bury'):
-                buried = yield from execution.delay_until(lambda: inventory.count('Bones') < before, 3000)
-                if buried:
-                    self.buried += 1
+            if not bones.interact('Bury'):
+                return
+
+            buried = yield from execution.delay_until(lambda: inventory.count('Bones') < before, 3000)
+            if buried:
+                self.buried += 1
 
     def next_target(self):
         if game.in_combat():
@@ -243,10 +254,16 @@ class ChickenKiller(TaskBot):
         if npc.index == self.target:
             self.target = None
 
+        if npc.index in self.dying_targets:
+            self.dying_targets.remove(npc.index)
+            self.kills += 1
+            log('Killed', npc, ', total:', self.kills)
+
     def on_server_message(self, msg):
         if msg.startswith("I can't reach"):
-            log('Unreachable')
             self.target = None
+            log('Unreachable')
+
             self.walk_to_start()
         elif msg.startswith("Oh dear"):
             log('You have died')
