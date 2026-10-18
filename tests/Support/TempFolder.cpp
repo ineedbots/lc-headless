@@ -1,10 +1,29 @@
 #include "pch.hpp"
 #include "TempFolder.hpp"
 
-TempFolder::TempFolder(std::string_view prefix)
-    : m_path{std::filesystem::temp_directory_path() / std::format("{}-{}", prefix, std::chrono::steady_clock::now().time_since_epoch().count())}
+namespace
 {
-    std::filesystem::create_directories(m_path);
+    // ctest runs the tests in parallel processes, so a name from the clock can be taken by another process that
+    // started in the same tick. A random name that create_directory reports as new belongs to this folder alone.
+    std::filesystem::path MakeUniqueFolder(std::string_view prefix)
+    {
+        static auto random = std::mt19937_64{std::random_device{}()};
+
+        const auto parent = std::filesystem::temp_directory_path();
+        while (true)
+        {
+            auto path = parent / std::format("{}-{:016x}", prefix, random());
+            if (std::filesystem::create_directory(path))
+            {
+                return path;
+            }
+        }
+    }
+}
+
+TempFolder::TempFolder(std::string_view prefix)
+    : m_path{MakeUniqueFolder(prefix)}
+{
 }
 
 TempFolder::~TempFolder()
