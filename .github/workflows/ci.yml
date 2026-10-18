@@ -1,0 +1,92 @@
+# Builds and tests every preset pair: Windows (MSVC) and Linux (clang), in Debug and Release. Each pair is its own
+# check. Release builds treat warnings as errors, so a new warning fails the Release checks only. The real-cache tests
+# skip, because the runners have no game cache.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}-${{ matrix.config }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows, linux]
+        config: [debug, release]
+        include:
+          # windows-2022 is pinned because the windows-msvc preset uses the Visual Studio 17 2022 generator.
+          - platform: windows
+            runner: windows-2022
+            configure-preset: windows-msvc
+          - platform: linux
+            runner: ubuntu-24.04
+            configure-preset: linux-clang
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux packages
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang cmake ninja-build git curl zip unzip tar pkg-config perl
+
+      # vcpkg is cloned whole, because vcpkg.json pins a baseline commit. The paths use forward slashes on Windows too,
+      # since VCPKG_ROOT ends up in the preset's toolchainFile.
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          temp=$RUNNER_TEMP
+          if [ "$RUNNER_OS" = Windows ]; then
+            temp=$(cygpath -m "$temp")
+          fi
+          export VCPKG_ROOT="$temp/vcpkg" VCPKG_DEFAULT_BINARY_CACHE="$temp/vcpkg-cache"
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
+          echo "VCPKG_DEFAULT_BINARY_CACHE=$VCPKG_DEFAULT_BINARY_CACHE" >> "$GITHUB_ENV"
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          if [ "$RUNNER_OS" = Windows ]; then
+            "$VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+          else
+            "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+      # The binary cache holds both configurations' packages, so Debug and Release on one OS share it. vcpkg rebuilds
+      # any package whose ABI hash changed, such as after a compiler update, so a stale restore is only slower.
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'ports/**') }}
+          restore-keys: vcpkg-${{ runner.os }}-
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.configure-preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.platform }}-${{ matrix.config }} --parallel
+
+      - name: Test
+        run: ctest --preset ${{ matrix.platform }}-${{ matrix.config }} --parallel 4
+
+      - name: Upload vcpkg logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-logs-${{ matrix.platform }}-${{ matrix.config }}
+          path: |
+            ${{ env.VCPKG_ROOT }}/buildtrees/**/*.log
+            build/${{ matrix.configure-preset }}/vcpkg-manifest-install.log
+          if-no-files-found: ignore

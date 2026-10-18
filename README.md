@@ -101,6 +101,8 @@ tools/docker/check.sh ubuntu       # one distro
 
 It builds each distro's toolchain image, then configures, builds and tests a copy of the source with the `linux-clang` preset, without touching the checkout. Logs go to `build/docker/<distro>/`. The first run builds the vcpkg dependencies, which later runs reuse from a Docker volume.
 
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) builds and tests all four build presets on every push to `master` and every pull request, with each preset as its own check. The first run builds the vcpkg dependencies, which later runs restore from the Actions cache.
+
 ## Configuration
 
 The client reads two kinds of file. Both are JSON and allow `//` and `/* */` comments. Paths are relative to the working directory, so run the client from the repository root.
