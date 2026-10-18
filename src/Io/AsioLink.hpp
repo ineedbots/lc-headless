@@ -16,9 +16,9 @@
 #include <boost/beast/websocket/stream.hpp>
 #include <boost/system/error_code.hpp>
 
-// A link over Asio: the lookup, TCP, TLS and the WebSocket, run by one coroutine on the loop's thread. Its handlers
-// touch only this link and its logger, never a Connection, a GameClient or a script, which is what makes one loop
-// safe to share.
+// A link over Asio: the lookup and TCP, then for a WebSocket, TLS and the upgrade, run by one coroutine on the loop's
+// thread. Its handlers touch only this link and its logger, never a Connection, a GameClient or a script, which is
+// what makes one loop safe to share.
 class AsioLink : public Link, public std::enable_shared_from_this<AsioLink>
 {
 public:
@@ -35,23 +35,32 @@ private:
     using PlainWebSocket = boost::beast::websocket::stream<Tcp::socket>;
     using SecureWebSocket = boost::beast::websocket::stream<boost::asio::ssl::stream<Tcp::socket>>;
 
+    static constexpr auto READ_CHUNK_SIZE = std::size_t{4096};
+
     static boost::asio::awaitable<void> Run(std::shared_ptr<AsioLink> self);
     boost::asio::awaitable<void> RunWebSocket(PlainWebSocket& socket);
     boost::asio::awaitable<void> RunWebSocket(SecureWebSocket& socket);
+    boost::asio::awaitable<void> RunTcp(Tcp::socket& socket);
     template <typename TSocket>
     boost::asio::awaitable<void> Connect(TSocket& socket);
     template <typename TSocket>
     boost::asio::awaitable<void> Upgrade(TSocket& socket);
     template <typename TSocket>
     boost::asio::awaitable<void> ReadMessages(TSocket& socket);
+    boost::asio::awaitable<void> ReadStream(Tcp::socket& socket);
     template <typename TFunction>
     void VisitSocket(TFunction function);
 
+    void FinishConnecting();
     void EndRead(boost::system::error_code error, std::string_view closeReason);
+    void EndStream(boost::system::error_code error);
+    void End(std::string reason);
     void Fail(std::string reason);
     void StartWrite();
     void OnWrite(boost::system::error_code error);
+    // The code goes in a WebSocket's close frame; TCP has none.
     void StartClose(boost::beast::websocket::close_code code);
+    void ShutdownTcp() noexcept;
     void ArmTimer(std::chrono::milliseconds timeout);
     void OnTimer();
     void Abort() noexcept;
@@ -65,8 +74,9 @@ private:
     // Before the socket, which holds a reference to it.
     std::optional<boost::asio::ssl::context> m_tls;
     // Empty until the coroutine starts, so a TLS setup failure is the attempt's failure, not the constructor's.
-    std::variant<std::monostate, PlainWebSocket, SecureWebSocket> m_socket;
+    std::variant<std::monostate, PlainWebSocket, SecureWebSocket, Tcp::socket> m_socket;
     boost::beast::flat_buffer m_frame;
+    std::array<u8, READ_CHUNK_SIZE> m_chunk{};
     std::deque<std::vector<u8>> m_outgoing;
     bool m_writing = false;
 };

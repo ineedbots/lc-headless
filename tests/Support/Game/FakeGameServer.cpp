@@ -22,6 +22,7 @@
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/use_awaitable.hpp>
+#include <boost/asio/write.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/http/field.hpp>
 #include <boost/beast/websocket/rfc6455.hpp>
@@ -46,6 +47,7 @@ namespace
     constexpr auto RECONNECTED = u8{15};
     constexpr auto SERVER_SEED_OFFSET = u32{50};
     constexpr auto RSA_MODULUS_HEX_DIGITS = std::size_t{128};
+    constexpr auto READ_SIZE = std::size_t{4096};
 
     const auto AS_TUPLE = asio::as_tuple(asio::use_awaitable);
 
@@ -56,14 +58,16 @@ namespace
     }
 }
 
-FakeServerClient_s::FakeServerClient_s(Tcp::socket tcp)
+FakeServerClient_s::FakeServerClient_s(Tcp::socket tcp, bool raw)
     : socket{std::move(tcp)}
+    , raw{raw}
 {
 }
 
-FakeGameServer::FakeGameServer(Script onLogin, Revision_e revision)
+FakeGameServer::FakeGameServer(Script onLogin, Revision_e revision, Transport_e transport)
     : m_onLogin{std::move(onLogin)}
     , m_revision{revision}
+    , m_transport{transport}
     , m_acceptor{m_thread.GetContext(), Tcp::endpoint{asio::ip::make_address(LOOPBACK_HOST), 0}}
     , m_port{m_acceptor.local_endpoint().port()}
 {
@@ -84,7 +88,7 @@ FakeGameServer::~FakeGameServer()
 
 ServerSettings_s FakeGameServer::MakeServerSettings() const
 {
-    return {.transport = Transport_e::Ws, .host = LOOPBACK_HOST, .port = m_port};
+    return {.transport = m_transport, .host = LOOPBACK_HOST, .port = m_port};
 }
 
 Revision_e FakeGameServer::GetRevision() const
@@ -217,25 +221,31 @@ asio::awaitable<void> FakeGameServer::Accept()
 
 asio::awaitable<void> FakeGameServer::Serve(Tcp::socket socket)
 {
-    const auto client = std::make_shared<FakeServerClient_s>(std::move(socket));
-    client->socket.set_option(websocket::stream_base::decorator([](websocket::response_type& response)
+    const auto client = std::make_shared<FakeServerClient_s>(std::move(socket), m_transport == Transport_e::Tcp);
+    if (!client->raw)
     {
-        response.set(boost::beast::http::field::sec_websocket_protocol, SUBPROTOCOL);
-    }));
+        client->socket.set_option(websocket::stream_base::decorator([](websocket::response_type& response)
+        {
+            response.set(boost::beast::http::field::sec_websocket_protocol, SUBPROTOCOL);
+        }));
 
-    const auto [acceptError] = co_await client->socket.async_accept(AS_TUPLE);
-    if (acceptError)
-    {
-        co_return;
+        const auto [acceptError] = co_await client->socket.async_accept(AS_TUPLE);
+        if (acceptError)
+        {
+            co_return;
+        }
+
+        client->socket.binary(true);
     }
 
-    client->socket.binary(true);
     {
         const auto lock = std::scoped_lock{m_mutex};
         m_client = client;
         m_stage = Stage_e::SeedRequest;
         m_fromClient.reset();
         m_toClient.reset();
+        m_gameBytes.clear();
+        m_partialProt.reset();
     }
 
     if (m_revision < Revision_e::Rev274)
@@ -243,18 +253,13 @@ asio::awaitable<void> FakeGameServer::Serve(Tcp::socket socket)
         SendSeed(client, false);
     }
 
-    auto buffer = boost::beast::flat_buffer{};
-    while (true)
+    if (client->raw)
     {
-        const auto [readError, size] = co_await client->socket.async_read(buffer, AS_TUPLE);
-        if (readError)
-        {
-            break;
-        }
-
-        const auto message = std::vector<u8>(static_cast<const u8*>(buffer.cdata().data()), static_cast<const u8*>(buffer.cdata().data()) + size);
-        buffer.consume(size);
-        OnMessage(client, message);
+        co_await ReadStream(client);
+    }
+    else
+    {
+        co_await ReadMessages(client);
     }
 
     {
@@ -266,6 +271,39 @@ asio::awaitable<void> FakeGameServer::Serve(Tcp::socket socket)
     }
 
     m_changed.notify_all();
+}
+
+asio::awaitable<void> FakeGameServer::ReadMessages(Client client)
+{
+    auto buffer = boost::beast::flat_buffer{};
+    while (true)
+    {
+        const auto [error, size] = co_await client->socket.async_read(buffer, AS_TUPLE);
+        if (error)
+        {
+            co_return;
+        }
+
+        const auto* const data = static_cast<const u8*>(buffer.cdata().data());
+        const auto message = std::vector<u8>(data, data + size);
+        buffer.consume(size);
+        OnMessage(client, message);
+    }
+}
+
+asio::awaitable<void> FakeGameServer::ReadStream(Client client)
+{
+    auto buffer = std::array<u8, READ_SIZE>{};
+    while (true)
+    {
+        const auto [error, size] = co_await client->socket.next_layer().async_read_some(asio::buffer(buffer), AS_TUPLE);
+        if (error)
+        {
+            co_return;
+        }
+
+        OnMessage(client, std::span{buffer}.first(size));
+    }
 }
 
 void FakeGameServer::OnMessage(const Client& client, std::span<const u8> bytes)
@@ -420,36 +458,77 @@ void FakeGameServer::HandleGamePackets(const Client& client, std::span<const u8>
     auto loggedOut = false;
     {
         const auto lock = std::scoped_lock{m_mutex};
-        auto packet = Packet{bytes};
-        while (packet.GetAvailable() > 0)
+        m_gameBytes.insert(m_gameBytes.end(), bytes.begin(), bytes.end());
+
+        // A packet can end in a later read, so each is taken only once it's whole. Its opcode is read once, because
+        // reading it steps the cipher.
+        const auto& table = ClientProt::GetTable(m_revision);
+        auto packet = Packet{m_gameBytes};
+        auto used = std::size_t{0};
+        while (true)
         {
-            const auto& table = ClientProt::GetTable(m_revision);
-            const auto opcode = static_cast<u8>(packet.G1() - static_cast<u32>(m_fromClient->NextInt()));
-            const auto found = table.byOpcode[opcode];
-            if (!found)
+            if (!m_partialProt)
             {
-                m_errors.push_back(std::format("Client sent unknown opcode {}", opcode));
+                if (packet.GetAvailable() == 0)
+                {
+                    break;
+                }
+
+                const auto opcode = static_cast<u8>(packet.G1() - static_cast<u32>(m_fromClient->NextInt()));
+                const auto found = table.byOpcode[opcode];
+                if (!found)
+                {
+                    m_errors.push_back(std::format("Client sent unknown opcode {}", opcode));
+                    used = m_gameBytes.size();
+                    break;
+                }
+
+                m_partialProt = *found;
+                used = packet.GetPos();
+            }
+
+            const auto prot = *m_partialProt;
+            const auto size = table.byProt[static_cast<std::size_t>(prot)]->size;
+            auto lengthSize = std::size_t{0};
+            if (size == ClientProt::VAR_BYTE)
+            {
+                lengthSize = 1;
+            }
+            else if (size == ClientProt::VAR_SHORT)
+            {
+                lengthSize = 2;
+            }
+
+            if (packet.GetAvailable() < lengthSize)
+            {
                 break;
             }
 
-            const auto prot = *found;
-            const auto size = table.byProt[static_cast<std::size_t>(prot)]->size;
             auto length = static_cast<std::size_t>(size);
-            if (size == ClientProt::VAR_BYTE)
+            if (lengthSize == 1)
             {
                 length = packet.G1();
             }
-            else if (size == ClientProt::VAR_SHORT)
+            else if (lengthSize == 2)
             {
                 length = packet.G2();
             }
 
+            if (packet.GetAvailable() < length)
+            {
+                break;
+            }
+
             auto payload = std::vector<u8>(length);
             packet.GData(payload);
+            used = packet.GetPos();
+            m_partialProt.reset();
 
             loggedOut = loggedOut || (!m_ignoreLogout && prot == ClientProt_e::IfButton && Packet{payload}.G2() == LOGOUT_COMPONENT);
             m_packets.push_back({.prot = prot, .payload = std::move(payload)});
         }
+
+        m_gameBytes.erase(m_gameBytes.begin(), m_gameBytes.begin() + static_cast<std::ptrdiff_t>(used));
 
         if (loggedOut)
         {
@@ -514,6 +593,15 @@ void FakeGameServer::WriteNext(const Client& client)
     auto& next = client->outgoing.front();
     if (!next)
     {
+        if (client->raw)
+        {
+            // A FIN, as the engine ends a TCP connection. The read goes on until the client closes too.
+            auto ignored = boost::system::error_code{};
+            client->socket.next_layer().shutdown(Tcp::socket::shutdown_send, ignored);
+            client->outgoing.clear();
+            return;
+        }
+
         client->socket.async_close(websocket::close_code::normal, [client](boost::system::error_code)
         {
             client->outgoing.clear();
@@ -521,7 +609,7 @@ void FakeGameServer::WriteNext(const Client& client)
         return;
     }
 
-    client->socket.async_write(asio::buffer(*next), [client](boost::system::error_code error, std::size_t)
+    auto onWrite = [client](boost::system::error_code error, std::size_t)
     {
         client->writing = false;
         client->outgoing.pop_front();
@@ -532,7 +620,15 @@ void FakeGameServer::WriteNext(const Client& client)
         }
 
         WriteNext(client);
-    });
+    };
+
+    if (client->raw)
+    {
+        asio::async_write(client->socket.next_layer(), asio::buffer(*next), std::move(onWrite));
+        return;
+    }
+
+    client->socket.async_write(asio::buffer(*next), std::move(onWrite));
 }
 
 void FakeGameServer::AddError(std::string error)

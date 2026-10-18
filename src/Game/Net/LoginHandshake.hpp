@@ -18,7 +18,9 @@ struct LoginResult_s
 
 // Never waits, so the caller owns the timeout. Bytes after the login response stay in the connection. The
 // account, the login settings and the CRCs must outlive the handshake. A 225 server sends its seed as soon as
-// the connection opens; later revisions wait for a seed request.
+// the connection opens; later revisions wait for a seed request. Each request is sent only once the reply to the
+// one before has arrived: over raw TCP the engine takes one request from each read, so two sent together would
+// arrive as one.
 class LoginHandshake
 {
 public:

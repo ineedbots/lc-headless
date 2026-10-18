@@ -1,5 +1,5 @@
 #include "pch.hpp"
-#include "TestWebSocketServer.hpp"
+#include "TestServer.hpp"
 
 #include "ServerThread.hpp"
 #include "TestCertificate.hpp"
@@ -8,9 +8,11 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
+#include <boost/asio/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/use_awaitable.hpp>
+#include <boost/asio/write.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/core/stream_traits.hpp>
 #include <boost/beast/http/field.hpp>
@@ -34,6 +36,7 @@ namespace
 
     constexpr auto LOOPBACK = "127.0.0.1";
     constexpr auto SUBPROTOCOL = "binary";
+    constexpr auto READ_SIZE = std::size_t{4096};
 
     const auto AS_TUPLE = asio::as_tuple(asio::use_awaitable);
 
@@ -41,7 +44,7 @@ namespace
     class Session : public ServerSession
     {
     public:
-        Session(TSocket& socket, TestWebSocketServer& server)
+        Session(TSocket& socket, TestServer& server)
             : m_socket{socket}
             , m_server{server}
         {
@@ -113,7 +116,83 @@ namespace
 
     private:
         TSocket& m_socket;
-        TestWebSocketServer& m_server;
+        TestServer& m_server;
+    };
+
+    class TcpSession : public ServerSession
+    {
+    public:
+        TcpSession(Tcp::socket& socket, TestServer& server)
+            : m_socket{socket}
+            , m_server{server}
+        {
+        }
+
+        asio::awaitable<void> Send(std::vector<u8> bytes) override
+        {
+            co_await asio::async_write(m_socket, asio::buffer(bytes), AS_TUPLE);
+        }
+
+        asio::awaitable<void> SendText(std::string text) override
+        {
+            assert(false && "TCP has no text messages");
+            co_await Send({text.begin(), text.end()});
+        }
+
+        asio::awaitable<std::optional<std::vector<u8>>> Receive() override
+        {
+            auto bytes = std::vector<u8>(READ_SIZE);
+            const auto [error, size] = co_await m_socket.async_read_some(asio::buffer(bytes), AS_TUPLE);
+            if (error)
+            {
+                if (error == asio::error::eof)
+                {
+                    m_server.Record([](ServerRecord_s& record)
+                    {
+                        ++record.fins;
+                    });
+                }
+
+                co_return std::nullopt;
+            }
+
+            bytes.resize(size);
+            m_server.Record([&bytes](ServerRecord_s& record)
+            {
+                record.messages.push_back(bytes);
+            });
+
+            co_return bytes;
+        }
+
+        asio::awaitable<void> Close(u16) override
+        {
+            auto ignored = boost::system::error_code{};
+            m_socket.shutdown(Tcp::socket::shutdown_send, ignored);
+            co_return;
+        }
+
+        void Drop() override
+        {
+            auto ignored = boost::system::error_code{};
+            m_socket.close(ignored);
+        }
+
+        void Reset() override
+        {
+            auto ignored = boost::system::error_code{};
+            m_socket.set_option(asio::socket_base::linger{true, 0}, ignored);
+            m_socket.close(ignored);
+        }
+
+        asio::any_io_executor GetExecutor() override
+        {
+            return m_socket.get_executor();
+        }
+
+    private:
+        Tcp::socket& m_socket;
+        TestServer& m_server;
     };
 
     ServerHandshake_s ReadHandshake(const http::request<http::string_body>& request)
@@ -142,7 +221,7 @@ namespace
 
     // The rest of a connection after TCP and TLS: the upgrade, then the script.
     template <typename TSocket>
-    asio::awaitable<void> ServeWebSocket(TSocket& socket, TestWebSocketServer& server, ServerMode_e mode, std::string serverName)
+    asio::awaitable<void> ServeWebSocket(TSocket& socket, TestServer& server, ServerMode_e mode, std::string serverName)
     {
         auto buffer = beast::flat_buffer{};
         auto request = http::request<http::string_body>{};
@@ -210,12 +289,13 @@ asio::awaitable<void> ServerSession::Echo()
     }
 }
 
-TestWebSocketServer::TestWebSocketServer(Script script, ServerMode_e mode, bool tls)
+TestServer::TestServer(Script script, ServerMode_e mode, bool tls)
     : m_script{std::move(script)}
     , m_mode{mode}
     , m_acceptor{m_thread.GetContext(), Tcp::endpoint{asio::ip::make_address(LOOPBACK), 0}}
 {
     m_port = m_acceptor.local_endpoint().port();
+    assert(!(tls && mode == ServerMode_e::Tcp) && "TestServer has no TLS over raw TCP");
     if (tls)
     {
         m_tls.emplace(MakeTlsContext());
@@ -224,30 +304,30 @@ TestWebSocketServer::TestWebSocketServer(Script script, ServerMode_e mode, bool 
     asio::co_spawn(m_thread.GetContext(), Accept(), asio::detached);
 }
 
-TestWebSocketServer::~TestWebSocketServer()
+TestServer::~TestServer()
 {
     m_thread.Stop();
 }
 
-u16 TestWebSocketServer::FindClosedPort()
+u16 TestServer::FindClosedPort()
 {
     auto io = asio::io_context{};
     auto acceptor = Tcp::acceptor{io, Tcp::endpoint{asio::ip::make_address(LOOPBACK), 0}};
     return acceptor.local_endpoint().port();
 }
 
-u16 TestWebSocketServer::GetPort() const
+u16 TestServer::GetPort() const
 {
     return m_port;
 }
 
-ServerRecord_s TestWebSocketServer::GetRecord() const
+ServerRecord_s TestServer::GetRecord() const
 {
     const auto lock = std::scoped_lock{m_mutex};
     return m_record;
 }
 
-bool TestWebSocketServer::WaitFor(const std::function<bool(const ServerRecord_s&)>& condition, std::chrono::milliseconds timeout) const
+bool TestServer::WaitFor(const std::function<bool(const ServerRecord_s&)>& condition, std::chrono::milliseconds timeout) const
 {
     auto lock = std::unique_lock{m_mutex};
     return m_changed.wait_for(lock, timeout, [&]
@@ -256,7 +336,7 @@ bool TestWebSocketServer::WaitFor(const std::function<bool(const ServerRecord_s&
     });
 }
 
-void TestWebSocketServer::Record(const std::function<void(ServerRecord_s&)>& change)
+void TestServer::Record(const std::function<void(ServerRecord_s&)>& change)
 {
     {
         const auto lock = std::scoped_lock{m_mutex};
@@ -266,12 +346,12 @@ void TestWebSocketServer::Record(const std::function<void(ServerRecord_s&)>& cha
     m_changed.notify_all();
 }
 
-const TestWebSocketServer::Script& TestWebSocketServer::GetScript() const
+const TestServer::Script& TestServer::GetScript() const
 {
     return m_script;
 }
 
-asio::awaitable<void> TestWebSocketServer::Accept()
+asio::awaitable<void> TestServer::Accept()
 {
     while (true)
     {
@@ -285,7 +365,7 @@ asio::awaitable<void> TestWebSocketServer::Accept()
     }
 }
 
-asio::awaitable<void> TestWebSocketServer::Serve(Tcp::socket socket)
+asio::awaitable<void> TestServer::Serve(Tcp::socket socket)
 {
     Record([](ServerRecord_s& record)
     {
@@ -298,7 +378,19 @@ asio::awaitable<void> TestWebSocketServer::Serve(Tcp::socket socket)
         co_return;
     }
 
-    if (m_tls)
+    if (m_mode == ServerMode_e::Tcp)
+    {
+        auto session = TcpSession{socket, *this};
+        if (m_script)
+        {
+            co_await m_script(session);
+        }
+        else
+        {
+            co_await session.ReceiveUntilClosed();
+        }
+    }
+    else if (m_tls)
     {
         auto secure = websocket::stream<asio::ssl::stream<Tcp::socket>>{std::move(socket), *m_tls};
         const auto [handshakeError] = co_await secure.next_layer().async_handshake(asio::ssl::stream_base::server, AS_TUPLE);

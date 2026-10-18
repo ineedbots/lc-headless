@@ -14,6 +14,7 @@ namespace
     constexpr auto NAMES = std::array{
         TransportName_s{Transport_e::Ws, "ws"},
         TransportName_s{Transport_e::Wss, "wss"},
+        TransportName_s{Transport_e::Tcp, "tcp"},
     };
 }
 

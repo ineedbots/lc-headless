@@ -190,10 +190,10 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 
 | Key | Type | Default | Rule |
 |---|---|---|---|
-| `server.transport` | string | `"ws"` | `ws` or `wss`, written exactly. An unknown name fails in conversion, not silently as the first value |
+| `server.transport` | string | `"ws"` | `ws`, `wss` or `tcp`, written exactly. An unknown name fails in conversion, not silently as the first value |
 | `server.host` | string | `""` | 1 to 253 characters, each an ASCII letter, a digit, `-` or `.`: a host name or an IPv4 address |
 | `server.port` | integer | `0` | 1 to 65535. An `s32`, so a value too big for a port fails instead of wrapping |
-| `server.origin` | string | `""`: no `Origin` header | Empty, or printable ASCII |
+| `server.origin` | string | `""`: no `Origin` header | Empty, or printable ASCII. Checked with `tcp` too, and unused |
 | `server.tlsCaFile` | string | `"SYSTEM"` | Not empty: a PEM CA bundle path, `SYSTEM` for the platform trust store, or `NONE` for no verification. Only used for `wss` |
 | `login.rsaModulus` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 1 |
 | `login.rsaExponent` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 0 |
@@ -620,7 +620,7 @@ m_connection.emplace(*m_net, MakeOptions(m_config->server), m_logger);
 
     - `Check(valid, path, rule)` throws `ConfigError{std::format("{}: {}", path, rule)}` when `valid` is false.
     - `Validate` is also where a key that can't do without a value fails when it's missing: its default breaks the rule. It can't tell a missing key from one set to the same value, so the message gives the rule, not "missing".
-    - `IsHost` allows ASCII letters, digits, `-` and `.`, so a scheme, a port, a path, a space and an IPv6 literal all fail it. `server.transport` needs no check here: `adl_serializer<Transport_e>` rejects an unknown name while converting, with `must be ws or wss`.
+    - `IsHost` allows ASCII letters, digits, `-` and `.`, so a scheme, a port, a path, a space and an IPv6 literal all fail it. `server.transport` needs no check here: `adl_serializer<Transport_e>` rejects an unknown name while converting, with `must be ws, wss or tcp`.
     - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_CALL_TIMEOUT`, `MAX_CALL_TIMEOUT`, ...). The revision check looks the value up in `LoginSettings_s::SUPPORTED_REVISIONS` and builds its message from that list. `Revision_e`'s values are the revision numbers, and nlohmann converts a scoped enum to and from its underlying integer, so the file still says `"revision": 289` ([RevisionDesign.md](RevisionDesign.md) §3).
     - `lowMemory` has no rule beyond its type.
     - The paths in `Validate` are written out by hand. A test for each rule (§6.5) catches a path that no longer matches its member after a rename.

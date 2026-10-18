@@ -6,6 +6,8 @@ Plan for the client's network transport. Boost.Beast and Asio replace IXWebSocke
 2. Raw TCP (`tcp`).
 3. SOCKS5, for all three transports.
 
+Phases 1 and 2 are built. Phase 3 is not.
+
 This plan replaces two documents. WebSocketDesign.md describes the IXWebSocket transport built today; it is deleted when phase 1 lands. ProxyDesign.md planned SOCKS5 as a patch to IXWebSocket and was never built; its config, message and test decisions carry over into §2 and §9, and the file is deleted with this plan. Both stay readable in git history: where this plan says "WebSocketDesign §n", it means `git show 878e4dd:docs/WebSocketDesign.md`. Code style follows [CONVENTIONS.md](CONVENTIONS.md). The transport logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)) and is configured through `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)).
 
 Reference sources:
@@ -154,8 +156,8 @@ rs2004-headless/
     ├── Support/
     │   ├── Io/ServerThread.hpp / .cpp    new: an io_context on a thread of its own, for test servers
     │   ├── Io/TestCertificate.hpp / .cpp new: a self-signed certificate made at run time
-    │   ├── Io/TestWebSocketServer.hpp / .cpp new: a scripted WebSocket server, plain or TLS, for ConnectionTests
-    │   ├── Game/FakeGameServer.hpp / .cpp on Beast
+    │   ├── Io/TestServer.hpp / .cpp      new: a scripted server, WebSocket (plain or TLS) or raw TCP, for ConnectionTests
+    │   ├── Game/FakeGameServer.hpp / .cpp on Beast, over WebSocket or raw TCP
     │   └── LoopbackPort.hpp / .cpp       deleted: test servers bind port 0
     └── Io/
         ├── ConnectionTests.cpp           replaces WebSocketClientTests.cpp
@@ -715,9 +717,9 @@ From [tcp-protocol-289.md](tcp-protocol-289.md), Endpoints and Transport, and th
 
 ### AsioLink
 
-- **A third alternative**, `boost::asio::ip::tcp::socket`, and `RunTcp(socket)` beside `RunWebSocket`. It runs steps 1 to 3 of §6.2 and step 6 (open), then its own read loop.
-- **Reading:** `async_read_some` into `m_chunk`, a `std::array<u8, READ_CHUNK_SIZE>` member (4096), so it lives as long as the link. Each read is passed to `Receive`.
-- **Writing:** `boost::asio::async_write` of the front item, which writes all of it. The same queue and `OnWrite`.
+- **A third alternative**, `boost::asio::ip::tcp::socket`, and `RunTcp(socket)` beside `RunWebSocket`. `Run` picks the alternative with a `switch` on `transport`. `RunTcp` runs steps 1 to 3 of §6.2 and step 6 (open, which both share as `FinishConnecting`), then its own read loop, `ReadStream`.
+- **Reading:** `async_read_some` into `m_chunk`, a `std::array<u8, READ_CHUNK_SIZE>` member (4096), so it lives as long as the link. Each read is passed to `Receive` while `Open`, and dropped while `Closing`.
+- **Writing:** `boost::asio::async_write` of the front item, which writes all of it. The same queue and `OnWrite`. `StartWrite` and `StartClose` visit the socket with `if constexpr` on `IS_TCP`, because a `tcp::socket` has neither `async_write` as a member nor `async_close`.
 - **Ending:**
 
     | Error | In state | Effect |
@@ -726,7 +728,8 @@ From [tcp-protocol-289.md](tcp-protocol-289.md), Endpoints and Transport, and th
     | Anything else | `Open` | `MarkFailed("Read failed: {message}")` |
     | Anything, including `eof` | `Closing` | Nothing |
 
-- **Closing:** `shutdown(shutdown_send)` sends a FIN, and the read loop keeps reading, and dropping, until the server's FIN, which the engine sends when it sees the client's. The same `CLOSE_TIMEOUT` timer bounds it, then `Abort()`.
+- **Closing:** `StartClose` drops the unsent writes as before, then `ShutdownTcp()` sends a FIN (`shutdown(shutdown_send)`), and the read loop keeps reading, and dropping, until the server's FIN, which the engine sends when it sees the client's. The same `CLOSE_TIMEOUT` timer bounds it, then `Abort()`.
+- **A write in flight finishes first.** A FIN sent while `async_write` is part-way through a large buffer would fail the rest of it, so when a write is in flight `StartClose` leaves the FIN to `OnWrite`, which sends it once that write is done and the link is no longer `Open`. A logout click queued just before `Close()` still reaches the server whole.
 - **No message boundaries.** Each `Send` is one `async_write`, but the server may read two as one or one as two. `GameClient::Flush` already sends a pass's packets in one `Send`.
 - **The WebSocket message limit doesn't apply.** The engine caps WebSocket messages at 1600 bytes (289) and 2000 (225). Nothing caps a TCP write.
 
@@ -953,7 +956,9 @@ The reads and writes are on the lowest-layer `tcp::socket`, before any TLS or We
 
 ### 10.3 Phase 2
 
-- **ConnectionTests over `tcp`**: echo; three server writes read as one stream; a FIN is `ConnectionClosedError`; a reset is `ConnectionError`; `Close()` sends a FIN (the server reads EOF) and finishes when the server closes; a server that never closes ends after `CLOSE_TIMEOUT`; `Close()` while connecting to an address that never answers returns at once.
+- **`TestServer`** (renamed from `TestWebSocketServer`) gains `ServerMode_e::Tcp`: no upgrade, and the script's session reads with `async_read_some`, so each recorded message is one read. `Close(code)` sends a FIN and ignores the code, and a read that ends at the client's FIN counts in `ServerRecord_s::fins`.
+- **`FakeGameServer`** takes a `Transport_e` after the revision. Over TCP it uses the WebSocket stream's socket without upgrading it, takes each read during login as one request, as the engine does, and parses game packets from a buffer, so a packet split across reads waits for its end. Its close is a FIN.
+- **ConnectionTests over `tcp`**: open and echo; no upgrade, only the bytes sent; two sends arrive in order as one stream; three server writes read as one stream; a 65 536-byte send arrives whole; a FIN is `ConnectionClosedError` and keeps the data before it; a reset is `ConnectionError`; `Close()` sends a FIN (the server reads EOF) and finishes in under 800 ms when the server closes; a 4 MiB write in flight at `Close()` reaches the server whole before the FIN; a server that never closes ends after `CLOSE_TIMEOUT`; `Close()` while connecting is immediate; a destroyed open connection still sends its FIN; nothing listening is a failure; the log lines, with `Connecting to tcp://` and `Server closed the connection`.
 - **GameClient over both.** The login, reconnect and logout cases for each revision run with `GENERATE(Transport_e::Ws, Transport_e::Tcp)`.
 - **Config**: `tcp` accepted.
 

@@ -12,6 +12,6 @@ struct ConnectionOptions_s
     // wss only: a PEM bundle's path, SYSTEM or NONE.
     std::string tlsCaFile = "SYSTEM";
     std::string subprotocol = "binary";
-    // Everything before the connection opens: the lookup, the TCP connect, TLS and the upgrade.
+    // Everything before the connection opens: the lookup, the TCP connect, and for a WebSocket, TLS and the upgrade.
     std::chrono::milliseconds connectTimeout = 10s;
 };

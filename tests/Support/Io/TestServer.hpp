@@ -16,28 +16,33 @@ struct ServerHandshake_s
     std::string serverName;
 };
 
-// What a test server has seen. Read through TestWebSocketServer's getters, which copy it under the lock.
+// What a test server has seen. Read through TestServer's getters, which copy it under the lock.
 struct ServerRecord_s
 {
     std::size_t accepted = 0;
     std::size_t ended = 0;
     std::vector<ServerHandshake_s> handshakes;
+    // Over TCP, each read: the bytes arrive as a stream, so a test joins them.
     std::vector<std::vector<u8>> messages;
     std::vector<u16> closeCodes;
+    // TCP only: reads that ended at the client's FIN.
+    std::size_t fins = 0;
 };
 
-// One accepted WebSocket connection, as a script sees it. Every call runs on the server's thread.
+// One accepted connection, as a script sees it. Every call runs on the server's thread.
 class ServerSession
 {
 public:
     virtual ~ServerSession() = default;
 
     virtual boost::asio::awaitable<void> Send(std::vector<u8> bytes) = 0;
+    // WebSocket only.
     virtual boost::asio::awaitable<void> SendText(std::string text) = 0;
-    // Nullopt once the connection has ended; a close frame's code is recorded first.
+    // Nullopt once the connection has ended; a close frame's code, or a FIN, is recorded first.
     virtual boost::asio::awaitable<std::optional<std::vector<u8>>> Receive() = 0;
+    // Over TCP, sends a FIN; the code is for a close frame.
     virtual boost::asio::awaitable<void> Close(u16 code) = 0;
-    // Ends TCP without a close frame or a TLS close_notify.
+    // Ends TCP without a close frame or a TLS close_notify, or over TCP, closes the socket.
     virtual void Drop() = 0;
     // Ends TCP with a reset.
     virtual void Reset() = 0;
@@ -60,20 +65,22 @@ enum class ServerMode_e : u8
     Silent,
     // Answers the upgrade with HTTP 403.
     Reject,
+    // Raw TCP, with no upgrade, and runs the script. Not with TLS.
+    Tcp,
 };
 
-// A scripted WebSocket server on 127.0.0.1, on a port the system picks, with TLS when asked. Without a script, a
-// connection reads until it ends.
-class TestWebSocketServer
+// A scripted WebSocket or raw TCP server on 127.0.0.1, on a port the system picks, with TLS when asked. Without a
+// script, a connection reads until it ends.
+class TestServer
 {
 public:
     using Script = std::function<boost::asio::awaitable<void>(ServerSession& session)>;
 
-    explicit TestWebSocketServer(Script script = {}, ServerMode_e mode = ServerMode_e::WebSocket, bool tls = false);
-    ~TestWebSocketServer();
+    explicit TestServer(Script script = {}, ServerMode_e mode = ServerMode_e::WebSocket, bool tls = false);
+    ~TestServer();
 
-    TestWebSocketServer(const TestWebSocketServer&) = delete;
-    TestWebSocketServer& operator=(const TestWebSocketServer&) = delete;
+    TestServer(const TestServer&) = delete;
+    TestServer& operator=(const TestServer&) = delete;
 
     // A loopback port that nothing listens on, at least for a moment.
     [[nodiscard]] static u16 FindClosedPort();

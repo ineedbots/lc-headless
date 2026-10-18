@@ -6,6 +6,7 @@
 #include "Config/Config_s.hpp"
 #include "Config/Revision_e.hpp"
 #include "Config/ServerSettings_s.hpp"
+#include "Config/Transport_e.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"
@@ -25,16 +26,19 @@ struct ReceivedPacket_s
 // server's thread.
 struct FakeServerClient_s
 {
-    explicit FakeServerClient_s(boost::asio::ip::tcp::socket tcp);
+    FakeServerClient_s(boost::asio::ip::tcp::socket tcp, bool raw);
 
+    // Over raw TCP, never upgraded: only its next layer, the TCP socket, is used.
     boost::beast::websocket::stream<boost::asio::ip::tcp::socket> socket;
+    bool raw;
     std::deque<std::optional<std::vector<u8>>> outgoing;
     bool writing = false;
 };
 
 // A scripted game server on loopback, speaking one revision. The test config uses RSA exponent 1, so the
 // login block arrives as plaintext and the server can seed both ISAAC streams the way the engine does.
-// Like the 225 engine, a 225 server sends its seed as soon as the connection opens.
+// Like the 225 engine, a 225 server sends its seed as soon as the connection opens. Over raw TCP, like the engine, it
+// takes each read during login as one request, and reads game packets from a byte stream.
 class FakeGameServer
 {
 public:
@@ -45,7 +49,7 @@ public:
     static constexpr auto USERNAME = "bot";
     static constexpr auto PASSWORD = "secret";
 
-    explicit FakeGameServer(Script onLogin = {}, Revision_e revision = Revision_e::Rev289);
+    explicit FakeGameServer(Script onLogin = {}, Revision_e revision = Revision_e::Rev289, Transport_e transport = Transport_e::Ws);
     ~FakeGameServer();
 
     FakeGameServer(const FakeGameServer&) = delete;
@@ -85,6 +89,8 @@ private:
 
     boost::asio::awaitable<void> Accept();
     boost::asio::awaitable<void> Serve(boost::asio::ip::tcp::socket socket);
+    boost::asio::awaitable<void> ReadMessages(Client client);
+    boost::asio::awaitable<void> ReadStream(Client client);
     void OnMessage(const Client& client, std::span<const u8> bytes);
     void HandleSeedRequest(const Client& client, std::span<const u8> bytes);
     void SendSeed(const Client& client, bool withHeader);
@@ -103,12 +109,16 @@ private:
 
     Script m_onLogin;
     Revision_e m_revision;
+    Transport_e m_transport;
 
     mutable std::mutex m_mutex;
     std::condition_variable m_changed;
     Stage_e m_stage = Stage_e::SeedRequest;
     std::optional<Isaac> m_fromClient;
     std::optional<Isaac> m_toClient;
+    // Game bytes not yet a whole packet, and the packet whose opcode has been read from them.
+    std::vector<u8> m_gameBytes;
+    std::optional<ClientProt_e> m_partialProt;
     u8 m_loginStatus = 2;
     bool m_stalled = false;
     bool m_ignoreLogout = false;

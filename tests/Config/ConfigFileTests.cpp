@@ -603,6 +603,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
     {
         CHECK(ParseAccepted(SetKey({"server", "transport"}, "ws")).server.transport == Transport_e::Ws);
         CHECK(ParseAccepted(SetKey({"server", "transport"}, "wss")).server.transport == Transport_e::Wss);
+        CHECK(ParseAccepted(SetKey({"server", "transport"}, "tcp")).server.transport == Transport_e::Tcp);
 
         for (const auto& host : {"localhost"s, "127.0.0.1"s, "w1.2004scape.org"s, std::string(253, 'a')})
         {
@@ -690,7 +691,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
     const auto rejections = std::vector<Rejection_s>{
         {{"server", "transport"}, "WS"},
         {{"server", "transport"}, "wws"},
-        {{"server", "transport"}, "tcp"},
         {{"server", "transport"}, ""},
         {{"server", "transport"}, 5},
         {{"server", "host"}, ""},

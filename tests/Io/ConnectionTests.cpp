@@ -1,6 +1,6 @@
 #include "pch.hpp"
 #include "../Support/Io/TestCertificate.hpp"
-#include "../Support/Io/TestWebSocketServer.hpp"
+#include "../Support/Io/TestServer.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
 
@@ -31,6 +31,7 @@ namespace
     constexpr auto WOKEN_WITHIN = 1500ms;
     constexpr auto SHORT_CONNECT_TIMEOUT = 300ms;
     constexpr auto DESTROY_ATTEMPTS = 20;
+    constexpr auto LARGE_SEND_SIZE = std::size_t{4} * 1024 * 1024;
     constexpr auto CLOSE_CODE_NORMAL = u16{1000};
     constexpr auto CLOSE_CODE_UNSUPPORTED_DATA = u16{1003};
 
@@ -49,6 +50,11 @@ namespace
     ConnectionOptions_s MakeOptions(u16 port)
     {
         return {.host = LOOPBACK, .port = port};
+    }
+
+    ConnectionOptions_s MakeTcpOptions(u16 port)
+    {
+        return {.transport = Transport_e::Tcp, .host = LOOPBACK, .port = port};
     }
 
     template <typename TAction>
@@ -99,7 +105,41 @@ namespace
         return bytes;
     }
 
-    bool HasCloseCode(const TestWebSocketServer& server, u16 code)
+    // What a TCP server has read, joined: the reads split and combine the sends as they please.
+    std::vector<u8> GetStream(const TestServer& server)
+    {
+        auto stream = std::vector<u8>{};
+        for (const auto& read : server.GetRecord().messages)
+        {
+            stream.insert(stream.end(), read.begin(), read.end());
+        }
+
+        return stream;
+    }
+
+    bool HasStreamSize(const TestServer& server, std::size_t size)
+    {
+        return server.WaitFor([size](const ServerRecord_s& record)
+        {
+            auto total = std::size_t{0};
+            for (const auto& read : record.messages)
+            {
+                total += read.size();
+            }
+
+            return total >= size;
+        });
+    }
+
+    bool HasFin(const TestServer& server)
+    {
+        return server.WaitFor([](const ServerRecord_s& record)
+        {
+            return record.fins > 0;
+        });
+    }
+
+    bool HasCloseCode(const TestServer& server, u16 code)
     {
         return server.WaitFor([code](const ServerRecord_s& record)
         {
@@ -147,7 +187,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("opens")
     {
-        const auto server = TestWebSocketServer{};
+        const auto server = TestServer{};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         CHECK(connection.WaitOpen(WAIT));
         CHECK(connection.Pump() == ConnectionState_e::Open);
@@ -155,7 +195,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("sends the origin, the subprotocol and the host with its port")
     {
-        const auto server = TestWebSocketServer{};
+        const auto server = TestServer{};
         auto options = MakeOptions(server.GetPort());
         options.origin = "http://test";
         auto connection = Connection{*loop, options, logger};
@@ -170,7 +210,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("sends no Origin header for an empty origin")
     {
-        const auto server = TestWebSocketServer{};
+        const auto server = TestServer{};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -181,7 +221,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("echoes")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -192,7 +232,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("echoes a message too long for a 16-bit frame length")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -209,7 +249,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("each send is one message")
     {
-        const auto server = TestWebSocketServer{};
+        const auto server = TestServer{};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -228,7 +268,7 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
 
     SECTION("message boundaries are discarded")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.Send({1, 2});
             co_await session.Send({3, 4});
@@ -249,7 +289,7 @@ TEST_CASE("Connection reports a failure to connect", "[Connection][network]")
 
     SECTION("nothing listening is a failure, not a close")
     {
-        auto connection = Connection{*loop, MakeOptions(TestWebSocketServer::FindClosedPort()), logger};
+        auto connection = Connection{*loop, MakeOptions(TestServer::FindClosedPort()), logger};
         CHECK(GetOutcome([&]
         {
             static_cast<void>(connection.WaitOpen(WAIT));
@@ -258,7 +298,7 @@ TEST_CASE("Connection reports a failure to connect", "[Connection][network]")
 
     SECTION("a silent server leaves it connecting")
     {
-        const auto server = TestWebSocketServer{{}, ServerMode_e::Silent};
+        const auto server = TestServer{{}, ServerMode_e::Silent};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         CHECK_FALSE(connection.WaitOpen(200ms));
         CHECK(connection.Pump() == ConnectionState_e::Connecting);
@@ -266,7 +306,7 @@ TEST_CASE("Connection reports a failure to connect", "[Connection][network]")
 
     SECTION("connectTimeout ends the attempt and names the stage")
     {
-        const auto server = TestWebSocketServer{{}, ServerMode_e::Silent};
+        const auto server = TestServer{{}, ServerMode_e::Silent};
         auto options = MakeOptions(server.GetPort());
         options.connectTimeout = SHORT_CONNECT_TIMEOUT;
         auto connection = Connection{*loop, options, logger};
@@ -285,7 +325,7 @@ TEST_CASE("Connection reports a failure to connect", "[Connection][network]")
 
     SECTION("a refused upgrade gives the HTTP status")
     {
-        const auto server = TestWebSocketServer{{}, ServerMode_e::Reject};
+        const auto server = TestServer{{}, ServerMode_e::Reject};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         const auto failure = GetFailure([&]
         {
@@ -302,7 +342,7 @@ TEST_CASE("Connection waits time out and wake on events", "[Connection][network]
 
     SECTION("an idle server times a wait out")
     {
-        const auto server = TestWebSocketServer{};
+        const auto server = TestServer{};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -322,7 +362,7 @@ TEST_CASE("Connection waits time out and wake on events", "[Connection][network]
         CHECK(connection.Pump() == ConnectionState_e::Open);
     }
 
-    const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+    const auto server = TestServer{[](ServerSession& session) -> Awaitable
     {
         co_await session.Delay(SERVER_DELAY);
         co_await session.Send({1, 2, 3, 4});
@@ -360,7 +400,7 @@ TEST_CASE("Connection reports how the server ended it", "[Connection][network]")
 
     SECTION("a close after data keeps the data readable")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.Send({1, 2, 3, 4});
             co_await session.Close(CLOSE_CODE_NORMAL);
@@ -382,7 +422,7 @@ TEST_CASE("Connection reports how the server ended it", "[Connection][network]")
 
     SECTION("a close wakes WaitClosed")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.Delay(SERVER_DELAY);
             co_await session.Close(CLOSE_CODE_NORMAL);
@@ -401,7 +441,7 @@ TEST_CASE("Connection reports how the server ended it", "[Connection][network]")
 
     SECTION("a text message fails the connection and keeps the data before it")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.Send({1, 2, 3, 4});
             co_await session.SendText("hello");
@@ -421,7 +461,7 @@ TEST_CASE("Connection reports how the server ended it", "[Connection][network]")
 
     SECTION("a text message closes with 1003")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.SendText("hello");
             co_await session.ReceiveUntilClosed();
@@ -437,7 +477,7 @@ TEST_CASE("Connection reports how the server ended it", "[Connection][network]")
 
     SECTION("TCP ending without a close frame is a close")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             session.Drop();
             co_return;
@@ -453,7 +493,7 @@ TEST_CASE("Connection reports how the server ended it", "[Connection][network]")
 
     SECTION("a reset is a failure")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             session.Reset();
             co_return;
@@ -474,7 +514,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("Close returns at once and ends sending")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -496,7 +536,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("the server sees a normal close")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -508,7 +548,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("pumping alone finishes a close")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -524,7 +564,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("bytes already received stay readable")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.Send({1, 2});
             co_await session.ReceiveUntilClosed();
@@ -540,7 +580,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("a server that never answers the close frame is dropped after the close timeout")
     {
-        const auto server = TestWebSocketServer{Silent};
+        const auto server = TestServer{Silent};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         REQUIRE(connection.WaitOpen(WAIT));
 
@@ -557,7 +597,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("a close while connecting is immediate")
     {
-        const auto server = TestWebSocketServer{{}, ServerMode_e::Silent};
+        const auto server = TestServer{{}, ServerMode_e::Silent};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         connection.Pump();
 
@@ -577,7 +617,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("WaitOpen after a close while connecting throws at once")
     {
-        const auto server = TestWebSocketServer{{}, ServerMode_e::Silent};
+        const auto server = TestServer{{}, ServerMode_e::Silent};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
         connection.Close();
 
@@ -595,7 +635,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("a connection destroyed while connecting goes at once")
     {
-        const auto server = TestWebSocketServer{{}, ServerMode_e::Silent};
+        const auto server = TestServer{{}, ServerMode_e::Silent};
         for (auto attempt = 0; attempt < DESTROY_ATTEMPTS; ++attempt)
         {
             CHECK(Measure([&]
@@ -613,7 +653,7 @@ TEST_CASE("Connection closes without waiting", "[Connection][network]")
 
     SECTION("a connection destroyed while open still closes cleanly")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         {
             auto connection = Connection{*loop, MakeOptions(server.GetPort()), logger};
             REQUIRE(connection.WaitOpen(WAIT));
@@ -631,8 +671,8 @@ TEST_CASE("Connections share a loop", "[Connection][network]")
 
     SECTION("waiting on one runs the other's I/O")
     {
-        const auto firstServer = TestWebSocketServer{Echo};
-        const auto secondServer = TestWebSocketServer{Echo};
+        const auto firstServer = TestServer{Echo};
+        const auto secondServer = TestServer{Echo};
         auto first = Connection{*loop, MakeOptions(firstServer.GetPort()), logger};
         auto second = Connection{*loop, MakeOptions(secondServer.GetPort()), logger};
         REQUIRE(first.WaitOpen(WAIT));
@@ -700,7 +740,7 @@ TEST_CASE("Connection logs its lifecycle", "[Connection][network]")
 
     SECTION("an exchange and a local close")
     {
-        const auto server = TestWebSocketServer{Echo};
+        const auto server = TestServer{Echo};
         auto connection = Connection{*loop, MakeOptions(server.GetPort()), capture.GetLogger()};
         REQUIRE(connection.WaitOpen(WAIT));
         connection.Send(std::array<u8, 3>{1, 2, 3});
@@ -723,7 +763,7 @@ TEST_CASE("Connection logs its lifecycle", "[Connection][network]")
 
     SECTION("a server's close")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.Close(CLOSE_CODE_NORMAL);
         }};
@@ -738,7 +778,7 @@ TEST_CASE("Connection logs its lifecycle", "[Connection][network]")
 
     SECTION("a failure, at Verbose only")
     {
-        auto connection = Connection{*loop, MakeOptions(TestWebSocketServer::FindClosedPort()), capture.GetLogger()};
+        auto connection = Connection{*loop, MakeOptions(TestServer::FindClosedPort()), capture.GetLogger()};
         CHECK(GetOutcome([&]
         {
             static_cast<void>(connection.WaitClosed(WAIT));
@@ -754,7 +794,7 @@ TEST_CASE("Connection logs its lifecycle", "[Connection][network]")
 
     SECTION("a text message")
     {
-        const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
         {
             co_await session.SendText("hello");
             co_await session.ReceiveUntilClosed();
@@ -771,6 +811,257 @@ TEST_CASE("Connection logs its lifecycle", "[Connection][network]")
     }
 }
 
+TEST_CASE("Connection over raw TCP", "[Connection][network]")
+{
+    const auto loop = NetLoop::Create();
+    const auto logger = MakeConsoleLogger();
+
+    SECTION("opens and echoes")
+    {
+        const auto server = TestServer{Echo, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        connection.Send(std::array<u8, 3>{1, 2, 3});
+        REQUIRE(connection.WaitAvailable(3, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{1, 2, 3});
+    }
+
+    SECTION("sends no upgrade, only the bytes it's given")
+    {
+        const auto server = TestServer{{}, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        connection.Send(std::array<u8, 2>{14, 0});
+        REQUIRE(HasStreamSize(server, 2));
+        CHECK(GetStream(server) == std::vector<u8>{14, 0});
+    }
+
+    SECTION("sends arrive in order as one stream")
+    {
+        const auto server = TestServer{{}, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        connection.Send(std::array<u8, 2>{1, 2});
+        connection.Send(std::array<u8, 1>{3});
+        connection.Pump();
+        REQUIRE(HasStreamSize(server, 3));
+        CHECK(GetStream(server) == std::vector<u8>{1, 2, 3});
+    }
+
+    SECTION("the server's writes read as one stream")
+    {
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
+        {
+            co_await session.Send({1, 2});
+            co_await session.Send({3, 4});
+            co_await session.Send({5, 6});
+            co_await session.ReceiveUntilClosed();
+        }, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+
+        REQUIRE(connection.WaitAvailable(6, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{1, 2, 3, 4, 5, 6});
+    }
+
+    SECTION("a send larger than a read arrives whole")
+    {
+        const auto server = TestServer{Echo, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        auto sent = std::vector<u8>(65'536);
+        for (auto i = std::size_t{0}; i < sent.size(); ++i)
+        {
+            sent[i] = static_cast<u8>(i & 0xFF);
+        }
+
+        connection.Send(sent);
+        REQUIRE(connection.WaitAvailable(sent.size(), WAIT));
+        CHECK(ReadAll(connection) == sent);
+    }
+
+    SECTION("the server's FIN is a close, and keeps the data before it")
+    {
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
+        {
+            co_await session.Send({1, 2});
+            co_await session.Close(0);
+            co_await session.ReceiveUntilClosed();
+        }, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+
+        CHECK(GetOutcome([&]
+        {
+            static_cast<void>(connection.WaitAvailable(3, WAIT));
+        }) == Outcome_e::Closed);
+        CHECK(ReadAll(connection) == std::vector<u8>{1, 2});
+        CHECK(connection.Pump() == ConnectionState_e::Closed);
+    }
+
+    SECTION("a reset is a failure")
+    {
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
+        {
+            session.Reset();
+            co_return;
+        }, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+
+        CHECK(GetOutcome([&]
+        {
+            static_cast<void>(connection.WaitAvailable(1, WAIT));
+        }) == Outcome_e::Failed);
+    }
+
+    SECTION("Close sends a FIN and finishes when the server closes")
+    {
+        const auto server = TestServer{Echo, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        connection.Close();
+        auto closed = false;
+        const auto elapsed = Measure([&]
+        {
+            closed = connection.WaitClosed(WAIT);
+        });
+        CHECK(closed);
+        CHECK(elapsed < 800ms);
+        CHECK(HasFin(server));
+        CHECK(connection.Pump() == ConnectionState_e::Closed);
+    }
+
+    SECTION("Close lets the write in flight finish before the FIN")
+    {
+        const auto server = TestServer{{}, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        connection.Send(std::vector<u8>(LARGE_SEND_SIZE, 7));
+        connection.Close();
+        REQUIRE(connection.WaitClosed(WAIT));
+
+        CHECK(HasFin(server));
+        CHECK(GetStream(server) == std::vector<u8>(LARGE_SEND_SIZE, 7));
+    }
+
+    SECTION("a server that never closes is dropped after the close timeout")
+    {
+        const auto server = TestServer{Silent, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        connection.Close();
+        auto closed = false;
+        const auto elapsed = Measure([&]
+        {
+            closed = connection.WaitClosed(WAIT);
+        });
+        CHECK(closed);
+        CHECK(elapsed > 800ms);
+        CHECK(elapsed < 2s);
+    }
+
+    SECTION("a close while connecting is immediate")
+    {
+        const auto server = TestServer{{}, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+
+        CHECK(Measure([&]
+        {
+            connection.Close();
+        }) < AT_ONCE);
+
+        auto closed = false;
+        const auto elapsed = Measure([&]
+        {
+            closed = connection.WaitClosed(WAIT);
+        });
+        CHECK(closed);
+        CHECK(elapsed < 100ms);
+    }
+
+    SECTION("a connection destroyed while open still sends its FIN")
+    {
+        const auto server = TestServer{Echo, ServerMode_e::Tcp};
+        {
+            auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), logger};
+            REQUIRE(connection.WaitOpen(WAIT));
+        }
+
+        loop->Settle(Clock::now() + 2s);
+        CHECK(HasFin(server));
+    }
+
+    SECTION("nothing listening is a failure")
+    {
+        auto connection = Connection{*loop, MakeTcpOptions(TestServer::FindClosedPort()), logger};
+        CHECK(GetOutcome([&]
+        {
+            static_cast<void>(connection.WaitOpen(WAIT));
+        }) == Outcome_e::Failed);
+    }
+
+    SECTION("logs its lifecycle")
+    {
+        auto capture = LogCapture{};
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
+        {
+            co_await session.Echo();
+        }, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), capture.GetLogger()};
+        REQUIRE(connection.WaitOpen(WAIT));
+        connection.Send(std::array<u8, 3>{1, 2, 3});
+        REQUIRE(connection.WaitAvailable(3, WAIT));
+        connection.Close();
+        REQUIRE(connection.WaitClosed(WAIT));
+
+        auto info = std::vector<std::string>{};
+        auto verbose = std::vector<std::string>{};
+        for (const auto& entry : capture.GetEntries())
+        {
+            CHECK(entry.level != LogLevel_e::Warning);
+            CHECK(entry.level != LogLevel_e::Error);
+            if (entry.level == LogLevel_e::Info)
+            {
+                info.push_back(entry.message);
+            }
+            else if (entry.level == LogLevel_e::Verbose)
+            {
+                verbose.push_back(entry.message);
+            }
+        }
+
+        REQUIRE(info.size() == 3);
+        CHECK(info[0] == std::format("Connecting to tcp://{}:{}", LOOPBACK, server.GetPort()));
+        CHECK(info[1] == "Connection open");
+        CHECK(info[2] == "Connection closing");
+        CHECK(std::ranges::find(verbose, "Sending 3 bytes") != verbose.end());
+        CHECK(std::ranges::find(verbose, "Received 3 bytes") != verbose.end());
+    }
+
+    SECTION("logs the server's close")
+    {
+        auto capture = LogCapture{};
+        const auto server = TestServer{[](ServerSession& session) -> Awaitable
+        {
+            co_await session.Close(0);
+            co_await session.ReceiveUntilClosed();
+        }, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), capture.GetLogger()};
+        REQUIRE(connection.WaitClosed(WAIT));
+
+        const auto entries = capture.GetEntries();
+        CHECK(std::ranges::any_of(entries, [](const CapturedLog_s& entry)
+        {
+            return entry.level == LogLevel_e::Info && entry.message == "Server closed the connection";
+        }));
+    }
+}
+
 TEST_CASE("Connection over TLS", "[Connection][network][tls]")
 {
     const auto loop = NetLoop::Create();
@@ -779,7 +1070,7 @@ TEST_CASE("Connection over TLS", "[Connection][network][tls]")
     folder.WriteFile("ca.pem", TestCertificate::Get().certificatePem);
     const auto caFile = (folder.GetPath() / "ca.pem").string();
 
-    const auto server = TestWebSocketServer{Echo, ServerMode_e::WebSocket, true};
+    const auto server = TestServer{Echo, ServerMode_e::WebSocket, true};
     const auto makeOptions = [&](std::string host, std::string tlsCaFile)
     {
         return ConnectionOptions_s{.transport = Transport_e::Wss, .host = std::move(host), .port = server.GetPort(), .tlsCaFile = std::move(tlsCaFile)};
@@ -852,7 +1143,7 @@ TEST_CASE("Connection over TLS", "[Connection][network][tls]")
 TEST_CASE("Connection over TLS treats a truncated stream as a close", "[Connection][network][tls]")
 {
     const auto loop = NetLoop::Create();
-    const auto server = TestWebSocketServer{[](ServerSession& session) -> Awaitable
+    const auto server = TestServer{[](ServerSession& session) -> Awaitable
     {
         session.Drop();
         co_return;

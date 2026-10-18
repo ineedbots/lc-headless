@@ -102,9 +102,9 @@ Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If `client.js
 
 | Key | Meaning |
 |---|---|
-| `server.transport` | `ws` or `wss`, the WebSocket the server's webclient uses. The default is `ws` |
-| `server.host`, `server.port` | Where the server is: a host name or IPv4 address, and its web port. A local engine serves `ws` on port 80 on Windows and 8888 on Linux |
-| `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header |
+| `server.transport` | `ws` or `wss`, the WebSocket the server's webclient uses, or `tcp`, the engine's raw TCP port. The default is `ws` |
+| `server.host`, `server.port` | Where the server is: a host name or IPv4 address, and the port for the transport. A local engine serves `ws` on port 80 on Windows and 8888 on Linux, and `tcp` on 43594 |
+| `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header. WebSocket only |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
 | `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
 | `login.revision` | The server's revision: `289`, the default, `274` or `225`. It's set for the whole process, because the cache is, so servers of different revisions each need a process of their own |

@@ -6,7 +6,7 @@
 class TransportNames
 {
 public:
-    static constexpr auto CHOICES = "ws or wss"sv;
+    static constexpr auto CHOICES = "ws, wss or tcp"sv;
 
     TransportNames() = delete;
 

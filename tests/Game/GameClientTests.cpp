@@ -7,6 +7,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Config/Config_s.hpp"
 #include "Config/Revision_e.hpp"
+#include "Config/Transport_e.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/GameActions.hpp"
@@ -21,6 +22,7 @@
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace
 {
@@ -65,8 +67,9 @@ namespace
 
 TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
 {
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{TestWorld::Send};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, transport};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
@@ -143,8 +146,9 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
 
 TEST_CASE("GameClient logs in to a 225 server and answers each rebuild", "[GameClient]")
 {
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev225};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev225, transport};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(Revision_e::Rev225), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
@@ -204,8 +208,9 @@ TEST_CASE("GameClient logs in to a 225 server and answers each rebuild", "[GameC
 
 TEST_CASE("GameClient logs in to a 274 server and owes no replies", "[GameClient]")
 {
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev274};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev274, transport};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(Revision_e::Rev274), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
@@ -349,8 +354,9 @@ TEST_CASE("GameClient logs a 225 staff account in with status 18", "[GameClient]
 
 TEST_CASE("GameClient reconnects when the connection drops", "[GameClient]")
 {
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{TestWorld::Send};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, transport};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
@@ -402,8 +408,9 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
 
 TEST_CASE("GameClient ends the session when the server logs it out", "[GameClient]")
 {
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{TestWorld::Send};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, transport};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
 
     client.Login();
@@ -539,8 +546,9 @@ TEST_CASE("GameClient retries a login the server can't take yet", "[GameClient]"
 
 TEST_CASE("GameClient reconnects when a send meets a dropped connection", "[GameClient]")
 {
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
     auto capture = LogCapture{LogLevel_e::Info};
-    auto server = FakeGameServer{TestWorld::Send};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, transport};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
     REQUIRE(PumpUntil(client, [&client]

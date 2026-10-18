@@ -2,7 +2,7 @@
 // Each account goes in its own file in scripting.accountsDirectory.
 {
     "server": {
-        // ws or wss. A local engine serves ws on port 80 on Windows, and on 8888 on Linux.
+        // ws, wss or tcp. A local engine serves ws on port 80 on Windows, and on 8888 on Linux, and tcp on 43594.
         "transport": "ws",
         "host": "localhost",
         "port": 80,
