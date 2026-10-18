@@ -37,7 +37,7 @@ namespace
         auto account = AccountConfig_s{.name = name, .credentials = {.username = name, .password = "secret"}};
         if (ownServer != nullptr)
         {
-            account.server = ServerSettings_s{.url = ownServer->Url()};
+            account.server = ownServer->MakeServerSettings();
         }
 
         if (script)
@@ -317,9 +317,11 @@ def loop():
 )python");
 
     auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "ping.py"), MakeAccount("bot2", &fixture.second, "pong.py"), MakeAccount("idler", &third, std::nullopt)});
-    const auto succeeded = runner->Run([&fixture]
+    // The idler must be in game too, or the interrupt abandons its login and the run doesn't succeed.
+    const auto succeeded = runner->Run([&fixture, &runner]
     {
-        return CountLines(fixture.capture, "bot1", "reply bot2 2") >= 1 || fixture.TimedOut() ? 1u : 0u;
+        const auto replied = CountLines(fixture.capture, "bot1", "reply bot2 2") >= 1 && runner->GetAccount(2).GetClient().IsInGame();
+        return replied || fixture.TimedOut() ? 1u : 0u;
     });
     fixture.ReportProblems();
 
@@ -353,7 +355,8 @@ def loop():
     auto quitSent = false;
     const auto succeeded = runner->Run([&]
     {
-        if (!quitSent && CountLines(fixture.capture, "bot1", "said just  me") == 1)
+        // bot2's first loop too: the accounts don't log in in step, and the status line needs both in game.
+        if (!quitSent && CountLines(fixture.capture, "bot1", "said just  me") == 1 && CountLines(fixture.capture, "bot2", "loop") >= 1)
         {
             console.Push("status");
             console.Push("quit");
@@ -461,4 +464,24 @@ TEST_CASE("AccountRunner quits one account from the console", "[AccountRunner]")
     CHECK(runner->GetAccount(0).DescribeOutcome() == "logged out");
     CHECK_FALSE(runner->GetAccount(1).IsStarted());
     CHECK(fixture.second.GetPackets(ClientProt_e::IfButton).empty());
+}
+
+TEST_CASE("AccountRunner wakes for a connection's I/O, not only on its poll interval", "[AccountRunner]")
+{
+    auto fixture = RunnerFixture{};
+    // At one pass a second, logging in and out would take over four seconds, a round trip per pass.
+    fixture.config.scripting.pollIntervalMs = 1000ms;
+    auto account = MakeAccount("bot1", nullptr, std::nullopt);
+    account.idleSeconds = 1s;
+    auto runner = fixture.MakeRunner({std::move(account)});
+
+    const auto start = Clock::now();
+    const auto succeeded = runner->Run([]
+    {
+        return 0u;
+    });
+    fixture.ReportProblems();
+
+    CHECK(succeeded);
+    CHECK(Clock::now() - start < 3s);
 }

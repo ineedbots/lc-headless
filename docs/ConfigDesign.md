@@ -1,6 +1,9 @@
 # Config Design
 
-Design and test plan for `ConfigFile`, which loads the client's settings from a JSON file with comments, and points to the committed `client.jsonc.sample` when there is none. It replaces the reference client's INI config. The settings structs are converted in both directions with nlohmann/json's `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, so a missing key takes its default, and a validation pass checks the rules their types don't carry. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8, parses RSA keys with `BigUInt` ([PacketDesign.md](PacketDesign.md) §5), checks the server URL the same way `WebSocketClient` does ([WebSocketDesign.md](WebSocketDesign.md) §3), and logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)).
+Design and test plan for `ConfigFile`, which loads the client's settings from a JSON file with comments, and points to the committed `client.jsonc.sample` when there is none. It replaces the reference client's INI config. The settings structs are converted in both directions with nlohmann/json's `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, so a missing key takes its default, and a validation pass checks the rules their types don't carry. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8, parses RSA keys with `BigUInt` ([PacketDesign.md](PacketDesign.md) §5), and logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)).
+
+> The `server` section changed after this plan was built: `transport`, `host` and `port` replaced `url`, and IXWebSocket went with it ([TransportDesign.md](TransportDesign.md) §2). §3 and §4 describe the keys as they are now. The differences in §5 and the test plan in §6 keep the `url` they were written with; the tests in `tests/Config/` hold the current cases.
+
 
 Reference sources:
 
@@ -24,7 +27,7 @@ Reference sources:
 | Macros | A deliberate exception to CONVENTIONS §6. The macros generate a `from_json` and a `to_json` per struct that would otherwise have to be written, and kept in step with the struct, by hand |
 | Keys | The JSON keys are the C++ member names, because the macro uses each member's name as its key. They are camelCase (CONVENTIONS §6), and a key's path in the file is its path in code: `login.rsaModulus` in the file is `config.login.rsaModulus` |
 | Key order | Reading uses `nlohmann::json`. Writing uses `nlohmann::ordered_json`, so a written file lists sections and keys in declaration order, the order of §3, instead of alphabetically |
-| Defaults | Every key is optional. The macro reads each member with `value(name, default)`, so a missing key keeps the member's initializer. Five initializers break their own key's rule: the empty `url`, `username` and `password`, and the zero RSA modulus and exponent. Leaving out one of those keys fails in `Validate`, which names it |
+| Defaults | Every key is optional. The macro reads each member with `value(name, default)`, so a missing key keeps the member's initializer. Six initializers break their own key's rule: the empty `host`, the zero `port`, the empty `username` and `password`, and the zero RSA modulus and exponent. Leaving out one of those keys fails in `Validate`, which names it |
 | Rules | Rules that a type doesn't carry, such as the username's length or the range of the call timeout, are checked by `Validate` after conversion |
 | Numbers | Counts and IDs are JSON integers. RSA values are strings holding a decimal or `0x`-hex number, because JSON has no hex literals and a 512-bit modulus doesn't fit in a JSON number. Hex is case-insensitive when read, so `0xCA1` and `0xca1` are the same value. `Serialize` writes lowercase |
 | Strictness | `Validate` is the only check beyond what conversion does: a wrong type, or a value that breaks its rule, is an error. Unknown sections and keys are ignored without a warning, and a repeated key takes its last value, as nlohmann does by default |
@@ -86,7 +89,7 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 - `Config_s` and its section structs live in `Config_s.hpp`, the account's structs in `AccountConfig_s.hpp`, and `ServerSettings_s`, which both use, in a header of its own.
 - `Config_s.hpp` includes `../Utils/BigUInt.hpp`, because `BigUInt` is a member of `LoginSettings_s`, and `../Console/LogLevel_e.hpp`, because `LogLevel_e` is a member of `ClientSettings_s`. `ConfigFile.hpp` includes `../Console/Logger.hpp`, because `Logger` appears in `Load`'s and `Parse`'s prototypes.
 - `ConfigError.hpp` is header-only, exactly as in CONVENTIONS §8, and sits in `Config/Error/`. No header includes it, because no prototype uses it. The files that throw it include it, as does any code that catches it.
-- `ConfigJson.cpp` is the only file that includes `<nlohmann/json.hpp>` for the config, and `WebSocketUrl` (in `Io/`) checks the URL with `<ixwebsocket/IXUrlParser.h>`. IXWebSocket is already a dependency ([WebSocketDesign.md](WebSocketDesign.md) §2).
+- `ConfigJson.cpp` is the only file that includes `<nlohmann/json.hpp>` for the config. `Transport_e` and `TransportNames`, which name `server.transport`'s values, live in `Config/` too.
 - `vcpkg.json` gains `"nlohmann-json"`.
 - CMake:
     - `find_package(nlohmann_json CONFIG REQUIRED)`. The library target links `nlohmann_json::nlohmann_json` privately, because no public header includes it. The test executable links it too, because the tests build their inputs with it (§6.1).
@@ -105,10 +108,12 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 ```jsonc
 {
     "server": {
-        "url": "ws://localhost:80",
-        // "url": "ws://127.0.0.1:80",
+        "transport": "ws",
+        "host": "localhost",
+        "port": 80,
+        // "host": "127.0.0.1",
         // "origin": "http://localhost",
-        // "url": "wss://w1.rs2b2t.com:443",
+        // "transport": "wss", "host": "w1.rs2b2t.com", "port": 443,
         "origin": "https://w1.rs2b2t.com",
         "tlsCaFile": "SYSTEM"
     },
@@ -147,7 +152,9 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 ```jsonc
 {
     "server": {
-        "url": "",
+        "transport": "ws",
+        "host": "",
+        "port": 0,
         "origin": "",
         "tlsCaFile": "SYSTEM"
     },
@@ -177,13 +184,15 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 }
 ```
 
-- Every value is its key's default. A file that sets nothing behaves exactly like this one: it fails `Validate`, starting with `server.url`.
+- Every value is its key's default. A file that sets nothing behaves exactly like this one: it fails `Validate`, starting with `server.host`.
 
 ### Keys
 
 | Key | Type | Default | Rule |
 |---|---|---|---|
-| `server.url` | string | `""` | A URL that `ix::UrlParser` accepts, with the scheme `ws` or `wss`: the check `WebSocketClient::Connect` makes ([WebSocketDesign.md](WebSocketDesign.md) §3, step 1) |
+| `server.transport` | string | `"ws"` | `ws` or `wss`, written exactly. An unknown name fails in conversion, not silently as the first value |
+| `server.host` | string | `""` | 1 to 253 characters, each an ASCII letter, a digit, `-` or `.`: a host name or an IPv4 address |
+| `server.port` | integer | `0` | 1 to 65535. An `s32`, so a value too big for a port fails instead of wrapping |
 | `server.origin` | string | `""`: no `Origin` header | Empty, or printable ASCII |
 | `server.tlsCaFile` | string | `"SYSTEM"` | Not empty: a PEM CA bundle path, `SYSTEM` for the platform trust store, or `NONE` for no verification. Only used for `wss` |
 | `login.rsaModulus` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 1 |
@@ -204,7 +213,7 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 | `scripting.reloginDelaySeconds` | integer | `60` | 0 to 3600. How long an account waits before logging in afresh after its session ended unexpectedly, such as the server logging it out ([ScriptingDesign.md](ScriptingDesign.md)). Passed to `AccountOptions_s::reloginDelay` |
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
 
-- **Keys that must be set.** The defaults of `server.url`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
+- **Keys that must be set.** The defaults of `server.host`, `server.port`, `login.rsaModulus` and `login.rsaExponent` break their own rules. A file that leaves one of them out fails in `Validate`, which names the key.
 
 ### Rules
 
@@ -244,7 +253,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `Account
 | `username` | string | none | 1 to 12 printable ASCII characters |
 | `password` | string | none | 1 to 20 printable ASCII characters |
 | `enabled` | boolean | `true` | |
-| `server` | object or `null` | none: `client.jsonc`'s | The same keys and rules as `client.jsonc`'s `server` section, with `url` required. Logs this account into another world |
+| `server` | object or `null` | none: `client.jsonc`'s | The same keys and rules as `client.jsonc`'s `server` section, with `host` and `port` required. Logs this account into another world |
 | `idleSeconds` | integer | `0`: idle until interrupted | 0 to 86400. Without a script, how long the account idles, from its first step in game, before it logs out. Stored as `std::chrono::seconds` |
 | `randomEvents` | boolean | `true` | Whether the script's random event guardian runs ([BotApiDesign.md](BotApiDesign.md) §10) |
 | `stallMinutes` | integer | `10` | 0 to 1440. How long the script may go without moving, gaining experience or noting progress before the stall guard steps in; 0 turns it off. Stored as `std::chrono::minutes` ([BotApiDesign.md](BotApiDesign.md) §11) |
@@ -271,7 +280,9 @@ This section shows `ConfigFile` as it was first written, as one class. [Refactor
 
 struct ServerSettings_s
 {
-    std::string url;
+    Transport_e transport = Transport_e::Ws;
+    std::string host;
+    s32 port = 0;
     std::string origin;
     std::string tlsCaFile = "SYSTEM";
 };
@@ -375,10 +386,10 @@ public:
 - A script's settings can be any object, so `AccountConfig_s` and `ScriptConfig_s` have hand-written `from_json` functions instead of the macro. Neither has a `to_json`, and there's no account sample to serialize. The one write to an account file, `AddScriptSettings`, goes through `JsoncEditor`, which inserts the new members into the text, matching its indentation and line endings, instead of serializing the file again, which would drop its comments. It writes a temporary file beside it and renames it over the original.
 
 - The member names are the JSON keys, so renaming a member renames its key.
-- `ServerSettings_s` uses the member names and the `tlsCaFile` default of `WebSocketOptions_s`, so building the options is a member-by-member copy (see Usage).
+- `ServerSettings_s` uses the member names and the `tlsCaFile` default of `ConnectionOptions_s`, so `GameClient` builds the options member by member, casting the validated port to `u16`.
 - **The member initializers are the defaults.**
     - A key missing from the file keeps its member's initializer, and the default serialization is made of them.
-    - Values that differ for each server or account are left empty or zero: `url`, the credentials and the RSA key. All of them fail `Validate` until the file sets them.
+    - Values that differ for each server or account are left empty or zero: `host`, `port`, the credentials and the RSA key. All of them fail `Validate` until the file sets them.
     - Code that builds a struct in place starts from the same values.
 - `Load` reads a file and calls `Parse`, or throws when there's no file. `Parse` and `Serialize` work on text, which is what the tests call.
 - `Load` and `Parse` take the `Logger&` their warnings go through, and default to the default logger when it is left out. They log only during the call and don't keep the logger, so a reference is enough, as with a function that only reads the config ([LoggerDesign.md](LoggerDesign.md) §3 Usage). `Serialize` doesn't log, so it takes none.
@@ -403,7 +414,7 @@ Application::Application(const std::filesystem::path& configPath, std::shared_pt
 
 - `std::make_shared` moves the loaded `Config_s` into its one allocation, so nothing is copied.
 - The config is loaded in the body, after the `assert`, so `Load` never gets a null logger, and nothing depends on the order the members are declared in.
-- `Application` passes `m_logger` on to every class it builds that logs, such as `WebSocketClient` ([LoggerDesign.md](LoggerDesign.md) §3 Usage).
+- `Application` passes `m_logger` on to every class it builds that logs, such as `GameClient` ([LoggerDesign.md](LoggerDesign.md) §3 Usage).
 - `Application.hpp` includes `../Config/Config_s.hpp`, because `Config_s` appears in a member's type, and `../Console/Logger.hpp`, because `Logger` appears in the constructor and a member.
 
 `main.cpp` creates the logger, as in [LoggerDesign.md](LoggerDesign.md) §3 Usage, and passes it and the optional path to `Application`. A `ConfigError` reaches the last-resort catch like any other failure at startup, and the message says which file and key are wrong. On a first run, the message says to copy `client.jsonc.sample` into place.
@@ -458,8 +469,7 @@ auto session = LoginSession{m_config};
 Connecting:
 
 ```cpp
-const auto& server = m_config->server;
-m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = server.tlsCaFile});
+m_connection.emplace(*m_net, MakeOptions(m_config->server), m_logger);
 ```
 
 - A null config is a bug in the caller, not bad input, so classes `assert` on it rather than throw (CONVENTIONS §8).
@@ -555,7 +565,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
         // adl_serializer<LogLevel_e> and adl_serializer<std::chrono::seconds> follow the same pattern.
     }
 
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, transport, host, port, origin, tlsCaFile)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
@@ -598,7 +608,8 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     ```cpp
     void Validate(const Config_s& config)
     {
-        Check(IsWebSocketUrl(config.server.url), "server.url", "must be a ws:// or wss:// URL");
+        Check(IsHost(config.server.host), "server.host", "must be a host name or IPv4 address of 1 to 253 letters, digits, '-' and '.'");
+        Check(config.server.port >= 1 && config.server.port <= MAX_PORT, "server.port", "must be from 1 to 65535");
         Check(config.server.origin.empty() || IsPrintableAscii(config.server.origin), "server.origin", "must be empty or printable ASCII");
         Check(!config.server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
         // ...one Check per remaining rule in §3, in the order of the table
@@ -609,11 +620,11 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
 
     - `Check(valid, path, rule)` throws `ConfigError{std::format("{}: {}", path, rule)}` when `valid` is false.
     - `Validate` is also where a key that can't do without a value fails when it's missing: its default breaks the rule. It can't tell a missing key from one set to the same value, so the message gives the rule, not "missing".
-    - `IsWebSocketUrl` calls `ix::UrlParser::parse` and requires the protocol it returns to be `ws` or `wss`.
+    - `IsHost` allows ASCII letters, digits, `-` and `.`, so a scheme, a port, a path, a space and an IPv6 literal all fail it. `server.transport` needs no check here: `adl_serializer<Transport_e>` rejects an unknown name while converting, with `must be ws or wss`.
     - The limits are named `constexpr` constants in the anonymous namespace (`MAX_USERNAME_LENGTH`, `MIN_CALL_TIMEOUT`, `MAX_CALL_TIMEOUT`, ...). The revision check looks the value up in `LoginSettings_s::SUPPORTED_REVISIONS` and builds its message from that list. `Revision_e`'s values are the revision numbers, and nlohmann converts a scoped enum to and from its underlying integer, so the file still says `"revision": 289` ([RevisionDesign.md](RevisionDesign.md) §3).
     - `lowMemory` has no rule beyond its type.
     - The paths in `Validate` are written out by hand. A test for each rule (§6.5) catches a path that no longer matches its member after a rename.
-- **TLS.** `tlsCaFile` matters only for `wss`. With a `ws` URL it's stored as written and unused, without a warning, so switching `url` between a local `ws` server and a remote `wss` one stays a one-line edit, as in `client.ini`. With a `wss` URL and `NONE`, `Parse` logs `Warning` through the logger it was given: `Config disables TLS certificate verification (server.tlsCaFile is NONE)`.
+- **TLS.** `tlsCaFile` matters only for `wss`. With `ws` it's stored as written and unused, without a warning, so switching between a local `ws` server and a remote `wss` one doesn't touch it. With `wss` and `NONE`, `Parse` logs `Warning` through the logger it was given: `Config disables TLS certificate verification (server.tlsCaFile is NONE)`.
 - **Error messages.**
     - Every message from `Parse` but a syntax error reads `{path}: {problem}`, such as `scripting.callTimeoutMs: must be from 10 to 60000`.
     - Messages never contain a value from the file.
@@ -630,7 +641,7 @@ m_socket.Connect({.url = server.url, .origin = server.origin, .tlsCaFile = serve
     - Saving a loaded config back. `Serialize` could do it, but the file's comments would be lost.
     - Reloading the config while the client runs.
     - Overriding individual keys from the command line or the environment.
-    - Resolving a relative `tlsCaFile` against the config file's folder. It's passed to IXWebSocket as written and resolves against the working directory, as in the reference.
+    - Resolving a relative `tlsCaFile` against the config file's folder. It's passed to OpenSSL as written and resolves against the working directory, as in the reference.
     - A JSON Schema for editor completion. TODO if the file grows.
     - Trailing commas. nlohmann 3.12 can accept them, but then the file would no longer be JSON plus comments.
     - More than one account per file.

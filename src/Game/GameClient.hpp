@@ -4,7 +4,8 @@
 #include "../Config/AccountConfig_s.hpp"
 #include "../Config/Config_s.hpp"
 #include "../Console/Logger.hpp"
-#include "../Io/WebSocketClient.hpp"
+#include "../Io/Connection.hpp"
+#include "../Io/NetLoop.hpp"
 #include "Decode/ServerPacketDecoder.hpp"
 #include "InputTracker.hpp"
 #include "Map/WorldMap.hpp"
@@ -48,7 +49,8 @@ struct GameClientOptions_s
 class GameClient
 {
 public:
-    GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger = Logger::GetDefault(), GameClientOptions_s options = {});
+    // A client made alone gets a loop of its own; AccountRunner gives every account the same one.
+    GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger = Logger::GetDefault(), GameClientOptions_s options = {}, std::shared_ptr<NetLoop> net = NetLoop::Create());
 
     GameClient(const GameClient&) = delete;
     GameClient& operator=(const GameClient&) = delete;
@@ -91,8 +93,6 @@ private:
     void BeginReconnect(std::string_view reason);
     [[nodiscard]] bool ScheduleRetry(std::string_view error, bool retryable);
     [[nodiscard]] bool ContinueLogout();
-    void ReleaseSocket() noexcept;
-    void FreeClosedSockets() noexcept;
     void ProcessInput();
     // Sends what a packet the decoder just read asks for in reply.
     void Reply(ServerProt_e prot);
@@ -110,10 +110,10 @@ private:
     Protocol m_protocol;
     ClientPackets m_packets;
 
-    std::unique_ptr<WebSocketClient> m_socket;
-    // Connections being closed. IXWebSocket waits up to about 300 ms for a peer's close reply, so a
-    // closed socket is set aside and freed once it reports Closed, rather than waited for.
-    std::vector<std::unique_ptr<WebSocketClient>> m_closingSockets;
+    // Declared before the connection, which needs it to outlive it.
+    std::shared_ptr<NetLoop> m_net;
+    // Resetting it closes the connection, and the close finishes on the loop without waiting.
+    std::optional<Connection> m_connection;
     std::optional<ServerPacketReader> m_reader;
     std::optional<ClientPacketWriter> m_writer;
     ServerPacketDecoder m_decoder;

@@ -1,8 +1,11 @@
-// Sample config. Copy it to client.jsonc, set server.url and the login RSA key, and put the server's cache in client.cacheDirectory.
+// Sample config. Copy it to client.jsonc, set server.host and server.port and the login RSA key, and put the server's cache in client.cacheDirectory.
 // Each account goes in its own file in scripting.accountsDirectory.
 {
     "server": {
-        "url": "ws://localhost:80",
+        // ws or wss. A local engine serves ws on port 80 on Windows, and on 8888 on Linux.
+        "transport": "ws",
+        "host": "localhost",
+        "port": 80,
         "origin": "http://localhost",
         "tlsCaFile": "SYSTEM"
     },

@@ -1,29 +1,40 @@
 #include "pch.hpp"
 #include "FakeGameServer.hpp"
 #include "../Cache/TestCache.hpp"
-#include "../LoopbackPort.hpp"
+#include "../Io/ServerThread.hpp"
 
 #include "Cache/GameCache_s.hpp"
 #include "Config/AccountConfig_s.hpp"
 #include "Config/Config_s.hpp"
 #include "Config/Revision_e.hpp"
+#include "Config/ServerSettings_s.hpp"
+#include "Config/Transport_e.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"
 #include "Io/Packet.hpp"
 #include "Utils/BigUInt.hpp"
 
-#include <ixwebsocket/IXConnectionState.h>
-#include <ixwebsocket/IXWebSocket.h>
-#include <ixwebsocket/IXWebSocketMessage.h>
-#include <ixwebsocket/IXWebSocketMessageType.h>
-#include <ixwebsocket/IXWebSocketServer.h>
+#include <boost/asio/as_tuple.hpp>
+#include <boost/asio/buffer.hpp>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/detached.hpp>
+#include <boost/asio/ip/address.hpp>
+#include <boost/asio/post.hpp>
+#include <boost/asio/use_awaitable.hpp>
+#include <boost/beast/core/flat_buffer.hpp>
+#include <boost/beast/http/field.hpp>
+#include <boost/beast/websocket/rfc6455.hpp>
+#include <boost/beast/websocket/stream.hpp>
 
 namespace
 {
-    constexpr auto FIRST_PORT = 47100;
-    constexpr auto LAST_PORT = 47199;
+    namespace asio = boost::asio;
+    namespace websocket = boost::beast::websocket;
+    using Tcp = asio::ip::tcp;
+
     constexpr auto LOOPBACK_HOST = "127.0.0.1";
+    constexpr auto SUBPROTOCOL = "binary";
     constexpr auto WAIT = 5s;
     constexpr auto SERVER_SEED = s64{0x0123456789ABCDEF};
     constexpr auto SEED_REQUEST_SIZE = std::size_t{2};
@@ -36,46 +47,27 @@ namespace
     constexpr auto SERVER_SEED_OFFSET = u32{50};
     constexpr auto RSA_MODULUS_HEX_DIGITS = std::size_t{128};
 
-    std::span<const u8> AsBytes(const std::string& text)
-    {
-        return {reinterpret_cast<const u8*>(text.data()), text.size()};
-    }
+    const auto AS_TUPLE = asio::as_tuple(asio::use_awaitable);
 
-    std::string ToText(std::span<const u8> bytes)
+    std::vector<u8> ToBytes(const Packet& packet)
     {
-        return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
+        const auto data = packet.GetData();
+        return {data.begin(), data.end()};
     }
+}
+
+FakeServerClient_s::FakeServerClient_s(Tcp::socket tcp)
+    : socket{std::move(tcp)}
+{
 }
 
 FakeGameServer::FakeGameServer(Script onLogin, Revision_e revision)
     : m_onLogin{std::move(onLogin)}
     , m_revision{revision}
+    , m_acceptor{m_thread.GetContext(), Tcp::endpoint{asio::ip::make_address(LOOPBACK_HOST), 0}}
+    , m_port{m_acceptor.local_endpoint().port()}
 {
-    for (auto port = FIRST_PORT; port <= LAST_PORT; ++port)
-    {
-        if (!LoopbackPort::IsFree(port))
-        {
-            continue;
-        }
-
-        auto server = std::make_unique<ix::WebSocketServer>(port, LOOPBACK_HOST);
-        server->disablePerMessageDeflate();
-        server->setOnClientMessageCallback([this](std::shared_ptr<ix::ConnectionState>, ix::WebSocket& connection, const ix::WebSocketMessagePtr& message)
-        {
-            OnMessage(connection, *message);
-        });
-
-        if (!server->listen().first)
-        {
-            continue;
-        }
-
-        server->start();
-        m_server = std::move(server);
-        return;
-    }
-
-    throw std::runtime_error{"No free port for the fake game server"};
+    asio::co_spawn(m_thread.GetContext(), Accept(), asio::detached);
 }
 
 template <typename TCondition>
@@ -87,12 +79,12 @@ bool FakeGameServer::WaitFor(TCondition condition)
 
 FakeGameServer::~FakeGameServer()
 {
-    m_server->stop();
+    m_thread.Stop();
 }
 
-std::string FakeGameServer::Url() const
+ServerSettings_s FakeGameServer::MakeServerSettings() const
 {
-    return std::format("ws://{}:{}/", LOOPBACK_HOST, m_server->getPort());
+    return {.transport = Transport_e::Ws, .host = LOOPBACK_HOST, .port = m_port};
 }
 
 Revision_e FakeGameServer::GetRevision() const
@@ -103,7 +95,7 @@ Revision_e FakeGameServer::GetRevision() const
 Config_s FakeGameServer::MakeConfig() const
 {
     auto config = Config_s{};
-    config.server.url = Url();
+    config.server = MakeServerSettings();
     config.login.rsaModulus = BigUInt::Parse("0x" + std::string(RSA_MODULUS_HEX_DIGITS, 'f'));
     config.login.rsaExponent = BigUInt::Parse("1");
     config.login.revision = m_revision;
@@ -159,13 +151,10 @@ void FakeGameServer::Send(ServerProt_e prot, std::span<const u8> payload)
 
 void FakeGameServer::Close()
 {
-    // Held across close(), as SendLocked holds it across a send: the server frees a connection once
-    // its Close callback returns, and that callback waits for this lock to clear m_connection.
     const auto lock = std::scoped_lock{m_mutex};
-
-    if (m_connection != nullptr)
+    if (m_client)
     {
-        m_connection->close();
+        Write(m_client, std::nullopt);
     }
 }
 
@@ -212,47 +201,75 @@ std::vector<std::string> FakeGameServer::GetErrors() const
     return m_errors;
 }
 
-void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMessage& message)
+asio::awaitable<void> FakeGameServer::Accept()
 {
-    if (message.type == ix::WebSocketMessageType::Open)
+    while (true)
     {
+        auto [error, socket] = co_await m_acceptor.async_accept(AS_TUPLE);
+        if (error)
         {
-            const auto lock = std::scoped_lock{m_mutex};
-            m_connection = &connection;
-            m_stage = Stage_e::SeedRequest;
-            m_fromClient.reset();
-            m_toClient.reset();
+            co_return;
         }
 
-        if (m_revision < Revision_e::Rev274)
+        asio::co_spawn(m_acceptor.get_executor(), Serve(std::move(socket)), asio::detached);
+    }
+}
+
+asio::awaitable<void> FakeGameServer::Serve(Tcp::socket socket)
+{
+    const auto client = std::make_shared<FakeServerClient_s>(std::move(socket));
+    client->socket.set_option(websocket::stream_base::decorator([](websocket::response_type& response)
+    {
+        response.set(boost::beast::http::field::sec_websocket_protocol, SUBPROTOCOL);
+    }));
+
+    const auto [acceptError] = co_await client->socket.async_accept(AS_TUPLE);
+    if (acceptError)
+    {
+        co_return;
+    }
+
+    client->socket.binary(true);
+    {
+        const auto lock = std::scoped_lock{m_mutex};
+        m_client = client;
+        m_stage = Stage_e::SeedRequest;
+        m_fromClient.reset();
+        m_toClient.reset();
+    }
+
+    if (m_revision < Revision_e::Rev274)
+    {
+        SendSeed(client, false);
+    }
+
+    auto buffer = boost::beast::flat_buffer{};
+    while (true)
+    {
+        const auto [readError, size] = co_await client->socket.async_read(buffer, AS_TUPLE);
+        if (readError)
         {
-            SendSeed(connection, false);
+            break;
         }
 
-        return;
+        const auto message = std::vector<u8>(static_cast<const u8*>(buffer.cdata().data()), static_cast<const u8*>(buffer.cdata().data()) + size);
+        buffer.consume(size);
+        OnMessage(client, message);
     }
 
-    if (message.type == ix::WebSocketMessageType::Close)
     {
+        const auto lock = std::scoped_lock{m_mutex};
+        if (m_client == client)
         {
-            const auto lock = std::scoped_lock{m_mutex};
-
-            if (m_connection == &connection)
-            {
-                m_connection = nullptr;
-            }
+            m_client.reset();
         }
-
-        m_changed.notify_all();
-        return;
     }
 
-    if (message.type != ix::WebSocketMessageType::Message)
-    {
-        return;
-    }
+    m_changed.notify_all();
+}
 
-    const auto bytes = AsBytes(message.str);
+void FakeGameServer::OnMessage(const Client& client, std::span<const u8> bytes)
+{
     auto stage = Stage_e::SeedRequest;
     {
         const auto lock = std::scoped_lock{m_mutex};
@@ -262,18 +279,18 @@ void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMes
     switch (stage)
     {
     case Stage_e::SeedRequest:
-        HandleSeedRequest(connection, bytes);
+        HandleSeedRequest(client, bytes);
         return;
     case Stage_e::Login:
-        HandleLogin(connection, bytes);
+        HandleLogin(client, bytes);
         return;
     case Stage_e::InGame:
-        HandleGamePackets(connection, bytes);
+        HandleGamePackets(client, bytes);
         return;
     }
 }
 
-void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<const u8> bytes)
+void FakeGameServer::HandleSeedRequest(const Client& client, std::span<const u8> bytes)
 {
     if (m_revision < Revision_e::Rev274)
     {
@@ -287,11 +304,11 @@ void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<cons
         return;
     }
 
-    SendSeed(connection, true);
+    SendSeed(client, true);
 }
 
 // Later revisions put 8 zero bytes and a status of 0 before the seed.
-void FakeGameServer::SendSeed(ix::WebSocket& connection, bool withHeader)
+void FakeGameServer::SendSeed(const Client& client, bool withHeader)
 {
     auto response = Packet{};
     if (withHeader)
@@ -301,21 +318,18 @@ void FakeGameServer::SendSeed(ix::WebSocket& connection, bool withHeader)
     }
 
     response.P8(SERVER_SEED);
+
+    const auto lock = std::scoped_lock{m_mutex};
+    if (m_stalled)
     {
-        const auto lock = std::scoped_lock{m_mutex};
-
-        if (m_stalled)
-        {
-            return;
-        }
-
-        m_stage = Stage_e::Login;
+        return;
     }
 
-    connection.sendBinary(ToText(response.GetData()));
+    m_stage = Stage_e::Login;
+    Write(client, ToBytes(response));
 }
 
-void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> bytes)
+void FakeGameServer::HandleLogin(const Client& client, std::span<const u8> bytes)
 {
     auto packet = Packet{bytes};
     const auto opcode = packet.G1();
@@ -365,14 +379,17 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
             response.P1(1);
         }
 
-        connection.sendBinary(ToText(response.GetData()));
+        Write(client, ToBytes(response));
+        if (!IsLoggedIn(status) && status != RECONNECTED)
+        {
+            Write(client, std::nullopt);
+        }
     }
 
     m_changed.notify_all();
 
     if (!IsLoggedIn(status) && status != RECONNECTED)
     {
-        connection.close();
         return;
     }
 
@@ -398,7 +415,7 @@ bool FakeGameServer::IsLoggedIn(u8 status) const
     return status == LOGGED_IN || (m_revision < Revision_e::Rev274 && status == LOGGED_IN_STAFF_225);
 }
 
-void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<const u8> bytes)
+void FakeGameServer::HandleGamePackets(const Client& client, std::span<const u8> bytes)
 {
     auto loggedOut = false;
     {
@@ -437,20 +454,16 @@ void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<cons
         if (loggedOut)
         {
             SendLocked(ServerProt_e::Logout, {});
+            Write(client, std::nullopt);
         }
     }
 
     m_changed.notify_all();
-
-    if (loggedOut)
-    {
-        connection.close();
-    }
 }
 
 void FakeGameServer::SendLocked(ServerProt_e prot, std::span<const u8> payload)
 {
-    if (m_connection == nullptr || !m_toClient)
+    if (!m_client || !m_toClient)
     {
         m_errors.push_back(std::format("Send of {} with no client in game", ServerProt::GetName(prot)));
         return;
@@ -477,7 +490,49 @@ void FakeGameServer::SendLocked(ServerProt_e prot, std::span<const u8> payload)
     }
 
     packet.PData(payload);
-    m_connection->sendBinary(ToText(packet.GetData()));
+    Write(m_client, ToBytes(packet));
+}
+
+void FakeGameServer::Write(const Client& client, std::optional<std::vector<u8>> bytes)
+{
+    asio::post(m_thread.GetContext(), [client, bytes = std::move(bytes)]() mutable
+    {
+        client->outgoing.push_back(std::move(bytes));
+        WriteNext(client);
+    });
+}
+
+// One write at a time, as Beast requires. A close waits for the writes queued before it.
+void FakeGameServer::WriteNext(const Client& client)
+{
+    if (client->writing || client->outgoing.empty())
+    {
+        return;
+    }
+
+    client->writing = true;
+    auto& next = client->outgoing.front();
+    if (!next)
+    {
+        client->socket.async_close(websocket::close_code::normal, [client](boost::system::error_code)
+        {
+            client->outgoing.clear();
+        });
+        return;
+    }
+
+    client->socket.async_write(asio::buffer(*next), [client](boost::system::error_code error, std::size_t)
+    {
+        client->writing = false;
+        client->outgoing.pop_front();
+        if (error)
+        {
+            client->outgoing.clear();
+            return;
+        }
+
+        WriteNext(client);
+    });
 }
 
 void FakeGameServer::AddError(std::string error)

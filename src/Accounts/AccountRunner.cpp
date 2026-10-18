@@ -8,6 +8,7 @@
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/Logger.hpp"
+#include "../Io/NetLoop.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
@@ -17,6 +18,8 @@
 namespace
 {
     constexpr auto TARGET_PREFIX = ConsoleCommandParser::TARGET_PREFIX;
+    // A little over AsioLink's close timeout, so a close the server never answers still finishes.
+    constexpr auto SETTLE_TIMEOUT = 2s;
 
 }
 
@@ -30,7 +33,7 @@ AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared
 
     for (auto& account : accounts)
     {
-        m_accounts.push_back(std::make_unique<Account>(m_config, m_cache, std::move(account), runtime, m_logger, options, &m_messenger));
+        m_accounts.push_back(std::make_unique<Account>(m_config, m_cache, std::move(account), runtime, m_logger, options, &m_messenger, m_net));
     }
 }
 
@@ -42,6 +45,14 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
     auto handledInterrupts = interrupts();
 
     m_logger->Info("Running {} account{}", m_accounts.size(), m_accounts.size() == 1 ? "" : "s");
+
+    if (console != nullptr)
+    {
+        console->SetOnArrived([net = m_net]
+        {
+            net->Wake();
+        });
+    }
 
     while (true)
     {
@@ -80,9 +91,16 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
             break;
         }
 
-        Wait(now, console);
+        Wait(now);
     }
 
+    if (console != nullptr)
+    {
+        console->SetOnArrived({});
+    }
+
+    // So every account's last close ends with a close frame rather than a dropped socket.
+    m_net->Settle(Clock::now() + SETTLE_TIMEOUT);
     return LogOutcomes();
 }
 
@@ -209,7 +227,7 @@ void AccountRunner::Quit(Account* target)
     }
 }
 
-void AccountRunner::Wait(Clock::time_point now, ConsoleInput* console) const
+void AccountRunner::Wait(Clock::time_point now) const
 {
     auto wake = now + m_config->scripting.pollIntervalMs;
     if (m_nextLogin)
@@ -225,13 +243,8 @@ void AccountRunner::Wait(Clock::time_point now, ConsoleInput* console) const
         }
     }
 
-    if (console != nullptr)
-    {
-        console->WaitUntil(wake);
-        return;
-    }
-
-    std::this_thread::sleep_until(wake);
+    // Wakes early for any account's I/O, and for a console line through SetOnArrived.
+    m_net->Wait(wake);
 }
 
 bool AccountRunner::LogOutcomes() const

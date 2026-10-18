@@ -3,14 +3,12 @@
     "name": "rs2004-headless",
     "version": "0.1.0",
     "dependencies": [
+        "boost-asio",
+        "boost-beast",
         "bzip2",
         "catch2",
-        {
-            "name": "ixwebsocket",
-            "default-features": false,
-            "features": ["openssl"]
-        },
         "nlohmann-json",
+        "openssl",
         "pocketpy",
         "zlib"
     ],

@@ -8,7 +8,7 @@
     "enabled": true,
 
     // Uncomment to log this account into a different world than client.jsonc's server.
-    // "server": {"url": "wss://w2.example.com:443", "origin": "https://w2.example.com"},
+    // "server": {"transport": "wss", "host": "w2.example.com", "port": 443, "origin": "https://w2.example.com"},
 
     // Without a script: seconds to idle before logging out. 0 idles until Ctrl+C.
     "idleSeconds": 0,

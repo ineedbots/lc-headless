@@ -7,15 +7,13 @@
 class ConsoleInput
 {
 public:
-    using Clock = std::chrono::steady_clock;
-
     // The thread is detached: it outlives the returned object if need be, and ends with the input.
     [[nodiscard]] static std::shared_ptr<ConsoleInput> ReadStdin();
 
     void Push(std::string line);
     [[nodiscard]] std::vector<std::string> TakeLines();
-    // Returns early when a line arrives.
-    void WaitUntil(Clock::time_point time);
+    // Called on the reader thread after each line arrives, so a loop waiting elsewhere can wake. Empty clears it.
+    void SetOnArrived(std::function<void()> onArrived);
 
     [[nodiscard]] bool IsInteractive() const;
     // Above the prompt while there is one.
@@ -28,7 +26,7 @@ private:
     void ReadKeys();
 
     std::mutex m_mutex;
-    std::condition_variable m_arrived;
+    std::function<void()> m_onArrived;
     std::vector<std::string> m_lines;
     // The prompt and the output around it; the reader thread draws the keys under it too.
     std::mutex m_outputMutex;

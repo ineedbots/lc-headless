@@ -29,7 +29,7 @@ A headless (shell) game client for revision-289, revision-274 and revision-225 (
 - [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
 - A revision-289, revision-274 or revision-225 server to connect to, plus its RSA public key and a copy of its game cache (see [Configuration](#configuration)).
 
-vcpkg installs the dependencies from `vcpkg.json`: bzip2 and zlib (for the cache's archives and maps), Catch2, IXWebSocket (with OpenSSL, for `wss://`), nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
+vcpkg installs the dependencies from `vcpkg.json`: bzip2 and zlib (for the cache's archives and maps), Boost.Beast and Boost.Asio (WebSocket and networking), OpenSSL (for `wss`), Catch2, nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
 
 ## Building
 
@@ -102,7 +102,8 @@ Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If `client.js
 
 | Key | Meaning |
 |---|---|
-| `server.url` | The server's WebSocket URL, `ws://` or `wss://`. For a local engine on Windows, it's `ws://localhost:80` |
+| `server.transport` | `ws` or `wss`, the WebSocket the server's webclient uses. The default is `ws` |
+| `server.host`, `server.port` | Where the server is: a host name or IPv4 address, and its web port. A local engine serves `ws` on port 80 on Windows and 8888 on Linux |
 | `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
 | `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
@@ -266,7 +267,7 @@ src/
 │   ├── Protocol/             opcodes, client packet builders, text encodings
 │   ├── Decode/               turns server packets (including player, NPC and zone updates) into game state
 │   └── State/                the game state, and the event log that script hooks receive
-├── Io/                       WebSocket transport, packet buffer, ISAAC cipher
+├── Io/                       Network transport, packet buffer, ISAAC cipher
 └── Utils/                    shared helpers: strings, files, big integers for RSA, file watcher
 tests/                        Catch2 tests in the same folders as src/; Support/ holds the fake game server and other helpers
 scripts/                      bot scripts: examples/, lib/ for shared modules, typings/ for editors
@@ -290,7 +291,7 @@ Everything in `src/` except `main.cpp` builds into a static library. The client 
 | [Revision274Design.md](docs/Revision274Design.md) | Adding revision 274: how it differs from 225 and 289, and where each branch lands |
 | [ConfigDesign.md](docs/ConfigDesign.md) | The formats of the config and account files, with every key and rule |
 | [CacheDesign.md](docs/CacheDesign.md) | Loading the game cache, the collision map and the route search |
-| [WebSocketDesign.md](docs/WebSocketDesign.md) | The non-blocking WebSocket transport |
+| [TransportDesign.md](docs/TransportDesign.md) | The network transport on Boost.Beast and Asio, and the plan for raw TCP and SOCKS5 proxies |
 | [PacketDesign.md](docs/PacketDesign.md) | The packet buffer, the ISAAC cipher and `BigUInt` |
 | [LoggerDesign.md](docs/LoggerDesign.md) | The logger |
 | [CONVENTIONS.md](docs/CONVENTIONS.md) | C++ code style and project setup |

@@ -2,7 +2,6 @@
 #include "ConfigValidator.hpp"
 
 #include "../Console/Logger.hpp"
-#include "../Io/WebSocketUrl.hpp"
 #include "../Utils/BigUInt.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "AccountConfig_s.hpp"
@@ -10,6 +9,7 @@
 #include "Error/ConfigError.hpp"
 #include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
+#include "Transport_e.hpp"
 
 namespace
 {
@@ -28,6 +28,8 @@ namespace
     constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
     constexpr auto MAX_RUN_ENERGY = 100;
     constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
+    constexpr auto MAX_HOST_LENGTH = std::size_t{253};
+    constexpr auto MAX_PORT = 65535;
 
     void Check(bool valid, std::string_view path, std::string_view rule)
     {
@@ -42,6 +44,17 @@ namespace
     bool IsCredential(std::string_view text, std::size_t maxLength)
     {
         return !text.empty() && text.size() <= maxLength && StringUtils::IsPrintableAscii(text);
+    }
+
+    // A host name or an IPv4 address: no scheme, port, path, space or IPv6 literal gets through.
+    bool IsHost(std::string_view text)
+    {
+        const auto isHostCharacter = [](char c)
+        {
+            return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '-' || c == '.';
+        };
+
+        return !text.empty() && text.size() <= MAX_HOST_LENGTH && std::ranges::all_of(text, isHostCharacter);
     }
 
     bool IsSupported(Revision_e revision)
@@ -70,7 +83,8 @@ namespace
 
     void ValidateServer(const ServerSettings_s& server)
     {
-        Check(WebSocketUrl::IsValid(server.url), "server.url", "must be a ws:// or wss:// URL");
+        Check(IsHost(server.host), "server.host", std::format("must be a host name or IPv4 address of 1 to {} letters, digits, '-' and '.'", MAX_HOST_LENGTH));
+        Check(server.port >= 1 && server.port <= MAX_PORT, "server.port", std::format("must be from 1 to {}", MAX_PORT));
         Check(server.origin.empty() || StringUtils::IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
         Check(!server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
     }
@@ -127,7 +141,7 @@ void ConfigValidator::ValidateAccount(const AccountConfig_s& account)
 
 void ConfigValidator::Warn(const Config_s& config, Logger& logger)
 {
-    if (WebSocketUrl::GetScheme(config.server.url) != WebSocketUrl::SECURE_SCHEME || config.server.tlsCaFile != NO_TLS_VERIFICATION)
+    if (config.server.transport != Transport_e::Wss || config.server.tlsCaFile != NO_TLS_VERIFICATION)
     {
         return;
     }

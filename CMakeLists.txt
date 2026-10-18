@@ -7,11 +7,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+find_package(boost_asio CONFIG REQUIRED)
+find_package(boost_beast CONFIG REQUIRED)
 find_package(BZip2 REQUIRED)
 find_package(Catch2 3 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
-find_package(ixwebsocket CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(pocketpy CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 
@@ -30,9 +32,16 @@ function(configure_project_target target)
     target_include_directories(${target} PRIVATE src)
     target_precompile_headers(${target} PRIVATE src/pch.hpp)
 
+    target_compile_definitions(${target} PRIVATE BOOST_ASIO_NO_DEPRECATED)
+    if(WIN32)
+        # Windows 10; Asio warns when it isn't set.
+        target_compile_definitions(${target} PRIVATE _WIN32_WINNT=0x0A00)
+    endif()
+
     if(MSVC)
+        # /bigobj: Beast's templates and coroutines exceed the default section count in Debug.
         target_compile_options(${target} PRIVATE
-            /W4 /permissive- /utf-8 /EHsc /Zc:__cplusplus /Zc:preprocessor
+            /W4 /permissive- /utf-8 /EHsc /Zc:__cplusplus /Zc:preprocessor /bigobj
             "$<$<NOT:$<CONFIG:Debug>>:/WX>")
     else()
         target_compile_options(${target} PRIVATE
@@ -49,8 +58,9 @@ target_sources(${PROJECT_NAME}Lib PRIVATE ${LIBRARY_SOURCES})
 configure_project_target(${PROJECT_NAME}Lib)
 target_compile_definitions(${PROJECT_NAME}Lib PRIVATE JSON_DIAGNOSTICS=1)
 target_link_libraries(${PROJECT_NAME}Lib
-    PUBLIC ixwebsocket::ixwebsocket pocketpy::pocketpy
-    PRIVATE nlohmann_json::nlohmann_json BZip2::BZip2 ZLIB::ZLIB)
+    PUBLIC pocketpy::pocketpy
+    PRIVATE Boost::asio Boost::beast OpenSSL::SSL OpenSSL::Crypto nlohmann_json::nlohmann_json BZip2::BZip2 ZLIB::ZLIB
+            $<$<PLATFORM_ID:Windows>:crypt32>)
 
 # The Python standard library is embedded in the library, regenerated whenever a .py file changes.
 file(GLOB_RECURSE STDLIB_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/Script/Stdlib/*.py)
@@ -81,6 +91,10 @@ target_compile_definitions(${PROJECT_NAME}Tests PRIVATE RS2004_SOURCE_DIR="${CMA
 # CacheWriter compresses its fixtures with the libraries the cache reader uses.
 target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     ${PROJECT_NAME}Lib
+    Boost::asio
+    Boost::beast
+    OpenSSL::SSL
+    OpenSSL::Crypto
     nlohmann_json::nlohmann_json
     BZip2::BZip2
     ZLIB::ZLIB

@@ -6,7 +6,7 @@
 #include "../../Config/Config_s.hpp"
 #include "../../Config/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
-#include "../../Io/WebSocketClient.hpp"
+#include "../../Io/Connection.hpp"
 #include "../Protocol/Base37.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "Error/LoginError.hpp"
@@ -41,19 +41,19 @@ LoginHandshake::LoginHandshake(Protocol protocol, const AccountSettings_s& accou
 {
 }
 
-std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
+std::optional<LoginResult_s> LoginHandshake::Advance(Connection& connection)
 {
     while (true)
     {
         switch (m_stage)
         {
         case Stage_e::SendSeedRequest:
-            socket.Send(BuildSeedRequest(m_account.username));
+            connection.Send(BuildSeedRequest(m_account.username));
             m_stage = Stage_e::SeedResponse;
             break;
         case Stage_e::SeedResponse:
         {
-            const auto header = TryReceive(socket, SEED_HEADER_SIZE + 1);
+            const auto header = TryReceive(connection, SEED_HEADER_SIZE + 1);
             if (!header)
             {
                 return std::nullopt;
@@ -69,20 +69,20 @@ std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
         }
         case Stage_e::ServerSeed:
         {
-            const auto serverSeed = TryReceive(socket, SERVER_SEED_SIZE);
+            const auto serverSeed = TryReceive(connection, SERVER_SEED_SIZE);
             if (!serverSeed)
             {
                 return std::nullopt;
             }
 
             m_result.seed = MakeSeed(Packet{*serverSeed}.G8());
-            socket.Send(BuildLoginRequest(m_protocol, m_account, m_login, m_crcs, m_result.seed, m_reconnect));
+            connection.Send(BuildLoginRequest(m_protocol, m_account, m_login, m_crcs, m_result.seed, m_reconnect));
             m_stage = Stage_e::LoginResponse;
             break;
         }
         case Stage_e::LoginResponse:
         {
-            const auto response = TryReceive(socket, 1);
+            const auto response = TryReceive(connection, 1);
             if (!response)
             {
                 return std::nullopt;
@@ -97,7 +97,7 @@ std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
         }
         case Stage_e::LoginDetails:
         {
-            const auto details = TryReceive(socket, LOGIN_DETAILS_SIZE);
+            const auto details = TryReceive(connection, LOGIN_DETAILS_SIZE);
             if (!details)
             {
                 return std::nullopt;
@@ -110,7 +110,7 @@ std::optional<LoginResult_s> LoginHandshake::Advance(WebSocketClient& socket)
         }
         case Stage_e::HopTimer:
         {
-            const auto seconds = TryReceive(socket, 1);
+            const auto seconds = TryReceive(connection, 1);
             if (!seconds)
             {
                 return std::nullopt;
@@ -260,14 +260,14 @@ std::optional<LoginResult_s> LoginHandshake::ReadResponse(u8 status)
     throw LoginError{status};
 }
 
-std::optional<std::vector<u8>> LoginHandshake::TryReceive(WebSocketClient& socket, std::size_t count)
+std::optional<std::vector<u8>> LoginHandshake::TryReceive(Connection& connection, std::size_t count)
 {
-    if (socket.Available() < count)
+    if (connection.Available() < count)
     {
         return std::nullopt;
     }
 
     auto bytes = std::vector<u8>(count);
-    socket.Read(bytes);
+    connection.Read(bytes);
     return bytes;
 }

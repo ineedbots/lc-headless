@@ -287,6 +287,7 @@ A header includes another header only when the header itself requires it: a clas
 - Headers needed only by the implementation are included in the `.cpp`, never in the header.
 - A header never includes something just to make it available to the files that include it.
 - Never forward declare. When a type is needed, include its header, even if the type is only used by pointer or reference.
+- When a heavy or platform-dependent third-party header must stay out of headers that much of the code includes, put an abstract class in front of the implementation: the shared header declares the interface and a factory, and only the `.cpp` files that need the implementation include its header. `NetLoop` and `Link` keep Boost.Asio, and with it `<windows.h>`, out of `GameClient.hpp` this way. A pimpl would need a forward declaration.
 
 ```cpp
 // src/Graphics/Renderer.hpp
@@ -719,6 +720,13 @@ lines.push_back(std::move(header));
 auto textures = std::unordered_map<std::string, Texture>{};
 textures.try_emplace(name, path, TextureFormat_e::Rgba8);
 ```
+
+### Coroutines
+
+C++20 coroutines are for Asio I/O sequences only, where they keep a connect-then-handshake-then-read sequence in the order it happens.
+
+- A coroutine that outlives its caller takes a `std::shared_ptr` to what it uses as a by-value parameter, so the coroutine frame keeps it alive. Never rely on `this` or a lambda capture for that: neither is kept alive across a suspension.
+- Expected endings, such as a peer closing the connection, come back as an `error_code` (`as_tuple`), not as an exception. A failure may throw, and the coroutine catches it at its outermost level, which is a boundary like a thread entry point.
 
 ### Error handling: exceptions
 

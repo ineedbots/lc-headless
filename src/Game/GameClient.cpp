@@ -7,9 +7,12 @@
 #include "../Config/AccountConfig_s.hpp"
 #include "../Config/Config_s.hpp"
 #include "../Config/Revision_e.hpp"
+#include "../Config/ServerSettings_s.hpp"
 #include "../Console/Logger.hpp"
-#include "../Io/Error/WebSocketError.hpp"
-#include "../Io/WebSocketClient.hpp"
+#include "../Io/Connection.hpp"
+#include "../Io/ConnectionOptions_s.hpp"
+#include "../Io/Error/ConnectionError.hpp"
+#include "../Io/NetLoop.hpp"
 #include "Decode/ServerPacketDecoder.hpp"
 #include "Error/ConnectionLostError.hpp"
 #include "Error/ProtocolError.hpp"
@@ -81,21 +84,19 @@ namespace
         return std::max(remaining, 0ms);
     }
 
-    // A failed connection has also delivered its last event, so freeing it doesn't wait either.
-    bool IsClosed(WebSocketClient& socket) noexcept
+    ConnectionOptions_s MakeOptions(const ServerSettings_s& server)
     {
-        try
-        {
-            return socket.Pump() == WebSocketState_e::Closed;
-        }
-        catch (const std::exception&)
-        {
-            return true;
-        }
+        return {
+            .transport = server.transport,
+            .host = server.host,
+            .port = static_cast<u16>(server.port),
+            .origin = server.origin,
+            .tlsCaFile = server.tlsCaFile,
+        };
     }
 }
 
-GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger, GameClientOptions_s options)
+GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountSettings_s account, std::shared_ptr<Logger> logger, GameClientOptions_s options, std::shared_ptr<NetLoop> net)
     : m_config{std::move(config)}
     , m_cache{std::move(cache)}
     , m_account{std::move(account)}
@@ -103,7 +104,7 @@ GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<c
     , m_options{options}
     , m_protocol{m_config->login.revision}
     , m_packets{m_protocol}
-    , m_socket{std::make_unique<WebSocketClient>(m_logger)}
+    , m_net{std::move(net)}
     , m_decoder{m_protocol, m_logger}
     , m_map{m_cache}
     , m_retries{options.connectAttempts, options.retryDelay, options.maxRetryDelay}
@@ -112,6 +113,7 @@ GameClient::GameClient(std::shared_ptr<const Config_s> config, std::shared_ptr<c
     assert(m_cache && "GameClient needs a cache");
     assert(m_cache->revision == m_protocol.GetRevision() && "The cache must be read in the protocol's revision");
     assert(m_logger && "GameClient needs a logger");
+    assert(m_net && "GameClient needs a loop");
 }
 
 void GameClient::BeginLogin()
@@ -144,8 +146,6 @@ void GameClient::Login()
 
 void GameClient::Pump(std::chrono::milliseconds maxWait)
 {
-    FreeClosedSockets();
-
     switch (m_status)
     {
     case ClientStatus_e::Connecting:
@@ -199,7 +199,7 @@ void GameClient::Logout(std::chrono::milliseconds timeout)
 
 void GameClient::Disconnect() noexcept
 {
-    ReleaseSocket();
+    m_connection.reset();
     m_handshake.reset();
     m_reader.reset();
     m_writer.reset();
@@ -307,9 +307,9 @@ void GameClient::Flush()
 
     try
     {
-        m_socket->Send(bytes);
+        m_connection->Send(bytes);
     }
-    catch (const WebSocketError& e)
+    catch (const ConnectionError& e)
     {
         LoseConnection(e.what());
     }
@@ -320,12 +320,12 @@ void GameClient::PumpSession(std::chrono::milliseconds maxWait)
     auto lostReason = std::optional<std::string>{};
     try
     {
-        if (maxWait > 0ms && m_socket->Available() == 0)
+        if (maxWait > 0ms && m_connection->Available() == 0)
         {
-            static_cast<void>(m_socket->WaitAvailable(1, maxWait));
+            static_cast<void>(m_connection->WaitAvailable(1, maxWait));
         }
 
-        const auto socketState = m_socket->Pump();
+        const auto connectionState = m_connection->Pump();
         ProcessInput();
 
         if (m_status == ClientStatus_e::LoggedOut)
@@ -334,7 +334,7 @@ void GameClient::PumpSession(std::chrono::milliseconds maxWait)
             return;
         }
 
-        if (socketState != WebSocketState_e::Open)
+        if (connectionState != ConnectionState_e::Open)
         {
             lostReason = "the server closed the connection";
         }
@@ -353,7 +353,7 @@ void GameClient::PumpSession(std::chrono::milliseconds maxWait)
             Flush();
         }
     }
-    catch (const WebSocketError& e)
+    catch (const ConnectionError& e)
     {
         lostReason = e.what();
     }
@@ -422,11 +422,11 @@ void GameClient::StartAttempt()
         m_logger->Info("Logging in as {}", m_account.username);
     }
 
-    const auto& server = m_config->server;
     m_reader.reset();
     m_writer.reset();
     m_outgoing.clear();
-    m_socket->Connect({.url = server.url, .origin = server.origin, .tlsCaFile = server.tlsCaFile});
+    m_connection.reset();
+    m_connection.emplace(*m_net, MakeOptions(m_config->server), m_logger);
     m_handshake.emplace(m_protocol, m_account, m_config->login, m_cache->crcs, m_reconnecting);
     m_attemptDeadline = Clock::now() + m_options.loginTimeout;
 }
@@ -438,7 +438,8 @@ void GameClient::PumpConnecting(std::chrono::milliseconds maxWait)
         const auto remaining = GetRemaining(*retryAt);
         if (remaining > 0ms)
         {
-            std::this_thread::sleep_for(std::min(maxWait, remaining));
+            // Waiting on the loop, not sleeping, so a close still in progress keeps moving.
+            m_net->Wait(Clock::now() + std::min(maxWait, remaining));
             return;
         }
 
@@ -472,31 +473,31 @@ void GameClient::PumpConnecting(std::chrono::milliseconds maxWait)
 void GameClient::AdvanceAttempt(std::chrono::milliseconds maxWait)
 {
     const auto wait = std::min(maxWait, GetRemaining(m_attemptDeadline));
-    if (wait > 0ms && m_socket->Available() == 0)
+    if (wait > 0ms && m_connection->Available() == 0)
     {
-        static_cast<void>(m_socket->WaitAvailable(1, wait));
+        static_cast<void>(m_connection->WaitAvailable(1, wait));
     }
 
-    const auto socketState = m_socket->Pump();
-    if (socketState != WebSocketState_e::Connecting)
+    const auto connectionState = m_connection->Pump();
+    if (connectionState != ConnectionState_e::Connecting)
     {
         // A server that refuses a login closes the connection straight after the status, so what
         // arrived is read before the close counts as the failure.
-        if (const auto result = m_handshake->Advance(*m_socket))
+        if (const auto result = m_handshake->Advance(*m_connection))
         {
             FinishLogin(*result);
             return;
         }
 
-        if (socketState != WebSocketState_e::Open)
+        if (connectionState != ConnectionState_e::Open)
         {
-            throw WebSocketError{"The connection closed during login"};
+            throw ConnectionError{"The connection closed during login"};
         }
     }
 
     if (Clock::now() >= m_attemptDeadline)
     {
-        const auto waitingFor = socketState == WebSocketState_e::Open ? m_handshake->GetWaitingFor() : "connection to open"sv;
+        const auto waitingFor = connectionState == ConnectionState_e::Open ? m_handshake->GetWaitingFor() : "connection to open"sv;
         throw std::runtime_error{std::format("Login timed out after {} ms waiting for the {}", m_options.loginTimeout.count(), waitingFor)};
     }
 }
@@ -595,33 +596,13 @@ bool GameClient::ScheduleRetry(std::string_view error, bool retryable)
     return true;
 }
 
-void GameClient::ReleaseSocket() noexcept
-{
-    if (IsClosed(*m_socket))
-    {
-        return;
-    }
-
-    m_socket->Close();
-    m_closingSockets.push_back(std::move(m_socket));
-    m_socket = std::make_unique<WebSocketClient>(m_logger);
-}
-
-void GameClient::FreeClosedSockets() noexcept
-{
-    std::erase_if(m_closingSockets, [](const std::unique_ptr<WebSocketClient>& socket)
-    {
-        return IsClosed(*socket);
-    });
-}
-
 void GameClient::ProcessInput()
 {
-    const auto available = m_socket->Available();
+    const auto available = m_connection->Available();
     if (available > 0)
     {
         auto bytes = std::vector<u8>(available);
-        m_socket->Read(bytes);
+        m_connection->Read(bytes);
         m_reader->Append(bytes);
     }
 

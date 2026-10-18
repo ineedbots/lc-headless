@@ -24,13 +24,13 @@ namespace
     constexpr auto PROGRESS_EXTENSION = ".txt";
 }
 
-Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger)
+Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger, std::shared_ptr<NetLoop> net)
     : m_config{ConfigOverrides::ForAccount(std::move(config), account)}
     , m_account{std::move(account)}
     , m_logger{Logger::CreateNamed(std::move(logger), m_account.name)}
     , m_options{options}
     , m_messenger{messenger}
-    , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client}
+    , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client, std::move(net)}
     , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger}
 {
     if (m_account.script)

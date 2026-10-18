@@ -3,7 +3,7 @@
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Config/AccountConfig_s.hpp"
 #include "../../Config/Config_s.hpp"
-#include "../../Io/WebSocketClient.hpp"
+#include "../../Io/Connection.hpp"
 #include "../Protocol/Protocol.hpp"
 
 struct LoginResult_s
@@ -16,7 +16,7 @@ struct LoginResult_s
     std::array<s32, SEED_SIZE> seed{};
 };
 
-// Never waits, so the caller owns the timeout. Bytes after the login response stay in the socket. The
+// Never waits, so the caller owns the timeout. Bytes after the login response stay in the connection. The
 // account, the login settings and the CRCs must outlive the handshake. A 225 server sends its seed as soon as
 // the connection opens; later revisions wait for a seed request.
 class LoginHandshake
@@ -36,7 +36,7 @@ public:
     LoginHandshake(Protocol protocol, const AccountSettings_s& account, const LoginSettings_s& login, std::span<const s32, GameCache_s::CRC_COUNT> crcs, bool reconnect);
 
     // Nullopt while a response is still on its way.
-    [[nodiscard]] std::optional<LoginResult_s> Advance(WebSocketClient& socket);
+    [[nodiscard]] std::optional<LoginResult_s> Advance(Connection& connection);
     [[nodiscard]] std::string_view GetWaitingFor() const;
 
     [[nodiscard]] static std::vector<u8> BuildSeedRequest(std::string_view username);
@@ -57,7 +57,7 @@ private:
         Done,
     };
 
-    [[nodiscard]] static std::optional<std::vector<u8>> TryReceive(WebSocketClient& socket, std::size_t count);
+    [[nodiscard]] static std::optional<std::vector<u8>> TryReceive(Connection& connection, std::size_t count);
     [[nodiscard]] std::optional<LoginResult_s> ReadResponse(u8 status);
 
     Protocol m_protocol;

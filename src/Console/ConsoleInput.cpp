@@ -48,27 +48,30 @@ std::shared_ptr<ConsoleInput> ConsoleInput::ReadStdin()
 
 void ConsoleInput::Push(std::string line)
 {
+    auto onArrived = std::function<void()>{};
     {
         const auto lock = std::lock_guard{m_mutex};
         m_lines.push_back(std::move(line));
+        onArrived = m_onArrived;
     }
 
-    m_arrived.notify_all();
+    // Outside the lock: the callback may take a lock of its own.
+    if (onArrived)
+    {
+        onArrived();
+    }
+}
+
+void ConsoleInput::SetOnArrived(std::function<void()> onArrived)
+{
+    const auto lock = std::lock_guard{m_mutex};
+    m_onArrived = std::move(onArrived);
 }
 
 std::vector<std::string> ConsoleInput::TakeLines()
 {
     const auto lock = std::lock_guard{m_mutex};
     return std::exchange(m_lines, {});
-}
-
-void ConsoleInput::WaitUntil(Clock::time_point time)
-{
-    auto lock = std::unique_lock{m_mutex};
-    m_arrived.wait_until(lock, time, [this]
-    {
-        return !m_lines.empty();
-    });
 }
 
 bool ConsoleInput::IsInteractive() const

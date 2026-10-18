@@ -8,6 +8,8 @@
 #include "Config_s.hpp"
 #include "Error/ConfigError.hpp"
 #include "ServerSettings_s.hpp"
+#include "TransportNames.hpp"
+#include "Transport_e.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -129,6 +131,27 @@ namespace nlohmann
         }
     };
 
+    // Not NLOHMANN_JSON_SERIALIZE_ENUM: it reads an unknown name as the first value, so "wws" would quietly mean ws.
+    template <>
+    struct adl_serializer<Transport_e>
+    {
+        static void from_json(const json& value, Transport_e& result)
+        {
+            const auto transport = TransportNames::Find(value.get<std::string>());
+            if (!transport)
+            {
+                throw json::type_error::create(TYPE_ERROR_ID, std::format("must be {}", TransportNames::CHOICES), &value);
+            }
+
+            result = *transport;
+        }
+
+        static void to_json(ordered_json& value, Transport_e transport)
+        {
+            value = std::string{TransportNames::GetName(transport)};
+        }
+    };
+
     template <>
     struct adl_serializer<std::chrono::seconds>
     {
@@ -172,7 +195,7 @@ namespace nlohmann
     };
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, url, origin, tlsCaFile)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, transport, host, port, origin, tlsCaFile)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)

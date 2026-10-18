@@ -6,6 +6,7 @@
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/Logger.hpp"
+#include "../Io/NetLoop.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "Account.hpp"
@@ -38,12 +39,14 @@ private:
     void StartNextLogin(Clock::time_point now);
     void InterruptAll();
     void Quit(Account* target);
-    void Wait(Clock::time_point now, ConsoleInput* console) const;
+    void Wait(Clock::time_point now) const;
     [[nodiscard]] bool LogOutcomes() const;
 
     std::shared_ptr<const Config_s> m_config;
     std::shared_ptr<const GameCache_s> m_cache;
     std::shared_ptr<Logger> m_logger;
+    // Every account's connection runs on it, so a packet for any of them wakes the runner.
+    std::shared_ptr<NetLoop> m_net = NetLoop::Create();
     // Declared before the accounts, which unregister from it as they go.
     BotMessenger m_messenger;
     std::vector<std::unique_ptr<Account>> m_accounts;

@@ -7,6 +7,7 @@
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Game/Nav/Navigation.hpp"
+#include "../Io/NetLoop.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/Host/ScriptHost.hpp"
 #include "../Script/ScriptCommand_s.hpp"
@@ -35,7 +36,7 @@ public:
     // Long enough to outlast the server's refusal to log out during combat and for 10 seconds after.
     static constexpr auto LOGOUT_TIMEOUT = 30s;
 
-    Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {}, BotMessenger* messenger = nullptr);
+    Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {}, BotMessenger* messenger = nullptr, std::shared_ptr<NetLoop> net = NetLoop::Create());
     ~Account();
 
     Account(const Account&) = delete;

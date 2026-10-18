@@ -25,6 +25,7 @@
 #include <format> // Linux: needs libstdc++ 13+ or libc++ 17+
 #include <fstream>
 #include <functional>
+#include <future>
 #include <iterator>
 #include <limits>
 #include <map>

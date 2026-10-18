@@ -417,7 +417,7 @@ The `from_json` overloads for `ScriptConfig_s` and `AccountConfig_s` stay at glo
 
 ### 6.5 `ConfigOverrides`
 
-`Account.cpp`'s `WithServer` becomes `ConfigOverrides::ForAccount(std::shared_ptr<const Config_s> config, const AccountConfig_s& account)`, which returns the config unchanged when the account replaces nothing. This is the function [ProxyDesign.md](ProxyDesign.md) §3 calls `WithAccountOverrides`, so the proxy work adds its `proxy` case here.
+`Account.cpp`'s `WithServer` becomes `ConfigOverrides::ForAccount(std::shared_ptr<const Config_s> config, const AccountConfig_s& account)`, which returns the config unchanged when the account replaces nothing. This is the function ProxyDesign.md §3 called `WithAccountOverrides`, so the proxy work, now [TransportDesign.md](TransportDesign.md) §9, adds its `proxy` case here.
 
 ### 6.6 `JsoncScanner`
 
@@ -745,7 +745,7 @@ Docs that name a moved file, to update in the phase that moves it:
 - The `login.revision` rule goes in `ConfigValidator`. Its tests go in `tests/Config/ConfigFileTests.cpp`.
 - `Protocol` can use `MenuOp::MIN` and `MAX` where it checks ops.
 
-[ProxyDesign.md](ProxyDesign.md):
+ProxyDesign.md, since replaced by [TransportDesign.md](TransportDesign.md) §9:
 
 - `ProxySettings_s` goes in `Config/ProxySettings_s.hpp`, since both `Config_s` and `AccountConfig_s` hold one, as `ServerSettings_s` does (§6.1).
 - `ValidateProxy` goes in `ConfigValidator`, and the `proxy` override in `ConfigOverrides::ForAccount`, which is that plan's `WithAccountOverrides` (§6.5).
@@ -770,4 +770,4 @@ Every phase is done. Where the code differs from the plan above:
 | §12, phase 10: `RetrySchedule` | It lives in `Game/Net/`, and counts the attempts and holds when the next is due as well as working out the delay. `GameClient` keeps the log lines and decides when a failure ends the login or the reconnect |
 | §12, phase 10: `ServerPacketDecoder` | The switch still lists every opcode, so GCC and Clang warn about one with no decoder, and hands each group to `InterfacePacketDecoder`, `InventoryDecoder`, `PlayerStateDecoder`, `SocialDecoder` (which remembers the private message ids) or `SceneDecoder` (rebuild, camera and sound). `PacketFields` reads the id and base-37 name fields that these and `EntityInfo` share |
 | §12, phase 10: `TypeDecoder` | `LocTypeDecoder`, `NpcTypeDecoder`, `ObjTypeDecoder` and `VarpTypeDecoder`, with `TypeDecoder` keeping the shared framing and readers and `DroppedOpcodes_s` in a header of its own. The tests stay in `TypeDecoderTests.cpp`, which shares its definition builders across the types |
-| §12: docs in the phase that moves a file | Every doc was updated in phase 11. The plans not yet built, [RevisionDesign.md](RevisionDesign.md) and [ProxyDesign.md](ProxyDesign.md), now use §13's paths. The other designs' change records keep the names they had at the time, under a note that points here |
+| §12: docs in the phase that moves a file | Every doc was updated in phase 11. The plans not yet built, [RevisionDesign.md](RevisionDesign.md) and ProxyDesign.md (since replaced by [TransportDesign.md](TransportDesign.md)), now use §13's paths. The other designs' change records keep the names they had at the time, under a note that points here |

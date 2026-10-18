@@ -8,6 +8,7 @@
 #include "Config/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
 #include "Config/Revision_e.hpp"
+#include "Config/Transport_e.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Utils/BigUInt.hpp"
@@ -21,10 +22,12 @@ namespace
 {
     constexpr auto EXAMPLE = R"json({
     "server": {
-        "url": "ws://localhost:80",
-        // "url": "ws://127.0.0.1:80",
+        "transport": "ws",
+        "host": "localhost",
+        "port": 80,
+        // "host": "127.0.0.1",
         // "origin": "http://localhost",
-        // "url": "wss://w1.rs2b2t.com:443",
+        // "transport": "wss", "host": "w1.rs2b2t.com", "port": 443,
         "origin": "https://w1.rs2b2t.com",
         "tlsCaFile": "SYSTEM"
     },
@@ -59,7 +62,9 @@ namespace
 
     constexpr auto SAMPLE_BODY = R"json({
     "server": {
-        "url": "",
+        "transport": "ws",
+        "host": "",
+        "port": 0,
         "origin": "",
         "tlsCaFile": "SYSTEM"
     },
@@ -90,7 +95,7 @@ namespace
 )json"sv;
 
     constexpr auto MINIMAL = R"json({
-    "server": {"url": "ws://localhost:80"},
+    "server": {"host": "localhost", "port": 80},
     "login": {
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
         "rsaExponent": "0x81f390b2cf8ca7039ee507975951d5a0b15a87bf8b3f99c966834118c50fd94d"
@@ -128,12 +133,14 @@ namespace
     };
 
     const auto MUST_SET_KEYS = std::vector<KeyPath_s>{
-        {"server", "url"},
+        {"server", "host"},
+        {"server", "port"},
         {"login", "rsaModulus"},
         {"login", "rsaExponent"},
     };
 
     const auto OPTIONAL_KEYS = std::vector<KeyPath_s>{
+        {"server", "transport"},
         {"server", "origin"},
         {"server", "tlsCaFile"},
         {"login", "lowMemory"},
@@ -249,7 +256,9 @@ namespace
 
     void CheckExampleMembers(const Config_s& config)
     {
-        CHECK(config.server.url == "ws://localhost:80");
+        CHECK(config.server.transport == Transport_e::Ws);
+        CHECK(config.server.host == "localhost");
+        CHECK(config.server.port == 80);
         CHECK(config.server.origin == "https://w1.rs2b2t.com");
         CHECK(config.server.tlsCaFile == "SYSTEM");
         CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
@@ -312,7 +321,9 @@ TEST_CASE("ConfigFile parses a file with only the keys that must be set", "[Conf
 {
     const auto config = ParseAccepted(MINIMAL);
 
-    CHECK(config.server.url == "ws://localhost:80");
+    CHECK(config.server.transport == Transport_e::Ws);
+    CHECK(config.server.host == "localhost");
+    CHECK(config.server.port == 80);
     CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
     CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
     CheckOptionalDefaults(config);
@@ -469,7 +480,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             });
         };
 
-        CheckRejected(removeSection("server"), "server.url");
+        CheckRejected(removeSection("server"), "server.host");
         CheckRejected(removeSection("login"), "login.rsaModulus");
 
         const auto config = ParseAccepted(removeSection("client"));
@@ -479,9 +490,9 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         CheckScriptingDefaults(ParseAccepted(removeSection("scripting")).scripting);
     }
 
-    SECTION("an empty object fails on server.url")
+    SECTION("an empty object fails on server.host")
     {
-        CheckRejected("{}", "server.url");
+        CheckRejected("{}", "server.host");
     }
 
     SECTION("a section that isn't an object")
@@ -530,9 +541,9 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         // clang-format off
         CheckRejected(EditBase([](nlohmann::json& json)
         {
-            json["server"].erase("url");
-            json["server"]["uri"] = "ws://localhost:80";
-        }), "server.url");
+            json["server"].erase("host");
+            json["server"]["hostname"] = "localhost";
+        }), "server.host");
         // clang-format on
     }
 
@@ -543,21 +554,21 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         {
             json["Server"] = json["server"];
             json.erase("server");
-        }), "server.url");
+        }), "server.host");
         // clang-format on
     }
 
     SECTION("a repeated key takes its last value")
     {
-        const auto text = ReplaceAll(std::string{EXAMPLE}, "\"tlsCaFile\": \"SYSTEM\"", "\"tlsCaFile\": \"SYSTEM\",\n        \"url\": \"ws://other:80\"");
-        CHECK(ParseAccepted(text).server.url == "ws://other:80");
+        const auto text = ReplaceAll(std::string{EXAMPLE}, "\"tlsCaFile\": \"SYSTEM\"", "\"tlsCaFile\": \"SYSTEM\",\n        \"host\": \"other\"");
+        CHECK(ParseAccepted(text).server.host == "other");
     }
 
     SECTION("wss with TLS verification turned off logs a warning")
     {
         const auto text = EditBase([](nlohmann::json& json)
         {
-            json["server"]["url"] = "wss://w1.example.com:443";
+            json["server"]["transport"] = "wss";
             json["server"]["tlsCaFile"] = "NONE";
         });
 
@@ -573,7 +584,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
 
     SECTION("wss with the system trust store logs nothing")
     {
-        ParseAccepted(SetKey({"server", "url"}, "wss://w1.example.com:443"));
+        ParseAccepted(SetKey({"server", "transport"}, "wss"));
     }
 
     SECTION("ws stores tlsCaFile as written, without a warning")
@@ -590,9 +601,17 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
 {
     SECTION("server")
     {
-        for (const auto* const url : {"ws://localhost:80", "wss://w1.example.com:443/path"})
+        CHECK(ParseAccepted(SetKey({"server", "transport"}, "ws")).server.transport == Transport_e::Ws);
+        CHECK(ParseAccepted(SetKey({"server", "transport"}, "wss")).server.transport == Transport_e::Wss);
+
+        for (const auto& host : {"localhost"s, "127.0.0.1"s, "w1.2004scape.org"s, std::string(253, 'a')})
         {
-            CHECK(ParseAccepted(SetKey({"server", "url"}, url)).server.url == url);
+            CHECK(ParseAccepted(SetKey({"server", "host"}, host)).server.host == host);
+        }
+
+        for (const auto port : {1, 65535})
+        {
+            CHECK(ParseAccepted(SetKey({"server", "port"}, port)).server.port == port);
         }
 
         for (const auto* const origin : {"", "http://localhost"})
@@ -669,10 +688,23 @@ TEST_CASE("ConfigFile names the revisions it supports", "[ConfigFile]")
 TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
 {
     const auto rejections = std::vector<Rejection_s>{
-        {{"server", "url"}, "http://localhost:80"},
-        {{"server", "url"}, "localhost:80"},
-        {{"server", "url"}, ""},
-        {{"server", "url"}, 80},
+        {{"server", "transport"}, "WS"},
+        {{"server", "transport"}, "wws"},
+        {{"server", "transport"}, "tcp"},
+        {{"server", "transport"}, ""},
+        {{"server", "transport"}, 5},
+        {{"server", "host"}, ""},
+        {{"server", "host"}, "ws://localhost"},
+        {{"server", "host"}, "localhost:80"},
+        {{"server", "host"}, "local host"},
+        {{"server", "host"}, "::1"},
+        {{"server", "host"}, "\xC3\xA9"},
+        {{"server", "host"}, std::string(254, 'a')},
+        {{"server", "host"}, 80},
+        {{"server", "port"}, 0},
+        {{"server", "port"}, 65536},
+        {{"server", "port"}, -1},
+        {{"server", "port"}, "80"},
         {{"server", "origin"}, "http://ex\xC3\xA4mple"},
         {{"server", "origin"}, "a\tb"},
         {{"server", "origin"}, true},
@@ -805,12 +837,14 @@ TEST_CASE("ConfigFile::Serialize", "[ConfigFile]")
     SECTION("the sample works once filled in")
     {
         auto sample = ParseJsonWithComments(SAMPLE_BODY);
-        sample["server"]["url"] = "ws://localhost:80";
+        sample["server"]["host"] = "localhost";
+        sample["server"]["port"] = 80;
         sample["login"]["rsaModulus"] = "3233";
         sample["login"]["rsaExponent"] = "17";
 
         const auto config = ParseAccepted(sample.dump());
-        CHECK(config.server.url == "ws://localhost:80");
+        CHECK(config.server.host == "localhost");
+        CHECK(config.server.port == 80);
         CHECK(config.login.rsaModulus == BigUInt::Parse("3233"));
         CHECK(config.login.rsaExponent == BigUInt::Parse("17"));
         CheckOptionalDefaults(config);
@@ -823,7 +857,7 @@ TEST_CASE("ConfigFile logs through the default logger when given none", "[Config
     const auto scope = DefaultLoggerScope{capture.GetLogger()};
     const auto text = EditBase([](nlohmann::json& json)
     {
-        json["server"]["url"] = "wss://w1.example.com:443";
+        json["server"]["transport"] = "wss";
         json["server"]["tlsCaFile"] = "NONE";
     });
 

@@ -4,6 +4,7 @@
 #include "Config/AccountConfig_s.hpp"
 #include "Config/AccountFile.hpp"
 #include "Config/Error/ConfigError.hpp"
+#include "Config/Transport_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>
@@ -160,14 +161,18 @@ TEST_CASE("AccountFile reads an account's own server", "[AccountFile]")
 {
     CHECK_FALSE(AccountFile::Parse(ACCOUNT_EXAMPLE, "bot1").server.has_value());
 
-    const auto account = AccountFile::Parse(SetAccountKey("server", {{"url", "wss://w2.example.com:443"}, {"origin", "https://w2.example.com"}}), "bot1");
+    const auto account = AccountFile::Parse(SetAccountKey("server", {{"transport", "wss"}, {"host", "w2.example.com"}, {"port", 443}, {"origin", "https://w2.example.com"}}), "bot1");
     REQUIRE(account.server.has_value());
-    CHECK(account.server->url == "wss://w2.example.com:443");
+    CHECK(account.server->transport == Transport_e::Wss);
+    CHECK(account.server->host == "w2.example.com");
+    CHECK(account.server->port == 443);
     CHECK(account.server->origin == "https://w2.example.com");
     CHECK(account.server->tlsCaFile == "SYSTEM");
 
-    CheckAccountRejected(SetAccountKey("server", {{"url", "http://w2.example.com"}}), "server.url");
-    CheckAccountRejected(SetAccountKey("server", nlohmann::json::object()), "server.url");
+    CheckAccountRejected(SetAccountKey("server", {{"host", "http://w2.example.com"}, {"port", 80}}), "server.host");
+    CheckAccountRejected(SetAccountKey("server", {{"host", "w2.example.com"}}), "server.port");
+    CheckAccountRejected(SetAccountKey("server", nlohmann::json::object()), "server.host");
+    CheckAccountRejected(SetAccountKey("server", {{"url", "wss://w2.example.com:443"}}), "server.host");
     CheckAccountRejected(SetAccountKey("server", "ws://w2.example.com"), "server");
 }
 
