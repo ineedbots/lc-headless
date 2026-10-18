@@ -1,0 +1,98 @@
+# Publishes a GitHub release when a version tag is pushed:
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# The tag has to match the project VERSION in CMakeLists.txt, with an optional pre-release suffix such as v0.1.0-rc1,
+# which marks the release as a pre-release. Windows and Linux are built and tested in Release, then each is packaged
+# with the files the client loads from its working directory, and the release's notes are generated from the commits
+# since the previous tag.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check the tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare the tag with CMakeLists.txt
+        shell: bash
+        run: |
+          version=$(sed -nE 's/^project\([A-Za-z0-9_]+ VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          tagged=${GITHUB_REF_NAME#v}
+          tagged=${tagged%%-*}
+          if [ "$tagged" != "$version" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME doesn't match the project VERSION $version in CMakeLists.txt"
+            exit 1
+          fi
+
+  package:
+    name: package-${{ matrix.platform }}
+    needs: version
+    strategy:
+      matrix:
+        include:
+          # windows-2022 is pinned because the windows-msvc preset uses the Visual Studio 17 2022 generator.
+          - platform: windows
+            runner: windows-2022
+            configure-preset: windows-msvc
+          - platform: linux
+            runner: ubuntu-24.04
+            configure-preset: linux-clang
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-vcpkg
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.configure-preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.platform }}-release --parallel
+
+      - name: Test
+        run: ctest --preset ${{ matrix.platform }}-release --parallel 4
+
+      # CMakeLists.txt's install rules say what goes in the archive. The tag replaces the project version in its name.
+      - name: Package
+        run: >-
+          cpack --preset ${{ matrix.platform }}-release
+          -D CPACK_PACKAGE_FILE_NAME=rs2004-headless-${{ github.ref_name }}-${{ matrix.platform }}-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.platform }}
+          path: |
+            build/packages/*.zip
+            build/packages/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish the release
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+
+      # Pinned to a commit, because this job's token can write to the repository. The SHA is v3.0.3.
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
+        with:
+          name: ${{ github.ref_name }}
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

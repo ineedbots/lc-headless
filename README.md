@@ -103,6 +103,16 @@ It builds each distro's toolchain image, then configures, builds and tests a cop
 
 GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) builds and tests all four build presets on every push to `master` and every pull request, with each preset as its own check. The first run builds the vcpkg dependencies, which later runs restore from the Actions cache.
 
+### Releases
+
+Pushing a tag that matches the project `VERSION` in `CMakeLists.txt` publishes a GitHub release ([.github/workflows/release.yml](.github/workflows/release.yml)):
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0      # v0.1.0-rc1 and similar publish a pre-release
+```
+
+The workflow builds and tests Release on Windows and Linux, then attaches a `.zip` and a `.tar.gz`. Each holds the client with the files it loads from its working directory: `scripts/`, `data/nav/`, an empty `data/cache/`, and the sample config and account files. The install rules in `CMakeLists.txt` define the contents, so `cpack --preset windows-release` (or `linux-release`) builds the same archive locally into `build/packages/`, after a Release build. The Windows build needs the [Visual C++ redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist), and the Linux build needs glibc and libstdc++ at least as new as Ubuntu 24.04's.
+
 ## Configuration
 
 The client reads two kinds of file. Both are JSON and allow `//` and `/* */` comments. Paths are relative to the working directory, so run the client from the repository root.

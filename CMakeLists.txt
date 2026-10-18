@@ -104,3 +104,29 @@ include(Catch)
 catch_discover_tests(${PROJECT_NAME}Tests
     DISCOVERY_MODE PRE_TEST
     PROPERTIES TIMEOUT 60)
+
+# The release archive is one folder laid out like the repository, with the files the client loads from its working
+# directory, so it runs from inside the folder with the default paths in client.jsonc.sample. The tests aren't installed.
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION .)
+install(FILES README.md client.jsonc.sample DESTINATION .)
+install(FILES accounts/example.jsonc.sample DESTINATION accounts)
+install(FILES data/cache/.gitkeep DESTINATION data/cache)
+install(DIRECTORY data/nav DESTINATION data)
+install(DIRECTORY scripts/examples scripts/typings DESTINATION scripts)
+file(GLOB THIRDPARTY_LICENSES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS thirdparty/*/LICENSE)
+foreach(license IN LISTS THIRDPARTY_LICENSES)
+    cmake_path(GET license PARENT_PATH folder)
+    install(FILES ${license} DESTINATION ${folder})
+endforeach()
+
+if(WIN32)
+    set(PACKAGE_PLATFORM windows)
+    set(CPACK_GENERATOR ZIP)
+else()
+    set(PACKAGE_PLATFORM linux)
+    set(CPACK_GENERATOR TGZ)
+endif()
+set(CPACK_PACKAGE_NAME rs2004-headless)
+# The release workflow overrides this with the tag, which can carry a pre-release suffix.
+set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-v${PROJECT_VERSION}-${PACKAGE_PLATFORM}-x64)
+include(CPack)

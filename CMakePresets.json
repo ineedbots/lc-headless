@@ -41,5 +41,9 @@
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release", "output": { "outputOnFailure": true } },
         { "name": "linux-debug",     "configurePreset": "linux-clang",  "configuration": "Debug",   "output": { "outputOnFailure": true } },
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release", "output": { "outputOnFailure": true } }
+    ],
+    "packagePresets": [
+        { "name": "windows-release", "configurePreset": "windows-msvc", "configurations": ["Release"], "generators": ["ZIP"], "packageDirectory": "${sourceDir}/build/packages" },
+        { "name": "linux-release",   "configurePreset": "linux-clang",  "configurations": ["Release"], "generators": ["TGZ"], "packageDirectory": "${sourceDir}/build/packages" }
     ]
 }
