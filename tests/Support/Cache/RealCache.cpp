@@ -16,6 +16,8 @@ namespace
         {
         case Revision_e::Rev225:
             return "RS2004_CACHE_DIR_225";
+        case Revision_e::Rev274:
+            return "RS2004_CACHE_DIR_274";
         case Revision_e::Rev289:
             return "RS2004_CACHE_DIR";
         }

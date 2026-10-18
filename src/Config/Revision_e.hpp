@@ -4,5 +4,6 @@
 enum class Revision_e : u16
 {
     Rev225 = 225,
+    Rev274 = 274,
     Rev289 = 289,
 };

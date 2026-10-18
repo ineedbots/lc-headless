@@ -191,6 +191,91 @@ namespace
         {ClientProt_e::TutClickSide, 175, 1},
     });
 
+    constexpr auto CLIENT_PROTS_274 = std::to_array<ClientProtRow_s>({
+        {ClientProt_e::AnticheatCycleLogic1, 12, ClientProt::VAR_BYTE},
+        {ClientProt_e::AnticheatCycleLogic2, 149, ClientProt::VAR_BYTE},
+        {ClientProt_e::AnticheatCycleLogic3, 52, 1},
+        {ClientProt_e::AnticheatCycleLogic4, 230, 1},
+        {ClientProt_e::AnticheatCycleLogic5, 100, 0},
+        {ClientProt_e::AnticheatCycleLogic6, 188, 1},
+        {ClientProt_e::AnticheatCycleLogic7, 89, 0},
+        {ClientProt_e::AnticheatOpLogic1, 219, 4},
+        {ClientProt_e::AnticheatOpLogic2, 201, 2},
+        {ClientProt_e::AnticheatOpLogic3, 41, 4},
+        {ClientProt_e::AnticheatOpLogic4, 80, 1},
+        {ClientProt_e::AnticheatOpLogic5, 235, 1},
+        {ClientProt_e::AnticheatOpLogic6, 250, 2},
+        {ClientProt_e::AnticheatOpLogic7, 25, 4},
+        {ClientProt_e::AnticheatOpLogic8, 0, 1},
+        {ClientProt_e::AnticheatOpLogic9, 24, 3},
+        {ClientProt_e::ChatSetMode, 154, 3},
+        {ClientProt_e::ClientCheat, 224, ClientProt::VAR_BYTE},
+        {ClientProt_e::CloseModal, 51, 0},
+        {ClientProt_e::EventAppletFocus, 73, 1},
+        {ClientProt_e::EventCameraPosition, 53, 4},
+        {ClientProt_e::EventMouseClick, 20, 4},
+        {ClientProt_e::EventMouseMove, 222, ClientProt::VAR_BYTE},
+        {ClientProt_e::FriendListAdd, 13, 8},
+        {ClientProt_e::FriendListDel, 106, 8},
+        {ClientProt_e::IdkSaveDesign, 125, 13},
+        {ClientProt_e::IdleTimer, 209, 0},
+        {ClientProt_e::IfButton, 9, 2},
+        {ClientProt_e::IgnoreListAdd, 255, 8},
+        {ClientProt_e::IgnoreListDel, 101, 8},
+        {ClientProt_e::InvButton1, 74, 6},
+        {ClientProt_e::InvButton2, 82, 6},
+        {ClientProt_e::InvButton3, 239, 6},
+        {ClientProt_e::InvButton4, 179, 6},
+        {ClientProt_e::InvButton5, 46, 6},
+        {ClientProt_e::InvButtonD, 93, 7},
+        {ClientProt_e::MapBuildComplete, 214, 0},
+        {ClientProt_e::MessagePrivate, 139, ClientProt::VAR_BYTE},
+        {ClientProt_e::MessagePublic, 253, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveGameClick, 207, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveMinimapClick, 86, ClientProt::VAR_BYTE},
+        {ClientProt_e::MoveOpClick, 138, ClientProt::VAR_BYTE},
+        {ClientProt_e::NoTimeout, 120, 0},
+        {ClientProt_e::OpHeld1, 185, 6},
+        {ClientProt_e::OpHeld2, 2, 6},
+        {ClientProt_e::OpHeld3, 123, 6},
+        {ClientProt_e::OpHeld4, 216, 6},
+        {ClientProt_e::OpHeld5, 42, 6},
+        {ClientProt_e::OpHeldT, 135, 8},
+        {ClientProt_e::OpHeldU, 136, 12},
+        {ClientProt_e::OpLoc1, 215, 6},
+        {ClientProt_e::OpLoc2, 103, 6},
+        {ClientProt_e::OpLoc3, 187, 6},
+        {ClientProt_e::OpLoc4, 157, 6},
+        {ClientProt_e::OpLoc5, 127, 6},
+        {ClientProt_e::OpLocT, 213, 8},
+        {ClientProt_e::OpLocU, 60, 12},
+        {ClientProt_e::OpNpc1, 236, 2},
+        {ClientProt_e::OpNpc2, 233, 2},
+        {ClientProt_e::OpNpc3, 223, 2},
+        {ClientProt_e::OpNpc4, 147, 2},
+        {ClientProt_e::OpNpc5, 189, 2},
+        {ClientProt_e::OpNpcT, 181, 4},
+        {ClientProt_e::OpNpcU, 150, 8},
+        {ClientProt_e::OpObj1, 247, 6},
+        {ClientProt_e::OpObj2, 169, 6},
+        {ClientProt_e::OpObj3, 108, 6},
+        {ClientProt_e::OpObj4, 62, 6},
+        {ClientProt_e::OpObj5, 117, 6},
+        {ClientProt_e::OpObjT, 91, 8},
+        {ClientProt_e::OpObjU, 39, 12},
+        {ClientProt_e::OpPlayer1, 109, 2},
+        {ClientProt_e::OpPlayer2, 166, 2},
+        {ClientProt_e::OpPlayer3, 196, 2},
+        {ClientProt_e::OpPlayer4, 98, 2},
+        {ClientProt_e::OpPlayer5, 174, 2},
+        {ClientProt_e::OpPlayerT, 240, 4},
+        {ClientProt_e::OpPlayerU, 36, 8},
+        {ClientProt_e::ReportAbuse, 137, 10},
+        {ClientProt_e::ResumePauseButton, 72, 2},
+        {ClientProt_e::ResumePCountDialog, 102, 4},
+        {ClientProt_e::TutClickSide, 94, 1},
+    });
+
     constexpr auto CLIENT_PROTS_289 = std::to_array<ClientProtRow_s>({
         {ClientProt_e::AnticheatCycleLogic1, 130, ClientProt::VAR_BYTE},
         {ClientProt_e::AnticheatCycleLogic2, 154, ClientProt::VAR_BYTE},
@@ -277,11 +362,14 @@ namespace
     });
 
     static_assert(CLIENT_PROTS_225.size() == 78, "Revision 225 has 78 client packets");
+    static_assert(CLIENT_PROTS_274.size() == 82, "Revision 274 has 82 client packets");
     static_assert(CLIENT_PROTS_289.size() == 82, "Revision 289 has 82 client packets");
     static_assert(ProtTableBuilder::HasUniqueRows(CLIENT_PROTS_225), "A 225 client opcode or packet is listed twice");
+    static_assert(ProtTableBuilder::HasUniqueRows(CLIENT_PROTS_274), "A 274 client opcode or packet is listed twice");
     static_assert(ProtTableBuilder::HasUniqueRows(CLIENT_PROTS_289), "A 289 client opcode or packet is listed twice");
 
     constexpr auto TABLE_225 = ProtTableBuilder::Build<ClientProtTable_s>(CLIENT_PROTS_225);
+    constexpr auto TABLE_274 = ProtTableBuilder::Build<ClientProtTable_s>(CLIENT_PROTS_274);
     constexpr auto TABLE_289 = ProtTableBuilder::Build<ClientProtTable_s>(CLIENT_PROTS_289);
 }
 
@@ -298,6 +386,8 @@ const ClientProtTable_s& ClientProt::GetTable(Revision_e revision)
     {
     case Revision_e::Rev225:
         return TABLE_225;
+    case Revision_e::Rev274:
+        return TABLE_274;
     case Revision_e::Rev289:
         return TABLE_289;
     }

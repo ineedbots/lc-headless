@@ -177,6 +177,78 @@ namespace
         {ServerProt_e::VarpSmall, 150, 3},
     });
 
+    constexpr auto SERVER_PROTS_274 = std::to_array<ServerProtRow_s>({
+        {ServerProt_e::CamLookAt, 233, 6},
+        {ServerProt_e::CamMoveTo, 200, 6},
+        {ServerProt_e::CamReset, 101, 0},
+        {ServerProt_e::CamShake, 64, 4},
+        {ServerProt_e::ChatFilterSettings, 114, 3},
+        {ServerProt_e::FriendListLoaded, 185, 1},
+        {ServerProt_e::HintArrow, 156, 6},
+        {ServerProt_e::IfClose, 171, 0},
+        {ServerProt_e::IfOpenChat, 166, 2},
+        {ServerProt_e::IfOpenMain, 211, 2},
+        {ServerProt_e::IfOpenMainSide, 158, 4},
+        {ServerProt_e::IfOpenOverlay, 240, 2},
+        {ServerProt_e::IfOpenSide, 16, 2},
+        {ServerProt_e::IfSetAnim, 134, 4},
+        {ServerProt_e::IfSetColour, 183, 4},
+        {ServerProt_e::IfSetHide, 10, 3},
+        {ServerProt_e::IfSetModel, 129, 4},
+        {ServerProt_e::IfSetNpcHead, 142, 4},
+        {ServerProt_e::IfSetObject, 28, 6},
+        {ServerProt_e::IfSetPlayerHead, 192, 2},
+        {ServerProt_e::IfSetPosition, 77, 6},
+        {ServerProt_e::IfSetScrollPos, 54, 4},
+        {ServerProt_e::IfSetTab, 215, 3},
+        {ServerProt_e::IfSetTabActive, 241, 1},
+        {ServerProt_e::IfSetText, 44, ServerProt::VAR_SHORT},
+        {ServerProt_e::LastLoginInfo, 91, 10},
+        {ServerProt_e::LocAddChange, 138, 4},
+        {ServerProt_e::LocAnim, 48, 4},
+        {ServerProt_e::LocDel, 173, 2},
+        {ServerProt_e::LocMerge, 176, 14},
+        {ServerProt_e::Logout, 88, 0},
+        {ServerProt_e::MapAnim, 85, 6},
+        {ServerProt_e::MapProjAnim, 107, 15},
+        {ServerProt_e::MessageGame, 161, ServerProt::VAR_BYTE},
+        {ServerProt_e::MessagePrivate, 235, ServerProt::VAR_BYTE},
+        {ServerProt_e::MidiJingle, 15, 4},
+        {ServerProt_e::MidiSong, 23, 2},
+        {ServerProt_e::MinimapToggle, 194, 1},
+        {ServerProt_e::NpcInfo, 197, ServerProt::VAR_SHORT},
+        {ServerProt_e::ObjAdd, 81, 5},
+        {ServerProt_e::ObjCount, 95, 7},
+        {ServerProt_e::ObjDel, 52, 3},
+        {ServerProt_e::ObjReveal, 219, 7},
+        {ServerProt_e::PlayerInfo, 167, ServerProt::VAR_SHORT},
+        {ServerProt_e::PCountDialog, 210, 0},
+        {ServerProt_e::RebuildNormal, 231, 4},
+        {ServerProt_e::ResetAnims, 47, 0},
+        {ServerProt_e::ResetClientVarCache, 190, 0},
+        {ServerProt_e::SetMultiway, 207, 1},
+        {ServerProt_e::SetPlayerOp, 17, ServerProt::VAR_BYTE},
+        {ServerProt_e::SynthSound, 34, 5},
+        {ServerProt_e::TutFlash, 90, 1},
+        {ServerProt_e::TutOpen, 130, 2},
+        {ServerProt_e::UnsetMapFlag, 115, 0},
+        {ServerProt_e::UpdateFriendList, 247, 9},
+        {ServerProt_e::UpdateIgnoreList, 3, ServerProt::VAR_SHORT},
+        {ServerProt_e::UpdateInvFull, 106, ServerProt::VAR_SHORT},
+        {ServerProt_e::UpdateInvPartial, 172, ServerProt::VAR_SHORT},
+        {ServerProt_e::UpdateInvStopTransmit, 227, 2},
+        {ServerProt_e::UpdatePid, 133, 3},
+        {ServerProt_e::UpdateRebootTimer, 89, 2},
+        {ServerProt_e::UpdateRunEnergy, 83, 1},
+        {ServerProt_e::UpdateRunWeight, 67, 2},
+        {ServerProt_e::UpdateStat, 105, 6},
+        {ServerProt_e::UpdateZoneFullFollows, 153, 2},
+        {ServerProt_e::UpdateZonePartialEnclosed, 195, ServerProt::VAR_SHORT},
+        {ServerProt_e::UpdateZonePartialFollows, 32, 2},
+        {ServerProt_e::VarpLarge, 245, 6},
+        {ServerProt_e::VarpSmall, 203, 3},
+    });
+
     constexpr auto SERVER_PROTS_289 = std::to_array<ServerProtRow_s>({
         {ServerProt_e::CamLookAt, 82, 6},
         {ServerProt_e::CamMoveTo, 73, 6},
@@ -250,11 +322,14 @@ namespace
     });
 
     static_assert(SERVER_PROTS_225.size() == 71, "Revision 225 has 71 server packets");
+    static_assert(SERVER_PROTS_274.size() == 69, "Revision 274 has 69 server packets");
     static_assert(SERVER_PROTS_289.size() == 69, "Revision 289 has 69 server packets");
     static_assert(ProtTableBuilder::HasUniqueRows(SERVER_PROTS_225), "A 225 server opcode or packet is listed twice");
+    static_assert(ProtTableBuilder::HasUniqueRows(SERVER_PROTS_274), "A 274 server opcode or packet is listed twice");
     static_assert(ProtTableBuilder::HasUniqueRows(SERVER_PROTS_289), "A 289 server opcode or packet is listed twice");
 
     constexpr auto TABLE_225 = ProtTableBuilder::Build<ServerProtTable_s>(SERVER_PROTS_225);
+    constexpr auto TABLE_274 = ProtTableBuilder::Build<ServerProtTable_s>(SERVER_PROTS_274);
     constexpr auto TABLE_289 = ProtTableBuilder::Build<ServerProtTable_s>(SERVER_PROTS_289);
 
     const ServerProtInfo_s& GetInfo(ServerProt_e prot)
@@ -281,6 +356,8 @@ const ServerProtTable_s& ServerProt::GetTable(Revision_e revision)
     {
     case Revision_e::Rev225:
         return TABLE_225;
+    case Revision_e::Rev274:
+        return TABLE_274;
     case Revision_e::Rev289:
         return TABLE_289;
     }

@@ -40,6 +40,23 @@ namespace
         {"P_COUNTDIALOG", 243, 0}, {"SET_MULTIWAY", 254, 1}
     });
 
+    constexpr auto SERVER_ROWS_274 = std::to_array<ProtRow_s>({
+        {"UPDATE_IGNORELIST", 3, -2}, {"IF_SETHIDE", 10, 3}, {"MIDI_JINGLE", 15, 4}, {"IF_OPENSIDE", 16, 2}, {"SET_PLAYER_OP", 17, -1},
+        {"MIDI_SONG", 23, 2}, {"IF_SETOBJECT", 28, 6}, {"UPDATE_ZONE_PARTIAL_FOLLOWS", 32, 2}, {"SYNTH_SOUND", 34, 5}, {"IF_SETTEXT", 44, -2},
+        {"RESET_ANIMS", 47, 0}, {"LOC_ANIM", 48, 4}, {"OBJ_DEL", 52, 3}, {"IF_SETSCROLLPOS", 54, 4}, {"CAM_SHAKE", 64, 4},
+        {"UPDATE_RUNWEIGHT", 67, 2}, {"IF_SETPOSITION", 77, 6}, {"OBJ_ADD", 81, 5}, {"UPDATE_RUNENERGY", 83, 1}, {"MAP_ANIM", 85, 6},
+        {"LOGOUT", 88, 0}, {"UPDATE_REBOOT_TIMER", 89, 2}, {"TUT_FLASH", 90, 1}, {"LAST_LOGIN_INFO", 91, 10}, {"OBJ_COUNT", 95, 7},
+        {"CAM_RESET", 101, 0}, {"UPDATE_STAT", 105, 6}, {"UPDATE_INV_FULL", 106, -2}, {"MAP_PROJANIM", 107, 15}, {"CHAT_FILTER_SETTINGS", 114, 3},
+        {"UNSET_MAP_FLAG", 115, 0}, {"IF_SETMODEL", 129, 4}, {"TUT_OPEN", 130, 2}, {"UPDATE_PID", 133, 3}, {"IF_SETANIM", 134, 4},
+        {"LOC_ADD_CHANGE", 138, 4}, {"IF_SETNPCHEAD", 142, 4}, {"UPDATE_ZONE_FULL_FOLLOWS", 153, 2}, {"HINT_ARROW", 156, 6}, {"IF_OPENMAIN_SIDE", 158, 4},
+        {"MESSAGE_GAME", 161, -1}, {"IF_OPENCHAT", 166, 2}, {"PLAYER_INFO", 167, -2}, {"IF_CLOSE", 171, 0}, {"UPDATE_INV_PARTIAL", 172, -2},
+        {"LOC_DEL", 173, 2}, {"LOC_MERGE", 176, 14}, {"IF_SETCOLOUR", 183, 4}, {"FRIENDLIST_LOADED", 185, 1}, {"RESET_CLIENT_VARCACHE", 190, 0},
+        {"IF_SETPLAYERHEAD", 192, 2}, {"MINIMAP_TOGGLE", 194, 1}, {"UPDATE_ZONE_PARTIAL_ENCLOSED", 195, -2}, {"NPC_INFO", 197, -2}, {"CAM_MOVETO", 200, 6},
+        {"VARP_SMALL", 203, 3}, {"SET_MULTIWAY", 207, 1}, {"P_COUNTDIALOG", 210, 0}, {"IF_OPENMAIN", 211, 2}, {"IF_SETTAB", 215, 3},
+        {"OBJ_REVEAL", 219, 7}, {"UPDATE_INV_STOP_TRANSMIT", 227, 2}, {"REBUILD_NORMAL", 231, 4}, {"CAM_LOOKAT", 233, 6}, {"MESSAGE_PRIVATE", 235, -1},
+        {"IF_OPENOVERLAY", 240, 2}, {"IF_SETTAB_ACTIVE", 241, 1}, {"VARP_LARGE", 245, 6}, {"UPDATE_FRIENDLIST", 247, 9}
+    });
+
     constexpr auto SERVER_ROWS_289 = std::to_array<ProtRow_s>({
         {"TUT_OPEN", 12, 2}, {"CHAT_FILTER_SETTINGS", 13, 3}, {"IF_SETOBJECT", 18, 6}, {"SET_PLAYER_OP", 21, -1}, {"IF_CLOSE", 23, 0},
         {"UPDATE_INV_STOP_TRANSMIT", 28, 2}, {"MIDI_JINGLE", 29, 4}, {"IF_SETPLAYERHEAD", 30, 2}, {"P_COUNTDIALOG", 35, 0},
@@ -77,6 +94,26 @@ namespace
         {"OPOBJ5", 247, 6}, {"OPPLAYERU", 248, 8}
     });
 
+    constexpr auto CLIENT_ROWS_274 = std::to_array<ProtRow_s>({
+        {"ANTICHEAT_OPLOGIC8", 0, 1}, {"OPHELD2", 2, 6}, {"IF_BUTTON", 9, 2}, {"ANTICHEAT_CYCLELOGIC1", 12, -1}, {"FRIENDLIST_ADD", 13, 8},
+        {"EVENT_MOUSE_CLICK", 20, 4}, {"ANTICHEAT_OPLOGIC9", 24, 3}, {"ANTICHEAT_OPLOGIC7", 25, 4}, {"OPPLAYERU", 36, 8}, {"OPOBJU", 39, 12},
+        {"ANTICHEAT_OPLOGIC3", 41, 4}, {"OPHELD5", 42, 6}, {"INV_BUTTON5", 46, 6}, {"CLOSE_MODAL", 51, 0}, {"ANTICHEAT_CYCLELOGIC3", 52, 1},
+        {"EVENT_CAMERA_POSITION", 53, 4}, {"OPLOCU", 60, 12}, {"OPOBJ4", 62, 6}, {"RESUME_PAUSEBUTTON", 72, 2}, {"EVENT_APPLET_FOCUS", 73, 1},
+        {"INV_BUTTON1", 74, 6}, {"ANTICHEAT_OPLOGIC4", 80, 1}, {"INV_BUTTON2", 82, 6}, {"MOVE_MINIMAPCLICK", 86, -1}, {"ANTICHEAT_CYCLELOGIC7", 89, 0},
+        {"OPOBJT", 91, 8}, {"INV_BUTTOND", 93, 7}, {"TUT_CLICKSIDE", 94, 1}, {"OPPLAYER4", 98, 2}, {"ANTICHEAT_CYCLELOGIC5", 100, 0},
+        {"IGNORELIST_DEL", 101, 8}, {"RESUME_P_COUNTDIALOG", 102, 4}, {"OPLOC2", 103, 6}, {"FRIENDLIST_DEL", 106, 8}, {"OPOBJ3", 108, 6},
+        {"OPPLAYER1", 109, 2}, {"OPOBJ5", 117, 6}, {"NO_TIMEOUT", 120, 0}, {"OPHELD3", 123, 6}, {"IDK_SAVEDESIGN", 125, 13},
+        {"OPLOC5", 127, 6}, {"OPHELDT", 135, 8}, {"OPHELDU", 136, 12}, {"REPORT_ABUSE", 137, 10}, {"MOVE_OPCLICK", 138, -1},
+        {"MESSAGE_PRIVATE", 139, -1}, {"OPNPC4", 147, 2}, {"ANTICHEAT_CYCLELOGIC2", 149, -1}, {"OPNPCU", 150, 8}, {"CHAT_SETMODE", 154, 3},
+        {"OPLOC4", 157, 6}, {"OPPLAYER2", 166, 2}, {"OPOBJ2", 169, 6}, {"OPPLAYER5", 174, 2}, {"INV_BUTTON4", 179, 6},
+        {"OPNPCT", 181, 4}, {"OPHELD1", 185, 6}, {"OPLOC3", 187, 6}, {"ANTICHEAT_CYCLELOGIC6", 188, 1}, {"OPNPC5", 189, 2},
+        {"OPPLAYER3", 196, 2}, {"ANTICHEAT_OPLOGIC2", 201, 2}, {"MOVE_GAMECLICK", 207, -1}, {"IDLE_TIMER", 209, 0}, {"OPLOCT", 213, 8},
+        {"MAP_BUILD_COMPLETE", 214, 0}, {"OPLOC1", 215, 6}, {"OPHELD4", 216, 6}, {"ANTICHEAT_OPLOGIC1", 219, 4}, {"EVENT_MOUSE_MOVE", 222, -1},
+        {"OPNPC3", 223, 2}, {"CLIENT_CHEAT", 224, -1}, {"ANTICHEAT_CYCLELOGIC4", 230, 1}, {"OPNPC2", 233, 2}, {"ANTICHEAT_OPLOGIC5", 235, 1},
+        {"OPNPC1", 236, 2}, {"INV_BUTTON3", 239, 6}, {"OPPLAYERT", 240, 4}, {"OPOBJ1", 247, 6}, {"ANTICHEAT_OPLOGIC6", 250, 2},
+        {"MESSAGE_PUBLIC", 253, -1}, {"IGNORELIST_ADD", 255, 8}
+    });
+
     constexpr auto CLIENT_ROWS_289 = std::to_array<ProtRow_s>({
         {"OPOBJ2", 4, 6}, {"OPLOC1", 10, 6}, {"OPPLAYER3", 13, 2}, {"OPPLAYERU", 16, 8}, {"OPNPC2", 21, 2}, {"OPOBJ5", 22, 6},
         {"IDK_SAVEDESIGN", 27, 13}, {"OPNPC4", 30, 2}, {"CLIENT_CHEAT", 34, -1}, {"OPHELD3", 40, 6}, {"INV_BUTTON1", 44, 6}, {"OPLOC2", 45, 6},
@@ -99,6 +136,7 @@ namespace
     // clang-format on
 
     constexpr auto ZONE_OPCODES_225 = std::to_array<u8>({23, 42, 49, 50, 59, 69, 76, 151, 191, 223});
+    constexpr auto ZONE_OPCODES_274 = std::to_array<u8>({48, 52, 81, 85, 95, 107, 138, 173, 176, 219});
     constexpr auto ZONE_OPCODES_289 = std::to_array<u8>({60, 71, 83, 87, 90, 106, 117, 176, 194, 233});
 
     constexpr auto CLIENT_ONLY_225 = std::to_array({ClientProt_e::EventTracking, ClientProt_e::RebuildGetMaps});
@@ -128,6 +166,8 @@ namespace
         {
         case Revision_e::Rev225:
             return {revision, SERVER_ROWS_225, CLIENT_ROWS_225, ZONE_OPCODES_225, CLIENT_ONLY_289};
+        case Revision_e::Rev274:
+            return {revision, SERVER_ROWS_274, CLIENT_ROWS_274, ZONE_OPCODES_274, CLIENT_ONLY_225};
         case Revision_e::Rev289:
             return {revision, SERVER_ROWS_289, CLIENT_ROWS_289, ZONE_OPCODES_289, CLIENT_ONLY_225};
         }
@@ -151,9 +191,10 @@ namespace
 TEST_CASE("Each revision's server table matches the engine's for all 256 opcodes", "[Protocol]")
 {
     static_assert(SERVER_ROWS_225.size() == 71);
+    static_assert(SERVER_ROWS_274.size() == 69);
     static_assert(SERVER_ROWS_289.size() == 69);
 
-    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev289));
+    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289));
     const auto protocol = Protocol{rows.revision};
     CAPTURE(static_cast<u16>(rows.revision));
 
@@ -177,9 +218,10 @@ TEST_CASE("Each revision's server table matches the engine's for all 256 opcodes
 TEST_CASE("Each revision's client table matches the engine's", "[Protocol]")
 {
     static_assert(CLIENT_ROWS_225.size() == 78);
+    static_assert(CLIENT_ROWS_274.size() == 82);
     static_assert(CLIENT_ROWS_289.size() == 82);
 
-    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev289));
+    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289));
     const auto protocol = Protocol{rows.revision};
     CAPTURE(static_cast<u16>(rows.revision));
 
@@ -204,9 +246,9 @@ TEST_CASE("Each revision's client table matches the engine's", "[Protocol]")
     CHECK(present == rows.clientRows.size());
 }
 
-TEST_CASE("Each revision lacks the client packets only the other has", "[Protocol]")
+TEST_CASE("Each revision lacks the client packets it doesn't have", "[Protocol]")
 {
-    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev289));
+    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289));
     const auto protocol = Protocol{rows.revision};
     CAPTURE(static_cast<u16>(rows.revision));
 
@@ -222,7 +264,7 @@ TEST_CASE("Each revision lacks the client packets only the other has", "[Protoco
 
 TEST_CASE("Each revision marks exactly the zone sub-packets", "[Protocol]")
 {
-    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev289));
+    const auto rows = GetRows(GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289));
     const auto protocol = Protocol{rows.revision};
     CAPTURE(static_cast<u16>(rows.revision));
 
