@@ -1,0 +1,7 @@
+# The Linux build's toolchain on Arch, for the newest clang and CMake. The packages are README's, plus rsync for
+# run-tests.sh. vcpkg is cloned whole, because vcpkg.json pins a baseline commit.
+FROM archlinux:latest
+RUN pacman -Syu --noconfirm --needed base-devel clang cmake ninja git curl zip unzip tar perl python rsync \
+    && pacman -Scc --noconfirm
+RUN git clone https://github.com/microsoft/vcpkg /opt/vcpkg && /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+ENV VCPKG_ROOT=/opt/vcpkg

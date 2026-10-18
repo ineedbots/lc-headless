@@ -1,0 +1,9 @@
+# The Linux build's toolchain on Ubuntu 24.04, the oldest Ubuntu with a libstdc++ that has <format>. The packages are
+# README's, plus rsync for run-tests.sh. vcpkg is cloned whole, because vcpkg.json pins a baseline commit.
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential clang cmake ninja-build git curl zip unzip tar pkg-config perl python3 ca-certificates rsync \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone https://github.com/microsoft/vcpkg /opt/vcpkg && /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+ENV VCPKG_ROOT=/opt/vcpkg
