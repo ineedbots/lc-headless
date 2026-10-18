@@ -6,12 +6,14 @@
 #include "DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
 #include "ObjType_s.hpp"
+#include "RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 #include "TypeDecoder.hpp"
 
 namespace
 {
     using Dropped = DroppedOpcodes_s;
+    using Revisioned = RevisionedOpcode_s;
 
     constexpr auto NO_VALUE = DroppedOpcodes_s::NO_VALUE;
     constexpr auto VOWELS = "aeiou"sv;
@@ -88,8 +90,15 @@ namespace
         Dropped::Drop(TEAM, sizeof(u8)),
     });
 
-    constexpr auto REMOVED_IN_289 = std::to_array({CODE9});
-    constexpr auto ADDED_IN_289 = std::to_array({RESIZE_X, RESIZE_Y, RESIZE_Z, AMBIENT, CONTRAST, TEAM});
+    constexpr auto REVISIONED = std::to_array({
+        Revisioned::RemovedIn(CODE9, Revision_e::Rev289),
+        Revisioned::AddedIn(RESIZE_X, Revision_e::Rev289),
+        Revisioned::AddedIn(RESIZE_Y, Revision_e::Rev289),
+        Revisioned::AddedIn(RESIZE_Z, Revision_e::Rev289),
+        Revisioned::AddedIn(AMBIENT, Revision_e::Rev289),
+        Revisioned::AddedIn(CONTRAST, Revision_e::Rev289),
+        Revisioned::AddedIn(TEAM, Revision_e::Rev289),
+    });
 
     // A banknote's links, resolved once every obj is decoded.
     struct CertLinks_s
@@ -108,7 +117,7 @@ namespace
                 break;
             }
 
-            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            if (!TypeDecoder::HasOpcode(revision, opcode, REVISIONED))
             {
                 TypeDecoder::ThrowUnknown(opcode);
             }

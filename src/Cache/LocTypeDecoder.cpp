@@ -5,12 +5,14 @@
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "LocType_s.hpp"
+#include "RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 #include "TypeDecoder.hpp"
 
 namespace
 {
     using Dropped = DroppedOpcodes_s;
+    using Revisioned = RevisionedOpcode_s;
 
     constexpr auto NO_VALUE = DroppedOpcodes_s::NO_VALUE;
     constexpr auto CENTREPIECE_STRAIGHT = u8{10};
@@ -73,8 +75,13 @@ namespace
         Dropped::Drop(RAISE_OBJECT, sizeof(u8)),
     });
 
-    constexpr auto REMOVED_IN_289 = std::to_array({ANIMATE_TRANSPARENCIES});
-    constexpr auto ADDED_IN_289 = std::to_array({MODELS, BREAK_ROUTE_FINDING, RAISE_OBJECT, MULTILOC});
+    constexpr auto REVISIONED = std::to_array({
+        Revisioned::RemovedIn(ANIMATE_TRANSPARENCIES, Revision_e::Rev289),
+        Revisioned::AddedIn(MODELS, Revision_e::Rev289),
+        Revisioned::AddedIn(BREAK_ROUTE_FINDING, Revision_e::Rev289),
+        Revisioned::AddedIn(RAISE_OBJECT, Revision_e::Rev289),
+        Revisioned::AddedIn(MULTILOC, Revision_e::Rev289),
+    });
 
     // What a loc's model opcodes said, which decides whether it's active when opcode 19 doesn't.
     struct LocModels_s
@@ -133,7 +140,7 @@ namespace
                 break;
             }
 
-            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            if (!TypeDecoder::HasOpcode(revision, opcode, REVISIONED))
             {
                 TypeDecoder::ThrowUnknown(opcode);
             }

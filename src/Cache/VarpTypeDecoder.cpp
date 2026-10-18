@@ -4,12 +4,14 @@
 #include "../Config/Revision_e.hpp"
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
+#include "RevisionedOpcode_s.hpp"
 #include "TypeDecoder.hpp"
 #include "VarpType_s.hpp"
 
 namespace
 {
     using Dropped = DroppedOpcodes_s;
+    using Revisioned = RevisionedOpcode_s;
 
     constexpr auto NO_VALUE = DroppedOpcodes_s::NO_VALUE;
 
@@ -41,8 +43,11 @@ namespace
         Dropped::Drop(CODE13, NO_VALUE),
     });
 
-    constexpr auto REMOVED_IN_289 = std::array<u8, 0>{};
-    constexpr auto ADDED_IN_289 = std::to_array({CODE11, CODE12, CODE13});
+    constexpr auto REVISIONED = std::to_array({
+        Revisioned::AddedIn(CODE11, Revision_e::Rev289),
+        Revisioned::AddedIn(CODE12, Revision_e::Rev289),
+        Revisioned::AddedIn(CODE13, Revision_e::Rev289),
+    });
 
     void DecodeVarp(Packet& packet, VarpType_s& type, Revision_e revision)
     {
@@ -54,7 +59,7 @@ namespace
                 break;
             }
 
-            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            if (!TypeDecoder::HasOpcode(revision, opcode, REVISIONED))
             {
                 TypeDecoder::ThrowUnknown(opcode);
             }

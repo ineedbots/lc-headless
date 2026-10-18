@@ -5,12 +5,14 @@
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "NpcType_s.hpp"
+#include "RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 #include "TypeDecoder.hpp"
 
 namespace
 {
     using Dropped = DroppedOpcodes_s;
+    using Revisioned = RevisionedOpcode_s;
 
     constexpr auto NO_VALUE = DroppedOpcodes_s::NO_VALUE;
     constexpr auto NO_COMBAT_LEVEL = u16{0};
@@ -60,8 +62,14 @@ namespace
         Dropped::Drop(TURN_SPEED, sizeof(u16)),
     });
 
-    constexpr auto REMOVED_IN_289 = std::to_array({ANIMATE_TRANSPARENCIES});
-    constexpr auto ADDED_IN_289 = std::to_array({ALWAYS_ON_TOP, AMBIENT, CONTRAST, HEAD_ICON, TURN_SPEED});
+    constexpr auto REVISIONED = std::to_array({
+        Revisioned::RemovedIn(ANIMATE_TRANSPARENCIES, Revision_e::Rev289),
+        Revisioned::AddedIn(ALWAYS_ON_TOP, Revision_e::Rev289),
+        Revisioned::AddedIn(AMBIENT, Revision_e::Rev289),
+        Revisioned::AddedIn(CONTRAST, Revision_e::Rev289),
+        Revisioned::AddedIn(HEAD_ICON, Revision_e::Rev289),
+        Revisioned::AddedIn(TURN_SPEED, Revision_e::Rev289),
+    });
 
     void DecodeNpc(Packet& packet, NpcType_s& type, TextPool& text, Revision_e revision)
     {
@@ -73,7 +81,7 @@ namespace
                 break;
             }
 
-            if (!TypeDecoder::HasOpcode(revision, opcode, REMOVED_IN_289, ADDED_IN_289))
+            if (!TypeDecoder::HasOpcode(revision, opcode, REVISIONED))
             {
                 TypeDecoder::ThrowUnknown(opcode);
             }

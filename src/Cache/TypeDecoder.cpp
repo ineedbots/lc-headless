@@ -6,6 +6,7 @@
 #include "../Utils/StringUtils.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
+#include "RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 
 namespace
@@ -14,14 +15,15 @@ namespace
     constexpr auto HIDDEN_OPTION = "hidden"sv;
 }
 
-bool TypeDecoder::HasOpcode(Revision_e revision, u8 opcode, std::span<const u8> removedIn289, std::span<const u8> addedIn289)
+bool TypeDecoder::HasOpcode(Revision_e revision, u8 opcode, std::span<const RevisionedOpcode_s> table)
 {
-    if (revision >= Revision_e::Rev289)
+    const auto found = std::ranges::find(table, opcode, &RevisionedOpcode_s::opcode);
+    if (found == table.end())
     {
-        return std::ranges::find(removedIn289, opcode) == removedIn289.end();
+        return true;
     }
 
-    return std::ranges::find(addedIn289, opcode) == addedIn289.end();
+    return revision >= found->addedIn && (!found->removedIn || revision < *found->removedIn);
 }
 
 void TypeDecoder::Skip(Packet& packet, std::size_t count)

@@ -4,6 +4,7 @@
 #include "../Io/Packet.hpp"
 #include "DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
+#include "RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 
 // What the loc, NPC, obj and varp decoders share: the .dat and .idx framing, the opcodes every type
@@ -87,9 +88,9 @@ public:
         return types;
     }
 
-    // Whether the revision has the opcode, given the opcodes 289 removed and added. A cache decoded as the
-    // wrong revision then fails on an unknown opcode rather than reading garbage.
-    [[nodiscard]] static bool HasOpcode(Revision_e revision, u8 opcode, std::span<const u8> removedIn289, std::span<const u8> addedIn289);
+    // Whether the revision has the opcode; one the table doesn't list is in every revision. A cache decoded as
+    // the wrong revision then fails on an unknown opcode rather than reading garbage.
+    [[nodiscard]] static bool HasOpcode(Revision_e revision, u8 opcode, std::span<const RevisionedOpcode_s> table);
     static void Skip(Packet& packet, std::size_t count);
     // Reads and drops the value of an opcode in the table, or returns false for an opcode that isn't.
     [[nodiscard]] static bool SkipDropped(Packet& packet, u8 opcode, std::span<const DroppedOpcodes_s> table);

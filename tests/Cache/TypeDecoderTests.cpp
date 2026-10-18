@@ -8,7 +8,9 @@
 #include "Cache/NpcType_s.hpp"
 #include "Cache/ObjTypeDecoder.hpp"
 #include "Cache/ObjType_s.hpp"
+#include "Cache/RevisionedOpcode_s.hpp"
 #include "Cache/TextPool.hpp"
+#include "Cache/TypeDecoder.hpp"
 #include "Cache/VarpTypeDecoder.hpp"
 #include "Cache/VarpType_s.hpp"
 #include "Config/Revision_e.hpp"
@@ -404,6 +406,21 @@ TEST_CASE("VarpTypeDecoder keeps each varp's client code and drops its other opc
 TEST_CASE("VarpTypeDecoder rejects an unknown opcode", "[TypeDecoder]")
 {
     CHECK_THROWS_WITH(DecodeVarps({std::vector<u8>{9, 0}}), "varp 0: unknown opcode 9");
+}
+
+TEST_CASE("TypeDecoder finds an opcode's revisions in its table", "[TypeDecoder]")
+{
+    constexpr auto TABLE = std::to_array({
+        RevisionedOpcode_s::AddedIn(1, Revision_e::Rev289),
+        RevisionedOpcode_s::RemovedIn(2, Revision_e::Rev289),
+    });
+
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev225, 3, TABLE));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev289, 3, TABLE));
+    CHECK_FALSE(TypeDecoder::HasOpcode(Revision_e::Rev225, 1, TABLE));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev289, 1, TABLE));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev225, 2, TABLE));
+    CHECK_FALSE(TypeDecoder::HasOpcode(Revision_e::Rev289, 2, TABLE));
 }
 
 TEST_CASE("TypeDecoder reads the flags only 225 has, and 289 rejects them", "[TypeDecoder]")
