@@ -6,12 +6,21 @@
 
 std::shared_ptr<const Config_s> ConfigOverrides::ForAccount(std::shared_ptr<const Config_s> config, const AccountConfig_s& account)
 {
-    if (!account.server)
+    if (!account.server && !account.proxy)
     {
         return config;
     }
 
     auto own = *config;
-    own.server = *account.server;
+    if (account.server)
+    {
+        own.server = *account.server;
+    }
+
+    if (account.proxy)
+    {
+        own.proxy = *account.proxy;
+    }
+
     return std::make_shared<const Config_s>(std::move(own));
 }

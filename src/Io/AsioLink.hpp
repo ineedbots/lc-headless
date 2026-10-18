@@ -43,6 +43,11 @@ private:
     boost::asio::awaitable<void> RunTcp(Tcp::socket& socket);
     template <typename TSocket>
     boost::asio::awaitable<void> Connect(TSocket& socket);
+    boost::asio::awaitable<void> NegotiateProxy(Tcp::socket& tcp);
+    // False when Close or the timer has ended the attempt.
+    boost::asio::awaitable<bool> WriteToProxy(Tcp::socket& tcp, std::vector<u8> bytes);
+    boost::asio::awaitable<bool> ReadFromProxy(Tcp::socket& tcp, std::span<u8> bytes);
+    [[nodiscard]] bool CheckProxyStep(boost::system::error_code error) const;
     template <typename TSocket>
     boost::asio::awaitable<void> Upgrade(TSocket& socket);
     template <typename TSocket>

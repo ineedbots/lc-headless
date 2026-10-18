@@ -2,10 +2,12 @@
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/Game/TestWorld.hpp"
+#include "../Support/Io/FakeSocks5Proxy.hpp"
 #include "../Support/LogCapture.hpp"
 
 #include "Cache/GameCache_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/ProxySettings_s.hpp"
 #include "Config/Revision_e.hpp"
 #include "Config/Transport_e.hpp"
 #include "Console/LogLevel_e.hpp"
@@ -381,6 +383,41 @@ TEST_CASE("GameClient reconnects when the connection drops", "[GameClient]")
     CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 18});
     CHECK(client.GetState().pid == Fixtures::PID);
     CHECK(client.GetState().npcs.size() == 1);
+    CHECK(server.GetErrors().empty());
+}
+
+TEST_CASE("GameClient logs in and reconnects through a SOCKS5 proxy", "[GameClient][Socks5]")
+{
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, transport};
+    auto proxy = FakeSocks5Proxy{};
+    proxy.SetCredentials("proxyuser", "proxypass");
+
+    auto config = server.MakeConfig();
+    config.proxy = ProxySettings_s{.host = "127.0.0.1", .port = proxy.GetPort(), .username = "proxyuser", .password = "proxypass"};
+    auto client = GameClient{std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+
+    client.Login();
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.GetState().placed;
+    }));
+
+    const auto record = proxy.GetRecord();
+    CHECK(record.accepted == 1);
+    REQUIRE(record.requests.size() == 1);
+    CHECK(record.requests[0].port == config.server.port);
+
+    // A reconnect builds its options again, so it goes through the proxy too.
+    server.SetLoginStatus(15);
+    server.Close();
+    REQUIRE(PumpUntil(client, [&server]
+    {
+        return server.GetLoginOpcodes().size() == 2;
+    }));
+
+    CHECK(proxy.GetRecord().accepted == 2);
     CHECK(server.GetErrors().empty());
 }
 

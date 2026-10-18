@@ -2,6 +2,7 @@
 
 #include "../Console/LogLevel_e.hpp"
 #include "../Utils/BigUInt.hpp"
+#include "ProxySettings_s.hpp"
 #include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
 
@@ -43,6 +44,7 @@ struct ScriptingSettings_s
 struct Config_s
 {
     ServerSettings_s server;
+    ProxySettings_s proxy;
     LoginSettings_s login;
     ClientSettings_s client;
     ScriptingSettings_s scripting;

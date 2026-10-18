@@ -7,6 +7,7 @@
 #include "AccountConfig_s.hpp"
 #include "Config_s.hpp"
 #include "Error/ConfigError.hpp"
+#include "ProxySettings_s.hpp"
 #include "ServerSettings_s.hpp"
 #include "TransportNames.hpp"
 #include "Transport_e.hpp"
@@ -196,11 +197,31 @@ namespace nlohmann
 }
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, transport, host, port, origin, tlsCaFile)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ProxySettings_s, host, port, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, password)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, reloginDelaySeconds, progressDirectory)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, login, client, scripting)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, proxy, login, client, scripting)
+
+// An account's own copy of a client.jsonc section. Missing or null keeps client.jsonc's, and a key the object leaves
+// out takes the section's default.
+template <typename TSection>
+std::optional<TSection> ReadSection(const nlohmann::json& account, std::string_view key)
+{
+    const auto section = account.find(key);
+    if (section == account.end() || section->is_null())
+    {
+        return std::nullopt;
+    }
+
+    if (!section->is_object())
+    {
+        throw nlohmann::json::type_error::create(TYPE_ERROR_ID, "must be an object", &*section);
+    }
+
+    return section->get<TSection>();
+}
 
 // Account files are only read, and a script's settings can be any object, so they convert by hand.
 void from_json(const nlohmann::json& value, ScriptConfig_s& script)
@@ -232,16 +253,8 @@ void from_json(const nlohmann::json& value, AccountConfig_s& account)
     account.runAuto = value.value("runAuto", account.runAuto);
     account.runEnergyMin = value.value("runEnergyMin", account.runEnergyMin);
 
-    const auto server = value.find("server");
-    if (server != value.end() && !server->is_null())
-    {
-        if (!server->is_object())
-        {
-            throw nlohmann::json::type_error::create(TYPE_ERROR_ID, "must be an object", &*server);
-        }
-
-        account.server = server->get<ServerSettings_s>();
-    }
+    account.server = ReadSection<ServerSettings_s>(value, "server");
+    account.proxy = ReadSection<ProxySettings_s>(value, "proxy");
 
     const auto script = value.find("script");
     if (script == value.end() || script->is_null())

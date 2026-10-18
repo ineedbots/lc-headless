@@ -9,6 +9,9 @@
 
     // Uncomment to log this account into a different world than client.jsonc's server.
     // "server": {"transport": "wss", "host": "w2.example.com", "port": 443, "origin": "https://w2.example.com"},
+    // Uncomment to send this account through its own SOCKS5 proxy instead of client.jsonc's.
+    // {"host": ""} connects it directly.
+    // "proxy": {"host": "127.0.0.1", "port": 1080, "username": "user", "password": "pass"},
 
     // Without a script: seconds to idle before logging out. 0 idles until Ctrl+C.
     "idleSeconds": 0,

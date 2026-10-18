@@ -9,6 +9,13 @@
         "origin": "http://localhost",
         "tlsCaFile": "SYSTEM"
     },
+    // Optional SOCKS5 proxy for every account; an empty host connects directly.
+    "proxy": {
+        "host": "",
+        "port": 1080,
+        "username": "",
+        "password": ""
+    },
     "login": {
         "rsaModulus": "0x0",
         "rsaExponent": "0x0",

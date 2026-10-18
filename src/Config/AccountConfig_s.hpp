@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProxySettings_s.hpp"
 #include "ServerSettings_s.hpp"
 
 struct AccountSettings_s
@@ -17,7 +18,7 @@ struct ScriptConfig_s
     std::chrono::minutes progressReportMinutes{0};
 };
 
-// One account file. A server section replaces client.jsonc's for this account.
+// One account file. A server or proxy section replaces client.jsonc's for this account.
 struct AccountConfig_s
 {
     std::string name;
@@ -26,6 +27,7 @@ struct AccountConfig_s
     AccountSettings_s credentials;
     bool enabled = true;
     std::optional<ServerSettings_s> server;
+    std::optional<ProxySettings_s> proxy;
     std::optional<ScriptConfig_s> script;
     // Zero idles until interrupted.
     std::chrono::seconds idleSeconds{0};

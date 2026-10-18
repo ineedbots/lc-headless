@@ -77,7 +77,7 @@ rs2004-headless/
 │       ├── AccountDirectory.hpp / .cpp  every enabled account in the accounts folder
 │       ├── ConfigJson.hpp / .cpp        every nlohmann conversion
 │       ├── ConfigValidator.hpp / .cpp   every rule and limit
-│       └── ConfigOverrides.hpp / .cpp   an account's server over client.jsonc's
+│       └── ConfigOverrides.hpp / .cpp   an account's server and proxy over client.jsonc's
 └── tests/
     └── Config/
         ├── ConfigFileTests.cpp
@@ -195,6 +195,10 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 | `server.port` | integer | `0` | 1 to 65535. An `s32`, so a value too big for a port fails instead of wrapping |
 | `server.origin` | string | `""`: no `Origin` header | Empty, or printable ASCII. Checked with `tcp` too, and unused |
 | `server.tlsCaFile` | string | `"SYSTEM"` | Not empty: a PEM CA bundle path, `SYSTEM` for the platform trust store, or `NONE` for no verification. Only used for `wss` |
+| `proxy.host` | string | `""`: connect directly | Empty, or the `server.host` rule. A SOCKS5 proxy ([TransportDesign.md](TransportDesign.md) §9) |
+| `proxy.port` | integer | `1080` | 1 to 65535 |
+| `proxy.username` | string | `""`: no authentication | Empty, or 1 to 255 printable ASCII characters. A secret: no message or log line contains it |
+| `proxy.password` | string | `""` | 1 to 255 printable ASCII characters when `proxy.username` is set, and empty when it isn't. A secret |
 | `login.rsaModulus` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 1 |
 | `login.rsaExponent` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 0 |
 | `login.lowMemory` | boolean | `false` | |
@@ -254,6 +258,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `Account
 | `password` | string | none | 1 to 20 printable ASCII characters |
 | `enabled` | boolean | `true` | |
 | `server` | object or `null` | none: `client.jsonc`'s | The same keys and rules as `client.jsonc`'s `server` section, with `host` and `port` required. Logs this account into another world |
+| `proxy` | object or `null` | none: `client.jsonc`'s | The same keys, rules and defaults as `client.jsonc`'s `proxy` section. It replaces that section whole, so a key it leaves out takes its default, and `{"host": ""}` connects this account directly |
 | `idleSeconds` | integer | `0`: idle until interrupted | 0 to 86400. Without a script, how long the account idles, from its first step in game, before it logs out. Stored as `std::chrono::seconds` |
 | `randomEvents` | boolean | `true` | Whether the script's random event guardian runs ([BotApiDesign.md](BotApiDesign.md) §10) |
 | `stallMinutes` | integer | `10` | 0 to 1440. How long the script may go without moving, gaining experience or noting progress before the stall guard steps in; 0 turns it off. Stored as `std::chrono::minutes` ([BotApiDesign.md](BotApiDesign.md) §11) |

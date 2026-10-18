@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"
+#include "../Support/Io/FakeSocks5Proxy.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 #include "../Support/TempFolder.hpp"
@@ -9,6 +10,7 @@
 #include "Cache/GameCache_s.hpp"
 #include "Config/AccountConfig_s.hpp"
 #include "Config/Config_s.hpp"
+#include "Config/ProxySettings_s.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/GameClient.hpp"
@@ -451,4 +453,39 @@ def loop():
         CHECK(fixture.account->DescribeOutcome() == "failed");
         CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16, 16, 16});
     }
+}
+
+TEST_CASE("An account connects through client.jsonc's proxy unless its file names its own", "[Account][Socks5]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto shared = FakeSocks5Proxy{};
+    auto own = FakeSocks5Proxy{};
+
+    auto config = server.MakeConfig();
+    config.proxy = ProxySettings_s{.host = "127.0.0.1", .port = shared.GetPort()};
+    auto settings = AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()};
+
+    SECTION("no proxy in the account file")
+    {
+    }
+
+    SECTION("the account's own proxy")
+    {
+        settings.proxy = ProxySettings_s{.host = "127.0.0.1", .port = own.GetPort()};
+    }
+
+    SECTION("an empty host connects directly")
+    {
+        settings.proxy = ProxySettings_s{};
+    }
+
+    const auto expectShared = !settings.proxy;
+    const auto expectOwn = settings.proxy && !settings.proxy->host.empty();
+    auto account = Account{std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger()};
+    account.Login();
+
+    CHECK(server.GetLoginOpcodes().size() == 1);
+    CHECK(shared.GetRecord().accepted == (expectShared ? 1 : 0));
+    CHECK(own.GetRecord().accepted == (expectOwn ? 1 : 0));
 }

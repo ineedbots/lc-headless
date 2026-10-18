@@ -31,6 +31,12 @@ namespace
         "origin": "https://w1.rs2b2t.com",
         "tlsCaFile": "SYSTEM"
     },
+    "proxy": {
+        "host": "127.0.0.1",
+        "port": 9050,
+        "username": "",
+        "password": ""
+    },
     "login": {
         "rsaModulus": "0x88c38748a58228f7261cdc340b5691d7d0975dee0ecdb717609e6bf971eb3fe723ef9d130e4686813739768ad9472eb46d8bfcc042c1a5fcb05e931f632eea5d",
         "rsaExponent": "0x81f390b2cf8ca7039ee507975951d5a0b15a87bf8b3f99c966834118c50fd94d",
@@ -67,6 +73,12 @@ namespace
         "port": 0,
         "origin": "",
         "tlsCaFile": "SYSTEM"
+    },
+    "proxy": {
+        "host": "",
+        "port": 1080,
+        "username": "",
+        "password": ""
     },
     "login": {
         "rsaModulus": "0x0",
@@ -143,6 +155,10 @@ namespace
         {"server", "transport"},
         {"server", "origin"},
         {"server", "tlsCaFile"},
+        {"proxy", "host"},
+        {"proxy", "port"},
+        {"proxy", "username"},
+        {"proxy", "password"},
         {"login", "lowMemory"},
         {"login", "revision"},
         {"client", "logLevel"},
@@ -261,6 +277,10 @@ namespace
         CHECK(config.server.port == 80);
         CHECK(config.server.origin == "https://w1.rs2b2t.com");
         CHECK(config.server.tlsCaFile == "SYSTEM");
+        CHECK(config.proxy.host == "127.0.0.1");
+        CHECK(config.proxy.port == 9050);
+        CHECK(config.proxy.username.empty());
+        CHECK(config.proxy.password.empty());
         CHECK(config.login.rsaModulus == BigUInt::Parse(EXAMPLE_MODULUS));
         CHECK(config.login.rsaExponent == BigUInt::Parse(EXAMPLE_EXPONENT));
         CHECK_FALSE(config.login.lowMemory);
@@ -296,6 +316,10 @@ namespace
     {
         CHECK(config.server.origin.empty());
         CHECK(config.server.tlsCaFile == "SYSTEM");
+        CHECK(config.proxy.host.empty());
+        CHECK(config.proxy.port == 1080);
+        CHECK(config.proxy.username.empty());
+        CHECK(config.proxy.password.empty());
         CHECK_FALSE(config.login.lowMemory);
         CHECK(config.login.revision == Revision_e::Rev289);
         CHECK(config.client.logLevel == LogLevel_e::Info);
@@ -399,7 +423,14 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             CAPTURE(key.GetPath());
 
             const auto config = ParseAccepted(RemoveKey(key));
-            if (key.key == "origin")
+            if (key.section == "proxy")
+            {
+                CHECK(config.proxy.host == (key.key == "host" ? "" : "127.0.0.1"));
+                CHECK(config.proxy.port == (key.key == "port" ? 1080 : 9050));
+                CHECK(config.proxy.username.empty());
+                CHECK(config.proxy.password.empty());
+            }
+            else if (key.key == "origin")
             {
                 CHECK(config.server.origin.empty());
             }
@@ -488,6 +519,7 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         CHECK(config.client.cacheDirectory == "data/cache");
 
         CheckScriptingDefaults(ParseAccepted(removeSection("scripting")).scripting);
+        CHECK(ParseAccepted(removeSection("proxy")).proxy.host.empty());
     }
 
     SECTION("an empty object fails on server.host")
@@ -506,6 +538,10 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
         {
             json["login"] = "x";
         }), "login");
+        CheckRejected(EditBase([](nlohmann::json& json)
+        {
+            json["proxy"] = nlohmann::json::array();
+        }), "proxy");
         // clang-format on
     }
 
@@ -626,6 +662,30 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         }
     }
 
+    SECTION("proxy")
+    {
+        for (const auto& host : {""s, "127.0.0.1"s, "proxy.example.com"s, std::string(253, 'a')})
+        {
+            CHECK(ParseAccepted(SetKey({"proxy", "host"}, host)).proxy.host == host);
+        }
+
+        for (const auto port : {1, 65535})
+        {
+            CHECK(ParseAccepted(SetKey({"proxy", "port"}, port)).proxy.port == port);
+        }
+
+        for (const auto length : {std::size_t{1}, std::size_t{255}})
+        {
+            const auto config = ParseAccepted(EditBase([length](nlohmann::json& json)
+            {
+                json["proxy"]["username"] = std::string(length, 'u');
+                json["proxy"]["password"] = std::string(length, 'p');
+            }));
+            CHECK(config.proxy.username.size() == length);
+            CHECK(config.proxy.password.size() == length);
+        }
+    }
+
     SECTION("scripting")
     {
         CHECK(ParseAccepted(SetKey({"scripting", "accountsDirectory"}, "C:/bots/accounts")).scripting.accountsDirectory == "C:/bots/accounts");
@@ -710,6 +770,18 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"server", "origin"}, true},
         {{"server", "tlsCaFile"}, ""},
         {{"server", "tlsCaFile"}, 5},
+        {{"proxy", "host"}, "local host"},
+        {{"proxy", "host"}, "\xC3\xA9"},
+        {{"proxy", "host"}, "socks5://proxy"},
+        {{"proxy", "host"}, std::string(254, 'a')},
+        {{"proxy", "host"}, 5},
+        {{"proxy", "port"}, 0},
+        {{"proxy", "port"}, 65536},
+        {{"proxy", "port"}, -1},
+        {{"proxy", "port"}, "1080"},
+        {{"proxy", "username"}, std::string(256, 'u')},
+        {{"proxy", "username"}, "a\tb"},
+        {{"proxy", "password"}, SECRET_PASSWORD},
         {{"login", "rsaModulus"}, "0"},
         {{"login", "rsaModulus"}, "1"},
         {{"login", "rsaModulus"}, ""},
@@ -761,6 +833,31 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
     {
         CAPTURE(rejection.key.GetPath(), rejection.value.dump());
         CheckRejected(SetKey(rejection.key, rejection.value), rejection.key.GetPath());
+    }
+
+    SECTION("a proxy username needs a password, of 255 characters at most")
+    {
+        CheckRejected(SetKey({"proxy", "username"}, "user"), "proxy.password");
+        CheckRejected(EditBase([](nlohmann::json& json)
+        {
+            json["proxy"]["username"] = "user";
+            json["proxy"]["password"] = std::string(256, 'p');
+        }), "proxy.password");
+    }
+
+    SECTION("a rejected proxy names neither credential")
+    {
+        CheckRejected(EditBase([](nlohmann::json& json)
+        {
+            json["proxy"]["username"] = SECRET_PASSWORD;
+            json["proxy"]["password"] = SECRET_PASSWORD;
+            json["proxy"]["port"] = 0;
+        }), "proxy.port");
+        CheckRejected(EditBase([](nlohmann::json& json)
+        {
+            json["proxy"]["username"] = std::string{SECRET_PASSWORD} + std::string(255, 'u');
+            json["proxy"]["password"] = SECRET_PASSWORD;
+        }), "proxy.username");
     }
 }
 

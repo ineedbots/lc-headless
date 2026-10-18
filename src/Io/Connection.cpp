@@ -36,6 +36,16 @@ namespace
             throw std::invalid_argument{"Connection options: tlsCaFile must not be empty for wss"};
         }
 
+        if (options.proxy && options.proxy->host.empty())
+        {
+            throw std::invalid_argument{"Connection options: proxy host must not be empty"};
+        }
+
+        if (options.proxy && options.proxy->port == 0)
+        {
+            throw std::invalid_argument{"Connection options: proxy port must not be 0"};
+        }
+
         return options;
     }
 

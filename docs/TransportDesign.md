@@ -6,7 +6,7 @@ Plan for the client's network transport. Boost.Beast and Asio replace IXWebSocke
 2. Raw TCP (`tcp`).
 3. SOCKS5, for all three transports.
 
-Phases 1 and 2 are built. Phase 3 is not.
+All three phases are built.
 
 This plan replaces two documents. WebSocketDesign.md describes the IXWebSocket transport built today; it is deleted when phase 1 lands. ProxyDesign.md planned SOCKS5 as a patch to IXWebSocket and was never built; its config, message and test decisions carry over into §2 and §9, and the file is deleted with this plan. Both stay readable in git history: where this plan says "WebSocketDesign §n", it means `git show 878e4dd:docs/WebSocketDesign.md`. Code style follows [CONVENTIONS.md](CONVENTIONS.md). The transport logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)) and is configured through `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)).
 
@@ -894,7 +894,13 @@ public:
 5. Write `BuildConnectRequest(host, port)`, read `CONNECT_REPLY_SIZE` bytes, `ParseConnectReply`. For a name, read its length byte. Then read and discard `GetBoundAddressSize(...)` bytes.
 6. Carry on with TLS (`wss`), the upgrade (`ws`, `wss`) or open (`tcp`).
 
-The reads and writes are on the lowest-layer `tcp::socket`, before any TLS or WebSocket layer is used. `GameClient`'s `MakeOptions` adds `MakeProxy(m_config->proxy)`: `std::nullopt` for an empty host, otherwise the members with the port cast to `u16`. Every reconnect builds its options again, so it goes through the proxy too.
+The reads and writes are on the lowest-layer `tcp::socket`, before any TLS or WebSocket layer is used.
+
+As built:
+
+- **The step names** for the proxy's own lookup and connect name it as the proxy: `Looking up SOCKS5 proxy {host} failed: ...` and `Connecting to SOCKS5 proxy {host}:{port} failed: ...`.
+- **I/O during the exchange.** `WriteToProxy` and `ReadFromProxy` return `false` once `Close()` or the timer has ended the attempt, and the exchange returns at once. A proxy that closes mid-exchange reads `closed the connection during the exchange`; any other error reads as its system message. Both get the `SOCKS5 proxy {host}:{port}: ` prefix, like the parse errors.
+- **`FakeSocks5Proxy`** resolves its targets over IPv4 only, so a test that sends `localhost` doesn't wait for `::1` to be refused. `GameClient`'s `MakeOptions` adds `MakeProxy(m_config->proxy)`: `std::nullopt` for an empty host, otherwise the members with the port cast to `u16`. Every reconnect builds its options again, so it goes through the proxy too.
 
 ---
 

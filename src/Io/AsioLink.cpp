@@ -8,6 +8,7 @@
 #include "ConnectionOptions_s.hpp"
 #include "Error/ConnectionError.hpp"
 #include "Link.hpp"
+#include "Socks5Handshake.hpp"
 #include "TrustStore.hpp"
 
 #include <boost/asio/as_tuple.hpp>
@@ -15,6 +16,7 @@
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/error.hpp>
+#include <boost/asio/read.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/asio/ssl/stream_base.hpp>
@@ -108,7 +110,16 @@ AsioLink::~AsioLink()
 
 void AsioLink::Start()
 {
-    m_logger->Info("Connecting to {}://{}:{}", TransportNames::GetName(m_options.transport), m_options.host, m_options.port);
+    const auto transport = TransportNames::GetName(m_options.transport);
+    if (m_options.proxy)
+    {
+        m_logger->Info("Connecting to {}://{}:{} through SOCKS5 proxy {}:{}", transport, m_options.host, m_options.port, m_options.proxy->host, m_options.proxy->port);
+    }
+    else
+    {
+        m_logger->Info("Connecting to {}://{}:{}", transport, m_options.host, m_options.port);
+    }
+
     ArmTimer(m_options.connectTimeout);
 
     // Run takes the shared_ptr as a parameter, so the coroutine frame keeps the link alive through every suspension;
@@ -250,17 +261,23 @@ boost::asio::awaitable<void> AsioLink::RunTcp(Tcp::socket& socket)
     co_await ReadStream(socket);
 }
 
+// With a proxy, TCP goes to the proxy, and the server's host is only ever named in the SOCKS5 exchange.
 template <typename TSocket>
 boost::asio::awaitable<void> AsioLink::Connect(TSocket& socket)
 {
+    const auto& proxy = m_options.proxy;
+    const auto& host = proxy ? proxy->host : m_options.host;
+    const auto port = proxy ? proxy->port : m_options.port;
+    const auto peer = proxy ? "SOCKS5 proxy "sv : ""sv;
+
     m_stage = "looking up the host"sv;
-    const auto [lookupError, endpoints] = co_await m_resolver.async_resolve(m_options.host, std::to_string(m_options.port), AS_TUPLE);
+    const auto [lookupError, endpoints] = co_await m_resolver.async_resolve(host, std::to_string(port), AS_TUPLE);
     if (!IsConnecting())
     {
         co_return;
     }
 
-    ThrowIfFailed(lookupError, std::format("Looking up {}", m_options.host));
+    ThrowIfFailed(lookupError, std::format("Looking up {}{}", peer, host));
 
     m_stage = "connecting"sv;
     auto& tcp = boost::beast::get_lowest_layer(socket);
@@ -270,8 +287,111 @@ boost::asio::awaitable<void> AsioLink::Connect(TSocket& socket)
         co_return;
     }
 
-    ThrowIfFailed(connectError, std::format("Connecting to {}:{}", m_options.host, m_options.port));
+    ThrowIfFailed(connectError, std::format("Connecting to {}{}:{}", peer, host, port));
     tcp.set_option(Tcp::no_delay{true});
+
+    if (proxy)
+    {
+        co_await NegotiateProxy(tcp);
+    }
+}
+
+// Each reply is read to its exact length, so the first byte of TLS, the upgrade or the game is left for them.
+boost::asio::awaitable<void> AsioLink::NegotiateProxy(Tcp::socket& tcp)
+{
+    m_stage = "during the SOCKS5 exchange"sv;
+    const auto& proxy = *m_options.proxy;
+    const auto withPassword = !proxy.username.empty();
+
+    try
+    {
+        if (!co_await WriteToProxy(tcp, Socks5Handshake::BuildGreeting(withPassword)))
+        {
+            co_return;
+        }
+
+        auto methodReply = std::array<u8, Socks5Handshake::METHOD_REPLY_SIZE>{};
+        if (!co_await ReadFromProxy(tcp, methodReply))
+        {
+            co_return;
+        }
+
+        if (Socks5Handshake::ParseMethodReply(methodReply, withPassword) == Socks5Method_e::UsernamePassword)
+        {
+            if (!co_await WriteToProxy(tcp, Socks5Handshake::BuildPasswordRequest(proxy.username, proxy.password)))
+            {
+                co_return;
+            }
+
+            auto passwordReply = std::array<u8, Socks5Handshake::PASSWORD_REPLY_SIZE>{};
+            if (!co_await ReadFromProxy(tcp, passwordReply))
+            {
+                co_return;
+            }
+
+            Socks5Handshake::ParsePasswordReply(passwordReply);
+        }
+
+        if (!co_await WriteToProxy(tcp, Socks5Handshake::BuildConnectRequest(m_options.host, m_options.port)))
+        {
+            co_return;
+        }
+
+        auto connectReply = std::array<u8, Socks5Handshake::CONNECT_REPLY_SIZE>{};
+        if (!co_await ReadFromProxy(tcp, connectReply))
+        {
+            co_return;
+        }
+
+        const auto type = Socks5Handshake::ParseConnectReply(connectReply);
+        auto domainLength = std::array<u8, 1>{};
+        if (type == Socks5AddressType_e::DomainName && !co_await ReadFromProxy(tcp, domainLength))
+        {
+            co_return;
+        }
+
+        auto boundAddress = std::vector<u8>(Socks5Handshake::GetBoundAddressSize(type, domainLength[0]));
+        if (!co_await ReadFromProxy(tcp, boundAddress))
+        {
+            co_return;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        throw ConnectionError{std::format("SOCKS5 proxy {}:{}: {}", proxy.host, proxy.port, e.what())};
+    }
+}
+
+boost::asio::awaitable<bool> AsioLink::WriteToProxy(Tcp::socket& tcp, std::vector<u8> bytes)
+{
+    const auto [error, size] = co_await boost::asio::async_write(tcp, boost::asio::buffer(bytes), AS_TUPLE);
+    co_return CheckProxyStep(error);
+}
+
+boost::asio::awaitable<bool> AsioLink::ReadFromProxy(Tcp::socket& tcp, std::span<u8> bytes)
+{
+    const auto [error, size] = co_await boost::asio::async_read(tcp, boost::asio::buffer(bytes), AS_TUPLE);
+    co_return CheckProxyStep(error);
+}
+
+bool AsioLink::CheckProxyStep(boost::system::error_code error) const
+{
+    if (!IsConnecting())
+    {
+        return false;
+    }
+
+    if (error == boost::asio::error::eof)
+    {
+        throw std::runtime_error{"closed the connection during the exchange"};
+    }
+
+    if (error)
+    {
+        throw std::runtime_error{error.message()};
+    }
+
+    return true;
 }
 
 template <typename TSocket>

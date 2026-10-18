@@ -6,6 +6,7 @@
 #include "../Cache/MapSquare.hpp"
 #include "../Config/AccountConfig_s.hpp"
 #include "../Config/Config_s.hpp"
+#include "../Config/ProxySettings_s.hpp"
 #include "../Config/Revision_e.hpp"
 #include "../Config/ServerSettings_s.hpp"
 #include "../Console/Logger.hpp"
@@ -84,14 +85,32 @@ namespace
         return std::max(remaining, 0ms);
     }
 
-    ConnectionOptions_s MakeOptions(const ServerSettings_s& server)
+    // The ports were validated, so they fit a u16.
+    std::optional<Socks5Proxy_s> MakeProxy(const ProxySettings_s& proxy)
     {
+        if (proxy.host.empty())
+        {
+            return std::nullopt;
+        }
+
+        return Socks5Proxy_s{
+            .host = proxy.host,
+            .port = static_cast<u16>(proxy.port),
+            .username = proxy.username,
+            .password = proxy.password,
+        };
+    }
+
+    ConnectionOptions_s MakeOptions(const Config_s& config)
+    {
+        const auto& server = config.server;
         return {
             .transport = server.transport,
             .host = server.host,
             .port = static_cast<u16>(server.port),
             .origin = server.origin,
             .tlsCaFile = server.tlsCaFile,
+            .proxy = MakeProxy(config.proxy),
         };
     }
 }
@@ -426,7 +445,7 @@ void GameClient::StartAttempt()
     m_writer.reset();
     m_outgoing.clear();
     m_connection.reset();
-    m_connection.emplace(*m_net, MakeOptions(m_config->server), m_logger);
+    m_connection.emplace(*m_net, MakeOptions(*m_config), m_logger);
     m_handshake.emplace(m_protocol, m_account, m_config->login, m_cache->crcs, m_reconnecting);
     m_attemptDeadline = Clock::now() + m_options.loginTimeout;
 }

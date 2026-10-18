@@ -92,6 +92,15 @@ ctest --preset windows-debug      # or linux-debug
 
 The Catch2 tests don't need a server. The network tests run against a fake game server on loopback ports. The tests also load the scripts in `scripts/examples/`, so an example that no longer loads fails them.
 
+To check the Linux build from any machine with Docker, including Windows through Git Bash:
+
+```sh
+tools/docker/check.sh              # Ubuntu 24.04 and Arch, Debug and Release
+tools/docker/check.sh ubuntu       # one distro
+```
+
+It builds each distro's toolchain image, then configures, builds and tests a copy of the source with the `linux-clang` preset, without touching the checkout. Logs go to `build/docker/<distro>/`. The first run builds the vcpkg dependencies, which later runs reuse from a Docker volume.
+
 ## Configuration
 
 The client reads two kinds of file. Both are JSON and allow `//` and `/* */` comments. Paths are relative to the working directory, so run the client from the repository root.
@@ -105,6 +114,8 @@ Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If `client.js
 | `server.transport` | `ws` or `wss`, the WebSocket the server's webclient uses, or `tcp`, the engine's raw TCP port. The default is `ws` |
 | `server.host`, `server.port` | Where the server is: a host name or IPv4 address, and the port for the transport. A local engine serves `ws` on port 80 on Windows and 8888 on Linux, and `tcp` on 43594 |
 | `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header. WebSocket only |
+| `proxy.host`, `proxy.port` | Optional. A SOCKS5 proxy for every connection; the empty default connects directly. The proxy resolves `server.host` itself. An account file's own `proxy` section replaces this one, and `{"host": ""}` there connects that account directly |
+| `proxy.username`, `proxy.password` | The proxy's credentials, or empty for none. Never logged |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
 | `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
 | `login.revision` | The server's revision: `289`, the default, `274` or `225`. It's set for the whole process, because the cache is, so servers of different revisions each need a process of their own |
@@ -274,6 +285,7 @@ scripts/                      bot scripts: examples/, lib/ for shared modules, t
 accounts/                     account files (ignored by git) and the sample file
 ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0
 docs/                         design documents and protocol reference
+tools/                        data exporters for rs2b0t's walker and catalogs, and docker/ for the Linux build check
 ```
 
 Everything in `src/` except `main.cpp` builds into a static library. The client and the tests both link that library, so the tests run the same code that ships.

@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../Support/Io/FakeSocks5Proxy.hpp"
 #include "../Support/Io/TestCertificate.hpp"
 #include "../Support/Io/TestServer.hpp"
 #include "../Support/LogCapture.hpp"
@@ -13,10 +14,12 @@
 #include "Io/Error/ConnectionError.hpp"
 #include "Io/Link.hpp"
 #include "Io/NetLoop.hpp"
+#include "Io/Socks5Handshake.hpp"
 
 #include <boost/asio/awaitable.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
@@ -173,8 +176,12 @@ TEST_CASE("Connection rejects bad options before connecting", "[Connection]")
     auto noCaFile = MakeOptions(443);
     noCaFile.transport = Transport_e::Wss;
     noCaFile.tlsCaFile.clear();
+    auto emptyProxyHost = MakeOptions(80);
+    emptyProxyHost.proxy = Socks5Proxy_s{.port = 1080};
+    auto zeroProxyPort = MakeOptions(80);
+    zeroProxyPort.proxy = Socks5Proxy_s{.host = LOOPBACK};
 
-    for (const auto& options : {emptyHost, zeroPort, zeroTimeout, noCaFile})
+    for (const auto& options : {emptyHost, zeroPort, zeroTimeout, noCaFile, emptyProxyHost, zeroProxyPort})
     {
         CHECK_THROWS_AS(Connection(*loop, options, logger), std::invalid_argument);
     }
@@ -1156,4 +1163,227 @@ TEST_CASE("Connection over TLS treats a truncated stream as a close", "[Connecti
     {
         static_cast<void>(connection.WaitAvailable(1, WAIT));
     }) == Outcome_e::Closed);
+}
+
+TEST_CASE("Connection through a SOCKS5 proxy", "[Connection][network][Socks5]")
+{
+    const auto loop = NetLoop::Create();
+    const auto logger = MakeConsoleLogger();
+    auto proxy = FakeSocks5Proxy{};
+
+    const auto through = [&proxy](ConnectionOptions_s options)
+    {
+        options.proxy = Socks5Proxy_s{.host = LOOPBACK, .port = proxy.GetPort()};
+        return options;
+    };
+
+    SECTION("ws to an IPv4 address sends the address, and exchanges data")
+    {
+        const auto server = TestServer{Echo};
+        auto connection = Connection{*loop, through(MakeOptions(server.GetPort())), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+        connection.Send(std::array<u8, 3>{1, 2, 3});
+        REQUIRE(connection.WaitAvailable(3, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{1, 2, 3});
+
+        const auto record = proxy.GetRecord();
+        CHECK(record.accepted == 1);
+        REQUIRE(record.requests.size() == 1);
+        CHECK(record.requests[0].type == Socks5AddressType_e::Ipv4);
+        CHECK(record.requests[0].host == LOOPBACK);
+        CHECK(record.requests[0].port == server.GetPort());
+        CHECK(record.credentials.empty());
+    }
+
+    SECTION("a host name goes to the proxy unresolved")
+    {
+        const auto server = TestServer{Echo};
+        auto options = MakeOptions(server.GetPort());
+        options.host = "localhost";
+        auto connection = Connection{*loop, through(options), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        const auto record = proxy.GetRecord();
+        REQUIRE(record.requests.size() == 1);
+        CHECK(record.requests[0].type == Socks5AddressType_e::DomainName);
+        CHECK(record.requests[0].host == "localhost");
+    }
+
+    SECTION("wss checks the server's certificate, not the proxy's")
+    {
+        const auto folder = TempFolder{"rs2004-socks5-tests"};
+        folder.WriteFile("ca.pem", TestCertificate::Get().certificatePem);
+        const auto server = TestServer{Echo, ServerMode_e::WebSocket, true};
+        const auto options = ConnectionOptions_s{
+            .transport = Transport_e::Wss,
+            .host = TestCertificate_s::HOST,
+            .port = server.GetPort(),
+            .tlsCaFile = (folder.GetPath() / "ca.pem").string(),
+        };
+
+        auto connection = Connection{*loop, through(options), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+        connection.Send(std::array<u8, 2>{4, 5});
+        REQUIRE(connection.WaitAvailable(2, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{4, 5});
+        REQUIRE(server.GetRecord().handshakes.size() == 1);
+        CHECK(server.GetRecord().handshakes[0].serverName == TestCertificate_s::HOST);
+    }
+
+    SECTION("tcp exchanges data")
+    {
+        const auto server = TestServer{Echo, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, through(MakeTcpOptions(server.GetPort())), logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+        connection.Send(std::array<u8, 3>{7, 8, 9});
+        REQUIRE(connection.WaitAvailable(3, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{7, 8, 9});
+    }
+
+    SECTION("sends the credentials the proxy requires")
+    {
+        proxy.SetCredentials("b0tuser", "s3cret");
+        const auto server = TestServer{Echo};
+        auto options = through(MakeOptions(server.GetPort()));
+        options.proxy->username = "b0tuser";
+        options.proxy->password = "s3cret";
+        auto connection = Connection{*loop, options, logger};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        const auto record = proxy.GetRecord();
+        REQUIRE(record.credentials.size() == 1);
+        CHECK(record.credentials[0].username == "b0tuser");
+        CHECK(record.credentials[0].password == "s3cret");
+    }
+
+    SECTION("a wrong password fails without naming the credentials")
+    {
+        auto capture = LogCapture{};
+        proxy.SetCredentials("b0tuser", "s3cret");
+        const auto server = TestServer{Echo};
+        auto options = through(MakeOptions(server.GetPort()));
+        options.proxy->username = "b0tuser";
+        options.proxy->password = "wr0ng";
+        auto connection = Connection{*loop, options, capture.GetLogger()};
+
+        const auto failure = GetFailure([&]
+        {
+            static_cast<void>(connection.WaitOpen(WAIT));
+        });
+        CHECK_THAT(failure, Catch::Matchers::ContainsSubstring("SOCKS5") && Catch::Matchers::ContainsSubstring("rejected"));
+
+        const auto namesSecret = [](std::string_view text)
+        {
+            return text.find("b0tuser") != std::string_view::npos || text.find("wr0ng") != std::string_view::npos;
+        };
+        CHECK_FALSE(namesSecret(failure));
+        for (const auto& entry : capture.GetEntries())
+        {
+            CHECK_FALSE(namesSecret(entry.message));
+        }
+    }
+
+    SECTION("a refused connect gives the reply's meaning")
+    {
+        proxy.SetReply(5);
+        const auto server = TestServer{Echo};
+        auto connection = Connection{*loop, through(MakeOptions(server.GetPort())), logger};
+        const auto failure = GetFailure([&]
+        {
+            static_cast<void>(connection.WaitOpen(WAIT));
+        });
+        CHECK_THAT(failure, Catch::Matchers::ContainsSubstring(std::format("SOCKS5 proxy {}:{}: connection refused (reply 5)", LOOPBACK, proxy.GetPort())));
+    }
+
+    SECTION("the reply is read to its end, so a server's first bytes come through")
+    {
+        const auto type = GENERATE(Socks5AddressType_e::DomainName, Socks5AddressType_e::Ipv6);
+        proxy.SetBoundAddress(type);
+        proxy.SetGreetingWithReply({9, 8, 7});
+        const auto server = TestServer{Echo, ServerMode_e::Tcp};
+        auto connection = Connection{*loop, through(MakeTcpOptions(server.GetPort())), logger};
+
+        REQUIRE(connection.WaitAvailable(3, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{9, 8, 7});
+        connection.Send(std::array<u8, 1>{6});
+        REQUIRE(connection.WaitAvailable(1, WAIT));
+        CHECK(ReadAll(connection) == std::vector<u8>{6});
+    }
+
+    SECTION("a stalled proxy times out during the exchange")
+    {
+        proxy.SetStalled(true);
+        auto options = through(MakeOptions(TestServer::FindClosedPort()));
+        options.connectTimeout = 1s;
+        auto connection = Connection{*loop, options, logger};
+
+        auto failure = std::string{};
+        const auto elapsed = Measure([&]
+        {
+            failure = GetFailure([&]
+            {
+                static_cast<void>(connection.WaitOpen(WAIT));
+            });
+        });
+        CHECK(elapsed < 2s);
+        CHECK_THAT(failure, Catch::Matchers::ContainsSubstring("during the SOCKS5 exchange"));
+    }
+
+    SECTION("a close during the exchange is immediate")
+    {
+        proxy.SetStalled(true);
+        auto connection = Connection{*loop, through(MakeOptions(TestServer::FindClosedPort())), logger};
+        const auto deadline = Clock::now() + WAIT;
+        while (proxy.GetRecord().accepted == 0 && Clock::now() < deadline)
+        {
+            static_cast<void>(connection.WaitOpen(10ms));
+        }
+
+        REQUIRE(proxy.GetRecord().accepted == 1);
+        CHECK(Measure([&]
+        {
+            connection.Close();
+        }) < AT_ONCE);
+
+        auto closed = false;
+        const auto elapsed = Measure([&]
+        {
+            closed = connection.WaitClosed(WAIT);
+        });
+        CHECK(closed);
+        CHECK(elapsed < 100ms);
+    }
+
+    SECTION("nothing listening on the proxy's port names the proxy")
+    {
+        const auto closedPort = TestServer::FindClosedPort();
+        auto options = MakeOptions(80);
+        options.proxy = Socks5Proxy_s{.host = LOOPBACK, .port = closedPort};
+        auto connection = Connection{*loop, options, logger};
+        const auto failure = GetFailure([&]
+        {
+            static_cast<void>(connection.WaitOpen(WAIT));
+        });
+        CHECK_THAT(failure, Catch::Matchers::ContainsSubstring(std::format("SOCKS5 proxy {}:{}", LOOPBACK, closedPort)));
+    }
+
+    SECTION("the connect line names the proxy, and not its credentials")
+    {
+        auto capture = LogCapture{};
+        proxy.SetCredentials("b0tuser", "s3cret");
+        const auto server = TestServer{Echo};
+        auto options = through(MakeOptions(server.GetPort()));
+        options.proxy->username = "b0tuser";
+        options.proxy->password = "s3cret";
+        auto connection = Connection{*loop, options, capture.GetLogger()};
+        REQUIRE(connection.WaitOpen(WAIT));
+
+        const auto entries = capture.GetEntries();
+        REQUIRE_FALSE(entries.empty());
+        CHECK(entries[0].message == std::format("Connecting to ws://{}:{} through SOCKS5 proxy {}:{}", LOOPBACK, server.GetPort(), LOOPBACK, proxy.GetPort()));
+        for (const auto& entry : entries)
+        {
+            CHECK_THAT(entry.message, !(Catch::Matchers::ContainsSubstring("b0tuser") || Catch::Matchers::ContainsSubstring("s3cret")));
+        }
+    }
 }

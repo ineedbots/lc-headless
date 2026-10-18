@@ -176,6 +176,27 @@ TEST_CASE("AccountFile reads an account's own server", "[AccountFile]")
     CheckAccountRejected(SetAccountKey("server", "ws://w2.example.com"), "server");
 }
 
+TEST_CASE("AccountFile reads an account's own proxy", "[AccountFile]")
+{
+    CHECK_FALSE(AccountFile::Parse(ACCOUNT_EXAMPLE, "bot1").proxy.has_value());
+    CHECK_FALSE(AccountFile::Parse(SetAccountKey("proxy", nullptr), "bot1").proxy.has_value());
+
+    const auto account = AccountFile::Parse(SetAccountKey("proxy", {{"host", "127.0.0.1"}, {"username", "user"}, {"password", "pass"}}), "bot1");
+    REQUIRE(account.proxy.has_value());
+    CHECK(account.proxy->host == "127.0.0.1");
+    CHECK(account.proxy->port == 1080);
+    CHECK(account.proxy->username == "user");
+    CHECK(account.proxy->password == "pass");
+
+    const auto direct = AccountFile::Parse(SetAccountKey("proxy", {{"host", ""}}), "bot1");
+    REQUIRE(direct.proxy.has_value());
+    CHECK(direct.proxy->host.empty());
+
+    CheckAccountRejected(SetAccountKey("proxy", 5), "proxy");
+    CheckAccountRejected(SetAccountKey("proxy", {{"host", "127.0.0.1"}, {"port", 0}}), "proxy.port");
+    CheckAccountRejected(SetAccountKey("proxy", {{"host", "127.0.0.1"}, {"username", "user"}}), "proxy.password");
+}
+
 TEST_CASE("AccountFile rejects invalid account files", "[AccountFile]")
 {
     const auto rejections = std::vector<std::pair<std::string, nlohmann::json>>{

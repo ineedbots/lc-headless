@@ -7,6 +7,7 @@
 #include "AccountConfig_s.hpp"
 #include "Config_s.hpp"
 #include "Error/ConfigError.hpp"
+#include "ProxySettings_s.hpp"
 #include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
 #include "Transport_e.hpp"
@@ -30,6 +31,8 @@ namespace
     constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
     constexpr auto MAX_HOST_LENGTH = std::size_t{253};
     constexpr auto MAX_PORT = 65535;
+    // RFC 1929's limit on the proxy's username and password.
+    constexpr auto MAX_PROXY_CREDENTIAL_LENGTH = std::size_t{255};
 
     void Check(bool valid, std::string_view path, std::string_view rule)
     {
@@ -88,11 +91,28 @@ namespace
         Check(server.origin.empty() || StringUtils::IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
         Check(!server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
     }
+
+    // The rules never quote the credentials, which are secrets.
+    void ValidateProxy(const ProxySettings_s& proxy)
+    {
+        Check(proxy.host.empty() || IsHost(proxy.host), "proxy.host", std::format("must be empty (no proxy), or a host name or IPv4 address of 1 to {} letters, digits, '-' and '.'", MAX_HOST_LENGTH));
+        Check(proxy.port >= 1 && proxy.port <= MAX_PORT, "proxy.port", std::format("must be from 1 to {}", MAX_PORT));
+        Check(proxy.username.empty() || IsCredential(proxy.username, MAX_PROXY_CREDENTIAL_LENGTH), "proxy.username", std::format("must be empty (no authentication) or 1 to {} printable ASCII characters", MAX_PROXY_CREDENTIAL_LENGTH));
+        if (proxy.username.empty())
+        {
+            Check(proxy.password.empty(), "proxy.password", "must be empty when proxy.username is");
+        }
+        else
+        {
+            Check(IsCredential(proxy.password, MAX_PROXY_CREDENTIAL_LENGTH), "proxy.password", std::format("must be 1 to {} printable ASCII characters when proxy.username is set", MAX_PROXY_CREDENTIAL_LENGTH));
+        }
+    }
 }
 
 void ConfigValidator::Validate(const Config_s& config)
 {
     ValidateServer(config.server);
+    ValidateProxy(config.proxy);
 
     const auto& login = config.login;
     const auto one = BigUInt::Parse("1");
@@ -128,6 +148,11 @@ void ConfigValidator::ValidateAccount(const AccountConfig_s& account)
     if (account.server)
     {
         ValidateServer(*account.server);
+    }
+
+    if (account.proxy)
+    {
+        ValidateProxy(*account.proxy);
     }
 
     if (account.script)
