@@ -24,7 +24,6 @@ namespace
 {
     constexpr auto MAP_VERSION_SIZE = std::size_t{2};
     constexpr auto MAP_SIZE_PREFIX = std::size_t{4};
-    constexpr auto STORE_HINT = "for revision 289, set client.cacheDirectory to the folder that holds the server's cache"sv;
     constexpr auto FOLDER_HINT = "for revision 225, set client.cacheDirectory to the 225 engine's data/pack/client folder"sv;
     constexpr auto LAND_FILE_PREFIX = 'm';
     constexpr auto LOC_FILE_PREFIX = 'l';
@@ -245,7 +244,7 @@ namespace
 
     const IfComponent_s& FindBank(std::span<const IfComponent_s> components, Revision_e revision)
     {
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             return FindClientCode(components, ClientCode_e::BankMode, "the bank");
         }
@@ -471,7 +470,8 @@ namespace
     {
         if (!std::filesystem::is_regular_file(directory / CacheStore::DAT_FILE))
         {
-            throw CacheError{std::format("{} not found; {}", CacheStore::DAT_FILE, STORE_HINT)};
+            throw CacheError{std::format("{} not found; for revision {}, set client.cacheDirectory to the folder that holds the server's cache", CacheStore::DAT_FILE,
+                                         static_cast<u16>(cache.revision))};
         }
 
         auto store = CacheStore{directory};
@@ -499,7 +499,7 @@ namespace
 
         const auto one = count == 1;
         const auto squares = one ? "1 map square"s : std::format("{} map squares", count);
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             logger.Warning("{} in map_index {} no files; {} as open ground", squares, one ? "has" : "have", one ? "it loads" : "they load");
             return;
@@ -528,7 +528,7 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Revision_e
         auto cache = GameCache_s{};
         cache.revision = revision;
 
-        const auto missingFiles = revision >= Revision_e::Rev289 ? LoadStore(directory, cache) : LoadFolder(directory, cache);
+        const auto missingFiles = revision >= Revision_e::Rev274 ? LoadStore(directory, cache) : LoadFolder(directory, cache);
         cache.text.FinishInterning();
 
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
@@ -539,6 +539,6 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Revision_e
     }
     catch (const CacheError& e)
     {
-        throw CacheError{std::format("{}: {}", directory.string(), e.what())};
+        throw CacheError{std::format("{}: read as revision {}: {}", directory.string(), static_cast<u16>(revision), e.what())};
     }
 }

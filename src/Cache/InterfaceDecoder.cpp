@@ -32,9 +32,9 @@ namespace
 
     constexpr auto INV_BACKGROUND_COUNT = 20;
     // A rect or text component's colour comes first, then its active and hover colours, which aren't kept.
-    // 289 added an active hover colour.
+    // Later revisions added an active hover colour.
     constexpr auto OTHER_COLOUR_COUNT_225 = std::size_t{2};
-    constexpr auto OTHER_COLOUR_COUNT_289 = std::size_t{3};
+    constexpr auto OTHER_COLOUR_COUNT_274 = std::size_t{3};
     constexpr auto GRAPHIC_STRING_COUNT = std::size_t{2};
     constexpr auto MODEL_REFERENCE_COUNT = 4;
     constexpr auto INV_BACKGROUND_STRING_COUNT = std::size_t{1};
@@ -103,7 +103,7 @@ namespace
         component.objOps = packet.G1() == ENABLED;
         component.objUse = packet.G1() == ENABLED;
 
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             Skip(packet, OBJ_REPLACE_SIZE);
         }
@@ -143,8 +143,8 @@ namespace
         Skip(packet, SCROLL_HEIGHT_SIZE);
         component.hidden = packet.G1() == ENABLED;
 
-        // 225 counts the children in a byte; 289 widened it.
-        const auto childCount = revision >= Revision_e::Rev289 ? packet.G2() : packet.G1();
+        // 225 counts the children in a byte; later revisions widened it.
+        const auto childCount = revision >= Revision_e::Rev274 ? packet.G2() : packet.G1();
         component.children.resize(childCount);
         for (auto& child : component.children)
         {
@@ -163,7 +163,7 @@ namespace
     // through them.
     void ReadTypeFields(Packet& packet, IfComponent_s& component, Revision_e revision)
     {
-        const auto otherColourCount = revision >= Revision_e::Rev289 ? OTHER_COLOUR_COUNT_289 : OTHER_COLOUR_COUNT_225;
+        const auto otherColourCount = revision >= Revision_e::Rev274 ? OTHER_COLOUR_COUNT_274 : OTHER_COLOUR_COUNT_225;
         switch (component.type)
         {
         case ComponentType_e::Layer:
@@ -257,7 +257,7 @@ namespace
         component.width = packet.G2();
         component.height = packet.G2();
 
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             Skip(packet, TRANS_SIZE);
         }

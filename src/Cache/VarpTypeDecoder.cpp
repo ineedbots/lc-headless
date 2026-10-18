@@ -44,7 +44,7 @@ namespace
     });
 
     constexpr auto REVISIONED = std::to_array({
-        Revisioned::AddedIn(CODE11, Revision_e::Rev289),
+        Revisioned::AddedIn(CODE11, Revision_e::Rev274),
         Revisioned::AddedIn(CODE12, Revision_e::Rev289),
         Revisioned::AddedIn(CODE13, Revision_e::Rev289),
     });

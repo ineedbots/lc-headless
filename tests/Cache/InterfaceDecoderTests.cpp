@@ -55,7 +55,7 @@ namespace
 
 TEST_CASE("InterfaceDecoder reads every component in order", "[InterfaceDecoder]")
 {
-    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
     const auto components = Decode(MakeComponents(), revision);
     const auto ids = std::vector<u16>{0, 1, 2, 3, 10, 11, 12, 13, 2458};
     REQUIRE(components.size() == ids.size());
@@ -77,7 +77,7 @@ TEST_CASE("InterfaceDecoder reads every component in order", "[InterfaceDecoder]
 
 TEST_CASE("InterfaceDecoder reads conditions and scripts", "[InterfaceDecoder]")
 {
-    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
     const auto components = Decode(MakeComponents(), revision);
     const auto& toggle = components[4];
     CHECK(toggle.operands == std::vector<u16>{5, 70});
@@ -90,7 +90,7 @@ TEST_CASE("InterfaceDecoder reads conditions and scripts", "[InterfaceDecoder]")
 
 TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks components by", "[InterfaceDecoder]")
 {
-    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
     const auto written = std::vector<InterfaceComponent_s>{
         {.id = 100, .layer = 100, .type = LAYER, .children = {101, 102, 103}, .childOffsets = {{10, -5}, {-3, 7}}},
         {.id = 101, .type = LAYER, .children = {104}, .hidden = true},
@@ -129,7 +129,7 @@ TEST_CASE("InterfaceDecoder keeps what the client finds, reads and clicks compon
 
 TEST_CASE("InterfaceDecoder reads an inventory's size, use, backgrounds and options", "[InterfaceDecoder]")
 {
-    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
     const auto written = std::vector<InterfaceComponent_s>{
         {.id = 2, .type = INV, .width = 4, .height = 7, .objUse = true, .slotBackground = true, .options = {"Use", "", "Drop"}},
         {.id = 3, .type = INV, .width = 3, .height = 5},
@@ -190,9 +190,16 @@ TEST_CASE("InterfaceDecoder names the component that doesn't decode", "[Interfac
     }
 }
 
-TEST_CASE("InterfaceDecoder fails on components written for the other revision", "[InterfaceDecoder]")
+TEST_CASE("InterfaceDecoder fails on components written for a revision with another format", "[InterfaceDecoder]")
 {
-    const auto [written, read] = GENERATE(std::pair{Revision_e::Rev225, Revision_e::Rev289}, std::pair{Revision_e::Rev289, Revision_e::Rev225});
+    const auto [written, read] = GENERATE(std::pair{Revision_e::Rev225, Revision_e::Rev274}, std::pair{Revision_e::Rev274, Revision_e::Rev225},
+                                          std::pair{Revision_e::Rev225, Revision_e::Rev289}, std::pair{Revision_e::Rev289, Revision_e::Rev225});
     CAPTURE(static_cast<u16>(written), static_cast<u16>(read));
     CHECK_THROWS_AS(InterfaceDecoder::Decode(CacheWriter::MakeInterfaces(MakeComponents(), written), read), CacheError);
+}
+
+TEST_CASE("InterfaceDecoder reads 274's components in 289's format", "[InterfaceDecoder]")
+{
+    const auto data = CacheWriter::MakeInterfaces(MakeComponents(), Revision_e::Rev274);
+    CHECK(InterfaceDecoder::Decode(data, Revision_e::Rev289).size() == InterfaceDecoder::Decode(data, Revision_e::Rev274).size());
 }

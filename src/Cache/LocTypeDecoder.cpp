@@ -76,10 +76,10 @@ namespace
     });
 
     constexpr auto REVISIONED = std::to_array({
-        Revisioned::RemovedIn(ANIMATE_TRANSPARENCIES, Revision_e::Rev289),
-        Revisioned::AddedIn(MODELS, Revision_e::Rev289),
-        Revisioned::AddedIn(BREAK_ROUTE_FINDING, Revision_e::Rev289),
-        Revisioned::AddedIn(RAISE_OBJECT, Revision_e::Rev289),
+        Revisioned::RemovedIn(ANIMATE_TRANSPARENCIES, Revision_e::Rev274),
+        Revisioned::AddedIn(MODELS, Revision_e::Rev274),
+        Revisioned::AddedIn(BREAK_ROUTE_FINDING, Revision_e::Rev274),
+        Revisioned::AddedIn(RAISE_OBJECT, Revision_e::Rev274),
         Revisioned::AddedIn(MULTILOC, Revision_e::Rev289),
     });
 

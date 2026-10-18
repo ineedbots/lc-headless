@@ -17,6 +17,7 @@
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
@@ -411,19 +412,21 @@ TEST_CASE("VarpTypeDecoder rejects an unknown opcode", "[TypeDecoder]")
 TEST_CASE("TypeDecoder finds an opcode's revisions in its table", "[TypeDecoder]")
 {
     constexpr auto TABLE = std::to_array({
-        RevisionedOpcode_s::AddedIn(1, Revision_e::Rev289),
+        RevisionedOpcode_s::AddedIn(1, Revision_e::Rev274),
         RevisionedOpcode_s::RemovedIn(2, Revision_e::Rev289),
     });
 
     CHECK(TypeDecoder::HasOpcode(Revision_e::Rev225, 3, TABLE));
     CHECK(TypeDecoder::HasOpcode(Revision_e::Rev289, 3, TABLE));
     CHECK_FALSE(TypeDecoder::HasOpcode(Revision_e::Rev225, 1, TABLE));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev274, 1, TABLE));
     CHECK(TypeDecoder::HasOpcode(Revision_e::Rev289, 1, TABLE));
     CHECK(TypeDecoder::HasOpcode(Revision_e::Rev225, 2, TABLE));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev274, 2, TABLE));
     CHECK_FALSE(TypeDecoder::HasOpcode(Revision_e::Rev289, 2, TABLE));
 }
 
-TEST_CASE("TypeDecoder reads the flags only 225 has, and 289 rejects them", "[TypeDecoder]")
+TEST_CASE("TypeDecoder reads the flags only 225 has, and later revisions reject them", "[TypeDecoder]")
 {
     const auto flag = [](u8 opcode)
     {
@@ -435,9 +438,57 @@ TEST_CASE("TypeDecoder reads the flags only 225 has, and 289 rejects them", "[Ty
     CHECK(DecodeNpcs(flag(16), text, Revision_e::Rev225)[0].name == "Rock");
     CHECK(DecodeObjs(flag(9), text, Revision_e::Rev225)[0].name == "Rock");
 
-    CHECK_THROWS_WITH(DecodeLocs(flag(25), text), "loc 0: unknown opcode 25");
-    CHECK_THROWS_WITH(DecodeNpcs(flag(16), text), "npc 0: unknown opcode 16");
-    CHECK_THROWS_WITH(DecodeObjs(flag(9), text), "obj 0: unknown opcode 9");
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    CAPTURE(static_cast<u16>(revision));
+    CHECK_THROWS_WITH(DecodeLocs(flag(25), text, revision), "loc 0: unknown opcode 25");
+    CHECK_THROWS_WITH(DecodeNpcs(flag(16), text, revision), "npc 0: unknown opcode 16");
+    CHECK_THROWS_WITH(DecodeObjs(flag(9), text, revision), "obj 0: unknown opcode 9");
+}
+
+TEST_CASE("TypeDecoder reads the opcodes 274 shares with 289", "[TypeDecoder]")
+{
+    const auto definition = [](const std::vector<u8>& opcode)
+    {
+        return std::vector<std::vector<u8>>{CacheWriter::MakeDefinition("", {}, opcode)};
+    };
+
+    auto text = TextPool{};
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    CAPTURE(static_cast<u16>(revision));
+
+    for (const auto& opcode : {std::vector<u8>{5, 1, 0, 7}, std::vector<u8>{74}, std::vector<u8>{75, 1}})
+    {
+        CAPTURE(opcode[0]);
+        CHECK_NOTHROW(DecodeLocs(definition(opcode), text, revision));
+    }
+
+    for (const auto& opcode : {std::vector<u8>{99}, std::vector<u8>{100, 0}, std::vector<u8>{101, 0}, std::vector<u8>{102, 0, 0}, std::vector<u8>{103, 0, 0}})
+    {
+        CAPTURE(opcode[0]);
+        CHECK_NOTHROW(DecodeNpcs(definition(opcode), text, revision));
+    }
+
+    for (const auto& opcode : {std::vector<u8>{110, 0, 0}, std::vector<u8>{111, 0, 0}, std::vector<u8>{112, 0, 0}, std::vector<u8>{113, 0}, std::vector<u8>{114, 0}})
+    {
+        CAPTURE(opcode[0]);
+        CHECK_NOTHROW(DecodeObjs(definition(opcode), text, revision));
+    }
+
+    CHECK_NOTHROW(DecodeVarps(definition({11}), revision));
+}
+
+TEST_CASE("TypeDecoder rejects the opcodes only 289 has when it reads 274", "[TypeDecoder]")
+{
+    const auto definition = [](const std::vector<u8>& opcode)
+    {
+        return std::vector<std::vector<u8>>{CacheWriter::MakeDefinition("", {}, opcode)};
+    };
+
+    auto text = TextPool{};
+    CHECK_THROWS_WITH(DecodeLocs(definition({77, 0, 1, 0, 0xFF, 0xFF}), text, Revision_e::Rev274), "loc 0: unknown opcode 77");
+    CHECK_THROWS_WITH(DecodeObjs(definition({115, 1}), text, Revision_e::Rev274), "obj 0: unknown opcode 115");
+    CHECK_THROWS_WITH(DecodeVarps(definition({12, 0, 0, 0, 0}), Revision_e::Rev274), "varp 0: unknown opcode 12");
+    CHECK_THROWS_WITH(DecodeVarps(definition({13}), Revision_e::Rev274), "varp 0: unknown opcode 13");
 }
 
 TEST_CASE("TypeDecoder rejects the opcodes 289 added when it reads 225", "[TypeDecoder]")

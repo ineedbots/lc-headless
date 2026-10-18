@@ -111,6 +111,47 @@ TEST_CASE("The real 225 cache has its map squares and their files' CRCs", "[Real
     CHECK_FALSE(cache.FindLocIds("Bank booth").empty());
 }
 
+// These read the 274 cache from the folder in RS2004_CACHE_DIR_274, and skip when it isn't set. The CRCs are
+// those of 274server's store 0, and the ids and counts are the ones its content/pack files list.
+TEST_CASE("The real 274 cache gives the server's CRCs, components and run varp", "[RealCache]")
+{
+    const auto& cache = RealCache::Require(Revision_e::Rev274);
+    CHECK(cache.revision == Revision_e::Rev274);
+
+    const auto expected = std::array<u32, GameCache_s::CRC_COUNT>{0x00000000, 0x1874c632, 0x18adef32, 0x7f4cbeb7, 0x0f5e70de, 0x103ed240, 0x368f1792, 0x52a628b7, 0xd2b9c577};
+    for (auto i = std::size_t{0}; i < expected.size(); ++i)
+    {
+        CHECK(std::bit_cast<u32>(cache.crcs[i]) == expected[i]);
+    }
+
+    // The same ids as 289's; the bank is found by its client code.
+    CHECK(cache.logoutComponent == 2458);
+    CHECK(cache.inventoryComponent == 3214);
+    CHECK(cache.inventorySize == 28);
+    CHECK(cache.equipmentComponent == 1688);
+    CHECK(cache.bankComponent == 5382);
+    CHECK(cache.bankInventoryComponent == 2006);
+    CHECK(cache.runOffButton == 152);
+    CHECK(cache.runOnButton == 153);
+    CHECK(cache.runVarp == 173);
+}
+
+TEST_CASE("The real 274 cache has every type and its map squares", "[RealCache]")
+{
+    const auto& cache = RealCache::Require(Revision_e::Rev274);
+    CHECK(cache.locs.size() == 4671);
+    CHECK(cache.npcs.size() == 1359);
+    CHECK(cache.objs.size() == 3894);
+
+    REQUIRE(cache.FindSquare(50, 50) != nullptr);
+    CHECK_FALSE(cache.FindSquare(50, 50)->GetLocs().empty());
+    CHECK(cache.FindObj(995)->name == "Coins");
+    CHECK(cache.FindObj(1512)->noteOf == std::optional<u16>{1511});
+    CHECK(cache.FindLoc(1276)->name == "Tree");
+    CHECK(cache.FindLoc(2213)->name == "Bank booth");
+    CHECK_FALSE(cache.FindNpcIds("Man").empty());
+}
+
 TEST_CASE("The real cache has every type and square", "[RealCache]")
 {
     const auto& cache = RequireRealCache();

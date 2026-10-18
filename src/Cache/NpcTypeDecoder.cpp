@@ -63,12 +63,12 @@ namespace
     });
 
     constexpr auto REVISIONED = std::to_array({
-        Revisioned::RemovedIn(ANIMATE_TRANSPARENCIES, Revision_e::Rev289),
-        Revisioned::AddedIn(ALWAYS_ON_TOP, Revision_e::Rev289),
-        Revisioned::AddedIn(AMBIENT, Revision_e::Rev289),
-        Revisioned::AddedIn(CONTRAST, Revision_e::Rev289),
-        Revisioned::AddedIn(HEAD_ICON, Revision_e::Rev289),
-        Revisioned::AddedIn(TURN_SPEED, Revision_e::Rev289),
+        Revisioned::RemovedIn(ANIMATE_TRANSPARENCIES, Revision_e::Rev274),
+        Revisioned::AddedIn(ALWAYS_ON_TOP, Revision_e::Rev274),
+        Revisioned::AddedIn(AMBIENT, Revision_e::Rev274),
+        Revisioned::AddedIn(CONTRAST, Revision_e::Rev274),
+        Revisioned::AddedIn(HEAD_ICON, Revision_e::Rev274),
+        Revisioned::AddedIn(TURN_SPEED, Revision_e::Rev274),
     });
 
     void DecodeNpc(Packet& packet, NpcType_s& type, TextPool& text, Revision_e revision)

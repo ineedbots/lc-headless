@@ -13,6 +13,7 @@
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
@@ -144,9 +145,9 @@ namespace
             return "no error";
         }
 
-        [[nodiscard]] std::string Prefix() const
+        [[nodiscard]] std::string Prefix(Revision_e revision = Revision_e::Rev289) const
         {
-            return folder.GetPath().string() + ": ";
+            return std::format("{}: read as revision {}: ", folder.GetPath().string(), static_cast<u16>(revision));
         }
 
         [[nodiscard]] bool HasLog(LogLevel_e level, std::string_view text) const
@@ -165,10 +166,14 @@ namespace
 
 TEST_CASE("CacheLoader loads a whole store", "[CacheLoader]")
 {
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    CAPTURE(static_cast<u16>(revision));
+
     auto fixture = LoaderFixture{};
     static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
 
-    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger());
+    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), revision, *fixture.capture.GetLogger());
+    CHECK(cache.revision == revision);
 
     CHECK(cache.crcs[0] == 0);
 
@@ -247,9 +252,9 @@ namespace
             return "no error";
         }
 
-        [[nodiscard]] std::string Prefix() const
+        [[nodiscard]] std::string Prefix(Revision_e revision = Revision_e::Rev225) const
         {
-            return folder.GetPath().string() + ": ";
+            return std::format("{}: read as revision {}: ", folder.GetPath().string(), static_cast<u16>(revision));
         }
 
         [[nodiscard]] s32 GetCrc(const std::string& name) const
@@ -395,7 +400,7 @@ TEST_CASE("CacheLoader tells each layout given the other revision what it expect
         auto fixture = LoaderFixture{};
         static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
         CHECK_THROWS_WITH(CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev225, *fixture.capture.GetLogger()),
-                          fixture.Prefix() + "config not found; for revision 225, set client.cacheDirectory to the 225 engine's data/pack/client folder");
+                          fixture.Prefix(Revision_e::Rev225) + "config not found; for revision 225, set client.cacheDirectory to the 225 engine's data/pack/client folder");
     }
 
     SECTION("a 225 folder read as 289")
@@ -403,7 +408,15 @@ TEST_CASE("CacheLoader tells each layout given the other revision what it expect
         auto fixture = FolderFixture{};
         CacheWriter::WriteFolder(fixture.folder.GetPath(), fixture.files);
         CHECK_THROWS_WITH(CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger()),
-                          fixture.Prefix() + "main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache");
+                          fixture.Prefix(Revision_e::Rev289) + "main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache");
+    }
+
+    SECTION("a 225 folder read as 274")
+    {
+        auto fixture = FolderFixture{};
+        CacheWriter::WriteFolder(fixture.folder.GetPath(), fixture.files);
+        CHECK_THROWS_WITH(CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev274, *fixture.capture.GetLogger()),
+                          fixture.Prefix(Revision_e::Rev274) + "main_file_cache.dat not found; for revision 274, set client.cacheDirectory to the folder that holds the server's cache");
     }
 }
 
@@ -426,7 +439,7 @@ TEST_CASE("CacheLoader names the folder and file that failed", "[CacheLoader]")
     {
         const auto missing = fixture.folder.GetPath() / "missing";
         CHECK_THROWS_WITH(CacheLoader::Load(missing, Revision_e::Rev289, *fixture.capture.GetLogger()),
-                          missing.string() + ": main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache");
+                          missing.string() + ": read as revision 289: main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache");
     }
 
     SECTION("a missing config archive")

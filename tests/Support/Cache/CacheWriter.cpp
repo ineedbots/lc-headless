@@ -55,7 +55,7 @@ namespace
     constexpr auto INV_BACKGROUND_COUNT = 20;
     constexpr auto INV_OPTION_COUNT = std::size_t{5};
     constexpr auto RECT_TEXT_COLOUR_COUNT_225 = 3;
-    constexpr auto RECT_TEXT_COLOUR_COUNT_289 = 4;
+    constexpr auto RECT_TEXT_COLOUR_COUNT_274 = 4;
     constexpr auto MODEL_VIEW_COUNT = 3;
     constexpr auto SAMPLE_SIZE = 32;
     constexpr auto SAMPLE_OFFSET = -4;
@@ -128,7 +128,7 @@ namespace
         packet.P1(component.hidden ? 1 : 0);
 
         const auto childCount = static_cast<s32>(component.children.size());
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             packet.P2(childCount);
         }
@@ -154,7 +154,7 @@ namespace
         packet.P1(component.objOps ? 1 : 0);
         packet.P1(component.objUse ? 1 : 0);
 
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             PutFlags(packet, OBJ_REPLACE_COUNT);
         }
@@ -194,7 +194,7 @@ namespace
 
     void PutTypeFields(Packet& packet, const InterfaceComponent_s& component, Revision_e revision)
     {
-        const auto colourCount = revision >= Revision_e::Rev289 ? RECT_TEXT_COLOUR_COUNT_289 : RECT_TEXT_COLOUR_COUNT_225;
+        const auto colourCount = revision >= Revision_e::Rev274 ? RECT_TEXT_COLOUR_COUNT_274 : RECT_TEXT_COLOUR_COUNT_225;
         switch (component.type)
         {
         case IF_LAYER:
@@ -289,7 +289,7 @@ namespace
         packet.P2(component.width);
         packet.P2(component.height);
 
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             packet.P1(0);
         }

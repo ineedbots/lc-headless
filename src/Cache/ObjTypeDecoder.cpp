@@ -91,12 +91,12 @@ namespace
     });
 
     constexpr auto REVISIONED = std::to_array({
-        Revisioned::RemovedIn(CODE9, Revision_e::Rev289),
-        Revisioned::AddedIn(RESIZE_X, Revision_e::Rev289),
-        Revisioned::AddedIn(RESIZE_Y, Revision_e::Rev289),
-        Revisioned::AddedIn(RESIZE_Z, Revision_e::Rev289),
-        Revisioned::AddedIn(AMBIENT, Revision_e::Rev289),
-        Revisioned::AddedIn(CONTRAST, Revision_e::Rev289),
+        Revisioned::RemovedIn(CODE9, Revision_e::Rev274),
+        Revisioned::AddedIn(RESIZE_X, Revision_e::Rev274),
+        Revisioned::AddedIn(RESIZE_Y, Revision_e::Rev274),
+        Revisioned::AddedIn(RESIZE_Z, Revision_e::Rev274),
+        Revisioned::AddedIn(AMBIENT, Revision_e::Rev274),
+        Revisioned::AddedIn(CONTRAST, Revision_e::Rev274),
         Revisioned::AddedIn(TEAM, Revision_e::Rev289),
     });
 

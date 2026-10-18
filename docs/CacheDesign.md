@@ -1,6 +1,6 @@
 # Cache Design
 
-Plan for loading the revision-289 game cache once per process and sharing it, read-only, with every account. The client computes the nine login CRCs from the cache, so `login.crcs` leaves `client.jsonc`. The cache also lifts the packet-only limits in [ScriptingDesign.md](ScriptingDesign.md) §10: scripts get names and options for NPCs, items and scenery, they see scenery the server never changed, and walks route around walls. The work ships in four phases, plus an optional fifth that lets several processes share one copy (§16, §17). Revision 225's cache, a folder of loose files, came later and is in §18. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It reads bytes and computes CRCs with `Packet` ([PacketDesign.md](PacketDesign.md) §3), adds a key to `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)), and extends the script API ([ScriptingDesign.md](ScriptingDesign.md) §6).
+Plan for loading the revision-289 game cache once per process and sharing it, read-only, with every account. The client computes the nine login CRCs from the cache, so `login.crcs` leaves `client.jsonc`. The cache also lifts the packet-only limits in [ScriptingDesign.md](ScriptingDesign.md) §10: scripts get names and options for NPCs, items and scenery, they see scenery the server never changed, and walks route around walls. The work ships in four phases, plus an optional fifth that lets several processes share one copy (§16, §17). Revision 225's cache, a folder of loose files, came later and is in §18; revision 274's, which is 289's store with fewer definition opcodes, is in §19. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It reads bytes and computes CRCs with `Packet` ([PacketDesign.md](PacketDesign.md) §3), adds a key to `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)), and extends the script API ([ScriptingDesign.md](ScriptingDesign.md) §6).
 
 > The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
 
@@ -783,7 +783,7 @@ public:
 - A default `GameCache_s{}` is a valid, empty cache: nine zero CRCs, every component and varp id 0, no types, no options but `NO_OPTION`, and no squares. Tests of code that needs a cache but not its contents pass `std::make_shared<const GameCache_s>()`. `TestCache::SetComponents` gives a test's cache the 289 ids. Tests that log out through `FakeGameServer` pass `FakeGameServer::MakeCache()`, which is empty but for those ids and the logout button that server answers.
 ### Behaviour
 
-1. If `directory / "main_file_cache.dat"` doesn't exist, throw `CacheError{"{dir}: main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache"}`. This section is the 289 store; §18 has 225's folder.
+1. If `directory / "main_file_cache.dat"` doesn't exist, throw `CacheError{"{dir}: read as revision 289: main_file_cache.dat not found; for revision 289, set client.cacheDirectory to the folder that holds the server's cache"}`. Every error `Load` throws starts with the folder and the revision it read as. This section is the 289 store, which 274 shares (§19); §18 has 225's folder.
 2. Open a `CacheStore` and compute the CRCs (§5).
 3. Read archive 2 into a `JagArchive`, decode `loc`, `npc` and `obj` from it into the cache's `TextPool`, and find the run varp in `varp` (§6). A missing archive or entry throws, and so does a `varp` without the run varp.
 4. Read archive 3, decode its `data` entry, and find the components (§6, Components and the run varp). A missing archive or entry throws, and so does an archive without one of them: `store 0 file 3 (interface): no component has client code 205, which marks the logout button`.
@@ -1374,14 +1374,14 @@ The loader keeps each square's raw-file CRCs in `GameCache_s::mapCrcs`, as `MapC
 
 ### Definitions and interfaces
 
-Each type decoder takes the revision. `TypeDecoder::HasOpcode` checks each opcode against the ones 289 removed and added before the decoder reads it, so a cache read as the wrong revision fails on an unknown opcode rather than reading garbage:
+Each type decoder takes the revision. Each has a table of `RevisionedOpcode_s`, which names the revision that added or removed an opcode, and `TypeDecoder::HasOpcode` checks each opcode against it before the decoder reads it. A cache read as the wrong revision then fails on an unknown opcode rather than reading garbage:
 
-| Type | 225 only | 289 only |
-|---|---|---|
-| loc | `25` (a flag) | `5`, `74`, `75`, `77` |
-| npc | `16` (a flag) | `99` to `103` |
-| obj | `9` (a flag) | `110` to `115` |
-| varp | | `11` to `13` |
+| Type | 225 only | 274 and 289 | 289 only |
+|---|---|---|---|
+| loc | `25` (a flag) | `5`, `74`, `75` | `77` |
+| npc | `16` (a flag) | `99` to `103` | |
+| obj | `9` (a flag) | `110` to `114` | `115` |
+| varp | | `11` | `12`, `13` |
 
 225's default for whether a loc is active reduces to the same rule as 289's, because a 225 loc's models always have shapes. `InterfaceDecoder::Decode` takes the revision too: 225 has no `trans` byte, counts a layer's children in a byte, has no inventory `objReplace`, and gives rect and text components three colours, not four.
 
@@ -1392,3 +1392,13 @@ Every component and the run varp are found as in §6, except the bank. 225 has n
 ### Tests
 
 `CacheWriter::MakeFolder` writes the 225 layout, and `MakeInterfaces` writes either revision's format. `CacheLoaderTests` loads a folder, shifts the CRCs past a missing file, finds the bank by its content, loads a square with one file, names the 225 file that fails, and reads each layout as the other revision. The type and interface decoder tests read each revision's opcodes and fields, and reject the other's. `RealCache::Require(Revision_e::Rev225)` reads the folder in `RS2004_CACHE_DIR_225` and skips when it isn't set; `RealCacheTests` checks its CRCs, components and map squares against the 225 engine's content.
+
+---
+
+## 19. Revision 274
+
+274's cache is 289's store layout, read as §3 to §8 describe: the 274 engine's `data/pack` folder, the CRCs of files 0 to 8 of store 0, `map_index` in `versionlist`, and 289's interface format. Its bank has client code 206, as 289's does. What differs is the definition opcodes in §18's table: 274 lacks loc `77`, obj `115` and varp `12` and `13` ([Revision274Design.md](Revision274Design.md) §6, §8).
+
+The two store revisions can't be told apart by their files. A 289 cache read as 274 fails on the two objs that use opcode `115`: `{dir}: read as revision 274: store 0 file 2 (config): obj 4041: unknown opcode 115`. A 274 cache read as 289 decodes, since 274's opcodes are a subset of 289's, and the login then fails with status 6.
+
+`RealCache::Require(Revision_e::Rev274)` reads the folder in `RS2004_CACHE_DIR_274`, such as `../274server/engine/data/pack`, and skips when it isn't set. `RealCacheTests` checks its CRCs against the CRC32 of each file in the 274 engine's store 0, and its components and type counts against its `content/pack` files. On the real 274 cache every component id matches 289's.
