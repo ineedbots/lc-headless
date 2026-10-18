@@ -22,6 +22,7 @@ namespace
     constexpr auto MAX_WIRE_COORD = 0xFFFF;
     constexpr auto MAX_CHAT_COLOUR = static_cast<u8>(ChatColour_e::Glow3);
     constexpr auto MAX_CHAT_EFFECT = static_cast<u8>(ChatEffect_e::Slide);
+    constexpr auto SCROLL_BEFORE_289 = u8{2};
     constexpr auto MAX_PUBLIC_CHAT_MODE = 3;
     constexpr auto MAX_PRIVATE_CHAT_MODE = 2;
     constexpr auto MAX_REPORT_RULE = 11;
@@ -38,6 +39,30 @@ namespace
         }
 
         return prots[MenuOp::GetSlot(op)];
+    }
+
+    // 225 has three effects, with scroll third; 289 added three more and moved scroll to 4.
+    u8 GetWireEffect(ChatEffect_e effect, Revision_e revision)
+    {
+        if (revision >= Revision_e::Rev289)
+        {
+            return static_cast<u8>(effect);
+        }
+
+        switch (effect)
+        {
+        case ChatEffect_e::None:
+        case ChatEffect_e::Wave:
+            return static_cast<u8>(effect);
+        case ChatEffect_e::Scroll:
+            return SCROLL_BEFORE_289;
+        case ChatEffect_e::Wave2:
+        case ChatEffect_e::Shake:
+        case ChatEffect_e::Slide:
+            break;
+        }
+
+        throw std::invalid_argument{std::format("Revision {} has only the wave and scroll chat effects", static_cast<u16>(revision))};
     }
 
     void PutCoord(Packet& packet, s32 coord)
@@ -391,7 +416,7 @@ ClientPacket_s ClientPackets::MessagePublic(std::string_view text, ChatColour_e 
 
     auto packet = Packet{};
     packet.P1(static_cast<u8>(colour));
-    packet.P1(static_cast<u8>(effect));
+    packet.P1(GetWireEffect(effect, m_protocol.GetRevision()));
     packet.PData(WordPack::Pack(text));
     return Make(ClientProt_e::MessagePublic, packet);
 }

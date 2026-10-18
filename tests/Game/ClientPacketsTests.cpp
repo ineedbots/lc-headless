@@ -10,6 +10,8 @@
 #include "Game/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
 {
@@ -145,6 +147,21 @@ TEST_CASE("ClientPackets builds 225's drags and camera position", "[ClientPacket
     CHECK(camera.payload == Bytes({0, 128, 4, 0, 0, 0}));
     CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, camera));
     CheckPacket(PACKETS.EventCameraPosition(128, 1024), ClientProt_e::EventCameraPosition, Bytes({0, 128, 4, 0}));
+}
+
+TEST_CASE("ClientPackets numbers chat effects as the revision does", "[ClientPackets]")
+{
+    const auto packets = ClientPackets{Protocol{Revision_e::Rev225}};
+
+    CHECK(packets.MessagePublic("hi", ChatColour_e::Yellow, ChatEffect_e::Wave).payload[1] == 1);
+    CHECK(packets.MessagePublic("hi", ChatColour_e::Yellow, ChatEffect_e::Scroll).payload[1] == 2);
+    CHECK(PACKETS.MessagePublic("hi", ChatColour_e::Yellow, ChatEffect_e::Wave2).payload[1] == 2);
+    CHECK(PACKETS.MessagePublic("hi", ChatColour_e::Yellow, ChatEffect_e::Scroll).payload[1] == 4);
+
+    const auto effect = GENERATE(ChatEffect_e::Wave2, ChatEffect_e::Shake, ChatEffect_e::Slide);
+    CAPTURE(static_cast<u8>(effect));
+    CHECK_THROWS_WITH(packets.MessagePublic("hi", ChatColour_e::Yellow, effect), "Revision 225 has only the wave and scroll chat effects");
+    CHECK_NOTHROW(PACKETS.MessagePublic("hi", ChatColour_e::Yellow, effect));
 }
 
 TEST_CASE("ClientPackets builds 225's map requests and input reports", "[ClientPackets]")
