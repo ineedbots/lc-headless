@@ -1,0 +1,2 @@
+// The first icon in the file is the one Explorer shows for the executable.
+IDI_APPLICATION_ICON ICON "../assets/icon.ico"

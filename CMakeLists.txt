@@ -78,6 +78,9 @@ target_sources(${PROJECT_NAME}Lib PRIVATE ${STDLIB_SOURCE})
 
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE src/main.cpp)
+if(WIN32)
+    target_sources(${PROJECT_NAME} PRIVATE src/main.rc)
+endif()
 configure_project_target(${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}Lib)
 
