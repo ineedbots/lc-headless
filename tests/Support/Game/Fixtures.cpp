@@ -71,7 +71,7 @@ std::vector<u8> Fixtures::Appearance(std::string_view name, std::optional<u16> n
     packet.P8(std::bit_cast<s64>(Base37::Encode(name)));
     packet.P1(3);
 
-    if (revision >= Revision_e::Rev289)
+    if (revision >= Revision_e::Rev274)
     {
         packet.P2(32);
     }
@@ -108,7 +108,7 @@ std::vector<u8> Fixtures::UpdatePid(u16 pid, bool members, Revision_e revision)
     auto packet = Packet{};
     packet.P2(pid);
 
-    if (revision >= Revision_e::Rev289)
+    if (revision >= Revision_e::Rev274)
     {
         packet.P1(members ? 1 : 0);
     }
@@ -139,7 +139,7 @@ std::vector<u8> Fixtures::PlaceLocalPlayer(s32 localX, s32 localZ, s32 level, st
 std::vector<u8> Fixtures::AddNpc(u16 index, u16 type, s32 dx, s32 dz, Revision_e revision)
 {
     auto bits = BitWriter{};
-    if (revision >= Revision_e::Rev289)
+    if (revision >= Revision_e::Rev274)
     {
         bits.Put(8, 0).Put(14, index).Put(11, type).Put(5, dx).Put(5, dz).Put(1, 1).Put(1, 0);
         return bits.GetBytes();

@@ -128,7 +128,7 @@ namespace
         lastLogin.daysSinceRecoveryChange = packet.G1();
         lastLogin.unreadMessages = packet.G2();
 
-        if (protocol.GetRevision() >= Revision_e::Rev289)
+        if (protocol.GetRevision() >= Revision_e::Rev274)
         {
             lastLogin.warnMembers = packet.G1() == 1;
         }
@@ -167,7 +167,7 @@ void PlayerStateDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& 
         state.pid = packet.G2();
         state.localPlayer.index = state.pid;
 
-        if (protocol.GetRevision() >= Revision_e::Rev289)
+        if (protocol.GetRevision() >= Revision_e::Rev274)
         {
             state.members = packet.G1() == 1;
         }

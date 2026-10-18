@@ -140,7 +140,7 @@ namespace
 
 TEST_CASE("Script bindings report the configured revision", "[ScriptBindings]")
 {
-    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev289);
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
     auto fixture = BindingFixture{revision};
     fixture.Run(std::format("assert game.revision() == {}\n", static_cast<u16>(revision)));
 }

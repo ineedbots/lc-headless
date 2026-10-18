@@ -155,7 +155,7 @@ Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes, Revisi
 
         // A transformed player sends the NPC type instead of the rest of the wear slots. 225 has no transforms.
         const auto value = (high << 8) | packet.G1();
-        if (revision >= Revision_e::Rev289 && slot == 0 && value == TRANSFORM_MARKER)
+        if (revision >= Revision_e::Rev274 && slot == 0 && value == TRANSFORM_MARKER)
         {
             appearance.npcTransform = packet.G2();
             break;
@@ -180,7 +180,7 @@ Appearance_s PlayerInfoDecoder::ReadAppearance(std::span<const u8> bytes, Revisi
     appearance.name = Base37::DecodeDisplayName(appearance.name37);
     appearance.combatLevel = packet.G1();
 
-    if (revision >= Revision_e::Rev289)
+    if (revision >= Revision_e::Rev274)
     {
         appearance.totalLevel = packet.G2();
     }
@@ -288,7 +288,7 @@ void PlayerInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Player_
     }
 
     // 225 has no second hit, so its bit means the decoder is out of step with the server.
-    if (m_protocol.GetRevision() < Revision_e::Rev289 && (mask & MASK_DAMAGE2) != 0)
+    if (m_protocol.GetRevision() < Revision_e::Rev274 && (mask & MASK_DAMAGE2) != 0)
     {
         throw ProtocolError{std::format("PLAYER_INFO mask {:#x} has DAMAGE2, which revision 225 doesn't send", mask)};
     }

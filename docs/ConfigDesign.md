@@ -189,9 +189,9 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 | `login.rsaModulus` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 1 |
 | `login.rsaExponent` | string | `"0x0"` | A number that `BigUInt::Parse` accepts, greater than 0 |
 | `login.lowMemory` | boolean | `false` | |
-| `login.revision` | integer | `289` | `225` or `289`, the revisions the client speaks ([RevisionDesign.md](RevisionDesign.md)). It's process-wide, like the cache, which must be the same revision's |
+| `login.revision` | integer | `289` | `225`, `274` or `289`, the revisions the client speaks ([RevisionDesign.md](RevisionDesign.md)). It's process-wide, like the cache, which must be the same revision's |
 | `client.logLevel` | string | `"info"` | `verbose`, `info`, `warning` or `error` |
-| `client.cacheDirectory` | string | `"data/cache"` | Not empty. The folder that holds the server's cache, relative to the working directory: for 289, `main_file_cache.dat` and its index files; for 225, the engine's `data/pack/client` folder. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
+| `client.cacheDirectory` | string | `"data/cache"` | Not empty. The folder that holds the server's cache, relative to the working directory: for 289 and 274, `main_file_cache.dat` and its index files; for 225, the engine's `data/pack/client` folder. The login CRCs and the game data come from it ([CacheDesign.md](CacheDesign.md)) |
 | `client.navDirectory` | string | `"data/nav"` | Not empty. rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes ([BotApiDesign.md](BotApiDesign.md) §9) |
 | `client.logFile` | string | `""` | Where log lines are appended as plain text, at `logLevel`, as well as the console. Its folder is made if need be. Empty for no file. Lines logged while the config file loads come before it opens, so they're only on the console |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
@@ -284,7 +284,7 @@ struct AccountSettings_s
 
 struct LoginSettings_s
 {
-    static constexpr auto SUPPORTED_REVISIONS = std::to_array({Revision_e::Rev289});
+    static constexpr auto SUPPORTED_REVISIONS = std::to_array({Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289});
 
     BigUInt rsaModulus;
     BigUInt rsaExponent;
@@ -760,7 +760,7 @@ Each rejection is a `ConfigError` containing the key's path.
 | `login.rsaModulus` | `"3233"`, `"0xca1"`, `"0xCA1"` and `"0XcA1"`, all equal to `BigUInt::Parse("3233")` | `"0"`, `"1"`, `""`, `"0xzz"`, `3233` |
 | `login.rsaExponent` | `"1"`, `"0x10001"` | `"0"`, `""`, `65537` |
 | `login.lowMemory` | `true`, `false` | `0`, `1`, `"true"` |
-| `login.revision` | `225`, `289` | `224`, `226`, `288`, `290`, `"289"`, `true`; the message names both, `must be 225 or 289` |
+| `login.revision` | `225`, `274`, `289` | `224`, `226`, `273`, `275`, `288`, `290`, `"289"`, `true`; the message names each, `must be 225, 274 or 289` |
 | `client.logLevel` | `"verbose"`, `"info"`, `"warning"` and `"error"` give the four levels | `"warn"`, `"Info"`, `"debug"`, `""`, `2` |
 | `client.cacheDirectory` | `"C:/rs/pack"`, stored as written | `""`, `5` |
 

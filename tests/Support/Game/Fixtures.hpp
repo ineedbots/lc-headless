@@ -31,7 +31,7 @@ public:
     [[nodiscard]] static std::vector<u8> PlaceLocalPlayer(s32 localX = HOME_LOCAL, s32 localZ = HOME_LOCAL, s32 level = 0, std::span<const u8> appearance = {});
     // 225 has 13-bit indexes and no jump bit.
     [[nodiscard]] static std::vector<u8> AddNpc(u16 index, u16 type, s32 dx, s32 dz, Revision_e revision = Revision_e::Rev289);
-    // An inventory filled from slot 0 with each obj's id and count. 225 sends the size in a byte.
+    // An inventory filled from slot 0 with each obj's id and count. 225 and 274 send the size in a byte.
     [[nodiscard]] static std::vector<u8> UpdateInvFull(u16 com, std::span<const std::pair<u16, s32>> items, Revision_e revision = Revision_e::Rev289);
     [[nodiscard]] static std::vector<u8> Zone(s32 localX, s32 localZ);
     [[nodiscard]] static std::vector<u8> ObjAdd(u8 pos, u16 obj, u16 count);

@@ -149,9 +149,30 @@ TEST_CASE("ClientPackets builds 225's drags and camera position", "[ClientPacket
     CheckPacket(PACKETS.EventCameraPosition(128, 1024), ClientProt_e::EventCameraPosition, Bytes({0, 128, 4, 0}));
 }
 
+TEST_CASE("ClientPackets builds 274's packets in 289's layout", "[ClientPackets]")
+{
+    const auto protocol = Protocol{Revision_e::Rev274};
+    const auto packets = ClientPackets{protocol};
+
+    const auto drag = packets.InvButtonD(5382, 1, 2, DragMode_e::Insert);
+    CHECK(drag.payload == Bytes({0x15, 0x06, 0, 1, 0, 2, 1}));
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, drag));
+
+    const auto camera = packets.EventCameraPosition(128, 1024);
+    CHECK(camera.payload == Bytes({0, 128, 4, 0}));
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, camera));
+
+    CHECK(packets.OpPlayer(5, 1).prot == ClientProt_e::OpPlayer5);
+    CHECK_NOTHROW(packets.MapBuildComplete());
+    CHECK_THROWS_AS(packets.RebuildGetMaps({}), std::invalid_argument);
+    CHECK_THROWS_AS(packets.EventTracking(std::vector<u8>{1}), std::invalid_argument);
+}
+
 TEST_CASE("ClientPackets numbers chat effects as the revision does", "[ClientPackets]")
 {
-    const auto packets = ClientPackets{Protocol{Revision_e::Rev225}};
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274);
+    const auto packets = ClientPackets{Protocol{revision}};
+    CAPTURE(static_cast<u16>(revision));
 
     CHECK(packets.MessagePublic("hi", ChatColour_e::Yellow, ChatEffect_e::Wave).payload[1] == 1);
     CHECK(packets.MessagePublic("hi", ChatColour_e::Yellow, ChatEffect_e::Scroll).payload[1] == 2);
@@ -160,7 +181,7 @@ TEST_CASE("ClientPackets numbers chat effects as the revision does", "[ClientPac
 
     const auto effect = GENERATE(ChatEffect_e::Wave2, ChatEffect_e::Shake, ChatEffect_e::Slide);
     CAPTURE(static_cast<u8>(effect));
-    CHECK_THROWS_WITH(packets.MessagePublic("hi", ChatColour_e::Yellow, effect), "Revision 225 has only the wave and scroll chat effects");
+    CHECK_THROWS_WITH(packets.MessagePublic("hi", ChatColour_e::Yellow, effect), std::format("Revision {} has only the wave and scroll chat effects", static_cast<u16>(revision)));
     CHECK_NOTHROW(PACKETS.MessagePublic("hi", ChatColour_e::Yellow, effect));
 }
 

@@ -16,7 +16,7 @@ namespace
 void TestWorld::Send(FakeGameServer& server, bool reconnect)
 {
     const auto revision = server.GetRevision();
-    const auto rebuild = revision >= Revision_e::Rev289 ? Fixtures::Rebuild() : Fixtures::Rebuild225(std::span{&SQUARE_225, 1});
+    const auto rebuild = revision >= Revision_e::Rev274 ? Fixtures::Rebuild() : Fixtures::Rebuild225(std::span{&SQUARE_225, 1});
     server.Send(ServerProt_e::RebuildNormal, rebuild);
     if (!reconnect)
     {

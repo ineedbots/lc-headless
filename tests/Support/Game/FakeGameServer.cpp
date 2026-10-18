@@ -224,7 +224,7 @@ void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMes
             m_toClient.reset();
         }
 
-        if (m_revision < Revision_e::Rev289)
+        if (m_revision < Revision_e::Rev274)
         {
             SendSeed(connection, false);
         }
@@ -275,7 +275,7 @@ void FakeGameServer::OnMessage(ix::WebSocket& connection, const ix::WebSocketMes
 
 void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<const u8> bytes)
 {
-    if (m_revision < Revision_e::Rev289)
+    if (m_revision < Revision_e::Rev274)
     {
         AddError("A 225 client sent something before its seed arrived");
         return;
@@ -290,7 +290,7 @@ void FakeGameServer::HandleSeedRequest(ix::WebSocket& connection, std::span<cons
     SendSeed(connection, true);
 }
 
-// 289 puts 8 zero bytes and a status of 0 before the seed.
+// Later revisions put 8 zero bytes and a status of 0 before the seed.
 void FakeGameServer::SendSeed(ix::WebSocket& connection, bool withHeader)
 {
     auto response = Packet{};
@@ -359,7 +359,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
 
         auto response = Packet{};
         response.P1(status);
-        if (status == LOGGED_IN && m_revision >= Revision_e::Rev289)
+        if (status == LOGGED_IN && m_revision >= Revision_e::Rev274)
         {
             response.P1(0);
             response.P1(1);
@@ -385,7 +385,7 @@ void FakeGameServer::HandleLogin(ix::WebSocket& connection, std::span<const u8> 
 bool FakeGameServer::ReadRevision(Packet& packet) const
 {
     const auto revision = static_cast<u16>(m_revision);
-    if (m_revision < Revision_e::Rev289)
+    if (m_revision < Revision_e::Rev274)
     {
         return packet.G1() == revision;
     }
@@ -395,7 +395,7 @@ bool FakeGameServer::ReadRevision(Packet& packet) const
 
 bool FakeGameServer::IsLoggedIn(u8 status) const
 {
-    return status == LOGGED_IN || (m_revision < Revision_e::Rev289 && status == LOGGED_IN_STAFF_225);
+    return status == LOGGED_IN || (m_revision < Revision_e::Rev274 && status == LOGGED_IN_STAFF_225);
 }
 
 void FakeGameServer::HandleGamePackets(ix::WebSocket& connection, std::span<const u8> bytes)

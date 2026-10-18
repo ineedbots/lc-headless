@@ -32,6 +32,7 @@ TEST_CASE("Menus chooses options by their text", "[Menus]")
     CHECK(Menus::FindPlayerOp(state, Revision_e::Rev289, "follow") == 2);
     CHECK_THROWS_WITH(Menus::FindPlayerOp(state, Revision_e::Rev289, "Trade"), "a player has no option 'Trade'; its options are Follow (2)");
     CHECK(Menus::FindPlayerOp(state, Revision_e::Rev225, "trade with") == 4);
+    CHECK(Menus::FindPlayerOp(state, Revision_e::Rev274, "follow") == 2);
 
     SECTION("ground items offer Take, and inventory items Drop, where their type has no option")
     {
@@ -52,6 +53,7 @@ TEST_CASE("Menus lists each kind of target's menu by slot", "[Menus]")
     CHECK(Menus::GetGroundItemMenu(cache, W::BONES) == Menus::Menu{"", "", "Take", "", ""});
     CHECK(Menus::GetItemMenu(cache, W::BONES) == Menus::Menu{"Bury", "", "", "", "Drop"});
     CHECK(Menus::GetPlayerMenu(world.state, Revision_e::Rev289) == Menus::Menu{"", "Follow", "", "", ""});
+    CHECK(Menus::GetPlayerMenu(world.state, Revision_e::Rev274) == Menus::Menu{"", "Follow", "", "", ""});
     // 225 has no SET_PLAYER_OP, so its menu is the webclient's, whatever the state holds.
     CHECK(Menus::GetPlayerMenu(world.state, Revision_e::Rev225) == Menus::Menu{"Duel-with", "Attack", "Follow", "Trade with", ""});
 

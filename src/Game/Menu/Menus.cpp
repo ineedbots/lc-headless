@@ -151,7 +151,7 @@ std::optional<Menu> Menus::GetInventoryMenu(const GameCache_s& cache, u16 com)
 Menu Menus::GetPlayerMenu(const GameState_s& state, Revision_e revision)
 {
     // The server still decides whether an option is allowed where the player is.
-    if (revision < Revision_e::Rev289)
+    if (revision < Revision_e::Rev274)
     {
         return PLAYER_MENU_225;
     }

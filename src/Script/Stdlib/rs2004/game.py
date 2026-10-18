@@ -69,7 +69,7 @@ class _Game:
         return _core.get_tick()
 
     def revision(self):
-        """The server revision this client speaks: 225 or 289."""
+        """The server revision this client speaks: 225, 274 or 289."""
         return _core.get_revision()
 
     def my_name(self):

@@ -202,6 +202,40 @@ TEST_CASE("GameClient logs in to a 225 server and answers each rebuild", "[GameC
     CHECK(server.GetErrors().empty());
 }
 
+TEST_CASE("GameClient logs in to a 274 server and owes no replies", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev274};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(Revision_e::Rev274), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+
+    client.Login();
+    REQUIRE(client.IsInGame());
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return !client.GetState().messages.empty();
+    }));
+
+    const auto& state = client.GetState();
+    CHECK(state.pid == Fixtures::PID);
+    CHECK(state.members);
+    REQUIRE(state.localPlayer.appearance.has_value());
+    CHECK(state.localPlayer.appearance->totalLevel == 32);
+    REQUIRE(state.npcs.size() == 1);
+    REQUIRE(state.FindInventory(INVENTORY) != nullptr);
+    CHECK(state.FindInventory(INVENTORY)->slots[0].id == TestWorld::LOGS);
+    CHECK(state.buildArea.loaded);
+    CHECK(state.buildArea.squares.empty());
+
+    auto actions = GameActions{client};
+    actions.InteractNpc(TestWorld::NPC_INDEX, 1);
+    client.Pump();
+    REQUIRE(server.WaitForPacket(ClientProt_e::OpNpc1));
+    CHECK(server.GetPackets(ClientProt_e::OpNpc1)[0].payload == std::vector<u8>{0, 100});
+    CHECK(server.GetPackets(ClientProt_e::RebuildGetMaps).empty());
+    CHECK(server.GetPackets(ClientProt_e::EventTracking).empty());
+    CHECK(server.GetErrors().empty());
+}
+
 TEST_CASE("GameClient reports a 225 server's input tracking windows", "[GameClient]")
 {
     auto capture = LogCapture{LogLevel_e::Info};

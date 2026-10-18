@@ -18,6 +18,7 @@
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace
 {
@@ -327,7 +328,10 @@ TEST_CASE("PLAYER_INFO reads extended blocks", "[PlayerInfoDecoder]")
 
 TEST_CASE("PLAYER_INFO reads an NPC-transformed appearance", "[PlayerInfoDecoder]")
 {
-    const auto appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("frog", 18), Revision_e::Rev289);
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    CAPTURE(static_cast<u16>(revision));
+
+    const auto appearance = PlayerInfoDecoder::ReadAppearance(Fixtures::Appearance("frog", 18, revision), revision);
     REQUIRE(appearance.npcTransform.has_value());
     CHECK(*appearance.npcTransform == 18);
     CHECK(std::ranges::all_of(appearance.wear, [](const WearSlot_s& slot)
@@ -338,6 +342,7 @@ TEST_CASE("PLAYER_INFO reads an NPC-transformed appearance", "[PlayerInfoDecoder
     CHECK(appearance.runAnim == 824);
     CHECK(appearance.name == "Frog");
     CHECK(appearance.combatLevel == 3);
+    CHECK(appearance.totalLevel == 32);
 }
 
 TEST_CASE("PLAYER_INFO hits from a later tick replace the earlier ones", "[PlayerInfoDecoder]")
@@ -367,9 +372,13 @@ TEST_CASE("PLAYER_INFO hits from a later tick replace the earlier ones", "[Playe
 
 TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
 {
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    const auto protocol = Protocol{revision};
+    CAPTURE(static_cast<u16>(revision));
+
     auto state = Fixtures::PlacedState();
 
-    NpcInfoDecoder{PROTOCOL_289}.Decode(Fixtures::AddNpc(100, 50, 2, -1), state);
+    NpcInfoDecoder{protocol}.Decode(Fixtures::AddNpc(100, 50, 2, -1), state);
     REQUIRE(state.npcs.size() == 1);
     CHECK(state.npcs[0].index == 100);
     CHECK(state.npcs[0].type == 50);
@@ -380,12 +389,12 @@ TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
     {
         auto walk = BitWriter{};
         walk.Put(8, 1).Put(1, 1).Put(2, 1).Put(3, 2).Put(1, 0);
-        NpcInfoDecoder{PROTOCOL_289}.Decode(walk.GetBytes(), state);
+        NpcInfoDecoder{protocol}.Decode(walk.GetBytes(), state);
         CHECK(state.npcs[0].tile == Offset(3, 0));
 
         auto remove = BitWriter{};
         remove.Put(8, 1).Put(1, 1).Put(2, 3);
-        NpcInfoDecoder{PROTOCOL_289}.Decode(remove.GetBytes(), state);
+        NpcInfoDecoder{protocol}.Decode(remove.GetBytes(), state);
         CHECK(state.npcs.empty());
     }
 
@@ -394,7 +403,7 @@ TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
         auto teleport = BitWriter{};
         teleport.Put(8, 1).Put(1, 1).Put(2, 3);
         teleport.Put(14, 100).Put(11, 50).Put(5, -10).Put(5, 10).Put(1, 1).Put(1, 0);
-        NpcInfoDecoder{PROTOCOL_289}.Decode(teleport.GetBytes(), state);
+        NpcInfoDecoder{protocol}.Decode(teleport.GetBytes(), state);
         REQUIRE(state.npcs.size() == 1);
         CHECK(state.npcs[0].tile == Offset(-10, 10));
         CHECK(state.npcs[0].lastMovement == Movement_e::Teleport);
@@ -403,6 +412,10 @@ TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")
 
 TEST_CASE("NPC_INFO reads extended blocks in mask order", "[NpcInfoDecoder]")
 {
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    const auto protocol = Protocol{revision};
+    CAPTURE(static_cast<u16>(revision));
+
     auto state = Fixtures::PlacedState();
     state.npcs = {MakeNpc(100, 50, Offset(1, 0)), MakeNpc(101, 51, Offset(0, 1))};
 
@@ -432,7 +445,7 @@ TEST_CASE("NPC_INFO reads extended blocks in mask order", "[NpcInfoDecoder]")
     extended.P2(6403);
     extended.P2(6405);
 
-    NpcInfoDecoder{PROTOCOL_289}.Decode(WithExtended(bits, extended), state);
+    NpcInfoDecoder{protocol}.Decode(WithExtended(bits, extended), state);
 
     const auto& first = state.npcs[0];
     REQUIRE(first.hits.size() == 2);

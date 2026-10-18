@@ -24,7 +24,7 @@ namespace
     constexpr auto MASK_FACE_COORD = 0x80u;
     constexpr auto BITS_PER_BYTE = std::size_t{8};
 
-    // 289 widened the index from 13 bits to 14, so each list ends with that many set bits.
+    // Later revisions widened the index from 13 bits to 14, so each list ends with that many set bits.
     struct NpcIndexBits_s
     {
         u32 bits = 0;
@@ -33,7 +33,7 @@ namespace
 
     NpcIndexBits_s GetIndexBits(Revision_e revision)
     {
-        if (revision >= Revision_e::Rev289)
+        if (revision >= Revision_e::Rev274)
         {
             return {.bits = 14, .endOfList = 16383};
         }
@@ -112,7 +112,7 @@ void NpcInfoDecoder::ReadNew(Packet& packet, const GameState_s& state, std::vect
 
         // 225 has no jump bit, so every new NPC is placed as a walk.
         auto jump = false;
-        if (m_protocol.GetRevision() >= Revision_e::Rev289)
+        if (m_protocol.GetRevision() >= Revision_e::Rev274)
         {
             jump = packet.GBit(EntityInfo::UPDATE_BITS) == 1;
         }
@@ -148,7 +148,7 @@ void NpcInfoDecoder::ReadExtended(Packet& packet, GameState_s& state, Npc_s& npc
     const auto mask = u32{packet.G1()};
 
     // 225 has no second hit, so its bit means the decoder is out of step with the server.
-    if (m_protocol.GetRevision() < Revision_e::Rev289 && (mask & MASK_DAMAGE2) != 0)
+    if (m_protocol.GetRevision() < Revision_e::Rev274 && (mask & MASK_DAMAGE2) != 0)
     {
         throw ProtocolError{std::format("NPC_INFO mask {:#x} has DAMAGE2, which revision 225 doesn't send", mask)};
     }

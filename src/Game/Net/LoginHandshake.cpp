@@ -37,7 +37,7 @@ LoginHandshake::LoginHandshake(Protocol protocol, const AccountSettings_s& accou
     , m_login{login}
     , m_crcs{crcs}
     , m_reconnect{reconnect}
-    , m_stage{protocol.GetRevision() >= Revision_e::Rev289 ? Stage_e::SendSeedRequest : Stage_e::ServerSeed}
+    , m_stage{protocol.GetRevision() >= Revision_e::Rev274 ? Stage_e::SendSeedRequest : Stage_e::ServerSeed}
 {
 }
 
@@ -178,8 +178,8 @@ std::vector<u8> LoginHandshake::BuildLoginRequest(const Protocol& protocol, cons
     const auto bodyStart = packet.GetPos();
     const auto revision = static_cast<u16>(protocol.GetRevision());
 
-    // 225 fits its revision in a byte; 289 doesn't, so it sends a marker and two bytes.
-    if (protocol.GetRevision() >= Revision_e::Rev289)
+    // 225 fits its revision in a byte; later revisions don't, so they send a marker and two bytes.
+    if (protocol.GetRevision() >= Revision_e::Rev274)
     {
         packet.P1(REVISION_MARKER);
         packet.P2(revision);
@@ -238,7 +238,7 @@ std::optional<LoginResult_s> LoginHandshake::ReadResponse(u8 status)
     }
 
     // 225 tells a staff account by its status, and sends nothing after either success.
-    if (m_protocol.GetRevision() < Revision_e::Rev289 && (status == STATUS_LOGGED_IN || status == STATUS_LOGGED_IN_STAFF))
+    if (m_protocol.GetRevision() < Revision_e::Rev274 && (status == STATUS_LOGGED_IN || status == STATUS_LOGGED_IN_STAFF))
     {
         m_result.staffLevel = status == STATUS_LOGGED_IN_STAFF ? 1 : 0;
         m_stage = Stage_e::Done;
@@ -251,7 +251,7 @@ std::optional<LoginResult_s> LoginHandshake::ReadResponse(u8 status)
         return std::nullopt;
     }
 
-    if (status == STATUS_HOP_TIMER && m_protocol.GetRevision() >= Revision_e::Rev289)
+    if (status == STATUS_HOP_TIMER && m_protocol.GetRevision() >= Revision_e::Rev274)
     {
         m_stage = Stage_e::HopTimer;
         return std::nullopt;

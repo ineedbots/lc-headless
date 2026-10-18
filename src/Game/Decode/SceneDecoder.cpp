@@ -43,7 +43,7 @@ namespace
             .baseZ = (zoneZ - BUILD_AREA_RADIUS_ZONES) * Zone_s::SIZE,
         };
 
-        if (protocol.GetRevision() < Revision_e::Rev289)
+        if (protocol.GetRevision() < Revision_e::Rev274)
         {
             state.buildArea.squares = ReadBuildSquares(packet);
         }
@@ -100,7 +100,7 @@ void SceneDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state,
         return;
 
     case ServerProt_e::MidiSong:
-        if (protocol.GetRevision() < Revision_e::Rev289)
+        if (protocol.GetRevision() < Revision_e::Rev274)
         {
             packet.SetPos(packet.GetLength());
             return;
@@ -109,7 +109,7 @@ void SceneDecoder::Decode(ServerProt_e prot, Packet& packet, GameState_s& state,
         state.audio.song = PacketFields::ReadId(packet);
         return;
     case ServerProt_e::MidiJingle:
-        if (protocol.GetRevision() < Revision_e::Rev289)
+        if (protocol.GetRevision() < Revision_e::Rev274)
         {
             packet.SetPos(packet.GetLength());
             return;

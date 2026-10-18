@@ -23,7 +23,7 @@ public:
     // The options of an inventory whose menu offers its own rather than its items', such as the bank's
     // "Withdraw 1", or nullopt for one that offers its items', such as the backpack.
     [[nodiscard]] static std::optional<Menu> GetInventoryMenu(const GameCache_s& cache, u16 com);
-    // 289's comes from SET_PLAYER_OP. 225 has no such packet, and its webclient's menu is fixed.
+    // Later revisions' comes from SET_PLAYER_OP. 225 has no such packet, and its webclient's menu is fixed.
     [[nodiscard]] static Menu GetPlayerMenu(const GameState_s& state, Revision_e revision);
 
     // Matched without regard to case. Text that matches no option throws std::invalid_argument, listing the

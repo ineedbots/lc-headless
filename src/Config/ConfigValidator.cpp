@@ -50,7 +50,7 @@ namespace
         return std::ranges::find(revisions, revision) != revisions.end();
     }
 
-    // "must be 225 or 289", from the supported list.
+    // "must be 225, 274 or 289", from the supported list.
     std::string DescribeSupportedRevisions()
     {
         const auto& revisions = LoginSettings_s::SUPPORTED_REVISIONS;

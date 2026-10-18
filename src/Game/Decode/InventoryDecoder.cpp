@@ -33,7 +33,7 @@ namespace
     void DecodeFull(Packet& packet, GameState_s& state, const Protocol& protocol)
     {
         const auto com = packet.G2();
-        // 225 sends the inventory's whole capacity in a byte; 289 sends up to the last used slot in two.
+        // 225 and 274 send the size in a byte; 289 widened it to two. 225's size is the whole capacity, and the others' run to the last used slot.
         const auto size = protocol.GetRevision() >= Revision_e::Rev289 ? packet.G2() : packet.G1();
         auto inventory = Inventory_s{.com = com, .tick = state.tick};
         inventory.slots.reserve(size);
@@ -54,7 +54,7 @@ namespace
         inventory.tick = state.tick;
         while (packet.GetAvailable() > 0)
         {
-            // 225 sends each slot in a byte; 289 widened it to a smart.
+            // 225 and 274 send each slot in a byte; 289 widened it to a smart.
             const auto slot = static_cast<std::size_t>(protocol.GetRevision() >= Revision_e::Rev289 ? packet.GSmart() : packet.G1());
             const auto item = ReadItem(packet);
             if (slot >= inventory.slots.size())

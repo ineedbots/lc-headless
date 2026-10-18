@@ -18,7 +18,7 @@ struct LoginResult_s
 
 // Never waits, so the caller owns the timeout. Bytes after the login response stay in the socket. The
 // account, the login settings and the CRCs must outlive the handshake. A 225 server sends its seed as soon as
-// the connection opens; 289 waits for a seed request.
+// the connection opens; later revisions wait for a seed request.
 class LoginHandshake
 {
 public:

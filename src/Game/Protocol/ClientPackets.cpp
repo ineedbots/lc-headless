@@ -41,7 +41,7 @@ namespace
         return prots[MenuOp::GetSlot(op)];
     }
 
-    // 225 has three effects, with scroll third; 289 added three more and moved scroll to 4.
+    // 225 and 274 have three effects, with scroll third; 289 added three more and moved scroll to 4.
     u8 GetWireEffect(ChatEffect_e effect, Revision_e revision)
     {
         if (revision >= Revision_e::Rev289)
@@ -149,7 +149,7 @@ ClientPacket_s ClientPackets::EventCameraPosition(u16 pitch, u16 yaw) const
     packet.P2(yaw);
 
     // 225 also sends the minimap's angle and zoom, which the engine never reads, so they're zero.
-    if (m_protocol.GetRevision() < Revision_e::Rev289)
+    if (m_protocol.GetRevision() < Revision_e::Rev274)
     {
         packet.P1(0);
         packet.P1(0);
@@ -345,8 +345,8 @@ ClientPacket_s ClientPackets::InvButton(u8 op, const ItemRef_s& item) const
 
 ClientPacket_s ClientPackets::InvButtonD(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode) const
 {
-    // 225 only swaps; 289 added the mode.
-    const auto hasMode = m_protocol.GetRevision() >= Revision_e::Rev289;
+    // 225 only swaps; later revisions add the mode.
+    const auto hasMode = m_protocol.GetRevision() >= Revision_e::Rev274;
     if (!hasMode && mode == DragMode_e::Insert)
     {
         throw std::invalid_argument{"Revision 225 can't insert a dragged item, only swap it"};

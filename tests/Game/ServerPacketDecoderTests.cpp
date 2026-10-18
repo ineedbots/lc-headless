@@ -20,6 +20,7 @@
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace
 {
@@ -616,10 +617,13 @@ TEST_CASE("ServerPacketDecoder reads UPDATE_PID and LAST_LOGIN_INFO in each revi
         CHECK_FALSE(fixture.state.lastLogin->warnMembers);
     }
 
-    SECTION("289 sends them")
+    SECTION("274 and 289 send them")
     {
-        auto fixture = DecoderFixture{Revision_e::Rev289};
-        fixture.Decode(ServerProt_e::UpdatePid, Fixtures::UpdatePid(9, true, Revision_e::Rev289));
+        const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+        CAPTURE(static_cast<u16>(revision));
+
+        auto fixture = DecoderFixture{revision};
+        fixture.Decode(ServerProt_e::UpdatePid, Fixtures::UpdatePid(9, true, revision));
         fixture.Decode(ServerProt_e::LastLoginInfo, MakeLastLogin(true));
 
         CHECK(fixture.state.members);
@@ -629,12 +633,15 @@ TEST_CASE("ServerPacketDecoder reads UPDATE_PID and LAST_LOGIN_INFO in each revi
     }
 }
 
-TEST_CASE("ServerPacketDecoder reads 225's inventory sizes and slots in a byte", "[ServerPacketDecoder]")
+TEST_CASE("ServerPacketDecoder reads 225's and 274's inventory sizes and slots in a byte", "[ServerPacketDecoder]")
 {
-    auto fixture = DecoderFixture{Revision_e::Rev225};
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274);
+    CAPTURE(static_cast<u16>(revision));
+
+    auto fixture = DecoderFixture{revision};
 
     const auto items = std::to_array<std::pair<u16, s32>>({{995, 100000}, {1511, 1}, {0, 0}});
-    fixture.Decode(ServerProt_e::UpdateInvFull, Fixtures::UpdateInvFull(INVENTORY, items, Revision_e::Rev225));
+    fixture.Decode(ServerProt_e::UpdateInvFull, Fixtures::UpdateInvFull(INVENTORY, items, revision));
 
     const auto* inventory = fixture.state.FindInventory(INVENTORY);
     REQUIRE(inventory != nullptr);
@@ -673,9 +680,12 @@ TEST_CASE("ServerPacketDecoder keeps the map squares a 225 rebuild lists", "[Ser
     CHECK((area.squares[1].landCrc == 13 && area.squares[1].locCrc == 0));
     CHECK(area.squares[2].x == 51);
 
-    SECTION("a 289 rebuild lists none")
+    SECTION("a later rebuild lists none")
     {
-        auto later = DecoderFixture{Revision_e::Rev289};
+        const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+        CAPTURE(static_cast<u16>(revision));
+
+        auto later = DecoderFixture{revision};
         later.Decode(ServerProt_e::RebuildNormal, Fixtures::Rebuild(401, 399));
         CHECK(later.state.buildArea.squares.empty());
         CHECK(later.state.buildArea.centreZoneX == 401);
@@ -703,9 +713,12 @@ TEST_CASE("ServerPacketDecoder reads music in each revision", "[ServerPacketDeco
         CHECK(fixture.state.audio.jingle == -1);
     }
 
-    SECTION("289 sends their ids")
+    SECTION("274 and 289 send their ids")
     {
-        auto fixture = DecoderFixture{Revision_e::Rev289};
+        const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+        CAPTURE(static_cast<u16>(revision));
+
+        auto fixture = DecoderFixture{revision};
         fixture.Decode(ServerProt_e::MidiSong, std::vector<u8>{0, 62});
         fixture.Decode(ServerProt_e::MidiJingle, std::vector<u8>{0, 9, 0, 80});
         CHECK(fixture.state.audio.song == 62);
@@ -723,10 +736,13 @@ TEST_CASE("ServerPacketDecoder gives a private message's staff level the same me
     CHECK(fixture225.state.messages[0].rights == 0);
     CHECK(fixture225.state.messages[1].rights == 2);
 
-    auto fixture289 = DecoderFixture{Revision_e::Rev289};
-    fixture289.Decode(ServerProt_e::MessagePrivate, MakePrivateMessage(1, 2));
-    REQUIRE(fixture289.state.messages.size() == 1);
-    CHECK(fixture289.state.messages[0].rights == 2);
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    CAPTURE(static_cast<u16>(revision));
+
+    auto later = DecoderFixture{revision};
+    later.Decode(ServerProt_e::MessagePrivate, MakePrivateMessage(1, 2));
+    REQUIRE(later.state.messages.size() == 1);
+    CHECK(later.state.messages[0].rights == 2);
 }
 
 TEST_CASE("ServerPacketDecoder consumes the packets only 225 sends", "[ServerPacketDecoder]")

@@ -115,8 +115,8 @@ void SocialDecoder::DecodePrivateMessage(Packet& packet, GameState_s& state, con
     const auto messageId = packet.G4();
     auto staffLevel = packet.G1();
 
-    // The 225 engine sends a staff level of 1 or more as one higher, so it's taken back down to mean what 289's does.
-    if (protocol.GetRevision() < Revision_e::Rev289 && staffLevel > 0)
+    // The 225 engine sends a staff level of 1 or more as one higher, so it's taken back down to mean what later revisions' does.
+    if (protocol.GetRevision() < Revision_e::Rev274 && staffLevel > 0)
     {
         --staffLevel;
     }

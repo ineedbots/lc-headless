@@ -153,6 +153,21 @@ TEST_CASE("ServerPacketReader reads each revision's opcodes and rejects the othe
     CHECK_THROWS_WITH(earlier.Next(), "Server sent opcode 60, which revision 225 never sends");
 }
 
+TEST_CASE("ServerPacketReader reads 274's opcodes", "[ServerPacketReader]")
+{
+    // 197 is 274's NPC_INFO and 133 its UPDATE_PID; 12 is 289's TUT_OPEN, which 274 doesn't use.
+    const auto protocol = Protocol{Revision_e::Rev274};
+    auto framer = ServerFramer{protocol};
+    auto reader = ServerPacketReader{SEED, protocol};
+    reader.Append(Join({framer.Frame(197, {77}), framer.Frame(133, {0, 9, 1})}));
+    CheckPacket(reader.Next(), ServerProt_e::NpcInfo, {77});
+    CheckPacket(reader.Next(), ServerProt_e::UpdatePid, {0, 9, 1});
+
+    auto other = ServerPacketReader{SEED, protocol};
+    other.Append(ServerFramer{protocol}.Frame(12, {}));
+    CHECK_THROWS_WITH(other.Next(), "Server sent opcode 12, which revision 274 never sends");
+}
+
 TEST_CASE("ServerPacketReader rejects an opcode the server never sends", "[ServerPacketReader]")
 {
     auto framer = ServerFramer{};
@@ -253,6 +268,21 @@ TEST_CASE("LoginHandshake builds a 225 login request with a one-byte revision", 
     CHECK(request[2] == 225);
     CHECK(request[3] == 0);
     CHECK(std::ranges::equal(std::span{request}.subspan(4), std::span{request289}.subspan(6)));
+}
+
+TEST_CASE("LoginHandshake builds a 274 login request with the marker and a two-byte revision", "[LoginHandshake]")
+{
+    const auto account = AccountSettings_s{.username = "bot", .password = "pw"};
+    auto login = MakeLoginSettings();
+    login.revision = Revision_e::Rev274;
+    const auto request = LoginHandshake::BuildLoginRequest(Protocol{Revision_e::Rev274}, account, login, CRCS, SEED, false);
+    const auto request289 = LoginHandshake::BuildLoginRequest(PROTOCOL, account, login, CRCS, SEED, false);
+
+    REQUIRE(request.size() == request289.size());
+    CHECK(request[2] == 0xFF);
+    CHECK(request[3] == 0x01);
+    CHECK(request[4] == 0x12);
+    CHECK(std::ranges::equal(std::span{request}.subspan(5), std::span{request289}.subspan(5)));
 }
 
 TEST_CASE("LoginHandshake seeds", "[LoginHandshake]")

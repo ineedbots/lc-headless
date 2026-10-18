@@ -646,6 +646,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK_FALSE(ParseAccepted(SetKey({"login", "lowMemory"}, false)).login.lowMemory);
         CHECK(ParseAccepted(SetKey({"login", "revision"}, 289)).login.revision == Revision_e::Rev289);
         CHECK(ParseAccepted(SetKey({"login", "revision"}, 225)).login.revision == Revision_e::Rev225);
+        CHECK(ParseAccepted(SetKey({"login", "revision"}, 274)).login.revision == Revision_e::Rev274);
     }
 
     SECTION("client")
@@ -662,7 +663,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
 TEST_CASE("ConfigFile names the revisions it supports", "[ConfigFile]")
 {
     auto capture = LogCapture{};
-    CHECK_THROWS_WITH(ConfigFile::Parse(SetKey({"login", "revision"}, 226), *capture.GetLogger()), "login.revision: must be 225 or 289");
+    CHECK_THROWS_WITH(ConfigFile::Parse(SetKey({"login", "revision"}, 226), *capture.GetLogger()), "login.revision: must be 225, 274 or 289");
 }
 
 TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
@@ -690,6 +691,8 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"login", "lowMemory"}, "true"},
         {{"login", "revision"}, 224},
         {{"login", "revision"}, 226},
+        {{"login", "revision"}, 273},
+        {{"login", "revision"}, 275},
         {{"login", "revision"}, 288},
         {{"login", "revision"}, 290},
         {{"login", "revision"}, "289"},

@@ -2,11 +2,11 @@
 
 ![HEADLESS](assets/anim.gif)
 
-A headless (shell) game client for revision-289 and revision-225 (2004-era RuneScape) servers, such as the 289 and 225 server engines. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics, reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process.
+A headless (shell) game client for revision-289, revision-274 and revision-225 (2004-era RuneScape) servers, such as the 289, 274 and 225 server engines. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics, reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process.
 
 ## Features
 
-- **The 289 and 225 protocols.** It does the RSA and ISAAC login handshake and decodes every server packet into state: players, NPCs, ground items, scenery changes, inventories, stats, interfaces and chat. It can also build every request the webclient sends.
+- **The 289, 274 and 225 protocols.** It does the RSA and ISAAC login handshake and decodes every server packet into state: players, NPCs, ground items, scenery changes, inventories, stats, interfaces and chat. It can also build every request the webclient sends.
 - **The game cache.** It loads the server's cache once per process and shares it with every account. The login CRCs are computed from it, scripts get the names and options of NPCs, items and scenery, scenery the server never changed is known, and walks and interactions route around walls as the webclient does.
 - **Python scripting** on an embedded [pocketpy](https://github.com/pocketpy/pocketpy) interpreter. A script defines `loop()` and the `on_*` hooks it needs, and calls a flat API such as `get_nearest_npc_by_name('Chicken')`, `interact_npc(npc, 'Attack')` and `walk_to(x, z)`.
 - **Several accounts per process.** Each account has its own interpreter and its own log name, and logins are spaced a few seconds apart. An account can log into a different world from the others.
@@ -27,7 +27,7 @@ A headless (shell) game client for revision-289 and revision-225 (2004-era RuneS
   - Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC and CMake 3.25+ both come with that workload.
   - Linux, with clang, CMake 3.25+ and Ninja. The C++ standard library has to be libstdc++ 13+ or libc++ 17+, for `<format>`. The build is tested on Ubuntu 24.04 and Arch, and [Linux](#linux) lists the packages each one needs.
 - [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
-- A revision-289 or revision-225 server to connect to, plus its RSA public key and a copy of its game cache (see [Configuration](#configuration)).
+- A revision-289, revision-274 or revision-225 server to connect to, plus its RSA public key and a copy of its game cache (see [Configuration](#configuration)).
 
 vcpkg installs the dependencies from `vcpkg.json`: bzip2 and zlib (for the cache's archives and maps), Catch2, IXWebSocket (with OpenSSL, for `wss://`), nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
 
@@ -106,8 +106,8 @@ Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If `client.js
 | `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header |
 | `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
 | `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
-| `login.revision` | The server's revision: `289`, the default, or `225`. It's set for the whole process, because the cache is, so a 289 server and a 225 server each need a process of their own |
-| `client.cacheDirectory` | The folder that holds the server's cache, in its revision's layout. For 289, `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as the 289 engine keeps them in `engine/data/pack`. For 225, the engine's `engine/data/pack/client` folder of archive files and `maps/`. The default is `data/cache`, which git ignores |
+| `login.revision` | The server's revision: `289`, the default, `274` or `225`. It's set for the whole process, because the cache is, so servers of different revisions each need a process of their own |
+| `client.cacheDirectory` | The folder that holds the server's cache, in its revision's layout. For 289 and 274, `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as those engines keep them in `engine/data/pack`. For 225, the engine's `engine/data/pack/client` folder of archive files and `maps/`. The default is `data/cache`, which git ignores |
 
 The RSA key comes from the server's deployment, not from the protocol, so take it from the server you're connecting to; its webclient uses the same values. The login CRCs are computed from the cache, so the cache must be the server's own, and `login.revision` must be the server's. If any of them is wrong, the server rejects the login with status 6. The client loads the cache once at startup, in well under a second, and a missing or damaged cache stops it before any login, naming the file.
 
