@@ -9,17 +9,33 @@
             "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
         },
         {
-            "name": "windows-msvc",
+            "name": "windows-base",
+            "hidden": true,
             "inherits": "base",
             "generator": "Visual Studio 17 2022",
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "windows-msvc",
+            "inherits": "windows-base",
             "architecture": {
                 "value": "x64",
                 "strategy": "set"
             },
             "cacheVariables": {
                 "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+            }
+        },
+        {
+            "name": "windows-msvc-x86",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "Win32",
+                "strategy": "set"
             },
-            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x86-windows-static-md"
+            }
         },
         {
             "name": "linux-clang",
@@ -33,17 +49,22 @@
     "buildPresets": [
         { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug" },
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release" },
+        { "name": "windows-x86-debug",   "configurePreset": "windows-msvc-x86", "configuration": "Debug" },
+        { "name": "windows-x86-release", "configurePreset": "windows-msvc-x86", "configuration": "Release" },
         { "name": "linux-debug",     "configurePreset": "linux-clang",  "configuration": "Debug" },
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release" }
     ],
     "testPresets": [
         { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug",   "output": { "outputOnFailure": true } },
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release", "output": { "outputOnFailure": true } },
+        { "name": "windows-x86-debug",   "configurePreset": "windows-msvc-x86", "configuration": "Debug",   "output": { "outputOnFailure": true } },
+        { "name": "windows-x86-release", "configurePreset": "windows-msvc-x86", "configuration": "Release", "output": { "outputOnFailure": true } },
         { "name": "linux-debug",     "configurePreset": "linux-clang",  "configuration": "Debug",   "output": { "outputOnFailure": true } },
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release", "output": { "outputOnFailure": true } }
     ],
     "packagePresets": [
         { "name": "windows-release", "configurePreset": "windows-msvc", "configurations": ["Release"], "generators": ["ZIP"], "packageDirectory": "${sourceDir}/build/packages" },
+        { "name": "windows-x86-release", "configurePreset": "windows-msvc-x86", "configurations": ["Release"], "generators": ["ZIP"], "packageDirectory": "${sourceDir}/build/packages" },
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configurations": ["Release"], "generators": ["TGZ"], "packageDirectory": "${sourceDir}/build/packages" }
     ]
 }

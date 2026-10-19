@@ -3,6 +3,11 @@
 name: Set up vcpkg
 description: Install the build's packages and vcpkg, with vcpkg's binary cache restored.
 
+inputs:
+  cache-name:
+    description: Names the binary cache, so builds for different triplets on one OS keep separate caches.
+    required: true
+
 runs:
   using: composite
   steps:
@@ -34,11 +39,11 @@ runs:
           "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
         fi
 
-    # The binary cache holds both configurations' packages, so Debug and Release on one OS share it. vcpkg rebuilds
+    # The binary cache holds both configurations' packages, so Debug and Release of one preset share it. vcpkg rebuilds
     # any package whose ABI hash changed, such as after a compiler update, so a stale restore is only slower.
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
         path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'ports/**') }}
-        restore-keys: vcpkg-${{ runner.os }}-
+        key: vcpkg-${{ inputs.cache-name }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'ports/**') }}
+        restore-keys: vcpkg-${{ inputs.cache-name }}-

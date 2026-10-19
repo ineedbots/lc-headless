@@ -3,9 +3,9 @@
 #     git tag v0.1.0 && git push origin v0.1.0
 #
 # The tag has to match the project VERSION in CMakeLists.txt, with an optional pre-release suffix such as v0.1.0-rc1,
-# which marks the release as a pre-release. Windows and Linux are built and tested in Release, then each is packaged
-# with the files the client loads from its working directory, and the release's notes are generated from the commits
-# since the previous tag.
+# which marks the release as a pre-release. Windows (x64 and x86) and Linux are built and tested in Release, then each
+# is packaged with the files the client loads from its working directory, and the release's notes are generated from
+# the commits since the previous tag.
 name: Release
 
 on:
@@ -39,11 +39,20 @@ jobs:
     strategy:
       matrix:
         include:
-          # windows-2022 is pinned because the windows-msvc preset uses the Visual Studio 17 2022 generator.
+          # windows-2022 is pinned because the windows-msvc presets use the Visual Studio 17 2022 generator.
           - platform: windows
+            os: windows
+            arch: x64
             runner: windows-2022
             configure-preset: windows-msvc
+          - platform: windows-x86
+            os: windows
+            arch: x86
+            runner: windows-2022
+            configure-preset: windows-msvc-x86
           - platform: linux
+            os: linux
+            arch: x64
             runner: ubuntu-24.04
             configure-preset: linux-clang
     runs-on: ${{ matrix.runner }}
@@ -51,6 +60,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-name: ${{ matrix.configure-preset }}
 
       - name: Configure
         run: cmake --preset ${{ matrix.configure-preset }}
@@ -65,7 +76,7 @@ jobs:
       - name: Package
         run: >-
           cpack --preset ${{ matrix.platform }}-release
-          -D CPACK_PACKAGE_FILE_NAME=rs2004-headless-${{ github.ref_name }}-${{ matrix.platform }}-x64
+          -D CPACK_PACKAGE_FILE_NAME=rs2004-headless-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:

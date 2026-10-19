@@ -486,6 +486,6 @@ TEST_CASE("An account connects through client.jsonc's proxy unless its file name
     account.Login();
 
     CHECK(server.GetLoginOpcodes().size() == 1);
-    CHECK(shared.GetRecord().accepted == (expectShared ? 1 : 0));
-    CHECK(own.GetRecord().accepted == (expectOwn ? 1 : 0));
+    CHECK(shared.GetRecord().accepted == (expectShared ? 1u : 0u));
+    CHECK(own.GetRecord().accepted == (expectOwn ? 1u : 0u));
 }
