@@ -3,9 +3,9 @@
 #     git tag v0.1.0 && git push origin v0.1.0
 #
 # The tag has to match the project VERSION in CMakeLists.txt, with an optional pre-release suffix such as v0.1.0-rc1,
-# which marks the release as a pre-release. Windows (x64 and x86) and Linux are built and tested in Release, then each
-# is packaged with the files the client loads from its working directory, and the release's notes are generated from
-# the commits since the previous tag.
+# which marks the release as a pre-release. Windows (x64 and x86) and Linux (x64 and arm64) are built and tested in
+# Release, then each is packaged with the files the client loads from its working directory, and the release's notes
+# are generated from the commits since the previous tag.
 name: Release
 
 on:
@@ -45,37 +45,47 @@ jobs:
             arch: x64
             runner: windows-2022
             configure-preset: windows-msvc
+            preset: windows
           - platform: windows-x86
             os: windows
             arch: x86
             runner: windows-2022
             configure-preset: windows-msvc-x86
+            preset: windows-x86
           - platform: linux
             os: linux
             arch: x64
             runner: ubuntu-24.04
             configure-preset: linux-clang
+            preset: linux
+          # The same presets as linux, built natively on an arm64 runner.
+          - platform: linux-arm64
+            os: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            configure-preset: linux-clang
+            preset: linux
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-vcpkg
         with:
-          cache-name: ${{ matrix.configure-preset }}
+          cache-name: ${{ matrix.platform }}
 
       - name: Configure
         run: cmake --preset ${{ matrix.configure-preset }}
 
       - name: Build
-        run: cmake --build --preset ${{ matrix.platform }}-release --parallel
+        run: cmake --build --preset ${{ matrix.preset }}-release --parallel
 
       - name: Test
-        run: ctest --preset ${{ matrix.platform }}-release --parallel 4
+        run: ctest --preset ${{ matrix.preset }}-release --parallel 4
 
       # CMakeLists.txt's install rules say what goes in the archive. The tag replaces the project version in its name.
       - name: Package
         run: >-
-          cpack --preset ${{ matrix.platform }}-release
+          cpack --preset ${{ matrix.preset }}-release
           -D CPACK_PACKAGE_FILE_NAME=rs2004-headless-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4

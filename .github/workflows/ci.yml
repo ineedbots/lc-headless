@@ -1,6 +1,6 @@
-# Builds and tests every preset pair: Windows (MSVC, x64 and x86) and Linux (clang), in Debug and Release. Each pair is
-# its own check. Release builds treat warnings as errors, so a new warning fails the Release checks only. The real-cache
-# tests skip, because the runners have no game cache.
+# Builds and tests every preset pair: Windows (MSVC, x64 and x86) and Linux (clang, x64 and arm64), in Debug and
+# Release. Each pair is its own check. Release builds treat warnings as errors, so a new warning fails the Release
+# checks only. The real-cache tests skip, because the runners have no game cache.
 name: CI
 
 on:
@@ -22,35 +22,43 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows, windows-x86, linux]
+        platform: [windows, windows-x86, linux, linux-arm64]
         config: [debug, release]
         include:
           # windows-2022 is pinned because the windows-msvc presets use the Visual Studio 17 2022 generator.
           - platform: windows
             runner: windows-2022
             configure-preset: windows-msvc
+            preset: windows
           - platform: windows-x86
             runner: windows-2022
             configure-preset: windows-msvc-x86
+            preset: windows-x86
           - platform: linux
             runner: ubuntu-24.04
             configure-preset: linux-clang
+            preset: linux
+          # The same presets as linux, built natively on an arm64 runner.
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            configure-preset: linux-clang
+            preset: linux
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-vcpkg
         with:
-          cache-name: ${{ matrix.configure-preset }}
+          cache-name: ${{ matrix.platform }}
 
       - name: Configure
         run: cmake --preset ${{ matrix.configure-preset }}
 
       - name: Build
-        run: cmake --build --preset ${{ matrix.platform }}-${{ matrix.config }} --parallel
+        run: cmake --build --preset ${{ matrix.preset }}-${{ matrix.config }} --parallel
 
       - name: Test
-        run: ctest --preset ${{ matrix.platform }}-${{ matrix.config }} --parallel 4
+        run: ctest --preset ${{ matrix.preset }}-${{ matrix.config }} --parallel 4
 
       - name: Upload vcpkg logs
         if: failure()
