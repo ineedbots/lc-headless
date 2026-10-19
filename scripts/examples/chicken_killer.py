@@ -152,14 +152,11 @@ class ChickenKiller(TaskBot):
         self.target = None
         log('Picking up', name)
 
-        going_to_move = loot.tile().distance_to(game.tile()) > 0
         before = inventory.count(name)
-        if loot.interact('Take'):
-            if going_to_move:
-                yield from execution.delay_ticks(POLL_TICKS * 2)
-                yield from execution.delay_until(lambda: inventory.count(name) != before or not game.moving(), 10000)
-            else:
-                yield from execution.delay_until(lambda: inventory.count(name) != before, 10000)
+        if not loot.interact('Take'):
+            return
+
+        yield from execution.delay_until(lambda: inventory.count(name) != before or not loot.valid(), 10000)
 
         if inventory.count(name) == before:
             self.loot_skip[self.key_for_item(loot)] = game.tick() + SKIP_TICKS
@@ -196,16 +193,6 @@ class ChickenKiller(TaskBot):
                        .where(lambda npc: self.key_for_npc(npc) not in self.npc_skip)
                        .where(lambda npc: not npc.in_combat or npc.targets_me())
                        .nearest())
-
-    def finish_waiting_for_attack(self):
-        if self.target is None:
-            return True
-
-        npc = npcs.get(self.target)
-        if npc is None or npc.in_combat:
-            return True
-
-        return False
 
     def attack(self):
         self.target = None
@@ -244,7 +231,18 @@ class ChickenKiller(TaskBot):
 
         self.target = npc.index
         self.attack_tick = game.tick()
-        yield from execution.delay_until(self.finish_waiting_for_attack, 5000)
+
+        def finish_waiting_for_attack():
+            if self.target is None:
+                return True
+
+            npc = npcs.get(self.target)
+            if npc is None or npc.in_combat:
+                return True
+
+            return False
+
+        yield from execution.delay_until(finish_waiting_for_attack, 5000)
 
     def on_npc_spawned(self, npc):
         if npc.name == CHICKEN_NAME:
