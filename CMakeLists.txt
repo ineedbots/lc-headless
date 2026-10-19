@@ -40,8 +40,9 @@ function(configure_project_target target)
 
     if(MSVC)
         # /bigobj: Beast's templates and coroutines exceed the default section count in Debug.
+        # /MP: the Visual Studio generator compiles a project's sources serially without it.
         target_compile_options(${target} PRIVATE
-            /W4 /permissive- /utf-8 /EHsc /Zc:__cplusplus /Zc:preprocessor /bigobj
+            /W4 /permissive- /utf-8 /EHsc /Zc:__cplusplus /Zc:preprocessor /bigobj /MP
             "$<$<NOT:$<CONFIG:Debug>>:/WX>")
     else()
         target_compile_options(${target} PRIVATE
