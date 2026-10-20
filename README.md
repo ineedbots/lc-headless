@@ -24,7 +24,7 @@ A headless (shell/packet) game client for LostCity private servers (2004scape, *
 
 - The client, either from a [GitHub release](../../releases) or [built from source](#building):
   - Windows 10 or 11, x64 or x86, with the [Visual C++ redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
-  - Linux, x64 or arm64, with glibc 2.38 or higher.
+  - Linux, x64 or arm64, with glibc 2.38 or higher and libstdc++ from GCC 13.2 or higher (`GLIBCXX_3.4.32`), such as Ubuntu 24.04 or later.
 - A 289, 274 or 225 server to connect to.
 - That server's RSA public key (modulus and exponent), and a copy of its game cache (see [Configuration](#configuration)).
 
