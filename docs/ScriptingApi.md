@@ -2,6 +2,8 @@
 
 How to write Python scripts that drive the headless client. A script is a `.py` file in the scripts folder; each account file names the script it runs. The API is rs2b0t's bot API in Python's style: facades for the game's nouns, queries that find things, and bots that wait with `yield from` where rs2b0t awaits. The design behind it is in [ScriptingDesign.md](ScriptingDesign.md), and [BotApiDesign.md](BotApiDesign.md) plans the rest of rs2b0t's abilities, phase by phase.
 
+This page is the guided tour. [scripting/README.md](scripting/README.md) is the full reference, function by function.
+
 ## Quick start
 
 1. Copy `accounts/example.jsonc.sample` to `accounts/<name>.jsonc` and fill in the username and password. The file name becomes the account's name in log lines.
@@ -75,7 +77,7 @@ For working on a script, `--watch` reloads it whenever you save it, and `--debug
 - Everything runs on one thread, shared by every account in the process. Each call into the script may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. The walker's route search is the one exception: a search across the map can take longer, so it gets 5 times that, and the call gets its usual time afresh once the search returns. `time.sleep()` raises an error: wait with `execution` instead.
 - An uncaught exception, or a `loop()` that returns or yields something it can't, stops the script. The client calls `on_stop`, logs the traceback, and logs the account out, unless it's running with `--watch`.
 - Objects such as `Npc` are snapshots taken when the query ran. `valid()` asks whether one is still there; keep an NPC's `index` to find it again with `npcs.get(index)`.
-- Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view, or that has no such option, return `False`. A wrong argument type raises `TypeError`, and a value out of range (an option outside 1 to 5, say) raises `ValueError`.
+- Actions queue packets and return at once; their effects show up in the state over the next ticks. Actions on a target that's no longer in view, or that has no such option (including an option number outside 1 to 5), return `False`. A wrong argument type raises `TypeError`, and a value out of range (a `relog` delay over a day, say) raises `ValueError`.
 - Names, options and scenery come from the server's cache, which the client loads at startup from `client.cacheDirectory`. They're exactly as the cache has them, case included.
 - `log(*args)` writes at Info level and `debug(*args)` at Verbose level; `print()` also goes to the log. Each line carries the account's name.
 
@@ -490,7 +492,7 @@ And the spellbook, by name:
 
 ## Random events
 
-While a script runs, the client answers random events for it. Once a server tick it asks `random_events` whether one needs answering. When one does, the bot's step in progress is dropped, the solver runs until it's done, and `loop()` starts afresh, as it does after a reconnect. `on_start` isn't interrupted.
+While a script runs, the client answers random events for it. Once a server tick it asks `random_events` whether one needs answering. When one does, the bot's step in progress is dropped, the solver runs until it's done, and `loop()` starts afresh. `on_start` isn't interrupted.
 
 | Event | What's done |
 |---|---|
@@ -577,7 +579,7 @@ The rest pass their values:
 | `server_message` | `msg` | A game message arrived |
 | `private_message` | `sender`, `msg` | A private message arrived |
 | `trade_request`, `duel_request` | `name` | A player wants to trade or duel |
-| `npc_spawned`, `npc_despawned` | `npc` | An NPC came into view or left it. A despawned NPC is its last snapshot, so `npc.hp == 0` means it died |
+| `npc_spawned`, `npc_despawned` | `npc` | An NPC came into view or left it. A despawned NPC is its last snapshot, so `npc.health == 0` means it died |
 | `npc_damaged` | `npc`, `damage` | An NPC took a hit. `npc` is `None` if it has already left view |
 | `player_spawned`, `player_despawned`, `player_damaged` | `player` (and `damage`) | The same, for other players |
 | `damaged` | `damage` | You took a hit |

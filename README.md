@@ -134,33 +134,48 @@ The exit code is 0 only when every account logged out cleanly and no script fail
 
 ## Writing scripts
 
-A script is a `.py` file under `scripts/` that the account file names. It's a bot, as in rs2b0t: either a module-level `loop()` with `on_*` hooks, or a class set with `BOT = define_bot(...)`. It finds things with queries, acts on them, and waits with `yield from` where rs2b0t awaits. `loop()` returns how many milliseconds to wait before it runs again; `600` means the next server tick.
+You can find a full comprehensive reference at [docs/scripting/](docs/scripting/README.md).
+
+A script is a `.py` file under `scripts/`. It must either define a `loop()` function with `on_*` hooks, or a class set with `BOT = define_bot(...)`.
+
+A loop styled script (plutonium style) will have a function `loop()` that will return a number of milliseconds to wait before being called again. The script can also define hooks for other events like `on_server_message()`.
 
 ```python
+kill_limit = settings.get('kills', 0) # account.settings.kills in the .jsonc
+kills = 0
+
 def on_start():
     log('Starting at', game.tile())
 
 def loop():
+    global kills, kill_limit
+
     if game.in_combat():
-        return 600
+        return 600 # one game server tick
+
+    if kill_limit > 0 and kills > kill_limit:
+        stop_account()
 
     chicken = npcs.query().name('Chicken').within(8).where(lambda npc: not npc.in_combat).nearest()
     if chicken is not None and chicken.interact('Attack'):
-        # Wait until the fight starts, or 3 seconds.
-        yield from execution.delay_until(lambda: game.in_combat(), 3000)
+        kills += 1
+        return 5000
 
 def on_server_message(msg):
     if msg.startswith('Oh dear'):
         stop_account()
 ```
 
-The same as a `TaskBot`, with a settings schema the account file is checked against:
+A BOT style script (rs2b0t style) will define `BOT = define_bot(name='BotName', create=BotClass, settings_schema={...})`. `BotClass` must inherit `TaskBot`, `LoopingBot` or `TreeBot`.
 
 ```python
+# account.settings.Fighter.npc will be created if its missing, and defaulted to 'Chicken'
+SETTINGS = {'npc': SettingDef('string', 'Chicken')}
+
 class Fighter(TaskBot):
     def on_start(self):
         self.add(
-            Task(lambda: game.in_combat(), lambda: None, label='fight'),
+            Task(lambda: game.in_combat(), lambda: execution.delay_ticks(1), label='fight'),
             Task(lambda: True, self.attack, label='attack'),
         )
 
@@ -169,20 +184,10 @@ class Fighter(TaskBot):
         if target is not None and target.interact('Attack'):
             yield from execution.delay_ticks(2)
 
-BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': SettingDef('string', 'Chicken')})
+BOT = define_bot(name='Fighter', create=Fighter, settings_schema=SETTINGS)
 ```
 
-- [docs/ScriptingApi.md](docs/ScriptingApi.md) is the full reference: every facade, object and hook, how scripts are scheduled, settings, the walker, banking, progress reports, messages between scripts, setting up the debugger, and tables for porting from rs2b0t and plutonium.
-- [scripts/examples/](scripts/examples) has complete scripts: `walker.py`, `chicken_killer.py`, `cow_killer.py`, `power_miner.py`, `miner.py`, `bank_fletcher.py` and `aio_thiever.py`.
-- `import name` loads the client's `rs2004` library first (its names are already builtins), then `scripts/name.py`, then `scripts/lib/name.py`.
-- If you open the repository in VS Code, the stubs in [scripts/typings/](scripts/typings) give scripts completion and type checking.
-
-Before you write one, know these limits:
-
-- **Scripts run on pocketpy, not CPython.** pocketpy implements a subset of Python 3: there's no `finally`, no generator expressions, no `re` module and no pip packages. [ScriptingApi.md](docs/ScriptingApi.md#python-dialect) lists all the differences.
-- **One thread runs every script.** A call that runs longer than `callTimeoutMs` raises `TimeoutError`, and `time.sleep()` raises an error immediately. To wait, return a delay from `loop()` or `yield from` an `execution` wait.
-- **"Nearest" counts tiles, not steps.** With `reachable()`, the nearest target that can be reached may still be a long walk round.
-- **Scripts aren't sandboxed.** Run only scripts you trust.
+The randoms events will be detected and solved automatically and run will set according to the configuration.
 
 ## Building
 
