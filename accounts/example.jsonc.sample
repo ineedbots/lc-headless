@@ -40,11 +40,16 @@
         // without BOT reads this whole object, and nothing is added. A script with a settings schema
         // checks these before login.
         "settings": {
-            "Chicken killer": {
-                "npcs": ["Chicken"],
-                "loot": ["Bones"],
-                "loot_goal": 3
-            }
+            // script specific settings
+            "Chicken Killer": {
+                "combat_style": "strength",
+                "start_location": [3188, 3277, 0],
+                "radius": 8,
+                "bury_bones": true,
+                "kill_over_loot": true
+            },
+            // settings for scripts that implement the loop, and use settings.get
+            "laps": 10
         }
     }
 }

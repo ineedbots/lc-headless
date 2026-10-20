@@ -2,19 +2,18 @@
 
 ![HEADLESS](assets/anim.gif)
 
-A headless (shell) game client for revision-289, revision-274 and revision-225 (2004-era RuneScape) servers, such as the 289, 274 and 225 server engines. It logs in over WebSocket, decodes the server's packets into game state, and runs Python bot scripts against that state. It has no graphics, reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process.
+A headless (shell/packet) game client for LostCity private servers (2004scape, **NOT THE OFFICIAL LOST CITY SERVER**). It logs in over WebSocket or raw TCP, parses packets, builds a gamestate, and runs Python bot scripts. It reads the server's game cache for names, scenery and collision, and runs up to 16 scripted accounts in one process. The code is portable and can target multiple architectures and operating systems.
 
 ## Features
 
-- **The 289, 274 and 225 protocols.** It does the RSA and ISAAC login handshake and decodes every server packet into state: players, NPCs, ground items, scenery changes, inventories, stats, interfaces and chat. It can also build every request the webclient sends.
+- **289, 274 and 225 protocols.**
+- **WebSocket, secure WebSocket and raw TCP**, each optionally through a **SOCKS5** proxy, set for the whole process or per account.
 - **The game cache.** It loads the server's cache once per process and shares it with every account. The login CRCs are computed from it, scripts get the names and options of NPCs, items and scenery, scenery the server never changed is known, and walks and interactions route around walls as the webclient does.
-- **Python scripting** on an embedded [pocketpy](https://github.com/pocketpy/pocketpy) interpreter. A script defines `loop()` and the `on_*` hooks it needs, and calls a flat API such as `get_nearest_npc_by_name('Chicken')`, `interact_npc(npc, 'Attack')` and `walk_to(x, z)`.
+- **Python scripting** on an embedded [pocketpy](https://github.com/pocketpy/pocketpy) interpreter, with [rs2b0t](https://github.com/rs2b2t/rs2b0t)'s bot API in Python's style: `npcs`, `inventory`, `bank` and the other facades, chained queries, `LoopingBot`, `TaskBot` and `TreeBot`, a world walker, random-event solvers and typed settings.
 - **Several accounts per process.** Each account has its own interpreter and its own log name, and logins are spaced a few seconds apart. An account can log into a different world from the others.
-- **Survives server restarts.** A dropped connection reconnects on its own, with up to 10 attempts over about four minutes. The other accounts keep playing in the meantime.
-- **Clean shutdown.** Ctrl+C gives each script time to finish what it's doing, then logs every account out.
 - **Tools for script authors:**
   - progress reports written to a file
-  - messages between scripts
+  - messages between scripts, and console commands of a script's own
   - reloading a script when it's saved (`--watch`)
   - a [VS Code debugger](https://pocketpy.github.io/features/debugging/#attach-to-an-embedded-application) (`--debugger`)
   - type stubs for Pylance and Pyright
@@ -23,37 +22,180 @@ A headless (shell) game client for revision-289, revision-274 and revision-225 (
 
 ## Requirements
 
-- One of these:
-  - Windows 10 or 11 (x64), with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC and CMake 3.25+ both come with that workload.
-  - Linux, with clang, CMake 3.25+ and Ninja. The C++ standard library has to be libstdc++ 13+ or libc++ 17+, for `<format>`. The build is tested on Ubuntu 24.04 and Arch, and [Linux](#linux) lists the packages each one needs.
-- [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
-- A revision-289, revision-274 or revision-225 server to connect to, plus its RSA public key and a copy of its game cache (see [Configuration](#configuration)).
+- The client, either from a [GitHub release](../../releases) or [built from source](#building):
+  - Windows 10 or 11, x64 or x86, with the [Visual C++ redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
+  - Linux, x64 or arm64, with glibc 2.38 or higher.
+- A 289, 274 or 225 server to connect to.
+- That server's RSA public key (modulus and exponent), and a copy of its game cache (see [Configuration](#configuration)).
 
-vcpkg installs the dependencies from `vcpkg.json`: bzip2 and zlib (for the cache's archives and maps), Boost.Beast and Boost.Asio (WebSocket and networking), OpenSSL (for `wss`), Catch2, nlohmann/json and pocketpy 2.2.0. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
+## Configuration
+
+The client reads two kinds of JSON (with comments) configuration files. Paths are relative to the working directory.
+
+### `client.jsonc`: the server and process-wide settings
+
+Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If it doesn't exist, the client exits with an error. Fill in at least these keys:
+
+| Key | Meaning |
+|---|---|
+| `server.transport` | `ws` or `wss`, the WebSocket the server's webclient uses, or `tcp`, the engine's raw TCP port. The default is `ws` |
+| `server.host`, `server.port` | Where the server is: a host name or IPv4 address, and the port for the transport. A local engine serves `ws` on port `80` on Windows and `8888` on Linux, and `tcp` on `43594` |
+| `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header. Only applies to WebSocket |
+| `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
+| `login.revision` | The server's revision: `289`, the default, `274` or `225`. It's set for the whole process, because the cache is, so servers of different revisions each need a process of their own |
+| `client.cacheDirectory` | The folder that holds the server's cache, in its revision's layout, default `data/cache`. 289 and 274 expect `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`. Those engines keep them in `engine/data/pack`. For 225, the engine's `engine/data/pack/client` folder of archive files and `maps/`. |
+
+The RSA key comes from the server's deployment, so take it from the server you're connecting to; its webclient uses the same values. The login CRCs are computed from the cache, so the cache must be the server's own, and `login.revision` must be the server's. If any of them is wrong, the server rejects the login. The client loads the cache once at startup, in well under a second.
+
+You can extract an RSA's publickey's modulus and exponent with `openssl`:
+
+```sh
+openssl rsa -pubin -in <server_path>/engine/data/config/public.pem -text -noout
+```
+
+So an output of
+
+```
+00:91:e3:80:...
+```
+
+would look like
+```
+0x91e380...
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `server.tlsCaFile` | `SYSTEM` | For `wss` only: the path to a PEM CA bundle, `SYSTEM` for the platform's trust store, or `NONE` to skip certificate checks |
+| `login.lowMemory` | `false` | Sets the low-memory flag in the login packet |
+| `proxy.host`, `proxy.port` | empty, `1080` | A SOCKS5 proxy for every connection; an empty host connects directly. The proxy resolves `server.host` itself |
+| `proxy.username`, `proxy.password` | empty | The proxy's credentials, or empty for none. Never logged |
+| `client.logLevel` | `info` | `verbose`, `info`, `warning` or `error` |
+| `client.logFile` | empty | A file log lines are appended to as well, as plain text. The sample sets it to `rs2004-headless.log` |
+| `client.navDirectory` | `data/nav` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default is the copy in this repository |
+| `scripting.accountsDirectory` | `accounts` | The folder of account files |
+| `scripting.scriptsDirectory` | `scripts` | The folder of scripts and the modules they import |
+| `scripting.loginIntervalSeconds` | `2` | The time between one account's login and the next |
+| `scripting.callTimeoutMs` | `1000` | How long one call into a script may run |
+| `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
+| `scripting.progressDirectory` | `progress` | Where progress reports are written |
+| `scripting.pollIntervalMs` | `10` | The longest the main loop waits between passes, 1 to 1000 ms |
+| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. The waits between them double from 2 s up to 30 s, so 10 cover about four minutes |
+| `scripting.reloginDelaySeconds` | `60` | How long an account waits before logging in again after its session ended unexpectedly, such as the server logging it out |
+
+### `accounts/<name>.jsonc`: one file per account
+
+Copy [accounts/example.jsonc.sample](accounts/example.jsonc.sample) to `accounts/<name>.jsonc`. The file name, without `.jsonc`, is the account's name in the logs.
+
+| Key | Meaning |
+|---|---|
+| `username` | The login username, 1 to 12 characters |
+| `password` | The login password, 1 to 20 characters |
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | `false` keeps the file but doesn't run the account |
+| `server` | `client.jsonc`'s | A section with the same keys as `client.jsonc`'s, with `host` and `port` required. Logs this account into a different world |
+| `proxy` | `client.jsonc`'s | A section with the same keys as `client.jsonc`'s, which replaces it whole. `{"host": ""}` connects this account directly |
+| `idleSeconds` | `0` | Without a script, how long the account idles before it logs out; 0 idles until Ctrl+C |
+| `randomEvents` | `true` | Whether the script answers random events automatically |
+| `stallMinutes` | `10` | How long the script may go without progress before stopping; 0 turns it off |
+| `runAuto`, `runEnergyMin` | `true`, `20` | Turn run back on once energy reaches the minimum |
+| `script` | none | The script this account runs. Without one, the account logs in, idles, and logs a summary of its surroundings every 10 seconds, which is a quick way to check a new server config |
+| `script.file` | none | The script's file, relative to `scripts/`. Required when there's a `script` section |
+| `script.progressReportMinutes` | `0` | How often the script's `on_progress_report()` is written to `progress/<name>.txt`; 0 means no reports |
+| `script.settings` | `{}` | The object the script reads as its settings (see below) |
+
+A script with `BOT = define_bot(name=...)` reads only `settings["<name>"]`, so one account file can keep the settings of several scripts. When it loads, any missing keys will be written out to the file with defaults. A script without `BOT` (one that defines `loop`) reads the whole `settings` object and can be accessed via `settings.get`.
+
+## Running
+
+```
+Rs2004Headless [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger] [--raw-console]
+```
+
+| Argument | Effect |
+|---|---|
+| `client.jsonc` | The config file to use. Defaults to `client.jsonc` in the working directory |
+| `--account <file>` | Runs only this account. Without it, every enabled file in the accounts folder runs |
+| `--watch` | Reloads a script, without logging out, whenever the script or a module it imports is saved. A script that fails stays logged in and idle until the next save |
+| `--debugger` | Waits for VS Code's pocketpy debugger to attach on `127.0.0.1:6110` before logging in. Needs `--account`, and can't be used with `--watch` |
+| `--raw-console` | Writes plain log lines, with no colors, prompt or other VT100 codes, and doesn't read console input, for a service or another program reading the output. Ctrl+C still works |
+
+While it runs, the client takes commands typed into its console: `help` lists them, `status` shows where each account is, and `quit` does what Ctrl+C does. Scripts can define their own.
+
+**Stopping.** Ctrl+C works in three steps:
+
+1. The first Ctrl+C calls `on_kill_signal()` in each script that defines it, so the script can stop at a safe point. Every other account logs out straight away. Any account still logged in after `killGraceSeconds` is logged out.
+2. A second Ctrl+C logs every account out at once.
+3. A third Ctrl+C closes any connection whose logout the server is still refusing. The server refuses a logout during combat and for 10 seconds after it.
+
+The exit code is 0 only when every account logged out cleanly and no script failed.
+
+## Writing scripts
+
+A script is a `.py` file under `scripts/` that the account file names. It's a bot, as in rs2b0t: either a module-level `loop()` with `on_*` hooks, or a class set with `BOT = define_bot(...)`. It finds things with queries, acts on them, and waits with `yield from` where rs2b0t awaits. `loop()` returns how many milliseconds to wait before it runs again; `600` means the next server tick.
+
+```python
+def on_start():
+    log('Starting at', game.tile())
+
+def loop():
+    if game.in_combat():
+        return 600
+
+    chicken = npcs.query().name('Chicken').within(8).where(lambda npc: not npc.in_combat).nearest()
+    if chicken is not None and chicken.interact('Attack'):
+        # Wait until the fight starts, or 3 seconds.
+        yield from execution.delay_until(lambda: game.in_combat(), 3000)
+
+def on_server_message(msg):
+    if msg.startswith('Oh dear'):
+        stop_account()
+```
+
+The same as a `TaskBot`, with a settings schema the account file is checked against:
+
+```python
+class Fighter(TaskBot):
+    def on_start(self):
+        self.add(
+            Task(lambda: game.in_combat(), lambda: None, label='fight'),
+            Task(lambda: True, self.attack, label='attack'),
+        )
+
+    def attack(self):
+        target = npcs.query().name(self.settings.npc).within(8).where(lambda npc: not npc.in_combat).nearest()
+        if target is not None and target.interact('Attack'):
+            yield from execution.delay_ticks(2)
+
+BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': SettingDef('string', 'Chicken')})
+```
+
+- [docs/ScriptingApi.md](docs/ScriptingApi.md) is the full reference: every facade, object and hook, how scripts are scheduled, settings, the walker, banking, progress reports, messages between scripts, setting up the debugger, and tables for porting from rs2b0t and plutonium.
+- [scripts/examples/](scripts/examples) has complete scripts: `walker.py`, `chicken_killer.py`, `cow_killer.py`, `power_miner.py`, `miner.py`, `bank_fletcher.py` and `aio_thiever.py`.
+- `import name` loads the client's `rs2004` library first (its names are already builtins), then `scripts/name.py`, then `scripts/lib/name.py`.
+- If you open the repository in VS Code, the stubs in [scripts/typings/](scripts/typings) give scripts completion and type checking.
+
+Before you write one, know these limits:
+
+- **Scripts run on pocketpy, not CPython.** pocketpy implements a subset of Python 3: there's no `finally`, no generator expressions, no `re` module and no pip packages. [ScriptingApi.md](docs/ScriptingApi.md#python-dialect) lists all the differences.
+- **One thread runs every script.** A call that runs longer than `callTimeoutMs` raises `TimeoutError`, and `time.sleep()` raises an error immediately. To wait, return a delay from `loop()` or `yield from` an `execution` wait.
+- **"Nearest" counts tiles, not steps.** With `reachable()`, the nearest target that can be reached may still be a long walk round.
+- **Scripts aren't sandboxed.** Run only scripts you trust.
 
 ## Building
 
-The first configure builds every dependency through vcpkg, so it takes a while. Release builds treat warnings as errors (`/W4 /WX` with MSVC, `-Werror` with clang). Debug builds report warnings without failing.
+### Requirements for building
 
-### Windows
+- One of these:
+  - Windows 10 or 11, with Visual Studio 2022 and its *Desktop development with C++* workload. MSVC, vcpkg and CMake 3.25+ all come with that workload.
+  - Linux, with clang, CMake 3.25+ and Ninja. The C++ standard library has to be libstdc++ 13+ or libc++ 17+, for `<format>`. The build is tested on Ubuntu 24.04 and Arch, on x64 and arm64.
+- [vcpkg](https://github.com/microsoft/vcpkg), with the `VCPKG_ROOT` environment variable set to its folder.
 
-Run these from any prompt:
+vcpkg installs the dependencies from `vcpkg.json`: `bzip2` and `zlib` (for the cache's archives and maps), `Boost.Beast` and `Boost.Asio` (networking), `OpenSSL` (for `wss`), `Catch2`, `nlohmann/json` and `pocketpy`. pocketpy comes from an overlay port in [ports/pocketpy](ports/pocketpy), because the vcpkg registry only has its older 1.x versions.
 
-```sh
-cmake --preset windows-msvc
-cmake --build --preset windows-release      # or windows-debug
-```
-
-The `windows-msvc` preset uses the *Visual Studio 17 2022* generator, which finds MSVC on its own and targets x64, so a developer prompt isn't needed. It also writes `build/windows-msvc/Rs2004Headless.sln`, which you can open in Visual Studio.
-
-The build writes these files to `build/windows-msvc/<Config>/`:
-
-- `Rs2004Headless.exe`: the client
-- `Rs2004HeadlessTests.exe`: the tests
-
-### Linux
-
-Install the compiler and the tools that vcpkg needs. On Ubuntu 24.04:
+On Ubuntu 24.04, install the compiler and the tools vcpkg needs with:
 
 ```sh
 sudo apt install build-essential clang cmake ninja-build git curl zip unzip tar pkg-config perl
@@ -67,205 +209,39 @@ sudo pacman -S --needed base-devel clang cmake ninja git curl zip unzip tar perl
 
 Ubuntu 22.04 and older ship libstdc++ 12 or earlier, which has no `<format>`.
 
-If you don't have vcpkg yet, clone it with its full history. `vcpkg.json` pins a baseline commit, and a `--depth 1` clone doesn't include it.
+To set up vcpkg, clone it, run its bootstrap script, and point `VCPKG_ROOT` at the folder. Don't use a shallow (`--depth 1`) clone: `vcpkg.json` pins a baseline commit from vcpkg's history, and a shallow clone doesn't have it.
 
 ```sh
 git clone https://github.com/microsoft/vcpkg ~/vcpkg
 ~/vcpkg/bootstrap-vcpkg.sh
-export VCPKG_ROOT=~/vcpkg      # add this line to ~/.bashrc too
+echo 'export VCPKG_ROOT=~/vcpkg' >> ~/.bashrc && source ~/.bashrc
 ```
 
-Then build from the repository root:
+### Building the client
+
+The first configure builds every dependency through vcpkg, so it takes a while. Release builds treat warnings as errors.
+
+| Platform | Configure | Build | Output folder |
+|---|---|---|---|
+| Windows x64 | `cmake --preset windows-msvc` | `cmake --build --preset windows-release` | `build/windows-msvc/Release/` |
+| Windows x86 | `cmake --preset windows-msvc-x86` | `cmake --build --preset windows-x86-release` | `build/windows-msvc-x86/Release/` |
+| Linux (x64 or arm64) | `cmake --preset linux-clang` | `cmake --build --preset linux-release` | `build/linux-clang/Release/` |
+
+Swap `release` for `debug` in a build preset for a Debug build, which goes to `Debug/` instead. Each build writes `Rs2004Headless` (the client) and `Rs2004HeadlessTests` (the tests).
+
+On Windows, these write `Rs2004Headless.sln` to the build folder, which you can open in Visual Studio.
+
+### Running the tests
 
 ```sh
-cmake --preset linux-clang
-cmake --build --preset linux-release      # or linux-debug
-```
-
-The build writes `Rs2004Headless` (the client) and `Rs2004HeadlessTests` (the tests) to `build/linux-clang/<Config>/`.
-
-### Tests
-
-```sh
-ctest --preset windows-debug      # or linux-debug
+ctest --preset windows-debug      # or windows-x86-debug, linux-debug, or a -release preset
 ```
 
 The Catch2 tests don't need a server. The network tests run against a fake game server on loopback ports. The tests also load the scripts in `scripts/examples/`, so an example that no longer loads fails them.
 
-To check the Linux build from any machine with Docker, including Windows through Git Bash:
+A few tests read a real game cache, and skip unless you point environment variables to the cache directory: `RS2004_CACHE_DIR` for a 289 cache (such as `<289 server>/engine/data/pack`), `RS2004_CACHE_DIR_274` for a 274 cache, and `RS2004_CACHE_DIR_225` for a 225 one (ex: `<255 server>/engine/data/pack/client`).
 
-```sh
-tools/docker/check.sh              # Ubuntu 24.04 and Arch, Debug and Release
-tools/docker/check.sh ubuntu       # one distro
-```
-
-It builds each distro's toolchain image, then configures, builds and tests a copy of the source with the `linux-clang` preset, without touching the checkout. Logs go to `build/docker/<distro>/`. The first run builds the vcpkg dependencies, which later runs reuse from a Docker volume.
-
-GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) builds and tests all four build presets on every push to `master` and every pull request, with each preset as its own check. The first run builds the vcpkg dependencies, which later runs restore from the Actions cache.
-
-### Releases
-
-Pushing a tag that matches the project `VERSION` in `CMakeLists.txt` publishes a GitHub release ([.github/workflows/release.yml](.github/workflows/release.yml)):
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0      # v0.1.0-rc1 and similar publish a pre-release
-```
-
-The workflow builds and tests Release on Windows and Linux, then attaches a `.zip` and a `.tar.gz`. Each holds the client with the files it loads from its working directory: `scripts/`, `data/nav/`, an empty `data/cache/`, and the sample config and account files. The install rules in `CMakeLists.txt` define the contents, so `cpack --preset windows-release` (or `linux-release`) builds the same archive locally into `build/packages/`, after a Release build. The Windows build needs the [Visual C++ redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist), and the Linux build needs glibc and libstdc++ at least as new as Ubuntu 24.04's.
-
-## Configuration
-
-The client reads two kinds of file. Both are JSON and allow `//` and `/* */` comments. Paths are relative to the working directory, so run the client from the repository root.
-
-### `client.jsonc`: the server and process-wide settings
-
-Copy [client.jsonc.sample](client.jsonc.sample) to `client.jsonc`. If `client.jsonc` doesn't exist, the client exits with an error. Fill in at least these keys:
-
-| Key | Meaning |
-|---|---|
-| `server.transport` | `ws` or `wss`, the WebSocket the server's webclient uses, or `tcp`, the engine's raw TCP port. The default is `ws` |
-| `server.host`, `server.port` | Where the server is: a host name or IPv4 address, and the port for the transport. A local engine serves `ws` on port 80 on Windows and 8888 on Linux, and `tcp` on 43594 |
-| `server.origin` | The `Origin` header to send. A server that sets `WEB_ALLOWED_ORIGIN` requires it; an empty string sends no header. WebSocket only |
-| `proxy.host`, `proxy.port` | Optional. A SOCKS5 proxy for every connection; the empty default connects directly. The proxy resolves `server.host` itself. An account file's own `proxy` section replaces this one, and `{"host": ""}` there connects that account directly |
-| `proxy.username`, `proxy.password` | The proxy's credentials, or empty for none. Never logged |
-| `login.rsaModulus`, `login.rsaExponent` | The server's RSA public key, as decimal or `0x` hex strings |
-| `client.navDirectory` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default, `data/nav`, is the copy in this repository |
-| `login.revision` | The server's revision: `289`, the default, `274` or `225`. It's set for the whole process, because the cache is, so servers of different revisions each need a process of their own |
-| `client.cacheDirectory` | The folder that holds the server's cache, in its revision's layout. For 289 and 274, `main_file_cache.dat` and `main_file_cache.idx0` to `idx4`, as those engines keep them in `engine/data/pack`. For 225, the engine's `engine/data/pack/client` folder of archive files and `maps/`. The default is `data/cache`, which git ignores |
-
-The RSA key comes from the server's deployment, not from the protocol, so take it from the server you're connecting to; its webclient uses the same values. The login CRCs are computed from the cache, so the cache must be the server's own, and `login.revision` must be the server's. If any of them is wrong, the server rejects the login with status 6. The client loads the cache once at startup, in well under a second, and a missing or damaged cache stops it before any login, naming the file.
-
-Every other key has a default. These are the ones you're most likely to change:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `client.logLevel` | `info` | `verbose`, `info`, `warning` or `error` |
-| `scripting.accountsDirectory` | `accounts` | The folder of account files |
-| `scripting.scriptsDirectory` | `scripts` | The folder of scripts and the modules they import |
-| `scripting.loginIntervalSeconds` | `2` | The time between one account's login and the next |
-| `scripting.callTimeoutMs` | `1000` | How long one call into a script may run |
-| `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
-| `scripting.progressDirectory` | `progress` | Where progress reports are written |
-
-[docs/ConfigDesign.md §3](docs/ConfigDesign.md#3-file-format) lists every key and its rules. An error message names the key that's wrong but never shows its value, so a mistyped password doesn't end up in the log.
-
-### `accounts/<name>.jsonc`: one file per account
-
-Copy [accounts/example.jsonc.sample](accounts/example.jsonc.sample) to `accounts/<name>.jsonc`. The file name, without `.jsonc`, is the account's name in log lines.
-
-```jsonc
-{
-    "username": "myuser",
-    "password": "mypass",
-    "enabled": true,
-    "stallMinutes": 15,                         // upkeep for this account's script, below
-    "script": {
-        "file": "examples/chicken_killer.py",   // relative to scripts/
-        "progressReportMinutes": 20,           // 0, or no key at all, means no reports
-        "settings": {                           // read by the script as its settings object
-            "Chicken killer": { "loot_goal": 3 }   // a define_bot script's, under its name
-        }
-    }
-}
-```
-
-- An account with no `script` logs in and idles, and logs a summary of its surroundings every 10 seconds. This is a quick way to check a new server config. It logs out after `idleSeconds`, or idles until Ctrl+C when that's `0`, the default.
-- `"enabled": false` keeps the file but doesn't run the account.
-- A `server` section, with the same keys as the one in `client.jsonc`, logs this account into a different world.
-- A script with `BOT = define_bot(name=...)` reads only `settings["<name>"]`, so one file can keep the settings of several scripts, and switching `file` between them loses nothing. When it loads, the settings its schema declares that are missing there are written into the file with their defaults, leaving your comments and layout as they were, so the file shows everything you can set. A script without `BOT` reads the whole `settings` object, and nothing is written.
-
-These keys set how the account's script is kept going. Each has a default, so leave out the ones you don't change:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `randomEvents` | `true` | Whether the script answers random events itself ([docs/ScriptingApi.md](docs/ScriptingApi.md#random-events)) |
-| `stallMinutes` | `10` | How long the script may go without progress before the stall guard steps in; 0 turns it off ([docs/ScriptingApi.md](docs/ScriptingApi.md#upkeep)) |
-| `runAuto`, `runEnergyMin` | `true`, `20` | Turn run back on once energy reaches the minimum |
-
-Git ignores `client*.jsonc`, `accounts/*.jsonc` and `progress/`, so credentials stay out of the repository.
-
-## Running
-
-```
-Rs2004Headless.exe [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger] [--raw-console]
-```
-
-| Argument | Effect |
-|---|---|
-| `client.jsonc` | The config file to use. Defaults to `client.jsonc` in the working directory |
-| `--account <file>` | Runs only this account. Without it, every enabled file in the accounts folder runs |
-| `--watch` | Reloads a script, without logging out, whenever the script or a module it imports is saved. A script that fails stays logged in and idle until the next save |
-| `--debugger` | Waits for VS Code's pocketpy debugger to attach on `127.0.0.1:6110` before logging in. Needs `--account`, and can't be used with `--watch` |
-| `--raw-console` | Writes plain log lines, with no colors, prompt or other VT100 codes, and doesn't read console input, for a service or another program reading the output. Ctrl+C still works |
-
-`client.logFile` in `client.jsonc` names a file that log lines are appended to as well, as plain text; `client.jsonc.sample` sets it to `rs2004-headless.log`, which git ignores.
-
-From the repository root:
-
-```powershell
-# Every enabled account
-.\build\windows-msvc\Release\Rs2004Headless.exe
-
-# One account, reloading its script on save
-.\build\windows-msvc\Release\Rs2004Headless.exe --account accounts\bot1.jsonc --watch
-```
-
-On Linux, the client is `build/linux-clang/Release/Rs2004Headless`:
-
-```sh
-./build/linux-clang/Release/Rs2004Headless --account accounts/bot1.jsonc --watch
-```
-
-Every script loads before the first login, so a script that fails to load stops the run before any account logs in. pocketpy has 16 interpreter slots, so one process runs at most 16 scripted accounts. Start more processes to run more accounts. No two account files may share a username.
-
-**Stopping.** Ctrl+C works in three steps:
-
-1. The first Ctrl+C calls `on_kill_signal()` in each script that defines it, so the script can stop at a safe point. Every other account logs out straight away. Any account still logged in after `killGraceSeconds` is logged out.
-2. A second Ctrl+C logs every account out at once.
-3. A third Ctrl+C closes any connection whose logout the server is still refusing. The server refuses a logout during combat and for 10 seconds after it.
-
-The exit code is 0 only when every account logged out cleanly and no script failed.
-
-## Writing scripts
-
-A script is a `.py` file under `scripts/` that defines `loop()`. `loop()` returns how many milliseconds to wait before it's called again; a game tick is 600 ms. A script can also define any of the `on_*` hooks:
-
-```python
-CHICKEN = 41
-
-def on_start():
-    log('Starting at', get_x(), get_z())
-
-def loop():
-    if in_combat():
-        return 600
-
-    chicken = get_nearest_npc_by_id(CHICKEN, radius=8, in_combat=False)
-    if chicken is not None:
-        attack_npc(chicken)
-        return 1200
-
-    return 600
-
-def on_server_message(msg):
-    if msg.startswith('Oh dear'):
-        stop_account()
-```
-
-- [docs/ScriptingApi.md](docs/ScriptingApi.md) is the full reference. It covers every function, object and hook, how scripts are scheduled, progress reports, messages between scripts and setting up the debugger.
-- [scripts/examples/](scripts/examples) has two complete scripts. `walker.py` walks a loop of tiles, and `chicken_killer.py` kills chickens, picks up the bones and logs out.
-- `import name` loads `scripts/name.py`, or `scripts/lib/name.py` if the first doesn't exist.
-- If you open the repository in VS Code, the stubs in [scripts/typings/\_\_builtins\_\_.pyi](scripts/typings/__builtins__.pyi) give scripts completion and type checking.
-
-Before you write one, know these limits:
-
-- **Scripts run on pocketpy, not CPython.** pocketpy implements a subset of Python 3: there's no `finally`, no generator expressions, no `re` module and no pip packages. [ScriptingApi.md](docs/ScriptingApi.md#python-dialect) lists all the differences.
-- **One thread runs every script.** A call that runs longer than `callTimeoutMs` raises `TimeoutError`, and `time.sleep()` raises an error immediately. To wait, return a delay from `loop()`.
-- **Interfaces are numbers.** The cache's interface definitions are read only to find the logout button, so component ids, such as the bank's, are constants in scripts.
-- **"Nearest" counts tiles, not steps.** `reachable=True` skips targets that can't be reached at all, but the nearest one left may still be a long walk round.
-- **Scripts aren't sandboxed.** Run only scripts you trust.
-
-## Project layout
+### Project layout
 
 ```
 src/
@@ -290,43 +266,22 @@ src/
 │   ├── Protocol/             opcodes, client packet builders, text encodings
 │   ├── Decode/               turns server packets (including player, NPC and zone updates) into game state
 │   └── State/                the game state, and the event log that script hooks receive
-├── Io/                       Network transport, packet buffer, ISAAC cipher
+├── Io/                       network transport, packet buffer, ISAAC cipher
 └── Utils/                    shared helpers: strings, files, big integers for RSA, file watcher
 tests/                        Catch2 tests in the same folders as src/; Support/ holds the fake game server and other helpers
-scripts/                      bot scripts: examples/, lib/ for shared modules, typings/ for editors
+scripts/                      bot scripts: examples/, and typings/ for editors
 accounts/                     account files (ignored by git) and the sample file
 ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0
 docs/                         design documents and protocol reference
 tools/                        data exporters for rs2b0t's walker and catalogs, and docker/ for the Linux build check
+thirdparty/                   licenses of the projects code was ported from
 ```
 
 Everything in `src/` except `main.cpp` builds into a static library. The client and the tests both link that library, so the tests run the same code that ships.
-
-## Documentation
-
-| Document | Covers |
-|---|---|
-| [ScriptingApi.md](docs/ScriptingApi.md) | How to write scripts: the API, hooks and tools |
-| [ScriptingDesign.md](docs/ScriptingDesign.md) | How scripting works inside: the runtime, events, the main loop and accounts |
-| [tcp-protocol-289.md](docs/tcp-protocol-289.md) | The revision-289 wire protocol: login, framing and the payload of every opcode |
-| [tcp-protocol-225.md](docs/tcp-protocol-225.md) | The revision-225 wire protocol, as its differences from 289's |
-| [tcp-protocol-274.md](docs/tcp-protocol-274.md) | The revision-274 wire protocol, as its differences from 289's |
-| [RevisionDesign.md](docs/RevisionDesign.md) | Speaking more than one revision: the opcode tables, where the code branches, and adding a revision |
-| [Revision274Design.md](docs/Revision274Design.md) | Adding revision 274: how it differs from 225 and 289, and where each branch lands |
-| [ConfigDesign.md](docs/ConfigDesign.md) | The formats of the config and account files, with every key and rule |
-| [CacheDesign.md](docs/CacheDesign.md) | Loading the game cache, the collision map and the route search |
-| [TransportDesign.md](docs/TransportDesign.md) | The network transport on Boost.Beast and Asio, and the plan for raw TCP and SOCKS5 proxies |
-| [PacketDesign.md](docs/PacketDesign.md) | The packet buffer, the ISAAC cipher and `BigUInt` |
-| [LoggerDesign.md](docs/LoggerDesign.md) | The logger |
-| [CONVENTIONS.md](docs/CONVENTIONS.md) | C++ code style and project setup |
-
-## Contributing
-
-Code follows [CONVENTIONS.md](docs/CONVENTIONS.md) (C++20, Allman braces, `PascalCase_s` structs, exceptions for errors) and `.clang-format`. Files use LF line endings, which `.gitattributes` enforces. The build finds `.cpp` and `.hpp` files under `src/` and `tests/` on its own, so a new file doesn't need to be added to `CMakeLists.txt`.
 
 ## Credits
 
 - LostCity - https://github.com/LostCityRS
 - Plutonium (OpenRSC) - https://gitlab.com/openrsc/plutonium
-- rs2b2t - https://github.com/rs2b2t/rs2b0t
+- rs2b0t - https://github.com/rs2b2t/rs2b0t
 - Claude (yes this is slopped)
