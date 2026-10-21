@@ -70,3 +70,11 @@ def test_walking_needs_the_walker_data():
         pass
     assert traversal.last_outcome == 'failed'
     assert 'navigation unavailable' in traversal.last_reason
+
+
+def test_webs_and_ladders_with_an_id_take_only_the_loc_on_their_tile():
+    ladder = {'loc_name': 'Ladder', 'action': 'Climb-down', 'loc_id': 1759, 'loc_x': 2848, 'loc_z': 3513}
+    assert walker._exact_placement(ladder)
+    assert not walker._exact_placement({'loc_name': 'Ladder', 'action': 'Climb-down', 'loc_x': 2848, 'loc_z': 3513})
+    assert walker._exact_placement({'loc_name': 'Web', 'action': 'Slash', 'loc_x': 2569, 'loc_z': 3118})
+    assert not walker._exact_placement({'loc_name': 'Staircase', 'action': 'Climb-up', 'loc_id': 1738, 'loc_x': 3204, 'loc_z': 3207})

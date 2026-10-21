@@ -235,6 +235,17 @@ def _ids_of(transport):
     return ids
 
 
+def _exact_placement(transport):
+    """Whether only the loc on the hop's own tile will do. Slashable webs sit a tile apart with one id
+    (Yanille), and ladders with one id stand a few tiles apart (Ice Queen's lair), so a neighbour would
+    make a different hop."""
+    action = transport['action'].lower()
+    name = transport['loc_name'].lower()
+    if action == 'slash' and 'web' in name:
+        return True
+    return transport.get('loc_id') is not None and action.startswith('climb') and 'ladder' in name
+
+
 def find_transport_loc(transport):
     """The loc that makes the hop: by its name, option and placement, else by name and option near the
     placement, else any stairs there. None when an open leaf shows the door is open already."""
@@ -243,8 +254,9 @@ def find_transport_loc(transport):
     x = transport['loc_x']
     z = transport['loc_z']
     ids = _ids_of(transport)
-    exact = locs.query().name(names).action(action).where(lambda l: _near(l.tile(), x, z, 1) and (not ids or l.id in ids)).nearest()
-    if exact is not None:
+    slack = 0 if _exact_placement(transport) else 1
+    exact = locs.query().name(names).action(action).where(lambda l: _near(l.tile(), x, z, slack) and (not ids or l.id in ids)).nearest()
+    if exact is not None or slack == 0:
         return exact
     near = locs.query().name(names).action(action).where(lambda l: _near(l.tile(), x, z, 5)).nearest()
     if near is not None:

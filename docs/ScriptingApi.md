@@ -362,7 +362,7 @@ if opened:
 | `withdraw(name, op='Withdraw 1')`, `withdraw_by_id(id, op='Withdraw 1')` | Uses the option once, without waiting |
 | `withdraw_x(name, count)` | Withdraws `count`, or all there is. It uses Withdraw 1, 5 or 10 when one fits, and otherwise X and the count dialog. Then it waits for the items to land |
 | `withdraw_x_by_id(id, count, lands_as_id=None)` | The same by id. In note mode the backpack gets the note, which has a different id; give that as `lands_as_id` |
-| `withdraw_load(name)` | Fills the backpack: Withdraw All, or else X for the free slots |
+| `withdraw_load(name)` | Fills the backpack from an item, by name or id: Withdraw All, or else X for the free slots |
 | `set_note_mode(on)` | Withdraws as notes or as items. Opening the bank resets this to items |
 | `deposit(name, op='Deposit 1')` | Uses the option once, without waiting |
 | `deposit_inventory()` | Deposits everything |

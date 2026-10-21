@@ -37,7 +37,7 @@ Item names match whole, without regard to case. Option names match without regar
 | `bank.withdraw_by_id(id, op='Withdraw 1')` | The same by id |
 | `bank.withdraw_x(name, count)` | **Wait.** Withdraws `count`, or all there is if fewer. Uses Withdraw 1, 5 or 10 when `count` is one of those, otherwise Withdraw X and answers the count dialog. Waits up to 4 seconds for the items to land (or for the backpack to fill). `True` when they did |
 | `bank.withdraw_x_by_id(id, count, lands_as_id=None)` | **Wait.** The same by id. In note mode the backpack receives the note, which has a different id: pass that as `lands_as_id` |
-| `bank.withdraw_load(name)` | **Wait.** Fills the backpack from one item: Withdraw All where it has one, else X for the free slots |
+| `bank.withdraw_load(name)` | **Wait.** Fills the backpack from one item, by name or id: Withdraw All where it has one, else X for the free slots. Waits up to 4 seconds for the whole load to land. `True` straight away, without a click, when the backpack is already full |
 | `bank.set_note_mode(on)` | **Wait.** Withdraws as notes (`True`) or items (`False`). Opening the bank resets this to items, so set it after opening |
 
 ### Depositing

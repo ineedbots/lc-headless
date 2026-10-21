@@ -191,23 +191,26 @@ class _Bank:
         return result
 
     def withdraw_load(self, name):
-        """Fills the backpack from one bank item: Withdraw All, or else X for the free slots."""
+        """Fills the backpack from one bank item, named or by id: Withdraw All, or else X for the free slots.
+        Waits for the whole load to land, not just the first of it."""
         ready = yield from self.wait_ready(READY_TIMEOUT_MS)
-        item = _named(self.items(), name)
-        if not ready or item is None:
+        by_id = isinstance(name, int)
+        item = _with_id(self.items(), name) if by_id else _named(self.items(), name)
+        if not ready or item is None or item.count <= 0:
             return False
-        all_op = withdraw_op(item._ops, 'all')
-        if all_op is not None:
-            before = inventory.used()
-            if not _use(item, all_op):
-                return False
-            loaded = yield from execution.delay_until(lambda: inventory.used() > before or inventory.is_full() or self.count(item.name) == 0, LOAD_TIMEOUT_MS)
-            return loaded
         free = inventory.free()
         if free <= 0:
             return True
-        result = yield from self.withdraw_x(item.name, free)
-        return result
+        all_op = withdraw_op(item._ops, 'all')
+        if all_op is None:
+            result = yield from self._withdraw_x(item, free, lambda: inventory.count_by_id(item.id))
+            return result
+        before = inventory.count_by_id(item.id)
+        target = before + min(free, item.count)
+        if not _use(item, all_op):
+            return False
+        loaded = yield from execution.delay_until(lambda: inventory.count_by_id(item.id) >= target or (inventory.count_by_id(item.id) > before and inventory.is_full()), LOAD_TIMEOUT_MS)
+        return loaded
 
     def deposit(self, name, op='Deposit 1'):
         """Uses the option on the backpack item beside the bank, without waiting."""
