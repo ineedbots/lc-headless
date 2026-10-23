@@ -54,6 +54,9 @@ For [`Loc.layer`](world.md#loc), a query's `layer()`, and `locs.at(tile, layer)`
 | `RANGE_STYLE_OPTIONS` | `['accurate', 'rapid', 'longrange']` | Ranged styles |
 | `PRAYER_NAMES` | 15 names | See [prayer](side-tabs.md#prayer) |
 | `AUTOCAST_SPELLS` | 16 names | See [autocast](side-tabs.md#autocast) |
+| `PROTECT_FROM_MAGIC`, `PROTECT_FROM_MISSILES`, `PROTECT_FROM_MELEE` | `'Protect from Magic'` and so on | The protection prayers, as `prayer.set` takes them |
+| `PLAYER_FACE_BASE` | 32768 | Added to a player's index in a face target; see [`facing_player`](game.md#combat-styles) |
+| `OVERHEAD_TICKS` | 5 | How long overhead text shows |
 
 ## Dialogues
 
@@ -68,8 +71,12 @@ For [`Loc.layer`](world.md#loc), a query's `layer()`, and `locs.at(tile, layer)`
 |---|---|
 | `NAV_PURE_WALK` | `{'use_teleport_catalog': False, 'policy': {'use_teleports': False}}` |
 | `NAV_WITH_TELES` | `{'use_teleport_catalog': True, 'policy': {'use_teleports': True}}` |
+| `BANK_LOCATIONS` | Every known bank, as [`bank_locations()`](walking.md#banks) gives them |
 | `CANT_REACH` | `"i can't reach that"`, a [message pattern](walking.md#game_messages) |
 | `WRONG_SIDE` | A pattern function, not a string: true for "You can't do that from here." |
+| `USE_MAGE_BANK`, `USE_ZANARIS_BANK` | `'use_mage_bank'` and `'use_zanaris_bank'`, the settings those banks need |
+| `SPELL_MAX_WILDERNESS` | 20: the deepest Wilderness level spell teleports work at |
+| `GLORY_MAX_WILDERNESS` | 30: the same for an amulet of glory |
 
 ## Bank, shop and trade
 
@@ -83,4 +90,4 @@ For [`Loc.layer`](world.md#loc), a query's `layer()`, and `locs.at(tile, layer)`
 
 ## Settings
 
-`settings` itself is a builtin: the script's [`SettingsBag`](settings.md#settingsbag).
+`settings` itself is a builtin: the script's [`SettingsBag`](settings.md#settingsbag). `GLOBAL_SETTINGS` is the schema of the [Global settings](settings.md#global-settings).

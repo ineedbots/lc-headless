@@ -15,6 +15,8 @@ __all__ = [
     'Quest', 'CombatStyleResolution', 'quests', 'prayer', 'special', 'autocast', 'parse_combat_style',
     'try_parse_combat_style', 'parse_interface_combat_style', 'resolve_combat_style', 'parse_range_style',
     'COMBAT_STYLE_OPTIONS', 'RANGE_STYLE_OPTIONS', 'PRAYER_NAMES', 'AUTOCAST_SPELLS', 'SA_MAX_ENERGY',
+    'describe_combat_style', 'resolve_split_combat_settings', 'CombatStyleController', 'PROTECT_FROM_MAGIC', 'PROTECT_FROM_MISSILES',
+    'PROTECT_FROM_MELEE',
 ]
 
 COMBAT_TAB = 0
@@ -140,6 +142,10 @@ PRAYER_NAMES = [
     'improved reflexes', 'rapid restore', 'rapid heal', 'protect item', 'steel skin', 'ultimate strength',
     'incredible reflexes', 'protect from magic', 'protect from missiles', 'protect from melee',
 ]
+# The protection prayers, by the names prayer.set takes.
+PROTECT_FROM_MAGIC = 'Protect from Magic'
+PROTECT_FROM_MISSILES = 'Protect from Missiles'
+PROTECT_FROM_MELEE = 'Protect from Melee'
 PRAYER_LEVELS = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 40, 43]
 
 
@@ -325,6 +331,62 @@ def resolve_combat_style(style, offered):
         if effective == 'defence':
             fallback = CombatStyleResolution(style, effective, mode)
     return fallback
+
+
+def describe_combat_style(resolution):
+    """What a resolution trains, as rs2b0t logs it: 'strength (training Strength)', or with the requested style
+    it stands in for, 'defence (training Defence; controlled unavailable)'."""
+    descriptions = {
+        'attack': 'attack (training Attack)',
+        'strength': 'strength (training Strength)',
+        'controlled': 'controlled (training Attack, Strength & Defence)',
+        'defence': 'defence (training Defence)',
+    }
+    description = descriptions[resolution.effective]
+    if resolution.requested != resolution.effective:
+        head = description[:-1]
+        return f'{head}; {resolution.requested} unavailable)'
+    return description
+
+
+def resolve_split_combat_settings(raw_combat_style, raw_melee_style=None):
+    """rs2b0t's fighters once had one combat_style setting for the melee style, and now split it into the kind
+    ('melee', 'mage' or 'range') and melee_style. A Record of kind, melee_style and legacy_migrated: the old
+    melee style found in combat_style, which the bot saves as melee_style, else None."""
+    from rs2004.catalogs.record import Record
+    legacy = try_parse_combat_style(raw_combat_style)
+    if legacy is not None:
+        melee = parse_combat_style(raw_melee_style) if raw_melee_style is not None else legacy
+        return Record({'kind': 'melee', 'melee_style': melee, 'legacy_migrated': legacy if raw_melee_style is None else None})
+    kind = raw_combat_style.strip().lower()
+    if kind != 'mage' and kind != 'range':
+        kind = 'melee'
+    return Record({'kind': kind, 'melee_style': parse_combat_style(raw_melee_style if raw_melee_style is not None else 'strength'), 'legacy_migrated': None})
+
+
+class CombatStyleController:
+    """rs2b0t's: one weapon-aware mapping for resolving, setting and checking a style, over a backend with
+    offered_modes() ((mode, label) pairs, or None), current_mode() and select_mode(mode). The game's own is
+    game.combat_style_resolution and the rest."""
+
+    def __init__(self, backend):
+        self._backend = backend
+
+    def resolution(self, style):
+        modes = self._backend.offered_modes()
+        return None if modes is None else resolve_combat_style(style, modes)
+
+    def mode(self, style):
+        resolution = self.resolution(style)
+        return resolution.mode if resolution is not None else None
+
+    def has(self, style):
+        mode = self.mode(style)
+        return mode is not None and self._backend.current_mode() == mode
+
+    def set(self, style):
+        mode = self.mode(style)
+        return mode is not None and self._backend.select_mode(mode)
 
 
 def combat_styles():

@@ -219,6 +219,36 @@ assert direct_navigator.path(here.translate(500, 0)) is None
 )python");
 }
 
+TEST_CASE("Script bindings read the hint arrow, what you face and say, and the scene's collision", "[ScriptBindings]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.hintArrow = HintArrow_s{.kind = HintArrowKind_e::Tile, .tile = Offset(3, 2)};
+    fixture.state.localPlayer.faceEntity = EntityRef_s{.type = EntityType_e::Npc, .index = 7};
+    fixture.state.localPlayer.say = OverheadText_s{.text = "Hello", .tick = 48};
+    fixture.Run(R"python(
+here = game.tile()
+assert reader.hint_tile() == here.translate(3, 2) and reader.hint_arrow().kind == 'tile'
+assert game.facing() == ('npc', 7) and not facing_player(game.facing())
+assert game.overhead_text() == 'Hello'
+assert reachability.flags(here.translate(1, 0)) and reachability.flags(here.translate(0, -1)) == 0
+assert reachability.flags(here.translate(500, 0)) is None
+assert reachability.line_of_sight(here, here.translate(0, -3))
+assert not reachability.line_of_sight(here, here.translate(-4, 6))
+)python");
+
+    // The text shows for 5 ticks.
+    fixture.state.hintArrow = HintArrow_s{.kind = HintArrowKind_e::Npc, .index = 7};
+    fixture.state.localPlayer.say = OverheadText_s{.text = "Hello", .tick = 45};
+    fixture.Run(R"python(
+arrow = reader.hint_arrow()
+assert arrow.kind == 'npc' and arrow.index == 7 and reader.hint_tile() is None
+assert game.overhead_text() is None
+)python");
+
+    fixture.state.hintArrow.reset();
+    fixture.Run("assert reader.hint_arrow() is None and reader.hint_tile() is None\n");
+}
+
 TEST_CASE("Script bindings read items, types, interfaces, varps and social lists", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};

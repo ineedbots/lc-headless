@@ -19,6 +19,11 @@ public:
     [[nodiscard]] bool CanStep(const Tile_s& from, const Tile_s& to) const;
     // The waypoints a walk to the tile would send, or nullopt without a route.
     [[nodiscard]] std::optional<std::vector<Tile_s>> FindPath(const Tile_s& tile) const;
+    // Whether the server's sight ray from one tile reaches a body of size whose south-west tile is to. False
+    // across levels, or for a tile outside the loaded area.
+    [[nodiscard]] bool HasLineOfSight(const Tile_s& from, const Tile_s& to, s32 size) const;
+    // A loaded tile's collision flags, as CollisionFlag has them, or nullopt outside the loaded area.
+    [[nodiscard]] std::optional<u32> GetFlags(const Tile_s& tile) const;
 
 private:
     [[nodiscard]] const Tile_s& GetPosition() const;

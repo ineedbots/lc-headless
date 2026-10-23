@@ -46,10 +46,14 @@ struct GameCache_s
     // 225 only, keyed by MapSquare::GetId.
     std::unordered_map<u16, MapCrcs_s> mapCrcs;
     std::unordered_map<u16, IfComponent_s> components;
+    // Each sequence's length in client cycles, by id; empty when the cache's anim frames couldn't be read.
+    std::vector<u32> seqLengths;
 
     [[nodiscard]] const LocType_s* FindLoc(s32 id) const;
     [[nodiscard]] const NpcType_s* FindNpc(s32 id) const;
     [[nodiscard]] const ObjType_s* FindObj(s32 id) const;
+    // Nullopt when the length isn't known.
+    [[nodiscard]] std::optional<u32> FindSeqLength(s32 id) const;
     // Empty when the cache has no such type, or it has no name.
     [[nodiscard]] std::string_view FindLocName(s32 id) const;
     [[nodiscard]] std::string_view FindNpcName(s32 id) const;

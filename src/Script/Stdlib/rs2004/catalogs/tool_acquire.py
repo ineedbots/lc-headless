@@ -8,12 +8,24 @@ plan out itself (bank, walk, shop), with walk_to_tool_vendor for the walk.
 from rs2004.catalogs.mining import BROKEN_PICKAXE
 from rs2004.catalogs.tools import AXES, HAMMER, PICKAXES
 from rs2004.geometry import Tile
+from rs2004.settings import SettingDef
 
 COINS = 'Coins'
 BROKEN_AXE = 'Broken axe'
 
 TOOL_ACQUIRE_OPTIONS = ['Off', 'Buy / repair']
+TOOL_ACQUIRE_SETTING = SettingDef(
+    'string', 'Off', 'Acquire tools', options=TOOL_ACQUIRE_OPTIONS, group='Tools',
+    help='Off uses only the tools in the bank and backpack. Buy / repair buys a missing tool, or a better one the coins '
+    + 'stretch to, from Bob (axes), Nurmof (pickaxes) or Gerrant and Harry (fishing gear), repairs a broken pickaxe or axe, '
+    + 'and smiths a mithril or better axe when the bank has its bar and a hammer.',
+)
+# One in this many bank visits wanders off a few tiles after closing it, then opens it again, as if forgetting something.
 FORGETFUL_BANK_ODDS = 100
+FORGETFUL_BANK_SETTING = SettingDef(
+    'boolean', False, 'Forgetful bank exits', group='Tools',
+    help=f'about one bank visit in {FORGETFUL_BANK_ODDS} walks a few tiles away, opens the bank again and leaves again',
+)
 
 
 def parse_tool_acquire_mode(raw):

@@ -47,6 +47,10 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 {
                     AddSettingDefaults(botName, settingsJson);
                 },
+                .onSettingSave = [this](const SettingSave_s& save)
+                {
+                    SaveSetting(save);
+                },
                 .callTimeout = scripting.callTimeoutMs,
                 .messenger = m_messenger,
                 .username = m_account.credentials.username,
@@ -484,6 +488,24 @@ void Account::AddSettingDefaults(std::string_view botName, std::string_view sett
     catch (const std::exception& e)
     {
         m_logger->Warning("{}'s default settings weren't added to the account file: {}", botName, e.what());
+    }
+}
+
+void Account::SaveSetting(const SettingSave_s& save)
+{
+    if (m_account.file.empty())
+    {
+        return;
+    }
+
+    try
+    {
+        AccountFile::SetScriptSetting(m_account.file, save.name, save.key, save.valueJson);
+        m_logger->Verbose("Saved settings[\"{}\"].{} to {}", save.name, save.key, m_account.file.string());
+    }
+    catch (const std::exception& e)
+    {
+        m_logger->Warning("settings[\"{}\"].{} wasn't saved to the account file: {}", save.name, save.key, e.what());
     }
 }
 

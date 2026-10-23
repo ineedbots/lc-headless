@@ -1,0 +1,49 @@
+# rs2004.quests.exec.primitives: talking to NPCs and walking to them. See docs/scripting/quests.md.
+
+from typing import Any, Callable, Optional, Sequence
+
+from __builtins__ import Tile, Wait
+
+Log = Callable[[str], None]
+
+UNDERGROUND_Z: int
+DIALOG_GAP_MS: int
+DIALOGUE_OPEN_MS: int
+
+def talk_op(actions: Sequence[Optional[str]]) -> Optional[str]: ...
+def pick_preferred(options: Sequence[str], prefer: Sequence[str]) -> Optional[str]: ...
+
+class LineRule:
+    when_line: str
+    choose: str
+    def __init__(self, when_line: str, choose: str) -> None: ...
+
+def pick_by_line(lines: Sequence[str], options: Sequence[str], rules: Sequence[LineRule]) -> Optional[str]: ...
+def is_underground(t: Any) -> bool: ...
+def needs_hop(here: Any, anchor: Any) -> bool: ...
+
+class LadderHop:
+    stand: Tile
+    loc_name: str
+    op: str
+    arrive: Tile
+    open: Optional[str]
+    walk: Optional[Tile]
+    def __init__(self, stand: Tile, loc_name: str, op: str, arrive: Tile, open: Optional[str] = None, walk: Optional[Tile] = None) -> None: ...
+
+class NpcStop:
+    npc: str
+    anchor: Tile
+    leash: int
+    prefer: list[str]
+    approach: Optional[list[Tile]]
+    gap_ms: Optional[int]
+    def __init__(self, npc: str, anchor: Tile, leash: int, prefer: Sequence[str], approach: Optional[Sequence[Tile]] = None, gap_ms: Optional[int] = None) -> None: ...
+
+def walk_with_hops(dest: Tile, radius: int, hops: Sequence[Any], log: Log) -> Wait[bool]: ...
+def goto_npc(stop: Any, hops: Sequence[Any], log: Log) -> Wait[bool]: ...
+def drive_dialog(prefer: Sequence[str], log: Log, gap_ms: Optional[int] = None) -> Wait[bool]: ...
+def open_dialogue(npc_name: str, log: Log) -> Wait[bool]: ...
+def talk_through(npc_name: str, prefer: Sequence[str], log: Log, gap_ms: Optional[int] = None) -> Wait[bool]: ...
+def talk_strict(npc_name: str, prefer: Sequence[str], log: Log) -> Wait[bool]: ...
+def talk_choosing_by(npc_name: str, rules: Sequence[LineRule], prefer: Sequence[str], log: Log) -> Wait[bool]: ...

@@ -28,7 +28,7 @@ void PyObjects::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCac
 {
     const auto object = NewInstance(out, NPC_CLASS);
     SetInt(object, "id", npc.type);
-    SetEntity(object, npc, tick);
+    SetEntity(object, npc, tick, cache);
     SetMenu(object, Menus::GetNpcMenu(cache, npc.type));
 
     const auto* const type = cache.FindNpc(npc.type);
@@ -45,10 +45,10 @@ void PyObjects::FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCac
     SetInt(object, "size", type->size);
 }
 
-void PyObjects::FromPlayer(py_OutRef out, const Player_s& player, u64 tick)
+void PyObjects::FromPlayer(py_OutRef out, const Player_s& player, u64 tick, const GameCache_s& cache)
 {
     const auto object = NewInstance(out, PLAYER_CLASS);
-    SetEntity(object, player, tick);
+    SetEntity(object, player, tick, cache);
 
     if (!player.appearance)
     {
@@ -419,11 +419,11 @@ void PyObjects::SetMenu(py_Ref object, const Menus::Menu& menu)
     py_pop();
 }
 
-void PyObjects::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
+void PyObjects::SetEntity(py_Ref object, const Entity_s& entity, u64 tick, const GameCache_s& cache)
 {
     SetInt(object, "index", entity.index);
     SetTile(object, entity.tile);
-    SetInt(object, "animation", entity.animation.id);
+    SetInt(object, "animation", EntityStatus::GetAnimation(entity, tick, cache.FindSeqLength(entity.animation.id)));
     SetBool(object, "moving", EntityStatus::IsMoving(entity, tick));
     SetBool(object, "in_combat", EntityStatus::InCombat(entity, tick));
 
@@ -433,6 +433,18 @@ void PyObjects::SetEntity(py_Ref object, const Entity_s& entity, u64 tick)
     SetInt(object, "max_health", hit == nullptr ? 0 : hit->maxHealth);
 
     SetTarget(object, entity.faceEntity);
+
+    // Overhead text and the tick it was said on, which the webclient shows for about 5 ticks.
+    if (entity.say)
+    {
+        SetString(object, "say", entity.say->text);
+        SetInt(object, "say_tick", static_cast<s64>(entity.say->tick));
+    }
+    else
+    {
+        SetNone(object, "say");
+        SetNone(object, "say_tick");
+    }
 }
 
 void PyObjects::SetTarget(py_Ref object, const std::optional<EntityRef_s>& entity)

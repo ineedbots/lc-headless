@@ -57,7 +57,29 @@ def test_banks_are_ranked_by_the_straight_line_whatever_the_level():
     here = tile(3200, 3200)
     assert [bank['name'] for bank in walker.nearest_banks(here)] == ['Up', 'Far']
     assert walker.nearest_bank(here, {'useGuildBank': True})['name'] == 'Guild'
+    assert walker.nearest_usable_bank(here, lambda bank: bank['name'] != 'Up')['name'] == 'Guild'
+    assert walker.nearest_usable_bank(here, lambda bank: False) is None
     walker._banks = None
+
+
+def test_a_bank_a_script_opts_into_follows_the_global_setting():
+    zanaris = {'name': 'Zanaris', 'tile': {'x': 2383, 'z': 4458, 'level': 0}, 'requires': {'setting': 'useZanarisBank'}}
+    settings_store.load({})
+    assert not walker.bank_unlocked(zanaris)
+    settings_store.load({'Global': {'use_zanaris_bank': True}})
+    assert walker.bank_unlocked(zanaris)
+    assert not walker.bank_unlocked(zanaris, {})
+    settings_store.load({})
+
+
+def test_rs2b0ts_walk_presets_and_teleports_off_by_default():
+    assert traversal.pure_walk == NAV_PURE_WALK
+    assert traversal.with_teles == NAV_WITH_TELES
+    assert traversal.preload() is None
+    settings_store.load({'Global': {'nav_teleports': True}})
+    assert traversal.teleports_enabled()
+    settings_store.load({})
+    assert not traversal.teleports_enabled()
 
 
 def test_walking_needs_the_walker_data():

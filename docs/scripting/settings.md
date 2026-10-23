@@ -6,6 +6,8 @@ A script's settings come from the account file's `script.settings` object. A scr
 - [SettingsBag](#settingsbag)
 - [SettingDef](#settingdef)
 - [Schemas](#schemas)
+- [Saved settings: `settings_store`](#saved-settings-settings_store)
+- [Global settings](#global-settings)
 - [Account file keys the client reads](#account-file-keys-the-client-reads)
 
 ## Where settings come from
@@ -52,7 +54,8 @@ Keys are used as the account file writes them, case included.
 ## `SettingDef`
 
 ```python
-SettingDef(type=None, default=None, label=None, min=None, max=None, help=None, options=None, option_labels=None, group=None)
+SettingDef(type=None, default=None, label=None, min=None, max=None, help=None, options=None, option_labels=None, group=None,
+           show_if=None, step=None, color=None, options_from=None, csv_toggle=None)
 ```
 
 One declared setting. `type` is required, and must be one of the types below, or `ValueError`.
@@ -65,6 +68,8 @@ One declared setting. `type` is required, and must be one of the types below, or
 | `min`, `max` | Bounds for a `'number'`, both included |
 | `options` | The allowed values of a `'string'`, or of each item of a `'string[]'` |
 | `option_labels` | A `dict` of option to display text, for your own use |
+| `show_if` | `{'key': name, 'any_of': [values]}`: the setting matters only while the setting `name` has one of the values, as rs2b0t's panel shows it. Nothing hides settings here, so it documents the schema; but `name` must be in the same schema, or loading fails with `ValueError` |
+| `step`, `color`, `options_from`, `csv_toggle` | Only shape rs2b0t's panel. They're kept so its schemas port unchanged |
 
 All fields are attributes of the same names.
 
@@ -74,7 +79,7 @@ All fields are attributes of the same names.
 |---|---|---|
 | `'boolean'` | `true` or `false` | `bool` |
 | `'number'` | Any number, within `min` and `max` | `int` or `float` |
-| `'string'` | A string; one of `options` when given, matched without regard to case | `str`, in the schema's spelling of the option |
+| `'string'` | A string; one of `options` when given, matched without regard to case, or `''`, which leaves it unset as a panel's blank choice does | `str`, in the schema's spelling of the option |
 | `'string[]'` | A list of strings, or one comma-separated string | `list` of `str`, each matched to `options` as above |
 | `'tile'` | `[x, z]`, `[x, z, level]`, `"x,z"`, `"x,z,level"` or `{"x": ..., "z": ..., "level": ...}`. A missing level is 0 | [`Tile`](geometry.md#tile) |
 
@@ -113,6 +118,48 @@ A schema entry that isn't a `SettingDef`, or a schema that isn't a `dict`, raise
 SETTINGS = {'radius': SettingDef('number', 8)}
 for key, definition in PERIODIC_BANK_SETTINGS.items():
     SETTINGS[key] = definition
+```
+
+## Saved settings: `settings_store`
+
+rs2b0t's `SettingsStore`. A script saves a value for the next run, and it's written into the account file, under `script.settings["<namespace>"]`, at the end of the script's step. The file's comments and layout are kept; an existing value is replaced in place. A namespace is a bot's name, `Global`, or one a bot keeps for itself, such as `Loadouts`.
+
+```python
+settings_store.save('Fighter', 'style', 'range')      # script.settings["Fighter"].style
+style = settings_store.saved('Fighter', 'style')      # 'range', or None when nothing is saved
+```
+
+| Member | Does |
+|---|---|
+| `save(name, key, value)` | Saves a `bool`, number, string, list, `Tile` (as `[x, z, level]`) or `dict` of them. `ValueError` without a name and key |
+| `saved(name, key)` | What was saved there, as the account file holds it (a tile as a list), or `None` |
+| `resolve(name, schema)` | A `dict` of each schema setting: the namespace's value when it's valid, else for a [Global](#global-settings) key the Global value, else the default, as rs2b0t falls back |
+| `display_string(name, key, definition)` | The value as rs2b0t's panel shows it: `'true'`, `'1,2,0'`, `'a, b'` |
+| `on_change(listener)` | Calls `listener(name, key, value)` after each save, until the returned function is called |
+| `global_bag()` | The [Global settings](#global-settings), resolved, as a `SettingsBag` |
+
+The bot's own `self.settings` were read when it started; saving doesn't change them. A script reloaded on save sees what it saved.
+
+## Global settings
+
+rs2b0t's account-wide settings, in the account file's `script.settings["Global"]`. They're checked like a bot's, before login, and read through `settings_store.global_bag()`.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `lamp_skill` | string | `'strength'` | The skill a genie lamp trains, unless the bot's `lamp_skill()` chooses |
+| `bank_common_junk` | boolean | `true` | Bank gems, fruit, beer, kebabs and caskets |
+| `clue_duel_partner` | string | `''` | An account running the duel arena as a clue helper; empty finds a player in the lobby |
+| `use_zanaris_bank` | boolean | `false` | Let the walker and `banking.open` use the Zanaris bank (needs Lost City) |
+| `use_mage_bank` | boolean | `false` | Let them use the Mage Arena bank, which crosses deep Wilderness |
+| `nav_teleports` | boolean | `false` | Let world walks plan teleports the backpack can pay for |
+| `nav_path_stall_ticks` | number, 1 to 60 | 5 | Ticks without moving before a walk plans again |
+| `nav_path_deviation` | number, 1 to 40 | 10 | How far off its route a walk may get before it plans again |
+
+```jsonc
+"settings": {
+    "Global": { "use_mage_bank": true, "lamp_skill": "mining" },
+    "Miner": { "rocks": ["Iron"] }
+}
 ```
 
 ## Account file keys the client reads

@@ -44,8 +44,8 @@ void AccountCommands::ShowHelp(const Account* target) const
 {
     if (target == nullptr)
     {
-        m_logger.Info("Console commands: {}, {}, {} (or {}; as Ctrl+C), {} [verbose|info|warning|error], {} <text>. Start a line with {}<account> to send it to that account only",
-                      HELP, STATUS, QUIT, EXIT, LOG_LEVEL, SAY, TARGET_PREFIX);
+        m_logger.Info("Console commands: {}, {}, {} (or {}; as Ctrl+C), {} [verbose|info|warning|error], {} <text>, and every script's {} and {}. Start a line with {}<account> to send it to that account only",
+                      HELP, STATUS, QUIT, EXIT, LOG_LEVEL, SAY, PAUSE, RESUME, TARGET_PREFIX);
     }
 
     auto any = false;
@@ -58,6 +58,11 @@ void AccountCommands::ShowHelp(const Account* target) const
 
         for (const auto& command : account->GetCommands())
         {
+            if (command.name == PAUSE || command.name == RESUME)
+            {
+                continue;
+            }
+
             any = true;
 
             if (command.help.empty())

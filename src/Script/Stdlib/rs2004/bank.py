@@ -12,6 +12,8 @@ beside the bank's are its ("Deposit 1" to "Deposit X"). Options match without re
 as good as a space, so rs2b0t's 'Withdraw-1' works too.
 """
 
+import random
+
 import _core
 from rs2004 import execution
 from rs2004.bot import Task, is_generator
@@ -19,14 +21,16 @@ from rs2004.dialogue import chat_dialog
 from rs2004.entities import locs, npcs
 from rs2004.game import direct_navigator, game
 from rs2004.geometry import Tile
-from rs2004.traversal import nearest_reachable_bank, traversal
+from rs2004.navigation import navigator, walk_opening
+from rs2004.traversal import locked_bank_at, nearest_bank, nearest_bank_reachable, traversal
 from rs2004.items import inventory
 from rs2004.settings import SettingDef
 
 __all__ = [
     'bank', 'banking', 'withdraw_op', 'deposit_all_except', 'deposit_matcher', 'matches_common_bank_loot',
     'is_disposable_gather_junk', 'parse_bank_strategy', 'should_bank_now', 'PeriodicBank', 'COMMON_BANK_LOOT',
-    'RANDOM_EVENT_CASKET_ID', 'PERIODIC_BANK_SETTINGS', 'NEARBY_BANK_RADIUS',
+    'RANDOM_EVENT_CASKET_ID', 'PERIODIC_BANK_SETTINGS', 'NEARBY_BANK_RADIUS', 'resolve_bank_open_route', 'open_bank_access',
+    'purge_pack_at_bank', 'bank_pace_ticks', 'bank_pace', 'wait_bank_ready', 'withdraw_coins',
 ]
 
 READY_TIMEOUT_MS = 4000
@@ -44,6 +48,38 @@ FIXED_AMOUNTS = (1, 5, 10)
 
 # A bank already this near counts as here.
 NEARBY_BANK_RADIUS = 14
+
+
+def _tile_of(place):
+    """A Tile from a Tile, a bank's {'tile': {...}} or {'x', 'z', 'level'}."""
+    if isinstance(place, dict):
+        place = place.get('tile', place)
+        return Tile(place['x'], place['z'], place.get('level', 0))
+    return Tile.from_tile(place)
+
+
+def _straight(a, b):
+    dx = b.x - a.x
+    dz = b.z - a.z
+    return (dx * dx + dz * dz) ** 0.5
+
+
+def resolve_bank_open_route(bank_open=False, here=None, stand=None, nearby_booth_dist=None, nearest=None, prefer_nearby=True, nearby_radius=14):
+    """How banking.open should get a bank open, as rs2b0t's resolveBankOpenRoute decides it: 'already-open',
+    'scene-booth' (a booth within nearby_radius), 'local-bank' (a known bank that near, when the preset stand
+    isn't), 'preset-stand' or 'nearest-fallback'. nearest is a bank from bank_locations()."""
+    if bank_open:
+        return 'already-open'
+    if prefer_nearby and nearby_booth_dist is not None and nearby_booth_dist <= nearby_radius:
+        return 'scene-booth'
+    if prefer_nearby and here is not None and nearest is not None:
+        here = _tile_of(here)
+        if _straight(here, _tile_of(nearest)) <= nearby_radius:
+            if stand is None or _straight(here, _tile_of(stand)) > nearby_radius:
+                return 'local-bank'
+    if stand is not None:
+        return 'preset-stand'
+    return 'nearest-fallback'
 
 
 def _norm(text):
@@ -123,6 +159,53 @@ class _Bank:
             return False
         yield from execution.delay_until(lambda: not self.is_open() or self.ready(), timeout_ms)
         return self.ready()
+
+    def loaded(self):
+        """rs2b0t's: the bank's item list isn't empty, which an empty bank never is."""
+        return len(self.items()) > 0
+
+    def snapshot_ready(self):
+        """rs2b0t's: open, with its item list sent."""
+        return self.is_open() and _core.has_inventory(BANK)
+
+    def snapshot_generation(self):
+        """rs2b0t's: which update of the bank's item list this is, as the tick it came on, or -1 while the bank
+        is shut. An action's answer comes a tick after it at the soonest, so wait_snapshot_after(generation) waits
+        for it."""
+        return _core.inventory_tick(BANK) if self.is_open() else -1
+
+    def wait_snapshot_after(self, generation, timeout_ms=4000):
+        """Waits for the bank's item list to update after generation. False when it doesn't, or the bank
+        shuts. Use with yield from."""
+        if generation < 0:
+            return False
+        yield from execution.delay_until(lambda: not self.is_open() or self.snapshot_generation() > generation, timeout_ms)
+        return self.snapshot_ready() and self.snapshot_generation() > generation
+
+    def normal_backpack_snapshot(self):
+        """rs2b0t's: the backpack's items while the bank is shut, to compare the bank's side view against once
+        it opens; None while it's open."""
+        return None if self.is_open() else inventory.items()
+
+    def backpack_ready(self, expected=None, log=None):
+        """Waits up to 2 seconds for the backpack beside the open bank, and with expected, a
+        normal_backpack_snapshot(), up to 4 more for it to hold the same items in the same slots. Use with yield
+        from."""
+        def side_ready():
+            return self.is_open() and _core.has_inventory(BANK_INVENTORY)
+
+        if not self.is_open():
+            return False
+        if not side_ready():
+            yield from execution.delay_until(lambda: side_ready() or not self.is_open(), 2000)
+        if not side_ready():
+            if log is not None:
+                log('bank: side backpack modal did not become ready')
+            return False
+        if expected is None:
+            return True
+        yield from execution.delay_until(lambda: not self.is_open() or _same_backpack(self.side_items(), expected), 4000)
+        return self.is_open() and _same_backpack(self.side_items(), expected)
 
     def set_note_mode(self, on):
         """Withdraws as notes, or as items. Opening the bank sets items, so set it after."""
@@ -373,53 +456,82 @@ def _loc_with_action(name, op):
 class _Banking:
     """Opening a bank for a trip, and the whole trip, walking to one across the map when none is near."""
 
-    def open(self, stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14):
-        """Opens a bank: a booth nearby, else a banker nearby, else the booth at stand, else the nearest bank
-        rs2b0t knows, walking there. destination is one of bank_locations() to go to instead. Use with yield
-        from."""
+    def open(self, stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14, log=None):
+        """Opens a bank, the way resolve_bank_open_route picks: a booth within nearby_radius; else a known bank
+        that near, when the preset stand isn't; else the booth at stand, walked to through the obstacles named
+        ('door', 'gate') when there are some; else destination, or the nearest bank a route reaches. A bank the
+        account can't use is never opened. Use with yield from."""
+        say = log if log is not None else _quiet
+        wanted = [o.strip().lower() for o in (obstacles or []) if o and o.strip()]
+        fallback = {'name': booth_name, 'op': booth_op}
         if bank.is_open():
             return True
-        booth = locs.query().name(booth_name).where(lambda l: len(l.actions()) > 0).nearest()
-        if booth is not None and (not prefer_nearby or booth.distance() <= nearby_radius or (stand is None and destination is None)):
-            opened = yield from bank.open_nearest_access({'name': booth_name, 'op': booth_op})
+
+        here = game.tile()
+        scene_booth = _real_booth(booth_name, say)
+        booth_near = scene_booth if prefer_nearby and scene_booth is not None and scene_booth.distance() <= nearby_radius else None
+        nearest = nearest_bank(here) if here is not None else None
+        route = resolve_bank_open_route(False, here, stand, booth_near.distance() if booth_near is not None else None, nearest, prefer_nearby, nearby_radius)
+
+        if route == 'scene-booth':
+            say(f'bank: booth within {nearby_radius}; opening here')
+            opened = yield from bank.open_nearest_access(fallback)
             return opened
-        banker = npcs.query().action('Bank').nearest()
-        if banker is not None and (not prefer_nearby or banker.distance() <= nearby_radius or (stand is None and destination is None)):
-            opened = yield from bank.open_npc_access({'name': banker.name, 'op': 'Bank'})
-            return opened
-        if stand is not None:
-            arrived = yield from traversal.walk_resilient(stand, 2, None, 120000)
+
+        if route == 'local-bank' and nearest is not None:
+            say(f"bank: local {nearest['name']} bank; using it instead of the distant preset")
+            arrived = yield from traversal.walk_resilient(_tile_of(nearest), 4, None, 120000, log=log)
             if not arrived:
                 return False
+            opened = yield from open_bank_access(nearest, fallback, log)
+            return opened
+
+        if route == 'preset-stand' and stand is not None:
+            stand = _tile_of(stand)
+            locked = locked_bank_at(stand)
+            if locked is not None:
+                say(f"bank: cannot use {locked['name']}; access requirements not met")
+                return False
+            if wanted:
+                yield from walk_opening(stand, 2, wanted, log)
+            else:
+                arrived = yield from traversal.walk_resilient(stand, 2, None, 120000, log=log)
+                if not arrived:
+                    return False
+            # Shantay, the Duel Arena and Gundai: the known bank's access beats a booth by name.
+            known = nearest_bank(stand)
+            if known is not None and (known.get('access') is not None or known.get('npcAccess') is not None) and _straight(stand, _tile_of(known)) <= nearby_radius:
+                say(f"bank: {known['name']} uses {'npc' if known.get('npcAccess') is not None else 'object'} access")
+                opened = yield from open_bank_access(known, fallback, log)
+                return opened
             opened = yield from bank.open_booth(stand, booth_name, booth_op)
             return opened
-        known = destination if destination is not None else nearest_reachable_bank(game.tile())
-        if known is None:
-            return False
-        tile = known['tile']
-        arrived = yield from traversal.walk_resilient(Tile(tile['x'], tile['z'], tile['level']), 4, None, 120000)
-        if not arrived:
-            return False
-        if known.get('npcAccess') is not None:
-            access = known['npcAccess']
-            opened = yield from bank.open_npc_access({'name': access['name'], 'op': access['op'], 'choose': access.get('choose')})
-            return opened
-        if known.get('access') is not None:
-            access = known['access']
-            first = access.get('openFirst')
-            opened = yield from bank.open_nearest_access({'name': access['name'], 'op': access['op'], 'open_first': first})
-            return opened
-        banker = npcs.query().action('Bank').within(10).nearest()
-        if banker is not None and locs.query().name(booth_name).within(10).nearest() is None:
-            opened = yield from bank.open_npc_access({'name': banker.name, 'op': 'Bank'})
-            return opened
-        opened = yield from bank.open_nearest(booth_name, booth_op)
+
+        # No stand: a booth anywhere in the scene, else the cheapest bank a route reaches, walked to.
+        dest = None
+        if scene_booth is None:
+            # Why: the straight line ranks every bank about the same from a dungeon, so routes rank them, with the
+            # nearest by the straight line when none is reached.
+            dest = destination
+            if dest is None and here is not None:
+                dest = nearest_bank_reachable(here, navigator)
+            if dest is None:
+                dest = nearest
+            if dest is not None:
+                say(f"no booth in scene; walking to the {dest['name']} bank")
+                arrived = yield from traversal.walk_resilient(_tile_of(dest), 4, None, 120000, log=log)
+                if not arrived:
+                    say(f"bank: could not reach {dest['name']}")
+                    return False
+        else:
+            say(f"bank: opening the {booth_name} in view")
+        opened = yield from open_bank_access(dest, fallback, log)
         return opened
 
-    def bank_nearest(self, deposit, common_junk=True, destination=None, return_to=None, booth_name='Bank booth', booth_op='Use-quickly', after_deposit=None):
+    def bank_nearest(self, deposit, common_junk=True, destination=None, return_to=None, booth_name='Bank booth', booth_op='Use-quickly', after_deposit=None, log=None):
         """Opens a bank, deposits what deposit(name) picks (and common junk), runs after_deposit, and walks back
         to return_to. Use with yield from."""
-        opened = yield from self.open(None, booth_name, booth_op, None, destination)
+        opened = yield from self.open(None, booth_name, booth_op, None, destination, log=log)
         if not opened:
             return False
         yield from bank.deposit_all_matching(deposit_matcher(deposit, common_junk))
@@ -429,8 +541,135 @@ class _Banking:
                 yield from result
         yield from execution.delay_ticks(1)
         if return_to is not None:
-            yield from traversal.walk_resilient(return_to, 6, None, 120000)
+            yield from traversal.walk_resilient(return_to, 6, None, 120000, log=log)
         return True
+
+
+def _quiet(_):
+    pass
+
+
+def _same_backpack(left, right):
+    """The same items, by slot, id and count."""
+    if len(left) != len(right):
+        return False
+    held = [(item.slot, item.id, item.count) for item in right]
+    return len([item for item in left if (item.slot, item.id, item.count) in held]) == len(left)
+
+
+def _real_booth(booth_name, say):
+    """The nearest booth of that name in the scene that has options and isn't at a bank the account can't use."""
+    skipped = []
+
+    def usable(loc):
+        if len(loc.actions()) == 0:
+            return False
+        locked = locked_bank_at(loc.tile())
+        if locked is None:
+            return True
+        if locked['name'] not in skipped:
+            say(f"bank: skipping {locked['name']}; access requirements not met")
+            skipped.append(locked['name'])
+        return False
+
+    return locs.query().name(booth_name).where(usable).nearest()
+
+
+def _object_access(access):
+    """A bank's access as bank.open_nearest_access takes it, from a bank_locations() entry's camelCase."""
+    first = access.get('open_first', access.get('openFirst'))
+    return {'name': access['name'], 'op': access['op'], 'open_first': first}
+
+
+def open_bank_access(dest, fallback, log=None):
+    """Opens the bank dest names, a bank_locations() entry: through its banker when it has npcAccess, else by
+    its access, else by fallback ({'name': ..., 'op': ...}). Use with yield from."""
+    npc = dest.get('npcAccess', dest.get('npc_access')) if dest is not None else None
+    if npc is not None:
+        opened = yield from bank.open_npc_access({'name': npc['name'], 'op': npc['op'], 'choose': npc.get('choose')})
+        return opened
+    access = dest.get('access') if dest is not None else None
+    opened = yield from bank.open_nearest_access(_object_access(access if access is not None else fallback))
+    return opened
+
+
+def purge_pack_at_bank(keep, stand=None, destination=None, prefer_nearby=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, log=None):
+    """rs2b0t's start-of-run cleanup: banks everything but the keep names, so a bot can start with a pack of
+    junk. True when nothing needed banking or the backpack is clear; False when the bank couldn't be opened or
+    junk is left. Use with yield from."""
+    say = log if log is not None else (lambda message: None)
+    deposit = deposit_all_except(keep)
+    junk = [i for i in inventory.items() if deposit(i.name or '')]
+    if not junk:
+        return True
+    say(f'start purge: banking {len(junk)} stack(s) (keep: {", ".join(list(keep)) or "none"})')
+    opened = yield from banking.open(stand, booth_name, booth_op, obstacles, destination, prefer_nearby is not False, log=log)
+    if not opened:
+        say('start purge: could not open bank; leaving the backpack as it is')
+        return False
+    yield from bank.deposit_all_matching(lambda name, id=-1: deposit(name))
+    yield from execution.delay_ticks(1)
+    yield from bank.close()
+    left = [i for i in inventory.items() if deposit(i.name or '')]
+    if left:
+        say(f'start purge: still holding {len(left)} junk stack(s) after depositing')
+        return False
+    say('start purge: backpack cleared')
+    return True
+
+
+def bank_pace_ticks(rand=None):
+    """rs2b0t's pause between bank actions: 2 ticks about a third of the time, else 1, so an open, a scan and a
+    close never land on one tick."""
+    roll = rand() if rand is not None else random.random()
+    return 2 if roll < 0.35 else 1
+
+
+def bank_pace(log=None):
+    """Pauses between bank actions. Use with yield from."""
+    ticks = bank_pace_ticks()
+    if log is not None:
+        log(f'bank: pause {ticks}t')
+    yield from execution.delay_ticks(ticks)
+
+
+def wait_bank_ready(log=None):
+    """Waits for the open bank's items, up to 7 ticks, pacing around it as rs2b0t does. False once it's
+    closed. Use with yield from."""
+    if not bank.is_open():
+        return False
+    yield from bank_pace(log)
+    yield from execution.delay_until_ticks(lambda: bank.ready() or not bank.is_open(), 7)
+    if not bank.is_open():
+        return False
+    yield from execution.delay_ticks(1)
+    yield from bank_pace()
+    return bank.is_open()
+
+
+def withdraw_coins(need, inv_coins, bank_coins, coin_name='Coins', log=None):
+    """With the bank open, withdraws coins until the backpack holds need. False when the bank has none or the
+    withdraw fails. Use with yield from."""
+    say = log if log is not None else (lambda message: None)
+    take = max(0, need - inv_coins)
+    if take <= 0:
+        return True
+    if not bank.is_open():
+        return False
+    if bank_coins <= 0:
+        say(f'acquire: no coins in the bank (need {need}gp)')
+        return False
+    amount = min(take, bank_coins)
+    say(f'acquire: withdraw {amount}gp')
+    yield from bank_pace()
+    withdrew = yield from bank.withdraw_x(coin_name, amount)
+    if not withdrew:
+        return False
+    target = min(need, inv_coins + amount)
+    ok = yield from execution.delay_until_ticks(lambda: inventory.count(coin_name) >= target, 7)
+    if ok:
+        yield from bank_pace()
+    return ok
 
 
 # Deposit rules and when to bank.
@@ -512,11 +751,12 @@ class PeriodicBank(Task):
     """A task that banks loot every so often, by items or time, as rs2b0t's PeriodicBank. Give it callables:
     strategy() ('off', 'items', 'time' or 'either'), items_threshold(), minutes_threshold(), count_loot()
     and deposit(name), and optionally after_deposit(), common_junk(), return_to(), destination() (one of
-    bank_locations() to bank at) and log(message)."""
+    bank_locations() to bank at), log(message) and set_status(text), told when a run starts."""
 
-    def __init__(self, strategy=None, items_threshold=None, minutes_threshold=None, count_loot=None, deposit=None, after_deposit=None, common_junk=None, return_to=None, log=None, destination=None):
+    def __init__(self, strategy=None, items_threshold=None, minutes_threshold=None, count_loot=None, deposit=None, after_deposit=None, common_junk=None, return_to=None, log=None, destination=None, set_status=None):
         Task.__init__(self, None, None, 'periodic bank')
         self.destination = destination
+        self.set_status = set_status
         self.strategy = strategy
         self.items_threshold = items_threshold
         self.minutes_threshold = minutes_threshold
@@ -541,10 +781,12 @@ class PeriodicBank(Task):
         })
 
     def execute(self):
+        if self.set_status is not None:
+            self.set_status('periodic bank run')
         common = True if self.common_junk is None else self.common_junk()
         back = None if self.return_to is None else self.return_to()
         where = None if self.destination is None else self.destination()
-        ok = yield from banking.bank_nearest(self.deposit, common, where, back, 'Bank booth', 'Use-quickly', self.after_deposit)
+        ok = yield from banking.bank_nearest(self.deposit, common, where, back, 'Bank booth', 'Use-quickly', self.after_deposit, log=self.log)
         self.last_bank_at = _core.step_time()
         if not ok:
             self.suppress_until = _core.step_time() + FAILURE_BACKOFF_MS

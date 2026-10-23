@@ -97,6 +97,18 @@ namespace
         });
     }
 
+    // The tick an inventory last changed, or -1 when the server hasn't sent it: rs2b0t's snapshot generation,
+    // since what an action changes arrives a tick after it at the soonest.
+    bool GetInventoryTick(int, py_StackRef argv) noexcept
+    {
+        return BindingSupport::Guard([argv]
+        {
+            const auto& inventories = BindingSupport::GetContext().GetState().inventories;
+            const auto found = inventories.find(PyValue::ToU16(py_arg(0), "com"));
+            return BindingSupport::ReturnInt(found == inventories.end() ? -1 : static_cast<s64>(found->second.tick));
+        });
+    }
+
     // (com, type, x, options) for the inventories in an interface, x from its corner and options with None
     // where empty, so the stdlib can find the shop's and the trade's by what they offer.
     bool GetInventories(int, py_StackRef argv) noexcept
@@ -152,6 +164,7 @@ void InventoryBindings::Add(std::vector<BoundFunction_s>& functions, const GameC
                                           {"get_empty_slots()", GetEmptySlots},
                                           {"is_inventory_full()", IsInventoryFull},
                                           {"has_inventory(com)", HasInventory},
+                                          {"inventory_tick(com)", GetInventoryTick},
                                           {"get_inventories(root)", GetInventories},
                                       });
 }

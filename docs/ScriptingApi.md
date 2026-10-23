@@ -59,9 +59,9 @@ BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': Setting
 `scripts/examples/` has complete scripts:
 - `chicken_killer.py` is a `TaskBot` that kills chickens, collects feathers and optionally buries bones. Set `combat_style`, `start_location` and `bury_bones` under `script.settings["Chicken killer"]`; `radius` controls the fighting area, and the bot walks back when outside it.
 - `power_miner.py` is a `LoopingBot` that mines and drops the ore.
-- `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Its console commands pause it and change the number of laps.
+- `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Its `laps` console command changes the number of laps, and like every script it has `pause` and `resume`.
 
-All three make progress reports.
+All three make progress reports. `scripts/bots/` has rs2b0t's bots, ported (see [Catalogs and behaviours](#catalogs-and-behaviours)).
 
 For working on a script, `--watch` reloads it whenever you save it, and `--debugger` lets VS Code debug it (see [Working on a script](#working-on-a-script)).
 
@@ -120,6 +120,8 @@ Mirroring rs2b0t's bot classes:
 
 Every bot has `settings`, `loop_delay`, `loop_cadence`, `log(*args)`, `on(event, callback)` (a subscription that ends with the bot), `request_finish(reason)` (stops the script, leaving the account logged in, with `reason` passed to `on_stop`), and the hooks it defines as methods. `define_bot(name=..., create=..., description=None, version=None, category=None, tags=None, settings_schema=None)` describes it; `create` is the class, or a function that makes the bot.
 
+A bot can run another inside it, as rs2b0t's account leveler runs its methods: `ScriptActivity(log)`, then `yield from activity.start(BOT, overrides)` with the other script's `BOT` imported (`from bots.cow_killer import BOT`), and `yield from activity.loop()` from its own `loop()`. The child's settings are its schema's defaults and the overrides, checked as an account's are; its `delegated` is true, its log lines go to the parent's log with its name, and its `request_finish` ends the activity, whose `outcome` says how (`'finished'`, `'failed'` or `'interrupted'`), not the script. See [script-structure.md](scripting/script-structure.md#running-a-bot-inside-another-scriptactivity).
+
 ### Settings
 
 The account file's `script.settings` object becomes the global `settings`, and the bot's `self.settings`. A script with `BOT = define_bot(name=...)` gets only the object under its name, `script.settings["<name>"]`, so one account file can keep the settings of several scripts; a script without `BOT` gets the whole object. Read its keys as attributes (`settings.loot_goal`), with `settings.get('key', default)`, or with rs2b0t's typed getters, `bool(key)`, `num(key)`, `str(key)`, `list(key)` and `tile(key, fallback)`, which return the fallback when the value isn't of their type. `'key' in settings` checks for one.
@@ -132,6 +134,10 @@ A script can declare its settings with a schema: `settings_schema=` in `define_b
 - a setting the schema doesn't declare draws a warning, since it's probably misspelled. For a `BOT`, so does a setting beside the bots' objects in `script.settings` rather than inside its own, which it doesn't read.
 
 A `BOT`'s declared settings that its object in the account file lacks, those with a default, are then written into the file with their defaults, creating the object if need be and leaving the file's comments and layout as they were. So the first run of a new script shows every setting it has, ready to edit, and a later version's new settings appear as it loads. Values already in the file are never changed. A script without `BOT` has nothing written for it.
+
+A `SettingDef` also takes rs2b0t's `show_if={'key': ..., 'any_of': [...]}`, which must name a setting of the same schema, and `step`, `color`, `options_from` and `csv_toggle`, which only shape rs2b0t's panel.
+
+`settings_store` is rs2b0t's `SettingsStore`: `settings_store.save(name, key, value)` keeps a value for later runs in the account file, under `script.settings["<name>"]`, written at the end of the step with the file's comments kept, and `settings_store.saved(name, key)` reads it back. rs2b0t's account-wide settings are the `Global` namespace, `script.settings["Global"]`, checked before login: `lamp_skill`, `bank_common_junk`, `clue_duel_partner`, `use_zanaris_bank`, `use_mage_bank`, `nav_teleports`, `nav_path_stall_ticks` and `nav_path_deviation` ([settings.md](scripting/settings.md#global-settings)).
 
 ### Imports
 
@@ -148,7 +154,8 @@ Scripts run on pocketpy 2.2, a subset of Python 3. The differences you're likely
 - A parameter can be passed by keyword only when it has a default value, and a default value must be a literal (`timeout=6000`, not `timeout=TIMEOUT`).
 - An attribute set on an instance doesn't replace a method of its class; give the instance a differently named attribute and call it from the method.
 - In unpacking, a starred name must come last (`first, *rest = items`), and only lists and tuples unpack.
-- Tuples can't be added together, `dict(another_dict)` doesn't copy, and `dict.setdefault` and `str.isdigit` don't exist.
+- Tuples can't be added together, `dict(another_dict)` doesn't copy, and `dict.setdefault`, `str.isdigit` and `str.capitalize` don't exist.
+- Strings side by side aren't joined, f-strings included: `'a' 'b'` is an error. Join them with `+`.
 - There's no `re` module.
 - A function can read the variables of the function it's defined in, but not of one further out. A lambda inside a nested function that uses the outer function's parameter fails, or quietly gets a builtin of the same name, such as `id`; copy the value into a local of the nested function first.
 - `match` is a keyword, so it can't name a variable or parameter. Where rs2b0t's functions take `match`, ours take `text` or `name`.
@@ -271,7 +278,7 @@ arrived = yield from traversal.walk_resilient(Tile(3253, 3420, 0), 2)
 - **Teleports.** These are off by default. Pass `**NAV_WITH_TELES` to plan spell teleports the backpack has the runes for, or `**NAV_PURE_WALK` to walk.
 - **Policy.** `policy` is a dict of `use_teleports`, `use_ships`, `use_shortcuts`, `allow_teleport_ids` and `deny_teleport_ids`.
 - **Avoided zones.** `avoid_zones` are areas a route never enters, though it may leave one it starts in. They're ids from rs2b0t's catalog, such as `'white-wolf-mountain'`, or dicts of `min_x`, `max_x`, `min_z`, `max_z` and optionally `level`. Draynor's jail guards are avoided automatically below combat level 51.
-- **Banks.** `nearest_bank(tile)`, `nearest_banks(tile)` and `nearest_reachable_bank(tile)` rank rs2b0t's known banks, leaving out those the account can't use. `banking.open()` walks to the nearest reachable one when none is in the area.
+- **Banks.** `nearest_bank(tile)`, `nearest_banks(tile)` and `nearest_bank_reachable(tile, navigator)` rank rs2b0t's known banks, leaving out those the account can't use. `banking.open()` walks to the nearest reachable one when none is in the area.
 
 ## Reach
 
@@ -545,14 +552,30 @@ A table entry is a `Record`: its fields are attributes, and one it doesn't set r
 
 The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout, which writes `rs2004/catalogs/_data.py` and `_shops.py`.
 
-`scripts/examples` has three of rs2b0t's bots translated with them: `miner.py` (the mining side of GatheringBot), `cow_killer.py` (ChickenKiller's CowKiller, in melee) and `bank_fletcher.py` (BankFletcher, less its cut+string mode). `aio_thiever.py` joins three more, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
+`scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
+
+| Kind | rs2b0t | Here |
+|---|---|---|
+| Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, tick manipulation (off until rs2b0t ships it). Not yet the mule hand-offs and the guild feather and Shilo supply runs |
+| Gathering | CoalTrucks, FlaxPicker, FlaxAIO, GnomeMagicChopper | `coal_trucks.py`, `flax_picker.py`, `flax_aio.py`, `gnome_magic_chopper.py` |
+| Skilling | BankFletcher, CookBot, DartFletcher, Firemaker, FlaxSpinner, GemCutter, HerbCleaner, HerbloreSecondaries, PotionMaker, LeatherCrafter, SmelterBot, SmithingBot, Superheater, TannerBot, VialFiller, BoneBurier, ClimbingBoots | `bank_fletcher.py` and the rest, each named as rs2b0t names it in snake_case |
+| Jewellery and caskets | JiveBalls, JiveCaskets, JiveCrafting, JiveEnchanter | `jive_balls.py`, `jive_caskets.py`, `jive_crafting.py`, `jive_enchanter.py` |
+| Runecrafting | RuneCrafter, NatureCrafter | `rune_crafter.py`, `nature_crafter.py`. NatureCrafter's paint button is the `gobank` console command |
+| Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
+| Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py` |
+| Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
+| Movement and magic | WalkTo, DoorOpener, AIO Teleport | `walk_to.py`, `door_opener.py`, `aio_teleport.py` |
+
+`scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
 
 ## Upkeep
 
 Two of rs2b0t's runtime services run for every script, once a server tick, beside the random event guardian:
 
 - **The run manager** turns run back on once energy reaches the account's `runEnergyMin` (20), when its `runAuto` is on (it is by default). It leaves run alone while a main interface is open, since clicking run makes the server close it, unless you're being hit, when any energy will do. `run_manager.override(run_auto=None, energy_min=None)` replaces the config's choices for this script; the last call wins as a whole, and one with neither goes back to the config's.
-- **The stall guard** watches for progress: a change of tile, any experience, or `execution.note_progress()`. After the account's `stallMinutes` (10) without any, it walks back to the bot's `recovery_anchor()` (a module-level function or a bot method that gives a `Tile`) when that's more than 8 tiles away or on another level, and otherwise restarts the bot: `on_stop` with "the stall guard restarted the bot", then `BOT`'s `create()` makes a new one and `on_start` runs again. A module's globals stay as they were. It tries once, then not again for 15 minutes. Time the account spends logged out, and time a random event takes, isn't a stall. `stallMinutes: 0` turns it off.
+- **The stall guard** watches for progress: a change of tile, any experience, or `execution.note_progress()`. After the account's `stallMinutes` (10) without any, it walks back to the bot's `recovery_anchor()` (a module-level function or a bot method that gives a `Tile`) when that's more than 8 tiles away or on another level, and otherwise restarts the bot: `on_stop` with "the stall guard restarted the bot", then `BOT`'s `create()` makes a new one and `on_start` runs again. A module's globals stay as they were. It tries once, then not again for 15 minutes. Time the account spends logged out, time a random event takes, and time the bot is paused aren't stalls. `stallMinutes: 0` turns it off. The restarted bot's `on_start` can ask `recovery_hints.take_anchor()` for the anchor the old one set in `recovery_hints.anchor`, as rs2b0t's ChickenKiller keeps its field.
+
+A long loop that would rather stop at a safe point than be dropped by the guardian asks `event_signal.pending()`, rs2b0t's `EventSignal`, which holds while the guardian sees an event it will answer, or while the bot's own `event_signal.set_interrupt(fn)` does.
 
 An account that starts on Tutorial Island leaves it before `on_start` runs. If the design screen is open, the client saves a plain design. Then it talks to the RuneScape Guide and answers "Yes please." when he asks whether to skip the tutorial, which sends the player to Lumbridge. Hooks and subscribers don't hear the game events that arrive while this happens, since `on_start` hasn't run yet. The guide only asks this on a server that isn't live, and only before the player has gone further into the tutorial. If he doesn't ask, the client logs that the player is still on the island and the script starts anyway.
 
@@ -600,6 +623,7 @@ A bot's lifecycle has hooks too, but no subscribers:
 |---|---|
 | `on_start()` | Once, a tick after the player is first placed after login, when the stats and inventories have arrived. One that's a generator runs before the first `loop()` |
 | `on_stop(reason)` | Once, when the script stops: after `stop_script()`, `stop_account()`, `request_finish(reason)` or an error, or when the account logs out for a reason of its own, such as Ctrl+C. It can't wait |
+| `on_pause()`, `on_resume()` | The console's `pause` stopped the bot, or `resume` started it again. They can't wait |
 | `on_progress_report()` | A progress report is due; return a `dict` (see [Progress reports](#progress-reports)) |
 
 Events only report what the server said. When the map rebuilds, or an area falls out of view, things vanish from the state without a despawn event, so check what's in view rather than keeping your own copy.
@@ -660,6 +684,7 @@ These commands are built in:
 | `quit`, `exit` | Does what Ctrl+C does: each script gets `on_kill_signal`, and typing it again logs the accounts out at once |
 | `loglevel [verbose\|info\|warning\|error]` | Shows or changes the log level of every account |
 | `say <text>` | Types the text into public chat from every account that's in game, cut to 80 characters |
+| `pause`, `resume` | Every script has these: `pause` stops stepping the bot, dropping its step in progress, and calls `on_pause`; `resume` calls `on_resume`, and `loop()` starts afresh. A paused account still answers random events and keeps its run on |
 
 To send a line to just one account, start it with `@<account>`, using the account file's name or its username, in any case: `@mule status`, `@mule help`, `@mule say hi` to chat from only that account, or `@mule quit` to stop only that account. An account that is quit before its turn to log in never logs in. `loglevel` always applies to every account.
 
@@ -677,11 +702,11 @@ console.command('bank', bank_soon, 'Bank once the backpack is full')
 ```
 
 - A line without `@` goes to every running script that added the command, and a line with `@<account>` goes only to that account's script. A name that no running script has added gets a warning.
-- A command name is one word, matched in any case. `help`, `status`, `quit`, `exit`, `loglevel` and `say` belong to the client and can't be added. Adding the same name twice raises `ValueError`.
+- A command name is one word, matched in any case. `help`, `status`, `quit`, `exit`, `loglevel`, `say`, `pause` and `resume` belong to the client and can't be added. Adding the same name twice raises `ValueError`.
 - The handler runs on the script's next pass, once the player is placed, so a line typed while the account logs in or reconnects waits until it's back. Like a hook, the handler can't wait: set a flag and do the work in `loop()`. An exception in the handler stops the script, just as one in a hook does, so check `args` before using them.
 - `console.command` returns a function that removes the command, and `console.remove(name)` removes it too. In a bot, `self.command(name, handler, help)` adds a command that is removed when the bot stops. A command added at module level lasts as long as the script.
 
-`scripts/examples/walker.py` adds `pause` and `laps` commands.
+`scripts/examples/walker.py` adds a `laps` command.
 
 ## Working on a script
 
@@ -761,7 +786,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, and the catalogs and behaviours (`rs2004.catalogs`). [BotApiParityDesign.md](BotApiParityDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, `RecoveryHints`, `EventSignal`, `SettingsStore` with the `Global` settings, `ScriptActivity`, and the catalogs and behaviours (`rs2004.catalogs`). [BotApiParityDesign.md](BotApiParityDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;

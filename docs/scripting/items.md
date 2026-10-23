@@ -15,6 +15,8 @@ The backpack. Names match whole, without regard to case, and surrounding spaces 
 | `inventory.free()` | Empty slots |
 | `inventory.is_full()` | Whether no slot is free |
 
+`backpack_capacity()` is rs2b0t's: how many slots the backpack has, `INVENTORY_SIZE`. rs2b0t reads 0 until its pack interface loads; here the size is known from the start.
+
 ```python
 if inventory.is_full():
     for item in inventory.items():

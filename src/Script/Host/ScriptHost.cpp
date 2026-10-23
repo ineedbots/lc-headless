@@ -26,6 +26,7 @@
 #include "LoopSchedule.hpp"
 #include "ScriptHooks.hpp"
 
+#include <nlohmann/json.hpp>
 #include <pocketpy.h>
 
 namespace
@@ -136,6 +137,8 @@ void ScriptHost::Step(Clock::time_point now)
     {
         RunLoop(now);
     }
+
+    SaveSettings();
 }
 
 void ScriptHost::Finish(std::string_view reason)
@@ -160,6 +163,7 @@ void ScriptHost::Finish(std::string_view reason)
 
     // A stop asked for while stopping changes nothing.
     static_cast<void>(m_context.GetControl().TakeStopRequest());
+    SaveSettings();
 }
 
 bool ScriptHost::HandlesKillSignal() const
@@ -628,6 +632,47 @@ void ScriptHost::Stop(ScriptStatus_e status, std::string_view reason)
 {
     m_status = status;
     Finish(reason);
+}
+
+// A reloaded script is given the settings with what was saved, as the account file now has them.
+void ScriptHost::SaveSettings()
+{
+    const auto saves = m_context.GetControl().TakeSettingSaves();
+    if (saves.empty())
+    {
+        return;
+    }
+
+    try
+    {
+        auto settings = nlohmann::json::parse(m_options.settings);
+        for (const auto& save : saves)
+        {
+            auto& name = settings[save.name];
+            if (!name.is_object())
+            {
+                name = nlohmann::json::object();
+            }
+
+            name[save.key] = nlohmann::json::parse(save.valueJson);
+        }
+
+        m_options.settings = settings.dump();
+    }
+    catch (const nlohmann::json::exception& e)
+    {
+        m_logger->Warning("A saved setting couldn't be kept for a reload: {}", e.what());
+    }
+
+    if (!m_options.onSettingSave)
+    {
+        return;
+    }
+
+    for (const auto& save : saves)
+    {
+        m_options.onSettingSave(save);
+    }
 }
 
 void ScriptHost::ApplyStopRequest()

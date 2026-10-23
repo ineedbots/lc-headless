@@ -100,6 +100,19 @@ def recovery_anchor():
 
 A bot that waits a long time on purpose, such as a mule standing by a bank, should call `execution.note_progress()` while it waits.
 
+### `recovery_hints`
+
+rs2b0t's `RecoveryHints`: a restart by the stall guard tells the new bot where the old one worked. The bot sets `recovery_hints.anchor` itself, as its anchor, and its `on_start` asks `recovery_hints.take_anchor()`, which gives that anchor after a restart only, once, and `None` on any other start:
+
+```python
+def on_start(self):
+    hinted = recovery_hints.take_anchor()
+    self.anchor = hinted if hinted is not None else game.tile()
+    recovery_hints.anchor = self.anchor
+```
+
+A hint the new bot's `on_start` doesn't take is dropped once it finishes. `recovery_hints.clear()` drops it, and the anchor, by hand.
+
 ## Tutorial Island
 
 An account that starts on Tutorial Island leaves it before `on_start` runs. If the character design screen is open, the client saves a plain design. Then it talks to the RuneScape Guide and answers "Yes please." when he offers to skip the tutorial, which sends the player to Lumbridge. Hooks and subscribers don't hear the game events that arrive meanwhile.

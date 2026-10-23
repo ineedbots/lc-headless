@@ -241,17 +241,46 @@ namespace
     }
 
     // The last, as a JSON parser keeps the last of a repeated key.
-    const JsoncValue_s* FindMemberValue(const JsoncValue_s& object, std::string_view key)
+    std::optional<std::size_t> FindMember(const JsoncValue_s& object, std::string_view key)
     {
         for (auto i = object.members.size(); i > 0; --i)
         {
             if (object.members[i - 1].key == key)
             {
-                return &object.values[i - 1];
+                return i - 1;
             }
         }
 
-        return nullptr;
+        return std::nullopt;
+    }
+
+    const JsoncValue_s* FindMemberValue(const JsoncValue_s& object, std::string_view key)
+    {
+        const auto index = FindMember(object, key);
+        return index ? &object.values[*index] : nullptr;
+    }
+
+    // The object at the end of the path, or null when one on the way is missing.
+    const JsoncValue_s* FindObject(const JsoncValue_s& root, std::span<const std::string> path)
+    {
+        const auto* object = &root;
+        for (auto depth = std::size_t{0}; depth < path.size(); ++depth)
+        {
+            const auto* value = FindMemberValue(*object, path[depth]);
+            if (value == nullptr)
+            {
+                return nullptr;
+            }
+
+            if (!value->isObject)
+            {
+                throw ConfigError{std::format("{}: must be an object", StringUtils::Join(path.first(depth + 1), "."))};
+            }
+
+            object = value;
+        }
+
+        return object;
     }
 }
 
@@ -328,4 +357,58 @@ JsoncEdit_s JsoncEditor::AddMissing(std::string_view text, std::span<const std::
     const auto replacement = AddMembers(text, *object, missing, DetectLayout(text, root));
     edit.text = std::string{text.substr(0, replacement.offset)} + replacement.text + std::string{text.substr(replacement.offset + replacement.length)};
     return edit;
+}
+
+// The values already there are replaced from the last in the text back, so earlier offsets stay right; the rest
+// are then added as AddMissing adds them.
+JsoncEdit_s JsoncEditor::Set(std::string_view text, std::span<const std::string> path, std::string_view membersJson)
+{
+    const auto members = Json::parse(membersJson);
+    assert(members.is_object() && "JsoncEditor::Set takes a JSON object of members");
+
+    const auto root = JsoncScanner{text}.ScanDocument();
+    if (!root.isObject)
+    {
+        throw ConfigError{"the top level must be an object"};
+    }
+
+    const auto* object = FindObject(root, path);
+    if (object == nullptr)
+    {
+        return AddMissing(text, path, membersJson);
+    }
+
+    const auto layout = DetectLayout(text, root);
+    const auto objectIndent = std::string{GetIndent(text, object->begin)};
+    auto replacements = std::vector<Replacement_s>{};
+    auto missing = Json::object();
+    for (const auto& [key, value] : members.items())
+    {
+        const auto index = FindMember(*object, key);
+        if (!index)
+        {
+            missing[key] = value;
+            continue;
+        }
+
+        const auto& member = object->members[*index];
+        const auto& old = object->values[*index];
+        const auto indent = StartsLine(text, member.keyBegin) ? std::string{GetIndent(text, member.keyBegin)} : objectIndent + std::string{layout.indentUnit};
+        replacements.push_back({.offset = old.begin, .length = old.end - old.begin, .text = FormatBlock(value, indent, layout)});
+    }
+
+    std::ranges::sort(replacements, std::ranges::greater{}, &Replacement_s::offset);
+
+    auto result = std::string{text};
+    for (const auto& replacement : replacements)
+    {
+        result.replace(replacement.offset, replacement.length, replacement.text);
+    }
+
+    if (missing.empty())
+    {
+        return {.text = std::move(result)};
+    }
+
+    return AddMissing(result, path, missing.dump());
 }

@@ -5,6 +5,7 @@ class CacheStore
 public:
     static constexpr u32 STORE_COUNT = 5;
     static constexpr u32 ARCHIVES = 0;
+    static constexpr u32 ANIMS = 2;
     static constexpr u32 MAPS = 4;
     static constexpr std::size_t SECTOR_SIZE = 520;
     static constexpr std::size_t SECTOR_HEADER_SIZE = 8;

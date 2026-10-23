@@ -1,7 +1,20 @@
 """Loadouts: the gear to wear and the supplies to carry. Ported from rs2b0t's api/loadout (MIT, see
-thirdparty/rs2b0t). rs2b0t keeps loadouts in its panel; here they're settings: a script's 'loadouts' setting
-is a list of {name, worn: {slot: item}, carry: [{item, qty}]}, and 'loadout' names the one to use.
+thirdparty/rs2b0t). A loadout is {name, worn: {slot: item}, carry: [{item, qty}]}. rs2b0t keeps them in its
+panel's storage; here they're the account file's script.settings["Loadouts"].sets, through the loadouts store,
+which every bot shares. A bot's own 'loadouts' setting, a list of them, is used instead when it has one, and its
+'loadout' setting (LOADOUT_SETTING) names the one to use.
 """
+
+import json
+
+from rs2004.settings import SettingDef, settings_store
+
+LOADOUTS_NAMESPACE = 'Loadouts'
+LOADOUTS_KEY = 'sets'
+LOADOUT_SETTING = SettingDef(
+    'string', '', 'Loadout', options=[], options_from='loadouts',
+    help="the gear and supplies to wear and carry; blank uses the first loadout. What it doesn't name falls back to the bot's own default",
+)
 
 SLOTS = ['hat', 'back', 'front', 'righthand', 'torso', 'lefthand', 'legs', 'hands', 'feet', 'ring', 'quiver']
 
@@ -74,6 +87,43 @@ def parse_loadouts(raw):
     return out
 
 
+def _as_dict(loadout):
+    return {'name': loadout.name, 'worn': {k: v for k, v in loadout.worn.items()}, 'carry': [{'item': c.item, 'qty': c.qty} for c in loadout.carry]}
+
+
+def serialize_loadouts(loadouts):
+    """The loadouts as JSON text, as parse_loadouts reads it back."""
+    return json.dumps([_as_dict(l) for l in loadouts])
+
+
+class _LoadoutStore:
+    """rs2b0t's Loadouts: the loadouts every bot on the account shares."""
+
+    def all(self):
+        return parse_loadouts(settings_store.saved(LOADOUTS_NAMESPACE, LOADOUTS_KEY) or [])
+
+    def names(self):
+        return [l.name for l in self.all()]
+
+    def by_name(self, name):
+        wanted = name.strip().lower()
+        for loadout in self.all():
+            if loadout.name.lower() == wanted:
+                return loadout
+        return None
+
+    def save(self, loadouts):
+        """Saves the list into the account file, replacing what was there."""
+        settings_store.save(LOADOUTS_NAMESPACE, LOADOUTS_KEY, [_as_dict(l) for l in loadouts])
+
+
+loadouts = _LoadoutStore()
+
+
+def _store_all():
+    return loadouts.all()
+
+
 def upsert_loadout(loadouts, loadout):
     out = list(loadouts)
     for i in range(len(out)):
@@ -99,8 +149,10 @@ def unique_name(loadouts, base):
 
 
 def selected_loadout(settings):
-    """The loadout settings.loadout names, else the first; None when settings.loadouts defines none."""
-    loadouts = parse_loadouts(settings.get('loadouts', []))
+    """The loadout settings.loadout names, else the first: of the bot's own loadouts setting when it has one,
+    else of the shared store. None when there are none."""
+    own = settings.get('loadouts')
+    loadouts = parse_loadouts(own) if own else _store_all()
     if not loadouts:
         return None
     wanted = str(settings.get('loadout', '') or '').strip().lower()

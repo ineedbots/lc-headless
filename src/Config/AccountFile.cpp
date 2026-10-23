@@ -8,6 +8,8 @@
 #include "Error/ConfigError.hpp"
 #include "JsoncEditor.hpp"
 
+#include <nlohmann/json.hpp>
+
 namespace
 {
     std::string ReadFile(const std::filesystem::path& path)
@@ -72,4 +74,26 @@ std::vector<std::string> AccountFile::AddScriptSettings(const std::filesystem::p
     }
 
     return std::move(edit.added);
+}
+
+void AccountFile::SetScriptSetting(const std::filesystem::path& path, std::string_view name, std::string_view key, std::string_view valueJson)
+{
+    const auto text = ReadFile(path);
+    auto edit = JsoncEdit_s{};
+    try
+    {
+        ConfigJson::CheckObject(text);
+
+        const auto keys = std::array{std::string{"script"}, std::string{"settings"}, std::string{name}};
+        edit = JsoncEditor::Set(text, keys, std::format("{{{}: {}}}", nlohmann::json(std::string{key}).dump(), valueJson));
+    }
+    catch (const ConfigError& e)
+    {
+        throw ConfigError{std::format("{}: {}", path.string(), e.what())};
+    }
+
+    if (edit.text != text)
+    {
+        FileUtils::ReplaceFile(path, edit.text);
+    }
 }

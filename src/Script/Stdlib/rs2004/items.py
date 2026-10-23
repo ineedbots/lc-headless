@@ -5,11 +5,17 @@ import _core
 from rs2004 import execution
 from rs2004.entities import GroundItem, Loc, Npc, Player, op_index, present_ops
 
-__all__ = ['InvItem', 'inventory', 'equipment']
+__all__ = ['InvItem', 'inventory', 'equipment', 'backpack_capacity']
 
 EQUIP_OPTIONS = ('Wield', 'Wear', 'Equip')
 REMOVE_OPTION = 1
 EQUIP_TIMEOUT_MS = 3000
+
+
+def backpack_capacity():
+    """rs2b0t's: how many slots the backpack has. rs2b0t reads 0 until its pack interface loads; here it's the
+    cache's INVENTORY_SIZE, 28, from the start."""
+    return INVENTORY_SIZE
 
 
 class InvItem:

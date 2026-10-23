@@ -91,7 +91,8 @@ void BindingSupport::FromTile(py_OutRef out, const Tile_s& tile)
 
 void BindingSupport::FromPlayer(py_OutRef out, const Player_s& player)
 {
-    PyObjects::FromPlayer(out, player, GetContext().GetState().tick);
+    const auto& context = GetContext();
+    PyObjects::FromPlayer(out, player, context.GetState().tick, context.GetCache());
 }
 
 void BindingSupport::FromFriend(py_OutRef out, const Friend_s& entry)

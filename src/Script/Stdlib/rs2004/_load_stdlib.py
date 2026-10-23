@@ -16,10 +16,13 @@ from rs2004.tabs import *
 from rs2004.messages import *
 from rs2004.reach import *
 from rs2004.traversal import *
+from rs2004.navigation import *
 from rs2004.random_events import *
 from rs2004.upkeep import *
 from rs2004.console import *
+from rs2004.activity import *
 from rs2004 import execution
+from rs2004.execution import event_signal
 from rs2004 import _runtime
 from rs2004.events import listening as _listening
 from rs2004.console import commands as _commands

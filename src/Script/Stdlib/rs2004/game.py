@@ -10,10 +10,33 @@ from rs2004.geometry import Tile
 from rs2004.tabs import COM_MODE_VARP, RETALIATE_VARP, _select_button, combat_styles, parse_combat_style
 from rs2004.tabs import resolve_combat_style, spell_button, teleport_button, try_parse_combat_style
 
-__all__ = ['game', 'skills', 'reader', 'chat', 'friends', 'ignores', 'direct_navigator']
+__all__ = [
+    'game', 'skills', 'reader', 'chat', 'friends', 'ignores', 'direct_navigator', 'retaliate_on_from_varp', 'PLAYER_FACE_BASE',
+    'facing_player', 'OVERHEAD_TICKS', 'HintArrow',
+]
 
 _SKILL_INDEXES = {name: index for index, name in SKILL_NAMES.items()}
 HITPOINTS_INDEX = 3
+
+# The engine encodes a player face target as slot + 32768, and an NPC's as its index.
+PLAYER_FACE_BASE = 32768
+# How long the webclient shows overhead text: 150 client cycles.
+OVERHEAD_TICKS = 5
+
+
+def retaliate_on_from_varp(value):
+    """Auto retaliate is on: the varp is inverted, 0 for on."""
+    return value == 0
+
+
+def facing_player(face_entity):
+    """The face target is a player: rs2b0t's raw value (slot + PLAYER_FACE_BASE), or an entity's target here,
+    a ('player', index) or ('npc', index) pair. None or -1 faces nothing."""
+    if face_entity is None:
+        return False
+    if isinstance(face_entity, tuple):
+        return face_entity[0] == 'player'
+    return face_entity >= PLAYER_FACE_BASE
 
 
 class _Game:
@@ -22,6 +45,21 @@ class _Game:
     def ingame(self):
         """Logged in and placed in the world, so the map is built and actions are taken."""
         return _core.is_placed()
+
+    def scene_ready(self):
+        """rs2b0t's: the scene takes input. Here that's ingame()."""
+        return _core.is_placed()
+
+    def scene_state(self):
+        """rs2b0t's scene build state: 2 once placed, as ingame(), and 0 before."""
+        return 2 if _core.is_placed() else 0
+
+    def open_side_tab(self, tab):
+        """rs2b0t's: opens a side tab. Every tab's interface is readable here without opening it, so this is
+        True at once. Use with yield from."""
+        if False:
+            yield
+        return True
 
     def tile(self):
         """Your tile, or None before you're placed."""
@@ -120,7 +158,7 @@ class _Game:
         return button is not None and _core.click_component(button.id)
 
     def auto_retaliate_on(self):
-        return _core.get_varp(RETALIATE_VARP) == 0
+        return retaliate_on_from_varp(_core.get_varp(RETALIATE_VARP))
 
     def set_auto_retaliate(self, on):
         button = _select_button(RETALIATE_VARP, 0 if on else 1)
@@ -129,8 +167,18 @@ class _Game:
     def attacked_by_player(self):
         """In combat and facing a player: one who attacked, since a bot that doesn't start fights only
         faces players by retaliating."""
-        target = _core.get_local_player().target
-        return _core.in_combat() and target is not None and target[0] == 'player'
+        return _core.in_combat() and facing_player(_core.get_local_player().target)
+
+    def facing(self):
+        """Who you face, as an entity's target: ('npc', index), ('player', index) or None."""
+        return _core.get_local_player().target
+
+    def overhead_text(self):
+        """rs2b0t's reader.selfChat: the text over your head while it shows, about 5 ticks, else None."""
+        me = _core.get_local_player()
+        if me.say is None or _core.get_tick() - me.say_tick >= OVERHEAD_TICKS:
+            return None
+        return me.say
 
     # Magic
 
@@ -205,8 +253,47 @@ class _Skills:
         return _core.get_current_stat(HITPOINTS_INDEX) / base
 
 
+class HintArrow:
+    """The arrow the server points with: kind 'tile', 'npc' or 'player'; index, the NPC's or player's; and tile,
+    the tile's, else None."""
+
+    def __init__(self, kind, index, tile):
+        self.kind = kind
+        self.index = index
+        self.tile = tile
+
+    def __repr__(self):
+        return f'HintArrow({repr(self.kind)}, {self.index}, {repr(self.tile)})'
+
+
+class Modals:
+    """The open modals' interface ids: main, side and chat, each -1 when shut."""
+
+    def __init__(self, main, side, chat):
+        self.main = main
+        self.side = side
+        self.chat = chat
+
+    def __repr__(self):
+        return f'Modals({self.main}, {self.side}, {self.chat})'
+
+
 class _Reader:
     """Raw reads, for what no facade covers yet."""
+
+    def hint_arrow(self):
+        """The hint arrow the server shows, a HintArrow, or None."""
+        arrow = _core.get_hint_arrow()
+        if arrow is None:
+            return None
+        kind = arrow[0]
+        return HintArrow(kind, arrow[1], Tile(arrow[2], arrow[3], arrow[4]) if kind == 'tile' else None)
+
+    def hint_tile(self):
+        """rs2b0t's: the tile the hint arrow points at, or None when there's none or it points at an NPC or a
+        player."""
+        arrow = self.hint_arrow()
+        return arrow.tile if arrow is not None else None
 
     def varp(self, id):
         return _core.get_varp(id)
@@ -216,6 +303,10 @@ class _Reader:
 
     def main_modal(self):
         return _core.get_main_modal()
+
+    def modals(self):
+        """rs2b0t's: the open modals' interface ids, main, side and chat, each -1 when shut."""
+        return Modals(_core.get_main_modal(), _core.get_side_modal(), _core.get_chat_modal())
 
     def side_modal(self):
         return _core.get_side_modal()

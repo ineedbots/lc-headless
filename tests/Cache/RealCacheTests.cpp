@@ -16,6 +16,7 @@
 #include "Game/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 // These read the 289 cache from the folder in RS2004_CACHE_DIR, and skip when it isn't set.
 namespace
@@ -472,4 +473,34 @@ TEST_CASE("The real cache's shop and trade inventories are told apart by their o
     std::ranges::sort(theirs);
     CHECK(mine == std::vector<u16>{3538, 3542});
     CHECK(theirs == std::vector<u16>{3532, 3539});
+}
+
+// Every revision's sequences, timed by its anim frames, for telling when an animation has finished.
+TEST_CASE("The real caches time their animations", "[RealCache]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    const auto& cache = RealCache::Require(revision);
+    CAPTURE(static_cast<u16>(revision));
+    REQUIRE(cache.seqLengths.size() > 800);
+
+    // In 289's numbering, which the earlier caches share for these.
+    constexpr auto WOODCUTTING_BRONZE_AXE = 879;
+    constexpr auto FIRECOOKING = 897;
+    constexpr auto SMITHING = 898;
+    const auto ticks = [&cache](s32 id)
+    {
+        return static_cast<double>(cache.FindSeqLength(id).value_or(0)) / 30.0;
+    };
+
+    // A chop's swing plays four times.
+    CHECK(ticks(WOODCUTTING_BRONZE_AXE) > 5.0);
+    CHECK(ticks(WOODCUTTING_BRONZE_AXE) < 6.0);
+    CHECK(ticks(FIRECOOKING) > 3.0);
+    CHECK(ticks(FIRECOOKING) < 3.5);
+    CHECK(ticks(SMITHING) > 3.5);
+    CHECK(ticks(SMITHING) < 4.0);
+    CHECK(std::ranges::all_of(cache.seqLengths, [](u32 length)
+    {
+        return length > 0;
+    }));
 }

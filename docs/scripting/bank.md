@@ -24,6 +24,12 @@ Item names match whole, without regard to case. Option names match without regar
 | `bank.is_open()` | The bank interface is the main interface |
 | `bank.ready()` | It's open, and its items and the backpack beside it have arrived |
 | `bank.wait_ready(timeout_ms=4000)` | **Wait.** Waits for the items. Gives `ready()` |
+| `bank.loaded()` | rs2b0t's: the bank's item list isn't empty |
+| `bank.snapshot_ready()` | rs2b0t's: open, with its item list sent |
+| `bank.snapshot_generation()` | rs2b0t's: which update of the bank's item list this is, as the tick it came on, or -1 while it's shut. Take it before an action, and `wait_snapshot_after` waits for the action's answer |
+| `bank.wait_snapshot_after(generation, timeout_ms=4000)` | **Wait.** Waits for the item list to update after `generation`. `False` when it doesn't or the bank shuts |
+| `bank.normal_backpack_snapshot()` | The backpack's items while the bank is shut, to compare with its side view once it opens; `None` while it's open |
+| `bank.backpack_ready(expected=None, log=None)` | **Wait.** Waits for the backpack beside the open bank, and given a `normal_backpack_snapshot()`, for it to hold the same items in the same slots |
 | `bank.root()` | The bank interface's id |
 | `bank.items()` | The bank's items as [`InvItem`](items.md#invitem)s, whose actions are the bank's options ("Withdraw 1" ... "Withdraw X"). `[]` when closed |
 | `bank.side_items()` | The backpack beside the bank, whose actions deposit. `[]` when closed |
@@ -71,18 +77,18 @@ None of these walk across the map. For that, use `banking`.
 
 ## `banking`
 
-### `banking.open(stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14)`
+### `banking.open(stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14, log=None)`
 
-**Wait.** Opens a bank, wherever you are. In order:
+**Wait.** Opens a bank, wherever you are, choosing the way as rs2b0t does with [`resolve_bank_open_route`](#helpers):
 
-1. A booth in the loaded area, when it's within `nearby_radius`, or `prefer_nearby` is `False`, or neither `stand` nor `destination` is given.
-2. Otherwise a banker (an NPC with a Bank option) by the same rule.
-3. Otherwise, when `stand` is given, walks there with [`traversal.walk_resilient`](walking.md#traversal) and opens the booth there.
-4. Otherwise walks to `destination`, one of [`bank_locations()`](walking.md#banks), or else the [`nearest_reachable_bank`](walking.md#banks), and opens it as that bank says: a banker, a chest, or a booth.
+1. A booth in the loaded area within `nearby_radius`, unless `prefer_nearby` is `False`.
+2. A known bank within `nearby_radius` of you, when `stand` isn't that near: walked to and opened as that bank says, by a banker, a chest or a booth. Starting beside Draynor's bank doesn't walk to a camp's Edgeville stand.
+3. The booth at `stand`, walked to with [`traversal.walk_resilient`](walking.md#traversal), or with [`walk_opening`](walking.md#walking-through-doors-walk_opening) when `obstacles` names doors or gates to open on the way. A bank near the stand with a chest or a banker, such as Shantay's, is opened that way.
+4. Without a stand, a booth anywhere in the loaded area, else `destination`, one of [`bank_locations()`](walking.md#banks), or else the [`nearest_bank_reachable`](walking.md#banks), walked to and opened as that bank says.
 
-`obstacles` is accepted for rs2b0t compatibility and not used. Gives `True` once the bank is open.
+A bank the account can't use, such as Zanaris's without `use_zanaris_bank`, is skipped, and a `stand` at one gives `False`. `log` is given its choices. Gives `True` once the bank is open.
 
-### `banking.bank_nearest(deposit, common_junk=True, destination=None, return_to=None, booth_name='Bank booth', booth_op='Use-quickly', after_deposit=None)`
+### `banking.bank_nearest(deposit, common_junk=True, destination=None, return_to=None, booth_name='Bank booth', booth_op='Use-quickly', after_deposit=None, log=None)`
 
 **Wait.** A whole bank trip: opens a bank as `open()` does, deposits every item for which `deposit(name)` is true (plus [common bank loot](#deposit-rules) when `common_junk`), runs `after_deposit()` (which may be a generator, to withdraw supplies), then walks back to `return_to` when given. Gives `True` when it banked.
 
@@ -109,7 +115,7 @@ rs2b0t's rules for what a deposit takes.
 
 Banking loot every so often, so a death doesn't lose it all.
 
-### `PeriodicBank(strategy, items_threshold, minutes_threshold, count_loot, deposit, after_deposit=None, common_junk=None, return_to=None, log=None, destination=None)`
+### `PeriodicBank(strategy, items_threshold, minutes_threshold, count_loot, deposit, after_deposit=None, common_junk=None, return_to=None, log=None, destination=None, set_status=None)`
 
 A [`Task`](script-structure.md#taskbot-and-task) for a `TaskBot`, labelled `'periodic bank'`. Every argument is a **callable**, so it reads the current settings each time:
 
@@ -125,6 +131,7 @@ A [`Task`](script-structure.md#taskbot-and-task) for a `TaskBot`, labelled `'per
 | `return_to()` | Optional, a `Tile` to walk back to |
 | `destination()` | Optional, one of `bank_locations()` to bank at |
 | `log(message)` | Optional, given progress lines |
+| `set_status(text)` | Optional, told `'periodic bank run'` when a run starts |
 
 It never runs while you're in combat or with no loot. When no bank can be reached it waits 3 minutes before trying again.
 
@@ -150,3 +157,10 @@ self.add(
 | `PERIODIC_BANK_SETTINGS` | A [settings schema](settings.md#schemas) fragment: `bank_strategy` (`'Off'`, `'Loot count'`, `'Time'` or `'Either'`, default `'Off'`), `bank_every_items` (1 to 27, default 15), `bank_every_minutes` (1 to 120, default 10) and `bank_common_junk` (default `True`) |
 | `parse_bank_strategy(label)` | `'off'`, `'items'`, `'time'` or `'either'`, from that setting's label |
 | `should_bank_now(strategy, state)` | Whether to bank, from `state`'s `loot_count`, `minutes_since_last_bank`, `items_threshold` and `minutes_threshold` (a dict or an object). Never with no loot |
+| `resolve_bank_open_route(bank_open=False, here=None, stand=None, nearby_booth_dist=None, nearest=None, prefer_nearby=True, nearby_radius=14)` | How `banking.open` would get a bank open, as rs2b0t decides it: `'already-open'`, `'scene-booth'` (a booth within `nearby_radius`), `'local-bank'` (a known bank that near, when the preset `stand` isn't), `'preset-stand'` or `'nearest-fallback'`. `nearest` is a bank from [`bank_locations()`](walking.md#banks) |
+| `open_bank_access(dest, fallback, log=None)` | **Wait.** Opens the bank `dest` names, a `bank_locations()` entry: through its banker when it has `npcAccess`, else by its `access`, else by `fallback` (`{'name': ..., 'op': ...}`) |
+| `purge_pack_at_bank(keep, stand=None, destination=None, prefer_nearby=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, log=None)` | **Wait.** rs2b0t's start-of-run cleanup: banks everything but the `keep` names, so a bot can start with a pack of junk. `True` when nothing needed banking or the backpack is clear; `False` when the bank couldn't be opened or junk is left |
+| `bank_pace_ticks(rand=None)` | rs2b0t's pause between bank actions: 2 ticks about a third of the time, else 1, so an open, a scan and a close never land on one tick. `rand` stands in for `random.random` |
+| `bank_pace(log=None)` | **Wait.** Pauses that long |
+| `wait_bank_ready(log=None)` | **Wait.** Waits up to 7 ticks for the open bank's items, pacing as rs2b0t does. `False` once it's closed |
+| `withdraw_coins(need, inv_coins, bank_coins, coin_name='Coins', log=None)` | **Wait.** With the bank open, withdraws coins until the backpack holds `need`. `False` when the bank has none or the withdraw fails |

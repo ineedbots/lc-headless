@@ -195,6 +195,8 @@ class _RandomEvents:
         self.grind_targets = []
         self.lamp_skill = 'strength'
         self._last_tick = -1
+        self._pending_tick = -1
+        self._pending = False
 
     def configure(self, bot):
         """Reads the bot's choices: ignored_randoms(), grind_targets() and lamp_skill()."""
@@ -226,6 +228,18 @@ class _RandomEvents:
         self._last_tick = tick
         self.configure(bot)
         return self.detect()
+
+    def pending(self, bot):
+        """Whether an event the guardian will answer is near, checked once a tick, as rs2b0t's pending() is:
+        event_signal asks it, so a long loop can stop before the guardian drops it."""
+        if self.handling or not _core.is_placed():
+            return False
+        tick = _core.tick()
+        if tick != self._pending_tick:
+            self._pending_tick = tick
+            self.configure(bot)
+            self._pending = self.detect() is not None
+        return self._pending
 
     def _detect_raw(self):
         if solvers.in_square(solvers.MIME_SQUARE):

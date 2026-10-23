@@ -213,3 +213,53 @@ TEST_CASE("JsoncEditor rejects what it can't add to", "[JsoncEditor]")
     CHECK_THROWS_AS(AddToMiner(R"json({"script": {"settings": {})json", members), ConfigError);
     CHECK_THROWS_AS(AddToMiner(R"json({"script": /* open)json", members), ConfigError);
 }
+
+TEST_CASE("JsoncEditor sets members in place, keeping the comments around them", "[JsoncEditor]")
+{
+    // clang-format off
+    const auto edit = JsoncEditor::Set(R"json({
+    "script": {
+        "settings": {
+            "Miner": {
+                // Which rock.
+                "rock": "Tin rocks", // the user's choice
+                "keep": ["Pickaxe"],
+                "home": {"x": 1, "z": 2}
+            }
+        }
+    }
+}
+)json",
+        MINER_PATH, R"json({"rock": "Iron rocks", "home": {"x": 3, "z": 4, "level": 0}, "trips": 10})json");
+    // clang-format on
+
+    CHECK(edit.text == R"json({
+    "script": {
+        "settings": {
+            "Miner": {
+                // Which rock.
+                "rock": "Iron rocks", // the user's choice
+                "keep": ["Pickaxe"],
+                "home": {
+                    "x": 3,
+                    "z": 4,
+                    "level": 0
+                },
+                "trips": 10
+            }
+        }
+    }
+}
+)json");
+    CHECK(edit.added == std::vector<std::string>{"trips"});
+}
+
+TEST_CASE("JsoncEditor sets members of objects the path lacks by adding them", "[JsoncEditor]")
+{
+    const auto edit = JsoncEditor::Set(R"json({"script": {"file": "main.py"}})json", MINER_PATH, R"json({"rock": "Iron rocks"})json");
+    CHECK(edit.text == R"json({"script": {"file": "main.py", "settings": {"Miner": {"rock": "Iron rocks"}}}})json");
+    CHECK(edit.added == std::vector<std::string>{"rock"});
+
+    const auto notObject = R"json({"script": {"settings": {"Miner": 5}}})json";
+    CHECK_THROWS_MATCHES(JsoncEditor::Set(notObject, MINER_PATH, R"json({"rock": "Iron rocks"})json"), ConfigError, Catch::Matchers::Message("script.settings.Miner: must be an object"));
+}

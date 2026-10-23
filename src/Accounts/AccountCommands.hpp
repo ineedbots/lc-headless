@@ -15,6 +15,9 @@ public:
     static constexpr auto EXIT = "exit"sv;
     static constexpr auto LOG_LEVEL = "loglevel"sv;
     static constexpr auto SAY = "say"sv;
+    // Every script's, from the standard library, so help lists them once rather than under each account.
+    static constexpr auto PAUSE = "pause"sv;
+    static constexpr auto RESUME = "resume"sv;
 
     AccountCommands(const std::vector<std::unique_ptr<Account>>& accounts, Logger& logger);
 

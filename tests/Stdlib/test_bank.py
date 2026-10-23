@@ -60,3 +60,53 @@ def test_the_bank_is_closed_without_a_game():
     assert not bank.withdraw('Coins')
     assert PERIODIC_BANK_SETTINGS['bank_every_items'].default == 15
     assert FAILURE_BACKOFF_MS == 180000
+
+
+# rs2b0t's test/api/bank/banking-route.test.ts.
+DRAYNOR = Tile(3093, 3243, 0)
+EDGEVILLE = Tile(3094, 3493, 0)
+CATHERBY = Tile(2809, 3441, 0)
+VARROCK_WEST = Tile(3185, 3440, 0)
+NEAREST_DRAYNOR = {'name': 'Draynor', 'tile': {'x': 3093, 'z': 3243, 'level': 0}}
+NEAREST_CATHERBY = {'name': 'Catherby', 'tile': {'x': 2809, 'z': 3441, 'level': 0}}
+
+
+def test_the_nearby_bank_radius_is_wide_enough_for_a_booth_underfoot():
+    assert NEARBY_BANK_RADIUS == 14
+
+
+def test_an_open_bank_wins_over_everything():
+    assert resolve_bank_open_route(bank_open=True, here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=2, nearest=NEAREST_DRAYNOR) == 'already-open'
+
+
+def test_a_booth_within_the_radius_beats_a_distant_preset():
+    assert resolve_bank_open_route(here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=3, nearest=NEAREST_DRAYNOR) == 'scene-booth'
+    assert resolve_bank_open_route(here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=NEARBY_BANK_RADIUS, nearest=NEAREST_DRAYNOR) == 'scene-booth'
+    assert resolve_bank_open_route(here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=NEARBY_BANK_RADIUS + 1, nearest=NEAREST_DRAYNOR) != 'scene-booth'
+
+
+def test_without_prefer_nearby_the_preset_stand_is_used():
+    assert resolve_bank_open_route(here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=2, nearest=NEAREST_DRAYNOR, prefer_nearby=False) == 'preset-stand'
+
+
+def test_a_known_bank_here_beats_a_distant_preset():
+    varrock = {'name': 'Varrock West', 'tile': {'x': 3185, 'z': 3440, 'level': 0}}
+    assert resolve_bank_open_route(here=VARROCK_WEST, stand=DRAYNOR, nearest=varrock) == 'local-bank'
+
+
+def test_the_preset_stand_when_it_is_the_bank_here_too():
+    assert resolve_bank_open_route(here=CATHERBY, stand=CATHERBY, nearest=NEAREST_CATHERBY) == 'preset-stand'
+
+
+def test_the_preset_stand_when_nothing_is_near():
+    assert resolve_bank_open_route(here=Tile(3000, 3300, 0), stand=EDGEVILLE) == 'preset-stand'
+
+
+def test_the_nearest_bank_when_there_is_no_stand_and_no_bank_here():
+    assert resolve_bank_open_route(here=Tile(2500, 3200, 0), nearest=NEAREST_DRAYNOR) == 'nearest-fallback'
+    assert resolve_bank_open_route(here=DRAYNOR, nearest=NEAREST_DRAYNOR) == 'local-bank'
+
+
+def test_a_tighter_radius_tightens_the_booth_snap():
+    assert resolve_bank_open_route(here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=10, nearest=NEAREST_DRAYNOR, nearby_radius=8) != 'scene-booth'
+    assert resolve_bank_open_route(here=DRAYNOR, stand=EDGEVILLE, nearby_booth_dist=10, nearest=NEAREST_DRAYNOR, nearby_radius=12) == 'scene-booth'

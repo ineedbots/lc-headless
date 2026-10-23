@@ -221,6 +221,61 @@ def potion_to_sip(plans, held, levels):
 
 
 SPELL_DB = _data.SPELL_DB
+STAFF_RUNES = _data.STAFF_RUNES
+
+
+def _spell_row(spell_name):
+    wanted = spell_name.strip().lower()
+    for name, row in SPELL_DB.items():
+        if name.lower() == wanted:
+            return row
+    return None
+
+
+def _provided_runes(wielded):
+    provided = []
+    for item in wielded:
+        for staff, runes in STAFF_RUNES.items():
+            if staff.lower() == item.lower():
+                provided.extend([r.lower() for r in runes])
+    return provided
+
+
+def runes_per_cast(spell_name, wielded):
+    """[{'rune': name, 'count': n}] one cast takes, less the runes a wielded staff gives, or None for a spell
+    rs2b0t's table lacks."""
+    row = _spell_row(spell_name)
+    if row is None:
+        return None
+    provided = _provided_runes(wielded)
+    return [{'rune': r['rune'], 'count': r['count']} for r in row['runes'] if r['rune'].lower() not in provided]
+
+
+def casts_available(spell_name, wielded, held):
+    """How many casts held(rune) pays for; float('inf') when a staff gives every rune, 0 for an unknown spell."""
+    costs = runes_per_cast(spell_name, wielded)
+    if costs is None:
+        return 0
+    if len(costs) == 0:
+        return float('inf')
+    return min([held(c['rune']) // c['count'] for c in costs])
+
+
+def rune_withdraw_list(spell_name, wielded, casts):
+    """The runes to withdraw for that many casts, as [{'rune', 'count'}]."""
+    return [{'rune': c['rune'], 'count': c['count'] * casts} for c in (runes_per_cast(spell_name, wielded) or [])]
+
+
+def spell_button_com(spell_name):
+    """The staff spell chooser's button for an autocast spell, while the chooser is open, or -1. rs2b0t numbers
+    it from the 289 interface; here it's found as autocast.arm finds it."""
+    from rs2004.tabs import AUTOCAST_SPELLS, COMBAT_TAB, _components
+    wanted = spell_name.strip().lower()
+    if wanted not in AUTOCAST_SPELLS:
+        return -1
+    choices = [c for c in _components(COMBAT_TAB) if c.button == 'ok']
+    index = AUTOCAST_SPELLS.index(wanted)
+    return choices[index].id if index < len(choices) else -1
 
 
 def combat_keep_names(food, style, spell=None, ammo=None, weapon=None, extra=None):

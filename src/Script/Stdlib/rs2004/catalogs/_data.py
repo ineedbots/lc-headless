@@ -694,3 +694,20 @@ SPELL_DB = {
         ],
     },
 }
+
+STAFF_RUNES = {
+    "Air battlestaff": ["Air rune"],
+    "Earth battlestaff": ["Earth rune"],
+    "Fire battlestaff": ["Fire rune"],
+    "Lava battlestaff": ["Earth rune", "Fire rune"],
+    "Mystic air staff": ["Air rune"],
+    "Mystic earth staff": ["Earth rune"],
+    "Mystic fire staff": ["Fire rune"],
+    "Mystic lava staff": ["Earth rune", "Fire rune"],
+    "Mystic water staff": ["Water rune"],
+    "Staff of air": ["Air rune"],
+    "Staff of earth": ["Earth rune"],
+    "Staff of fire": ["Fire rune"],
+    "Staff of water": ["Water rune"],
+    "Water battlestaff": ["Water rune"],
+}

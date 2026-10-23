@@ -42,7 +42,7 @@ public:
     PyObjects() = delete;
 
     static void FromNpc(py_OutRef out, const Npc_s& npc, u64 tick, const GameCache_s& cache);
-    static void FromPlayer(py_OutRef out, const Player_s& player, u64 tick);
+    static void FromPlayer(py_OutRef out, const Player_s& player, u64 tick, const GameCache_s& cache);
     static void FromGroundItem(py_OutRef out, const GroundItem_s& item, const GameCache_s& cache);
     static void FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s& cache);
     static void FromItem(py_OutRef out, const InventoryItem_s& item, const GameCache_s& cache);
@@ -66,7 +66,7 @@ private:
     static void SetOptions(py_Ref object, const char* name, std::span<const u16> ops, const GameCache_s& cache);
     static void SetTile(py_Ref object, const Tile_s& tile);
     static void SetMenu(py_Ref object, const Menus::Menu& menu);
-    static void SetEntity(py_Ref object, const Entity_s& entity, u64 tick);
+    static void SetEntity(py_Ref object, const Entity_s& entity, u64 tick, const GameCache_s& cache);
     // ('npc' or 'player', index), or None.
     static void SetTarget(py_Ref object, const std::optional<EntityRef_s>& target);
 };

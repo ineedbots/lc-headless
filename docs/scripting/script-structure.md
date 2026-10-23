@@ -11,6 +11,7 @@ How a script file is laid out, the bot classes it builds on, the hooks the clien
 - [What loop() returns](#what-loop-returns)
 - [Lifecycle hooks](#lifecycle-hooks)
 - [Upkeep hooks](#upkeep-hooks)
+- [Running a bot inside another: ScriptActivity](#running-a-bot-inside-another-scriptactivity)
 - [Logging](#logging)
 - [Stopping and relogging](#stopping-and-relogging)
 - [Timing rules](#timing-rules)
@@ -91,16 +92,18 @@ The base class of every bot. Subclass `LoopingBot`, `TaskBot` or `TreeBot` rathe
 |---|---|---|
 | `settings` | set before `on_start` | The bot's [`SettingsBag`](settings.md#settingsbag) |
 | `loop_delay` | `600` | Milliseconds to wait after a `loop()` that returns `None`. Must be a non-negative `int`, or the script stops with `TypeError`. 600 means "the next server tick", not 600 ms of wall-clock time |
-| `loop_cadence` | `None` | When set, wins over `loop_delay` for a `loop()` that returns `None`. One of `{'kind': 'frame'}` (the next pass), `{'kind': 'server_tick', 'ticks': n}` or `{'kind': 'time', 'ms': n}`. Anything else stops the script with `ValueError` |
+| `loop_cadence` | `None` | When set, wins over `loop_delay` for a `loop()` that returns `None`. One of `{'kind': 'frame'}` (the next pass once a packet arrives, or after 20ms, rs2b0t's client cycle), `{'kind': 'server_tick', 'ticks': n}` or `{'kind': 'time', 'ms': n}`. Anything else stops the script with `ValueError` |
+| `delegated` | `False` | Whether another bot runs this one, as a [`ScriptActivity`](#running-a-bot-inside-another-scriptactivity) |
 
 ### Methods
 
 | Method | Does |
 |---|---|
-| `log(*args)` | The same as the builtin [`log`](#logging) |
+| `log(*args)` | The same as the builtin [`log`](#logging); for a bot another runs, its parent's log, prefixed with its name |
 | `on(event, callback)` | Subscribes `callback` to an [event](events.md) until the bot stops. Returns `None` |
 | `command(name, handler, help=None)` | Adds a [console command](console-and-messages.md#console-commands) until the bot stops. Returns `None` |
-| `request_finish(reason)` | Stops the script, leaving the account logged in. `on_stop` and the `script_finish` event receive `reason` |
+| `request_finish(reason)` | Stops the script, leaving the account logged in. `on_stop` and the `script_finish` event receive `reason`. A bot another runs ends only its activity |
+| `bind_log(sink)`, `bind_finish(sink)` | Send its log lines, and its `request_finish(reason)`, to `sink(text)` instead. `ScriptActivity` uses them |
 
 ### Methods the client reads
 
@@ -110,7 +113,7 @@ Override these to change how the client's upkeep treats the bot. A module-level 
 |---|---|---|
 | `grind_targets()` | `[]` | NPC names you fight on purpose; the random-event guardian never takes them for a hostile event |
 | `ignored_randoms()` | `[]` | Random-event names to leave alone. See [Random events](upkeep.md#random-events) for the names |
-| `lamp_skill()` | `'strength'` | The skill a genie's lamp is rubbed for |
+| `lamp_skill()` | The [Global](settings.md#global-settings) `lamp_skill`, `'strength'` by default | The skill a genie's lamp is rubbed for |
 | `recovery_anchor()` | `None` | Where the bot works, as a `Tile`, for the [stall guard](upkeep.md#the-stall-guard) to walk back to. `None` means restart the bot instead |
 
 ## `LoopingBot`
@@ -232,6 +235,7 @@ Define these as methods on a bot, or as module-level functions. Unlike [events](
 |---|---|
 | `on_start()` | Once, one server tick after the player is first placed in the world, when stats and inventories have arrived. May be a generator; it runs before the first `loop()`. On Tutorial Island, after the [tutorial skip](upkeep.md#tutorial-island) |
 | `on_stop(reason)` | Once, when the script stops: after `stop_script()`, `stop_account()`, `request_finish(reason)`, an error, a stall-guard restart, or a logout the client starts, such as Ctrl+C. `reason` is a string. Can't wait |
+| `on_pause()`, `on_resume()` | When the console's [`pause` and `resume`](console-and-messages.md#built-in-commands) stop and start the bot. Can't wait |
 | `on_progress_report()` | When a [progress report](console-and-messages.md#progress-reports) is due. Returns a `dict` |
 
 A function or method named `on_<something>` that isn't a hook or an event draws a warning at load, which catches typos.
@@ -255,6 +259,42 @@ def lamp_skill():
 def recovery_anchor():
     return Tile(3255, 3288, 0)
 ```
+
+## Running a bot inside another: `ScriptActivity`
+
+rs2b0t's `ScriptActivity`, with which its account leveler runs each training method's bot. The parent imports the child's module for its `BOT`; a bot in `scripts/bots/` is importable as `bots.<name>`.
+
+```python
+from bots.cow_killer import BOT as COW_KILLER
+
+class Leveler(LoopingBot):
+    def on_start(self):
+        self.activity = ScriptActivity(self.log)
+        yield from self.activity.start(COW_KILLER, {'location': 'North-west of Lumbridge'})
+
+    def grind_targets(self):
+        child = self.activity.child
+        return child.grind_targets() if child is not None else []
+
+    def loop(self):
+        if self.activity.outcome is not None:
+            log('the cow killer ended:', self.activity.outcome.kind, self.activity.outcome.reason)
+            return None
+        yield from self.activity.loop()
+```
+
+| Member | Does |
+|---|---|
+| `ScriptActivity(log=None)` | One child at a time. `log(text)` gets the child's log lines, prefixed with its name; without it they go to the account's log |
+| `start(manifest, overrides=None)` | **Wait.** Makes the bot `manifest` (a `define_bot` result) describes and runs its `on_start`. Its settings are the schema's defaults and `overrides`, checked as an account's are, so a wrong one raises `ValueError` naming `activity settings["<name>"]`. `RuntimeError` while a child runs; `TypeError` for anything but a `define_bot` result, or a bot that isn't a `LoopingBot` |
+| `loop()` | **Wait.** One pass of the child's `loop()`, when its `loop_delay` or `loop_cadence` says it's due; nothing otherwise. Call it from the parent's `loop()` |
+| `outcome` | `None` while the child runs. Then an `ActivityOutcome`: `kind` is `'finished'` (it called `request_finish`), `'failed'` (it raised; `reason` is the message) or `'interrupted'`, and `reason` says why |
+| `child` | The child bot, or `None` once it has ended |
+| `current_task` | The child `TaskBot`'s task in progress, or `None` |
+| `interrupt(reason)` | Ends the child now, such as when the player dies: its step in progress stops at its next wait |
+| `stop()` | Ends the child: its `on_stop(reason)` and subscriptions, and what it set for the whole account (`sustain`, `run_manager.override`, `event_signal`'s interrupt) |
+
+The child's `on_<event>` hooks are called as subscriptions, which end with it. Its lifecycle hooks are the parent's to call: `on_pause` and `on_resume` aren't passed on unless the parent does it. The random event guardian reads the parent's `grind_targets()` and `ignored_randoms()`, so a parent that runs fighters passes the child's on, as above.
 
 ## Logging
 
@@ -295,4 +335,5 @@ The client then calls `on_stop`, logs the traceback, and logs the account out, u
 - Every account in a process runs on one thread. Each call into a script, and each stretch of a generator between two waits, may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. A route search inside `traversal` gets five times that.
 - `time.sleep()` raises `RuntimeError`, since it would stall every account. Wait with [`execution`](waiting.md) instead.
 - Each pass of the main loop, the client: (1) calls hooks and subscribers for everything that arrived, events first, then chat messages, then messages from other scripts and console commands; (2) calls `on_tick` if a server tick passed; (3) calls `on_progress_report` if one is due; (4) runs the client's [upkeep](upkeep.md) once a tick; (5) steps `loop()` if what it waits for has happened.
-- When the random-event guardian or the stall guard takes over, the `loop()` generator that was waiting is dropped, and `loop()` starts afresh once they finish. A dropped connection or a `relog()` doesn't drop it: the wait carries on once the player is placed again.
+- When the random-event guardian or the stall guard takes over, the `loop()` generator that was waiting is dropped, and `loop()` starts afresh once they finish. A dropped connection or a `relog()` doesn't drop it: the wait carries on once the player is placed again. A long loop can ask [`event_signal.pending()`](waiting.md#event_signal) and stop at a safe point first.
+- `pause` drops the step in progress too, and `resume` starts `loop()` afresh.

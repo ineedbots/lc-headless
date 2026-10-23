@@ -192,6 +192,10 @@ class _ChatDialog:
             return False
         return _core.answer_count(count)
 
+    def answer_count(self, count):
+        """Answers the open "Enter amount" dialog, rs2b0t's actions.answerCountDialog. False when none is open."""
+        return _core.is_count_dialog_open() and _core.answer_count(count)
+
     def is_main_make_panel(self):
         return len(_core.get_make_panel()) > 0
 

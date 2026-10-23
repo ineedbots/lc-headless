@@ -85,6 +85,32 @@ ARDOUGNE_PICKPOCKET_TARGETS = _data.ARDOUGNE_PICKPOCKET_TARGETS
 HERBS = records(_data.HERBS)
 HERB_OPTIONS = [h.name for h in HERBS]
 
+# Items, drops and staves
+
+_items = None
+
+
+def item_db():
+    """rs2b0t's item database, as Records of obj (the content's debug name), id, name, cost, members, and where
+    it has them slot (the wearpos: 'hat', 'righthand' and so on), two_handed and consumable ('eat' or 'drink').
+    It's large, so it's read on first use."""
+    global _items
+    if _items is None:
+        from rs2004.catalogs import _items as table
+        _items = records(table.ITEM_DB)
+    return _items
+
+
+def drop_db():
+    """What each monster drops, by its name: the item names its drop table can give, sub-tables resolved. Read
+    on first use."""
+    from rs2004.catalogs import _drops
+    return _drops.DROP_DB
+
+
+# The runes each elemental staff gives, so a spell needs none of them.
+STAFF_RUNES = _data.STAFF_RUNES
+
 # Shops
 
 

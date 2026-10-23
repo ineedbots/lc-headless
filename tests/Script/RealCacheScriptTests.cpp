@@ -3,6 +3,7 @@
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/LogCapture.hpp"
+#include "../Support/Script/Rs2b0tSpecs.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 
 #include "Cache/GameCache_s.hpp"
@@ -10,6 +11,7 @@
 #include "Config/Revision_e.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
+#include "Game/Nav/Navigation.hpp"
 #include "Game/Map/WorldMap.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Script/Bindings/ScriptBindings.hpp"
@@ -218,4 +220,54 @@ from rs2004.catalogs import Loadout, CarryEntry, food_of
 assert food_of(Loadout('melee', {}, [CarryEntry('Prayer potion(4)', 2), CarryEntry('Lobster', 10)]), 'Trout') == 'Lobster'
 )python", "catalog_names.py");
     // clang-format on
+}
+
+// Line of sight over a scene built from the real cache, at Lumbridge castle: the kitchen's walls and shut doors
+// block range as they block walking.
+TEST_CASE("Line of sight reads the real cache's walls and scenery", "[RealCache]")
+{
+    auto fixture = RealCacheFixture{};
+    constexpr auto LUMBRIDGE_ZONE = s32{402};
+    auto& state = fixture.state;
+    state.buildArea = BuildArea_s{.loaded = true, .centreZoneX = LUMBRIDGE_ZONE, .centreZoneZ = LUMBRIDGE_ZONE, .baseX = (LUMBRIDGE_ZONE - 6) * 8, .baseZ = (LUMBRIDGE_ZONE - 6) * 8};
+    state.localPlayer.tile = Tile_s{.x = 3222, .z = 3218, .level = 0};
+    ++state.sceneChangeCount;
+    fixture.map.Update(state);
+    // clang-format off
+    fixture.vm.RunSource(R"python(
+def seen(a, b):
+    return reachability.line_of_sight(Tile(a[0], a[1]), Tile(b[0], b[1]))
+courtyard = (3222, 3218)
+assert not seen(courtyard, (3209, 3215)), 'the kitchen'
+assert not seen(courtyard, (3215, 3218)), "the castle's east wall"
+assert seen(courtyard, (3230, 3218)) and seen(courtyard, (3222, 3214))
+assert seen((3209, 3215), (3208, 3215)), 'across the kitchen'
+# The kitchen's scenery at (3209, 3213) blocks walking but not range, so it's seen onto.
+assert reachability.flags(Tile(3209, 3213)) == 0x100 and seen((3209, 3215), (3209, 3213))
+)python", "sight.py");
+    // clang-format on
+}
+
+TEST_CASE("rs2b0t's ported tests of the walker's data pass", "[RealCache]")
+{
+    const auto cache = RealCache::RequireShared(Revision_e::Rev289);
+    const auto navigation = std::make_shared<const Navigation>(*cache, std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
+    const auto files = Rs2b0tSpecs::GetFiles(Rs2b0tSpecs::GetFolder() / "nav");
+    REQUIRE_FALSE(files.empty());
+
+    for (const auto& file : files)
+    {
+        CAPTURE(file.filename().string());
+
+        auto capture = LogCapture{};
+        auto map = WorldMap{cache};
+        auto client = GameClient{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()};
+        auto actions = GameActions{client};
+        auto state = Fixtures::PlacedState();
+        auto api = ScriptContext{state, map, actions, nullptr, {}, navigation};
+        auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts"}, capture.GetLogger()};
+        ScriptBindings::Bind(vm, api);
+        Rs2b0tSpecs::Run(vm, file);
+        ScriptBindings::Unbind(vm);
+    }
 }

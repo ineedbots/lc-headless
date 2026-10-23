@@ -126,7 +126,9 @@ Planning to buy, repair or smith a missing tool. Plans are pure: they read the w
 | `VARROCK_ANVIL_STAND`, `VARROCK_ANVIL_BANK` | Where to smith an axe |
 | `COINS`, `BROKEN_AXE` | `'Coins'`, `'Broken axe'` |
 | `TOOL_ACQUIRE_OPTIONS` | `['Off', 'Buy / repair']`, a setting's options |
+| `TOOL_ACQUIRE_SETTING` | rs2b0t's ready-made [`SettingDef`](settings.md#settingdef) for them: a `'string'`, default `'Off'` |
 | `FORGETFUL_BANK_ODDS` | 100 |
+| `FORGETFUL_BANK_SETTING` | rs2b0t's `SettingDef` for wandering off after one bank visit in that many: a `'boolean'`, default `False` |
 
 ### Planners
 
@@ -322,6 +324,29 @@ Fishing spots, mines and woods, each a `Record` with `name`, `spot` (a `Tile`), 
 | `in_fire_plot(tile, plot)` | Whether the tile is in it |
 | `should_burn_full_load(mode, inventory_full, log_count, has_tinderbox)` | Whether to burn now |
 
+#### Lanes
+
+A full backpack burns best in a lane: a row of free tiles you light westward, stepping back a tile after each fire as the game does. `find_burn_lane` finds the best one in a plot, from the loaded scene's collision flags.
+
+| Name | Is |
+|---|---|
+| `BURN_WEST`, `BURN_DIRS` | `(-1, 0)`, and the four directions, west first |
+| `MAX_BURN_LANE` | 27 |
+| `tile_key(tile)` | `'x,z'`, as the occupied sets hold tiles |
+| `burn_lane_want(log_count)` | How many lights to want from one lane: the logs held, 1 to 27 |
+| `run_in_dir(start, plot, direction, occupied, walkable, can_step, cap)`, `run_west(...)` | How many free tiles in a row from `start`, inside the plot, up to `cap`. Free is `walkable(tile)` and its key not in `occupied`; each step on must be `can_step(a, b)` |
+| `find_burn_lane(plot, here, occupied, want, walkable, can_step, dirs=None)` | A record of `start`, `run` and `dir`, or `None`: a westward run that fits `want` logs, else the longest westward run, else any free tile, nearest first |
+| `fire_reaction_ticks()` | Ticks between lights along a lane |
+| `NoLightTiles()` | Tiles that answered "You can't light a fire here" this session: `add(tile)`, `has(tile)`, `size`, `merge(occupied)` (the occupied set with them added) and `clear()` |
+| `light_fire(log_name)` | **Wait.** Lights the logs on your tile: `'lit'`, `'blocked'` (the game refused the tile) or `'stalled'` |
+
+```python
+refused = NoLightTiles()
+plot = local_fire_plot(game.tile())
+fires = {tile_key(l.tile()) for l in locs.query().name('Fire').within(20).results()}
+lane = find_burn_lane(plot, game.tile(), refused.merge(fires), inventory.count('Logs'), reachability.walkable, reachability.can_step)
+```
+
 ## Combat
 
 ### Food
@@ -378,11 +403,16 @@ if should_eat_food('Lobster', hp, top, inventory.count('Lobster')) and not shoul
 | Name | Is |
 |---|---|
 | `SPELL_DB` | Spell name (`'Wind Strike'`) to `ssb`, `level` and `runes` (`rune`, `count`) |
+| `STAFF_RUNES` | Staff name to the runes it gives, such as `'Lava battlestaff'` to earth and fire |
+| `runes_per_cast(spell_name, wielded)` | `[{'rune', 'count'}]` one cast takes, less what a wielded staff gives, or `None` for a spell the table lacks |
+| `casts_available(spell_name, wielded, held)` | How many casts `held(rune)` pays for: `float('inf')` when a staff gives every rune, 0 for an unknown spell |
+| `rune_withdraw_list(spell_name, wielded, casts)` | The runes to withdraw for that many casts |
+| `spell_button_com(spell_name)` | The staff spell chooser's button for an autocast spell while the chooser is open, or -1. rs2b0t numbers it from the 289 interface; here it's found as [`autocast.arm`](side-tabs.md#autocast) finds it |
 | `combat_keep_names(food, style, spell=None, ammo=None, weapon=None, extra=None)` | What a fight's deposit keeps: every form of the food, the spell's runes when `style` is `'mage'`, the ammo when `'range'`, the weapon, and `extra` |
 
 ## Loadouts
 
-A script's `loadouts` setting is a list of `{name, worn: {slot: item}, carry: [{item, qty}]}`, and its `loadout` setting names the one to use.
+A loadout is `{name, worn: {slot: item}, carry: [{item, qty}]}`. They're kept for every bot on the account in the account file's `script.settings["Loadouts"].sets`, through `loadouts`, rs2b0t's loadout store. A bot whose own `loadouts` setting holds a list uses that instead, and its `loadout` setting, `LOADOUT_SETTING`, names the one to use.
 
 | Name | Is |
 |---|---|
@@ -397,6 +427,11 @@ A script's `loadouts` setting is a list of `{name, worn: {slot: item}, carry: [{
 | `weapon_of(loadout, fallback=None)` | The `righthand` item, or `fallback` |
 | `script_food(settings, fallback)`, `script_foods(settings, fallback)` | The selected loadout's food, or foods |
 | `upsert_loadout(loadouts, loadout)`, `remove_loadout(loadouts, name)`, `unique_name(loadouts, base)` | Editing helpers, returning new lists |
+| `loadouts.all()`, `loadouts.names()`, `loadouts.by_name(name)` | The account's shared loadouts, their names, and one by name without regard to case |
+| `loadouts.save(list)` | Saves the list into the account file, replacing what was there |
+| `serialize_loadouts(list)` | The loadouts as JSON text, as `parse_loadouts` reads it |
+| `LOADOUT_SETTING` | A [`SettingDef`](settings.md#settingdef) for a bot's `loadout`: a string chosen from the loadouts' names |
+| `LOADOUTS_NAMESPACE`, `LOADOUTS_KEY` | `'Loadouts'` and `'sets'` |
 
 ```jsonc
 "Cow killer": {
@@ -406,6 +441,59 @@ A script's `loadouts` setting is a list of `{name, worn: {slot: item}, carry: [{
     ]
 }
 ```
+
+## Places
+
+| Name | Is |
+|---|---|
+| `ALTARS` | Records of `name`, `tile`, `loc` and, for the Monastery's, `requires` (Prayer 31) |
+| `nearest_altar(start)` | The usable altar the shortest route reaches from `start`, or `None`, as rs2b0t ranks them by route cost; `None` too when a random event is pending. Not a wait: each route is planned at once |
+| `TELEPORTS` | The standard teleports, lower-case name to a record of `name` and `fallback_com_id` |
+| `resolve_teleport(name)` | The teleport a name means: `'varrock'`, `'Varrock teleport'` or the button's `'Cast @gre@Varrock teleport'`; `None` for an unknown one |
+| `teleport_button_text(teleport)` | The magic tab button's text, `'Cast @gre@Varrock teleport'` |
+| `resolve_teleport_component(teleport, find_button)` | `find_button(text)` gives a component or -1; the 289 interface's component when it doesn't find one |
+| `in_ess_mine(x, z)` | Whether a tile is in the rune essence mine |
+| `item_db()` | rs2b0t's item database, read on first use: item name to a record of `obj`, `id`, `name`, `cost`, `members`, and where they apply `slot` (`'hat'`, `'righthand'` and so on), `two_handed` and `consumable` (`'eat'` or `'drink'`) |
+| `drop_db()` | Monster name to the item names its drop table can give, read on first use |
+
+## The pack
+
+rs2b0t's `packRules`.
+
+| Name | Is |
+|---|---|
+| `matches_any(name, patterns)` | Whether the name holds any of the patterns, by part and without regard to case. Blank patterns match nothing |
+| `count_matching(items, patterns)`, `slots_matching(items, patterns)` | How many matching items there are, stacks counted, and how many slots hold one |
+| `should_bank(loot_slots, bank_at, inv_full)` | At `bank_at` slots of loot, or a full pack holding any |
+| `should_restock(food_count, threshold)` | Fewer than `threshold` bites left |
+| `should_eat(hp, max_hp, heal, food_count)` | As `should_eat_to_use_food` |
+| `should_panic(hp_fraction, gate, food_count)` | Below the gate with no food left |
+
+## Thieving
+
+rs2b0t's `api/thieving`: Ardougne market's cake stall and its pickpocket targets.
+
+| Name | Is |
+|---|---|
+| `STALL_TILE`, `STAND`, `STAND_ALT`, `FLEE_TILE` | The Baker's stall, the two tiles it's stolen from, and where to run when caught |
+| `CAKE_ITEMS` | `['cake', 'bread', 'chocolate slice']`, matched by part |
+| `LOCKOUT_TICKS`, `RESET_AFTER_REFUSALS` | 10 ticks after a fight before the stall can be stolen from; 3 refusals before swapping stands |
+| `classify_steal(gained, combat, lockout_seen, attempt_seen)` | How a steal went: `'success'`, `'caught'`, `'lockout'`, `'refused'` (the Baker says no only overhead) or `'timeout'` |
+| `should_reset(consecutive_refusals)` | Whether to swap stands |
+| `carried_cakes()`, `needs_cake_restock(target)` | The stall's food in the backpack, and whether there's room and fewer than `target` |
+| `steal_cakes(abort, set_status, log, fill_to=None, should_eat=None, locked_out_until=None, on_steal=None, on_reset=None)` | **Wait.** Steals until the backpack is full or holds `fill_to` of the stall's food: `'stocked'`, `'combat'`, `'aborted'` or `'no-progress'` after 90 seconds |
+| `SPOTS`, `target_spot(target)` | Where each pickpocket target is worked: a record of `anchor` and `leash` |
+| `required_thieving(target)` | The level a target needs |
+| `HOSTILE_NAMES`, `is_hostile_attacker(candidate, max_distance)` | The market's guards and knights, and whether one is fighting you nearby |
+| `choose_target(candidates_nearest_first, reachable)` | A record of `target`, the nearest reachable, and `blocked`, the nearest when none is |
+| `THIEVER_BANKING_OPTIONS`, `auto_food_banking(mode)` | `['None', 'Auto']`, and whether the mode banks for food |
+| `food_matches(name, keyword)`, `count_food(items, keyword)` | Food by part of its name, and how many |
+| `should_restock_food(enabled, food_count, restock_at, bankable_pack_full)` | Bank at the food floor, or with a full pack |
+| `safe_to_steal(hp_fraction, eat_at, food_count)`, `can_steal_now(food_count, hp, min_eat_hp, suicide)` | Whether to steal now; suicide mode steals on with no food |
+| `STUN_COMBAT_TICKS` | 9: a pickpocket stun's movement lock. Retrying at 8 only turns the character |
+| `next_withdraw_chunk(need)` | The next withdrawal toward `need`: `('op', 'Withdraw-1')`, `-5` or `-10`, `('x', count)` above 10, or `None` |
+| `withdraw_to(name, target, count_in_inv=None)` | **Wait.** Withdraws until the backpack holds `target`; the units withdrawn |
+| `close_bank_and_confirm_count(expected, count)` | **Wait.** Closes the bank and waits for `count()` to reach `expected` |
 
 ## Trading partners
 

@@ -59,6 +59,16 @@ const ObjType_s* GameCache_s::FindObj(s32 id) const
     return FindType(objs, id);
 }
 
+std::optional<u32> GameCache_s::FindSeqLength(s32 id) const
+{
+    if (id < 0 || static_cast<std::size_t>(id) >= seqLengths.size())
+    {
+        return std::nullopt;
+    }
+
+    return seqLengths[static_cast<std::size_t>(id)];
+}
+
 std::string_view GameCache_s::FindLocName(s32 id) const
 {
     return FindName(locs, id);

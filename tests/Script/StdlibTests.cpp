@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/LogCapture.hpp"
+#include "../Support/Script/Rs2b0tSpecs.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 
 #include "Cache/GameCache_s.hpp"
@@ -22,6 +23,7 @@
 namespace
 {
     const auto TEST_FOLDER = std::filesystem::path{RS2004_SOURCE_DIR} / "tests" / "Stdlib";
+    const auto SCRIPTS_FOLDER = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts";
 
     bool CollectTestName(py_Name name, py_Ref value, void* context) noexcept
     {
@@ -40,13 +42,13 @@ namespace
     class StdlibFixture
     {
     public:
-        StdlibFixture()
+        explicit StdlibFixture(const std::filesystem::path& scripts = TEST_FOLDER)
             : cache{std::make_shared<const GameCache_s>()}
             , map{cache}
             , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
             , api{state, map, actions}
-            , vm{ScriptTestRuntime::Get(), {.scriptsDirectory = TEST_FOLDER}, capture.GetLogger()}
+            , vm{ScriptTestRuntime::Get(), {.scriptsDirectory = scripts}, capture.GetLogger()}
         {
             ScriptBindings::Bind(vm, api);
             ScriptBindings::SetSettings(vm, "{}");
@@ -116,5 +118,21 @@ TEST_CASE("The standard library's Python tests pass", "[Stdlib]")
             CAPTURE(test);
             CHECK_NOTHROW(fixture.vm.Call(test));
         }
+    }
+}
+
+// rs2b0t's own tests keep its describe/test/expect; they import the bots from scripts/, as an account's script does.
+// Those that read the walker's data are real-cache tests.
+TEST_CASE("rs2b0t's ported Python tests pass", "[Stdlib]")
+{
+    const auto files = Rs2b0tSpecs::GetFiles(Rs2b0tSpecs::GetFolder());
+    REQUIRE_FALSE(files.empty());
+
+    for (const auto& file : files)
+    {
+        CAPTURE(file.filename().string());
+
+        auto fixture = StdlibFixture{SCRIPTS_FOLDER};
+        Rs2b0tSpecs::Run(fixture.vm, file);
     }
 }

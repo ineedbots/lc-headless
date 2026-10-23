@@ -29,6 +29,8 @@ def test_missing_settings_take_their_defaults():
 def test_values_are_checked_and_normalised():
     bag, _ = checked({'rock': 'tin ROCKS', 'keep': 'Pickaxe, Hammer', 'home': '3222,3218,1'})
     assert bag.rock == 'Tin rocks'
+    # A blank choice is unset, not an option.
+    assert checked({'rock': ''})[0].rock == ''
     assert bag.keep == ['Pickaxe', 'Hammer']
     assert bag.home == Tile(3222, 3218, 1)
     assert checked({'home': [3222, 3218]})[0].home == Tile(3222, 3218, 0)

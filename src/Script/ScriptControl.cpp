@@ -21,6 +21,16 @@ std::optional<std::chrono::seconds> ScriptControl::TakeRelogRequest()
     return std::exchange(m_relogRequest, std::nullopt);
 }
 
+void ScriptControl::RequestSettingSave(SettingSave_s save)
+{
+    m_settingSaves.push_back(std::move(save));
+}
+
+std::vector<SettingSave_s> ScriptControl::TakeSettingSaves()
+{
+    return std::exchange(m_settingSaves, {});
+}
+
 void ScriptControl::SetStepTime(s64 milliseconds)
 {
     m_stepTime = milliseconds;

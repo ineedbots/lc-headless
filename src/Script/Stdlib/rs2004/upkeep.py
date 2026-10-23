@@ -11,7 +11,7 @@ import _core
 from rs2004.events import SKILL_NAMES
 from rs2004.geometry import Tile
 
-__all__ = ['run_manager']
+__all__ = ['run_manager', 'recovery_hints']
 
 RUN_CHECK_MS = 1500
 # Under attack, any energy at all is worth spending to get away.
@@ -164,5 +164,27 @@ def recover(bot, minutes, say):
     return 'restart'
 
 
+class RecoveryHints:
+    """rs2b0t's runtime/RecoveryHints.ts: when the stall guard restarts a bot, it tells the new one, so its
+    on_start can keep the anchor the old one had. A bot sets anchor itself; take_anchor() reads it once, after
+    a restart only."""
+
+    def __init__(self):
+        self.pending_recovery = False
+        self.anchor = None
+
+    def take_anchor(self):
+        """The anchor the bot before the restart set, or None when this start isn't a restart."""
+        if not self.pending_recovery:
+            return None
+        self.pending_recovery = False
+        return self.anchor
+
+    def clear(self):
+        self.pending_recovery = False
+        self.anchor = None
+
+
 run_manager = _RunManager()
 stall_guard = StallGuard()
+recovery_hints = RecoveryHints()

@@ -171,12 +171,12 @@ void EventDispatcher::DispatchEvent(const GameEvent_s& event, const GameState_s&
     else if (const auto* playerAdded = std::get_if<PlayerAdded_s>(&data); playerAdded && hooks.Has("player_spawned"))
     {
         const auto* current = state.FindPlayer(playerAdded->player.index);
-        PyObjects::FromPlayer(py_r0(), current ? *current : playerAdded->player, tick);
+        PyObjects::FromPlayer(py_r0(), current ? *current : playerAdded->player, tick, cache);
         hooks.Call("player_spawned", one);
     }
     else if (const auto* playerRemoved = std::get_if<PlayerRemoved_s>(&data); playerRemoved && hooks.Has("player_despawned"))
     {
-        PyObjects::FromPlayer(py_r0(), playerRemoved->player, tick);
+        PyObjects::FromPlayer(py_r0(), playerRemoved->player, tick, cache);
         hooks.Call("player_despawned", one);
     }
     else if (const auto* playerHit = std::get_if<PlayerHit_s>(&data); playerHit && hooks.Has("player_damaged"))
@@ -188,7 +188,7 @@ void EventDispatcher::DispatchEvent(const GameEvent_s& event, const GameState_s&
         }
         else
         {
-            PyObjects::FromPlayer(py_r0(), *player, tick);
+            PyObjects::FromPlayer(py_r0(), *player, tick, cache);
         }
 
         py_newint(py_r1(), playerHit->hit.damage);

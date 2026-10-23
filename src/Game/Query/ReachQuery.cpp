@@ -2,6 +2,7 @@
 #include "ReachQuery.hpp"
 
 #include "../Map/InteractionRoutes.hpp"
+#include "../Map/LineOfSight.hpp"
 #include "../Map/PathFinder.hpp"
 #include "../Map/WorldMap.hpp"
 #include "../State/GameState_s.hpp"
@@ -42,6 +43,30 @@ bool ReachQuery::CanStep(const Tile_s& from, const Tile_s& to) const
 std::optional<std::vector<Tile_s>> ReachQuery::FindPath(const Tile_s& tile) const
 {
     return InteractionRoutes::FindWalkRoute(m_map, GetPosition(), tile);
+}
+
+bool ReachQuery::HasLineOfSight(const Tile_s& from, const Tile_s& to, s32 size) const
+{
+    if (from.level != to.level || !m_map.Contains(from) || !m_map.Contains(to))
+    {
+        return false;
+    }
+
+    const auto& area = m_map.GetBuildArea();
+    const auto source = Footprint_s{.x = from.x - area.baseX, .z = from.z - area.baseZ};
+    const auto target = Footprint_s{.x = to.x - area.baseX, .z = to.z - area.baseZ, .size = size};
+    return LineOfSight::Has(m_map.GetCollision(from.level), source, target);
+}
+
+std::optional<u32> ReachQuery::GetFlags(const Tile_s& tile) const
+{
+    if (!m_map.Contains(tile))
+    {
+        return std::nullopt;
+    }
+
+    const auto& area = m_map.GetBuildArea();
+    return m_map.GetCollision(tile.level).GetFlags(tile.x - area.baseX, tile.z - area.baseZ);
 }
 
 const Tile_s& ReachQuery::GetPosition() const

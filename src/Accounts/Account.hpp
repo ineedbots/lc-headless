@@ -74,6 +74,7 @@ private:
     void StepScript(Clock::time_point now);
     void StepIdle(Clock::time_point now);
     void AddSettingDefaults(std::string_view botName, std::string_view settingsJson);
+    void SaveSetting(const SettingSave_s& save);
     void LogOut(std::string_view reason);
     void BeginRelog(std::chrono::seconds delay);
     // True while a relog is under way.

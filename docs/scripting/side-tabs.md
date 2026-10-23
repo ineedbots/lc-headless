@@ -94,6 +94,20 @@ if game.in_combat() and special.ready(weapon):
 | `resolve_combat_style(style, offered)` | Among `offered` `(mode, label)` pairs, a `CombatStyleResolution` for the mode that trains `style`, else for the last defensive one, else `None` |
 | `RANGE_STYLE_OPTIONS` | `['accurate', 'rapid', 'longrange']` |
 | `parse_range_style(name)` | The combat mode of a ranged style: 0 accurate, 1 rapid, 2 long range (`'longrange'`, `'long range'` or `'long-range'`). 1 for an unknown name |
+| `describe_combat_style(resolution)` | What a resolution trains, as rs2b0t logs it: `'strength (training Strength)'`, or for a fallback, `'defence (training Defence; controlled unavailable)'` |
+| `resolve_split_combat_settings(raw_combat_style, raw_melee_style=None)` | rs2b0t's fighters once had one `combat_style` setting for the melee style, and now split it into the kind (`'melee'`, `'mage'` or `'range'`) and `melee_style`. A record of `kind`, `melee_style` and `legacy_migrated`: the old melee style found in `combat_style`, which the bot saves as `melee_style`, else `None` |
+| `PROTECT_FROM_MAGIC`, `PROTECT_FROM_MISSILES`, `PROTECT_FROM_MELEE` | The protection prayers' names, as [`prayer.set`](#prayer) takes them |
+
+### `CombatStyleController(backend)`
+
+rs2b0t's: one weapon-aware mapping for resolving, setting and checking a style, over a `backend` with `offered_modes()` (`(mode, label)` pairs, or `None`), `current_mode()` and `select_mode(mode)`. `game`'s combat style methods are this over the combat tab.
+
+| Method | Gives or does |
+|---|---|
+| `resolution(style)` | The [`CombatStyleResolution`](#combatstyleresolution), or `None` without modes |
+| `mode(style)` | Its mode, or `None` |
+| `has(style)` | Whether that mode is the current one |
+| `set(style)` | Selects it; `False` when there's no mode for it |
 
 ### `CombatStyleResolution`
 

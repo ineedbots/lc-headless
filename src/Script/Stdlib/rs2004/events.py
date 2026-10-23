@@ -53,7 +53,7 @@ POSITIONAL = (
 )
 
 # A bot's lifecycle, which has hooks but no subscribers.
-LIFECYCLE = ('start', 'stop', 'progress_report')
+LIFECYCLE = ('start', 'stop', 'pause', 'resume', 'progress_report')
 
 EVENT_NAMES = tuple(list(PAYLOADS.keys()) + list(POSITIONAL))
 HOOK_NAMES = tuple(list(EVENT_NAMES) + list(LIFECYCLE))

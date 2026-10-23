@@ -6,9 +6,37 @@ with x, z and level.
 
 import _core
 
-__all__ = []
+__all__ = ['wilderness_level_at', 'SPELL_MAX_WILDERNESS', 'GLORY_MAX_WILDERNESS']
 
 INFINITY = 1000000000
+
+# The Wilderness, as LostCity's ~wilderness_level reads its zones: the surface from z 3520 up to 6399 on any
+# level, and the dungeon beneath from z 9920 up to 12799, both from x 2944 to 3391. Ported from rs2b0t's
+# event/webwalk/wilderness.ts.
+WILDERNESS_SOUTH_Z = 3520
+WILDERNESS_UNDERGROUND_SOUTH_Z = 9920
+WILD_X_MIN = 2944
+WILD_X_MAX = 3391
+SURFACE_Z_MAX = 6399
+UNDER_Z_MAX = 12799
+# Spell teleports, the ring of dueling and the games necklace don't work above this level, and a glory above
+# the next.
+SPELL_MAX_WILDERNESS = 20
+GLORY_MAX_WILDERNESS = 30
+
+
+def wilderness_level_at(tile):
+    """The Wilderness level at a tile, or 0 outside it."""
+    level = getattr(tile, 'level', 0) or 0
+    x = tile.x
+    z = tile.z
+    if x < WILD_X_MIN or x > WILD_X_MAX:
+        return 0
+    if level >= 0 and level <= 3 and z >= WILDERNESS_SOUTH_Z and z <= SURFACE_Z_MAX:
+        return (z - WILDERNESS_SOUTH_Z) // 8 + 1
+    if level == 0 and z >= WILDERNESS_UNDERGROUND_SOUTH_Z and z <= UNDER_Z_MAX:
+        return (z - WILDERNESS_UNDERGROUND_SOUTH_Z) // 8 + 1
+    return 0
 
 
 def _sign(value):

@@ -18,7 +18,7 @@ def test_loop_returns_are_read_as_rs2b0t_reads_them():
     load(returning(600))
     assert _runtime.step() == ('ticks', 1)
     load(returning(0))
-    assert _runtime.step() == ('ms', 0)
+    assert _runtime.step() == ('update', 20)
     load(returning(250))
     assert _runtime.step() == ('ms', 250)
 
@@ -45,7 +45,7 @@ def test_a_generator_loop_waits_as_it_yields():
     assert _runtime.step() == ('ticks', 2)
     assert _runtime.step() == ('update', 50)
     assert _runtime.step() == ('update', -1)
-    assert _runtime.step() == ('ms', 0)
+    assert _runtime.step() == ('update', 20)
 
 
 def test_a_generator_loop_can_only_yield_waits():
@@ -140,8 +140,8 @@ def test_a_task_bot_runs_the_first_task_that_validates():
     _runtime.start()
     bot = _runtime.bot
     assert _runtime.step() == ('ms', 100)
-    assert _runtime.step() == ('ms', 0)
-    assert _runtime.step() == ('ms', 0)
+    assert _runtime.step() == ('update', 20)
+    assert _runtime.step() == ('update', 20)
     assert bot.ran == ['eat eat', 'fight']
     assert bot.active_task_name is None
 
@@ -240,3 +240,113 @@ def test_finishing_runs_on_stop_once_and_drops_subscriptions():
     _runtime.finish('again')
     assert bot.stopped == ['done']
     assert 'tick' not in _listening
+
+
+class Pausing(LoopingBot):
+    calls = []
+
+    def loop(self):
+        Pausing.calls.append('loop')
+        yield 100
+        Pausing.calls.append('rest')
+
+    def on_pause(self):
+        Pausing.calls.append('pause')
+
+    def on_resume(self):
+        Pausing.calls.append('resume')
+
+
+def test_pause_stops_stepping_the_bot_until_resume_and_drops_its_step():
+    warnings = load(FakeModule(BOT=define_bot(name='Pausing', create=Pausing)))
+    assert warnings == []
+    assert _commands['pause'] != '' and _commands['resume'] != ''
+    assert _runtime.step() == ('ms', 100)
+    _runtime.command('pause', '', [])
+    assert _runtime.paused()
+    assert _runtime.step() == ('ms', _runtime.PAUSED_POLL_MS)
+    _runtime.command('pause', '', [])
+    _runtime.command('resume', '', [])
+    assert not _runtime.paused()
+    assert _runtime.step() == ('ms', 100)
+    assert Pausing.calls == ['loop', 'pause', 'resume', 'loop']
+
+
+def test_a_script_cannot_add_pause_or_resume_itself():
+    assert "client's own" in raises(ValueError, lambda: console.command('pause', lambda command: None))
+    assert "client's own" in raises(ValueError, lambda: console.command('Resume', lambda command: None))
+
+
+class Anchored(LoopingBot):
+    def on_start(self):
+        self.hinted = recovery_hints.take_anchor()
+        recovery_hints.anchor = Tile(5, 6)
+
+    def loop(self):
+        return None
+
+
+class Forgetful(LoopingBot):
+    def loop(self):
+        return None
+
+
+def test_a_restarted_bot_gets_the_anchor_the_last_one_set():
+    recovery_hints.clear()
+    load(FakeModule(BOT=define_bot(name='Anchored', create=Anchored)))
+    _runtime.start()
+    assert _runtime.bot.hinted is None
+
+    recovery_hints.pending_recovery = True
+    _runtime.restart('stalled')
+    assert _runtime.bot.hinted == Tile(5, 6)
+    assert not recovery_hints.pending_recovery
+
+    # A start that isn't a restart gets nothing, and one that doesn't ask drops the hint.
+    _runtime.restart('stalled again')
+    assert _runtime.bot.hinted is None
+    load(FakeModule(BOT=define_bot(name='Forgetful', create=Forgetful)))
+    recovery_hints.pending_recovery = True
+    _runtime.start()
+    assert not recovery_hints.pending_recovery
+    assert recovery_hints.anchor is None
+
+
+def test_event_signal_holds_while_the_bots_interrupt_does():
+    load(returning(None))
+    _runtime.configure(False, 0, False, 20)
+    assert not event_signal.pending()
+    event_signal.set_interrupt(lambda: True)
+    assert event_signal.pending()
+    event_signal.set_interrupt(None)
+    assert not event_signal.pending()
+
+
+def test_the_global_settings_are_checked_and_read():
+    events.clear()
+    message = raises(ValueError, lambda: _runtime.load(returning(None), SettingsBag({'Global': {'use_mage_bank': 'yes'}})))
+    assert message == 'settings["Global"].use_mage_bank must be true or false'
+    warnings = _runtime.load(returning(None), SettingsBag({'Global': {'lamp_skill': 'mining', 'colour': 'red'}}))
+    assert warnings == ["has settings[\"Global\"].colour, which its settings schema doesn't declare"]
+    assert _runtime.bot.lamp_skill() == 'mining'
+    assert settings_store.global_bag().str('lamp_skill') == 'mining'
+    settings_store.load({})
+
+
+class Child(LoopingBot):
+    def loop(self):
+        return None
+
+
+def test_a_bot_run_by_another_is_delegated_and_logs_and_finishes_through_it():
+    bot = Child()
+    assert not bot.delegated
+    lines = []
+    finished = []
+    bot.bind_log(lines.append)
+    bot.bind_finish(finished.append)
+    assert bot.delegated
+    bot.log('cut', 3, 'logs')
+    bot.request_finish('no more trees')
+    assert lines == ['cut 3 logs']
+    assert finished == ['no more trees']

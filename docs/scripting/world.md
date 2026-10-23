@@ -70,6 +70,8 @@ Filters return the query, so they chain. Nothing is searched until a terminal ru
 
 `name`, `id`, `within` and `layer` narrow the search inside the client, so they're cheap. The rest test each result in Python.
 
+`matches_entity_name(actual, configured)` is the rule `name()` matches by, for a name from a setting: trimmed, and without regard to case. `None` never matches.
+
 ### Terminals
 
 | Terminal | Gives |

@@ -12,6 +12,7 @@
 #include "GameCache_s.hpp"
 #include "InterfaceDecoder.hpp"
 #include "JagArchive.hpp"
+#include "SeqDecoder.hpp"
 #include "LocTypeDecoder.hpp"
 #include "MapDecoder.hpp"
 #include "MapSquare.hpp"
@@ -135,9 +136,10 @@ namespace
         return found->id;
     }
 
-    void DecodeConfig(std::vector<u8> data, std::string_view context, GameCache_s& cache)
+    // Returns the sequences, which take the anim frames to time.
+    std::vector<SeqType_s> DecodeConfig(std::vector<u8> data, std::string_view context, GameCache_s& cache)
     {
-        WithContext(context, [&data, &cache]
+        return WithContext(context, [&data, &cache]
         {
             const auto config = JagArchive{std::move(data)};
             const auto locDat = ReadEntry(config, "loc.dat");
@@ -155,7 +157,73 @@ namespace
             const auto varpDat = ReadEntry(config, "varp.dat");
             const auto varpIdx = ReadEntry(config, "varp.idx");
             cache.runVarp = FindRunVarp(VarpTypeDecoder::Decode(varpDat, varpIdx, cache.revision));
+
+            const auto seq = config.Read("seq.dat");
+            return seq ? SeqDecoder::DecodeTypes(*seq) : std::vector<SeqType_s>{};
         });
+    }
+
+    // Each sequence's length. Lengths only tell a script when an animation has finished, so the cache loads
+    // without them when they can't be read, and an animation then counts as playing until another replaces it.
+    void SetSeqLengths(std::span<const SeqType_s> types, const FrameDelays& delays, GameCache_s& cache)
+    {
+        cache.seqLengths.clear();
+        cache.seqLengths.reserve(types.size());
+        for (const auto& type : types)
+        {
+            cache.seqLengths.push_back(SeqDecoder::GetLength(type, delays));
+        }
+    }
+
+    // 274's and 289's anim files, one per frame group, each gzipped with a 2-byte version after it.
+    FrameDelays ReadStoreFrameDelays(CacheStore& store)
+    {
+        auto delays = FrameDelays{};
+        const auto count = store.GetFileCount(CacheStore::ANIMS);
+        for (auto file = u32{0}; file < count; ++file)
+        {
+            const auto data = store.Read(CacheStore::ANIMS, file);
+            if (!data || data->size() <= MAP_VERSION_SIZE)
+            {
+                continue;
+            }
+
+            WithContext(DescribeFile(CacheStore::ANIMS, file, "anim"), [&data, &delays]
+            {
+                SeqDecoder::ReadFrameDelays(Compression::Gunzip(std::span{*data}.first(data->size() - MAP_VERSION_SIZE)), delays);
+            });
+        }
+
+        return delays;
+    }
+
+    // 225's frames, in its models archive.
+    FrameDelays ReadFolderFrameDelays(const std::filesystem::path& directory)
+    {
+        auto delays = FrameDelays{};
+        const auto models = JagArchive{ReadFolderArchive(directory, "models")};
+        SeqDecoder::ReadFrameDelays225(ReadEntry(models, "frame_head.dat"), ReadEntry(models, "frame_del.dat"), delays);
+        return delays;
+    }
+
+    template <typename TRead>
+    void LoadSeqLengths(std::span<const SeqType_s> types, TRead readDelays, GameCache_s& cache, Logger& logger)
+    {
+        // A cache built for a test may have no seq.dat.
+        if (types.empty())
+        {
+            return;
+        }
+
+        try
+        {
+            SetSeqLengths(types, readDelays(), cache);
+        }
+        catch (const std::exception& e)
+        {
+            cache.seqLengths.clear();
+            logger.Warning("can't read the anim frames, so animations count as playing until another replaces them: {}", e.what());
+        }
     }
 
     template <typename TPredicate>
@@ -466,7 +534,7 @@ namespace
     }
 
     // Returns how many map squares in map_index have no files.
-    std::size_t LoadStore(const std::filesystem::path& directory, GameCache_s& cache)
+    std::size_t LoadStore(const std::filesystem::path& directory, GameCache_s& cache, Logger& logger)
     {
         if (!std::filesystem::is_regular_file(directory / CacheStore::DAT_FILE))
         {
@@ -476,17 +544,25 @@ namespace
 
         auto store = CacheStore{directory};
         cache.crcs = ReadStoreCrcs(store);
-        DecodeConfig(ReadArchive(store, CacheLoader::CONFIG_ARCHIVE, "config"), DescribeFile(CacheStore::ARCHIVES, CacheLoader::CONFIG_ARCHIVE, "config"), cache);
+        const auto seqs = DecodeConfig(ReadArchive(store, CacheLoader::CONFIG_ARCHIVE, "config"), DescribeFile(CacheStore::ARCHIVES, CacheLoader::CONFIG_ARCHIVE, "config"), cache);
         FindComponents(ReadArchive(store, CacheLoader::INTERFACE_ARCHIVE, "interface"), DescribeFile(CacheStore::ARCHIVES, CacheLoader::INTERFACE_ARCHIVE, "interface"), cache);
+        LoadSeqLengths(seqs, [&store]
+        {
+            return ReadStoreFrameDelays(store);
+        }, cache, logger);
         return DecodeStoreMaps(store, cache);
     }
 
     // Returns how many map squares have only one of their two files.
-    std::size_t LoadFolder(const std::filesystem::path& directory, GameCache_s& cache)
+    std::size_t LoadFolder(const std::filesystem::path& directory, GameCache_s& cache, Logger& logger)
     {
         cache.crcs = ReadFolderCrcs(directory);
-        DecodeConfig(ReadFolderArchive(directory, "config"), "config", cache);
+        const auto seqs = DecodeConfig(ReadFolderArchive(directory, "config"), "config", cache);
         FindComponents(ReadFolderArchive(directory, "interface"), "interface", cache);
+        LoadSeqLengths(seqs, [&directory]
+        {
+            return ReadFolderFrameDelays(directory);
+        }, cache, logger);
         return DecodeFolderMaps(directory / CacheLoader::MAPS_FOLDER_225, cache);
     }
 
@@ -528,7 +604,7 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Revision_e
         auto cache = GameCache_s{};
         cache.revision = revision;
 
-        const auto missingFiles = revision >= Revision_e::Rev274 ? LoadStore(directory, cache) : LoadFolder(directory, cache);
+        const auto missingFiles = revision >= Revision_e::Rev274 ? LoadStore(directory, cache, logger) : LoadFolder(directory, cache, logger);
         cache.text.FinishInterning();
 
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);

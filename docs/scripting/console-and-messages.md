@@ -8,24 +8,18 @@ The client reads each line typed into its console while it runs. A script can ad
 
 Calls `handler(command)` each time the command is typed, until removed. Returns a function that removes it.
 
-- `name` is one word, matched without regard to case, not starting with `@`. The client's own commands (`help`, `status`, `quit`, `exit`, `loglevel`, `say`) can't be added. A bad name, or a name already added, raises `ValueError`.
+- `name` is one word, matched without regard to case, not starting with `@`. The client's own commands (`help`, `status`, `quit`, `exit`, `loglevel`, `say`) and the standard library's (`pause`, `resume`) can't be added. A bad name, or a name already added, raises `ValueError`.
 - `handler` must be callable, or `TypeError`. It receives a [`Command`](#command).
 - `help` is a line shown by the `help` command; a non-string raises `TypeError`.
 
 ```python
-paused = False
+def set_laps(command):
+    global lap_limit
+    if command.args:
+        lap_limit = int(command.args[0])
+    log('logging out after', lap_limit, 'laps')
 
-def toggle_pause(command):
-    global paused
-    paused = not paused
-    log('Paused' if paused else 'Resumed')
-
-console.command('pause', toggle_pause, 'Pause or resume the walk')
-
-def loop():
-    if paused:
-        return 600
-    ...
+console.command('laps', set_laps, 'Logs out after the laps given')
 ```
 
 A command added at module level lasts as long as the script. In a bot, `self.command(name, handler, help=None)` adds one that's removed when the bot stops.
@@ -60,6 +54,8 @@ A command added at module level lasts as long as the script. In a bot, `self.com
 | `quit`, `exit` | As Ctrl+C: each script gets `on_kill_signal`; typing it again logs every account out at once |
 | `loglevel [verbose\|info\|warning\|error]` | Shows or sets the log level of every account |
 | `say <text>` | Says the text in public chat from every account in game, cut to 80 characters |
+| `pause` | Every script has it: stops stepping the bot, dropping its step in progress, and calls `on_pause`. Upkeep goes on, so a paused account still answers random events and keeps its run on, and the stall guard waits. `@<account> pause` pauses one |
+| `resume` | Calls `on_resume`, and `loop()` starts afresh |
 
 ## Messages between scripts
 

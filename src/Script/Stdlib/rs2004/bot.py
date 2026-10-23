@@ -34,9 +34,9 @@ def is_generator(value):
 
 
 class AbstractBot:
-    """The base of every bot. Override the hooks you need: on_start(), on_stop(reason), on_<event>(...),
-    recovery_anchor(), grind_targets(), ignored_randoms() and lamp_skill(). Subscriptions and console
-    commands made through the bot end when it stops."""
+    """The base of every bot. Override the hooks you need: on_start(), on_stop(reason), on_pause(),
+    on_resume(), on_<event>(...), recovery_anchor(), grind_targets(), ignored_randoms() and lamp_skill().
+    Subscriptions and console commands made through the bot end when it stops."""
 
     # How long to wait between loops when loop() returns None: 600 is the next server tick.
     loop_delay = ONE_TICK_MS
@@ -45,9 +45,28 @@ class AbstractBot:
     # The resolved settings, set before on_start.
     settings = None
     _subscriptions = None
+    # Set by a ScriptActivity running this bot inside another: where its log lines and finish go.
+    _log_sink = None
+    _finish_sink = None
+
+    @property
+    def delegated(self):
+        """Whether another bot runs this one, as a ScriptActivity."""
+        return self._finish_sink is not None
+
+    def bind_finish(self, sink):
+        """Sends request_finish(reason) to sink(reason) instead of stopping the script."""
+        self._finish_sink = sink
+
+    def bind_log(self, sink):
+        """Sends log lines to sink(message) instead of the account's log."""
+        self._log_sink = sink
 
     def log(self, *args):
-        log(*args)
+        if self._log_sink is not None:
+            self._log_sink(' '.join([str(arg) for arg in args]))
+        else:
+            log(*args)
 
     def on(self, event, callback):
         """Subscribes to an event until the bot stops."""
@@ -64,7 +83,11 @@ class AbstractBot:
         self._subscriptions.append(remove)
 
     def request_finish(self, reason):
-        """Stops the script, giving on_stop and script_finish the reason. The account stays logged in."""
+        """Stops the script, giving on_stop and script_finish the reason. The account stays logged in. A bot
+        another runs ends only its ScriptActivity."""
+        if self._finish_sink is not None:
+            self._finish_sink(reason)
+            return
         from rs2004 import _runtime
         _runtime.request_finish(reason)
 
@@ -77,8 +100,9 @@ class AbstractBot:
         return []
 
     def lamp_skill(self):
-        """The skill a genie's lamp is spent on."""
-        return 'strength'
+        """The skill a genie's lamp is spent on: the Global lamp_skill setting, strength by default."""
+        from rs2004.settings import settings_store
+        return settings_store.global_bag().str('lamp_skill', 'strength')
 
     def recovery_anchor(self):
         """Where the bot works, as a Tile, for the stall guard to walk back to; None to restart it instead."""

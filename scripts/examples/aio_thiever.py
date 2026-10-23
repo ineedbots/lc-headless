@@ -4,6 +4,7 @@
 # Thieving needs a members' world.
 
 from rs2004.catalogs import ContinueDialog, MIN_EAT_HP, food_heal_amount, should_eat_to_use_food
+from rs2004.catalogs import FLEE_TILE, LOCKOUT_TICKS, STAND, steal_cakes
 
 SETTINGS = {
     'food_target': SettingDef('number', 20, 'Cakes to carry', 1, 27, help='for guards and knights: how many to steal from the stall, or take from the bank'),
@@ -17,15 +18,6 @@ SETTINGS = {
 LUMBRIDGE = Tile(3221, 3219, 0)
 MARKET = Tile(2661, 3306, 0)
 ARDOUGNE_BANK_STAND = Tile(2655, 3286, 0)
-# The stall is 2x2 from STALL_TILE, and these are rs2b0t's two stands beside it. A steal the baker sees gives
-# nothing, and three of those in a row move to the other stand.
-STALL_NAME = "Baker's stall"
-STALL_OP = 'Steal from'
-STALL_TILE = Tile(2667, 3310, 0)
-STALL_STAND = Tile(2668, 3312, 0)
-STALL_STAND_ALT = Tile(2669, 3310, 0)
-NEAR_STALL = 2
-FLEE_TILE = Tile(2655, 3298, 0)
 # Port Sarim to Karamja, and Brimhaven to Ardougne.
 SHIP_FARES = 60
 # East of here is Asgarnia and Misthalin, across White Wolf Mountain or the sea from Ardougne. Its wolves kill a
@@ -33,15 +25,9 @@ SHIP_FARES = 60
 ARDOUGNE_EAST_X = 2880
 WOLF_PASS = 'white-wolf-mountain'
 
-# The server's lockout after combat: no stealing from a market stall for 10 ticks.
-LOCKOUT_TICKS = 10
 # A failed pickpocket stuns for 8 ticks; waiting 9 lets the next click path.
 STUN_TICKS = 9
 UNREACHABLE_SKIP_TICKS = 15
-REFUSALS_BEFORE_SWAP = 3
-STEAL_RESOLVE_MS = 2400
-STALL_RESTOCK_WAIT_MS = 8000
-STEAL_PASS_TICKS = 150
 LEASH_SLACK = 6
 LONG_WALK_TILES = 30
 TICKS_PER_MINUTE = 100
@@ -56,7 +42,6 @@ DEPOSIT_FOOD_ORDER = ['Slice of cake', 'Bread', 'Chocolate slice', '2/3 cake', '
 
 COINS = 'Coins'
 MEMBERS_ONLY = "members' world to gain experience in thieving"
-STALL_LOCKOUT = "can't steal from the market stall during combat"
 GRIND_TARGETS = ['man', 'woman', 'guard', 'knight of ardougne']
 
 
@@ -75,7 +60,7 @@ class Phase:
 
 PHASES = [
     Phase('men', 1, ['Man', 'Woman'], LUMBRIDGE, 18, 'Lumbridge'),
-    Phase('cakes', 5, None, STALL_STAND, 40, "East Ardougne's Baker's stall"),
+    Phase('cakes', 5, None, STAND, 40, "East Ardougne's Baker's stall"),
     Phase('guards', 40, ['Guard'], MARKET, 19, 'the East Ardougne market'),
     Phase('knights', 55, ['Knight of Ardougne'], MARKET, 29, 'the East Ardougne market'),
 ]
@@ -104,7 +89,6 @@ class AioThiever(TaskBot):
         self.deaths = 0
         self.stunned_until = 0
         self.lockout_until = 0
-        self.lockout_seen = False
         self.resting = False
         self.bank_out_of_food = False
         self.unreachable = {}
@@ -188,8 +172,6 @@ class AioThiever(TaskBot):
             if game.tick() > self.stunned_until:
                 self.stuns += 1
             self.stunned_until = game.tick() + STUN_TICKS
-        elif STALL_LOCKOUT in text:
-            self.lockout_seen = True
         elif MEMBERS_ONLY in text:
             self.request_finish('Thieving needs a members\' world')
 
@@ -301,7 +283,7 @@ class AioThiever(TaskBot):
         self.last_bank_tick = game.tick()
         log('banked', cakes, 'stall food;', self.banked, 'in all')
         yield from bank.close()
-        yield from traversal.walk_resilient(STALL_STAND, radius=1, attempts=4, timeout_ms=120000, log=lambda m: log(' ', m))
+        yield from traversal.walk_resilient(STAND, radius=1, attempts=4, timeout_ms=120000, log=lambda m: log(' ', m))
 
     def needs_bank(self):
         """Guards and knights: banks the loot when the backpack fills, and for cakes when low with bank_food."""
@@ -417,62 +399,15 @@ class AioThiever(TaskBot):
         elif result == 'no-progress':
             log('a pass at the stall made no progress; starting over')
 
-    def stocked_stall(self):
-        return locs.query().name(STALL_NAME).action(STALL_OP).where(lambda l: l.tile().distance_to(STALL_TILE) <= 3).nearest()
-
-    def lockout_over(self):
-        return game.tick() >= self.lockout_until
-
     def steal_cakes(self, fill_to):
-        """rs2b0t's stealCakes: steals from a stand beside the stall until the backpack is full, or holds fill_to
-        food. Gives 'stocked', 'combat', 'aborted' or 'no-progress'."""
-        stand = STALL_STAND
-        refusals = 0
-        deadline = game.tick() + STEAL_PASS_TICKS
-        while game.tick() < deadline:
-            if self.need_eat() or chat_dialog.can_continue():
-                return 'aborted'
-            if game.in_combat():
-                return 'combat'
-            if inventory.is_full() or (fill_to is not None and self.food_count() >= fill_to):
-                return 'stocked'
-            if not self.lockout_over():
-                yield from execution.delay_until(lambda: self.lockout_over(), 12000)
-                continue
+        """The catalogs' steal_cakes, with this bot's eating and its lockout after a flee. Gives 'stocked', 'combat',
+        'aborted' or 'no-progress'. Use with yield from."""
+        result = yield from steal_cakes(lambda: chat_dialog.can_continue(), lambda _status: None, lambda m: log(m), fill_to, self.need_eat,
+                                        lambda: self.lockout_until, self.count_steal)
+        return result
 
-            if game.tile().distance_to(stand) > 0:
-                yield from traversal.walk_to(stand, radius=0, timeout_ms=30000)
-                if STALL_TILE.distance_to(game.tile()) > NEAR_STALL:
-                    log('could not get beside the stall from', game.tile())
-                    yield from execution.delay_ticks(1)
-                    continue
-
-            stall = self.stocked_stall()
-            if stall is None:
-                yield from execution.delay_until(lambda: self.stocked_stall() is not None, STALL_RESTOCK_WAIT_MS)
-                continue
-
-            self.lockout_seen = False
-            before = self.food_count()
-            if stall.interact(STALL_OP):
-                yield from execution.delay_until(lambda: self.food_count() > before or game.in_combat() or self.lockout_seen, STEAL_RESOLVE_MS)
-                if self.food_count() > before:
-                    self.steals += 1
-                    refusals = 0
-                    continue
-                if game.in_combat():
-                    return 'combat'
-                if self.lockout_seen:
-                    self.lockout_until = game.tick() + LOCKOUT_TICKS
-                    continue
-            else:
-                yield from execution.delay_ticks(1)
-            refusals += 1
-            if refusals >= REFUSALS_BEFORE_SWAP:
-                stand = STALL_STAND_ALT if stand == STALL_STAND else STALL_STAND
-                log(refusals, 'steals got nothing; moving to the stand at', stand)
-                refusals = 0
-        return 'no-progress'
+    def count_steal(self):
+        self.steals += 1
 
     # Pickpocketing.
 

@@ -46,6 +46,24 @@ As `delay_until`, but checks once a server tick, for at most `max_ticks` ticks. 
 
 Not a wait. Tells the [stall guard](upkeep.md#the-stall-guard) the bot made progress it can't see for itself, such as a completed trade. It already counts a change of tile and any experience. Calling it every loop turns stall detection off in effect.
 
+## `event_signal`
+
+rs2b0t's `EventSignal`, a cooperative interrupt. Here the random event guardian takes over by dropping the bot's step at the next tick, so a long loop that would rather stop at a safe point (between hits, after a bank deposit) asks first:
+
+```python
+while fighting():
+    if event_signal.pending():
+        return                      # the guardian answers the event, and loop() starts afresh
+    yield from execution.delay_ticks(1)
+```
+
+| Member | Does |
+|---|---|
+| `event_signal.pending()` | True while the guardian sees an event it will answer, checked once a tick, or while the bot's interrupt holds |
+| `event_signal.set_interrupt(fn)` | The bot's own reason to stop, as a callable, such as `lambda: self.died`; `None` clears it. A [`ScriptActivity`](script-structure.md#running-a-bot-inside-another-scriptactivity)'s `stop()` clears it too |
+
+What a step must keep across an interruption goes on an object, such as the bot, not in a generator's locals, since the generator is dropped.
+
 ## Yielding directly
 
 A generator can `yield` these itself, which is what the functions above do:

@@ -12,6 +12,7 @@
 #include "../BotMessenger.hpp"
 #include "../ScriptCommand_s.hpp"
 #include "../ScriptContext.hpp"
+#include "../ScriptControl.hpp"
 #include "../ScriptRuntime.hpp"
 #include "../ScriptVm.hpp"
 #include "EventDispatcher.hpp"
@@ -39,6 +40,9 @@ struct ScriptHostOptions_s
     // Given a define_bot script's name and its schema's defaults, as a JSON object, each time the script
     // loads, so the account file can gain the settings it lacks.
     std::function<void(std::string_view botName, std::string_view settingsJson)> onSettingDefaults;
+    // Given each value settings_store.save() saved, at the end of the step, for script.settings[name][key]
+    // in the account file. The host keeps it in settings too, so a reloaded script sees it.
+    std::function<void(const SettingSave_s& save)> onSettingSave;
     std::chrono::milliseconds callTimeout = 1000ms;
     // Where send_bot_message sends, and the username it sends under.
     BotMessenger* messenger = nullptr;
@@ -121,6 +125,7 @@ private:
     void Fail(std::string_view where, std::string_view message);
     void Stop(ScriptStatus_e status, std::string_view reason);
     void ApplyStopRequest();
+    void SaveSettings();
 
     ScriptRuntime& m_runtime;
     GameClient& m_client;

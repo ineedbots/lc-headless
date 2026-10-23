@@ -44,6 +44,7 @@ A make menu is a stack of buttons over each product, one button per amount, such
 | `chat_dialog.make(name=None)` | **Wait.** Clicks the button that makes the most without asking, on the first product whose name (or item's name) contains `name`, or the first product: "All" where there's one, otherwise the largest count |
 | `chat_dialog.make_one(name=None)` | **Wait.** Clicks its "1" button |
 | `chat_dialog.make_x(name, count)` | **Wait.** Clicks its "X" button, waits up to 5 seconds for the count dialog, and answers it with `count`. Gives `True` once the answer is sent |
+| `chat_dialog.answer_count(count)` | Answers an open "Enter amount" dialog, rs2b0t's `actions.answerCountDialog`. `False` when none is open |
 
 A product's name is the text the player reads on its buttons, without line breaks or colour tags, such as "Oak Long Bow" or "Soft leather: 1 gp". A product with no text is named by the item drawn over it, and failing that by what follows the amount in its buttons' options.
 

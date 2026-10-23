@@ -9,8 +9,9 @@
 #   teleport  a ::tele argument for staff accounts, used on start, e.g. "0,50,51,29,34"
 #   partner   the username of another account in this process, told about each lap
 #
-# Console commands: "pause" stops walking or starts again, and "laps [n]" tells the laps done, or sets
-# how many to walk before logging out. With several accounts, "@<account> pause" pauses just one.
+# Console commands: "laps [n]" tells the laps done, or sets how many to walk before logging out. Every
+# script also has "pause" and "resume", which call on_pause and on_resume; with several accounts,
+# "@<account> pause" pauses just one.
 #
 # The server walks each step in a straight line and stops at the first obstacle, so keep the points
 # in sight of each other.
@@ -18,14 +19,7 @@
 points = []
 index = 0
 laps = 0
-paused = False
 lap_limit = settings.get('laps', 0)
-
-
-def toggle_pause(command):
-    global paused
-    paused = not paused
-    log('Paused' if paused else 'Walking again')
 
 
 def set_laps(command):
@@ -43,7 +37,6 @@ def set_laps(command):
         log(laps, 'laps done, with no limit')
 
 
-console.command('pause', toggle_pause, 'Stops walking, or starts again')
 console.command('laps', set_laps, 'Tells the laps done; "laps 3" logs out after 3, "laps 0" never')
 
 
@@ -57,6 +50,10 @@ def on_start():
     log('Walking between', points)
     if settings.get('teleport'):
         chat.command('tele ' + settings.teleport)
+
+
+def on_pause():
+    log('Paused after', laps, 'laps')
 
 
 def on_reconnect():
@@ -84,9 +81,6 @@ def loop():
             if lap_limit > 0 and laps >= lap_limit:
                 stop_account()
         return 0
-
-    if paused:
-        return 600
 
     if not game.moving():
         direct_navigator.walk((x, z), run=settings.get('run', False))

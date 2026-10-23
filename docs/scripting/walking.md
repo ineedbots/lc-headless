@@ -1,4 +1,4 @@
-# Walking: `direct_navigator`, `traversal`, `reach` and `game_messages`
+# Walking: `direct_navigator`, `traversal`, `reach`, `reachability`, `navigator` and `game_messages`
 
 Three layers, from short to long:
 
@@ -7,6 +7,8 @@ Three layers, from short to long:
 | [`direct_navigator`](#direct_navigator) | The loaded area, about 104 × 104 tiles around you | A click on a nearby tile, routed around walls |
 | [`traversal`](#traversal) | The whole map | Getting anywhere: through doors and gates, up and down stairs, through tolls and onto ships |
 | [`reach`](#reach) | The last few tiles | Walk to a stand, use something, and open the door in the way if the server says it can't be reached |
+
+And two that only look: [`reachability`](#reachability), probes of the loaded area such as line of sight, and [`navigator`](#navigator), the world route a walk would plan.
 
 A destination is a [`Tile`](geometry.md#tile), or an `(x, z)` pair on your level.
 
@@ -50,7 +52,7 @@ if not arrived:
 | `radius` | How near counts as there |
 | `timeout_ms` | The whole walk's limit; 5 minutes when `None` |
 | `max_expansions` | The route search's budget, in nodes; the default when `None` |
-| `use_teleport_catalog` | Plan spell teleports the backpack has runes for. `None` uses `teleports_enabled()`, which is `False` |
+| `use_teleport_catalog` | Plan spell teleports the backpack has runes for. `None` uses `teleports_enabled()`, the [Global](settings.md#global-settings) `nav_teleports`, off by default |
 | `policy` | A dict of `use_teleports`, `use_ships`, `use_shortcuts`, `allow_teleport_ids`, `deny_teleport_ids`. `use_teleports: False` also turns the catalog off |
 | `bank_item_counts` | Accepted for rs2b0t compatibility; not used yet |
 | `avoid_zones` | Areas a route never enters, though it may leave one it starts in: catalog ids such as `'white-wolf-mountain'`, or dicts of `min_x`, `max_x`, `min_z`, `max_z` and optionally `level`. The automatic zones are always added: `'draynor-jail-guards'` at combat level 50 and below, unless the walk starts or ends inside it |
@@ -59,7 +61,7 @@ if not arrived:
 
 **Gives** `True` on arrival, or when the route ends as close as it can get (`last_outcome` `'closest'` or `'blocked'`); `False` otherwise.
 
-`**NAV_PURE_WALK` and `**NAV_WITH_TELES` are ready-made keyword sets:
+`**NAV_PURE_WALK` and `**NAV_WITH_TELES` are ready-made keyword sets, also `traversal.pure_walk` and `traversal.with_teles` as rs2b0t names them:
 
 ```python
 yield from traversal.walk_to(dest, 2, **NAV_WITH_TELES)
@@ -94,7 +96,8 @@ yield from traversal.walk_to(dest, 2, **NAV_WITH_TELES)
 | `traversal.request_repath(reason=None)` | Plans the walk in progress again at its next step |
 | `traversal.route_cost(start, dest, max_expansions=300000)` | The cost of the route a walk would plan, without teleports and without walking, or `None` when there's none, as past a gate the account can't open |
 | `traversal.try_nearby_door(log=None)` | **Wait.** Opens a shut door or gate within 2 tiles, and waits up to 4 seconds for it to open. `True` when it did |
-| `traversal.teleports_enabled()` | Whether walks use teleports unless told otherwise: `False`, as in rs2b0t |
+| `traversal.teleports_enabled()` | Whether walks use teleports unless told otherwise: the [Global](settings.md#global-settings) `nav_teleports`, `False` by default, as in rs2b0t |
+| `traversal.preload()` | Nothing: the walker's map is built when the client starts. rs2b0t warms its worker here |
 
 ### Requirements
 
@@ -108,13 +111,34 @@ rs2b0t's list of banks, ranked for the account. A bank is a dict in rs2b0t's cam
 
 | Function | Gives |
 |---|---|
-| `bank_locations()` | Every known bank |
-| `bank_unlocked(bank, settings=None)` | Whether the account can use it: its skill level, its quest, and for a bank a script opts into (Zanaris, the Mage Arena), the named key in `settings`, a dict of booleans |
+| `bank_locations()`, `BANK_LOCATIONS` | Every known bank |
+| `bank_unlocked(bank, settings=None)` | Whether the account can use it: its skill level, its quest, and for a bank a script opts into (Zanaris, the Mage Arena), the setting it names: from `settings`, a dict of booleans, when given, and otherwise the [Global](settings.md#global-settings) `use_zanaris_bank` and `use_mage_bank` |
+| `nearest_usable_bank(tile, usable)` | The nearest bank, by straight line to its stand, for which `usable(bank)` holds, or `None` |
 | `nearest_banks(tile, settings=None)` | The usable banks, nearest first, by straight-line distance whatever the level |
 | `nearest_bank(tile, settings=None)` | The first of those, or `None` |
-| `nearest_reachable_bank(tile, candidates=4, settings=None)` | Of the `candidates` nearest, the one the shortest route reaches, or `None`. Slower: it plans routes |
+| `nearest_bank_reachable(here, navigator, candidates=8)` | rs2b0t's: of the `candidates` nearest, the one the cheapest route [`navigator`](#navigator) plans reaches, since from a dungeon or an island the straight line misleads; the nearest by the straight line when no route reaches one; and within 4 tiles of the nearest, that one at once. rs2b0t prices every usable bank; this prices the nearest few, since each route is planned while the script waits. Slower than the others: it plans routes |
 
 [`banking.open()`](bank.md#banking) uses these to walk to a bank when none is near.
+
+| Function or constant | Gives |
+|---|---|
+| `approach_of(bank)` | The tile a bank is ranked by: its `approach` when it has one, else its stand |
+| `locked_bank_at(tile)` | A bank within 14 tiles of `tile`, on its level, that the account can't use, or `None`: a bot standing at the Zanaris bank without `use_zanaris_bank` can say why it won't bank there |
+| `nearest_walkable_bank(tile, path_cost)` | Of the usable banks, the one `path_cost(tile, stand)` prices lowest; a cost of `None` means no route |
+| `bank_cost_for_navigator(navigator, max_expansions=None)` | A `path_cost` for it: the cost of the route [`navigator.find_path`](#navigator) plans without teleports, or `None`. rs2b0t's `nearestWalkableBankAsync` and `bankCostForFinder` are these, since the route search here gives its answer at once |
+| `USE_MAGE_BANK`, `USE_ZANARIS_BANK` | The setting names those banks' `requires` name: `'use_mage_bank'` and `'use_zanaris_bank'` |
+
+```python
+bank = nearest_walkable_bank(game.tile(), bank_cost_for_navigator(navigator))
+```
+
+### The Wilderness
+
+| Function or constant | Gives |
+|---|---|
+| `wilderness_level_at(tile)` | The Wilderness level at a tile, on the surface or in the dungeons below it, or 0 outside it |
+| `SPELL_MAX_WILDERNESS` | 20: spell teleports, the ring of dueling and the games necklace don't work above this level |
+| `GLORY_MAX_WILDERNESS` | 30: nor does an amulet of glory above this one |
 
 ### Helpers
 
@@ -122,6 +146,56 @@ rs2b0t's list of banks, ranked for the account. A bank is a dict in rs2b0t's cam
 |---|---|
 | `pick_choice(options, choose)` | The first of `options` containing any text in `choose`, without regard to case, or `None` |
 | `special_crossing_for_transport(transport, approach, step)` | The walker's special crossing (toll, ship and so on) for a route hop, or `None`. Used inside the walker |
+
+## `reachability`
+
+Probes of the loaded area, on your level, from the collision flags of the scene the server sent. They don't walk.
+
+| Method | Gives |
+|---|---|
+| `reachability.can_reach(dest, adjacent_ok=False, max_steps=None)` | Whether a walk from where you stand ends on `dest`, or with `adjacent_ok`, beside it. `max_steps` caps the search |
+| `reachability.can_step(a, b)` | Whether one step from `a` to its neighbour `b` is open: no wall between them, and nothing on `b` |
+| `reachability.line_of_sight(a, b, size=1)` | Whether the server's sight ray from `a` reaches a body of `size` tiles whose south-west tile is `b`, as ranged and magic attacks need. Walls and scenery that block range stop it; scenery that only blocks walking doesn't |
+| `reachability.walkable(dest)` | Whether `dest` is loaded and nothing stands on it |
+| `reachability.probeable(dest)` | Whether `dest` is in the loaded area on your level, so the other probes can answer for it |
+| `reachability.flags(dest)` | A loaded tile's raw collision flags, rs2b0t's `CollisionFlag` bits, or `None` |
+
+```python
+target = npcs.query().name('Hill Giant').nearest()
+if target is not None and reachability.line_of_sight(game.tile(), target.tile(), target.size):
+    game.cast_on_npc('Wind strike', target)
+```
+
+## `navigator`
+
+rs2b0t's `Navigator`: the route a [`traversal`](#traversal) walk would plan, without walking it.
+
+### `navigator.find_path(start, dest, avoid_doors=None, max_expansions=None, policy=None, use_teleport_catalog=None, avoid_zones=None, state=None)`
+
+The route from `start` to `dest`, as a `Route`. `policy`, `use_teleport_catalog` and `avoid_zones` are as `traversal.walk_to` takes them. `state` is [`world_state()`](#requirements)'s dict, the account's own by default, against which each hop's requirements are checked, so a route can be planned for other levels and items than the account's.
+
+| `Route` attribute | Is |
+|---|---|
+| `ok` | Whether a route was found |
+| `reason` | Why not, as text, or `None` |
+| `cost` | The route's cost, or `None` |
+| `expanded` | How many nodes the search took |
+| `waypoints` | The route as `Tile`s |
+
+`traversal.route_cost` is the cost of the same search.
+
+## Walking through doors: `walk_opening`
+
+### `walk_opening(dest, radius, obstacles, log=None, door_step_ticks=None)`
+
+**Wait.** Walks to within `radius` of `dest`, and each time a walk stops short, opens the nearest shut obstacle within 14 tiles that `obstacles` names, such as `['door', 'gate']`, matched by part of the name: one toward `dest` when there is one. With `door_step_ticks`, it waits that many ticks after a door swings and steps through it. `True` on arrival. [`banking.open`](bank.md#banking)'s `obstacles` walks this way.
+
+| Function | Gives |
+|---|---|
+| `is_openable_obstacle(name, actions, obstacles)` | Named like one of `obstacles`, by part and in lower case, with an Open option |
+| `face_steps(door, can_step=None)` | Which of a door tile's four faces can be stepped across now, west, north, east and south, as four booleans |
+| `opened_neighbour(door, before, after)` | Given `face_steps` before and after opening, the tile across the face that swung free, or `None` |
+| `far_side(door, across, here)` | Of the two tiles a passage joins, the one you aren't on; standing beside both, the further |
 
 ## `reach`
 

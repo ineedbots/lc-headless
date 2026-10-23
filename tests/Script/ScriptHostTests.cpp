@@ -209,12 +209,12 @@ def loop():
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank"});
     CHECK(*fixture.host->GetNextLoop() == start + 1800ms);
 
-    // Finishing runs the rest of the generator, and loop() starts over after what it returned.
+    // Finishing runs the rest of the generator, and loop() starts over after what it returned: 0, the next frame.
     fixture.host->Step(start + 1800ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank", "done"});
-    CHECK(*fixture.host->GetNextLoop() == start + 1800ms);
+    CHECK(*fixture.host->GetNextLoop() == start + 1820ms);
 
-    fixture.host->Step(start + 1810ms);
+    fixture.host->Step(start + 1820ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"walk", "bank", "done", "walk"});
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
 }
@@ -750,10 +750,11 @@ BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'food': Settin
     fixture.host->Step(start);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fight 1 fight"});
 
+    // A loop_delay of 0 runs the next task a frame, 20ms, after the last.
     fixture.host->Step(start + 100ms);
-    fixture.host->Step(start + 101ms);
-    fixture.host->Step(start + 201ms);
-    fixture.host->Step(start + 202ms);
+    fixture.host->Step(start + 120ms);
+    fixture.host->Step(start + 220ms);
+    fixture.host->Step(start + 240ms);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"fight 1 fight", "fought 1", "fight 2 fight", "fought 2", "rest Shrimps Shrimps", "stop rested"});
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Stopped);
 }
@@ -885,6 +886,42 @@ BOT = define_bot(name='Miner', create=Miner, settings_schema=SCHEMA)
     {
         return entry.level == LogLevel_e::Warning && entry.message == R"(main.py ignores settings.rock: a define_bot script reads only settings["Miner"])";
     }));
+}
+
+TEST_CASE("ScriptHost passes on what settings_store saves, once the step is over", "[ScriptHost]")
+{
+    auto saves = std::vector<SettingSave_s>{};
+    // clang-format off
+    auto fixture = HostFixture{R"python(
+class Miner(LoopingBot):
+    def on_start(self):
+        log('>', settings_store.saved('Miner', 'rock'))
+        settings_store.save('Miner', 'rock', 'Iron rocks')
+        settings_store.save('Loadouts', 'sets', [{'name': 'Melee', 'home': Tile(1, 2)}])
+
+    def loop(self):
+        log('>', settings_store.saved('Miner', 'rock'), settings_store.saved('Loadouts', 'sets'))
+        stop_script()
+
+BOT = define_bot(name='Miner', create=Miner)
+)python",
+        ScriptHostOptions_s{
+            .settings = R"json({"Miner": {"rock": "Tin rocks"}})json",
+            .onSettingSave = [&saves](const SettingSave_s& save)
+            {
+                saves.push_back(save);
+            },
+        }};
+    // clang-format on
+
+    fixture.host->Step(Clock::now());
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"Tin rocks", "Iron rocks [{'name': 'Melee', 'home': [1, 2, 0]}]"});
+    REQUIRE(saves.size() == 2);
+    CHECK(saves[0].name == "Miner");
+    CHECK(saves[0].key == "rock");
+    CHECK(nlohmann::json::parse(saves[0].valueJson) == "Iron rocks");
+    CHECK(saves[1].name == "Loadouts");
+    CHECK(nlohmann::json::parse(saves[1].valueJson) == nlohmann::json::parse(R"json([{"name": "Melee", "home": [1, 2, 0]}])json"));
 }
 
 TEST_CASE("ScriptHost clicks the button under an interface's text", "[ScriptHost]")
@@ -1236,27 +1273,37 @@ def loop():
     // clang-format on
 }
 
-TEST_CASE("The example scripts load without warnings", "[ScriptHost]")
+TEST_CASE("The example scripts and the ported bots load without warnings", "[ScriptHost]")
 {
     auto capture = LogCapture{};
     auto server = FakeGameServer{};
     auto client = GameClient{std::make_shared<const Config_s>(server.MakeConfig()), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger()};
     const auto scripts = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts";
     auto loaded = 0;
-    for (const auto& entry : std::filesystem::directory_iterator{scripts / "examples"})
+    for (const auto* const folder : {"examples", "bots"})
     {
-        CAPTURE(entry.path().string());
+        for (const auto& entry : std::filesystem::directory_iterator{scripts / folder})
+        {
+            // A package's own file isn't a script.
+            if (entry.path().extension() != ".py" || entry.path().filename() == "__init__.py")
+            {
+                continue;
+            }
 
-        const auto file = std::filesystem::relative(entry.path(), scripts);
-        CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = scripts, .file = file}, capture.GetLogger()});
-        ++loaded;
+            CAPTURE(entry.path().string());
+
+            const auto file = std::filesystem::relative(entry.path(), scripts);
+            CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = scripts, .file = file}, capture.GetLogger()});
+            ++loaded;
+        }
     }
 
-    CHECK(loaded >= 2);
-    CHECK(std::ranges::none_of(capture.GetEntries(), [](const CapturedLog_s& entry)
+    CHECK(loaded >= 5);
+    for (const auto& entry : capture.GetEntries())
     {
-        return entry.level >= LogLevel_e::Warning;
-    }));
+        INFO(entry.message);
+        CHECK(entry.level < LogLevel_e::Warning);
+    }
 }
 
 TEST_CASE("ScriptHost calls on_death, on_npc_say and on_projectile", "[ScriptHost]")
@@ -1406,11 +1453,14 @@ BOT = define_bot(name='Digger', create=Digger)
         return found;
     };
 
-    CHECK(names() == std::vector<std::string>{"echo:Logs the text"});
+    // Every script has the standard library's pause and resume.
+    const auto pause = std::string{"pause:Stops stepping the bot until resume; random events are still answered"};
+    const auto resume = std::string{"resume:Starts the bot again after pause"};
+    CHECK(names() == std::vector<std::string>{"echo:Logs the text", pause, resume});
     CHECK_FALSE(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
 
     fixture.host->Step(Clock::now());
-    CHECK(names() == std::vector<std::string>{"dig:", "echo:Logs the text"});
+    CHECK(names() == std::vector<std::string>{"dig:", "echo:Logs the text", pause, resume});
     CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "echo", .text = "hello  world", .args = {"hello", "world"}}));
     CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
 
@@ -1418,6 +1468,33 @@ BOT = define_bot(name='Digger', create=Digger)
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"echo hello  world ['hello', 'world']", "digging"});
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::AccountStopped);
     CHECK(fixture.host->GetCommands().empty());
+}
+
+TEST_CASE("ScriptHost pauses the bot on the console's pause, and carries on at resume", "[ScriptHost]")
+{
+    auto fixture = HostFixture{R"python(
+class Walker(LoopingBot):
+    loop_delay = 0
+
+    def loop(self):
+        log('>', 'loop')
+
+    def on_pause(self):
+        log('>', 'paused')
+
+    def on_resume(self):
+        log('>', 'resumed')
+
+BOT = define_bot(name='Walker', create=Walker)
+)python"};
+
+    fixture.host->Step(Clock::now());
+    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "pause"}));
+    fixture.host->Step(Clock::now());
+    fixture.host->Step(Clock::now() + 1s);
+    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "resume"}));
+    fixture.host->Step(Clock::now() + 2s);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop", "paused", "resumed", "loop"});
 }
 
 TEST_CASE("ScriptHost turns console commands down when the script can't take them", "[ScriptHost]")

@@ -7,6 +7,8 @@ __all__ = ['console', 'Command']
 
 # The client's own commands, which a script can't add. AccountRunner handles them.
 RESERVED = ('help', 'status', 'quit', 'exit', 'loglevel', 'say')
+# The standard library's own, which every script has: the runtime adds them.
+STDLIB = ('pause', 'resume')
 
 # Each command's help by name, '' for none. The host reads it to route lines and list the commands, so it's
 # only ever changed in place.
@@ -36,24 +38,9 @@ class Console:
         key = name.lower()
         if ' ' in key or '\t' in key or key.startswith('@'):
             raise ValueError(f'{repr(name)} is not a console command name; use one word, not starting with @')
-        if key in RESERVED:
+        if key in RESERVED or key in STDLIB:
             raise ValueError(f"{repr(name)} is the client's own console command")
-        if key in _handlers:
-            raise ValueError(f'the console command {repr(name)} was already added')
-        if not callable(handler):
-            raise TypeError('a console command handler must be callable')
-        if help is not None and not isinstance(help, str):
-            raise TypeError('a console command help must be a str')
-
-        commands[key] = help or ''
-        _handlers[key] = handler
-
-        def remove():
-            if _handlers.get(key) is handler:
-                del _handlers[key]
-                del commands[key]
-
-        return remove
+        return add(key, handler, help)
 
     def remove(self, name):
         """Removes a command, if it was added."""
@@ -68,6 +55,26 @@ class Console:
 
 
 console = Console()
+
+
+def add(key, handler, help):
+    """Adds a command by its lower-case name, as console.command does after its checks."""
+    if key in _handlers:
+        raise ValueError(f'the console command {repr(key)} was already added')
+    if not callable(handler):
+        raise TypeError('a console command handler must be callable')
+    if help is not None and not isinstance(help, str):
+        raise TypeError('a console command help must be a str')
+
+    commands[key] = help or ''
+    _handlers[key] = handler
+
+    def remove():
+        if _handlers.get(key) is handler:
+            del _handlers[key]
+            del commands[key]
+
+    return remove
 
 
 def handler(name):

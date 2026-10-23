@@ -24,9 +24,16 @@ from rs2004.geometry import Tile
 from rs2004.items import equipment, inventory
 from rs2004.messages import CANT_REACH, game_messages
 from rs2004.reach import close_op, is_open_barrier_leaf, is_openable_barrier, open_op
+from rs2004.settings import settings_store
 from rs2004.tabs import quests
+from rs2004.walkgeom import GLORY_MAX_WILDERNESS, SPELL_MAX_WILDERNESS, wilderness_level_at
 
-__all__ = ['traversal', 'NAV_PURE_WALK', 'NAV_WITH_TELES', 'world_state', 'special_crossing_for_transport', 'pick_choice', 'nearest_bank', 'nearest_banks', 'nearest_reachable_bank', 'bank_unlocked', 'bank_locations']
+__all__ = [
+    'traversal', 'NAV_PURE_WALK', 'NAV_WITH_TELES', 'world_state', 'special_crossing_for_transport', 'pick_choice', 'nearest_bank',
+    'nearest_banks', 'nearest_bank_reachable', 'nearest_usable_bank', 'bank_unlocked', 'bank_locations', 'BANK_LOCATIONS',
+    'approach_of', 'locked_bank_at', 'nearest_walkable_bank', 'bank_cost_for_navigator', 'USE_MAGE_BANK', 'USE_ZANARIS_BANK',
+    'wilderness_level_at', 'SPELL_MAX_WILDERNESS', 'GLORY_MAX_WILDERNESS',
+]
 
 # Passed with ** to walk_to or walk_resilient, to walk without teleports or with them.
 NAV_PURE_WALK = {'use_teleport_catalog': False, 'policy': {'use_teleports': False}}
@@ -83,9 +90,25 @@ def bank_locations():
     return _banks
 
 
+# rs2b0t's BANK_LOCATIONS: the same list bank_locations() gives.
+BANK_LOCATIONS = bank_locations()
+
+# The Global settings that open the Mage Arena's and Zanaris's banks to the walker and banking.open.
+USE_MAGE_BANK = 'use_mage_bank'
+USE_ZANARIS_BANK = 'use_zanaris_bank'
+
+
+def _snake(name):
+    out = ''
+    for c in name:
+        out += c if c == c.lower() else '_' + c.lower()
+    return out
+
+
 def bank_unlocked(bank, settings=None):
     """Whether the account can use the bank: its skill level and quest, and, for a bank a script opts into
-    (Zanaris, the Mage Arena), the setting named in settings, a dict of booleans."""
+    (Zanaris, the Mage Arena), the setting it names: from settings, a dict of booleans, when given, and
+    otherwise the Global settings (use_zanaris_bank, use_mage_bank)."""
     needs = bank.get('requires')
     if not needs:
         return True
@@ -94,8 +117,11 @@ def bank_unlocked(bank, settings=None):
         return False
     if needs.get('quest') is not None and quests.status(needs['quest']) != 'complete':
         return False
-    if needs.get('setting') is not None and not (settings or {}).get(needs['setting'], False):
-        return False
+    setting = needs.get('setting')
+    if setting is not None:
+        if settings is not None:
+            return bool(settings.get(setting, settings.get(_snake(setting), False)))
+        return settings_store.global_bag().bool(_snake(setting), False)
     return True
 
 
@@ -118,18 +144,86 @@ def nearest_bank(tile, settings=None):
     return banks[0] if banks else None
 
 
-def nearest_reachable_bank(tile, candidates=4, settings=None):
-    """Of the few nearest banks, the one the shortest route reaches, as rs2b0t's nearestBankReachable picks,
-    since in a dungeon or on an island the straight line misleads. None when none is reachable."""
+def approach_of(bank):
+    """The tile a bank is ranked by: its approach when it has one, else its stand."""
+    return _bank_stand(bank)
+
+
+def locked_bank_at(tile):
+    """A bank within 14 tiles of tile, on its level, that the account can't use, or None."""
+    tile = Tile.from_tile(tile)
+    for bank in bank_locations():
+        stand = bank['tile']
+        if stand['level'] == tile.level and Tile(stand['x'], stand['z'], stand['level']).distance_to(tile) <= 14 and not bank_unlocked(bank):
+            return bank
+    return None
+
+
+def nearest_walkable_bank(tile, path_cost):
+    """Of the usable banks, the one path_cost(tile, stand) prices lowest; a cost of None is no route."""
     best = None
     best_cost = None
-    for bank in nearest_banks(tile, settings)[:candidates]:
-        stand = Tile(bank['tile']['x'], bank['tile']['z'], bank['tile']['level'])
-        path = traversal._request(tile, stand, None, {'use_teleports': False}, False, [])
-        if path['ok'] and (best_cost is None or path['cost'] < best_cost):
+    for bank in nearest_banks(tile):
+        stand = bank['tile']
+        cost = path_cost(tile, Tile(stand['x'], stand['z'], stand['level']))
+        if cost is not None and (best_cost is None or cost < best_cost):
             best = bank
-            best_cost = path['cost']
+            best_cost = cost
     return best
+
+
+def bank_cost_for_navigator(navigator, max_expansions=None):
+    """A path_cost for nearest_walkable_bank: the cost of the route navigator.find_path plans, without
+    teleports, or None."""
+    def cost(start, dest):
+        route = navigator.find_path(start, dest, max_expansions=max_expansions, policy={'use_teleports': False})
+        return route.cost if route.ok else None
+
+    return cost
+
+
+def nearest_usable_bank(tile, usable):
+    """The nearest bank, by straight line to its stand, for which usable(bank) holds, or None."""
+    best = None
+    best_distance = None
+    for bank in bank_locations():
+        if not usable(bank):
+            continue
+        stand = _bank_stand(bank)
+        distance = (stand.x - tile.x) ** 2 + (stand.z - tile.z) ** 2
+        if best_distance is None or distance < best_distance:
+            best = bank
+            best_distance = distance
+    return best
+
+
+# Standing this near the nearest bank, it's the one in reach, and no route is priced.
+NEAR_BANK_RADIUS = 4
+BANK_SEARCH_EXPANSIONS = 500000
+
+
+def nearest_bank_reachable(here, navigator, candidates=8):
+    """rs2b0t's: the bank the cheapest route reaches, since from a dungeon or an island the straight line
+    misleads, or the nearest by the straight line when no route reaches one. Within 4 tiles of the nearest, that
+    one at once. rs2b0t prices every usable bank; this prices the candidates nearest, since each route is planned
+    while the script waits. None with no usable bank."""
+    near = nearest_bank(here)
+    if near is not None and _bank_tile(near).distance_to(here) <= NEAR_BANK_RADIUS:
+        return near
+    cost = bank_cost_for_navigator(navigator, BANK_SEARCH_EXPANSIONS)
+    best = None
+    best_cost = None
+    for bank in nearest_banks(here)[:candidates]:
+        price = cost(here, _bank_tile(bank))
+        if price is not None and (best_cost is None or price < best_cost):
+            best = bank
+            best_cost = price
+    return best if best is not None else near
+
+
+def _bank_tile(bank):
+    stand = bank['tile']
+    return Tile(stand['x'], stand['z'], stand['level'])
 
 
 def pick_choice(options, choose):
@@ -373,14 +467,23 @@ class _Traversal:
     last_reason = None
     _force_repath = False
 
+    # rs2b0t's Traversal.pureWalk and withTeles: the same as NAV_PURE_WALK and NAV_WITH_TELES.
+    pure_walk = NAV_PURE_WALK
+    with_teles = NAV_WITH_TELES
+
     def __init__(self):
         self._avoid_doors = []
         self._door_strikes = {}
         self._suppressed_teleports = []
 
+    def preload(self):
+        """Nothing to do: the walker's map is built when the client starts. rs2b0t warms its worker here."""
+        return None
+
     def teleports_enabled(self):
-        """Whether walks use teleports unless told otherwise: off, as rs2b0t's default is."""
-        return False
+        """Whether walks use teleports unless told otherwise: the Global nav_teleports setting, off by default,
+        as rs2b0t's is."""
+        return settings_store.global_bag().bool('nav_teleports', False)
 
     def request_repath(self, reason=None):
         """Plans the walk in progress again at its next step."""

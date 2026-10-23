@@ -13,8 +13,14 @@ from rs2004.geometry import Tile
 
 __all__ = [
     'Npc', 'Player', 'Loc', 'GroundItem', 'NpcType', 'ItemType', 'LocType', 'Projectile', 'EntityQuery',
-    'npcs', 'players', 'locs', 'ground_items',
+    'npcs', 'players', 'locs', 'ground_items', 'matches_entity_name',
 ]
+
+
+def matches_entity_name(actual, configured):
+    """Whether a thing's name is the configured one, trimmed and without regard to case, as a query's name()
+    matches."""
+    return actual is not None and actual.strip().lower() == configured.strip().lower()
 
 
 def present_ops(ops):

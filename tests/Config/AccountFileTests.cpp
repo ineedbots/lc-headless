@@ -341,3 +341,42 @@ TEST_CASE("AccountFile::AddScriptSettings", "[AccountFile]")
         CHECK_THROWS_WITH(AccountFile::AddScriptSettings(path, "Chicken killer", defaults), Catch::Matchers::StartsWith(path.string() + ": invalid JSON at line 1"));
     }
 }
+
+TEST_CASE("AccountFile::SetScriptSetting", "[AccountFile]")
+{
+    const auto folder = TempFolder{"rs2004-config-tests"};
+    const auto path = folder.GetPath() / "bot1.jsonc";
+
+    SECTION("replaces a value in place, or adds it")
+    {
+        WriteFile(path, ACCOUNT_EXAMPLE);
+        AccountFile::SetScriptSetting(path, "Chicken killer", "radius", "8");
+        AccountFile::SetScriptSetting(path, "Chicken killer", "radius", "12");
+        AccountFile::SetScriptSetting(path, "Global", "use_mage_bank", "true");
+
+        const auto text = ReadFile(path);
+        CHECK(text.starts_with("{\n    // The account and what it runs.\n"));
+        const auto settings = nlohmann::json::parse(AccountFile::Parse(text, "bot1").script->settings);
+        CHECK(settings["Chicken killer"] == nlohmann::json::parse(R"json({"radius": 12})json"));
+        CHECK(settings["Global"]["use_mage_bank"] == true);
+        CHECK(settings["name"] == "chickens");
+    }
+
+    SECTION("leaves the file alone when the value is already there")
+    {
+        WriteFile(path, ACCOUNT_EXAMPLE);
+        AccountFile::SetScriptSetting(path, "Chicken killer", "radius", "8");
+
+        const auto text = ReadFile(path);
+        const auto before = std::filesystem::last_write_time(path);
+        AccountFile::SetScriptSetting(path, "Chicken killer", "radius", "8");
+        CHECK(ReadFile(path) == text);
+        CHECK(std::filesystem::last_write_time(path) == before);
+    }
+
+    SECTION("puts the file's path in front of the message")
+    {
+        WriteFile(path, "{\"script\": {\"settings\": {\"Chicken killer\": []}}}");
+        CHECK_THROWS_WITH(AccountFile::SetScriptSetting(path, "Chicken killer", "radius", "8"), path.string() + ": script.settings.Chicken killer: must be an object");
+    }
+}

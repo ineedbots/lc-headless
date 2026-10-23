@@ -19,6 +19,21 @@ namespace
 {
     constexpr auto MAX_DAMAGE_TICKS = 1000;
 
+    std::string_view HintArrowKindName(HintArrowKind_e kind)
+    {
+        switch (kind)
+        {
+        case HintArrowKind_e::Npc:
+            return "npc";
+        case HintArrowKind_e::Player:
+            return "player";
+        case HintArrowKind_e::Tile:
+            return "tile";
+        }
+
+        return "tile";
+    }
+
     bool GetTick(int, py_StackRef) noexcept
     {
         return BindingSupport::Guard([]
@@ -189,6 +204,33 @@ namespace
         });
     }
 
+    // (kind, index, x, z, level, height): kind is 'npc' or 'player', with its index, or 'tile' with its tile and
+    // the arrow's height. None without an arrow.
+    bool GetHintArrow(int, py_StackRef) noexcept
+    {
+        return BindingSupport::Guard([]
+        {
+            PyValue::FromOptional(py_retval(), BindingSupport::GetContext().GetState().hintArrow, [](py_OutRef out, const HintArrow_s& arrow)
+            {
+                constexpr auto FIELDS = 6;
+                py_newtuple(out, FIELDS);
+                for (auto i = 1; i < FIELDS; ++i)
+                {
+                    py_newint(py_tuple_getitem(out, i), 0);
+                }
+
+                py_newnone(py_tuple_getitem(out, 0));
+                py_newint(py_tuple_getitem(out, 1), arrow.index);
+                py_newint(py_tuple_getitem(out, 2), arrow.tile.x);
+                py_newint(py_tuple_getitem(out, 3), arrow.tile.z);
+                py_newint(py_tuple_getitem(out, 4), arrow.tile.level);
+                py_newint(py_tuple_getitem(out, 5), arrow.height);
+                PyValue::FromString(py_tuple_getitem(out, 0), HintArrowKindName(arrow.kind));
+            });
+            return true;
+        });
+    }
+
     bool InCombat(int, py_StackRef) noexcept
     {
         return BindingSupport::Guard([]
@@ -304,6 +346,7 @@ void PlayerBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"get_weight()", GetWeight},
                                           {"is_moving()", IsMoving},
                                           {"get_walk_destination()", GetWalkDestination},
+                                          {"get_hint_arrow()", GetHintArrow},
                                           {"in_combat()", InCombat},
                                           {"is_running()", IsRunning},
                                           {"get_local_player()", GetLocalPlayer},

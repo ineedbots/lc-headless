@@ -59,6 +59,21 @@ namespace
         });
     }
 
+    // settings_store.save() has checked the value and turned it into JSON.
+    bool SaveSetting(int, py_StackRef argv) noexcept
+    {
+        return BindingSupport::Guard([argv]
+        {
+            auto save = SettingSave_s{
+                .name = PyValue::ToString(py_arg(0), "name"),
+                .key = PyValue::ToString(py_arg(1), "key"),
+                .valueJson = PyValue::ToString(py_arg(2), "value_json"),
+            };
+            BindingSupport::GetContext().GetControl().RequestSettingSave(std::move(save));
+            return BindingSupport::ReturnNone();
+        });
+    }
+
     bool StopScript(int, py_StackRef) noexcept
     {
         return BindingSupport::Guard([]
@@ -107,6 +122,7 @@ void ControlBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"note_progress()", NoteProgress},
                                           {"last_progress()", GetLastProgress},
                                           {"relog(delay_seconds=0)", Relog},
+                                          {"save_setting(name, key, value_json)", SaveSetting},
                                           {"stop_script()", StopScript},
                                           {"stop_account()", StopAccount},
                                           {"send_bot_message(username, message)", SendBotMessage},

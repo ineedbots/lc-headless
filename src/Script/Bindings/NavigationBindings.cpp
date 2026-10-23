@@ -18,6 +18,8 @@
 namespace
 {
     constexpr auto MAX_LEVEL = s64{MapSquare::LEVELS - 1};
+    // The largest NPC is 5 tiles across; this leaves room.
+    constexpr auto MAX_BODY_SIZE = s64{16};
 
     bool CanReachEntity(int, py_StackRef argv) noexcept
     {
@@ -80,6 +82,30 @@ namespace
 
             const auto& context = BindingSupport::GetContext();
             return BindingSupport::ReturnBool(context.GetReach().CanStep(context.ToTile(coord(0, "from_x"), coord(1, "from_z")), context.ToTile(coord(2, "to_x"), coord(3, "to_z"))));
+        });
+    }
+
+    // On the player's level, from (from_x, from_z) to a body of size whose south-west tile is (to_x, to_z).
+    bool LineOfSight(int, py_StackRef argv) noexcept
+    {
+        return BindingSupport::Guard([argv]
+        {
+            const auto& context = BindingSupport::GetContext();
+            const auto from = context.ToTile(PyArgs::ToCoord(py_arg(0), "from_x"), PyArgs::ToCoord(py_arg(1), "from_z"));
+            const auto to = context.ToTile(PyArgs::ToCoord(py_arg(2), "to_x"), PyArgs::ToCoord(py_arg(3), "to_z"));
+            const auto size = static_cast<s32>(PyValue::ToInt(py_arg(4), "size", 1, MAX_BODY_SIZE));
+            return BindingSupport::ReturnBool(context.GetReach().HasLineOfSight(from, to, size));
+        });
+    }
+
+    // A loaded tile's collision flags on the player's level, or None.
+    bool GetSceneFlags(int, py_StackRef argv) noexcept
+    {
+        return BindingSupport::Guard([argv]
+        {
+            const auto& context = BindingSupport::GetContext();
+            const auto flags = context.GetReach().GetFlags(context.ToTile(PyArgs::ToCoord(py_arg(0), "x"), PyArgs::ToCoord(py_arg(1), "z")));
+            return flags ? BindingSupport::ReturnInt(*flags) : BindingSupport::ReturnNone();
         });
     }
 
@@ -154,5 +180,7 @@ void NavigationBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"nav_data(name)", GetNavData},
                                           {"walk_tile(x, z, level)", GetWalkTile},
                                           {"can_step(from_x, from_z, to_x, to_z)", CanStep},
+                                          {"line_of_sight(from_x, from_z, to_x, to_z, size=1)", LineOfSight},
+                                          {"scene_flags(x, z)", GetSceneFlags},
                                       });
 }
