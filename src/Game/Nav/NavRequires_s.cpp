@@ -25,7 +25,7 @@ namespace
 
 bool NavRequires_s::IsGated() const
 {
-    return members || freeSlots || !skills.empty() || !items.empty() || !worn.empty() || currency || !questWaivesItems.empty() || !quests.empty() || forbidEntranaRestricted || slashTool;
+    return members || freeSlots || !skills.empty() || !items.empty() || !worn.empty() || currency || !questWaivesItems.empty() || !quests.empty() || forbidEntranaRestricted || slashTool || !essenceExitReturn.empty();
 }
 
 std::optional<std::string> NavRequires_s::Check(const NavState_s& state) const
@@ -84,6 +84,12 @@ std::optional<std::string> NavRequires_s::Check(const NavState_s& state) const
     if (slashTool && state.canSlashWeb == false)
     {
         return "need a knife or a bladed weapon to slash webs";
+    }
+
+    // Why: an unknown return passes, as rs2b0t's does, so a cheat-tele into the mine can still leave it.
+    if (!essenceExitReturn.empty() && state.essenceExitReturn && *state.essenceExitReturn != essenceExitReturn)
+    {
+        return std::format("essence exit returns to {}, not {}", *state.essenceExitReturn, essenceExitReturn);
     }
 
     for (const auto& quest : quests)

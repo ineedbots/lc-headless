@@ -73,6 +73,7 @@ namespace
 
         requirement.forbidEntranaRestricted = source.value("forbidEntranaRestricted", false);
         requirement.slashTool = source.value("slashTool", false);
+        requirement.essenceExitReturn = source.value("essenceExitReturn", std::string{});
         return requirement;
     }
 

@@ -29,6 +29,8 @@ struct NavRequires_s
     std::vector<Quest_s> quests;
     bool forbidEntranaRestricted = false;
     bool slashTool = false;
+    // An essence mine exit, open when the state's return is this one or isn't known.
+    std::string essenceExitReturn;
 
     [[nodiscard]] bool IsGated() const;
     // nullopt when the state meets it, else why not. An unknown quest status fails closed.

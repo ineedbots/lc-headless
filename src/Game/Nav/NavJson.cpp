@@ -57,6 +57,7 @@ namespace
             .freeSlots = json.value("free_slots", 0),
             .entranaRestrictedGear = json.value("entrana_restricted_gear", false),
             .canSlashWeb = ReadOptional<bool>(json, "can_slash_web"),
+            .essenceExitReturn = ReadOptional<std::string>(json, "essence_exit_return"),
         };
 
         if (const auto quests = json.find("quests"); quests != json.end() && quests->is_object())

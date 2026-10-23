@@ -557,7 +557,7 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Kind | rs2b0t | Here |
 |---|---|---|
 | Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, tick manipulation (off until rs2b0t ships it). Not yet the mule hand-offs and the guild feather and Shilo supply runs |
-| Gathering | CoalTrucks, FlaxPicker, FlaxAIO, GnomeMagicChopper | `coal_trucks.py`, `flax_picker.py`, `flax_aio.py`, `gnome_magic_chopper.py` |
+| Gathering | CoalTrucks, EssMiner, FlaxPicker, FlaxAIO, GnomeMagicChopper | `coal_trucks.py`, `ess_miner.py`, `flax_picker.py`, `flax_aio.py`, `gnome_magic_chopper.py` |
 | Skilling | BankFletcher, CookBot, DartFletcher, Firemaker, FlaxSpinner, GemCutter, HerbCleaner, HerbloreSecondaries, PotionMaker, LeatherCrafter, SmelterBot, SmithingBot, Superheater, TannerBot, VialFiller, BoneBurier, ClimbingBoots | `bank_fletcher.py` and the rest, each named as rs2b0t names it in snake_case |
 | Jewellery and caskets | JiveBalls, JiveCaskets, JiveCrafting, JiveEnchanter | `jive_balls.py`, `jive_caskets.py`, `jive_crafting.py`, `jive_enchanter.py` |
 | Runecrafting | RuneCrafter, NatureCrafter | `rune_crafter.py`, `nature_crafter.py`. NatureCrafter's paint button is the `gobank` console command |

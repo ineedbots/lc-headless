@@ -9,7 +9,8 @@
 class Navigation
 {
 public:
-    static constexpr std::array<std::string_view, 3> DATA_FILES = {"crossings", "banks", "danger_zones"};
+    // teleports.json is the graph's too; the stdlib reads its jewellery items and dialogue.
+    static constexpr std::array<std::string_view, 4> DATA_FILES = {"crossings", "banks", "danger_zones", "teleports"};
 
     Navigation(const GameCache_s& cache, const std::filesystem::path& directory);
     // Without the data files, for tests.

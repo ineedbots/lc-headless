@@ -44,6 +44,7 @@ public:
 
 private:
     void Rebuild(const GameState_s& state);
+    void BlockMissingSquares();
     void AddCollision(s32 level, s32 x, s32 z, s32 id, u8 shape, u8 angle);
     [[nodiscard]] const LocChange_s* FindChange(const Tile_s& tile, LocLayer_e layer) const;
     [[nodiscard]] std::vector<const MapSquare*> GetSquares() const;

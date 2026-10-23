@@ -266,3 +266,37 @@ def record_view(fn):
 def _records_after(gen):
     result = yield from gen
     return as_records(result)
+
+
+class Obj:
+    """rs2b0t's plain objects, for code that reads them both as attributes and as a dict: a transport is
+    transport['loc_x'] here and transport.locX there. A field not given reads as None."""
+
+    def __init__(self, fields):
+        self._fields = fields
+
+    def __getattr__(self, name):
+        if name.startswith('__'):
+            raise AttributeError(name)
+        return self._fields.get(name)
+
+    def __getitem__(self, key):
+        return self._fields[key]
+
+    def __setitem__(self, key, value):
+        self._fields[key] = value
+
+    def __contains__(self, key):
+        return key in self._fields
+
+    def get(self, key, default=None):
+        return self._fields.get(key, default)
+
+    def items(self):
+        return self._fields.items()
+
+    def keys(self):
+        return self._fields.keys()
+
+    def __repr__(self):
+        return f'Obj({self._fields})'

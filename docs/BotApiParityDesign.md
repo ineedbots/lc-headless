@@ -245,12 +245,33 @@ What BotApiDesign §9 left out of `traversal`, as rs2b0t has it:
 EssMiner, whose trips out of the mine need the essence session.
 
 - **Done when:**
-    - [ ] rs2b0t's `test/event/webwalk` tests for these pieces are ported and pass.
-    - [ ] Against the local engine, with teleports on:
+    - [x] rs2b0t's `test/event/webwalk` tests for these pieces are ported and pass, less those driving its own PathFinder (see "As built").
+    - [x] Against the local engine, with teleports on (see "As built" for the guild's and EssMiner's):
         - a glory takes an account from Varrock to Draynor;
         - a walk from Lumbridge to Karamja with no coins banks for the fare first;
         - EssMiner's trips leave the mine by the right portal from both banks;
         - a quest-locked gate is detected and routed around.
+
+### As built
+
+- **Where it lives.** rs2b0t's pure pieces are the new stdlib module `rs2004.routeplan`: `bankPlan.ts`, `virtualState.ts`, `gateItems.ts`, `slashTool.ts`, `essenceSession.ts`, `essenceExit.ts`, `pathFollowPolicy.ts`, `exec/questLock.ts`, `data/postQuestTalks.ts`, and the special-crossing lookup and `pick_choice`, which moved there from `traversal`. `traversal` is the walker that uses them; it still exports what moved. `Navigation` now hands the stdlib `teleports.json` too, for the jewellery's item names and dialogue.
+- **Jewellery teleports.** The planner already routed the glory, the games necklace and the ring of dueling the backpack holds; the walker now takes them: it rubs the item, picks the destination with the catalog's `dialogueChoose`, and waits for the landing, as `teleportExecute.ts` does.
+- **Banking for a route.** As rs2b0t's: once a walk, the route's items (summed fares, peak keys and tools, a teleport's runes, a knife for webs) are checked against the backpack, a route from the nearest bank is planned with the bank's stock assumed held, and the walk banks when that's cheaper; a route that still lacks items doesn't set off, and `last_missing_gate_items` says what. It goes further in one case. The core's planner gates fares and tolls on the coins held, so with none it plans no route at all, and rs2b0t gives up there with the missing coins named. Here the walker banks for the kit `explain_unreachable` names and plans again. That's what the "no coins" check below needs.
+- **The essence mine.** The exits' `essenceExitReturn` requirement is the core's now (`NavRequires_s`), against the state's `essence_exit_return`: a known return that doesn't match fails, an unknown one passes, as rs2b0t's `requires.ts` has it. rs2b0t also carries the return through the path search's state, for a route that enters and leaves the mine in one plan; nothing plans that, so it's left out. `essence_session` remembers the return from a wizard's crossing or Teleport hop, and EssMiner, which teleports in itself, notes Aubury.
+- **Quest-locked crossings.** rs2b0t reads its lock phrases only from the dialogue. The 289 doors refuse in the chatbox first ("The door won't open - you need at least 32 Quest Points."), so the walker reads the game messages since the click too, and "won't" joins the phrases. pocketpy has no `re`, so the ten patterns are word matches.
+- **Follow settings.** `path_follow` on a walk, then the Global `nav_path_stall_ticks` and `nav_path_deviation`, then the defaults, with `door_step_ticks` waited between a door opening and the step through.
+- **The camp's doors.** The Desert Mining Camp's scripted leaves are never matched by a neighbour, nor opened by `try_nearby_door`. The exporter already left out the doors rs2b0t replaces, and the rockslide's and the essence exits' edges were already in `edges.json`.
+- **Moved to later phases.** `karamjaRecovery.ts` fills Luthas's banana crate through Pirate's Treasure's quest steps, so it goes to phase 16 with the quest engine.
+- **Found and fixed live:**
+    - WildyAgility's stall at (2944, 3911). The server has no map for square (45, 61), so its tiles are off the map and every step onto them is refused. The cache has none either, but the scene's collision left a missing square open, so the client's path for a click ran west through it, and the server dropped the whole walk. The world planner already treated it as having no floor. `WorldMap` now blocks a square a loaded cache has no map for (`GameCache_s::squaresComplete`; a cache built by hand for a test holds only what it's given). WildyAgility then ran 4 laps, 2,333 xp, without a death.
+    - An attacked walk didn't move. On this server a hit makes a retaliating player attack back unless it's busy, and walking isn't busy, so every hit cancelled the walk, and rs2b0t's "hold course" held it in place. A walk under attack that isn't moving turns auto retaliate off until it ends.
+- **Tests.** rs2b0t's `bankPlan`, `gateItems`, `essenceSession`, `pathFollowPolicy`, `questLock` and the catalog half of `jewelleryAndStateAware` are in `tests/Stdlib/rs2b0t/`, those reading the real crossings in `nav/`, and EssMiner's logic beside them. `essenceMinePortal`, `essenceMineTransit`, `routeFunding` and `questGatedCrossings` drive rs2b0t's own PathFinder over its pack, or stub the executor; here the planner's real-cache tests cover the exits (`WorldPathFinderRealTests.cpp`: each known return leaves by its own portal), and the live checks the rest. `test_routeplan.py` has the cases that differ from rs2b0t.
+- **The live checks,** each on a fresh account against the local engine:
+    - Varrock to Draynor with an amulet of glory and teleports on: it rubbed the amulet, chose Draynor Village, landed, and arrived.
+    - Lumbridge to Karamja with no coins held and 100 banked: it banked at Al Kharid for 40 (the toll back out and the fare), paid both, sailed, and arrived with none left.
+    - Into the Champions' Guild with no quest points: the door refused, the walker read the refusal as a lock and left the door out, and the walk ended unreachable, since there's no other way in. So the detection is shown; a route around needs a refused crossing with another way past, which this one hasn't.
+    - EssMiner, on an account whose quests the engine's `~cq` cheat had completed: Aubury's teleport in, a full pack, the portal back, the Varrock East bank, twice in 12 minutes, 53 essence banked. EssMiner banks only at Varrock East and leaves by the portal itself, not through the walker, so "both banks" was one; the walker's exits are the planner test's. The cheat completes the quests a few seconds apart, each behind its quest scroll, and the quest list shows them only from the next login.
+    - WildyAgility, after the two fixes above: 4 laps and 2,333 xp in 12 minutes, without a death.
 
 ---
 

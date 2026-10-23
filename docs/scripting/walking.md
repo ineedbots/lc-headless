@@ -42,7 +42,7 @@ if not arrived:
     log('Walk failed:', traversal.last_outcome, traversal.last_reason)
 ```
 
-### `traversal.walk_to(dest, radius=2, timeout_ms=None, max_expansions=None, use_teleport_catalog=None, policy=None, bank_item_counts=None, avoid_zones=None, log=None, force_repath=False)`
+### `traversal.walk_to(dest, radius=2, timeout_ms=None, max_expansions=None, use_teleport_catalog=None, policy=None, bank_item_counts=None, avoid_zones=None, log=None, force_repath=False, path_follow=None)`
 
 **Wait.** One planned walk to within `radius` of `dest`, replanning up to 5 times.
 
@@ -52,12 +52,13 @@ if not arrived:
 | `radius` | How near counts as there |
 | `timeout_ms` | The whole walk's limit; 5 minutes when `None` |
 | `max_expansions` | The route search's budget, in nodes; the default when `None` |
-| `use_teleport_catalog` | Plan spell teleports the backpack has runes for. `None` uses `teleports_enabled()`, the [Global](settings.md#global-settings) `nav_teleports`, off by default |
+| `use_teleport_catalog` | Plan spell teleports the backpack has runes for, and the glory, games necklace and ring of dueling the backpack holds. A jewellery hop rubs the item and picks the destination. `None` uses `teleports_enabled()`, the [Global](settings.md#global-settings) `nav_teleports`, off by default |
 | `policy` | A dict of `use_teleports`, `use_ships`, `use_shortcuts`, `allow_teleport_ids`, `deny_teleport_ids`. `use_teleports: False` also turns the catalog off |
-| `bank_item_counts` | Accepted for rs2b0t compatibility; not used yet |
+| `bank_item_counts` | A dict of name to count of what the bank holds, for the bank leg (see [Banking for a route](#banking-for-a-route)). `None` reads the bank when it's open, else assumes it has every crossing's item |
 | `avoid_zones` | Areas a route never enters, though it may leave one it starts in: catalog ids such as `'white-wolf-mountain'`, or dicts of `min_x`, `max_x`, `min_z`, `max_z` and optionally `level`. The automatic zones are always added: `'draynor-jail-guards'` at combat level 50 and below, unless the walk starts or ends inside it |
 | `log` | A function given progress lines, such as `log` itself |
 | `force_repath` | Plan again at the next step |
+| `path_follow` | A dict overriding how the walk follows its route: `stall_ticks` (ticks without moving before it plans again), `deviation_chebyshev` (tiles off the route before it does), `transport_approach_chebyshev` (how near a hop's stand it takes the hop, at least 3) and `door_step_ticks` (ticks between a door opening and the step through it, 1 by default). The first two default to the [Global](settings.md#global-settings) `nav_path_stall_ticks` and `nav_path_deviation` |
 
 **Gives** `True` on arrival, or when the route ends as close as it can get (`last_outcome` `'closest'` or `'blocked'`); `False` otherwise.
 
@@ -92,6 +93,7 @@ yield from traversal.walk_to(dest, 2, **NAV_WITH_TELES)
 |---|---|
 | `traversal.last_outcome` | How the last walk ended: `'arrived'`, `'closest'` (as near as the route goes), `'blocked'`, `'budget'` (the search ran out of budget), `'failed'`, `'unreachable'` or `'interrupted'` |
 | `traversal.last_reason` | Why the last search failed, as text, or `None` |
+| `traversal.last_missing_gate_items` | What the last walk's route needed and the account didn't hold, as items with `name` and `count`: a toll's coins, a fare, a teleport's runes, a knife for webs. Empty when nothing was missing |
 | `traversal.remaining` | Route tiles left on the walk in progress |
 | `traversal.request_repath(reason=None)` | Plans the walk in progress again at its next step |
 | `traversal.route_cost(start, dest, max_expansions=300000)` | The cost of the route a walk would plan, without teleports and without walking, or `None` when there's none, as past a gate the account can't open |
@@ -103,7 +105,33 @@ yield from traversal.walk_to(dest, 2, **NAV_WITH_TELES)
 
 Each hop of a route is checked against the account: skill levels, quest status from the quest tab, the coins for a toll or fare, items it needs, and members' areas. A hop the account can't make isn't planned, so a walk into Al Kharid without 10 coins goes round rather than through the toll gate. On revision 225 the server doesn't say whether the world is members, so walks are planned as on a free world.
 
-`world_state()` gives what's checked, as a dict: `members`, `skills` (name to base level), `items` and `worn` (name to count), `quests` (name to `'not_started'`, `'started'`, `'complete'` or `'unknown'`) and `free_slots`.
+`world_state()` gives what's checked, as a dict: `members`, `skills` (name to base level), `items` and `worn` (name to count), `quests` (name to `'not_started'`, `'started'`, `'complete'` or `'unknown'`), `free_slots`, `can_slash_web` (a knife or a bladed weapon held or worn), and `essence_exit_return` once it's known (see [The essence mine](#the-essence-mine)).
+
+When a route can't be planned, the walker plans it again as if the account held every crossing's item, and the log names what would open it, such as `unreachable without 30x Coins`. `last_missing_gate_items` keeps the list.
+
+### Banking for a route
+
+Before setting off, the walker counts what the route's hops use: a toll's or fare's coins, summed over the route, a teleport's runes, a key or a knife. When the backpack is short, or a route through the bank would be cheaper, it plans the route again from the nearest bank as if the bank's stock were held, and when that's cheaper than the alternative, walks to the bank, withdraws what's missing, and plans again. It does this once a walk. A route that can't be planned at all because the backpack can't pay is funded the same way: rs2b0t gives up there, while this walker banks for the kit that would open one. A walk from Lumbridge to Karamja with no coins banks for the toll and the fare first.
+
+When a route still needs what the backpack lacks, the walk doesn't set off: it ends `'unreachable'`, with `last_missing_gate_items` saying what.
+
+### Crossings that refuse
+
+A door or gate that answers with a lock phrase, such as "The door won't open - you need at least 32 Quest Points." or "You need a key", in the dialogue or the chatbox, is left out of the rest of the walk, and the walk plans again. Some crossings open only after a talk the quest journal can't show, such as the Salve barrier after Priest in Peril: when one refuses, the walker talks the NPC through it once a session, and tries again.
+
+A walk under attack that isn't moving turns auto retaliate off until it ends. On this server a hit makes a retaliating player attack back unless it's busy, and walking isn't busy, so otherwise every hit cancels the walk.
+
+### The essence mine
+
+The essence mine's portal leads back to the wizard who sent you in, which the server keeps to itself. The walker remembers it when a walk goes in through a wizard, and plans the exit that leads there. `essence_session` holds it:
+
+| Member | Gives or does |
+|---|---|
+| `essence_session.get_return_id()` | `'aubury'`, `'sedridor'`, `'distentor'`, `'brimstail'`, `'cromperty'`, or `None` while it isn't known, when every exit is planned |
+| `essence_session.note_entry(return_id)` | Records the way back, for a script that teleports in itself, as EssMiner does |
+| `essence_session.note_entry_from_npc(name)` | The same from the wizard's name, such as `'Wizard Cromperty'` |
+| `essence_session.set_harness_override(return_id)`, `clear_harness_override()` | For a test that teleports into the mine without a wizard |
+| `essence_session.clear()` | Forgets it |
 
 ### Banks
 

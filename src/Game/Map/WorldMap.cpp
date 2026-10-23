@@ -196,6 +196,8 @@ void WorldMap::Rebuild(const GameState_s& state)
         }
     }
 
+    BlockMissingSquares();
+
     VisitCachedLocs([this](const SceneLoc_s& loc, s32 localX, s32 localZ)
     {
         AddCollision(loc.tile.level, localX, localZ, loc.id, loc.shape, loc.angle);
@@ -214,6 +216,44 @@ void WorldMap::Rebuild(const GameState_s& state)
     }
 
     m_builtAt = state.sceneChangeCount;
+}
+
+// Why: the server has no map for a square the cache has none for, and refuses a step onto it; the client would
+// leave it open and send a path across it, which the server then drops whole.
+void WorldMap::BlockMissingSquares()
+{
+    if (!m_cache->squaresComplete)
+    {
+        return;
+    }
+
+    const auto firstX = (m_area.centreZoneX - BUILD_AREA_RADIUS_ZONES) / ZONES_PER_SQUARE;
+    const auto lastX = (m_area.centreZoneX + BUILD_AREA_RADIUS_ZONES) / ZONES_PER_SQUARE;
+    const auto firstZ = (m_area.centreZoneZ - BUILD_AREA_RADIUS_ZONES) / ZONES_PER_SQUARE;
+    const auto lastZ = (m_area.centreZoneZ + BUILD_AREA_RADIUS_ZONES) / ZONES_PER_SQUARE;
+    for (auto squareX = firstX; squareX <= lastX; ++squareX)
+    {
+        for (auto squareZ = firstZ; squareZ <= lastZ; ++squareZ)
+        {
+            if (m_cache->FindSquare(squareX, squareZ) != nullptr)
+            {
+                continue;
+            }
+
+            const auto originX = squareX * MapSquare::SIZE - m_area.baseX;
+            const auto originZ = squareZ * MapSquare::SIZE - m_area.baseZ;
+            for (auto& collision : m_collision)
+            {
+                for (auto x = 0; x < MapSquare::SIZE; ++x)
+                {
+                    for (auto z = 0; z < MapSquare::SIZE; ++z)
+                    {
+                        collision.BlockGround(originX + x, originZ + z);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ClientBuild.addLoc's collision: only types that block walking touch it.

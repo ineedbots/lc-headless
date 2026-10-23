@@ -4,6 +4,7 @@
 #include "Cache/MapSquare.hpp"
 #include "Game/Nav/NavJson.hpp"
 #include "Game/Nav/NavPoint_s.hpp"
+#include "Game/Nav/NavRequires_s.hpp"
 #include "Game/Nav/NavState_s.hpp"
 #include "Game/Nav/Navigation.hpp"
 #include "Game/Nav/WorldPathFinder.hpp"
@@ -252,4 +253,23 @@ TEST_CASE("NavJson reads route requests and writes routes", "[WorldPathFinder]")
     CHECK_THAT(json, ContainsSubstring(R"("ok":true)"));
     CHECK_THAT(json, ContainsSubstring(R"("action":"Climb-up")"));
     CHECK_THAT(json, ContainsSubstring(R"("to_level":1)"));
+}
+
+TEST_CASE("An essence mine exit opens for its own return, or while the return isn't known", "[WorldPathFinder]")
+{
+    const auto exit = NavRequires_s{.essenceExitReturn = "aubury"};
+    CHECK(exit.IsGated());
+
+    auto state = NavState_s{};
+    CHECK_FALSE(exit.Check(state).has_value());
+
+    state.essenceExitReturn = "aubury";
+    CHECK_FALSE(exit.Check(state).has_value());
+
+    state.essenceExitReturn = "sedridor";
+    CHECK(exit.Check(state) == "essence exit returns to sedridor, not aubury");
+
+    const auto request = NavJson::ParseRequest(R"json({"from": [1, 2, 0], "to": [3, 4, 0], "state": {"essence_exit_return": "cromperty"}})json");
+    REQUIRE(request.options.state.has_value());
+    CHECK(request.options.state->essenceExitReturn == "cromperty");
 }

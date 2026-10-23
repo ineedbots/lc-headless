@@ -606,6 +606,7 @@ GameCache_s CacheLoader::Load(const std::filesystem::path& directory, Revision_e
 
         const auto missingFiles = revision >= Revision_e::Rev274 ? LoadStore(directory, cache, logger) : LoadFolder(directory, cache, logger);
         cache.text.FinishInterning();
+        cache.squaresComplete = true;
 
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
         logger.Info("Revision {} cache loaded from {} in {} ms: {} locs, {} NPCs, {} objs, {} map squares with {} locs", static_cast<u16>(revision),

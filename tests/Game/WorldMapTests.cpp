@@ -3,6 +3,7 @@
 #include "../Support/Game/Fixtures.hpp"
 
 #include "Cache/GameCache_s.hpp"
+#include "Cache/MapSquare.hpp"
 #include "Config/Revision_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
@@ -201,4 +202,31 @@ TEST_CASE("WorldMap follows the decoders' zone resets", "[WorldMap]")
     fixture.map.Update(fixture.state);
     CHECK(fixture.GetFlags(DOOR_TILE) == WALL_FLAGS);
     CHECK_FALSE(fixture.map.GetLoc(DOOR_TILE, LocLayer_e::Wall)->changed);
+}
+
+TEST_CASE("WorldMap blocks the squares a loaded cache has no map for, as the server does", "[WorldMap]")
+{
+    // One square, at home; the rest of the area has none.
+    const auto home = Local(Fixtures::HOME_LOCAL, Fixtures::HOME_LOCAL);
+    // The tile west of the home square's edge, off the area's outer ring, which is always blocked.
+    const auto westEdge = home.x / MapSquare::SIZE * MapSquare::SIZE - Fixtures::BASE;
+    const auto other = Local(westEdge - 1, Fixtures::HOME_LOCAL);
+    REQUIRE(westEdge - 1 >= 1);
+
+    const auto flagsAt = [&](bool complete, const Tile_s& tile)
+    {
+        auto cache = GameCache_s{};
+        TestCache::SetMap(cache, {}, std::to_array<Tile_s>({Local(Fixtures::HOME_LOCAL + 1, Fixtures::HOME_LOCAL + 1)}));
+        cache.squaresComplete = complete;
+        auto map = WorldMap{std::make_shared<const GameCache_s>(std::move(cache))};
+        auto state = Fixtures::PlacedState();
+        state.sceneChangeCount = 1;
+        map.Update(state);
+        return map.GetCollision(0).GetFlags(tile.x - Fixtures::BASE, tile.z - Fixtures::BASE);
+    };
+
+    CHECK(flagsAt(true, other) == CollisionFlag::GROUND);
+    CHECK(flagsAt(true, home) == CollisionFlag::OPEN);
+    // A cache built by hand holds only the squares given it, so the rest stay open.
+    CHECK(flagsAt(false, other) == CollisionFlag::OPEN);
 }

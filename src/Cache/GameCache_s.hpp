@@ -43,6 +43,9 @@ struct GameCache_s
     std::vector<ObjType_s> objs;
     // Keyed by MapSquare::GetId.
     std::unordered_map<u16, MapSquare> squares;
+    // Whether a square missing from squares has no map at all, as in a cache loaded from its files. A cache built
+    // by hand holds only the squares given it.
+    bool squaresComplete = false;
     // 225 only, keyed by MapSquare::GetId.
     std::unordered_map<u16, MapCrcs_s> mapCrcs;
     std::unordered_map<u16, IfComponent_s> components;

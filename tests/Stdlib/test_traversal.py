@@ -1,3 +1,4 @@
+import rs2004.routeplan as routes
 import rs2004.traversal as walker
 from rs2004.traversal import matches_landing, special_crossing_for_transport, pick_choice
 
@@ -15,7 +16,7 @@ def tile(x, z, level=0):
 
 
 def test_crossings_are_found_by_the_tiles_and_landing_of_the_hop():
-    walker._crossings = [TOLL, SHIP, OTHER_SHIP]
+    routes._crossings = [TOLL, SHIP, OTHER_SHIP]
     gate = {'loc_name': 'Gate', 'action': 'Open', 'loc_x': 3268, 'loc_z': 3227}
     assert special_crossing_for_transport(gate, tile(3267, 3227), tile(3269, 3227)) is TOLL
     ship = {'loc_name': 'Seaman Thresnor', 'action': 'Pay-fare', 'loc_x': 3027, 'loc_z': 3218}
@@ -24,7 +25,7 @@ def test_crossings_are_found_by_the_tiles_and_landing_of_the_hop():
     assert special_crossing_for_transport(ship, tile(3027, 3218), tile(3000, 3000, 1)) is None
     door = {'loc_name': 'Door', 'action': 'Open', 'loc_x': 3100, 'loc_z': 3100}
     assert special_crossing_for_transport(door, tile(3100, 3099), tile(3100, 3101)) is None
-    walker._crossings = None
+    routes._crossings = None
 
 
 def test_dialogue_choices_match_by_part():

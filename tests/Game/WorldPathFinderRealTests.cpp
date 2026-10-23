@@ -129,3 +129,31 @@ TEST_CASE("WorldPathFinder plans routes across the real map", "[RealCache]")
         CHECK(std::max(std::abs(end.x - 3252), std::abs(end.z - 3419)) <= 1);
     }
 }
+
+TEST_CASE("WorldPathFinder leaves the essence mine by the portal back to the wizard who sent you in", "[RealCache]")
+{
+    constexpr auto MINE = NavPoint_s{.x = 2910, .z = 4832, .level = 0};
+    constexpr auto AUBURY = NavPoint_s{.x = 3253, .z = 3401, .level = 0};
+    constexpr auto SEDRIDOR = NavPoint_s{.x = 3106, .z = 9572, .level = 0};
+
+    const auto landing = [&](const std::string& returnId)
+    {
+        auto state = MakeState(0);
+        state.essenceExitReturn = returnId;
+        const auto path = Find(MINE, {.x = 3253, .z = 3420, .level = 0}, state);
+        REQUIRE(path.ok);
+        const auto portal = std::ranges::find_if(path.waypoints, [](const NavWaypoint_s& waypoint)
+        {
+            return waypoint.edge != nullptr && waypoint.edge->locName == "Portal";
+        });
+        REQUIRE(portal != path.waypoints.end());
+        return portal->point;
+    };
+
+    const auto aubury = landing("aubury");
+    CHECK(std::max(std::abs(aubury.x - AUBURY.x), std::abs(aubury.z - AUBURY.z)) <= 2);
+
+    const auto sedridor = landing("sedridor");
+    CHECK(sedridor.level == SEDRIDOR.level);
+    CHECK(std::max(std::abs(sedridor.x - SEDRIDOR.x), std::abs(sedridor.z - SEDRIDOR.z)) <= 2);
+}
