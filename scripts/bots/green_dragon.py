@@ -1,8 +1,7 @@
 # Fights the green dragons in the wilderness north of Edgeville with melee or magic behind a Dragonfire shield, and
 # banks the bones and hides at Edgeville, sipping super attack and strength mid-fight: rs2b0t's GreenDragon (MIT,
 # see thirdparty/rs2b0t). It flees to the bank, or teleports to Varrock, when a player attacks or it's out of food
-# and low. rs2b0t also solves the hard clues the dragons drop; that comes with the clue solver, and until then a
-# clue picked up is banked.
+# and low. It solves the hard clues the dragons drop, the trail running out of the wilderness and back.
 
 import time
 
@@ -13,6 +12,7 @@ from rs2004.catalogs import EMPTY_VIAL, LOADOUT_SETTING, MELEE_WEAPONS, SPELL_DB
 from rs2004.catalogs import DeathRecovery, bury_one_in_fight, casts_available, combat_keep_names, drop_db, food_count, food_forms
 from rs2004.catalogs import food_heal_amount, is_food_item, planned_potions, potion_to_sip, rune_withdraw_list, script_food
 from rs2004.catalogs import selected_loadout, should_eat_to_use_food, should_hold_eat, supplies_of, swing_started_this_tick
+from rs2004.clues import SolveClue, SolveClueHost
 
 TARGET = 'Green dragon'
 DEFAULT_ANCHOR = Tile(3096, 3814, 0)
@@ -545,6 +545,10 @@ class GreenDragon(TaskBot):
         else:
             self.potions = []
         self.tracked_gear = [i.name for i in equipment.items() if i.name]
+        self.clues_solved = 0
+        self.solve_clue = SolveClue(SolveClueHost(log=self.log, set_status=self.clue_status, is_food=lambda name: is_food_item(name, self.food_name),
+                                                  food_name=lambda: self.food_name, food_withdraw=lambda: self.food_withdraw,
+                                                  weapon_name=lambda: self.weapon, enabled=lambda: self.solve_clues))
         yield from self.assert_auto_retaliate()
         mage = f' ({self.spell})' if self.style == 'mage' else ''
         escape = 'Varrock tele' if self.tele_escape else 'flee to bank'
@@ -563,7 +567,9 @@ class GreenDragon(TaskBot):
             traced('SetAttackStyle', SetAttackStyle(self)),
             traced('ArmAutocast', ArmAutocast(self)),
             traced('DropVial', DropVial(self)),
+            # Above SolveClue: a trail's bank stop would otherwise deposit the bones it was told to bury.
             traced('BuryBones', BuryBones(self)),
+            traced('SolveClue', self.solve_clue),
             traced('FreeSlot', FreeSlot(self)),
             traced('BankRun', BankRun(self)),
             traced('LootCorpse', LootCorpse(self)),
@@ -574,6 +580,7 @@ class GreenDragon(TaskBot):
     def died_now(self):
         self.died = True
         self.status = 'died — recovering'
+        self.solve_clue.note_death()
         self.log('died! recovering')
 
     def recovered(self):
@@ -585,13 +592,20 @@ class GreenDragon(TaskBot):
     def recovery_anchor(self):
         return self.bank_tile
 
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+        self.status = text
+
     def grind_targets(self):
         return [TARGET.lower()]
 
     def on_progress_report(self):
         minutes = (time.time() - self.started_at) / 60
         gained = sum([skills.xp(skill) for skill in GRIND_SKILLS]) - self.xp_at_start
-        return {
+        report = {
             'Status': self.status,
             'Kills': self.kills,
             'Looted': self.looted,
@@ -603,6 +617,10 @@ class GreenDragon(TaskBot):
             'Buried': self.buried,
             'XP/hr': f'{(gained / minutes * 60 / 1000):.1f}k' if minutes > 0.5 else '-',
         }
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
+        return report
 
     # Logging
 

@@ -1,10 +1,11 @@
 # Pickpockets East Ardougne market's guards, knights, paladins or heroes, stealing cakes from the Baker's stall
 # for food, kiting or fighting a guard that catches it, and banking the loot: rs2b0t's ArdyThiever (MIT, see
-# thirdparty/rs2b0t). rs2b0t also solves the clues it picks up; that comes with the clue solver.
+# thirdparty/rs2b0t). It solves the clues it picks up.
 
 from rs2004.catalogs import ARDOUGNE_PICKPOCKET_TARGETS, CAKE_ITEMS, STUN_COMBAT_TICKS, ContinueDialog, DeathRecovery
 from rs2004.catalogs import choose_target, count_matching, food_heal_amount, is_hostile_attacker, matches_any, required_thieving
 from rs2004.catalogs import should_bank, should_eat, should_panic, slots_matching, steal_cakes, sustain, target_spot, withdraw_to
+from rs2004.clues import SolveClue, SolveClueHost
 
 BANK_STAND = Tile(2655, 3286, 0)
 BOOTH_NAME = 'Bank booth'
@@ -28,6 +29,7 @@ SETTINGS = {
     'food_target': SettingDef('number', 22, 'Fill food to (count)', 1, 27),
     'restock_at_food': SettingDef('number', 3, 'Restock when food drops to', 0, 26),
     'bank_at_loot_slots': SettingDef('number', 12, 'Bank at loot slots', 1, 27),
+    'solve_clues': SettingDef('boolean', True, 'Solve clue drops', group='Clues'),
 }
 SETTINGS.update(PERIODIC_BANK_SETTINGS)
 
@@ -358,7 +360,11 @@ class ArdyThiever(TaskBot):
         self.status = 'starting'
         self.stunned_until_tick = 0
         self.loot_counts = {}
+        self.clues_solved = 0
         self.xp_at_start = skills.xp('thieving')
+        self.solve_clues = s.bool('solve_clues', True)
+        self.solve_clue = SolveClue(SolveClueHost(log=self.log, set_status=self.clue_status, is_food=lambda name: matches_any(name, FOOD),
+                                                  food_name=lambda: 'Cake', food_withdraw=lambda: self.food_target, enabled=lambda: self.solve_clues))
         sustain.set(eat_if_needed)
 
         need = required_thieving(self.target)
@@ -377,6 +383,7 @@ class ArdyThiever(TaskBot):
         tasks.append(PanicRetreat(self))
         if self.response == 'Fight':
             tasks.append(FightBack(self))
+        tasks.append(self.solve_clue)
         tasks.append(PeriodicBank(
             strategy=lambda: parse_bank_strategy(self.settings.str('bank_strategy', 'Off')),
             items_threshold=lambda: self.settings.num('bank_every_items', 15),
@@ -396,6 +403,13 @@ class ArdyThiever(TaskBot):
         for task in tasks:
             self.add(task)
 
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+        self.set_status(text)
+
     def heard(self, e):
         text = (e.text or '').lower()
         if 'oh dear' in text and 'you are dead' in text:
@@ -405,6 +419,7 @@ class ArdyThiever(TaskBot):
 
     def died_now(self):
         self.status = 'died; recovering'
+        self.solve_clue.note_death()
         self.log('died! recovering')
 
     def recovered(self):
@@ -435,8 +450,12 @@ class ArdyThiever(TaskBot):
             self.loot_counts[name] = self.loot_counts.get(name, 0) + 1
 
     def on_progress_report(self):
-        return {'Status': self.status, 'Steals': self.steals, 'Thieving xp': skills.xp('thieving') - self.xp_at_start, 'Food': food_count(),
-                'Loot slots': loot_slots(), 'Looted': self.looted, 'Bank trips': self.trips, 'Fled': self.flees, 'Fought': self.kills, 'Ate': self.eats}
+        report = {'Status': self.status, 'Steals': self.steals, 'Thieving xp': skills.xp('thieving') - self.xp_at_start, 'Food': food_count(),
+                  'Loot slots': loot_slots(), 'Looted': self.looted, 'Bank trips': self.trips, 'Fled': self.flees, 'Fought': self.kills, 'Ate': self.eats}
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
+        return report
 
 
 BOT = define_bot(

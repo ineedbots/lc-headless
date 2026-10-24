@@ -21,7 +21,7 @@ __all__ = [
     'items_required_by_waypoints', 'missing_items_for_path', 'plan_bank_leg', 'path_has_teleport', 'virtualize_with_items',
     'gate_item_candidates', 'explain_unreachable', 'is_quest_lock_text', 'is_quest_lock_dialogue', 'post_quest_talk_for',
     'essence_session', 'ESSENCE_EXIT_RETURNS', 'essence_return_id_from_tile', 'resolve_path_follow_config', 'is_slash_web_transport',
-    'records_have_slash_tool', 'WEB_SLASH_KNIFE_NAME',
+    'records_have_slash_tool', 'WEB_SLASH_KNIFE_NAME', 'is_entrana_restricted_gear', 'names_have_entrana_restricted_gear', 'meets_requires',
 ]
 
 
@@ -204,6 +204,96 @@ def records_have_slash_tool(items, worn=None):
 
 def is_slash_web_transport(loc_name, action):
     return (action or '').lower() == 'slash' and 'web' in (loc_name or '').lower()
+
+
+# Entrana's monks turn back anyone carrying weapons or armour: rs2b0t's ENTRANA_RESTRICTED_GEAR_RE as words, since
+# pocketpy has no re.
+ENTRANA_RESTRICTED_WORDS = [
+    'sword', 'dagger', 'scimitar', 'longsword', '2h', 'mace', 'warhammer', 'battleaxe', 'axe', 'pickaxe', 'spear', 'hasta', 'halberd', 'maul',
+    'claws', 'whip', 'bow', 'shortbow', 'longbow', 'crossbow', 'javelin', 'dart', 'thrownaxe', 'knife', 'staff', 'wand', 'battlestaff',
+    'cannon', 'helmet', 'coif', 'platebody', 'chainbody', 'platelegs', 'plateskirt', 'kiteshield', 'defender', 'chaps', 'vambraces', 'gauntlet',
+    'gauntlets', 'gloves', 'shield', 'cape', 'cloak', 'snelm', 'cowl', 'hat', 'hood',
+]
+ENTRANA_RESTRICTED_PHRASES = [
+    ['two', 'handed'], ['full', 'helm'], ['med', 'helm'], ['skirt', 'of'], ['square', 'shield'], ['sq', 'shield'], ['dragon', 'square'],
+    ['god', 'cape'], ['fire', 'cape'], ['obsidian', 'cape'],
+]
+
+
+def is_entrana_restricted_gear(name):
+    """Whether an item name looks like gear Entrana bans: a weapon, armour, a cape, or a body that isn't a rune."""
+    words = [w for w, _, _ in _words(name or '')]
+    for i in range(len(words)):
+        word = words[i]
+        if word in ENTRANA_RESTRICTED_WORDS:
+            return True
+        # Why: rs2b0t's body(?!\s+rune\b) bans a "body" but not the Body rune.
+        if word == 'body' and not (i + 1 < len(words) and words[i + 1] == 'rune'):
+            return True
+        for phrase in ENTRANA_RESTRICTED_PHRASES:
+            if words[i:i + len(phrase)] == phrase:
+                return True
+    return False
+
+
+def names_have_entrana_restricted_gear(names):
+    return any([len(n) > 0 and is_entrana_restricted_gear(n) for n in names])
+
+
+_QUEST_RANK = {'not_started': 0, 'unknown': 0, 'started': 1, 'complete': 2}
+
+
+def meets_requires(requires, state):
+    """(ok, reason): whether a catalog entry's requires is met by world_state(). rs2b0t's meetsRequires; an
+    unknown quest status fails closed."""
+    if not requires:
+        return (True, None)
+    if requires.get('members') == True and not state.get('members'):
+        return (False, 'members-only')
+    slots = requires.get('freeSlots')
+    if slots is not None and state.get('free_slots', 0) < slots:
+        return (False, f"need {slots} free inventory slots (have {state.get('free_slots', 0)})")
+    levels = state.get('skills', {})
+    for skill in requires.get('skills') or []:
+        have = levels.get(skill['name'].lower(), levels.get(skill['name'], 0))
+        if have < skill['level']:
+            return (False, f"need {skill['name']} {skill['level']} (have {have})")
+    held = state.get('items', {})
+    worn = state.get('worn', {})
+    statuses = state.get('quests', {})
+    waives = requires.get('questWaivesItems')
+    waived = waives is not None and statuses.get(waives) == 'complete'
+    currency = requires.get('currency')
+    if currency and not waived and held.get(currency['name'], 0) < currency['amount']:
+        return (False, f"need {currency['amount']}x {currency['name']} (have {held.get(currency['name'], 0)})")
+    for item in requires.get('items') or []:
+        if not waived and held.get(item['name'], 0) < item['count']:
+            return (False, f"need {item['count']}x {item['name']} (have {held.get(item['name'], 0)})")
+    for item in requires.get('worn') or []:
+        if worn.get(item['name'], 0) < item['count']:
+            return (False, f"need to wear {item['name']} (have {worn.get(item['name'], 0)})")
+    if requires.get('forbidEntranaRestricted') == True and state.get('entrana_restricted_gear'):
+        return (False, 'remove weapons/armour before Entrana')
+    if requires.get('slashTool') == True and state.get('can_slash_web') == False:
+        return (False, 'need Knife or a bladed weapon to slash webs')
+    for quest in requires.get('quests') or []:
+        name = quest['quest']
+        have = statuses.get(name, 'unknown')
+        most = quest.get('maxStatus')
+        least = quest.get('minStatus')
+        if have == 'unknown' and most is not None:
+            return (False, f'need known quest status for {name}')
+        if most is not None and _QUEST_RANK[have] > _QUEST_RANK[most]:
+            return (False, f'need quest {name} at most {most} (have {have})')
+        if least is not None and _QUEST_RANK[have] < _QUEST_RANK[least]:
+            return (False, f'need quest {name} {least} (have {have})')
+    # Why: an essence exit is a session destination, so a known return that doesn't match fails closed, and an
+    # unset one fails open.
+    exit_return = requires.get('essenceExitReturn')
+    live = state.get('essence_exit_return')
+    if exit_return is not None and live is not None and live != exit_return:
+        return (False, f'essence exit returns to {live}, not {exit_return}')
+    return (True, None)
 
 
 # What a route needs.

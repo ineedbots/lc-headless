@@ -43,6 +43,8 @@ NOT_PORTED_NAMES = {
     'api/combat/CombatStyleLogic.ts': {'AUTO_CHOOSE_COM', 'AUTO_TOGGLE_COM'},
     # rs2b0t's 289 modal ids for the duel screens; rs2004.duel finds each screen by its text.
     'api/duel/Duel.ts': {'DUEL_SELECT_MODAL', 'DUEL_CONFIRM_MODAL', 'DUEL_WIN_MODAL'},
+    # Regicide's stage, for the Isafdar crossings, which come with phase 17's quests.
+    'api/ai/clues/tirannwnTravel.ts': {'tirannwnStage'},
 }
 
 EXPORT = re.compile(r'^export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:abstract\s+)?(function\*?|const|let|class|type|interface|enum)\s+([A-Za-z_0-9]+)', re.M)

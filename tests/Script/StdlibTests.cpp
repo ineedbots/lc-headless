@@ -42,13 +42,13 @@ namespace
     class StdlibFixture
     {
     public:
-        explicit StdlibFixture(const std::filesystem::path& scripts = TEST_FOLDER)
+        explicit StdlibFixture(const std::filesystem::path& scripts = TEST_FOLDER, std::chrono::milliseconds callTimeout = 1000ms)
             : cache{std::make_shared<const GameCache_s>()}
             , map{cache}
             , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
             , api{state, map, actions}
-            , vm{ScriptTestRuntime::Get(), {.scriptsDirectory = scripts}, capture.GetLogger()}
+            , vm{ScriptTestRuntime::Get(), {.scriptsDirectory = scripts, .callTimeout = callTimeout}, capture.GetLogger()}
         {
             ScriptBindings::Bind(vm, api);
             ScriptBindings::SetSettings(vm, "{}");
@@ -132,7 +132,24 @@ TEST_CASE("rs2b0t's ported Python tests pass", "[Stdlib]")
     {
         CAPTURE(file.filename().string());
 
-        auto fixture = StdlibFixture{SCRIPTS_FOLDER};
+        // A file is one run_specs call, so the watchdog bounds the whole file rather than one test.
+        auto fixture = StdlibFixture{SCRIPTS_FOLDER, 60s};
+        Rs2b0tSpecs::Run(fixture.vm, file);
+    }
+}
+
+// Why: some of rs2b0t's tests run at a size pocketpy takes minutes over, such as 10,000 puzzle boxes, so the suite
+// runs a sample of each and this hidden case the whole: Rs2004HeadlessTests "[Slow]".
+TEST_CASE("rs2b0t's ported Python tests pass at full size", "[.][Slow]")
+{
+    const auto files = Rs2b0tSpecs::GetFiles(Rs2b0tSpecs::GetFolder() / "slow");
+    REQUIRE_FALSE(files.empty());
+
+    for (const auto& file : files)
+    {
+        CAPTURE(file.filename().string());
+
+        auto fixture = StdlibFixture{SCRIPTS_FOLDER, 1h};
         Rs2b0tSpecs::Run(fixture.vm, file);
     }
 }

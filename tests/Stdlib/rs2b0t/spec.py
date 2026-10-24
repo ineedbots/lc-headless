@@ -46,10 +46,164 @@ def run_specs():
             failures.append(f'{name}: {type(e).__name__}: {e}')
         for hook in _AFTER:
             _drain(hook())
+        restore_all()
     if len(failures) > 0:
         raise AssertionError(f'{len(failures)} of {len(_SPECS)} failed:\n' + '\n'.join(failures))
     if len(_SPECS) == 0:
         raise AssertionError('no tests')
+
+
+# rs2b0t's spyOn and stubs. pocketpy ignores a method set on an instance, but takes one set on its class, so a spy on
+# an object patches the object's class; on a module or a class, the thing itself. Every patch is put back after each
+# test.
+_PATCHES = []
+
+
+class Spy:
+    """A stand-in that records each call's arguments in calls and gives impl(*args), or returns. A callable object,
+    not a function, so the class it sits on doesn't bind it to self."""
+
+    def __init__(self, impl=None, returns=None):
+        self.impl = impl
+        self.returns = returns
+        self.calls = []
+
+    def __call__(self, *args, **kwargs):
+        self.calls.append(args)
+        if self.impl is not None:
+            return self.impl(*args, **kwargs)
+        return self.returns
+
+    def mock_return_value(self, value):
+        self.impl = None
+        self.returns = value
+        return self
+
+    def mock_implementation(self, impl):
+        self.impl = impl
+        return self
+
+    def called(self):
+        return len(self.calls) > 0
+
+
+def _owner(target):
+    if isinstance(target, type) or type(target).__name__ == 'module':
+        return target
+    return type(target)
+
+
+def patch(target, name, value):
+    """Sets name on target's class (or on target, for a module or class) until the test ends."""
+    owner = _owner(target)
+    _PATCHES.append((owner, name, getattr(owner, name, None)))
+    setattr(owner, name, value)
+    return value
+
+
+def spy_on(target, name, impl=None, returns=None):
+    """rs2b0t's spyOn(target, name), with mockImplementation as impl and mockReturnValue as returns."""
+    return patch(target, name, Spy(impl, returns))
+
+
+def stub(obj, **fields):
+    """Sets plain attributes on an object until the test ends, as rs2b0t's stubProps."""
+    for name, value in fields.items():
+        _PATCHES.append((obj, name, getattr(obj, name, None)))
+        setattr(obj, name, value)
+
+
+def restore_all():
+    while len(_PATCHES) > 0:
+        owner, name, original = _PATCHES.pop()
+        setattr(owner, name, original)
+
+
+# Fakes for a test's world, standing in where rs2b0t's tests build object literals.
+
+class Fake:
+    """An object of the given fields; a field that's a function is called as a method, without self."""
+
+    def __init__(self, **fields):
+        self._fields = fields
+
+    def __getattr__(self, name):
+        if name.startswith('__'):
+            raise AttributeError(name)
+        return self._fields.get(name)
+
+    def __repr__(self):
+        return f'Fake({self._fields})'
+
+
+class FakeQuery:
+    """An entity query over a list of fakes: name, action, where, within, nearest, first and results. A fake is
+    named by its name field and offers its actions()."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def name(self, *names):
+        flat = []
+        for n in names:
+            flat.extend(n if isinstance(n, list) else [n])
+        wanted = [n.lower() for n in flat]
+        return FakeQuery([r for r in self.rows if (r.name or '').lower() in wanted])
+
+    def action(self, op):
+        return FakeQuery([r for r in self.rows if op.lower() in [a.lower() for a in r.actions()]])
+
+    def where(self, fn):
+        return FakeQuery([r for r in self.rows if fn(r)])
+
+    def within(self, radius):
+        return FakeQuery([r for r in self.rows if r.distance() <= radius])
+
+    def nearest(self):
+        """The row of least distance(), or the first when the rows have no distance."""
+        if not self.rows:
+            return None
+        if all([callable(getattr(r, 'distance', None)) for r in self.rows]):
+            return sorted(self.rows, key=lambda r: r.distance())[0]
+        return self.rows[0]
+
+    def first(self):
+        return self.nearest()
+
+    def results(self):
+        return list(self.rows)
+
+
+def querying(supply):
+    """A query() that reads supply() afresh each time."""
+    return lambda: FakeQuery(supply())
+
+
+def instant_until(cond, timeout_ms=6000):
+    """execution.delay_until that answers at once."""
+    return cond()
+    yield
+
+
+def instant_until_ticks(cond, ticks=1):
+    return cond()
+    yield
+
+
+def instant_ticks(n=1):
+    return None
+    yield
+
+
+def run_wait(gen):
+    """Runs a Wait to its end, as run_specs does a test body, and gives its result."""
+    if gen is None or not hasattr(gen, '__next__'):
+        return gen
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        return stop.value
 
 
 def _fields(value):

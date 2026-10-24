@@ -1,11 +1,12 @@
 # Fights East Ardougne market's guards, feeding itself from the Baker's stall, and banks the rares they drop at
 # the south bank: rs2b0t's ArdyFighter (MIT, see thirdparty/rs2b0t). It needs melee stats that beat the guards'
-# 60-second respawn, about Strength 80 unarmed. rs2b0t also solves the clues they drop; that comes with the clue
-# solver.
+# 60-second respawn, about Strength 80 unarmed. It solves the clues they drop.
 
 from rs2004.catalogs import CAKE_ITEMS, ContinueDialog, DeathRecovery, count_matching, food_heal_amount
 from rs2004.catalogs import matches_any, needs_cake_restock, should_bank, should_eat, should_panic, slots_matching, steal_cakes
-from rs2004.catalogs import sustain
+from rs2004.catalogs import selected_loadout, sustain, weapon_of
+from rs2004.clues import SolveClue, SolveClueHost
+from rs2004.tabs import WEAPON_SLOT
 
 DEFAULT_ANCHOR = Tile(2661, 3306, 0)
 DEFAULT_BANK_STAND = Tile(2655, 3286, 0)
@@ -32,6 +33,7 @@ SETTINGS = {
     'food_target': SettingDef('number', 8, 'Keep food stocked to (count)', 1, 27, help="after eating to full, restock the Baker's stall back up to this many"),
     'bank_at_loot_slots': SettingDef('number', 12, 'Bank at loot slots', 1, 27),
     'loot': SettingDef('string[]', DEFAULT_LOOT, 'Loot item names (contains)'),
+    'solve_clues': SettingDef('boolean', True, 'Solve clue drops', group='Clues'),
 }
 SETTINGS.update(PERIODIC_BANK_SETTINGS)
 
@@ -320,7 +322,14 @@ class ArdyFighter(TaskBot):
         self.trips = 0
         self.deaths = 0
         self.died = False
+        self.clues_solved = 0
         self.status = 'starting'
+        self.solve_clues = s.bool('solve_clues', True)
+        worn = [i.name for i in equipment.items() if i.slot == WEAPON_SLOT]
+        weapon = weapon_of(selected_loadout(s), worn[0] if worn else None) or ''
+        self.solve_clue = SolveClue(SolveClueHost(log=self.log, set_status=self.clue_status, is_food=lambda name: matches_any(name, FOOD),
+                                                  food_name=lambda: 'Cake', food_withdraw=lambda: self.food_target, weapon_name=lambda: weapon,
+                                                  enabled=lambda: self.solve_clues))
         sustain.set(eat_if_needed)
         if skills.level('thieving') < 5:
             self.log(f"ArdyFighter needs Thieving 5 for the Baker's stall (have {skills.level('thieving')}), stopping.")
@@ -334,6 +343,7 @@ class ArdyFighter(TaskBot):
             LootDrops(self),
             EatFood(self),
             PanicRetreat(self),
+            self.solve_clue,
             PeriodicBank(
                 strategy=lambda: parse_bank_strategy(self.settings.str('bank_strategy', 'Off')),
                 items_threshold=lambda: self.settings.num('bank_every_items', 15),
@@ -360,6 +370,7 @@ class ArdyFighter(TaskBot):
     def died_now(self):
         self.status = 'died, recovering'
         self.deaths += 1
+        self.solve_clue.note_death()
         self.log('died! waiting for respawn, then walking back to the market')
 
     def recovered(self):
@@ -367,6 +378,13 @@ class ArdyFighter(TaskBot):
 
     def set_status(self, status):
         self.status = status
+
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+        self.set_status(text)
 
     def loot_slots(self):
         return slots_matching(inventory.items(), self.loot)
@@ -379,8 +397,12 @@ class ArdyFighter(TaskBot):
 
     def on_progress_report(self):
         xp = sum([skills.xp(sk) for sk in COMBAT_SKILLS]) - self.xp_at_start
-        return {'Status': self.status, 'Kills': self.kills, 'Combat xp': xp, 'Food': food_count(), 'Steals': self.steals,
-                'Looted': self.looted, 'Loot slots': self.loot_slots(), 'Bank trips': self.trips, 'Deaths': self.deaths}
+        report = {'Status': self.status, 'Kills': self.kills, 'Combat xp': xp, 'Food': food_count(), 'Steals': self.steals,
+                  'Looted': self.looted, 'Loot slots': self.loot_slots(), 'Bank trips': self.trips, 'Deaths': self.deaths}
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
+        return report
 
 
 BOT = define_bot(

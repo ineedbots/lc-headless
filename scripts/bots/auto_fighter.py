@@ -1,7 +1,6 @@
 # Fights any named NPC within a leash of where it starts, or of chosen coordinates: loots the chosen drops, banks
 # them at the nearest bank or a named one, and comes back. rs2b0t's AutoFighter (MIT, see thirdparty/rs2b0t). Melee,
-# magic or range, with special attacks. rs2b0t also solves the clues it picks up; that comes with the clue solver,
-# and until then a clue is banked.
+# magic or range, with special attacks. It solves the clues it picks up, and banks the reward after.
 
 import time
 
@@ -12,6 +11,7 @@ from bots.autofighter.data import should_bank_after_minutes, should_bury_regular
 from rs2004.catalogs import HERB_OPTIONS, HERBS, LOADOUT_SETTING, SPELL_DB, ContinueDialog, DeathRecovery, casts_available
 from rs2004.catalogs import count_matching, food_heal_amount, matches_any, rune_withdraw_list, script_food, should_bank, should_eat
 from rs2004.catalogs import should_panic, sustain
+from rs2004.clues import SolveClue, SolveClueHost
 from rs2004.hunting.logic import attack_range_for, body_origin, gap_to
 
 BOOTH = {'name': 'Bank booth', 'op': 'Use-quickly'}
@@ -318,15 +318,18 @@ class BankRun(Task):
             bot.bank_food_empty = False
         if bot.style != 'melee' and bot.supply_metric() >= bot.restock_threshold():
             bot.supply_empty = False
-        return self._loot_full() or bot.due_for_timed_bank() or self._out_of_food() \
+        return bot.bank_after_solve or self._loot_full() or bot.due_for_timed_bank() or self._out_of_food() \
             or (bot.style != 'melee' and bot.need_style_supplies() and not bot.supply_empty)
 
     def execute(self):
         bot = self.bot
         destination = bot.pick_bank(game.tile())
         if destination is None:
+            bot.bank_after_solve = False
             return
-        if self._loot_full():
+        if bot.bank_after_solve:
+            reason = 'clue solved'
+        elif self._loot_full():
             reason = f'loot {bot.loot_slots()}/{bot.bank_at} slots or inventory full'
         elif bot.due_for_timed_bank():
             reason = f'time {bot.minutes_since_bank():.1f}m/{bot.bank_every_minutes}m with loot'
@@ -337,7 +340,7 @@ class BankRun(Task):
         else:
             reason = 'unknown'
         bot.log(f'BankRun triggered: {reason}')
-        bot.status = 'banking'
+        bot.status = 'clue done — banking the loot' if bot.bank_after_solve else 'banking'
         bot.log(f"banking at the {destination['name']} bank ({bot.bank_tile_of(destination)})")
         bot.note_forced_fallback(destination)
         say = lambda m: bot.log(f'  {m}')
@@ -363,6 +366,7 @@ class BankRun(Task):
             bot.bank_food_empty = True
             bot.log(f"no '{bot.food}' in the bank — fighting on without food (foodless safety disarmed)")
         yield from self._restock_style_supplies()
+        bot.bank_after_solve = False
         bot.trips += 1
         bot.last_bank_at = now_ms()
         bot.status = 'heading back to the spot'
@@ -763,6 +767,10 @@ class AutoFighter(TaskBot):
         self.ammo_withdraw = s.num('ammo_withdraw', 500)
         self.ammo_restock_below = s.num('ammo_restock_below', 25) / 100
         self.tracked_gear = [i.name for i in equipment.items() if i.name]
+        self.clues_solved = 0
+        self.bank_after_solve = False
+        self.solve_clue = SolveClue(SolveClueHost(log=self.log, set_status=self.clue_status, is_food=lambda name: matches_any(name, [self.food]),
+                                                  food_name=lambda: self.food, food_withdraw=lambda: self.food_withdraw, enabled=lambda: self.solve_clues))
 
         def sustain_eat():
             # Why: with the bank open the backpack shows the bank's Deposit ops, so Eat fails and the loop spins.
@@ -796,7 +804,8 @@ class AutoFighter(TaskBot):
         self.add(
             ContinueDialog(),
             DeathRecovery(self, self.anchor, 6, on_death=self.died_now, on_recovered=self.recovered),
-            EnableAutoRetaliate(self), EatFood(self), PanicRetreat(self), BuryBones(self), LootDrops(self), ReequipGear(self), BankRun(self),
+            EnableAutoRetaliate(self), EatFood(self), PanicRetreat(self), BuryBones(self), LootDrops(self), ReequipGear(self), self.solve_clue,
+            BankRun(self),
             SetAttackStyle(self), ArmAutocast(self), ArmSpecial(self), Fight(self), ReturnToAnchor(self),
         )
 
@@ -804,10 +813,19 @@ class AutoFighter(TaskBot):
         self.died = True
         self.status = 'died — recovering'
         self.deaths += 1
+        self.solve_clue.note_death()
         self.log('died! waiting for respawn, then walking back to the spot')
 
     def recovered(self):
         self.died = False
+
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+            self.bank_after_solve = True
+        self.status = text
 
     def grind_targets(self):
         return [n.lower() for n in self.target_names()]
@@ -824,7 +842,7 @@ class AutoFighter(TaskBot):
             supplies = ('Ammo', self.total_ammo())
         else:
             supplies = ('Style', self.melee_style)
-        return {
+        report = {
             'Status': self.status,
             'Kills': self.kills,
             'Looted': self.looted,
@@ -836,6 +854,10 @@ class AutoFighter(TaskBot):
             'Specials': self.specials,
             'XP/hr': f'{(xp / minutes * 60 / 1000):.1f}k' if minutes > 0.5 else '-',
         }
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
+        return report
 
     def target_names(self):
         return [n.strip() for n in self.target.split(',') if n.strip()]

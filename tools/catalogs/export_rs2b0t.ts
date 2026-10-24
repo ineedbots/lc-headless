@@ -41,6 +41,12 @@ const aliases = await load('data/itemAliases.ts');
 const collisions = await load('data/nameCollisions.ts');
 const untradeable = await load('data/untradeable.ts');
 const clues = await load('api/ai/clues/data/cluedb.ts');
+const puzzlePieces = await load('api/ai/clues/data/puzzlePieces.ts');
+const talkAnchors = await load('api/ai/clues/data/talkAnchors.ts');
+const killAnchors = await load('api/ai/clues/data/killAnchors.ts');
+const digAnchors = await load('api/ai/clues/data/digAnchors.ts');
+const challengeAnswers = await load('api/ai/clues/data/challengeAnswers.ts');
+const unreachable = await load('api/ai/clues/data/unreachable.ts');
 
 const snake = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 
@@ -157,7 +163,17 @@ const pyIdRecord = (record: Record<string, any>): string => {
 // The clue database too: the hunting framework reads which objs are clues and caskets, and the clue engine the
 // rest.
 const cluesFile = path.join(path.dirname(outFile), '_clues.py');
-fs.writeFileSync(cluesFile, header + `\nCLUE_DB = ${pyIdRecord(clues.CLUE_DB)}\n\nCASKET_IDS = ${pyIdRecord(clues.CASKET_IDS)}\n`);
+const clueTables: [string, string][] = [
+    ['CLUE_DB', pyIdRecord(clues.CLUE_DB)],
+    ['CASKET_IDS', pyIdRecord(clues.CASKET_IDS)],
+    ['PUZZLE_PIECE_SLOT', pyIdRecord(puzzlePieces.PUZZLE_PIECE_SLOT)],
+    ['TALK_ANCHORS', pyIdRecord(talkAnchors.TALK_ANCHORS)],
+    ['KILL_ANCHORS', pyIdRecord(killAnchors.KILL_ANCHORS)],
+    ['DIG_ANCHORS', pyIdRecord(digAnchors.DIG_ANCHORS)],
+    ['CHALLENGE_ANSWERS', py(challengeAnswers.CHALLENGE_ANSWERS)],
+    ['PACK_UNREACHABLE', pyIdRecord(unreachable.PACK_UNREACHABLE)],
+];
+fs.writeFileSync(cluesFile, header + clueTables.map(([name, value]) => `\n${name} = ${value}\n`).join(''));
 console.log(`wrote ${tables.length} tables to ${outFile}, and the shop, item, drop and clue databases beside it`);
 
 const marketFile = path.join(path.dirname(outFile), '..', 'market', '_data.py');

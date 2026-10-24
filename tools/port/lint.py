@@ -156,8 +156,8 @@ class Finder(ast.NodeVisitor):
         if isinstance(func, ast.Name):
             if func.id in ('min', 'max') and any(k.arg == 'default' for k in node.keywords):
                 self.report(node, f'{func.id}() takes no default=')
-            # Why: a name or attribute is most often a dict being copied; a list of pairs is built in place.
-            if func.id == 'dict' and len(node.args) == 1 and isinstance(node.args[0], (ast.Dict, ast.DictComp, ast.Name, ast.Attribute)):
+            # Why: anything but a list or generator of pairs is most often a dict being copied, as dict(x or {}) is.
+            if func.id == 'dict' and len(node.args) == 1 and not isinstance(node.args[0], (ast.List, ast.ListComp, ast.GeneratorExp, ast.Tuple, ast.Call)):
                 self.report(node, "dict(a_dict) raises; copy with a comprehension")
         self.generic_visit(node)
 
@@ -272,7 +272,35 @@ def nested_ternaries(tree, source):
     return found
 
 
+# Why: pocketpy calls a class's method before a function set on the instance under the same name (a plain value set
+# there does win), so obj.opened = fn under a method named opened is silently ignored; the clue executor's test world
+# lost its casket hook that way.
+def shadowed_methods(tree):
+    """A function (a lambda, or a def local to the same function) set as an attribute named like a method of a class
+    in this file."""
+    methods = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            methods.update(n.name for n in node.body if isinstance(n, ast.FunctionDef))
+    found = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef):
+            continue
+        local_defs = set(n.name for n in fn.body if isinstance(n, ast.FunctionDef))
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Assign):
+                continue
+            value = node.value
+            if not (isinstance(value, ast.Lambda) or (isinstance(value, ast.Name) and value.id in local_defs)):
+                continue
+            for t in node.targets:
+                if isinstance(t, ast.Attribute) and t.attr in methods:
+                    found.append((t.lineno, f'.{t.attr} = a function is ignored where {t.attr} is also a method: pocketpy calls the method'))
+    return sorted(set(found))
+
+
 _SCRIPT_BUILTINS = None
+PYTHON_BUILTINS = set(dir(__builtins__) if isinstance(__builtins__, type(os)) else __builtins__.keys())
 
 
 def script_builtins():
@@ -294,13 +322,38 @@ def script_builtins():
     return _SCRIPT_BUILTINS
 
 
+_CORE_BUILTINS = None
+
+
+def core_builtins():
+    """What a stdlib module gets without an import: CPython's builtins and the names the C++ binds, which are the
+    stub's names that no stdlib module defines."""
+    global _CORE_BUILTINS
+    if _CORE_BUILTINS is None:
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        python_layer = set()
+        for path in files([os.path.join(repo, 'src', 'Script', 'Stdlib')]):
+            with open(path, encoding='utf-8') as f:
+                tree = ast.parse(f.read(), path)
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                    python_layer.add(node.name)
+                elif isinstance(node, ast.Assign):
+                    python_layer.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        _CORE_BUILTINS = PYTHON_BUILTINS | (script_builtins() - python_layer)
+    return _CORE_BUILTINS
+
+
 # Why: a name a bot forgot to import loads fine and raises only when the line runs, which a live run found after
 # 30 minutes of other bots passing: JiveKQ's on_start used sustain without importing it.
 def undefined_names(tree, path):
     """Names a script under scripts/ reads that nothing defines, imports or makes a builtin. Scoping is file-wide:
-    a name defined anywhere counts, so this finds the forgotten import, not every scoping slip."""
+    a name defined anywhere counts, so this finds the forgotten import, not every scoping slip. A stdlib module
+    is held to CPython's builtins alone."""
     parts = os.path.abspath(path).replace('\\', '/').split('/')
-    if 'scripts' not in parts or 'typings' in parts or any(isinstance(n, ast.ImportFrom) and any(a.name == '*' for a in n.names) for n in ast.walk(tree)):
+    in_stdlib = 'Stdlib' in parts and 'tests' not in parts
+    if ('scripts' not in parts and not in_stdlib) or 'typings' in parts \
+            or any(isinstance(n, ast.ImportFrom) and any(a.name == '*' for a in n.names) for n in ast.walk(tree)):
         return []
     defined = set()
     for node in ast.walk(tree):
@@ -314,7 +367,8 @@ def undefined_names(tree, path):
             defined.add(node.id)
         elif isinstance(node, ast.ExceptHandler) and node.name:
             defined.add(node.name)
-    known = script_builtins()
+    # Why: a stdlib module gets the C++ bindings but not the Python layer, which it must import.
+    known = core_builtins() if in_stdlib else script_builtins()
     found = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id not in defined and node.id not in known:
@@ -333,7 +387,7 @@ def lint(path):
     finder = Finder(path)
     finder.visit(tree)
     found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path)
-    return sorted(set(found + undefined_names(tree, path)))
+    return sorted(set(found + undefined_names(tree, path) + shadowed_methods(tree)))
 
 
 def files(paths):

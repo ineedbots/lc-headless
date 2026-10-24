@@ -1,9 +1,10 @@
 # Steals cakes from East Ardougne's Baker's stall, swapping stands when the baker watches, banks each full pack,
-# and kites or fights a guard that catches it: rs2b0t's ArdyCakes (MIT, see thirdparty/rs2b0t). rs2b0t also
-# solves the clues fought guards drop; that comes with the clue solver. Thieving 5 and a members' world.
+# and kites or fights a guard that catches it: rs2b0t's ArdyCakes (MIT, see thirdparty/rs2b0t). In Fight mode it
+# solves the medium clues the guards drop on the spot. Thieving 5 and a members' world.
 
 from rs2004.catalogs import CAKE_ITEMS, FLEE_TILE, HOSTILE_NAMES, LOCKOUT_TICKS, STAND, ContinueDialog, DeathRecovery
 from rs2004.catalogs import carried_cakes, food_heal_amount, is_hostile_attacker, matches_any, should_eat, steal_cakes, sustain
+from rs2004.clues import SolveClue, SolveClueHost
 
 BANK_STAND = Tile(2655, 3286, 0)
 BOOTH_NAME = 'Bank booth'
@@ -16,6 +17,7 @@ FIGHT_TICKS = 150
 
 SETTINGS = {
     'guard_response': SettingDef('string', 'Flee', 'Guard response', options=['Flee', 'Fight'], help='caught at the stall: Flee kites the guard off the market; Fight kills it (bring combat stats)'),
+    'solve_clues': SettingDef('boolean', True, 'Solve clue drops', group='Clues', help='Fight mode kills guards, which drop medium clues: solve them on the spot'),
 }
 
 
@@ -235,8 +237,12 @@ class ArdyCakes(TaskBot):
         self.kills = 0
         self.died = False
         self.combat_end_tick = 0
+        self.clues_solved = 0
         self.status = 'starting'
         self.xp_at_start = skills.xp('thieving')
+        self.solve_clues = self.settings.bool('solve_clues', True)
+        self.solve_clue = SolveClue(SolveClueHost(log=self.log, set_status=self.clue_status, is_food=lambda name: matches_any(name, CAKE_ITEMS),
+                                                  food_name=lambda: 'Cake', food_withdraw=lambda: 10, enabled=lambda: self.solve_clues))
         sustain.set(eat_if_needed)
         if skills.level('thieving') < 5:
             self.log(f"ArdyCakes needs Thieving 5 for the Baker's stall (have {skills.level('thieving')}); stopping.")
@@ -248,6 +254,7 @@ class ArdyCakes(TaskBot):
             DeathRecovery(self, STAND, 6, on_death=self.died_now, on_recovered=self.recovered),
             FightBack(self) if self.response == 'Fight' else Flee(self),
             EatCake(self),
+            self.solve_clue,
             BankRun(self),
             StealCakes(self),
             ReturnToStall(self),
@@ -260,6 +267,7 @@ class ArdyCakes(TaskBot):
 
     def died_now(self):
         self.status = 'died; recovering'
+        self.solve_clue.note_death()
         self.log('died! recovering')
 
     def recovered(self):
@@ -270,6 +278,13 @@ class ArdyCakes(TaskBot):
 
     def recovery_anchor(self):
         return STAND
+
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+        self.set_status(text)
 
     def mark_combat_end(self):
         self.combat_end_tick = game.tick()
@@ -282,6 +297,9 @@ class ArdyCakes(TaskBot):
         report = {'Status': self.status, 'Steals': self.steals, 'Thieving xp': skills.xp('thieving') - self.xp_at_start,
                   'Carried': carried_cakes(), 'Banked': self.banked, 'Resets': self.resets, 'Trips': self.trips}
         report.update(fought)
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
         return report
 
 

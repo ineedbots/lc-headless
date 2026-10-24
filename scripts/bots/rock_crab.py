@@ -1,13 +1,13 @@
 # Wakes and stacks the rock crabs north of Rellekka and clears them, melee, mage or range, banking for food at
 # Seers' Village: rs2b0t's RockCrab, with its AmmoLogic.ts and RockCrabSpots.ts (MIT, see thirdparty/rs2b0t). Ranged
-# sweeps its own arrows, bolts or darts off the field after each kill. rs2b0t also solves the easy clues the crabs
-# drop; that comes with the clue solver.
+# sweeps its own arrows, bolts or darts off the field after each kill. It solves the easy clues the crabs drop.
 
 import time
 
 from rs2004.catalogs import CUSTOM_RANGED_SETTINGS, LOADOUT_SETTING, ROCK_CRAB_RANGED_WEAPONS, SPELL_DB, STAFFS, DeathRecovery
 from rs2004.catalogs import casts_available, food_forms, food_heal_amount, range_supply_empty, ranged_item, rock_crab_range_loadout
 from rs2004.catalogs import rune_withdraw_list, script_food, should_eat_to_use_food, spell_button_com, sustain
+from rs2004.clues import SolveClue, SolveClueHost
 
 # The Rocks spawns of the field (RockCrabSpots.ts).
 ROCKS_SPAWNS = [
@@ -72,6 +72,7 @@ SETTINGS.update({
     'loot': SettingDef('string[]', DEFAULT_LOOT, 'Loot item names', group='Banking & loot'),
 })
 SETTINGS.update(PERIODIC_BANK_SETTINGS)
+SETTINGS['solve_clues'] = SettingDef('boolean', True, 'Solve easy clues', group='Clues')
 
 
 # The pure pieces, kept apart from the game so they can be tested without a client.
@@ -262,7 +263,7 @@ class CollectProjectiles(Task):
         bot = self.bot
         projectile = bot.range_projectile()
         dry = bot.equipped_projectile_count() == 0 and inventory.count(projectile) == 0
-        return dry or (not bot.has_food() and not bot.bank_known_empty) or bot.need_style_supplies()
+        return dry or (not bot.has_food() and not bot.bank_known_empty) or bot.need_style_supplies() or bot.clue_pending()
 
     def validate(self):
         bot = self.bot
@@ -610,6 +611,10 @@ class RockCrab(TaskBot):
         self.ammo_withdraw = s.num('ammo_withdraw', 200)
         self.min_stack = s.num('min_stack', 1)
         self.collect_range = s.num('collect_range', 12)
+        self.solve_clues = s.bool('solve_clues', True)
+        self.clues_solved = 0
+        self.solve_clue = SolveClue(SolveClueHost(log=self.log, set_status=self.clue_status, is_food=self.is_food_item, food_name=lambda: self.food_name,
+                                                  food_withdraw=lambda: self.food_withdraw, weapon_name=lambda: self.weapon, enabled=lambda: self.solve_clues))
         loadout = self.range_loadout()
         if self.style == 'mage':
             note = f", mage '{self.spell}' w/ '{self.weapon or '(no weapon set)'}'"
@@ -633,7 +638,8 @@ class RockCrab(TaskBot):
         sustain.set(eat_if_needed)
         self.add(
             DeathRecovery(self, self.locs[0], 4, on_death=self.died_now, on_recovered=self.recovered),
-            Eat(self), GearEquip(self), SetAttackStyle(self), ArmAutocast(self), CollectProjectiles(self), BankRun(self),
+            Eat(self), GearEquip(self), SetAttackStyle(self), ArmAutocast(self), CollectProjectiles(self), self.solve_clue,
+            BankRun(self),
             PeriodicBank(
                 strategy=lambda: parse_bank_strategy(self.settings.str('bank_strategy', 'Off')),
                 items_threshold=lambda: self.settings.num('bank_every_items', 15),
@@ -652,6 +658,7 @@ class RockCrab(TaskBot):
         self.died = True
         self.status = 'died — recovering'
         self.deaths += 1
+        self.solve_clue.note_death()
         self.log('died! waiting for respawn, then web-walking back to the field')
 
     def recovered(self):
@@ -659,6 +666,16 @@ class RockCrab(TaskBot):
 
     def set_status(self, text):
         self.status = text
+
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+        self.set_status(text)
+
+    def clue_pending(self):
+        return self.solve_clues and any([(i.name or '').lower() == 'clue scroll' for i in inventory.items()])
 
     def grind_targets(self):
         return ['rock crab', 'rocks']
@@ -669,7 +686,7 @@ class RockCrab(TaskBot):
     def on_progress_report(self):
         minutes = (time.time() - self.started_at) / 60
         gained = sum([skills.xp(skill) for skill in COMBAT_SKILLS]) - self.xp_at_start
-        return {
+        report = {
             'Status': self.status,
             'Kills': self.kills,
             'Looted': self.looted,
@@ -679,6 +696,10 @@ class RockCrab(TaskBot):
             'Combat xp': gained,
             'XP/hr': f'{(gained / minutes * 60 / 1000):.1f}k' if minutes > 0.5 else '-',
         }
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
+        return report
 
     # The field
 

@@ -2,13 +2,14 @@
 # dragon through its fence, the Gu'Tanoth Enclave's blue dragons and greater demons, and Brimhaven Dungeon's iron
 # and steel dragons. rs2b0t's JiveDragons (MIT, see thirdparty/rs2b0t). Magic and range fight from a derived
 # safespot; melee wears the Dragonfire shield and, on the metal dragons, prays Protect from Melee under an Antifire
-# dose. It opens the dusty-key gate, fetching the key from Velrak when the bank has none. rs2b0t also solves the hard
-# clues the dragons drop; that comes with the clue solver, and until then a clue is banked.
+# dose. It opens the dusty-key gate, fetching the key from Velrak when the bank has none, and solves the hard clues the
+# dragons drop, leaving the lair for the nearest bank to stock the trail.
 
 import time
 
 from rs2004.catalogs import ARROWS, AXES, BOWS, EMPTY_VIAL, LOADOUT_SETTING, MELEE_WEAPONS, SPELL_DB, STAFFS, SUPER_SET, ContinueDialog
 from rs2004.catalogs import DeathRecovery, Record, best_melee_weapon, casts_available, drop_db, food_count, food_heal_amount, is_edible_food
+from rs2004.catalogs import is_food_item
 from rs2004.catalogs import known_melee_weapon, planned_potions, potion_to_sip, ranging_plan, script_food, selected_loadout
 from rs2004.catalogs import should_eat_to_use_food, supplies_of, sustain
 from rs2004.hunting import ANTIFIRE_DOSES, ANTIFIRE_MARGIN_TICKS, ANTIFIRE_TICKS, ANTIPOISON_DOSES, BRIMHAVEN_IRON, BRIMHAVEN_STEEL, COINS
@@ -16,8 +17,11 @@ from rs2004.hunting import ENCLAVE_TARGET_OPTIONS, GUTANOTH_BLUE, HEROES_BLUE, M
 from rs2004.hunting import SHIELD, SHIELD_ABSORBS, SITE_OPTIONS, STAND_SITE_KEYS, TAVERLEY_BLACK, TAVERLEY_BLUE, BankOpts, Fight, HoldSafespot
 from rs2004.hunting import Retreat, WalkToSpot, acquire_key, anchor_for, antifire_due, antifire_lapsed, antifire_plan, antipoison_plan
 from rs2004.hunting import bank_routine, chase_mode, chases_target, dose_to_drink, enclave_targets, enter_lair, escape_runes_for, fee_prepaid
-from rs2004.hunting import hunt_names, in_cell, keep_doses, key_status, leave_cell, loot_halts, loot_reach, needs_shield, prayer_for
+from rs2004.hunting import hunt_names, in_cell, keep_doses, key_status, leave_cell, leave_lair, loot_halts, loot_reach, needs_shield, prayer_for
 from rs2004.hunting import prayer_plan, prayer_sip_due, site_for, site_tile_of, stand_for, style_gate, wants_drop
+from rs2004.clues import GuardianRangedLoadout, SolveClue, SolveClueHost, walk_to_bank
+from rs2004.navigation import navigator
+from rs2004.traversal import nearest_bank_reachable
 
 LOOT_BURST_MAX = 8
 # How near a dragon has to be for the overhead to go up ahead of the fight.
@@ -342,8 +346,8 @@ class GearEquip(Task):
     def merge_due(self):
         """Whether ammo picked up from the floor goes onto the quiver now."""
         bot = self.bot
-        return bot.combat_style == 'range' and equipment.contains(bot.ammo) and inventory.first(bot.ammo) is not None \
-            and (bot.has_food() or bot.recoverable_food()) and not bot.need_eat() and not bot.too_hurt_to_loot() and not bot.died \
+        return not bot.solve_clue.owns_equipment() and bot.combat_style == 'range' and equipment.contains(bot.ammo) \
+            and inventory.first(bot.ammo) is not None and (bot.has_food() or bot.recoverable_food()) and not bot.need_eat() and not bot.too_hurt_to_loot() and not bot.died \
             and not event_signal.pending()
 
     def _missing(self):
@@ -355,7 +359,7 @@ class GearEquip(Task):
         return bot.ammo if self.merge_due() else None
 
     def validate(self):
-        return now_ms() >= self.retry_at and self._missing() is not None
+        return not self.bot.solve_clue.owns_equipment() and now_ms() >= self.retry_at and self._missing() is not None
 
     def execute(self):
         bot = self.bot
@@ -412,7 +416,8 @@ class SetAttackStyle(Task):
         return game.combat_mode() == bot.range_mode if bot.combat_style == 'range' else game.has_combat_style(bot.melee_style)
 
     def validate(self):
-        return self.bot.combat_style != 'mage' and not self._selected() and now_ms() >= self.retry_at
+        bot = self.bot
+        return not bot.solve_clue.owns_equipment() and bot.combat_style != 'mage' and not self._selected() and now_ms() >= self.retry_at
 
     def execute(self):
         bot = self.bot
@@ -445,7 +450,7 @@ class SetRetaliate(Task):
     def validate(self):
         bot = self.bot
         controlled = bot.site.fire_at_range == True or chases_target(bot.site, bot.combat_style)
-        return controlled and game.auto_retaliate_on() != bot.retaliate_wanted() and now_ms() >= self.retry_at
+        return not bot.solve_clue.owns_equipment() and controlled and game.auto_retaliate_on() != bot.retaliate_wanted() and now_ms() >= self.retry_at
 
     def execute(self):
         bot = self.bot
@@ -474,7 +479,7 @@ class ArmAutocast(Task):
 
     def validate(self):
         bot = self.bot
-        if bot.combat_style != 'mage' or autocast.armed() or now_ms() < self.retry_at or bot.casts_left() < 1:
+        if bot.solve_clue.owns_equipment() or bot.combat_style != 'mage' or autocast.armed() or now_ms() < self.retry_at or bot.casts_left() < 1:
             return False
         return autocast.staff_tab_attached() or (bot.weapon != '' and equipment.contains(bot.weapon))
 
@@ -558,7 +563,8 @@ class PanicBank(Task):
 
     def validate(self):
         bot = self.bot
-        return not bot.parked and not bot.bank_empty and skills.hp_fraction() < bot.panic_at and not bot.has_food()
+        return not bot.solve_clue.owns_equipment() and not bot.parked and not bot.bank_empty and skills.hp_fraction() < bot.panic_at \
+            and not bot.has_food()
 
     def execute(self):
         bot = self.bot
@@ -621,8 +627,10 @@ class BankRun(Task):
 
     def validate(self):
         bot = self.bot
-        if bot.parked:
+        if bot.parked or bot.solve_clue.owns_equipment():
             return False
+        if bot.clue_restock:
+            return True
         if not bot.shield_ready() and inventory.count(SHIELD) == 0:
             return True
         run = bot.loot_run
@@ -731,6 +739,8 @@ class JiveDragons(TaskBot):
         self.antifire_until = 0
         self.antifire_mark = game_messages.mark()
         self.antifire_warned = False
+        self.clues_solved = 0
+        self.clue_restock = False
         yield from execution.delay_until(lambda: game.ingame() and game.tile() is not None, 0)
         s = self.settings
         base = enclave_targets(site_for(s.str('site', 'taverley-blue')), s.str('enclave_targets', 'both'))
@@ -806,6 +816,10 @@ class JiveDragons(TaskBot):
         self.xp_at_start = sum([skills.xp(skill) for skill in COMBAT_SKILLS])
         item = site.key_item
         self.key_state = 'held' if item is None else key_status(inventory.count_by_id(item.id), bank.count_by_id(item.id))
+        self.solve_clue = SolveClue(SolveClueHost(
+            log=self.log, set_status=self.clue_status, is_food=lambda name: is_food_item(name, self.food), food_name=lambda: self.food,
+            food_withdraw=lambda: self.food_withdraw_count, hard_food_target=12, weapon_name=self.weapon_name, ranged_loadout=self.clue_ranged_loadout,
+            enabled=self.clue_enabled, prepare_initial_bank=self.prepare_clue_bank))
         gate = style_gate(self.combat_style, site.fire_at_range == True)
         if gate is not None:
             self.park_for(gate)
@@ -841,7 +855,8 @@ class JiveDragons(TaskBot):
             Parked(self), ContinueDialog(),
             DeathRecovery(self, site.bank, 6, on_death=self.died_now, on_recovered=self.recovered),
             Retreat(self, site), Eat(self), CurePoison(self), SipAntifire(self), SipPrayer(self), PrayMelee(self), self.gear_equip, SetAttackStyle(self),
-            SetRetaliate(self), ArmAutocast(self), SipPotion(self), PanicBank(self), BuryBones(self), FreeSlot(self), BankRun(self), LootCorpse(self),
+            SetRetaliate(self), ArmAutocast(self), SipPotion(self), PanicBank(self), BuryBones(self), self.solve_clue,
+            FreeSlot(self), BankRun(self), LootCorpse(self),
             AcquireKey(self), EnterLair(self), WalkToSpot(self, site), HoldSafespot(self, site), self.fight,
         )
 
@@ -850,6 +865,7 @@ class JiveDragons(TaskBot):
         self.loot_run = None
         self.died = True
         self.set_status('died, recovering')
+        self.solve_clue.note_death()
         self.log('died! recovering')
 
     def recovered(self):
@@ -884,6 +900,9 @@ class JiveDragons(TaskBot):
             report['Antifire'] = f'{held_doses(ANTIFIRE_DOSES)} held, {max(0, self.antifire_until - game.tick())} ticks left'
         if self.prayer_name is not None:
             report['Prayer'] = f'{prayer.points()}/{prayer.max()}'
+        if self.solve_clues:
+            report['Clues'] = self.clues_solved
+            report['Clue'] = self.solve_clue.clue_status()
         if self.parked:
             report['Parked'] = self.park_reason
         return report
@@ -892,6 +911,36 @@ class JiveDragons(TaskBot):
 
     def set_status(self, text):
         self.status = text
+
+    # SolveClue's host
+
+    def clue_status(self, text):
+        if text == 'clue solved':
+            self.clues_solved += 1
+            self.clue_restock = True
+        self.set_status(text)
+
+    def clue_enabled(self):
+        return self.solve_clues and not self.fight.blocks_loot() and self.loot_run is None
+
+    def clue_ranged_loadout(self):
+        return GuardianRangedLoadout(self.weapon, self.ammo, self.ammo_withdraw, self.range_mode) if self.combat_style == 'range' else None
+
+    def prepare_clue_bank(self):
+        """Out of the lair to the nearest bank a route reaches, where the trail stocks up."""
+        self.clue_restock = True
+        left = yield from leave_lair(self, self.site)
+        if not left:
+            return False
+        here = game.tile()
+        near = nearest_bank_reachable(here, navigator) if here is not None else None
+        if near is None:
+            self.log('[clue] no nearby bank available for preparation')
+            return False
+        self.log(f"[clue] preparing at the {near['name']} bank")
+        stand = near['tile']
+        walked = yield from walk_to_bank(Tile(stand['x'], stand['z'], stand['level']), self.log)
+        return walked
 
     def vlog(self, message):
         if self.verbose:
@@ -1188,7 +1237,7 @@ class JiveDragons(TaskBot):
             flasks.append(antifire_plan(self.antifire_want))
         if self.prayer_want > 0:
             flasks.append(prayer_plan(self.prayer_want))
-        return BankOpts(withdraw_food=True, rune_casts=self.rune_casts, rune_buffer=self.rune_buffer, ammo=self.ammo_withdraw, escape_stock=self.escape_stock,
+        return BankOpts(withdraw_food=True, deposit_inventory=self.clue_restock, rune_casts=self.rune_casts, rune_buffer=self.rune_buffer, ammo=self.ammo_withdraw, escape_stock=self.escape_stock,
                         heal_to=self.heal_to, potions=self.potions, flasks=flasks, carry=[self.axe] if self.site.axe == True and self.axe != '' else [])
 
     # Why: bank_routine counts a trip only where it runs to the end, so the counter moving tells an empty bank from a
@@ -1197,6 +1246,11 @@ class JiveDragons(TaskBot):
         """Takes the trip, and notes what it came back with when it finished."""
         self.fight.reset()
         self.loot_run = None
+        # Why: a trail ends wherever its casket was, so the restock after it walks back to the site's bank first.
+        if self.clue_restock and not self.site.in_area(game.tile()):
+            walked = yield from walk_to_bank(self.site.bank, self.log)
+            if not walked:
+                return
         before = self.bank_trips
         yield from bank_routine(self, self.site, self.bank_opts())
         if self.bank_trips > before:
@@ -1205,6 +1259,7 @@ class JiveDragons(TaskBot):
     # Why: a finished trip with no food is the one state the run can't fix from inside, so it stops at the booth
     # rather than walking back unable to heal.
     def note_trip(self, food, supplies):
+        self.clue_restock = False
         self.bank_empty = not food
         self.supply_empty = not supplies
         if not food:
