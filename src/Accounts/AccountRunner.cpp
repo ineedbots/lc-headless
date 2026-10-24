@@ -8,6 +8,7 @@
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/Logger.hpp"
+#include "../Game/Net/LoginQueue.hpp"
 #include "../Io/NetLoop.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
@@ -27,10 +28,12 @@ AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared
     : m_config{std::move(config)}
     , m_cache{std::move(cache)}
     , m_logger{std::move(logger)}
+    , m_loginQueue{std::make_shared<LoginQueue>(m_config->scripting.loginIntervalSeconds)}
     , m_commands{m_accounts, *m_logger}
 {
     assert(m_cache && "AccountRunner needs a cache");
 
+    options.client.loginQueue = m_loginQueue;
     for (auto& account : accounts)
     {
         m_accounts.push_back(std::make_unique<Account>(m_config, m_cache, std::move(account), runtime, m_logger, options, &m_messenger, m_net));

@@ -16,6 +16,7 @@
 #include "Game/GameClient.hpp"
 #include "Game/InputTracker.hpp"
 #include "Game/Net/Error/LoginError.hpp"
+#include "Game/Net/LoginQueue.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/State/GameEvent_s.hpp"
@@ -384,6 +385,69 @@ TEST_CASE("GameClient reconnects when the connection drops", "[GameClient]")
     CHECK(client.GetState().pid == Fixtures::PID);
     CHECK(client.GetState().npcs.size() == 1);
     CHECK(server.GetErrors().empty());
+}
+
+TEST_CASE("GameClient takes turns reconnecting with the clients that share its login queue", "[GameClient]")
+{
+    constexpr auto INTERVAL = 300ms;
+
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto firstServer = FakeGameServer{TestWorld::Send};
+    auto secondServer = FakeGameServer{TestWorld::Send};
+    auto options = FastOptions();
+    options.loginQueue = std::make_shared<LoginQueue>(INTERVAL);
+
+    auto first = GameClient{MakeConfig(firstServer), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+    auto second = GameClient{MakeConfig(secondServer), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+
+    // Pumps both clients until each server has seen count logins, and returns when each saw its last.
+    const auto pumpUntilLogins = [&](std::size_t count)
+    {
+        auto firstAt = std::optional<Clock::time_point>{};
+        auto secondAt = std::optional<Clock::time_point>{};
+        const auto deadline = Clock::now() + WAIT;
+        while (Clock::now() < deadline && !(firstAt && secondAt))
+        {
+            first.Pump(5ms);
+            second.Pump(5ms);
+
+            if (!firstAt && firstServer.GetLoginOpcodes().size() == count)
+            {
+                firstAt = Clock::now();
+            }
+
+            if (!secondAt && secondServer.GetLoginOpcodes().size() == count)
+            {
+                secondAt = Clock::now();
+            }
+        }
+
+        REQUIRE(firstAt.has_value());
+        REQUIRE(secondAt.has_value());
+        return std::pair{*firstAt, *secondAt};
+    };
+
+    first.BeginLogin();
+    second.BeginLogin();
+    const auto [firstLogin, secondLogin] = pumpUntilLogins(1);
+    CHECK(secondLogin - firstLogin >= INTERVAL - 50ms);
+
+    REQUIRE(PumpUntil(second, [&]
+    {
+        first.Pump();
+        return first.GetState().placed && second.GetState().placed;
+    }));
+
+    firstServer.SetLoginStatus(15);
+    secondServer.SetLoginStatus(15);
+    firstServer.Close();
+    secondServer.Close();
+    const auto [firstReconnect, secondReconnect] = pumpUntilLogins(2);
+    const auto gap = firstReconnect > secondReconnect ? firstReconnect - secondReconnect : secondReconnect - firstReconnect;
+    CHECK(gap >= INTERVAL - 50ms);
+
+    CHECK(firstServer.GetLoginOpcodes() == std::vector<u8>{16, 18});
+    CHECK(secondServer.GetLoginOpcodes() == std::vector<u8>{16, 18});
 }
 
 TEST_CASE("GameClient logs in and reconnects through a SOCKS5 proxy", "[GameClient][Socks5]")

@@ -6,6 +6,7 @@
 #include "../Console/ConsoleCommand_s.hpp"
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/Logger.hpp"
+#include "../Game/Net/LoginQueue.hpp"
 #include "../Io/NetLoop.hpp"
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
@@ -47,6 +48,9 @@ private:
     std::shared_ptr<Logger> m_logger;
     // Every account's connection runs on it, so a packet for any of them wakes the runner.
     std::shared_ptr<NetLoop> m_net = NetLoop::Create();
+    // Every account's login attempts take turns on it, so reconnects and relogins are spaced out as the first
+    // logins are.
+    std::shared_ptr<LoginQueue> m_loginQueue;
     // Declared before the accounts, which unregister from it as they go.
     BotMessenger m_messenger;
     std::vector<std::unique_ptr<Account>> m_accounts;

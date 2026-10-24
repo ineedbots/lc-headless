@@ -11,6 +11,7 @@
 #include "Map/WorldMap.hpp"
 #include "Net/ClientPacketWriter.hpp"
 #include "Net/LoginHandshake.hpp"
+#include "Net/LoginQueue.hpp"
 #include "Net/RetrySchedule.hpp"
 #include "Net/ServerPacketReader.hpp"
 #include "Protocol/ClientPacket_s.hpp"
@@ -42,6 +43,8 @@ struct GameClientOptions_s
     std::chrono::milliseconds loginTimeout = 15s;
     std::chrono::milliseconds keepaliveInterval = 1s;
     std::chrono::milliseconds serverSilenceTimeout = 15s;
+    // Shared by clients that take turns at every login attempt; without one, each attempt starts when it's due.
+    std::shared_ptr<LoginQueue> loginQueue;
 };
 
 // Single-threaded, and only waits when told to: Pump() does the work, waiting for data at most maxWait.
@@ -92,6 +95,8 @@ private:
     void LoseConnection(std::string_view reason);
     void BeginReconnect(std::string_view reason);
     [[nodiscard]] bool ScheduleRetry(std::string_view error, bool retryable);
+    // The time an attempt due at earliest may start, after the turns of any clients ahead of it.
+    [[nodiscard]] Clock::time_point TakeTurn(Clock::time_point earliest) const;
     [[nodiscard]] bool ContinueLogout();
     void ProcessInput();
     // Sends what a packet the decoder just read asks for in reply.

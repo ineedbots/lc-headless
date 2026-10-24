@@ -142,6 +142,13 @@ void GameClient::BeginLogin()
     m_retries.Reset();
     m_status = ClientStatus_e::Connecting;
 
+    const auto now = Clock::now();
+    if (const auto turn = TakeTurn(now); turn > now)
+    {
+        m_retries.ScheduleAt(turn);
+        return;
+    }
+
     try
     {
         StartAttempt();
@@ -574,7 +581,7 @@ void GameClient::BeginReconnect(std::string_view reason)
     m_lostReason = reason;
     m_reconnecting = true;
     m_retries.Reset();
-    m_retries.ScheduleAt(Clock::now());
+    m_retries.ScheduleAt(TakeTurn(Clock::now()));
     m_status = ClientStatus_e::Connecting;
 }
 
@@ -608,11 +615,17 @@ bool GameClient::ScheduleRetry(std::string_view error, bool retryable)
         m_logger->Warning("Login attempt {} of {} failed: {}", attempt, maxAttempts, error);
     }
 
-    const auto delay = m_retries.GetDelay();
-    m_logger->Info("Trying again in {} ms", delay.count());
-    m_retries.ScheduleAt(Clock::now() + delay);
+    const auto now = Clock::now();
+    const auto retryAt = TakeTurn(now + m_retries.GetDelay());
+    m_logger->Info("Trying again in {} ms", std::chrono::duration_cast<std::chrono::milliseconds>(retryAt - now).count());
+    m_retries.ScheduleAt(retryAt);
     m_status = ClientStatus_e::Connecting;
     return true;
+}
+
+GameClient::Clock::time_point GameClient::TakeTurn(Clock::time_point earliest) const
+{
+    return m_options.loginQueue ? m_options.loginQueue->Reserve(earliest) : earliest;
 }
 
 void GameClient::ProcessInput()

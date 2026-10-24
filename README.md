@@ -75,7 +75,7 @@ would look like
 | `client.navDirectory` | `data/nav` | rs2b0t's walker data, which `tools/nav/export_rs2b0t.ts` writes. The default is the copy in this repository |
 | `scripting.accountsDirectory` | `accounts` | The folder of account files |
 | `scripting.scriptsDirectory` | `scripts` | The folder of scripts and the modules they import |
-| `scripting.loginIntervalSeconds` | `2` | The time between one account's login and the next |
+| `scripting.loginIntervalSeconds` | `2` | The time between one account's login and the next, and between any two accounts' login attempts when they retry, reconnect or log back in |
 | `scripting.callTimeoutMs` | `1000` | How long one call into a script may run |
 | `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
 | `scripting.progressDirectory` | `progress` | Where progress reports are written |
