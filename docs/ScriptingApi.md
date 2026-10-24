@@ -553,11 +553,13 @@ if not has_all_tools([pickaxe_req()], skills.level, inventory.count):
 
 A table entry is a `Record`: its fields are attributes, and one it doesn't set reads as `None`. Item, NPC and scenery names are the 289 cache's, and a test checks every name the tables use against it. `reader.item_ids(name)`, `npc_ids(name)` and `loc_ids(name)` look a name up in the cache.
 
-The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout, which writes `rs2004/catalogs/_data.py` and `_shops.py`.
+The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout, which writes `rs2004/catalogs/_data.py`, `_shops.py` and `_clues.py`.
 
 `rs2004.market` is rs2b0t's market: the tradeable catalog built from the cache (`live_catalog`, `resolve_by_name`, `display_name`), its shelves, price books kept in the account file (`PriceBooks`), `appraise` for a trade window, and the public-chat protocol (`parse_command`, `format_price_list`). See [market.md](scripting/market.md).
 
 `rs2004.hunting` is rs2b0t's boss and dragon framework: the dragon sites (`DRAGON_SITES`), the `Fight`, `Retreat`, `HoldSafespot` and `WalkToSpot` tasks over a host bot, the walks in and out of a lair (`enter_lair`, `leave_lair`), the bank trip (`bank_routine`), and the pure decisions under them. See [hunting.md](scripting/hunting.md).
+
+`rs2004.clues` is rs2b0t's clue engine: the clue database (`CLUE_DB`, `identify_step`), `SolveClue`, the task a bot adds to solve the clues it picks up, the `ClueExecutor` under it, the puzzle-box solver, the hard dig's guardian, and the Duel Arena and jungle travel a trail needs. See [clues.md](scripting/clues.md).
 
 `scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
 
@@ -569,10 +571,11 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Jewellery and caskets | JiveBalls, JiveCaskets, JiveCrafting, JiveEnchanter | `jive_balls.py`, `jive_caskets.py`, `jive_crafting.py`, `jive_enchanter.py` |
 | Runecrafting | RuneCrafter, NatureCrafter | `rune_crafter.py`, `nature_crafter.py`. NatureCrafter's paint button is the `gobank` console command |
 | Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
-| Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py` |
+| Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py`. The three Ardougne bots solve the clues they pick up |
+| Treasure Trails | ClueSolver | `clue_solver.py`: solves the clue or opens the casket in the pack, then banks the reward |
 | Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
-| Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. The clue drops are banked until the solver comes (phase 15) |
-| Bosses and dragons | JiveDragons, JiveDemons, JiveKBD | `jive_dragons.py`, `jive_demons.py`, `jive_kbd.py`, on [`rs2004.hunting`](scripting/hunting.md) |
+| Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. GreenDragon, RockCrab and AutoFighter solve the clues they pick up, on [`rs2004.clues`](scripting/clues.md) |
+| Bosses and dragons | JiveDragons, JiveDemons, JiveKBD | `jive_dragons.py`, `jive_demons.py`, `jive_kbd.py`, on [`rs2004.hunting`](scripting/hunting.md). JiveDragons solves the hard clues the dragons drop |
 | Duel Arena | Duel Arena Combat Trainer (DuelArena) | `duel_arena.py`, its logic in `bots/duelarena/`: two accounts duel each other to train Attack, Strength and Defence |
 | Movement and magic | WalkTo, DoorOpener, AIO Teleport, Alcher | `walk_to.py`, `door_opener.py`, `aio_teleport.py`, `alcher.py` |
 | Shops and trading | ShopBuyout, ShopRunner, MarketMaker, JiveMarketDumper, MuleTrader | `shop_buyout.py`, `shop_runner.py`, `market_maker.py` (its logic in `bots/marketmaker/`), `jive_market_dumper.py`, `mule_trader.py` |

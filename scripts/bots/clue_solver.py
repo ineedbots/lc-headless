@@ -3,7 +3,7 @@
 # reward, and banks the reward after.
 
 from rs2004.catalogs import LOADOUT_SETTING, ContinueDialog, food_heal_amount, script_food, should_eat_to_use_food, sustain
-from rs2004.clues import SPADE_NAME, TRIO, SolveClue, held_clue_like_id, open_clue_bank, walk_to_bank
+from rs2004.clues import SPADE_NAME, TRIO, SolveClue, held_clue_like_id, open_clue_bank, tiles_to, walk_to_bank
 
 SETTINGS = {
     'loadout': LOADOUT_SETTING,
@@ -129,6 +129,11 @@ class ClueSolver(TaskBot):
         }
         if current is not None:
             report['Leg'] = f'{current.leg}: {current.step} (attempt {current.attempt})'
+            # Why: a long walk logs little, so the distance left is what tells a walk from a stall.
+            left = tiles_to(current.target)
+            if left is not None:
+                report['To go'] = f'{left} of {current.start_dist} tiles'
+        report['At'] = str(game.tile())
         return report
 
 

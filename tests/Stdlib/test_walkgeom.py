@@ -222,3 +222,13 @@ def test_white_wolf_mountain_covers_the_pass_and_not_the_banks():
     assert tile_in_danger_zones(2850, 3495, 0, zones)
     assert not tile_in_danger_zones(2809, 3441, 0, zones)
     assert not tile_in_danger_zones(2895, 3435, 0, zones)
+
+
+def test_a_verify_probe_is_dead_without_a_route_or_at_the_same_end():
+    from rs2004.walkgeom import judge_probe
+    from rs2004.geometry import Tile
+    end = Tile(3000, 3000, 0)
+    assert judge_probe(None, False, None) == 'probe-dead'
+    assert judge_probe(None, True, end) == 'probe-fresh'
+    assert judge_probe(end, True, Tile(3000, 3000, 0)) == 'probe-dead'
+    assert judge_probe(end, True, Tile(3001, 3000, 0)) == 'probe-fresh'

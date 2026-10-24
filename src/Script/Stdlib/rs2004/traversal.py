@@ -21,6 +21,7 @@ from rs2004.entities import local_tile, locs, npcs
 from rs2004.events import SKILL_NAMES
 from rs2004.game import direct_navigator, game, skills
 from rs2004.geometry import Tile
+from rs2004.interfaces import interfaces
 from rs2004.items import equipment, inventory
 from rs2004.messages import CANT_REACH, game_messages
 from rs2004.reach import close_op, is_open_barrier_leaf, is_openable_barrier, open_op
@@ -62,6 +63,8 @@ LANDING_TOLERANCE = 3
 DEFAULT_TIMEOUT_MS = 300000
 DEFAULT_MAX_BUDGET = 1200000
 SCENE_TIMEOUT_MS = 6000
+# How often a resilient walk says where its ladder stands.
+PROGRESS_LOG_MS = 15000
 POST_QUEST_TALK_STEPS = 60
 POST_QUEST_TALK_OPEN_MS = 4000
 TELEPORT_LAND_MS = 8000
@@ -858,12 +861,14 @@ class _Traversal:
                 say(f'{transport["loc_name"]} landed at {here}, not where planned; repathing')
                 return 'repath'
             return 'crossed'
-        key = f'{transport["loc_x"]},{transport["loc_z"]}'
-        strikes = self._door_strikes.get(key, 0) + 1
-        self._door_strikes[key] = strikes
-        if strikes >= DOOR_STRIKES:
-            self._avoid_doors.append([transport['loc_x'], transport['loc_z']])
-            say(f'avoiding {transport["loc_name"]} at {key} on the next route')
+        # Why: a teleport hop has no loc, so only a door or a loc hop earns strikes; a teleport is suppressed instead.
+        if transport.get('loc_x') is not None:
+            key = f'{transport["loc_x"]},{transport["loc_z"]}'
+            strikes = self._door_strikes.get(key, 0) + 1
+            self._door_strikes[key] = strikes
+            if strikes >= DOOR_STRIKES:
+                self._avoid_doors.append([transport['loc_x'], transport['loc_z']])
+                say(f'avoiding {transport["loc_name"]} at {key} on the next route')
         teleport = transport.get('teleport_id')
         if teleport is not None and teleport not in self._suppressed_teleports:
             self._suppressed_teleports.append(teleport)
@@ -1156,6 +1161,7 @@ class _Traversal:
         if not talked:
             say(f'{label}: {crossing["npc"]} is not here to talk to')
             return False
+        map_clicked = False
         for i in range(SHIP_DIALOGUE_STEPS):
             if _near_landing(crossing, radius):
                 break
@@ -1164,6 +1170,15 @@ class _Traversal:
                 yield from chat_dialog.choose_option(pick)
             elif chat_dialog.can_continue():
                 yield from chat_dialog.continue_()
+            elif crossing.get('mapChoice') and not map_clicked:
+                # Why: the glider's dialogue opens a map, and its destination is a button beside the place's name; a
+                # map is answered before any open modal is closed.
+                button = interfaces.button_near_text(crossing['mapChoice'], _core.get_main_modal()) if modals.is_open() else None
+                if button is not None and interfaces.click(button):
+                    map_clicked = True
+                    say(f"{label}: map → {crossing['mapChoice']}")
+                else:
+                    yield from execution.delay_ticks(1)
             elif modals.is_open():
                 yield from modals.close()
                 yield from execution.delay_ticks(1)
@@ -1261,35 +1276,48 @@ class _Traversal:
         scene = radius + 1 if scene_radius is None else scene_radius
         budget = DEFAULT_MAX_BUDGET if max_budget is None else max_budget
         world_timeout = 90000 if timeout_ms is None else timeout_ms
+        # Why: rs2b0t's walkResilient pumps sustain and checks for an event every pass, and a backoff leaves no
+        # outcome, so the pass after one plans the route again; without that the ladder circled scene, unstick and
+        # backoff for good after one failed walk, silent and never giving up.
+        from rs2004.catalogs.tasks import sustain
         state = walkgeom.LadderState(walkgeom.walk_chebyshev(local_tile(), dest))
         last = None
         unstick = 0
-        for i in range(1000):
+        last_terminal = None
+        logged_at = _core.step_time()
+        for i in range(100000):
+            yield from sustain.run()
+            if execution.event_signal.pending():
+                say('walk interrupted by a runtime event; yielding to the runtime')
+                self.last_outcome = 'interrupted'
+                return False
             rung, state = walkgeom.advance(state, walkgeom.walk_chebyshev(local_tile(), dest), _arrived(dest, radius), False, last)
             kind = rung[0]
             if kind == 'arrived':
                 return True
             if kind == 'interrupted':
+                say('walk interrupted by a runtime event; yielding to the runtime')
                 self.last_outcome = 'interrupted'
-                return False
-            if kind == 'unreachable':
-                say(f'walk_resilient: {dest} is unreachable')
-                self.last_outcome = 'unreachable'
                 return False
             if attempts is not None and state.no_progress_passes >= attempts:
                 say(f'walk_resilient: {attempts} passes made no progress')
                 self.last_outcome = 'failed'
                 return False
+            if _core.step_time() - logged_at > PROGRESS_LOG_MS:
+                logged_at = _core.step_time()
+                say(f'walk_resilient: {kind} toward ({dest.x},{dest.z}), best {state.best_dist} tiles, pass {state.no_progress_passes}')
             if kind == 'world':
                 expansions = budget if rung[1] else None
                 yield from self.walk_to(dest, radius, world_timeout, expansions, use_teleport_catalog, policy, bank_item_counts, avoid_zones, say)
                 outcome = self.last_outcome
                 if outcome == 'blocked':
                     return True
+                if (outcome == 'failed' or outcome == 'unreachable') and len(self.last_missing_gate_items) > 0:
+                    return False
                 last = 'failed' if outcome == 'unreachable' else outcome
             elif kind == 'scene':
                 yield from direct_navigator.walk_to(dest, scene, SCENE_TIMEOUT_MS)
-                last = 'failed'
+                last = 'interrupted' if execution.event_signal.pending() else 'failed'
             elif kind == 'unstick':
                 yield from self.try_nearby_door(say)
                 me = local_tile()
@@ -1300,11 +1328,24 @@ class _Traversal:
                 last = 'failed'
             elif kind == 'backoff':
                 yield from execution.delay_ticks(rung[1])
-                last = 'failed'
+                last = None
             elif kind == 'verify':
                 me = local_tile()
                 probe = self._request(me, dest, budget, {'use_teleports': False}, False, [])
-                last = 'probe-fresh' if probe['ok'] else 'probe-dead'
+                points = (probe.get('waypoints') or []) if probe['ok'] else []
+                terminal = Tile(points[-1]['x'], points[-1]['z'], points[-1]['level']) if points else None
+                last = walkgeom.judge_probe(last_terminal, probe['ok'], terminal)
+                if terminal is not None:
+                    last_terminal = terminal
+                if last == 'probe-dead':
+                    say('walk_resilient: verify probe dead')
+                else:
+                    say(f'walk_resilient: verify probe fresh (terminal {terminal.x},{terminal.z})')
+            elif kind == 'unreachable':
+                say(f'walk_resilient: {dest} unreachable from here; stopping (best {state.best_dist} tiles)')
+                self.last_outcome = 'unreachable'
+                return False
+        say('walk_resilient: iteration cap hit; yielding')
         self.last_outcome = 'failed'
         return False
 

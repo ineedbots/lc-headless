@@ -75,7 +75,7 @@ yield from traversal.walk_to(dest, 2, **NAV_WITH_TELES)
 
 ### `traversal.walk_resilient(dest, radius=2, attempts=None, timeout_ms=None, scene_radius=None, max_budget=None, use_teleport_catalog=None, policy=None, bank_item_counts=None, avoid_zones=None, log=None)`
 
-**Wait.** `walk_to` behind rs2b0t's escalation ladder. Prefer it for most walks. When a world walk fails it tries, in turn, a `direct_navigator` walk, opening a door beside you and an unstick step, then a backoff of 2 to 16 ticks, and plans again. After three passes without getting nearer, it checks with a fresh search whether `dest` is reachable at all.
+**Wait.** `walk_to` behind rs2b0t's escalation ladder. Prefer it for most walks. When a world walk fails it tries, in turn, a `direct_navigator` walk, opening a door beside you and an unstick step, then a backoff of 2 to 16 ticks, and plans again. After three passes without getting nearer, it checks with a fresh search whether `dest` is reachable at all; a search that finds no route, or one ending where the last did, stops the walk with `last_outcome` `'unreachable'`. Every pass runs the sustain hook first, and a pending random event ends the walk with `'interrupted'`. Every 15 seconds it logs which step it's on.
 
 | Parameter | Meaning |
 |---|---|
@@ -235,7 +235,7 @@ The last mile. Walk to a stand, use something, and when the server answers "I ca
 | `'retry'` | It didn't yet; call again later |
 | `'unreachable'` | The stand or the target can't be reached, and no door explains it |
 
-`reach` walks to the stand within the loaded area, so the stand must be reachable from where you are: it opens the door between the stand and the target, not doors on the way there. Use `traversal` to get near first.
+`reach` walks to the stand with `traversal.walk_resilient`, as rs2b0t's does, so a stand can be anywhere on the map. Once there, it opens the door between the stand and the target.
 
 ### `reach.loc_op(name, op, near, expect, within=10, id=None, expect_ms=12000, refused=None, log=None)`
 

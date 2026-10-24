@@ -101,3 +101,84 @@ def test_webs_and_ladders_with_an_id_take_only_the_loc_on_their_tile():
     assert not walker._exact_placement({'loc_name': 'Ladder', 'action': 'Climb-down', 'loc_x': 2848, 'loc_z': 3513})
     assert walker._exact_placement({'loc_name': 'Web', 'action': 'Slash', 'loc_x': 2569, 'loc_z': 3118})
     assert not walker._exact_placement({'loc_name': 'Staircase', 'action': 'Climb-up', 'loc_id': 1738, 'loc_x': 3204, 'loc_z': 3207})
+
+
+class FailedHop:
+    def __init__(self, transport):
+        self.transport = transport
+        self.level = 0
+
+
+def refused(self, approach, hop, say):
+    return False
+    yield
+
+
+def take_hop(walk, hop):
+    gen = walk._take_hop(tile(3222, 3218), hop, lambda m: None)
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        return stop.value
+
+
+def test_a_teleport_that_fails_is_suppressed_without_a_door_strike():
+    handle = walker._Traversal._handle_transport
+    walker._Traversal._handle_transport = refused
+    walk = walker._Traversal()
+    spell = {'kind': 'teleport', 'family': 'spell', 'loc_name': 'Cast Ardougne teleport', 'teleport_id': 'ardougne'}
+    assert take_hop(walk, FailedHop(spell)) == 'repath'
+    assert walk._suppressed_teleports == ['ardougne']
+    assert walk._door_strikes == {}
+    door = {'loc_name': 'Door', 'action': 'Open', 'loc_x': 3100, 'loc_z': 3100}
+    assert take_hop(walk, FailedHop(door)) == 'repath'
+    assert walk._door_strikes == {'3100,3100': 1}
+    walker._Traversal._handle_transport = handle
+
+
+def no_wait(*args, **kwargs):
+    return None
+    yield
+
+
+def failed_world_walk(self, *args, **kwargs):
+    self.world_walks = getattr(self, 'world_walks', 0) + 1
+    self.last_outcome = 'failed'
+    return False
+    yield
+
+
+def dead_probe(self, *args, **kwargs):
+    return {'ok': False, 'reason': 'unreachable'}
+
+
+def test_a_resilient_walk_plans_again_after_a_backoff_and_gives_up():
+    from rs2004 import execution
+    from rs2004 import walkgeom
+    from rs2004.game import direct_navigator
+    saved = [(walker, 'local_tile', walker.local_tile), (walker, '_arrived', walker._arrived), (execution, 'delay_ticks', execution.delay_ticks),
+             (walkgeom, 'pick_unstick_step', walkgeom.pick_unstick_step), (walker._Traversal, 'walk_to', walker._Traversal.walk_to),
+             (walker._Traversal, 'try_nearby_door', walker._Traversal.try_nearby_door), (walker._Traversal, '_request', walker._Traversal._request),
+             (type(direct_navigator), 'walk_to', type(direct_navigator).walk_to)]
+    walker.local_tile = lambda: tile(3267, 3294)
+    walker._arrived = lambda dest, radius: False
+    execution.delay_ticks = no_wait
+    walkgeom.pick_unstick_step = lambda can_step, start: None
+    walker._Traversal.walk_to = failed_world_walk
+    walker._Traversal.try_nearby_door = no_wait
+    walker._Traversal._request = dead_probe
+    type(direct_navigator).walk_to = no_wait
+    walk = walker._Traversal()
+    gen = walk.walk_resilient(tile(2613, 3294), radius=4)
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        arrived = stop.value
+    for owner, name, value in saved:
+        setattr(owner, name, value)
+    # Two world walks fail, a backoff plans a third, and the probe from the same spot finds no route.
+    assert arrived is False
+    assert walk.world_walks >= 2
+    assert walk.last_outcome == 'unreachable'

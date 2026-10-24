@@ -57,5 +57,22 @@ class _Interfaces:
         there's no such text, or no button under it."""
         return _core.click_text(text, root)
 
+    # Why: a map such as the glider's draws its place names as text beside unlabelled buttons, so the button is the
+    # nearest one to the name: rs2b0t's mainModalButtonNearText.
+    def button_near_text(self, label, root=None):
+        """The id of the ok, target or select button nearest the first visible text containing label (without
+        regard to case), in root's interface or every open one, or None."""
+        shown = _core.find_components(None, None, root)
+        want = label.lower()
+        texts = [c for c in shown if c.type == 'text' and c.text and want in c.text.lower()]
+        buttons = [c for c in shown if c.button in ('ok', 'target', 'select')]
+        if not texts or not buttons:
+            return None
+        at = texts[0]
+        lx = at.x + at.width / 2
+        ly = at.y + at.height / 2
+        buttons.sort(key=lambda c: (c.x + c.width / 2 - lx) ** 2 + (c.y + c.height / 2 - ly) ** 2)
+        return buttons[0].id
+
 
 interfaces = _Interfaces()

@@ -349,6 +349,16 @@ def advance(state, cur_dist, within_radius, interrupted, last_outcome):
     return ('backoff', backoff_ticks(passes)), LadderState(best, passes)
 
 
+def judge_probe(previous, ok, terminal):
+    """'probe-fresh' when a verify probe found a route ending somewhere new, else 'probe-dead': no route, or the
+    same end as the last probe, so walking it again can't help. previous and terminal are tiles or None."""
+    if not ok or terminal is None:
+        return 'probe-dead'
+    if previous is not None and previous.x == terminal.x and previous.z == terminal.z and previous.level == terminal.level:
+        return 'probe-dead'
+    return 'probe-fresh'
+
+
 UNSTICK_STEPS = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
 
 

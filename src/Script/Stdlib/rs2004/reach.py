@@ -16,7 +16,6 @@ import _core
 from rs2004 import execution
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import local_tile, locs, npcs
-from rs2004.game import direct_navigator
 from rs2004.geometry import Tile
 from rs2004.messages import CANT_REACH, game_messages
 
@@ -106,14 +105,22 @@ def _barrier_at(tile, test):
     return locs.query().where(lambda l: l.tile() == tile and _wall_barrier(l, test)).nearest()
 
 
-def _walk(dest, radius, timeout_ms):
-    arrived = yield from direct_navigator.walk_to(dest, radius, timeout_ms)
+# Why: a stand can be across the map, as a clue's NPC is from the bank, so the walk is the walker's, as rs2b0t's
+# Reach walks with Traversal.walkResilient; traversal imports this module, so it's imported here.
+def _walk(dest, radius, timeout_ms, say, attempts=4):
+    from rs2004.traversal import traversal
+    arrived = yield from traversal.walk_resilient(dest, radius=radius, attempts=attempts, timeout_ms=timeout_ms, log=say)
     return arrived
 
 
+def _unreachable():
+    from rs2004.traversal import traversal
+    return traversal.last_outcome == 'unreachable'
+
+
 def _close_in(near, radius, say):
-    arrived = yield from _walk(near, radius, STAND_TIMEOUT_MS)
-    if not arrived and direct_navigator.last_outcome == 'unreachable':
+    arrived = yield from _walk(near, radius, STAND_TIMEOUT_MS, say)
+    if not arrived and _unreachable():
         say(f'reach: {near} is unreachable')
         return 'unreachable'
     return 'retry'
@@ -126,7 +133,7 @@ def _open_blocking_door(toward, say):
         return False
     tile = door.tile()
     if here.distance_to(tile) > 1:
-        yield from _walk(tile, 1, DOOR_WALK_TIMEOUT_MS)
+        yield from _walk(tile, 1, DOOR_WALK_TIMEOUT_MS, say, 3)
     shut = _barrier_at(tile, is_openable_barrier)
     if shut is None:
         return True
@@ -255,8 +262,8 @@ class _Reach:
             if not settled:
                 status = yield from _close_in(near, 2, say)
                 return status
-        arrived = yield from _walk(near, 1, STAND_TIMEOUT_MS)
-        if not arrived and direct_navigator.last_outcome == 'unreachable':
+        arrived = yield from _walk(near, 1, STAND_TIMEOUT_MS, say)
+        if not arrived and _unreachable():
             say(f'reach: the stand {near} is unreachable')
             return 'unreachable'
 
@@ -286,8 +293,8 @@ class _Reach:
         if find() is None:
             status = yield from _close_in(near, 3, say)
             return status
-        arrived = yield from _walk(near, 1, STAND_TIMEOUT_MS)
-        if not arrived and direct_navigator.last_outcome == 'unreachable':
+        arrived = yield from _walk(near, 1, STAND_TIMEOUT_MS, say)
+        if not arrived and _unreachable():
             say(f'reach: the stand {near} is unreachable')
             return 'unreachable'
 

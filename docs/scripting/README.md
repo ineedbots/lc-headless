@@ -25,12 +25,13 @@ The complete reference for writing Python scripts for rs2004-headless: every bui
 | [Catalogs](catalogs.md) | `rs2004.catalogs`: rs2b0t's data tables, planners and tasks |
 | [The market](market.md) | `rs2004.market`: the tradeable catalog, price books, appraising a trade, the chat protocol |
 | [Hunting](hunting.md) | `rs2004.hunting`: the dragon sites, the safespot and chase fight tasks, lairs entered and left, the bank trip, and the decisions under them |
+| [Clues](clues.md) | `rs2004.clues`: the clue database, `SolveClue` for a bot that carries clues, the executor, the puzzle box, the guardian, and the travel a trail needs |
 | [Quest steps](quests.md) | `rs2004.quests.exec`: talking to NPCs, walking to them across ladders, and answering what locs and doors ask; `rs2004.quests.prayer` |
 | [Python, imports, tools and porting](python-dialect.md) | pocketpy's dialect, imports, `--watch`, `--debugger`, revisions, porting from rs2b0t |
 
 ## Conventions used in this reference
 
-- **Builtins.** Everything here except [`rs2004.catalogs`](catalogs.md), [`rs2004.market`](market.md), [`rs2004.hunting`](hunting.md) and [`rs2004.quests`](quests.md) is in every script's builtins, with no import.
+- **Builtins.** Everything here except [`rs2004.catalogs`](catalogs.md), [`rs2004.market`](market.md), [`rs2004.hunting`](hunting.md), [`rs2004.clues`](clues.md) and [`rs2004.quests`](quests.md) is in every script's builtins, with no import.
 - **Wait.** A function marked **Wait** is a generator. Call it with `yield from` inside `loop()`, `on_start()`, a task's `execute()`, or another generator, and it gives back its result: `ok = yield from bank.close()`. Called without `yield from`, it does nothing. Everything not marked **Wait** returns at once.
 - **Actions queue.** Actions such as `interact()` queue packets and return at once. Their effects show in the state over the next ticks, so wait for them with [`execution.delay_until`](waiting.md#executiondelay_untilcond-timeout_ms6000).
 - **Snapshots.** Objects such as `Npc`, `InvItem` and `Component` are snapshots of when they were found. Query again, or call `valid()`, to see the present.

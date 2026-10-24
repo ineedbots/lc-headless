@@ -399,10 +399,69 @@ MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, 
 ClueSolver. `SolveClue` is also wired into the bots that carry it: ArdyCakes, ArdyFighter, ArdyThiever, AutoFighter, GreenDragon, JiveDragons and RockCrab.
 
 - **Done when:**
-    - [ ] rs2b0t's clue tests are ported and pass, including the puzzle solver against 10,000 shuffles.
-    - [ ] Against the local engine, given clues by a staff debugproc, ClueSolver:
+    - [x] rs2b0t's clue tests are ported and pass, including the puzzle solver against 10,000 shuffles.
+    - [x] Against the local engine, given clues by a staff debugproc, ClueSolver:
         - finishes an easy, a medium and a hard trail, hard including a dig guardian and a puzzle box;
         - finishes a trail with a duel-arena leg, run with a partner account.
+
+### As built
+
+- **Where it lives.** `rs2004.clues` is a package, as rs2b0t's `api/ai/clues/` is. Its modules:
+    - `data`: the tables, generated into `catalogs/_clues.py` by `export_rs2b0t.ts`, and the step lookup.
+    - `puzzle` and `puzzle_box`: the solver and its driver.
+    - `plan`: packing, the hard kit and the trace.
+    - `tools` and `acquire`: the spade, the coordinate tools and the shops.
+    - `teleports`, `travel`, `guardian`, `steps` and `bank_access`.
+    - `executor` and `solve`.
+
+  The package re-exports them all. It isn't a builtin: a script imports it. docs/scripting/clues.md documents it, and `scripts/typings/rs2004/clues/__init__.pyi` is its stub.
+- **The executor is an object.** rs2b0t keeps one `ClueExecutor` for the process. Here each `SolveClue` owns one, and with it the guardian encounter it resumes after a random event, the reset budget per leg, and the riddle key's hunt. rs2b0t's test of a new solver clearing an old session's death asks the new solver's executor.
+- **The host.** `SolveClue(host)` looks up rs2b0t's `SolveClueHost` members on the host, the optional ones with `getattr`.
+    - ClueSolver is its own host.
+    - A bot whose names clash hands it a `SolveClueHost` built from functions. The fighters keep `food_name` as a string attribute, and pocketpy's class methods hide instance attributes.
+    - The seven bots wired with it: ArdyCakes, ArdyFighter, ArdyThiever, AutoFighter, GreenDragon, JiveDragons and RockCrab. Each gained rs2b0t's `solve_clues` setting where it lacked one, and reports `Clues` and `Clue` in its progress report.
+    - JiveDragons also takes rs2b0t's `owns_equipment()` gates, on GearEquip, SetAttackStyle, SetRetaliate, ArmAutocast, PanicBank and BankRun, and its post-trail restock.
+    - AutoFighter banks the reward after a trail.
+- **Kharazi and Isafdar.** The walk into the Kharazi Jungle needs Legends' Quest's jungle code, and the walk across Isafdar needs Regicide's seams. Both are phase 17's, so `walk_across_kharazi` and `walk_across_tirannwn` log why and fail. Everything else is in place: the clue set, the crossings, the jungle kit (machete, best axe, Radimus's notes) and the bank stop that packs it. rs2b0t's tirannwnTravel tests wait for phase 17, as do kharaziJungle's walking parts. Its band check passes on our map (`nav/test_clue_kharazi_band.py`).
+- **Hint arrows.** The design said talk and kill steps would check `hint_arrow()`. rs2b0t's clue code doesn't, and neither does this.
+- **Test fakes.** rs2b0t's clue tests stub the client with `spyOn`. `spec.py` now has `spy_on`, `patch` and `stub` on a class or module, restored after each test, and `Fake`, `FakeQuery`, `querying`, the instant waits and `run_wait`. With those, 380 more of rs2b0t's tests are ported:
+    - ClueExecutor's, the guardian's (weapon, events, combat, the wait), the hard preparation;
+    - the initial bank, recovery, upkeep, the duel's travel and discovery, Hans, the gnome pilot, the puzzle room, and the trace;
+    - ArdyFighter's clue weapon, and JiveDragons' clue hand-off and hard preparation.
+
+  The puzzle solver runs 100 shuffles in the suite. The 10,000 run in the hidden `[Slow]` case (about 5 minutes in Release), as `tests/Stdlib/rs2b0t/slow/` does for anything a run that size.
+- **Left out.** hardclueNavReach and clue-audit need rs2b0t's tools and pack. cluesParse is rs2b0t's tooling. The e2e tests need rs2b0t's client. hard-tier's quest check waits for phase 16's quest list. JiveDragons' egress and nearest-bank cases plan the way out of the lair through the hunting framework's real walks. `post-clue-bank.test.ts` needs rs2b0t's safety fixture. `cluePaint.ts` is an overlay.
+- **The walker, found live.** Three of phase 12's walker paths diverged from rs2b0t's, and the trails found them:
+    - `walk_resilient` set the outcome after a backoff to `'failed'`, where rs2b0t leaves none. So after one failed world walk the ladder circled scene, unstick and backoff for good: silent, never planning again, never giving up. It also didn't pump sustain or check for an event each pass, and a verify probe never read as dead. All three are rs2b0t's now, with its progress line every 15 seconds.
+    - `reach` walked to a stand with `direct_navigator`, so a talk step's NPC across the map was never reached. It uses `walk_resilient`, as rs2b0t's `Reach` does.
+    - The NPC crossing closed the gnome glider's map rather than answering it. `mapChoice` is answered with `interfaces.button_near_text`, rs2b0t's `mainModalButtonNearText`.
+    - A failed teleport hop raised a `KeyError`, since it has no loc to strike.
+- **The live checks.** All on fresh accounts against the local engine. Each got `~cq` and a second login, then the stats, a bank of tools, runes and the hard kit, and its first clue from the engine's `give`. `~cq` leaves Watchtower's market stage unset, which Gu'Tanoth's battlement checks, so the hard accounts got `setvar itwatchtower_bits 2048`. The trails, each ending in "Well done you've completed the
+  Treasure Trail!":
+    - **Easy.** Two legs from a Lumbridge search, then the casket, then the reward banked in Varrock.
+    - **Medium.** Five legs: two coordinate digs, a Karamja dig, and Yanille's riddle, whose key it took from a Man it
+      killed. Then the reward banked in Yanille.
+    - **Hard,** in one session, from General Bentnoze's riddle:
+        - it solved his puzzle box in 93 moves and handed it back;
+        - it flew the gliders to Karamja and dug where a Saradomin wizard rose, beat it under Protect from Magic, eating
+          through the fight, and dug again;
+        - it went on through a search and a Wilderness map search to the reward.
+
+      Four other hard trails added:
+        - a Saradomin wizard at Gu'Tanoth;
+        - a Zamorak wizard in the deep Wilderness;
+        - puzzle boxes of 45, 57, 77 and 101 moves;
+        - the Varrock sewers' web, cut on the third try;
+        - a Shantay pass bought on the way to the desert, with no pass in the bank.
+    - **The Duel Arena.** Hard sextant028 with lvduelhelper running DuelArena as the clue helper:
+        - both screens unstaked with obstacles on, into the right pen;
+        - the dig, the forfeit, and the casket opened only once out;
+        - then a Zamorak wizard's dig in the Wilderness, and the reward.
+
+      The duel leg was run three times.
+- **Still open.**
+    - `trail complete` is logged twice at a trail's end, once by the executor and once by `SolveClue`.
+    - `~cq` leaves quest varbits like Watchtower's market unset, which no account the user plays would lack.
 
 ---
 

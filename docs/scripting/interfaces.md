@@ -106,6 +106,7 @@ options = [c.text for c in interfaces.find(button='ok', root=reader.chat_modal()
 | `interfaces.find(text=None, button=None, root=None)` | Visible components with that text (whole, without regard to case) and button type, where each is given, in every open interface or only in `root`'s |
 | `interfaces.click(id)` | Clicks the component as its button type says (see below). `False` when it isn't visible; a component that isn't a button raises `ValueError` |
 | `interfaces.click_text(text, root=None)` | Clicks the button under the visible text, as a player clicking the words would. Trade's "Accept", for one, is a label over an unlabelled button. `False` when there's no such text, or no button under it |
+| `interfaces.button_near_text(label, root=None)` | The id of the ok, target or select button nearest the first visible text containing `label` (without regard to case), or `None`. A map, such as the gnome glider's, draws its place names beside unlabelled buttons |
 
 What a click sends, by button type:
 
