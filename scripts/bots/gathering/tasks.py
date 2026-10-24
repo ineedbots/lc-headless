@@ -38,8 +38,11 @@ def first_where(items, test):
     return None
 
 
+# Why: an npc's in_combat is its own hit clock, and with auto retaliate off nothing hits it back, so a dark wizard
+# casting from range never read as an attacker and FleeCombat never ran; rs2b0t's has the same gap. The face
+# target is the attack, and FleeCombat's game.in_combat() is the proof something landed.
 def attacking_me(n):
-    return n.in_combat and n.targets_me() and 'Attack' in n.actions()
+    return n.targets_me() and 'Attack' in n.actions()
 
 
 def attacking_beside(n):

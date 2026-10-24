@@ -92,3 +92,51 @@ A trade request from another player arrives as the `trade_request` event (`on_tr
 Driving a trade with a partner bot, one screen at a time, and handing one item over, are [`rs2004.catalogs`' partner trades](catalogs.md#trading-partners). Shop prices and a buyout's plan are [its shops](catalogs.md#shops).
 
 For trading between your own accounts, see the partner helpers in [catalogs](catalogs.md#trading-partners) and [messages between scripts](console-and-messages.md#messages-between-scripts).
+
+## `duel`
+
+The Duel Arena, rs2b0t's `api/duel/Duel.ts` and `ClueDuel.ts`. A challenge opens the rules-and-stake screen on both sides; both accept it, then both accept the confirm screen, and the two are walked into a pen, where the countdown runs and the fight is sent with `duel.fight(player)`. Each screen is found by its text, not by id.
+
+```python
+if not duel.active() and target is not None:
+    duel.challenge(target)
+elif duel.offer_open() and duel.partner() == target.name and not duel.waiting_for_other():
+    duel.accept()
+elif duel.confirm_open() and duel.offers().ready and not duel.waiting_for_other():
+    duel.accept()
+```
+
+| Method | Gives or does |
+|---|---|
+| `duel.offer_open()`, `duel.confirm_open()`, `duel.win_open()` | The rules screen ("Dueling with:"), the confirm screen ("Before the duel starts:"), the win screen ("The Spoils:") |
+| `duel.active()` | The rules or the confirm screen is open |
+| `duel.partner()` | The name on the rules screen, or `None` |
+| `duel.waiting_for_other()` | You've accepted this screen and they haven't |
+| `duel.offers()` | A `DuelOffers`: `mine` and `theirs` as `InvItem`s, and `ready` once the server has sent both. On the confirm screen the stakes are text, so `ready` means both say "Absolutely nothing!" |
+| `duel.options()` | The agreed rules, varp 286 (`DUEL_OPTIONS_VARP`), a bit each |
+| `duel.challenge(player)`, `duel.fight(player)` | Player op 1 in the grounds, op 2 in a pen. Don't wait |
+| `duel.accept()` | Clicks Accept on whichever screen is open. Doesn't wait |
+| `duel.toggle_obstacles()` | Clicks the rules screen's Obstacles box. Doesn't wait |
+| `duel.cancel()`, `duel.close_win()` | **Wait.** Closes the rules or confirm screen; closes the win screen |
+
+A duel request arrives as a `chat_message` whose `type` is `'duel_request'`. The duel's status varp (285) never reaches the client: the start shows as the 3, 2, 1, FIGHT! over your head ([`game.overhead_text()`](game.md#game)).
+
+| Name | Is |
+|---|---|
+| `DUEL_FIGHT_ARENAS` | The six pens, each a record of `min_x`, `max_x`, `min_z` and `max_z` |
+| `fight_arena_at(tile)` | The pen a tile is in, or `None` |
+| `in_duel_challenge_area(tile)` | Whether a tile is in the grounds, where a challenge can be sent, and not in a pen |
+| `parse_duel_partner_header(header)` | The name in a "Dueling with: name" line, or `None` |
+
+### Clue duels
+
+A hard clue's duel step needs a duel won or lost with obstacles on and nothing staked. These run one with a partner account:
+
+| Name | Is |
+|---|---|
+| `CLUE_DUEL_LOBBY`, `CLUE_DUEL_OPTIONS` | Where the two meet, and the rules: obstacles and nothing else (1024) |
+| `clue_duel_name(name)` | A name as the duel compares them: lower case, `_` as a space |
+| `ClueDuelHandshake(partner, initiator, log)` | `tick()` (**Wait**) takes the duel through both screens; the initiator sets the rules. Either side cancels one with the wrong partner, a stake, other rules, or one that stalls. `False` when rejected |
+| `ClueDuelSearch(log, tried=None)` | `tick()` (**Wait**) finds a player in the lobby to challenge, each at most once a minute |
+| `ClueDuelHelper(partner, log)` | A task for the helping account: waits in the lobby, takes `partner`'s challenge, and forfeits a duel that runs three minutes |
+| `leave_clue_duel(log)` | **Wait.** Forfeits from inside the pen |

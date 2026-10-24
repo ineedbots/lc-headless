@@ -257,6 +257,71 @@ def two_level_closures(source, path):
     return found
 
 
+def nested_ternaries(tree, source):
+    """A conditional expression holding another without brackets, which pocketpy won't parse."""
+    found = []
+    lines = source.split('\n')
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.IfExp):
+            continue
+        for part in (node.body, node.orelse, node.test):
+            if isinstance(part, ast.IfExp):
+                before = lines[part.lineno - 1][:part.col_offset].rstrip()
+                if not before.endswith('('):
+                    found.append((part.lineno, 'a conditional expression inside another needs brackets'))
+    return found
+
+
+_SCRIPT_BUILTINS = None
+
+
+def script_builtins():
+    """Every name a script gets without an import: CPython's builtins and the scripts' builtins stub."""
+    global _SCRIPT_BUILTINS
+    if _SCRIPT_BUILTINS is None:
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        with open(os.path.join(repo, 'scripts', 'typings', '__builtins__.pyi'), encoding='utf-8') as f:
+            stub = ast.parse(f.read())
+        names = set(dir(__builtins__) if isinstance(__builtins__, type(os)) else __builtins__.keys())
+        for node in stub.body:
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                names.add(node.name)
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                names.add(node.target.id)
+            elif isinstance(node, ast.Assign):
+                names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        _SCRIPT_BUILTINS = names
+    return _SCRIPT_BUILTINS
+
+
+# Why: a name a bot forgot to import loads fine and raises only when the line runs, which a live run found after
+# 30 minutes of other bots passing: JiveKQ's on_start used sustain without importing it.
+def undefined_names(tree, path):
+    """Names a script under scripts/ reads that nothing defines, imports or makes a builtin. Scoping is file-wide:
+    a name defined anywhere counts, so this finds the forgotten import, not every scoping slip."""
+    parts = os.path.abspath(path).replace('\\', '/').split('/')
+    if 'scripts' not in parts or 'typings' in parts or any(isinstance(n, ast.ImportFrom) and any(a.name == '*' for a in n.names) for n in ast.walk(tree)):
+        return []
+    defined = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+            defined.add(node.name)
+        elif isinstance(node, ast.arg):
+            defined.add(node.arg)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            defined.update((a.asname or a.name).split('.')[0] for a in node.names)
+        elif isinstance(node, ast.Name) and not isinstance(node.ctx, ast.Load):
+            defined.add(node.id)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            defined.add(node.name)
+    known = script_builtins()
+    found = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id not in defined and node.id not in known:
+            found.setdefault(node.id, node.lineno)
+    return [(line, f'{name} is never defined or imported') for name, line in found.items()]
+
+
 def lint(path):
     with open(path, encoding='utf-8') as f:
         source = f.read()
@@ -267,8 +332,8 @@ def lint(path):
     link_parents(tree)
     finder = Finder(path)
     finder.visit(tree)
-    found = finder.found + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path)
-    return sorted(set(found))
+    found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path)
+    return sorted(set(found + undefined_names(tree, path)))
 
 
 def files(paths):
@@ -288,11 +353,19 @@ def required_params(trees):
     for tree in trees.values():
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                args = node.args
-                positional = args.posonlyargs + args.args
-                required = {a.arg for a in positional[:len(positional) - len(args.defaults)]}
-                found.setdefault(node.name, []).append(required)
+                found.setdefault(node.name, []).append(_required(node))
+            elif isinstance(node, ast.ClassDef):
+                # A class is called by its name, so its __init__'s parameters, less self, count under that name.
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef) and item.name == '__init__':
+                        found.setdefault(node.name, []).append(_required(item) - {'self'})
     return found
+
+
+def _required(node):
+    args = node.args
+    positional = args.posonlyargs + args.args
+    return {a.arg for a in positional[:len(positional) - len(args.defaults)]}
 
 
 def keywords_to_required(trees):

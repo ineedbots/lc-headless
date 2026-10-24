@@ -1,9 +1,11 @@
-"""Food, eating, boost potions and what a fight keeps in the backpack. Ported from rs2b0t's api/combat/food.ts,
-eatTiming.ts, boostPotions.ts, keepList.ts and fightUpkeep.ts (MIT, see thirdparty/rs2b0t)."""
+"""Food, eating, boost potions, gear lists and what a fight keeps in the backpack. Ported from rs2b0t's
+api/combat/food.ts, eatTiming.ts, boostPotions.ts, keepList.ts, fightUpkeep.ts, equipment.ts, meleeWeapons.ts, ranged.ts
+and rangedSettings.ts (MIT, see thirdparty/rs2b0t)."""
 
 import _core
 from rs2004 import execution
 from rs2004.catalogs import _data
+from rs2004.settings import SettingDef
 
 FOOD_OPTIONS = [
     'Shark', 'Lobster', 'Swordfish', 'Tuna', 'Salmon', 'Trout', 'Pike', 'Bass', 'Herring', 'Sardine', 'Anchovies', 'Shrimps',
@@ -288,3 +290,145 @@ def combat_keep_names(food, style, spell=None, ammo=None, weapon=None, extra=Non
     if weapon:
         keep.append(weapon)
     return keep
+
+
+# Gear lists, the melee weapon pick and the ranged loadout: rs2b0t's api/combat/equipment.ts, meleeWeapons.ts,
+# ranged.ts and rangedSettings.ts.
+
+BOWS = [
+    'Shortbow', 'Longbow',
+    'Oak shortbow', 'Oak longbow',
+    'Willow shortbow', 'Willow longbow',
+    'Maple shortbow', 'Maple longbow',
+    'Yew shortbow', 'Yew longbow',
+    'Magic shortbow', 'Magic longbow',
+]
+
+CROSSBOWS = [
+    'Crossbow',
+    'Bronze crossbow', 'Iron crossbow', 'Steel crossbow', 'Black crossbow',
+    'Mithril crossbow', 'Adamant crossbow', 'Rune crossbow',
+    'Dorgeshuun crossbow', "Karil's crossbow",
+]
+
+DARTS = ['Bronze dart', 'Iron dart', 'Steel dart', 'Black dart', 'Mithril dart', 'Adamant dart', 'Rune dart']
+
+# Arrow tiers for the bows, and bolt tiers for the crossbows.
+ARROWS = ['Bronze arrow', 'Iron arrow', 'Steel arrow', 'Mithril arrow', 'Adamant arrow', 'Rune arrow', 'Dragon arrow']
+BOLTS = ['Bronze bolts', 'Iron bolts', 'Steel bolts', 'Black bolts', 'Mithril bolts', 'Adamant bolts', 'Rune bolts', 'Broad bolts', 'Bone bolts']
+
+# One-handed melee weapons, so the shield slot stays free.
+# Why: the attack style comes from the labels the client offers for whatever is wielded ("aggressive" is strength),
+# so a dagger's Stab/Lunge and a longsword's Chop/Slash resolve with no per-weapon mapping here.
+MELEE_WEAPONS = [
+    'Bronze scimitar', 'Iron scimitar', 'Steel scimitar', 'Black scimitar', 'Mithril scimitar', 'Adamant scimitar', 'Rune scimitar',
+    'Bronze sword', 'Iron sword', 'Steel sword', 'Black sword', 'Mithril sword', 'Adamant sword', 'Rune sword',
+    'Bronze longsword', 'Iron longsword', 'Steel longsword', 'Black longsword', 'Mithril longsword', 'Adamant longsword', 'Rune longsword',
+    'Dragon longsword',
+    'Bronze dagger', 'Iron dagger', 'Steel dagger', 'Black dagger', 'Mithril dagger', 'Adamant dagger', 'Rune dagger', 'Dragon dagger',
+    'Dragon dagger(p)',
+    'Dragon battleaxe', 'Dragon mace',
+]
+
+STAFFS = [
+    'Staff', 'Magic staff',
+    'Staff of air', 'Staff of water', 'Staff of earth', 'Staff of fire',
+    'Battlestaff', 'Air battlestaff', 'Water battlestaff', 'Earth battlestaff', 'Fire battlestaff',
+    'Mystic air staff', 'Mystic water staff', 'Mystic earth staff', 'Mystic fire staff',
+]
+
+_TIER_ATTACK = {'bronze': 1, 'iron': 1, 'steel': 5, 'black': 10, 'mithril': 20, 'adamant': 30, 'rune': 40, 'dragon': 60}
+_TIER_RANK = ['bronze', 'iron', 'steel', 'black', 'mithril', 'adamant', 'rune', 'dragon']
+# Why: the pack's own rolls put the longsword's stab first against stab defence 50, the metal dragons' soft side,
+# while a scimitar's four-tick slash is the pick everywhere else.
+_STAB_ORDER = ['longsword', 'battleaxe', 'dagger', 'sword', 'scimitar', 'mace']
+_SLASH_ORDER = ['scimitar', 'sword', 'longsword', 'dagger', 'battleaxe', 'mace']
+
+
+def _tier_of(name):
+    return name.split(' ')[0].lower()
+
+
+def _type_of(name):
+    kind = ' '.join(name.split(' ')[1:]).lower()
+    return kind[:-3] if kind.endswith('(p)') else kind
+
+
+def _order_index(order, kind):
+    return order.index(kind) if kind in order else -1
+
+
+def best_melee_weapon(available, attack, prefer_stab, unusable=None):
+    """The best melee weapon among available that an Attack level can wield, or None: the highest tier, then
+    stab weapons first for a target soft to stab, scimitars first otherwise. unusable names those a wield
+    already refused."""
+    order = _STAB_ORDER if prefer_stab else _SLASH_ORDER
+    have = set([n.lower() for n in available])
+    refused = unusable if unusable is not None else set()
+    usable = [name for name in MELEE_WEAPONS if name.lower() in have and name not in refused
+              and _TIER_ATTACK.get(_tier_of(name), 1) <= attack]
+    usable.sort(key=lambda name: (-_TIER_RANK.index(_tier_of(name)), _order_index(order, _type_of(name))))
+    return usable[0] if usable else None
+
+
+def known_melee_weapon(names):
+    """The melee weapon among names that the list knows, or None."""
+    have = set([n.lower() for n in names])
+    for name in MELEE_WEAPONS:
+        if name.lower() in have:
+            return name
+    return None
+
+
+# Bows and darts, shared by RockCrab, MossGiant and any ranged fighter.
+RANGED_WEAPONS = BOWS + DARTS
+ROCK_CRAB_RANGED_WEAPONS = RANGED_WEAPONS
+
+
+class RangeLoadout:
+    def __init__(self, weapon, projectile, thrown):
+        self.weapon = weapon
+        self.projectile = projectile
+        self.thrown = thrown
+
+    def __repr__(self):
+        return f'RangeLoadout({repr(self.weapon)}, {repr(self.projectile)}, {self.thrown})'
+
+
+def range_loadout_of(weapon, ammo):
+    """When weapon is a dart it's both the wielded weapon and the projectile stack; a bow uses the ammo
+    setting."""
+    wanted = weapon.strip().lower()
+    dart = None
+    for name in DARTS:
+        if name.lower() == wanted:
+            dart = name
+    thrown = dart is not None or (len(wanted) > 0 and wanted == ammo.strip().lower())
+    return RangeLoadout(dart if dart is not None else weapon, dart if dart is not None else ammo, thrown)
+
+
+def rock_crab_range_loadout(weapon, ammo):
+    return range_loadout_of(weapon, ammo)
+
+
+def range_supply_empty(equipped, carried, ground):
+    return equipped <= 0 and carried <= 0 and ground <= 0
+
+
+CUSTOM_RANGED_SETTINGS = {
+    'custom_bow': SettingDef('string', '', 'Custom ranged weapon', group='Combat', show_if={'key': 'bow', 'any_of': ['Other']},
+                             help='exact item name; for thrown weapons use the same name for ammo'),
+    'custom_ammo': SettingDef('string', '', 'Custom ammunition', group='Combat', show_if={'key': 'ammo', 'any_of': ['Other']},
+                              help='exact item name, such as Bolts or Rune knife'),
+}
+
+
+def ranged_item(settings, key, fallback):
+    """The bow or ammo setting's item, or its custom name when it's 'Other'. key is 'bow' or 'ammo'."""
+    selected = settings.str(key, fallback).strip()
+    if selected != 'Other':
+        return selected
+    item = settings.str('custom_bow' if key == 'bow' else 'custom_ammo', '').strip()
+    if not item:
+        raise ValueError(f"Enter a custom {'ranged weapon' if key == 'bow' else 'ammunition'} name")
+    return item

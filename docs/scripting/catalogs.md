@@ -420,6 +420,30 @@ if should_eat_food('Lobster', hp, top, inventory.count('Lobster')) and not shoul
 | `spell_button_com(spell_name)` | The staff spell chooser's button for an autocast spell while the chooser is open, or -1. rs2b0t numbers it from the 289 interface; here it's found as [`autocast.arm`](side-tabs.md#autocast) finds it |
 | `combat_keep_names(food, style, spell=None, ammo=None, weapon=None, extra=None)` | What a fight's deposit keeps: every form of the food, the spell's runes when `style` is `'mage'`, the ammo when `'range'`, the weapon, and `extra` |
 
+### Gear
+
+rs2b0t's `api/combat/equipment.ts`, `meleeWeapons.ts`, `ranged.ts` and `rangedSettings.ts`: the lists a fighting bot's settings offer, and the picks made from them.
+
+| Name | Is |
+|---|---|
+| `BOWS`, `CROSSBOWS`, `DARTS` | The ranged weapons, Shortbow to Magic longbow, Crossbow to Karil's crossbow, Bronze to Rune dart |
+| `ARROWS`, `BOLTS` | Bronze to Dragon arrow; Bronze to Rune bolts, then Broad and Bone bolts |
+| `MELEE_WEAPONS` | One-handed melee weapons, so the shield slot stays free: the scimitars, swords, longswords and daggers, Dragon battleaxe and Dragon mace |
+| `STAFFS` | Staff to the mystic staffs |
+| `best_melee_weapon(available, attack, prefer_stab, unusable=None)` | The best of `available` (names) that `attack` can wield, or `None`: the highest tier, then the longsword's stab first when `prefer_stab` (the metal dragons are soft to it), a scimitar first otherwise. `unusable` is a set of names a wield already refused |
+| `known_melee_weapon(names)` | The first of `names` that `MELEE_WEAPONS` knows, or `None` |
+| `RANGED_WEAPONS`, `ROCK_CRAB_RANGED_WEAPONS` | `BOWS + DARTS` |
+| `RangeLoadout` | `weapon`, `projectile` and `thrown` |
+| `range_loadout_of(weapon, ammo)` | A dart is both the weapon and the projectile, and `thrown`; a bow fires `ammo` |
+| `rock_crab_range_loadout(weapon, ammo)` | The same |
+| `range_supply_empty(equipped, carried, ground)` | Whether all three counts are 0 |
+| `CUSTOM_RANGED_SETTINGS` | `custom_bow` and `custom_ammo`, shown when `bow` or `ammo` is `'Other'`. Merge them into a schema that offers `'Other'` |
+| `ranged_item(settings, key, fallback)` | The `bow` or `ammo` setting's item, or the custom name when it's `'Other'`. Raises `ValueError` when that name is empty |
+
+```python
+weapon = best_melee_weapon([i.name for i in bank.items()], skills.level('attack'), prefer_stab=False)
+```
+
 ## Loadouts
 
 A loadout is `{name, worn: {slot: item}, carry: [{item, qty}]}`. They're kept for every bot on the account in the account file's `script.settings["Loadouts"].sets`, through `loadouts`, rs2b0t's loadout store. A bot whose own `loadouts` setting holds a list uses that instead, and its `loadout` setting, `LOADOUT_SETTING`, names the one to use.

@@ -4,7 +4,7 @@
 //
 //     bun tools/catalogs/export_rs2b0t.ts ../rs2b0t src/Script/Stdlib/rs2004/catalogs/_data.py
 //
-// It writes _shops.py, _items.py and _drops.py beside _data.py too: large tables read on first use. And the
+// It writes _shops.py, _items.py, _drops.py and _clues.py beside _data.py too: large tables read on first use. And the
 // market's tables, to ../market/_data.py.
 
 import fs from 'node:fs';
@@ -40,6 +40,7 @@ const prices = await load('data/marketprices.ts');
 const aliases = await load('data/itemAliases.ts');
 const collisions = await load('data/nameCollisions.ts');
 const untradeable = await load('data/untradeable.ts');
+const clues = await load('api/ai/clues/data/cluedb.ts');
 
 const snake = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 
@@ -147,13 +148,17 @@ const itemsFile = path.join(path.dirname(outFile), '_items.py');
 fs.writeFileSync(itemsFile, plainHeader + `\nITEM_DB = ${py(items.ITEM_DB)}\n`);
 const dropsFile = path.join(path.dirname(outFile), '_drops.py');
 fs.writeFileSync(dropsFile, plainHeader + `\nDROP_DB = ${pyRecord(drops.DROP_DB)}\n`);
-console.log(`wrote ${tables.length} tables to ${outFile}, and the shop, item and drop databases beside it`);
-
 // Keyed by obj id, so the keys are ints.
 const pyIdRecord = (record: Record<string, any>): string => {
     const entries = Object.entries(record);
     return `{\n${entries.map(([k, v]) => `    ${Number(k)}: ${py(v, 1)}`).join(',\n')},\n}`;
 };
+
+// The clue database too: the hunting framework reads which objs are clues and caskets, and the clue engine the
+// rest.
+const cluesFile = path.join(path.dirname(outFile), '_clues.py');
+fs.writeFileSync(cluesFile, header + `\nCLUE_DB = ${pyIdRecord(clues.CLUE_DB)}\n\nCASKET_IDS = ${pyIdRecord(clues.CASKET_IDS)}\n`);
+console.log(`wrote ${tables.length} tables to ${outFile}, and the shop, item, drop and clue databases beside it`);
 
 const marketFile = path.join(path.dirname(outFile), '..', 'market', '_data.py');
 fs.mkdirSync(path.dirname(marketFile), { recursive: true });

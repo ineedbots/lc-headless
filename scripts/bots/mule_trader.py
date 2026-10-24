@@ -93,7 +93,7 @@ class MuleTrader(LoopingBot):
             self.trades += 1
             self.log('Trade complete')
 
-    def on_stop(self):
+    def on_stop(self, reason):
         self.log('Stopped')
 
     def on_progress_report(self):

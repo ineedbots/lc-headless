@@ -406,6 +406,28 @@ def planned_potions(carry: Sequence[CarryEntry], potions: Optional[Sequence[Boos
 def potion_to_sip(plans: Sequence[PotionPlan], held: Callable[[PotionPlan], int], levels: Callable[[str], tuple[int, int]]) -> Optional[PotionPlan]: ...
 def combat_keep_names(food: str, style: str, spell: Optional[str] = None, ammo: Optional[str] = None, weapon: Optional[str] = None, extra: Optional[Sequence[str]] = None) -> list[str]: ...
 
+# Gear lists, the melee weapon pick and the ranged loadout
+BOWS: list[str]
+CROSSBOWS: list[str]
+DARTS: list[str]
+ARROWS: list[str]
+BOLTS: list[str]
+MELEE_WEAPONS: list[str]
+STAFFS: list[str]
+RANGED_WEAPONS: list[str]
+ROCK_CRAB_RANGED_WEAPONS: list[str]
+CUSTOM_RANGED_SETTINGS: dict[str, SettingDef]
+def best_melee_weapon(available: Sequence[str], attack: int, prefer_stab: bool, unusable: Optional[set[str]] = None) -> Optional[str]: ...
+def known_melee_weapon(names: Sequence[str]) -> Optional[str]: ...
+class RangeLoadout:
+    weapon: str
+    projectile: str
+    thrown: bool
+def range_loadout_of(weapon: str, ammo: str) -> RangeLoadout: ...
+def rock_crab_range_loadout(weapon: str, ammo: str) -> RangeLoadout: ...
+def range_supply_empty(equipped: int, carried: int, ground: int) -> bool: ...
+def ranged_item(settings: Any, key: str, fallback: str) -> str: ...
+
 # Loadouts
 
 SLOTS: list[str]

@@ -13,6 +13,7 @@ from rs2004.dialogue import *
 from rs2004.bank import *
 from rs2004.banksort import *
 from rs2004.trade import *
+from rs2004.duel import *
 from rs2004.tabs import *
 from rs2004.messages import *
 from rs2004.reach import *

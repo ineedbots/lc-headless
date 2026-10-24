@@ -334,9 +334,47 @@ ShopBuyout, ShopRunner, FlaxRunner, MuleCrafter, MuleTrader, BankSorter, MarketM
 MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests, JiveDemons, JiveKBD, JiveKQ, JiveDragons and the Duel Arena Combat Trainer (DuelArena). Those that carry clues get the solver in phase 15.
 
 - **Done when:**
-    - [ ] rs2b0t's `test/api/combat` and the bots' own tests (`test/scripts/JiveDragons`, `AutoFighter`, `RockCrab`, `JiveDemons`, `JiveKBD`, `DuelArena`) are ported and pass.
-    - [ ] `line_of_sight` agrees with the engine: a ranged account on a known safespot is never hit in melee for ten minutes.
-    - [ ] Against the local engine, each bot runs 30 minutes, through a bank trip, without a script error. JiveDragons kills blue dragons under antifire and a shield. DuelArena finishes a duel between two accounts.
+    - [x] rs2b0t's `test/api/combat` and the bots' own tests (`test/scripts/JiveDragons`, `AutoFighter`, `RockCrab`, `JiveDemons`, `JiveKBD`, `DuelArena`) are ported and pass, less those that stub the client (see "As built").
+    - [x] `line_of_sight` agrees with the engine: a ranged account on a known safespot is never hit in melee for ten minutes.
+    - [x] Against the local engine, each bot runs 30 minutes, through a bank trip, without a script error. JiveDragons kills blue dragons under antifire and a shield. DuelArena finishes a duel between two accounts. (See "As built" for how the antifire and shield were shown, and for JiveChests and JiveKQ.)
+
+### As built
+
+- **Where it lives.** The gear lists and picks are in `rs2004.catalogs.combat`. `rs2004.hunting` is a package, as rs2b0t's `api/combat/hunting/` is: `logic`, `sites`, `guarded`, `supply` and `combat`, all re-exported from the package. `duel` is a builtin, loaded by `_load_stdlib`, with the clue duel beside it. The clue database the hunting loot filter reads (`CLUE_DB`, `CASKET_IDS`) comes out of `tools/catalogs/export_rs2b0t.ts` as `catalogs/_clues.py`, ahead of phase 15.
+- **The host.** rs2b0t's `CombatHost` interface is a set of methods and attributes the tasks look up on the bot (hunting.md lists them). `fight`, `rotate_spawns`, `shield_ready`, `pick_weapon` and `arm_special` are optional. A bot's own value can't share a method's name, since a class method hides an instance attribute in pocketpy, so the bots keep `combat_style` for `style()` and `food_withdraw_count` for `food_withdraw()`.
+- **Flattened logic.** As in phase 11, the pure functions take rs2b0t's option objects' fields positionally. `retreat_aim` gives `(index, next)`. A site's `fee_gate` lines, `SHIELD_ABSORBS`, `POTION_PROTECTS` and `POISONED` are lower-case parts of the server's lines, since there's no `re`; `game_messages` matches them case-insensitively.
+- **JiveKQ's team.** rs2b0t's four clients talked over a `BroadcastChannel`. Here the four are accounts of one client process, and `send_bot_message` carries the heartbeats and the leader's releases to the other three. The receiving side checks each message as `party.py` checks rs2b0t's. An account file may write a space in the name as `_`, so a send that names no account is tried the other way. rs2b0t's fire-and-forget calls (prayer toggles, weapon swaps, food between swings, loot clicks) keep their request-then-poll shape. `prayer.toggle(name, on)` is new for them: it clicks without waiting, and a request isn't sent again for ten ticks, since a second click on a toggle still in flight undoes it.
+- **Departures from rs2b0t,** each found live:
+    - `Fight` takes the dragon biting it on a site that breathes at range, as rs2b0t does only on the blue sites. Brimhaven is single combat too, so a second dragon breathing from ten tiles made every click on the chosen one "I'm already under attack!" for the 90 seconds the stall skip takes. That was one kill in 25 minutes; with the change, three in 30.
+    - The gatherers' `attacking_me` drops rs2b0t's `n.in_combat`: an npc's combat flag is its own hit clock, and with auto retaliate off nothing hits back, so a dark wizard casting from range never read as an attacker and FleeCombat never ran. This was phase 13's open item, and `test_gathering_attackers.py` pins it.
+- **Lint.** Two rules joined `tools/port/lint.py`. One flags a conditional expression nested in another without brackets. The other flags a name a script under `scripts/` reads but never defines or imports: JiveKQ's `on_start` used `sustain` without importing it, which loads fine and fails only when the line runs. The keyword-to-required-parameter rule now covers constructors too.
+- **Found and fixed.** DuelArena read `reader.combat_level()` and `reader.my_name()`, which are `game`'s, and `duel.py` had the second too. DuelArena's and MuleTrader's `on_stop` lacked the `reason` parameter.
+- **Left out.** Tests that stub the client under a bot with `spyOn` (pocketpy can't replace a method on an instance): most of JiveDragons' (adaptive, ammo, blue-loot, blue-recovery, blue-targets, capacity, clue, lifecycle, loot and its arbitration and recovery, melee anchor and potions, network, noted food, readiness, safety, scheduler, stands, potion restock, post-clue bank) and JiveKQ's bank, eating, loot, recovery, route and upkeep tests. Their pure parts are ported. The paint tests draw the overlay, which isn't headless, and the safespot derivations (`jive-safespots.ts`) need rs2b0t's tools and pack. Clue solving waits for phase 15: the bots that carry clues bank them, and their header comments say so.
+- **Tests.** rs2b0t's `test/api/combat` is in `tests/Stdlib/rs2b0t/test_combat_gear.py`, `test_ranged_settings.py` and, from phase 11, tests/Stdlib's catalog tests. The bots' are beside them: JiveDragons' logic, sites, enclave targets and settings, JiveKQ's party, policy, loadout, search and stats, and RockCrab, FireGiant, GreenDragon, RangingGuild, AutoFighter, JiveChests, JiveDemons, JiveKBD and DuelArena. The sites' escape teleports are checked against the walker's catalog in `nav/test_hunting_sites_teleports.py`.
+- **The live checks,** 30 minutes each against the local engine on fresh accounts, set up with the engine's cheats:
+    - With no script error, and each through at least one bank trip:
+        - AutoFighter: Varrock guards, 104 kills, 3 trips.
+        - RockCrab: 46 kills, 1 trip.
+        - MossGiant: 24 kills, 9 trips.
+        - BrimhavenMossGiants: 18 kills, 4 trips. Its field is reached by a rope swing that needs Agility 10; at Agility 1 the bot shuttles between the bank and the pier, as rs2b0t's does.
+        - GreenDragon: 4 kills, 5 trips.
+        - RangingGuild: 17 rounds, 9 trips.
+        - JiveDemons: 7 black demons, 1 trip.
+        - JiveKBD: 4 trips and no kills. Its default Fire Strike barely scratches the King Black Dragon, which heals while the bot banks.
+    - FireGiant: with Waterfall Quest done and Glarial's amulet in the bank, it took the log raft and the ledge door into the dungeon, fought, and left by the barrel to bank: 6 kills and 6 trips in 30 minutes on 8 lobsters a trip. Without the quest or the amulet it parks, saying which.
+    - JiveChests opened the six keys it was given in one trip and stopped, as rs2b0t's does, on "no Crystal keys left in the bank".
+    - JiveDragons:
+        - Range at Taverley's blue dragons: 11 kills.
+        - Melee there under the Dragonfire shield: 2 adult blues and 5 babies, on 10 food a trip.
+        - Melee at Brimhaven's iron dragons under an Antifire dose, the shield and Protect from Melee: 2 iron and a steel. It sipped each dose as the last lapsed, and every breath said both "Your shield absorbs" and "Your potion protects".
+        - The bot drinks Antifire only where the site needs it, so the blue-dragon kills under the shield and the kills under antifire and the shield are two runs.
+    - **Line of sight.** The range account stood on Taverley's safespot for 30 minutes and was never hit there: the ladder never rotated, and its one dragonfire breath came while it was off the tile looting.
+    - **DuelArena.** Two accounts fought 14 duels in 20 minutes, each through the challenge, both screens and the 3, 2, 1, FIGHT! countdown.
+    - **JiveKQ.**
+        - Four accounts in one client banked the shared loadout. The leader released them at the bank, the surface rope and the upper rope, and all four went down together and killed the queen in about two minutes.
+        - They elected looters, ran out of food and restocked by the Ring of dueling, and came back on trips 2 and 3 for a second kill.
+        - On the next restock one account stopped with "Could not buy a Shantay pass". It had bought one on each earlier trip, and the log doesn't say why this one failed. The other three then waited at the bank for a fourth, as they should.
+        - The first try needed Heroes' Quest for the dragon mace, and the bot said so.
 
 ---
 

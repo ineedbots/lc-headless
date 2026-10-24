@@ -557,6 +557,8 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 
 `rs2004.market` is rs2b0t's market: the tradeable catalog built from the cache (`live_catalog`, `resolve_by_name`, `display_name`), its shelves, price books kept in the account file (`PriceBooks`), `appraise` for a trade window, and the public-chat protocol (`parse_command`, `format_price_list`). See [market.md](scripting/market.md).
 
+`rs2004.hunting` is rs2b0t's boss and dragon framework: the dragon sites (`DRAGON_SITES`), the `Fight`, `Retreat`, `HoldSafespot` and `WalkToSpot` tasks over a host bot, the walks in and out of a lair (`enter_lair`, `leave_lair`), the bank trip (`bank_routine`), and the pure decisions under them. See [hunting.md](scripting/hunting.md).
+
 `scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
 
 | Kind | rs2b0t | Here |
@@ -569,9 +571,13 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
 | Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py` |
 | Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
+| Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. The clue drops are banked until the solver comes (phase 15) |
+| Bosses and dragons | JiveDragons, JiveDemons, JiveKBD | `jive_dragons.py`, `jive_demons.py`, `jive_kbd.py`, on [`rs2004.hunting`](scripting/hunting.md) |
+| Duel Arena | Duel Arena Combat Trainer (DuelArena) | `duel_arena.py`, its logic in `bots/duelarena/`: two accounts duel each other to train Attack, Strength and Defence |
 | Movement and magic | WalkTo, DoorOpener, AIO Teleport, Alcher | `walk_to.py`, `door_opener.py`, `aio_teleport.py`, `alcher.py` |
 | Shops and trading | ShopBuyout, ShopRunner, MarketMaker, JiveMarketDumper, MuleTrader | `shop_buyout.py`, `shop_runner.py`, `market_maker.py` (its logic in `bots/marketmaker/`), `jive_market_dumper.py`, `mule_trader.py` |
 | Two-account | FlaxRunner, MuleCrafter | `flax_runner.py` (a runner picks, a spinner spins), `mule_crafter.py` (a crafter and its mules) |
+| Four-account | JiveKQ | `jive_kq.py`, its parts in `bots/jivekq/`: four accounts in one client kill the Kalphite Queen together, talking over `send_bot_message` |
 | Utility | BankSorter | `bank_sorter.py` |
 
 `scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.

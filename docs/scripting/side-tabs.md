@@ -39,6 +39,7 @@ Prayers by name, lower case, as `PRAYER_NAMES` has them.
 | `prayer.available(name)` | Your level is high enough and you have points left |
 | `prayer.active(name)` | Whether it's on |
 | `prayer.set(name, on)` | **Wait.** Turns it on or off, and waits up to 2 seconds for the server to agree. `True` when it's as asked, including when it already was; `False` when unknown or not available |
+| `prayer.toggle(name, on)` | Clicks it towards `on` without waiting. `True` when it already is or the click went; `prayer.active(name)` shows when the server agrees. For a bot that sends the click and checks on a later pass |
 | `prayer.clear()` | **Wait.** Turns off every prayer that's on |
 
 `PRAYER_NAMES`, with the level each needs:

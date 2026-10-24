@@ -190,8 +190,9 @@ class _Prayer:
         button = self._button(name)
         return button is not None and button.varp is not None and _core.get_varp(button.varp) == 1
 
-    def set(self, name, on):
-        """Turns the prayer on or off, and waits for the server to agree. Use with yield from."""
+    def toggle(self, name, on):
+        """Clicks the prayer towards on without waiting: True when it's already there or the click went.
+        active() shows when the server agrees."""
         button = self._button(name)
         if button is None:
             return False
@@ -199,7 +200,13 @@ class _Prayer:
             return True
         if on and not self.available(name):
             return False
-        if not _core.click_component(button.id):
+        return _core.click_component(button.id)
+
+    def set(self, name, on):
+        """Turns the prayer on or off, and waits for the server to agree. Use with yield from."""
+        if self.active(name) == on:
+            return True
+        if not self.toggle(name, on):
             return False
         done = yield from execution.delay_until(lambda: self.active(name) == on, TOGGLE_TIMEOUT_MS)
         return done
