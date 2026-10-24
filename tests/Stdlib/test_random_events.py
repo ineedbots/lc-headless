@@ -132,6 +132,7 @@ def test_the_strange_box_answers_colour_and_shape_questions():
     assert len(CUBE_PARTS) == 15
     assert solve_cube('What colour is the Star?', parts) == 0
     assert solve_cube('What colour is the Half moon?', parts) == 1
+    assert solve_cube('What colour is the Halfmoon?', parts) == 1
     assert solve_cube('Which shape is Yellow?', parts) == 2
     assert cube_label('What colour is the Star?', parts, 0) == 'Red'
     assert cube_label('Which shape is Yellow?', parts, 2) == 'Circle'

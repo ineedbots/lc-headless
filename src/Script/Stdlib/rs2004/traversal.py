@@ -59,6 +59,10 @@ DIALOGUE_STEPS = 24
 SHIP_DIALOGUE_STEPS = 40
 DOOR_CROSS_MS = 12000
 DOOR_STRIKES = 2
+# Why: strikes count across walks, so a door or gate that refused this many is left out of every route for
+# DOOR_RETRY_MS, then tried afresh, or the next walk plans straight back through it.
+DOOR_COOLDOWN_STRIKES = 3
+DOOR_RETRY_MS = 60000
 LANDING_TOLERANCE = 3
 DEFAULT_TIMEOUT_MS = 300000
 DEFAULT_MAX_BUDGET = 1200000
@@ -400,6 +404,15 @@ def _near_landing(crossing, radius):
 
 # Quest-locked crossings.
 
+# Why: a gangplank or ladder that refuses is usually a scene that hasn't caught up, and leaving it out of routes can
+# strand the walker somewhere with one exit; only doors and gates cool down.
+def barrier_bannable(kind, loc_name):
+    if kind == 'door' or kind == 'gate':
+        return True
+    words = ''.join([c if 'a' <= c <= 'z' else ' ' for c in (loc_name or '').lower()]).split()
+    return 'door' in words or 'gate' in words
+
+
 def chat_shows_quest_lock():
     """Whether the dialogue open says a crossing won't open for you now."""
     if not chat_dialog.is_open() and not chat_dialog.can_continue():
@@ -444,6 +457,7 @@ class _Traversal:
     def __init__(self):
         self._avoid_doors = []
         self._door_strikes = {}
+        self._door_retry_at = {}
         self._suppressed_teleports = []
         self._post_quest_talks = []
         self._bank_leg_done = False
@@ -451,6 +465,28 @@ class _Traversal:
         self._bank_item_counts = None
         self._restore_retaliate = False
         self._follow = resolve_path_follow_config()
+
+    def reset_session(self):
+        """Forgets what earlier walks learned: refused doors, failed teleports, unlock talks already had. Run when a
+        bot starts, so one bot's refusals don't shape the next one's routes."""
+        self._avoid_doors = []
+        self._door_strikes = {}
+        self._door_retry_at = {}
+        self._suppressed_teleports = []
+        self._post_quest_talks = []
+
+    def _reset_avoids(self):
+        """The avoid list a new walk starts with: the doors still cooling down. A door whose cooldown has run out
+        loses its strikes."""
+        self._avoid_doors = []
+        now = _core.step_time()
+        for key in list(self._door_retry_at.keys()):
+            if now >= self._door_retry_at[key]:
+                self._door_retry_at.pop(key)
+                self._door_strikes.pop(key, None)
+            else:
+                x, z = key.split(',')
+                self._avoid_doors.append([int(x), int(z)])
 
     def preload(self):
         """Nothing to do: the walker's map is built when the client starts. rs2b0t warms its worker here."""
@@ -533,7 +569,7 @@ class _Traversal:
         self.last_outcome = None
         self.last_reason = None
         self.last_missing_gate_items = []
-        self._avoid_doors = []
+        self._reset_avoids()
         deadline = _core.step_time() + timeout
         settle = [CANDIDATE_SETTLE_TRIES]
         for repaths in range(MAX_REPATHS + 1):
@@ -546,7 +582,7 @@ class _Traversal:
                 self.last_reason = path['reason']
                 short = self._explain_unreachable(me, dest, path['reason'], max_expansions, walk_policy, use_teleports, zones)
                 # Why: the planner won't route a fare or toll the backpack can't pay, so with none held there's no
-                # route to fund; rs2b0t gives up here, while this banks for the kit that would open one.
+                # route to fund; this banks for the kit that would open one.
                 if short and not self._bank_leg_done:
                     banked = yield from self._maybe_bank_for_route(me, dest, None, None, max_expansions, walk_policy, use_teleports, zones, say)
                     if banked:
@@ -639,7 +675,7 @@ class _Traversal:
         plan = plan_bank_leg(direct_cost, False, to_bank['cost'], bank_to_dest['cost'], missing_items_for_path(bank_waypoints, state))
         if plan.action != 'bank':
             return False
-        say(f"bank plan: withdraw {', '.join([repr(m) for m in plan.missing])} (est cost {plan.estimated_cost}, direct {'underfunded' if direct_cost is None else direct_cost})")
+        say(f"bank plan: withdraw {', '.join([repr(m) for m in plan.missing])} (est cost {plan.estimated_cost}, direct {'unreachable' if direct is None else ('underfunded' if direct_cost is None else direct_cost)})")
         self._bank_leg_done = True
         follow = self._follow
         reached = yield from self._walk_to_bank_only(stand, say)
@@ -869,6 +905,9 @@ class _Traversal:
             if strikes >= DOOR_STRIKES:
                 self._avoid_doors.append([transport['loc_x'], transport['loc_z']])
                 say(f'avoiding {transport["loc_name"]} at {key} on the next route')
+            if strikes >= DOOR_COOLDOWN_STRIKES and key not in self._door_retry_at and barrier_bannable(transport.get('kind'), transport.get('loc_name')):
+                say(f"'{transport['loc_name']}' at ({key}) refused {strikes} crossings; retrying after {DOOR_RETRY_MS // 1000}s")
+                self._door_retry_at[key] = _core.step_time() + DOOR_RETRY_MS
         teleport = transport.get('teleport_id')
         if teleport is not None and teleport not in self._suppressed_teleports:
             self._suppressed_teleports.append(teleport)

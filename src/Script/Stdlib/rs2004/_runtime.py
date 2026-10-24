@@ -99,6 +99,9 @@ def load(main, settings):
     _settings = settings
     _setting_defaults = None
     _add_commands()
+    # Why: a bot restarted in the same VM mustn't inherit the last one's refused doors and failed teleports.
+    from rs2004.traversal import traversal
+    traversal.reset_session()
 
     settings_store.load(settings._values)
     stored = settings._values.get(GLOBAL)

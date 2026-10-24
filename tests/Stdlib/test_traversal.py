@@ -137,6 +137,63 @@ def test_a_teleport_that_fails_is_suppressed_without_a_door_strike():
     walker._Traversal._handle_transport = handle
 
 
+class FakeClock:
+    def __init__(self):
+        self.now = 1000
+
+    def step_time(self):
+        return self.now
+
+
+def test_a_door_that_keeps_refusing_cools_down_then_is_tried_afresh():
+    handle = walker._Traversal._handle_transport
+    core = walker._core
+    clock = FakeClock()
+    walker._Traversal._handle_transport = refused
+    walker._core = clock
+    walk = walker._Traversal()
+    door = {'kind': 'door', 'loc_name': 'Door', 'action': 'Open', 'loc_x': 3100, 'loc_z': 3100}
+    for _ in range(walker.DOOR_COOLDOWN_STRIKES):
+        take_hop(walk, FailedHop(door))
+    # The next walk still leaves it out, until the cooldown runs out and the strikes go with it.
+    walk._reset_avoids()
+    assert walk._avoid_doors == [[3100, 3100]]
+    clock.now += walker.DOOR_RETRY_MS
+    walk._reset_avoids()
+    assert walk._avoid_doors == []
+    assert walk._door_strikes == {}
+    # A ladder that refuses is left out of the walk, never cooled down across walks.
+    ladder = {'kind': 'loc', 'loc_name': 'Ladder', 'action': 'Climb-up', 'loc_x': 3200, 'loc_z': 3200}
+    for _ in range(walker.DOOR_COOLDOWN_STRIKES):
+        take_hop(walk, FailedHop(ladder))
+    walk._reset_avoids()
+    assert walk._avoid_doors == []
+    walker._Traversal._handle_transport = handle
+    walker._core = core
+
+
+def test_a_new_session_forgets_refused_doors_and_failed_teleports():
+    handle = walker._Traversal._handle_transport
+    walker._Traversal._handle_transport = refused
+    walk = walker._Traversal()
+    gate = {'kind': 'gate', 'loc_name': 'Gate', 'action': 'Open', 'loc_x': 3100, 'loc_z': 3100}
+    for _ in range(walker.DOOR_COOLDOWN_STRIKES):
+        take_hop(walk, FailedHop(gate))
+    take_hop(walk, FailedHop({'kind': 'teleport', 'family': 'spell', 'loc_name': 'Cast Ardougne teleport', 'teleport_id': 'ardougne'}))
+    walk.reset_session()
+    walk._reset_avoids()
+    assert walk._avoid_doors == [] and walk._door_strikes == {} and walk._suppressed_teleports == []
+    walker._Traversal._handle_transport = handle
+
+
+def test_only_doors_and_gates_cool_down():
+    assert walker.barrier_bannable('door', None)
+    assert walker.barrier_bannable(None, 'Large door')
+    assert walker.barrier_bannable(None, 'Gate')
+    assert not walker.barrier_bannable(None, 'Gangplank')
+    assert not walker.barrier_bannable(None, 'Doorway arch')
+
+
 def no_wait(*args, **kwargs):
     return None
     yield

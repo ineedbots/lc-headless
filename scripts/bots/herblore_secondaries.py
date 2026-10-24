@@ -2,7 +2,9 @@
 # unicorn horns: rs2b0t's HerbloreSecondaries (MIT, see thirdparty/rs2b0t). Food rides along on dangerous routes, and
 # shop trips carry at most 5000 coins.
 
-from rs2004.catalogs import LOADOUT_SETTING, ContinueDialog, Record, food_count, food_forms, food_heal_amount, script_food, should_eat_to_use_food
+import math
+
+from rs2004.catalogs import LOADOUT_SETTING, ContinueDialog, Record, food_count, food_forms, food_heal_amount, script_food, should_eat_to_use_food, sustain
 
 FOOD_DEFAULT = 'Lobster'
 FOOD_DEFAULT_COUNT = 10
@@ -67,8 +69,10 @@ def shop_coins_to_withdraw(in_pack, banked, want=None):
 
 
 def should_eat(hp, max_hp, heal, count, free_slots, collecting):
-    """Eats when a full heal fits, HP is at the safety floor, or the pack is full and eating frees a slot for loot."""
-    if should_eat_to_use_food(hp, max_hp, heal, count):
+    """Eats when a full heal fits, HP reaches the 60% safety floor, or the pack is full and eating frees a slot for
+    loot."""
+    min_hp = max(5, min(max_hp - 1, math.ceil(max_hp * 0.6)))
+    if should_eat_to_use_food(hp, max_hp, heal, count, min_hp):
         return True
     return count > 0 and collecting and free_slots == 0
 
@@ -439,7 +443,17 @@ class HerbloreSecondaries(TaskBot):
         self.log(f"HerbloreSecondaries — {d.name} ({d.mode}) bank {self.bank_name}, food '{self.food_name}' x{self.food_want}{shield}")
         # Why: ProcessSource comes before BankTrip so swamp toads become legs before the deposit, and Eat does too,
         # since a full pack with food left is one free slot from more loot and BankTrip would bank the food.
-        self.add(ContinueDialog(), GearUp(self), ProcessSource(self), Eat(self), BankTrip(self), BuyTool(self), BuyGoods(self), Grind(self), Loot(self), Travel(self))
+        eat = Eat(self)
+
+        def eat_on_the_way():
+            if not bank.is_open() and eat.validate():
+                yield from eat.execute()
+
+        sustain.set(eat_on_the_way)
+        self.add(ContinueDialog(), GearUp(self), ProcessSource(self), eat, BankTrip(self), BuyTool(self), BuyGoods(self), Grind(self), Loot(self), Travel(self))
+
+    def on_stop(self, reason):
+        sustain.set(None)
 
     def resolve_site(self, d):
         if d.mode != 'bank_grind':

@@ -839,8 +839,14 @@ class BankStrings(Task):
         used = inventory.used()
         self._bot.set_status(('banking bow strings' if strings > 0 else 'banking junk before handoff'))
         self._bot.log(f'spinner banking pack ({used} slot(s) used, {strings} string(s), {flax_count()} flax) so the next trade can take a full flax load')
-        yield from traversal.walk_resilient(BANK_ENTRANCE, radius=3, attempts=4, timeout_ms=120000, log=lambda m: self._bot.log(f'  {m}'))
-        yield from bank.open_booth(BANK_STAND, BOOTH_NAME, BOOTH_OP)
+        walked = yield from traversal.walk_resilient(BANK_ENTRANCE, radius=3, attempts=4, timeout_ms=120000, log=lambda m: self._bot.log(f'  {m}'))
+        if not walked:
+            self._bot.log('could not reach the bank entrance — will retry')
+            return
+        opened = yield from bank.open_booth(BANK_STAND, BOOTH_NAME, BOOTH_OP)
+        if not opened:
+            self._bot.log('could not open the bank — will retry')
+            return
         # Deposit everything, strings, leftover fibre, and random-event trash.
         yield from bank.deposit_inventory()
         yield from bank.close()

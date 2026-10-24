@@ -582,6 +582,7 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Two-account | FlaxRunner, MuleCrafter | `flax_runner.py` (a runner picks, a spinner spins), `mule_crafter.py` (a crafter and its mules) |
 | Four-account | JiveKQ | `jive_kq.py`, its parts in `bots/jivekq/`: four accounts in one client kill the Kalphite Queen together, talking over `send_bot_message` |
 | Utility | BankSorter | `bank_sorter.py` |
+| Event looting | WanderLooter | `wander_looter.py`, its logic and tasks in `bots/wanderlooter/`: wanders and picks up drops by exact name (Pumpkin by default), without fighting, and leaves alone drops where it took damage |
 
 `scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
 
