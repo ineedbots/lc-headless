@@ -215,6 +215,39 @@ namespace
         });
     }
 
+    // Every named obj, as (id, name, value, stackable, members, equippable, note_of, stack_variant) with note_of
+    // -1 for an obj that isn't a note: the market's catalog, built once, without an ItemType for each.
+    bool GetItemCatalog(int, py_StackRef) noexcept
+    {
+        return BindingSupport::Guard([]
+        {
+            const auto& cache = BindingSupport::GetContext().GetCache();
+            auto named = std::vector<const ObjType_s*>{};
+            for (const auto& type : cache.objs)
+            {
+                if (!type.name.empty())
+                {
+                    named.push_back(&type);
+                }
+            }
+
+            PyValue::FromList(py_retval(), named, [](py_OutRef out, const ObjType_s* type)
+            {
+                constexpr auto FIELDS = 8;
+                py_newtuple(out, FIELDS);
+                py_newint(py_tuple_getitem(out, 0), type->id);
+                PyValue::FromString(py_tuple_getitem(out, 1), type->name);
+                py_newint(py_tuple_getitem(out, 2), type->cost);
+                py_newbool(py_tuple_getitem(out, 3), type->stackable);
+                py_newbool(py_tuple_getitem(out, 4), type->members);
+                py_newbool(py_tuple_getitem(out, 5), type->equippable);
+                py_newint(py_tuple_getitem(out, 6), type->noteOf ? s32{*type->noteOf} : -1);
+                py_newbool(py_tuple_getitem(out, 7), type->stackVariant);
+            });
+            return true;
+        });
+    }
+
     bool GetLocType(int, py_StackRef argv) noexcept
     {
         return BindingSupport::Guard([argv]
@@ -296,6 +329,7 @@ void WorldBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"get_nearest_loc_by_name(names, radius=None, layer=None, reachable=False)", GetNearestLocByName},
                                           {"get_npc_type(id)", GetNpcType},
                                           {"get_item_type(id)", GetItemType},
+                                          {"get_item_catalog()", GetItemCatalog},
                                           {"get_loc_type(id)", GetLocType},
                                           {"find_type_ids(kind, name)", FindTypeIds},
                                           {"square_locs(x, z, level)", GetSquareLocs},

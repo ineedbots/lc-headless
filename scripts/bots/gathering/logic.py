@@ -1,10 +1,9 @@
-"""GatheringBot's pure decisions on combat, yielding a gather and the bait shop: rs2b0t's
-scripts/GatheringBot/GatheringBotLogic.ts (MIT, see thirdparty/rs2b0t). The feather buyout's cost (feather_coins_to_draw,
-FEATHER_BUYOUT_GP) comes with the shop pricing of phase 13."""
+"""GatheringBot's pure decisions on combat, yielding a gather, the bait shop and the guild feather buyout: rs2b0t's
+scripts/GatheringBot/GatheringBotLogic.ts (MIT, see thirdparty/rs2b0t)."""
 
 import math
 
-from rs2004.catalogs import Record
+from rs2004.catalogs import Record, buyout_cost, shop_buy_price
 
 from bots.gathering.tick_manip import combat_breaks_gather
 
@@ -13,6 +12,8 @@ FEATHER_RESTOCK_MINUTES = 15
 FEATHER_STOCK = 1500
 ROACHEY_SELL_MULTIPLIER = 1000
 ROACHEY_DELTA = 10
+# What Roachey's full shelf of feathers costs, the most one trip draws.
+FEATHER_BUYOUT_GP = buyout_cost(2, FEATHER_STOCK, ROACHEY_SELL_MULTIPLIER, ROACHEY_DELTA)
 # Why: at a camp whose bait only a shop sells, Shilo's feathers among them, the bank finds none, so running out is
 # a reason to go on its own as well as the clock; an empty shelf or purse would then go every loop, so it's paced
 # off the same stamp.
@@ -91,6 +92,15 @@ def ent_abort_action(neighbour_in_reach, neighbour_exists):
 def fishing_session_broken(event_pending, inventory_full, dialog_pending, in_combat, spot_gone, spot_moved, became_whirlpool, allow_combat=False):
     return (event_pending or inventory_full or dialog_pending or combat_breaks_gather(in_combat, allow_combat) or spot_gone or spot_moved
             or became_whirlpool)
+
+
+def feather_coins_to_draw(held, banked, price, stock=1500):
+    """The coins to take out for a buyout, on top of those held.
+
+    Why: the bank is the operator's, not the trip's, so it draws what a full shelf costs and leaves the rest
+    banked."""
+    budget = buyout_cost(price, stock, ROACHEY_SELL_MULTIPLIER, ROACHEY_DELTA)
+    return 0 if held >= budget else max(0, min(banked, budget - held))
 
 
 def feather_buyout_due(last_at_ms, interval_minutes, now_ms):

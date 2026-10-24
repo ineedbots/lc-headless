@@ -281,6 +281,16 @@ Fishing spots, mines and woods, each a `Record` with `name`, `spot` (a `Tile`), 
 | `shop_db()` | The shop database by inventory name: each a dict of title, keepers, sell and buy rates, and items (`obj`, `name`, `baseline`, `restock_ticks`, `cost`, `stackable`, `members`). Loaded on first use |
 | `shops_selling(item)` | `[(inventory name, shop)]` of the shops that stock the item, by name without regard to case |
 
+The engine's prices (rs2b0t's `api/shop`). Each price climbs as stock leaves the shelf, so a full shelf costs far more than stock times cost. An item is a shop database item as a Record, and a shop a record with `sell` and `delta`:
+
+| Function | Gives |
+|---|---|
+| `unit_price(item, shop, stock)` | What one costs with `stock` on the shelf |
+| `shop_buy_price(base_cost, bought, sell_multiplier=100, delta=10)`, `buyout_cost(base_cost, stock, sell_multiplier=100, delta=10)` | The next one's price once `bought` have gone, and a whole shelf's |
+| `expected_stock(item, seen, now_ms)` | The stock now, from what was `seen` (`count`, `at_ms`): it moves one towards the baseline every `restock_ticks` |
+| `units_under_policy(policy, stock, baseline)` | How many to buy: everything for `{'kind': 'buyout'}`, down to `pct` percent of the baseline for `{'kind': 'floor', 'pct': ...}` |
+| `buyout_plan(rec, stock, coins, chosen)` | What to buy of a shop's `chosen` items (lower-case names) with `coins`, the dearest first: Records of `obj`, `name`, `units` and `est_cost`. `stock` is `{obj: count}` |
+
 ### Walking destinations
 
 | Name | Is |
@@ -510,6 +520,16 @@ For accounts that hand their haul to each other.
 | `decide_giver_offer_screen(my_offer_slots)` | Giving: `'offer'`, then `'accept'` |
 | `parse_mule_mode(raw)` | `'gatherer'`, `'mule'`, `'cooker'`, `'supplier'` or `'off'` |
 | `mule_gatherer_handoff_active(mode, partners, power_mode)`, `mule_receiver_active(mode, partners)`, `mule_cooker_active(mode, partners)`, `mule_supplier_active(mode, partners, power_mode)`, `mule_non_gatherer_active(mode, partners)` | Which role is on: the mode matches and partners are configured |
+
+Driving the trade (rs2b0t's `drivePartnerTrade.ts` and `PartnerHandoff.ts`):
+
+| Name | Gives or does |
+|---|---|
+| `drive_active_partner_trade(role, partners, their_product_match, product_names_to_offer, set_status, log, on_complete=None, on_decline=None, inventory_metric=None, on_missing_partner=None, receiver_can_accept=None, my_offer_ready=None, baseline=None, verify_giver_partner=False, labels=None)` | **Wait.** One step of an open trade, as `'giver'` or `'receiver'`. The receiver accepts once a configured partner offers product (`their_product_match(name)`); the giver offers each of `product_names_to_offer()` with Offer All, then accepts; on the confirm screen both accept, and `on_complete(delta)` gets `inventory_metric()` (default `inventory.used()`) after less before, the before from `baseline()` when given. `on_missing_partner()` answers `'wait'` or `'decline'` while the partner's name hasn't shown, `receiver_can_accept(count)` a bool or `(ok, reason)`, and `labels` (a dict) renames the statuses. Call it every loop while `trade.active()` |
+| `trade_screen_state()` | `'offer'`, `'confirm'` or `'closed'` |
+| `stable_closed_poll(min_ms=600, now_fn=None)` | A condition that holds once the trade has been shut for `min_ms` without a break, since the swap between the screens reports neither for a moment |
+| `run_handoff(partner, rendezvous, id, name, giving, label, log)` | **Wait.** Moves one object, by id, between this bot and `partner`, meeting at `rendezvous`, and proves it landed. `True` once it has |
+| `decide_open_trade(trade_active, partner_near, now_ms, deadline_ms, next_request_at_ms)` | `'done'`, `'give-up'`, `'wait'` or `'request'`, for sending Trade with again until the window opens |
 
 ## Tasks
 

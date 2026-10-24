@@ -189,6 +189,12 @@ class Expect:
     def to_have_length(self, n):
         self.check(len(self.actual) == n, f'to have length {n}')
 
+    def to_start_with(self, prefix):
+        self.check(self.actual.startswith(prefix), f'to start with {repr(prefix)}')
+
+    def to_end_with(self, suffix):
+        self.check(self.actual.endswith(suffix), f'to end with {repr(suffix)}')
+
     def to_throw(self, text=None):
         try:
             self.actual()
@@ -234,6 +240,19 @@ def as_records(value):
         return [as_records(v) for v in value]
     if isinstance(value, tuple):
         return tuple([as_records(v) for v in value])
+    return value
+
+
+def plain(value):
+    """Records as dicts all the way down, for json.dumps."""
+    fields = _fields(value)
+    if fields is not None:
+        out = {}
+        for k in fields:
+            out[k] = plain(fields[k])
+        return out
+    if _is_sequence(value):
+        return [plain(v) for v in value]
     return value
 
 

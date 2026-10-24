@@ -19,8 +19,6 @@ namespace
     constexpr auto VOWELS = "aeiou"sv;
     // A model and its offset.
     constexpr auto WEAR_SIZE = sizeof(u16) + sizeof(u8);
-    // An obj and the count it's shown for.
-    constexpr auto COUNT_OBJ_SIZE = 2 * sizeof(u16);
 
     constexpr auto MODEL = u8{1};
     constexpr auto ZOOM_2D = u8{4};
@@ -69,7 +67,6 @@ namespace
         Dropped::Drop(YOF_2D, sizeof(u16)),
         Dropped::Drop(CODE9, NO_VALUE),
         Dropped::Drop(CODE10, sizeof(u16)),
-        Dropped::Drop(MAN_WEAR, WEAR_SIZE),
         Dropped::Drop(MAN_WEAR_2, sizeof(u16)),
         Dropped::Drop(WOMAN_WEAR, WEAR_SIZE),
         Dropped::Drop(WOMAN_WEAR_2, sizeof(u16)),
@@ -81,7 +78,6 @@ namespace
         Dropped::Drop(MAN_HEAD_2, sizeof(u16)),
         Dropped::Drop(WOMAN_HEAD_2, sizeof(u16)),
         Dropped::Drop(ZAN_2D, sizeof(u16)),
-        Dropped::DropRange(FIRST_COUNT_OBJ, LAST_COUNT_OBJ, COUNT_OBJ_SIZE),
         Dropped::Drop(RESIZE_X, sizeof(u16)),
         Dropped::Drop(RESIZE_Y, sizeof(u16)),
         Dropped::Drop(RESIZE_Z, sizeof(u16)),
@@ -107,7 +103,7 @@ namespace
         std::optional<u16> templateId;
     };
 
-    void DecodeObj(Packet& packet, ObjType_s& type, TextPool& text, CertLinks_s& cert, Revision_e revision)
+    void DecodeObj(Packet& packet, ObjType_s& type, TextPool& text, CertLinks_s& cert, std::vector<u16>& piles, Revision_e revision)
     {
         while (true)
         {
@@ -139,6 +135,19 @@ namespace
                 continue;
             }
 
+            // An obj and the count from which it's shown.
+            if (opcode >= FIRST_COUNT_OBJ && opcode <= LAST_COUNT_OBJ)
+            {
+                const auto pile = packet.G2();
+                packet.G2();
+                if (pile > 0)
+                {
+                    piles.push_back(pile);
+                }
+
+                continue;
+            }
+
             switch (opcode)
             {
             case TypeDecoder::NAME:
@@ -155,6 +164,12 @@ namespace
                 break;
             case MEMBERS:
                 type.members = true;
+                break;
+            case MAN_WEAR:
+                // The model and its offset.
+                packet.G2();
+                packet.G1();
+                type.equippable = true;
                 break;
             case CERTLINK:
                 cert.link = packet.G2();
@@ -211,11 +226,20 @@ namespace
 std::vector<ObjType_s> ObjTypeDecoder::Decode(std::span<const u8> dat, std::span<const u8> idx, TextPool& text, Revision_e revision)
 {
     auto certs = std::vector<CertLinks_s>{};
-    auto objs = TypeDecoder::DecodeAll<ObjType_s>("obj", dat, idx, [&text, &certs, revision](Packet& packet, ObjType_s& type)
+    auto piles = std::vector<u16>{};
+    auto objs = TypeDecoder::DecodeAll<ObjType_s>("obj", dat, idx, [&text, &certs, &piles, revision](Packet& packet, ObjType_s& type)
     {
-        DecodeObj(packet, type, text, certs.emplace_back(), revision);
+        DecodeObj(packet, type, text, certs.emplace_back(), piles, revision);
     });
 
     MakeNotes(objs, certs, text);
+    for (const auto pile : piles)
+    {
+        if (pile < objs.size())
+        {
+            objs[pile].stackVariant = true;
+        }
+    }
+
     return objs;
 }

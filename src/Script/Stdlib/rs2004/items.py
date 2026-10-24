@@ -35,9 +35,11 @@ class InvItem:
             return _core.inv_button(self, op)
         return _core.item_op(self, op)
 
-    def move_to(self, slot):
-        """Drags the item to another slot of its inventory, as the bank's rearranging does."""
-        _core.move_item(self.com, self.slot, slot)
+    def move_to(self, slot, insert=False):
+        """Drags the item to another slot of its inventory, as the bank's rearranging does: a swap, or with insert
+        the bank's insert, which shifts the items between. The server reads the bank's own mode (varp 304), not
+        this, so set that first (bank.set_arrange_mode)."""
+        _core.move_item(self.com, self.slot, slot, insert)
         return True
 
     def use_on(self, target):

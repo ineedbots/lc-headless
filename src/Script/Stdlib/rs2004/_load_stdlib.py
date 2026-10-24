@@ -11,6 +11,7 @@ from rs2004.game import *
 from rs2004.interfaces import *
 from rs2004.dialogue import *
 from rs2004.bank import *
+from rs2004.banksort import *
 from rs2004.trade import *
 from rs2004.tabs import *
 from rs2004.messages import *

@@ -287,6 +287,21 @@ class _Trade:
     def active(self):
         return self.on_offer_screen() or self.on_confirm_screen()
 
+    def confirm_ready(self):
+        """The confirm screen has filled in: each side lists its items, or says "Absolutely nothing!". rs2b0t's
+        reader.tradeConfirmReady.
+
+        Why: an empty offer is legal, so only that label tells it from a screen the server hasn't filled yet."""
+        if not self.on_confirm_screen():
+            return False
+        main = self._main()
+        root = _core.get_component(main)
+        centre = root.width // 2 if root is not None else 256
+        nothing = _core.find_components('Absolutely nothing!', None, main)
+        mine_ready = len(self.my_offer()) > 0 or len([c for c in nothing if c.x < centre]) > 0
+        theirs_ready = len(self.their_offer()) > 0 or len([c for c in nothing if c.x >= centre]) > 0
+        return mine_ready and theirs_ready
+
     def partner(self):
         """The other player's name, from the offer screen's "Trading With:", or None."""
         main = self._main()

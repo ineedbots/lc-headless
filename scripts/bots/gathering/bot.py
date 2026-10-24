@@ -1,8 +1,8 @@
 # GatheringBot: rs2b0t's scripts/GatheringBot/GatheringBot.ts (MIT, see thirdparty/rs2b0t), the bot behind the Miner,
 # Woodcutter and Fisher. Each entry script's settings pick the skill: rocks for the miner, tree_name for the
 # woodcutter, fish_method for the fisher. It gathers at a named camp or freeform around its start, banks the haul or
-# drops it, cooks the catch, burns the logs, and keeps its tools, buying, repairing or smithing them. The mule
-# hand-offs and the guild feather and Shilo supply runs aren't ported yet.
+# drops it or hands it to a mule, cooks the catch, burns the logs, keeps its tools, buying, repairing or smithing
+# them, and runs the Fishing Guild's feather buyout and Shilo's supply trip.
 
 import math
 import random
@@ -19,6 +19,8 @@ from rs2004.catalogs import resolve_chase_radius, resolve_fire_spot, resolve_fis
 from rs2004.catalogs import resolve_mining_location, resolve_rock_ids, resolve_run_anchor, resolve_woodcutting_location, should_burn_full_load
 from rs2004.catalogs import should_walk_home_to_gather_anchor, spot_matches_method, surplus_held_tool_names, sustain, tile_within_leash, tinderbox_req
 from rs2004.catalogs import tool_attack_level, tool_keep_names, tool_kit_label, tool_restock_plan, tools_needing_equip, with_bait_target, Record
+from rs2004.catalogs import DEFAULT_TRADE_RANGE, MULE_MODE_OPTIONS, mule_cooker_active, mule_gatherer_handoff_active, mule_non_gatherer_active
+from rs2004.catalogs import mule_receiver_active, mule_supplier_active, parse_mule_mode, parse_partner_list
 from rs2004.quests.exec.primitives import drive_dialog
 
 from bots.gathering.camp import NAMED_CAMP_LEASH_FLOOR, effective_gather_leash, is_auto_location, is_custom_location, spot_avoided, sweep_stop_for
@@ -28,10 +30,13 @@ from bots.gathering.desert_camp import desert_camp_keep_names, is_desert_camp_lo
 from bots.gathering.fish_cook import cook_batch_after_load, cook_filter_label, count_raw_in_bank, is_burnt_fish_name, is_cooked_fish_name, is_raw_fish_name
 from bots.gathering.fish_cook import last_matching_index, parse_after_cook_cycle, parse_burnt_policy, parse_cook_mode, parse_positive_int, raw_matches_cook_filter
 from bots.gathering.fish_cook import resolve_cook_fish_filter, should_cook_then_bank, should_start_bank_raw_cook_batch
-from bots.gathering.logic import gathering_combat_policy, hostile_attacker_nearby, incoming_player_attacker, wilderness_miner_at, wilderness_miner_stance_needed
+from bots.gathering.logic import bait_trip_due, gathering_combat_policy, hostile_attacker_nearby, incoming_player_attacker, wilderness_miner_at
+from bots.gathering.logic import wilderness_miner_stance_needed
 from bots.gathering.miner_logic import desert_camp_food_reserve_depleted, miner_food_config, miner_food_restock_needed, plan_miner_food_withdrawal
 from bots.gathering.miner_logic import should_eat_miner_food, unsupported_camp_ores
-from bots.gathering.tasks import STARTUP_PROVISION_RETRIES, BankCatch, ClearPackJunk, DesertMiningCampTravel, DropProduct, EnsureGatherToolEquipped
+from bots.gathering.shilo_supply import ShiloSupplyTrip
+from bots.gathering.tasks import STARTUP_PROVISION_RETRIES, BankCatch, BuyGuildFeathers, BuyShiloSupplies, ClearPackJunk, DesertMiningCampTravel, DropProduct
+from bots.gathering.tasks import EnsureGatherToolEquipped, HandleGatherMuleTrade, MuleBankHaul, MuleGoMeet, MuleRequestOrWait, SupplierWithdrawRaw
 from bots.gathering.tasks import EnsureShortbowRapid, FishBankCooked, FishCookDialog, FishCookLoad, FishWithdrawCookBatch, FleeCombat, Gather
 from bots.gathering.tasks import MaintainWildernessMinerStance, MinerEatFood, RepairBrokenGatherTool, RestockFishingGear, RestockGatherTool, StartupProvision
 from bots.gathering.tasks import TannerfishSustain, TrimKnifeDelayLogs, UpgradeGatherTool, WaitStickyCombat
@@ -80,6 +85,10 @@ GATHERING_SETTINGS = {
     'bank_location': SettingDef('string', 'Auto', 'Bank location', options=['Auto', 'Nearest'] + [b['name'] for b in BANK_LOCATIONS], group='Banking',
                                 show_if={'key': 'bank', 'any_of': ['true']},
                                 help="Shown only when Bank haul is on. Auto = the camp's own bank stand for Use Closest / named camps; the nearest bank for Use Start Position / Use Custom Position. Nearest = always the nearest usable bank. A named choice forces that exact bank (quest/skill locked choices fall back to the nearest)."),
+    'mule_mode': SettingDef('string', 'Off', 'Mule mode', options=MULE_MODE_OPTIONS, group='Mule',
+                            help='Off = bank/drop. Gatherer = trade full haul at camp meet. Mule = accept→bank (demo for ore/logs). Cooker = accept raw fish→cook→bank cooked (Fisher + cook mode). Supplier = withdraw raw from bank→trade at meet (pairs with Cooker). Needs Partner. Disabled when Bank=false (power mode).'),
+    'mule_partner': SettingDef('string', '', 'Mule partner name(s)', group='Mule',
+                               help='Comma-separated names. Gatherer/Supplier → Cooker or Mule. Cooker/Mule → gatherer/supplier name(s).'),
     'purge_pack_on_start': SettingDef('boolean', True, 'Bank junk on start', group='Banking',
                                       help='Deposit non-tool stacks at the camp bank before gathering so you can start with a junk pack. Skipped when Bank=false (power mode), Cooker (raw pack), and Supplier.'),
     'pack_junk': SettingDef('string', 'Bank', 'Event junk while gathering', options=['Bank', 'Drop', 'Off'], group='Banking',
@@ -177,6 +186,13 @@ class GatheringBot(TaskBot):
         self.startup_provision_pending = False
         self.forgetful_bank = False
         self.bait_qty = 1000
+        self.guild_feather_minutes = 0
+        self.last_guild_feather_at = None
+        self.shilo_supply_trip = ShiloSupplyTrip()
+        # Off, or a partner trade's role: gatherer, mule, cooker or supplier.
+        self.mule_mode = 'off'
+        self.mule_partners = []
+        self.mule_trades = 0
         self.sweep_index = 0
         # Why: after a kite off a pack, the camp's return and gathering are held so it doesn't walk back onto them.
         self.combat_clear_until_tick = 0
@@ -240,6 +256,9 @@ class GatheringBot(TaskBot):
         if forced is not None and self.forced_bank is None:
             why = 'disabled in power mode' if self.power_mode else 'locked (quest/skill) — using auto/nearest'
             self.log(f"bank: {forced['name']} {why}")
+        configured = self.configure_mule(desert_camp)
+        if not configured:
+            return
         self.configure_tick_manip(raw)
         self.configure_cooking()
         self.configure_burning(raw, here)
@@ -290,9 +309,10 @@ class GatheringBot(TaskBot):
             note = ' (Bank=false → drop if no bank)' if self.power_mode and self.pack_junk_policy == 'bank' else ''
             self.log(f'pack junk: {self.pack_junk_policy}{note}')
         # Junk is banked, so gathering can start with a pack full of trash; never in power mode.
-        self.startup_provision_pending = not self.power_mode and not self.strict_desert_camp_banking() and self.bank_provision_needed()
+        # Not for the mule roles either: a cooker's pack is raw to cook, a supplier's empty.
+        self.startup_provision_pending = not self.power_mode and self.mule_mode == 'off' and not self.strict_desert_camp_banking() and self.bank_provision_needed()
         purge = s.bool('purge_pack_on_start', True)
-        if purge and not self.startup_provision_pending and not self.power_mode and self.desert_camp_route is None:
+        if purge and not self.startup_provision_pending and not self.power_mode and not self.is_mule_cooker() and not self.is_mule_supplier() and self.desert_camp_route is None:
             keep = list(self.gear_keep) + tool_keep_names(self.tool_reqs)
             if self.fish_method is not None:
                 keep = keep + [g.name for g in self.fish_method.gear]
@@ -339,6 +359,7 @@ class GatheringBot(TaskBot):
             self.action = method.op
             self.pair_op = method.pair
             self.bait_qty = max(1, math.floor(s.num('bait_qty', 1000)))
+            self.guild_feather_minutes = max(0, math.floor(s.num('guild_feather_minutes', 0)))
             # The bait and feather targets apply only to the pieces that need them; tools stay at one.
             self.fish_method = Record({'name': method.name, 'op': method.op, 'pair': method.pair, 'gear': with_bait_target(method, self.bait_qty)})
             self.fishing = True
@@ -369,6 +390,40 @@ class GatheringBot(TaskBot):
                 self.product_keywords = [self.drop_match] if 'log' in self.drop_match else ['log']
             elif 'mine' in act or 'rock' in tgt:
                 self.tool_reqs = [pickaxe_req()]
+
+    def configure_mule(self, desert_camp):
+        """The partner trade's role, falling back to Off where it can't run. False when the run stops."""
+        self.mule_mode = parse_mule_mode(self.settings.str('mule_mode', 'Off'))
+        self.mule_partners = parse_partner_list(self.settings.str('mule_partner', ''))
+        if desert_camp is not None and self.mule_mode != 'off':
+            self.stop_with(f"{desert_camp.name} does not support Mule mode '{self.mule_mode}'")
+            return False
+        if self.mule_mode != 'off' and self.power_mode:
+            self.log(f"mule: '{self.mule_mode}' disabled when Bank=false (drop-only)")
+            self.mule_mode = 'off'
+        elif self.mule_mode != 'off' and len(self.mule_partners) == 0:
+            self.log('mule: no partner names — falling back to Off (bank/drop)')
+            self.mule_mode = 'off'
+        elif self.mule_mode != 'off':
+            self.log(f"mule: {self.mule_mode} with [{', '.join(self.mule_partners)}] meet={self.get_meet_tile()}")
+            # A cooker needs a cook path and a range, and cooks then banks when cooking was Off.
+            if self.is_mule_cooker() and self.fishing:
+                if self.cook_mode == 'off':
+                    self.cook_mode = 'cook-then-bank'
+                    self.log('mule: cooker forced cookMode=cook-then-bank')
+                if self.range_stand is None:
+                    self.resolve_cook_scene()
+                if self.range_stand is None:
+                    self.log('mule: cooker has no range — falling back to Off')
+                    self.mule_mode = 'off'
+            if self.is_mule_supplier() and not self.fishing:
+                self.log('mule: supplier is Fisher-only — falling back to Off')
+                self.mule_mode = 'off'
+        if self.miner_food is not None and self.mule_mode != 'off':
+            self.log('food: disabled while Miner mule mode owns the haul/bank loop')
+            self.miner_food = None
+            self.miner_food_startup_pending = False
+        return True
 
     def configure_tick_manip(self, raw):
         """Each skill's tick manipulation, off in power mode."""
@@ -471,13 +526,17 @@ class GatheringBot(TaskBot):
         self.log(f"gather: '{self.target}' ({self.action}{pair}) leash {self.leash_radius} @ {self.anchor}; {self.full_inventory_note()}")
 
     def add_tasks(self):
-        gather_tools = (self.mining() or self.woodcutting() or len(self.tool_reqs) > 0) and not self.fishing
+        # The partner roles that don't gather skip the gathering and the tools.
+        mule_side = self.is_mule_non_gatherer()
+        cooker = self.is_mule_cooker()
+        gather_tools = not mule_side and (self.mining() or self.woodcutting() or len(self.tool_reqs) > 0) and not self.fishing
         # Why: the miner always carries the combat tasks, so a wilderness camp's policy can switch from holding against
         # the residents to fleeing a player; other gatherers flee only at a named camp.
-        mob_flee = self.mining() or (not is_auto_location(self.location_setting) and not self.tick_manip.allow_combat)
+        mob_flee = not mule_side and (self.mining() or (not is_auto_location(self.location_setting) and not self.tick_manip.allow_combat))
         # Tannerfishing trains with the power: it cooks and eats on the pier and drops the haul.
         tanner_power = self.tick_manip.cook_eat_interleave
-        cook_tasks = self.fishing and self.cook_mode != 'off' and self.range_stand is not None
+        # The cooker always cooks; the others when cooking is on.
+        cook_tasks = (self.fishing and self.cook_mode != 'off' and self.range_stand is not None) or cooker
         bank_catch = BankCatch(self)
         food_loop = self.miner_food is not None
         tasks = []
@@ -489,31 +548,48 @@ class GatheringBot(TaskBot):
         tasks = tasks + [MaintainWildernessMinerStance(self), StartupProvision(self)]
         if self.desert_camp_route is not None:
             tasks.append(DesertMiningCampTravel(self))
-        if self.tick_manip.shortbow_rapid:
+        if not mule_side and self.tick_manip.shortbow_rapid:
             tasks.append(EnsureShortbowRapid(self))
-        if self.tick_manip.cook_eat_interleave:
+        if not mule_side and self.tick_manip.cook_eat_interleave:
             tasks.append(TannerfishSustain(self))
-        if self.tick_manip.use_knife_delay:
+        if not mule_side and self.tick_manip.use_knife_delay:
             tasks.append(TrimKnifeDelayLogs(self))
-        if self.mining() or self.woodcutting():
+        if not mule_side and (self.mining() or self.woodcutting()):
             tasks.append(RepairBrokenGatherTool(self))
-        if self.fishing:
-            tasks.append(RestockFishingGear(self))
+        if not mule_side and self.fishing:
+            tasks = tasks + [BuyGuildFeathers(self), RestockFishingGear(self)]
         if gather_tools:
             tasks = tasks + [EnsureGatherToolEquipped(self), RestockGatherTool(self), UpgradeGatherTool(self)]
         if cook_tasks:
             tasks = tasks + [FishCookDialog(self), FishCookLoad(self), FishBankCooked(self), FishWithdrawCookBatch(self)]
-        tasks.append(ClearPackJunk(self))
-        if self.burn_enabled():
+        if not mule_side:
+            tasks.append(ClearPackJunk(self))
+        if not mule_side and self.burn_enabled():
             tasks = tasks + create_chop_burn_tasks(self)
+        # The mule trade owns the loop while its window is open, since movement cancels it.
+        if self.mule_mode != 'off':
+            tasks.append(HandleGatherMuleTrade(self))
+        if not mule_side and self.fishing:
+            tasks.append(BuyShiloSupplies(self))
+        if self.is_mule_receiver():
+            tasks = tasks + [MuleBankHaul(self), MuleGoMeet(self), MuleRequestOrWait(self)]
+        if cooker:
+            tasks = tasks + [MuleGoMeet(self), MuleRequestOrWait(self)]
+        if self.is_mule_supplier():
+            tasks = tasks + [SupplierWithdrawRaw(self), MuleGoMeet(self), MuleRequestOrWait(self)]
+        if self.is_mule_gatherer():
+            tasks = tasks + [MuleGoMeet(self), MuleRequestOrWait(self)]
         if food_loop:
             tasks.append(bank_catch)
         if self.power_mode or tanner_power:
             tasks.append(DropProduct(self))
         elif not food_loop:
             tasks.append(bank_catch)
-        tasks.append(Gather(self))
-        tasks.append(create_return_to_anchor_task(self, slack=4, long_range_tiles=24, suppress=lambda: (self.burn_enabled() and self.burning_load) or self.should_suppress_camp_reentry()))
+        # The partner sides that bank, cook or supply don't gather.
+        if not mule_side:
+            tasks.append(Gather(self))
+        tasks.append(create_return_to_anchor_task(self, slack=4, long_range_tiles=24,
+                                                  suppress=lambda: (self.burn_enabled() and self.burning_load) or self.should_suppress_camp_reentry() or self.mule_mode != 'off'))
         self.add(*tasks)
 
     def desert_sustain(self):
@@ -1863,6 +1939,67 @@ class GatheringBot(TaskBot):
 
     # Why: the walk is skipped within the arrive radius, not the whole leash: a camp's bank stand can sit within the
     # leash far from the resources.
+    # The partner trade.
+
+    def get_meet_tile(self):
+        """Where the mule hand-off meets: the camp's spot when there is one, else the run's anchor."""
+        if self.location is not None and self.location.spot is not None:
+            return self.location.spot
+        return self.anchor
+
+    def is_mule_gatherer(self):
+        return mule_gatherer_handoff_active(self.mule_mode, self.mule_partners, self.power_mode)
+
+    def is_mule_receiver(self):
+        return mule_receiver_active(self.mule_mode, self.mule_partners)
+
+    def is_mule_cooker(self):
+        return mule_cooker_active(self.mule_mode, self.mule_partners)
+
+    def is_mule_supplier(self):
+        return mule_supplier_active(self.mule_mode, self.mule_partners, self.power_mode)
+
+    def is_mule_non_gatherer(self):
+        """The bank mule, the cooker or the supplier, which don't gather."""
+        return mule_non_gatherer_active(self.mule_mode, self.mule_partners)
+
+    def at_mule_meet(self, radius=2):
+        here = game.tile()
+        return here is not None and self.get_meet_tile().distance_to(here) <= radius
+
+    def nearest_mule_partner(self):
+        if len(self.mule_partners) == 0:
+            return None
+        return players.query().name(*self.mule_partners).within(DEFAULT_TRADE_RANGE + 6).nearest()
+
+    def depositable_product_names(self):
+        """The product names held that should go to the mule or the bank."""
+        names = []
+        for i in inventory.items():
+            if i.name and self.should_deposit(i.name) and i.name not in names:
+                names.append(i.name)
+        return names
+
+    def should_deposit_raw_catch(self, name):
+        if len(self.gear_keep) > 0 and not deposit_all_except(self.gear_keep)(name, -1):
+            return False
+        return is_raw_fish_name(name)
+
+    # The bait shop's supply runs.
+
+    def bait_vendor(self):
+        return self.location.bait_vendor if self.location is not None else None
+
+    def guild_feather_trip_due(self):
+        vendor = self.bait_vendor()
+        out_of_bait = False
+        if vendor is not None and self.fish_method is not None:
+            out_of_bait = len([g for g in self.fish_method.gear if g.name == vendor.item]) > 0 and inventory.count(vendor.item) == 0
+        return self.fishing and bait_trip_due(vendor is not None, out_of_bait, self.last_guild_feather_at, self.guild_feather_minutes, now_ms())
+
+    def note_guild_feather_trip(self):
+        self.last_guild_feather_at = now_ms()
+
     def walk_home_if_needed(self, log=None, arrive_radius=None):
         """Back toward the anchor after a bank, shop or repair. Use with yield from."""
         log = log or (lambda m: self.log(f'  {m}'))

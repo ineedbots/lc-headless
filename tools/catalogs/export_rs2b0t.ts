@@ -4,7 +4,8 @@
 //
 //     bun tools/catalogs/export_rs2b0t.ts ../rs2b0t src/Script/Stdlib/rs2004/catalogs/_data.py
 //
-// It writes _shops.py, _items.py and _drops.py beside _data.py too: large tables read on first use.
+// It writes _shops.py, _items.py and _drops.py beside _data.py too: large tables read on first use. And the
+// market's tables, to ../market/_data.py.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,6 +36,10 @@ const fire = await load('api/firemaking/Firemaking.ts');
 const spells = await load('data/spelldb.ts');
 const items = await load('data/itemdb.ts');
 const drops = await load('data/dropdb.ts');
+const prices = await load('data/marketprices.ts');
+const aliases = await load('data/itemAliases.ts');
+const collisions = await load('data/nameCollisions.ts');
+const untradeable = await load('data/untradeable.ts');
 
 const snake = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 
@@ -143,3 +148,21 @@ fs.writeFileSync(itemsFile, plainHeader + `\nITEM_DB = ${py(items.ITEM_DB)}\n`);
 const dropsFile = path.join(path.dirname(outFile), '_drops.py');
 fs.writeFileSync(dropsFile, plainHeader + `\nDROP_DB = ${pyRecord(drops.DROP_DB)}\n`);
 console.log(`wrote ${tables.length} tables to ${outFile}, and the shop, item and drop databases beside it`);
+
+// Keyed by obj id, so the keys are ints.
+const pyIdRecord = (record: Record<string, any>): string => {
+    const entries = Object.entries(record);
+    return `{\n${entries.map(([k, v]) => `    ${Number(k)}: ${py(v, 1)}`).join(',\n')},\n}`;
+};
+
+const marketFile = path.join(path.dirname(outFile), '..', 'market', '_data.py');
+fs.mkdirSync(path.dirname(marketFile), { recursive: true });
+const marketTables: [string, string][] = [
+    ['MARKET_PRICES', py(prices.MARKET_PRICES)],
+    ['ITEM_ALIASES', pyIdRecord(aliases.ITEM_ALIASES)],
+    ['NAME_SYNONYMS', pyRecord(aliases.NAME_SYNONYMS)],
+    ['NAME_COLLISIONS', py(collisions.NAME_COLLISIONS)],
+    ['UNTRADEABLE_IDS', py(untradeable.UNTRADEABLE_IDS)],
+];
+fs.writeFileSync(marketFile, plainHeader.replace('world catalogs', 'market tables') + marketTables.map(([name, value]) => `\n${name} = ${value}\n`).join(''));
+console.log(`wrote ${marketTables.length} market tables to ${marketFile}`);

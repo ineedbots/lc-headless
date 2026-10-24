@@ -358,6 +358,8 @@ if opened:
     yield from bank.close()
 ```
 
+`sort_bank(log)` sorts the open bank into categories, coins first and junk last ([bank.md](scripting/bank.md#sorting-the-bank)).
+
 `bank` is the bank interface. Its items are `InvItem`s whose actions are the bank's options, "Withdraw 1" to "Withdraw X". The backpack items beside the bank have the deposit options. Options match without regard to case, and a hyphen counts as a space, so rs2b0t's `'Withdraw-1'` works too.
 
 | Function | Returns or does |
@@ -454,7 +456,7 @@ A `Component` is a snapshot. Its fields:
 
 `component.click()` clicks it.
 
-An item in an interface inventory moves with `item.move_to(slot)`, as rearranging the bank does.
+An item in an interface inventory moves with `item.move_to(slot, insert=False)`, as rearranging the bank does.
 
 ## The side tabs
 
@@ -545,18 +547,21 @@ if not has_all_tools([pickaxe_req()], skills.level, inventory.count):
 | Other tables | Cow fields and the Al Kharid toll, runecrafting routes, pickpocket targets, herbs, walk destinations, cooking ranges and the cook location by each bank, fire spots and logs, and the shop database (`shop_db()`, `shops_selling(item)`) |
 | Combat | Food heals and when to eat (`should_eat_food`, `should_hold_eat` and `AttackClock`, so a bite doesn't cost a swing), super and ranging potions (`planned_potions`, `potion_to_sip`), `combat_keep_names`, `bury_one_in_fight` |
 | Loadouts | A script's `loadouts` setting (a list of `{name, worn, carry}`) and `loadout`, which names one: `selected_loadout`, `food_of`, `gear_of`, `weapon_of`, `supplies_of`, `script_food` |
-| Trading partners | `parse_partner_list`, `is_configured_partner`, `decide_receiver_offer_screen`, `decide_giver_offer_screen`, `count_offer_by_name`, and the mule roles |
+| Trading partners | `parse_partner_list`, `is_configured_partner`, `decide_receiver_offer_screen`, `decide_giver_offer_screen`, `count_offer_by_name`, the mule roles, `drive_active_partner_trade` (one step of a trade with a partner bot) and `run_handoff` (one item between two) |
+| Shops | The engine's prices as stock leaves the shelf (`unit_price`, `shop_buy_price`, `buyout_cost`), stock coming back (`expected_stock`) and a buyout's plan (`buyout_plan`) |
 | Tasks | `ContinueDialog`, `DeathRecovery` (from the death event), `AcquireTask` with `ItemNeed`s from a shop or the ground, `create_return_to_anchor_task`, the leash helpers, and `sustain`. `PeriodicBank` is the bank's, and takes a `destination` too |
 
 A table entry is a `Record`: its fields are attributes, and one it doesn't set reads as `None`. Item, NPC and scenery names are the 289 cache's, and a test checks every name the tables use against it. `reader.item_ids(name)`, `npc_ids(name)` and `loc_ids(name)` look a name up in the cache.
 
 The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout, which writes `rs2004/catalogs/_data.py` and `_shops.py`.
 
+`rs2004.market` is rs2b0t's market: the tradeable catalog built from the cache (`live_catalog`, `resolve_by_name`, `display_name`), its shelves, price books kept in the account file (`PriceBooks`), `appraise` for a trade window, and the public-chat protocol (`parse_command`, `format_price_list`). See [market.md](scripting/market.md).
+
 `scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
 
 | Kind | rs2b0t | Here |
 |---|---|---|
-| Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, tick manipulation (off until rs2b0t ships it). Not yet the mule hand-offs and the guild feather and Shilo supply runs |
+| Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, tick manipulation (off until rs2b0t ships it), the Fisher's mule hand-offs (gatherer, mule, cooker, supplier) and the Fishing Guild feather and Shilo supply runs |
 | Gathering | CoalTrucks, EssMiner, FlaxPicker, FlaxAIO, GnomeMagicChopper | `coal_trucks.py`, `ess_miner.py`, `flax_picker.py`, `flax_aio.py`, `gnome_magic_chopper.py` |
 | Skilling | BankFletcher, CookBot, DartFletcher, Firemaker, FlaxSpinner, GemCutter, HerbCleaner, HerbloreSecondaries, PotionMaker, LeatherCrafter, SmelterBot, SmithingBot, Superheater, TannerBot, VialFiller, BoneBurier, ClimbingBoots | `bank_fletcher.py` and the rest, each named as rs2b0t names it in snake_case |
 | Jewellery and caskets | JiveBalls, JiveCaskets, JiveCrafting, JiveEnchanter | `jive_balls.py`, `jive_caskets.py`, `jive_crafting.py`, `jive_enchanter.py` |
@@ -564,7 +569,10 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
 | Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py` |
 | Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
-| Movement and magic | WalkTo, DoorOpener, AIO Teleport | `walk_to.py`, `door_opener.py`, `aio_teleport.py` |
+| Movement and magic | WalkTo, DoorOpener, AIO Teleport, Alcher | `walk_to.py`, `door_opener.py`, `aio_teleport.py`, `alcher.py` |
+| Shops and trading | ShopBuyout, ShopRunner, MarketMaker, JiveMarketDumper, MuleTrader | `shop_buyout.py`, `shop_runner.py`, `market_maker.py` (its logic in `bots/marketmaker/`), `jive_market_dumper.py`, `mule_trader.py` |
+| Two-account | FlaxRunner, MuleCrafter | `flax_runner.py` (a runner picks, a spinner spins), `mule_crafter.py` (a crafter and its mules) |
+| Utility | BankSorter | `bank_sorter.py` |
 
 `scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
 

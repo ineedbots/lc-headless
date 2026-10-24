@@ -1,11 +1,13 @@
-# Fishes the chosen method, banking, cooking or dropping the catch: rs2b0t's Fisher, a preset of GatheringBot (MIT,
-# see thirdparty/rs2b0t). The fish_method setting is what makes the bot a fisher; see gathering/bot.py. The guild
-# feather trips come with the mules.
+# Fishes the chosen method, banking, cooking or dropping the catch, or handing it to a mule: rs2b0t's Fisher, a
+# preset of GatheringBot (MIT, see thirdparty/rs2b0t). The fish_method setting is what makes the bot a fisher; see
+# gathering/bot.py.
 
 from rs2004.catalogs import FISHING_LOCATION_OPTIONS, FISHING_METHOD_OPTIONS, FORGETFUL_BANK_SETTING, TOOL_ACQUIRE_SETTING
+from rs2004.market import format_gp
 
 from bots.gathering.bot import GATHERING_SETTINGS, GatheringBot
 from bots.gathering.fish_cook import AFTER_COOK_OPTIONS, BURNT_POLICY_OPTIONS, COOK_FISH_OPTIONS, COOK_MODE_OPTIONS
+from bots.gathering.logic import FEATHER_BUYOUT_GP, FEATHER_RESTOCK_MINUTES
 from bots.gathering.tick_manip import FISH_TICK_MANIP_OPTIONS, TICK_MANIP_UNSHIPPED_HELP, tick_manip_ui_options
 
 COOKING = {'key': 'cook_mode', 'any_of': ['Cook then bank', 'Bank raw then cook']}
@@ -20,6 +22,8 @@ SETTINGS = {
     'leash_radius': SettingDef('number', 18, 'Leash radius (tiles)', 2, 64,
                                help='How far from the camp/start anchor to prefer fishing spots. Only Location Use Closest / Use Start Position / Use Custom Position use this as-is. Named camps floor to 64 (Fishing Guild / Catherby piers are huge). The bot still hunts past the leash when spots hop along the pier. Freeform locations do not mob-flee (expert / may-die).'),
     'tick_manip': SettingDef('string', 'Off', 'Tick manip', options=tick_manip_ui_options(FISH_TICK_MANIP_OPTIONS), group='Tick manip', help=TICK_MANIP_UNSHIPPED_HELP),
+    'guild_feather_minutes': SettingDef('number', 0, 'Feather supply trip every (minutes)', 0, 120, show_if={'key': 'location', 'any_of': ['Fishing Guild', 'Shilo Village']},
+                                        help=f"In the Fishing Guild, buys Roachey's feathers with up to {format_gp(FEATHER_BUYOUT_GP)}gp; a full shelf restocks in {FEATHER_RESTOCK_MINUTES} minutes. In Shilo, banks the catch, buys Fernahei's feathers first, then affordable water vials from Obli, banks the vials and returns to fishing. 0 disables scheduled trips; running out of feathers still triggers a paced supply trip."),
     'location': SettingDef('string', 'Auto', 'Location / full inventory', options=FISHING_LOCATION_OPTIONS,
                            help='Fishing camp + full-pack behaviour. Auto = snap to a camp in your map square, otherwise stay at your start tile. Use Closest = nearest camp by distance. Use Start Position = freeform around your start tile + nearest bank. Use Custom Position = freeform around the custom tile. Named camps pin pier + bank (and range for Catherby cook). Power-fish via Bank=false (always drop; cook is disabled). Legacy None also power-fishes.'),
     'custom_location': GATHERING_SETTINGS['custom_location'],
@@ -37,6 +41,8 @@ SETTINGS = {
                                        help='Shown only for Bank raw then cook. Live bank total of the cook-filter raw (after each deposit). When the bank holds ≥ N, withdraw a load and cook. Type any amount (no artificial max).'),
     'after_cook_cycle': SettingDef('string', 'Stop', 'After cook cycle', options=AFTER_COOK_OPTIONS, group='Cooking', show_if=BANK_RAW,
                                    help='Shown only for Bank raw then cook. Stop = end the script after one cook cycle of the accumulated batch. Continue = keep fishing/banking/cooking in increments of N.'),
+    'mule_mode': GATHERING_SETTINGS['mule_mode'],
+    'mule_partner': GATHERING_SETTINGS['mule_partner'],
     'tool_acquire': TOOL_ACQUIRE_SETTING,
     'forgetful_bank': FORGETFUL_BANK_SETTING,
     'purge_pack_on_start': GATHERING_SETTINGS['purge_pack_on_start'],

@@ -214,6 +214,8 @@ The cache's definitions, from [`reader`](game.md#reader). Each returns `None` fo
 | `inventory_ops` | Its backpack options, five, `None` where empty |
 | `stackable`, `members` | Whether it stacks, and whether it's members-only |
 | `value` | Its shop value |
+| `equippable` | It has a model to wear, which is what tells a strung bow from its unstrung twin of the same name |
+| `stack_variant` | It's one of a stackable's pile-size models, such as a heap of coins: it repeats the item's name and isn't an item of its own |
 | `note_of` | For a banknote, the id of the item it's a note of; else `None` |
 
 ### `LocType` — `reader.loc_type(id)`

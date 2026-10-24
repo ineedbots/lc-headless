@@ -217,7 +217,8 @@ namespace
     {
         return BindingSupport::Guard([argv]
         {
-            BindingSupport::GetContext().GetActions().MoveItem(PyValue::ToU16(py_arg(0), "com"), PyValue::ToU16(py_arg(1), "from_slot"), PyValue::ToU16(py_arg(2), "to_slot"));
+            const auto mode = PyValue::ToBool(py_arg(3), "insert") ? DragMode_e::Insert : DragMode_e::Swap;
+            BindingSupport::GetContext().GetActions().MoveItem(PyValue::ToU16(py_arg(0), "com"), PyValue::ToU16(py_arg(1), "from_slot"), PyValue::ToU16(py_arg(2), "to_slot"), mode);
             return BindingSupport::ReturnNone();
         });
     }
@@ -417,7 +418,7 @@ void ActionBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"item_op(item, op)", ItemOp},
                                           {"inv_button(item, op)", InvButton},
                                           {"drop_item(item)", DropItem},
-                                          {"move_item(com, from_slot, to_slot)", MoveItem},
+                                          {"move_item(com, from_slot, to_slot, insert=False)", MoveItem},
                                           {"use_item_on_npc(item, npc)", UseItemOnNpc},
                                           {"use_item_on_player(item, player)", UseItemOnPlayer},
                                           {"use_item_on_loc(item, id, x, z)", UseItemOnLoc},

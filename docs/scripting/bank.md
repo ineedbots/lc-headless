@@ -164,3 +164,25 @@ self.add(
 | `bank_pace(log=None)` | **Wait.** Pauses that long |
 | `wait_bank_ready(log=None)` | **Wait.** Waits up to 7 ticks for the open bank's items, pacing as rs2b0t does. `False` once it's closed |
 | `withdraw_coins(need, inv_coins, bank_coins, coin_name='Coins', log=None)` | **Wait.** With the bank open, withdraws coins until the backpack holds `need`. `False` when the bank has none or the withdraw fails |
+
+## Sorting the bank
+
+rs2b0t's bank sorter: it files every item into a category, coins first and junk last, places each within its category (ores copper to rune, weapons dragon to bronze, runes combat then elemental, herbs in identify order, and the rest by price, dearest first), and drags the bank into that order in as few moves as it can.
+
+```python
+opened = yield from banking.open()
+if opened:
+    result = yield from sort_bank(log)
+    log(result.reason, result.moves)
+```
+
+| Function or constant | Gives or does |
+|---|---|
+| `sort_bank(log=None, category_overrides=None)` | **Wait.** Sorts the open bank, four drags a tick and planning again each round, using the bank's Swap or Insert setting, whichever needs fewer drags, and putting the setting back after. Gives a result with `sorted`, `moves` (drags sent), `mode`, `unmatched` (ids no rule files) and `reason`: `'sorted'`, `'bank not open'`, `'snapshot not ready'`, `'bank closed'`, `'arrange mode stuck'`, `'no progress'` or `'round limit'`. `category_overrides` files ids by hand, `{id: category}` |
+| `plan_bank_sort(items, overrides=None, force=None)` | The plan alone, for items with `slot`, `id`, `name` and `cost`: `mode` (`'swap'` or `'insert'`, or `force`'s), `moves` (each `from_` and `to`), `layout` (the ids in sorted order) and `unmatched`. The slots must run 0 to n-1, as the server keeps them; otherwise nothing is planned |
+| `sortable_bank_items()` | The open bank's items as the planner reads them, with the cache's value as their cost |
+| `CATEGORY_ORDER` | `coins`, `runes`, `staves`, `ammunition`, `weapons`, `armour`, `rangedArmour`, `food`, `potions`, `jewellery`, `herbs`, `oresBarsGems`, `logs`, `supplies`, `tools`, `teleports`, `questLive`, `questObsolete`, `junk`: rs2b0t's names |
+| `QUEST_JUNK`, `find_quest_junk(banked, status_of)` | The items finished quests leave behind (`id`, `name`, `quest`), and those among `banked`, each with its quest's `status_of(quest)` and `droppable`: the quest is complete |
+| `BANK_INSERT_VARP` | 304, the bank's Swap/Insert setting: 1 inserts |
+
+The server goes by the bank's own Swap/Insert setting, not the drag packet's mode, so `sort_bank` presses the Swap or Insert button (found by its label) and waits for the varp before it drags. [`InvItem.move_to(slot, insert=False)`](items.md#invitem) drags one item. `rs2004.banksort` also has the rules themselves: `category_of(item)`, `is_unmatched(item)`, `rank_within(category, item)`, `longest_increasing_subsequence(values)`, `apply_move(order, move, mode)` and `set_arrange_mode(mode)`.

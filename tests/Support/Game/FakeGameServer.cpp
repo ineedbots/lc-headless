@@ -126,6 +126,8 @@ std::shared_ptr<const GameCache_s> FakeGameServer::MakeCache(Revision_e revision
     TestCache::AddObj(cache, 995, "Coins").stackable = true;
     TestCache::AddObj(cache, 1511, "Logs");
     TestCache::AddObj(cache, 526, "Bones", {}, {"Bury"});
+    TestCache::AddObj(cache, 385, "Shark").cost = 200;
+    TestCache::AddObj(cache, 563, "Law rune").cost = 240;
     return std::make_shared<const GameCache_s>(std::move(cache));
 }
 

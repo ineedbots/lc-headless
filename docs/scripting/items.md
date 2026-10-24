@@ -61,7 +61,7 @@ One slot of any inventory: the backpack, the worn equipment, the bank, a shop's 
 | `actions()` | The options its right-click menu shows. In the backpack these are the item's own, with "Drop" where its type has nothing in that slot. In the bank, a shop, the worn equipment and other interfaces, they're the inventory's, such as "Withdraw 5", "Buy 1" or "Remove" |
 | `interact(action)` | Uses the option, by text (without regard to case) or number 1 to 5: `item.interact('Eat')`, `item.interact('Withdraw 5')`. `False` when it has no such option |
 | `use_on(target)` | Uses the item on another `InvItem`, an [`Npc`](world.md#npc), a [`Player`](world.md#player), a [`Loc`](world.md#loc) or a [`GroundItem`](world.md#grounditem). Walks to a world target first. Anything else raises `TypeError` |
-| `move_to(slot)` | Drags it to another slot of its inventory, as rearranging the bank does |
+| `move_to(slot, insert=False)` | Drags it to another slot of its inventory, as rearranging the bank does: a swap, or with `insert` the bank's insert, which shifts the items between. The server goes by the bank's own Swap/Insert setting, not this, so set that first (`bank.set_arrange_mode`) |
 
 None of these wait; they queue the click and return.
 

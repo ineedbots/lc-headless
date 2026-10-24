@@ -1,22 +1,26 @@
-"""GatheringBot's tasks: rs2b0t's scripts/GatheringBot/GatheringBotTasks.ts (MIT, see thirdparty/rs2b0t), less the
-mule hand-offs and the guild feather and Shilo supply runs, which come with phase 13."""
+"""GatheringBot's tasks: rs2b0t's scripts/GatheringBot/GatheringBotTasks.ts (MIT, see thirdparty/rs2b0t)."""
 
 import math
 import random
 
+import _core
+
 from rs2004.catalogs import BROKEN_AXE, BROKEN_PICKAXE, COINS, ENT_LIFE_TICKS, ENT_NPC_IDS, GAS_ROCK_IDS, GAS_ROCK_TICKS, WHIRLPOOL_IDS, beyond_leash, best_pickaxe
 from rs2004.catalogs import buy_plans_cost, fishing_gear_shop_cart, fishing_restock_plan, pick_bucket_nearest, plan_gather_tool_acquire, rock_tier_by_id
 from rs2004.catalogs import should_cooldown_gather_tile, should_soft_home_from_gather_miss, sustain, tile_within_leash
+from rs2004.catalogs import DEFAULT_TRADE_RANGE, count_offer_matching, drive_active_partner_trade, trade_screen_state
 from rs2004.random_events import step_off_candidates
 
 from bots.gathering.camp import gather_hunt_radius, gather_spot_range_origin, resource_within_camp, spot_within_gather_range
 from bots.gathering.fish_cook import bank_pace_ticks, cook_filter_label, cook_pace_ticks, is_burnt_fish_name, is_cooked_fish_name, should_cook_then_bank
-from bots.gathering.logic import ent_abort_action, fishing_session_broken, hostile_attacker_nearby, loc_gather_should_yield, should_flee_combat
+from bots.gathering.logic import ent_abort_action, feather_coins_to_draw, fishing_session_broken, hostile_attacker_nearby, loc_gather_should_yield
+from bots.gathering.logic import should_flee_combat
 from bots.gathering.tick_manip import TICK_MANIP_KNIFE, combat_breaks_gather, extra_delay_logs_to_drop, farmer_willow_phase, is_fletchable_log_name, is_shortbow_name
 from bots.gathering.tick_manip import knife_delay_phase, next_gather_click_tick, should_cook_for_tannerfish, should_eat_for_tannerfish
 
 STARTUP_PROVISION_RETRIES = 3
 SWEEP_WALK_MS = 30000
+SHOP_WALK_MS = 60000
 FLEE_STEP = 12
 FLEE_STEP_HARD = 20
 LOCAL_MINE_PREFER_RADIUS = 12
@@ -1881,3 +1885,343 @@ class Gather(Task):
         s = bot.farmer_cycle_start
         if game.tick() - s >= 6:
             bot.farmer_cycle_start = s + 6 * ((game.tick() - s) // 6)
+
+
+# Mule and partner trades (the policy is rs2004.catalogs' partner).
+
+MULE_TRADE_GRACE_MS = 2000
+
+
+def _signed(delta):
+    return f"{'+' if delta >= 0 else ''}{delta}"
+
+
+class HandleGatherMuleTrade(Task):
+    """Owns the loop while a mule trade's window is open, since movement cancels it, as giver or receiver."""
+
+    def __init__(self, bot):
+        Task.__init__(self, label='Handle gather mule trade')
+        self.bot = bot
+        self.partner_wait = 0
+        # Holds the task through the frame-long "no screen" blips between the trade's screens.
+        self.own_trade_until = 0
+        # Across beats, to tell why a window went.
+        self.last_screen = 'closed'
+        self.open_used = 0
+        self.saw_confirm = False
+        self.transferred = False
+
+    def validate(self):
+        if self.bot.mule_mode == 'off':
+            self.own_trade_until = 0
+            return False
+        if trade.active():
+            self.own_trade_until = _core.step_time() + MULE_TRADE_GRACE_MS
+            return True
+        # Why: the offer-to-confirm swap and the final teardown each report no screen for a frame, and yielding there
+        # lets gathering click under a window still up, so ownership is held through a short grace.
+        return _core.step_time() < self.own_trade_until
+
+    def missing_partner(self):
+        self.partner_wait += 1
+        if self.partner_wait == 1:
+            self.bot.log('trade: offer screen up but the partner header is still blank — waiting')
+        if self.partner_wait > 8:
+            self.partner_wait = 0
+            return 'decline'
+        return 'wait'
+
+    def can_accept(self, count):
+        if inventory.free() > 0:
+            return True
+        return (False, 'mule: pack full — cannot accept product (bank/cook first)')
+
+    def product_match(self, name):
+        if self.bot.is_mule_cooker():
+            return self.bot.should_deposit_raw_catch(name) or self.bot.should_deposit(name)
+        return self.bot.should_deposit(name)
+
+    def completed(self, delta):
+        # The receiver gains slots used; the giver loses product.
+        ok = delta > 0 if self.receiver else delta < 0
+        if not ok:
+            self.bot.log(f'mule: trade closed without transfer (inv Δ{_signed(delta)}) — not counting')
+            return
+        self.transferred = True
+        self.bot.mule_trades += 1
+        self.bot.log(f'mule: trade complete (inv Δ{_signed(delta)}, trades={self.bot.mule_trades})')
+
+    def execute(self):
+        bot = self.bot
+        self.receiver = bot.is_mule_receiver() or bot.is_mule_cooker()
+        giver = not self.receiver
+        self.transferred = False
+        screen_at_entry = trade_screen_state()
+        if screen_at_entry == 'offer' and self.last_screen == 'closed':
+            self.open_used = inventory.used()
+            self.saw_confirm = False
+            bot.log('trade: new handshake — offer screen up')
+        elif screen_at_entry == 'confirm':
+            self.saw_confirm = True
+        yield from drive_active_partner_trade(
+            'receiver' if self.receiver else 'giver', bot.mule_partners, self.product_match, bot.depositable_product_names, bot.set_status, bot.log,
+            on_complete=self.completed,
+            on_decline=lambda reason: bot.log(f'trade: we declined the trade ({reason})'),
+            on_missing_partner=self.missing_partner,
+            receiver_can_accept=self.can_accept if self.receiver else None,
+            my_offer_ready=(lambda: count_offer_matching(trade.my_offer(), bot.should_deposit) > 0) if giver else None,
+            baseline=lambda: self.open_used,
+            verify_giver_partner=giver,
+            labels={'accepting': 'mule: accepting raw for cook' if bot.is_mule_cooker() else 'mule: accepting product'})
+        if trade.partner() is not None:
+            self.partner_wait = 0
+        # Why: screens up at the last beat's end and gone now, with no confirm and no transfer, means the partner
+        # dropped it; the driver accounts for closes mid-beat.
+        screen_now = trade_screen_state()
+        if screen_at_entry == 'closed' and self.last_screen != 'closed' and not self.saw_confirm and not self.transferred:
+            d = inventory.used() - self.open_used
+            bot.log(f'trade: window closed between beats without reaching confirm or us declining — the partner most likely declined, walked away or logged out (inv Δ{_signed(d)})')
+        if screen_now != 'closed':
+            self.last_screen = screen_now
+        elif not trade.active():
+            self.last_screen = 'closed'
+        # Why: a closed report isn't proof of a settled pack, so the giver checks the traded items left before
+        # gathering resumes; the receiver's gain is its proof.
+        if self.transferred and giver:
+            cleared = yield from execution.delay_until(lambda: len(bot.depositable_product_names()) == 0, 3000)
+            if cleared:
+                bot.log('mule: verified — pack cleared of traded items')
+            else:
+                bot.log(f"mule: VERIFY FAILED — still holding {', '.join(bot.depositable_product_names()) or 'unknown items'}")
+        if trade.active():
+            self.own_trade_until = _core.step_time() + MULE_TRADE_GRACE_MS
+
+
+class MuleGoMeet(Task):
+    def __init__(self, bot):
+        Task.__init__(self, label='Mule go meet')
+        self.bot = bot
+
+    def validate(self):
+        bot = self.bot
+        if trade.active() or event_signal.pending() or bot.at_mule_meet():
+            return False
+        if bot.is_mule_gatherer() or bot.is_mule_supplier():
+            return inventory.is_full() and bot.has_depositable()
+        if bot.is_mule_receiver():
+            # The mule goes back to the meet with an empty pack, after banking.
+            return not bot.has_depositable() or not inventory.is_full()
+        if bot.is_mule_cooker():
+            # Idle and empty goes to the meet; holding raw, the cook tasks own the loop.
+            return bot.cookable_raw_count() == 0 and bot.cooked_fish_count() == 0
+        return False
+
+    def execute(self):
+        meet = self.bot.get_meet_tile()
+        self.bot.set_status(f'mule: walking to meet {meet}')
+        yield from traversal.walk_resilient(meet, radius=2, timeout_ms=90000, log=lambda m: self.bot.log(f'  {m}'))
+
+
+class MuleRequestOrWait(Task):
+    def __init__(self, bot):
+        Task.__init__(self, label='Mule request or wait')
+        self.bot = bot
+
+    def validate(self):
+        bot = self.bot
+        if trade.active() or event_signal.pending() or not bot.at_mule_meet():
+            return False
+        if bot.is_mule_gatherer() or bot.is_mule_supplier():
+            return inventory.is_full() and bot.has_depositable()
+        if bot.is_mule_receiver() or bot.is_mule_cooker():
+            # Idle at the meet waiting for the gatherer or supplier; a cooker holding raw cooks.
+            if bot.is_mule_cooker() and bot.cookable_raw_count() > 0:
+                return False
+            return not bot.has_depositable() or bot.is_mule_cooker()
+        return False
+
+    def execute(self):
+        bot = self.bot
+        partner = bot.nearest_mule_partner()
+        if partner is None or partner.distance() > DEFAULT_TRADE_RANGE:
+            msg = 'mule: waiting for gatherer'
+            if bot.is_mule_gatherer() or bot.is_mule_supplier():
+                msg = 'mule: waiting for partner at meet'
+            elif bot.is_mule_cooker():
+                msg = 'mule: cooker waiting for raw'
+            bot.set_status(msg)
+            bot.log(msg)
+            yield from execution.delay_ticks(2)
+            return
+        name = partner.name or (bot.mule_partners[0] if len(bot.mule_partners) > 0 else '')
+        bot.set_status(f"mule: requesting trade with {name or 'partner'}")
+        trade.request(name)
+        # Wall-clock: a two-player Trade with isn't tied to this client's tick rate.
+        yield from execution.delay_until(lambda: trade.active() or event_signal.pending(), 5000)
+
+
+class SupplierWithdrawRaw(Task):
+    """The supplier: the bank's raw fish, a pack of it withdrawn, to the meet and traded to the cooker. The bank raw
+    before cook setting is the "N ready" gate before a trip starts."""
+
+    def __init__(self, bot):
+        Task.__init__(self, label='Supplier withdraw raw')
+        self.bot = bot
+
+    def validate(self):
+        bot = self.bot
+        if not bot.is_mule_supplier() or trade.active() or event_signal.pending():
+            return False
+        # Already carrying raw for the hand-off.
+        return bot.raw_fish_count() == 0
+
+    def execute(self):
+        bot = self.bot
+        log = lambda m: bot.log(f'  {m}')
+        target = max(1, bot.bank_raw_target or 28)
+        bot.set_status(f'mule: supplier withdraw raw (need bank ≥{target})')
+        opened = yield from bot.open_script_bank(log)
+        if not opened:
+            bot.log('mule: supplier bank open failed — retry')
+            return
+        yield from execution.delay_ticks(1)
+        bank_raw = sum([max(1, i.count) for i in bank.items() if bot.is_cookable_raw(i.name)])
+        if bank_raw < target:
+            bot.log(f'mule: supplier bank raw {bank_raw} < {target} — waiting')
+            if bank.is_open():
+                yield from bank.close()
+            yield from execution.delay_ticks(8)
+            return
+        bot.log(f'mule: supplier withdrawing raw (bank {bank_raw})')
+        for i in range(40):
+            if inventory.free() <= 0:
+                break
+            stacks = [it for it in bank.items() if bot.is_cookable_raw(it.name) and it.count > 0]
+            if len(stacks) == 0 or not stacks[0].name:
+                break
+            name = stacks[0].name
+            before = bot.raw_fish_count()
+            bank.withdraw(name, 'Withdraw All')
+            yield from execution.delay_until_ticks(lambda: bot.raw_fish_count() > before or inventory.is_full(), 5)
+            if bot.raw_fish_count() == before:
+                # A single one, when All didn't land.
+                bank.withdraw(name, 'Withdraw 1')
+                yield from execution.delay_until_ticks(lambda: bot.raw_fish_count() > before or inventory.is_full(), 4)
+                if bot.raw_fish_count() == before:
+                    break
+        if bank.is_open():
+            yield from bank.close()
+        bot.log(f'mule: supplier pack raw={bot.raw_fish_count()} free={inventory.free()}')
+
+
+class MuleBankHaul(Task):
+    def __init__(self, bot):
+        Task.__init__(self, label='Mule bank haul')
+        self.bot = bot
+
+    def validate(self):
+        bot = self.bot
+        if not bot.is_mule_receiver() or trade.active() or event_signal.pending():
+            return False
+        return bot.has_depositable()
+
+    def execute(self):
+        bot = self.bot
+        log = lambda m: bot.log(f'  {m}')
+        had = len(bot.products())
+        bot.set_status('mule: banking haul')
+        opened = yield from bot.open_script_bank(log)
+        if not opened:
+            bot.log('mule: bank open failed — will retry')
+            return
+        yield from execution.delay_ticks(1)
+        yield from bank.deposit_all_matching(lambda name, id: bot.should_deposit(name))
+        yield from execution.delay_until_ticks(lambda: not bot.has_depositable() or not bank.is_open(), 9)
+        if bank.is_open():
+            yield from bank.close()
+        bot.count_trip(had)
+        bot.log(f'mule: deposited haul ({had} stacks, trades={bot.mule_trades})')
+        # Back toward the meet, at the camp.
+        yield from bot.walk_home_if_needed(log)
+
+
+# The guild's feathers and Shilo's supplies.
+
+
+class BuyGuildFeathers(Task):
+    """Why: Roachey's feathers come back one a tick toward 1500, so a bought-out stack is fifteen minutes from full and
+    the trip is worth taking on that clock, not only when the pack runs dry. The shop is a short walk from the guild
+    pier, and the run banks nothing on the way."""
+
+    def __init__(self, bot):
+        Task.__init__(self, label='Buy guild feathers')
+        self.bot = bot
+
+    def validate(self):
+        if event_signal.pending() or game.in_combat() or inventory.is_full():
+            return False
+        vendor = self.bot.bait_vendor()
+        return vendor is not None and vendor.keeper != 'Fernahei' and self.bot.guild_feather_trip_due()
+
+    def execute(self):
+        bot = self.bot
+        vendor = bot.bait_vendor()
+        if vendor is None:
+            return
+        log = lambda m: bot.log(f'  {m}')
+        # Why: the clock starts on the attempt rather than the sale, or a shop that won't open is retried every loop.
+        bot.note_guild_feather_trip()
+        if inventory.count(COINS) < vendor.price:
+            bot.set_status('feathers: drawing coins')
+            opened = yield from bot.open_script_bank(log)
+            if not opened:
+                bot.log('feathers: could not open the bank for coins, will try again next round')
+                return
+            yield from execution.delay_until_ticks(lambda: bank.loaded() or not bank.is_open(), 5)
+            yield from bank.deposit_all_matching(bot.restock_deposit_matcher())
+            draw = feather_coins_to_draw(inventory.count(COINS), bank.count(COINS), vendor.price)
+            if draw > 0:
+                bot.log(f'feathers: drawing {draw}gp of the {bank.count(COINS)}gp banked')
+                yield from bank.withdraw_x(COINS, draw)
+            yield from bot.close_script_bank(log, False)
+        coins = inventory.count(COINS)
+        if coins < vendor.price:
+            bot.log(f'feathers: only {coins}gp on hand or banked, skipping {vendor.keeper} this round')
+            return
+        bot.set_status(f'feathers: walking to {vendor.keeper}')
+        arrived = yield from traversal.walk_resilient(vendor.stand, radius=2, attempts=3, timeout_ms=SHOP_WALK_MS, log=log)
+        if not arrived:
+            bot.log(f'feathers: could not reach {vendor.keeper}, will try again next round')
+            return
+        opened = yield from shop.open(vendor.keeper)
+        if not opened:
+            bot.log(f"feathers: could not open {vendor.keeper}'s shop")
+            return
+        bot.set_status('feathers: buying out the stack')
+        before = inventory.count(vendor.item)
+        stock = 0
+        for line in shop.stock():
+            if line.name == vendor.item:
+                stock = line.count
+                break
+        yield from shop.buy(vendor.item, min(stock, coins // vendor.price))
+        yield from shop.close()
+        got = inventory.count(vendor.item) - before
+        bot.log(f'feathers: bought {got} from {vendor.keeper} (holding {inventory.count(vendor.item)})' if got > 0 else f'feathers: {vendor.keeper} had none to sell')
+        bot.set_status('feathers: back to the water')
+        yield from bot.walk_home_if_needed(log)
+
+
+class BuyShiloSupplies(Task):
+    def __init__(self, bot):
+        Task.__init__(self, label='Buy shilo supplies')
+        self.bot = bot
+
+    def validate(self):
+        if event_signal.pending() or game.in_combat():
+            return False
+        vendor = self.bot.bait_vendor()
+        return vendor is not None and vendor.keeper == 'Fernahei' and (self.bot.shilo_supply_trip.active or self.bot.guild_feather_trip_due())
+
+    def execute(self):
+        yield from self.bot.shilo_supply_trip.step(self.bot)

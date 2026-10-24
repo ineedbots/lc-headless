@@ -63,12 +63,18 @@ public:
     static constexpr u16 MAKE_5 = 333;
     static constexpr u16 MAKE_1 = 334;
     // SetBankScreen's: the bank, BANK in BANK_SCREEN beside BANK_INVENTORY in BANK_SIDE, as bank_main and
-    // bank_side have them, with "Note" and "Item" labels over the note mode's Select buttons.
+    // bank_side have them, with "Note" and "Item" labels over the note mode's Select buttons, and "Swap" and
+    // "Insert" over the arrange mode's, which read BANK_INSERT_VARP.
     static constexpr u16 BANK_SCREEN = 5292;
     static constexpr u16 BANK_NOTE = 5386;
     static constexpr u16 BANK_ITEM = 5387;
     static constexpr u16 BANK_NOTE_LABEL = 5390;
     static constexpr u16 BANK_ITEM_LABEL = 5391;
+    static constexpr u16 BANK_SWAP = 8130;
+    static constexpr u16 BANK_INSERT = 8131;
+    static constexpr u16 BANK_INSERT_LABEL = 8132;
+    static constexpr u16 BANK_SWAP_LABEL = 8133;
+    static constexpr u16 BANK_INSERT_VARP = 304;
     static constexpr u16 BANK_SIDE = 2005;
 
     TestCache() = delete;

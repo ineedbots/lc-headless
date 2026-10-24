@@ -2,7 +2,7 @@
 
 from rs2004.catalogs import AXE_BAR_FOR, DEFAULT_CAMP_RADIUS, DEFAULT_CHASE_RADIUS, HOME_ARRIVE_RADIUS, Record, pick_nearest_prefer_local, resolve_camp_radius, resolve_chase_radius, should_cooldown_gather_tile, should_soft_home_from_gather_miss, should_walk_home_to_gather_anchor
 from bots.gathering.camp import NAMED_CAMP_LEASH_FLOOR, effective_gather_leash, gather_hunt_radius, gather_spot_range_origin, is_auto_location, resource_within_camp, spot_within_gather_range
-from bots.gathering.logic import BAIT_RETRY_MINUTES, FEATHER_RESTOCK_MINUTES, bait_trip_due, ent_abort_action, feather_buyout_due, fishing_session_broken, gathering_combat_policy, hostile_attacker_nearby, loc_gather_should_yield, should_flee_combat, should_yield_gathering
+from bots.gathering.logic import BAIT_RETRY_MINUTES, FEATHER_BUYOUT_GP, FEATHER_RESTOCK_MINUTES, bait_trip_due, feather_coins_to_draw, ent_abort_action, feather_buyout_due, fishing_session_broken, gathering_combat_policy, hostile_attacker_nearby, loc_gather_should_yield, should_flee_combat, should_yield_gathering
 from bots.gathering.tasks import LOCAL_MINE_PREFER_RADIUS
 
 MIN = 60000
@@ -726,3 +726,29 @@ describe('the guild feather buyout', _fn99)
 
 
 # 'drawing coins for the buyout' waits for the feather buyout's shop pricing (phase 13).
+
+
+def _feather_draws():
+    def _fn1():
+        expect(feather_coins_to_draw(0, 5000000, 2)).to_be(FEATHER_BUYOUT_GP)
+    test('takes a shelf out of a bank that holds more', _fn1)
+
+    def _fn2():
+        expect(feather_coins_to_draw(0, 900, 2)).to_be(900)
+    test('takes the whole of a bank that holds less', _fn2)
+
+    def _fn3():
+        expect(feather_coins_to_draw(250, 5000000, 2)).to_be(FEATHER_BUYOUT_GP - 250)
+    test('counts what is already held against the budget', _fn3)
+
+    def _fn4():
+        expect(feather_coins_to_draw(FEATHER_BUYOUT_GP, 5000000, 2)).to_be(0)
+        expect(feather_coins_to_draw(FEATHER_BUYOUT_GP + 1, 5000000, 2)).to_be(0)
+    test('draws nothing when the pack already covers a shelf', _fn4)
+
+    def _fn5():
+        expect(feather_coins_to_draw(0, 0, 2)).to_be(0)
+    test('an empty bank asks for nothing', _fn5)
+
+
+describe('drawing coins for the buyout', _feather_draws)

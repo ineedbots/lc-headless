@@ -130,6 +130,16 @@ class Finder(ast.NodeVisitor):
             self.report(node, 'match is a keyword in pocketpy')
         self.generic_visit(node)
 
+    def visit_keyword(self, node):
+        if node.arg == 'match':
+            self.report(node, 'match is a keyword in pocketpy')
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        if node.attr == 'match':
+            self.report(node, 'match is a keyword in pocketpy')
+        self.generic_visit(node)
+
     def visit_YieldFrom(self, node):
         parent = getattr(node, 'parent', None)
         if not isinstance(parent, (ast.Expr, ast.Assign, ast.AnnAssign)):
@@ -184,6 +194,41 @@ def implicit_concatenation(path):
     return found
 
 
+def parenthesised_targets(path):
+    """for (a, b) in ...: pocketpy doesn't parse a loop target in brackets, in a comprehension at least."""
+    found = []
+    with open(path, 'rb') as f:
+        previous = None
+        for token in tokenize.tokenize(f.readline):
+            if token.type == tokenize.OP and token.string in ('(', '[') and previous is not None and previous.type == tokenize.NAME and previous.string == 'for':
+                found.append((token.start[0], "a loop target in brackets doesn't parse; write for a, b in ..."))
+            if token.type not in (tokenize.NL, tokenize.COMMENT):
+                previous = token
+    return found
+
+
+def unicode_escapes(path):
+    """\\u, \\U and \\N{...} in a string, which pocketpy rejects as an invalid escape: use chr()."""
+    found = []
+    with open(path, 'rb') as f:
+        for token in tokenize.tokenize(f.readline):
+            if token.type not in (tokenize.STRING, tokenize.FSTRING_MIDDLE):
+                continue
+            text = token.string
+            if token.type == tokenize.STRING and text.lstrip('bBfFuU')[:1] in ('r', 'R'):
+                continue
+            at = 0
+            while True:
+                at = text.find('\\', at)
+                if at < 0 or at + 1 >= len(text):
+                    break
+                if text[at + 1] in 'uUN':
+                    found.append((token.start[0], "pocketpy has no \\u, \\U or \\N escapes; use chr()"))
+                    break
+                at += 2
+    return found
+
+
 def two_level_closures(source, path):
     """A function nested two deep reading a local of the outermost function: pocketpy gives it a builtin or
     None instead."""
@@ -222,7 +267,7 @@ def lint(path):
     link_parents(tree)
     finder = Finder(path)
     finder.visit(tree)
-    found = finder.found + implicit_concatenation(path) + two_level_closures(source, path)
+    found = finder.found + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path)
     return sorted(set(found))
 
 

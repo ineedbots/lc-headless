@@ -286,6 +286,35 @@ TEST_CASE("TypeDecoder reads every obj opcode", "[TypeDecoder]")
     CHECK(objs[1].cost == 1);
 }
 
+// The market's catalog reads both: a strung bow is the one of its name with a wear model, and a pile-size model
+// repeats its stackable's name without being an item.
+TEST_CASE("TypeDecoder marks wearable objs and a stackable's pile-size models", "[TypeDecoder]")
+{
+    auto coins = Packet{};
+    PutString(coins, 2, "Coins");
+    coins.P1(11);
+    coins.P1(100);
+    coins.P2(1);
+    coins.P2(2);
+    coins.P1(0);
+
+    auto bow = Packet{};
+    PutString(bow, 2, "Maple longbow");
+    bow.P1(23);
+    bow.P2(512);
+    bow.P1(0);
+    bow.P1(0);
+
+    auto text = TextPool{};
+    const auto objs = DecodeObjs({ToBytes(coins), CacheWriter::MakeDefinition("Coins"), ToBytes(bow), CacheWriter::MakeDefinition("Maple longbow")}, text);
+    CHECK_FALSE(objs[0].stackVariant);
+    CHECK(objs[1].stackVariant);
+    CHECK_FALSE(objs[2].stackVariant);
+    CHECK(objs[2].equippable);
+    CHECK_FALSE(objs[3].equippable);
+    CHECK_FALSE(objs[0].equippable);
+}
+
 TEST_CASE("TypeDecoder works out whether a loc is active as the webclient does", "[TypeDecoder]")
 {
     CHECK_FALSE(IsActive({}));

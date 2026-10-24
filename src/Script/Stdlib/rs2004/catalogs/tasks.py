@@ -71,7 +71,7 @@ class AcquireTask(Task):
                 if bought == 0:
                     self.bot.log(f'bought no {need.name}: out of stock or coins')
                     yield from execution.delay_ticks(5)
-                shop.close()
+                yield from shop.close()
             return
         if kind == 'ground':
             at = need.source[1]

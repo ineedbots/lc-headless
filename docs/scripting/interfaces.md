@@ -144,4 +144,4 @@ A snapshot of one interface component.
 
 `component.click()` clicks it, as `interfaces.click(component.id)`.
 
-To move an item within an interface inventory, use [`InvItem.move_to(slot)`](items.md#invitem).
+To move an item within an interface inventory, use [`InvItem.move_to(slot, insert=False)`](items.md#invitem).

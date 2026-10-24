@@ -72,6 +72,7 @@ def loop():
 | `trade.status()` | The screen's own status lines, such as "Other player has accepted." |
 | `trade.their_accepted()` | The other player has accepted this screen |
 | `trade.waiting()` | You've accepted this screen and they haven't yet |
+| `trade.confirm_ready()` | The confirm screen has filled in: each side lists its items or says "Absolutely nothing!", since an empty offer is allowed |
 
 ### Acting
 
@@ -87,5 +88,7 @@ def loop():
 A trade request from another player arrives as the `trade_request` event (`on_trade_request(name)`), and as a `chat_message` whose `type` is `'trade_request'`.
 
 `parse_trade_partner_header(header)` gives the name in a "Trading With: name" line, or `None` while it's empty.
+
+Driving a trade with a partner bot, one screen at a time, and handing one item over, are [`rs2004.catalogs`' partner trades](catalogs.md#trading-partners). Shop prices and a buyout's plan are [its shops](catalogs.md#shops).
 
 For trading between your own accounts, see the partner helpers in [catalogs](catalogs.md#trading-partners) and [messages between scripts](console-and-messages.md#messages-between-scripts).

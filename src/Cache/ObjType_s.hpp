@@ -8,6 +8,10 @@ struct ObjType_s
     bool stackable = false;
     bool members = false;
     s32 cost = 1;
+    // It has a model for a man to wear, which is what tells a strung bow from its unstrung twin of the same name.
+    bool equippable = false;
+    // One of a stackable's pile-size models: an obj that repeats the base item's name and isn't an item of its own.
+    bool stackVariant = false;
     std::optional<u16> noteOf;
     std::string_view name;
     std::string_view examine;

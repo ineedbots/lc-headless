@@ -16,6 +16,7 @@
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/GameClient.hpp"
+#include "Game/Protocol/ClientPackets.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Packet.hpp"
@@ -1173,6 +1174,95 @@ def loop():
         "deposited []",
     });
     // clang-format on
+}
+
+// rs2b0t's bankSort.test.ts stubs the client; here the fake server plays the engine: the Swap and Insert buttons
+// set %bankinsert, and a drag swaps or inserts by it, not by the packet's mode byte.
+TEST_CASE("ScriptHost sorts the bank, setting insert mode and putting it back", "[ScriptHost]")
+{
+    constexpr auto COINS = u16{995};
+    constexpr auto LAW_RUNE = u16{563};
+    constexpr auto SHARK = u16{385};
+    constexpr auto LOGS = u16{1511};
+    constexpr auto BONES = u16{526};
+
+    auto fixture = HostFixture{R"python(
+def loop():
+    result = yield from sort_bank()
+    log('>', result.sorted, result.reason, result.mode, result.moves, [item.id for item in bank.items()])
+    stop_script()
+)python"};
+
+    // Sorted, then topped up with a law rune, which belongs second: one insert, where swaps would take three.
+    auto order = std::vector<u16>{COINS, SHARK, LOGS, BONES, LAW_RUNE};
+    const auto sendBank = [&fixture, &order]
+    {
+        auto items = std::vector<std::pair<u16, u8>>{};
+        for (const auto id : order)
+        {
+            items.emplace_back(id, 1);
+        }
+
+        fixture.SendInventory(TestCache::BANK, items);
+    };
+    const auto read2 = [](const std::vector<u8>& bytes, size_t at)
+    {
+        return static_cast<u16>((bytes[at] << 8) | bytes[at + 1]);
+    };
+    const auto answerButton = [&fixture, &read2](size_t count, u16 expected)
+    {
+        REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton, count));
+        CHECK(read2(fixture.LastPayload(ClientProt_e::IfButton), 0) == expected);
+        const auto value = expected == TestCache::BANK_INSERT ? 1 : 0;
+        auto packet = Packet{};
+        packet.P2(TestCache::BANK_INSERT_VARP);
+        packet.P1(value);
+        fixture.Send(ServerProt_e::VarpSmall, packet);
+        fixture.PumpUntil([&fixture, value]
+        {
+            const auto& varps = fixture.client.GetState().varps;
+            const auto found = varps.find(TestCache::BANK_INSERT_VARP);
+            return found != varps.end() && found->second == value;
+        });
+    };
+
+    sendBank();
+    fixture.SendInventory(TestCache::BANK_INVENTORY, {});
+    fixture.OpenMainSide(TestCache::BANK_SCREEN, TestCache::BANK_SIDE);
+
+    // The plan is an insert, so the Insert button first, and the drag once the varp shows it.
+    fixture.Step();
+    answerButton(1, TestCache::BANK_INSERT);
+    fixture.Step();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::InvButtonD));
+    const auto drag = fixture.LastPayload(ClientProt_e::InvButtonD);
+    CHECK(read2(drag, 0) == TestCache::BANK);
+    const auto from = read2(drag, 2);
+    const auto to = read2(drag, 4);
+    CHECK(from == 4);
+    CHECK(to == 1);
+    CHECK(drag[6] == static_cast<u8>(DragMode_e::Insert));
+    const auto item = order[from];
+    order.erase(order.begin() + from);
+    order.insert(order.begin() + to, item);
+
+    // The engine answers the drag on a later tick, and the next round waits for that answer before it plans.
+    fixture.SendTick();
+    sendBank();
+    fixture.PumpUntil([&fixture]
+    {
+        return fixture.client.GetState().inventories.at(TestCache::BANK).slots[1].id == LAW_RUNE;
+    });
+    fixture.Step();
+
+    // Sorted at the next round, so Swap again, as the bank was.
+    fixture.SendTick();
+    fixture.Step();
+    answerButton(2, TestCache::BANK_SWAP);
+    fixture.Step();
+
+    CHECK(fixture.server.GetPackets(ClientProt_e::InvButtonD).size() == 1);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"True sorted insert 1 [995, 563, 385, 1511, 526]"});
 }
 
 TEST_CASE("ScriptHost buys from a shop in batches the engine runs in a tick", "[ScriptHost]")

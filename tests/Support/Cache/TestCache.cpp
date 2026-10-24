@@ -171,12 +171,18 @@ void TestCache::SetBankScreen(GameCache_s& cache)
         {.id = BANK_SCREEN, .root = BANK_SCREEN, .type = ComponentType_e::Layer, .width = 512, .height = 334, .children = {
             {.id = BANK, .x = 75, .y = 58}, {.id = BANK_NOTE, .x = 364, .y = 291}, {.id = BANK_ITEM, .x = 291, .y = 291},
             {.id = BANK_ITEM_LABEL, .x = 315, .y = 301}, {.id = BANK_NOTE_LABEL, .x = 387, .y = 301},
+            {.id = BANK_SWAP, .x = 75, .y = 291}, {.id = BANK_INSERT, .x = 149, .y = 291},
+            {.id = BANK_INSERT_LABEL, .x = 168, .y = 301}, {.id = BANK_SWAP_LABEL, .x = 97, .y = 301},
         }},
         {.id = BANK, .root = BANK_SCREEN, .type = ComponentType_e::Inv, .width = 8, .height = 36, .marginX = 15, .marginY = 6, .options = {"Withdraw 1", "Withdraw 5", "Withdraw 10", "Withdraw All", "Withdraw X"}},
         selectButton(BANK_NOTE),
         selectButton(BANK_ITEM),
         label(BANK_ITEM_LABEL, "Item"),
         label(BANK_NOTE_LABEL, "Note"),
+        selectButton(BANK_SWAP),
+        selectButton(BANK_INSERT),
+        label(BANK_INSERT_LABEL, "Insert"),
+        label(BANK_SWAP_LABEL, "Swap"),
         {.id = BANK_SIDE, .root = BANK_SIDE, .type = ComponentType_e::Layer, .width = 190, .height = 261, .children = {{.id = BANK_INVENTORY, .x = 16, .y = 10}}},
         {.id = BANK_INVENTORY, .root = BANK_SIDE, .type = ComponentType_e::Inv, .width = 4, .height = 7, .marginX = 10, .marginY = 4, .options = {"Deposit 1", "Deposit 5", "Deposit 10", "Deposit All", "Deposit X"}},
     });

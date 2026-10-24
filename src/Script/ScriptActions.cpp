@@ -98,9 +98,9 @@ bool ScriptActions::InventoryButton(const InventoryItem_s& item, u8 op)
     return true;
 }
 
-void ScriptActions::MoveItem(u16 com, u16 fromSlot, u16 toSlot)
+void ScriptActions::MoveItem(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode)
 {
-    m_actions.MoveItem(com, fromSlot, toSlot);
+    m_actions.MoveItem(com, fromSlot, toSlot, mode);
 }
 
 bool ScriptActions::UseItemOnNpc(const InventoryItem_s& item, u16 npcIndex)

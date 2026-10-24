@@ -87,6 +87,10 @@ For [`Loc.layer`](world.md#loc), a query's `layer()`, and `locs.at(tile, layer)`
 | `NEARBY_BANK_RADIUS` | 14 |
 | `PERIODIC_BANK_SETTINGS` | A settings schema fragment; see [periodic banking](bank.md#periodic-banking) |
 | `SELL_STACK_STEP` | 10 |
+| `CATEGORY_ORDER` | The bank sorter's categories in order; see [sorting the bank](bank.md#sorting-the-bank) |
+| `QUEST_JUNK` | The items finished quests leave behind, each `id`, `name` and `quest` |
+| `BANK_INSERT_VARP` | 304, the bank's Swap/Insert setting |
+| `ARRANGE_SWAP_COM`, `ARRANGE_INSERT_COM` | 8130 and 8131, the 289 bank's Swap and Insert buttons; `sort_bank` finds them by their labels instead |
 
 ## Settings
 

@@ -12,7 +12,7 @@ from rs2004.tabs import resolve_combat_style, spell_button, teleport_button, try
 
 __all__ = [
     'game', 'skills', 'reader', 'chat', 'friends', 'ignores', 'direct_navigator', 'retaliate_on_from_varp', 'PLAYER_FACE_BASE',
-    'facing_player', 'OVERHEAD_TICKS', 'HintArrow',
+    'facing_player', 'OVERHEAD_TICKS', 'HintArrow', 'ObjRecord',
 ]
 
 _SKILL_INDEXES = {name: index for index, name in SKILL_NAMES.items()}
@@ -22,6 +22,24 @@ HITPOINTS_INDEX = 3
 PLAYER_FACE_BASE = 32768
 # How long the webclient shows overhead text: 150 client cycles.
 OVERHEAD_TICKS = 5
+
+
+class ObjRecord:
+    """One named obj of the cache, as reader.obj_catalog() lists them: rs2b0t's ObjRecord, with note_of (the
+    unnoted id, or None) for its certlink and certtemplate."""
+
+    def __init__(self, row):
+        self.id = row[0]
+        self.name = row[1]
+        self.cost = row[2]
+        self.stackable = row[3]
+        self.members = row[4]
+        self.equippable = row[5]
+        self.note_of = row[6] if row[6] >= 0 else None
+        self.stack_variant = row[7]
+
+    def __repr__(self):
+        return f'ObjRecord(id={self.id}, name={self.name})'
 
 
 def retaliate_on_from_varp(value):
@@ -281,6 +299,8 @@ class Modals:
 class _Reader:
     """Raw reads, for what no facade covers yet."""
 
+    _obj_catalog = None
+
     def hint_arrow(self):
         """The hint arrow the server shows, a HintArrow, or None."""
         arrow = _core.get_hint_arrow()
@@ -332,6 +352,13 @@ class _Reader:
 
     def item_type(self, id):
         return _core.get_item_type(id)
+
+    def obj_catalog(self):
+        """Every named obj in the cache, as ObjRecords: id, name, cost, stackable, members, equippable (it has a
+        wear model), note_of and stack_variant (one of a stackable's pile-size models). Read once and kept."""
+        if self._obj_catalog is None:
+            self._obj_catalog = [ObjRecord(row) for row in _core.get_item_catalog()]
+        return self._obj_catalog
 
     def loc_type(self, id):
         return _core.get_loc_type(id)

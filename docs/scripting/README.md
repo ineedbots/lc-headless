@@ -16,19 +16,20 @@ The complete reference for writing Python scripts for rs2004-headless: every bui
 | [You and the game](game.md) | `game`, `skills`, `reader`, `chat`, `friends`, `ignores` |
 | [Walking](walking.md) | `direct_navigator`, `traversal`, banks on the map, `reachability`, `navigator`, `walk_opening`, `reach`, `game_messages` |
 | [Interfaces and dialogues](interfaces.md) | `chat_dialog`, `MakeProduct`, `modals`, `interfaces`, `Component` |
-| [The bank](bank.md) | `bank`, `banking`, deposit rules, `PeriodicBank` |
+| [The bank](bank.md) | `bank`, `banking`, deposit rules, `PeriodicBank`, sorting the bank |
 | [Shops and trades](shops-and-trades.md) | `shop`, `trade` |
 | [The side tabs](side-tabs.md) | `quests`, `prayer`, `special`, combat styles, `autocast` |
 | [Upkeep](upkeep.md) | Random events, `random_events`, `run_manager`, the stall guard, Tutorial Island |
 | [Console and messages](console-and-messages.md) | `console`, `Command`, `send_bot_message`, progress reports |
 | [Constants](constants.md) | Every builtin constant and its value |
 | [Catalogs](catalogs.md) | `rs2004.catalogs`: rs2b0t's data tables, planners and tasks |
+| [The market](market.md) | `rs2004.market`: the tradeable catalog, price books, appraising a trade, the chat protocol |
 | [Quest steps](quests.md) | `rs2004.quests.exec`: talking to NPCs, walking to them across ladders, and answering what locs and doors ask; `rs2004.quests.prayer` |
 | [Python, imports, tools and porting](python-dialect.md) | pocketpy's dialect, imports, `--watch`, `--debugger`, revisions, porting from rs2b0t |
 
 ## Conventions used in this reference
 
-- **Builtins.** Everything here except [`rs2004.catalogs`](catalogs.md) and [`rs2004.quests`](quests.md) is in every script's builtins, with no import.
+- **Builtins.** Everything here except [`rs2004.catalogs`](catalogs.md), [`rs2004.market`](market.md) and [`rs2004.quests`](quests.md) is in every script's builtins, with no import.
 - **Wait.** A function marked **Wait** is a generator. Call it with `yield from` inside `loop()`, `on_start()`, a task's `execute()`, or another generator, and it gives back its result: `ok = yield from bank.close()`. Called without `yield from`, it does nothing. Everything not marked **Wait** returns at once.
 - **Actions queue.** Actions such as `interact()` queue packets and return at once. Their effects show in the state over the next ticks, so wait for them with [`execution.delay_until`](waiting.md#executiondelay_untilcond-timeout_ms6000).
 - **Snapshots.** Objects such as `Npc`, `InvItem` and `Component` are snapshots of when they were found. Query again, or call `valid()`, to see the present.
@@ -94,6 +95,7 @@ The complete reference for writing Python scripts for rs2004-headless: every bui
 | `EntityQuery` | [world](world.md#entityquery) |
 | `Npc`, `Player`, `Loc`, `GroundItem`, `Projectile` | [world](world.md) |
 | `NpcType`, `ItemType`, `LocType` | [world](world.md#cache-types) |
+| `ObjRecord` | [game](game.md#reader) |
 | `InvItem` | [items](items.md#invitem) |
 | `Component` | [interfaces](interfaces.md#component) |
 | `MakeProduct` | [interfaces](interfaces.md#makeproduct) |
@@ -122,11 +124,12 @@ The complete reference for writing Python scripts for rs2004-headless: every bui
 | `deposit_all_except`, `deposit_matcher`, `matches_common_bank_loot`, `is_disposable_gather_junk`, `withdraw_op` | [bank](bank.md#deposit-rules) |
 | `parse_bank_strategy`, `should_bank_now`, `resolve_bank_open_route`, `open_bank_access`, `purge_pack_at_bank`, `bank_pace`, `bank_pace_ticks`, `wait_bank_ready`, `withdraw_coins` | [bank](bank.md#helpers) |
 | `shop_op_batch`, `parse_trade_partner_header` | [shops-and-trades](shops-and-trades.md) |
+| `sort_bank`, `plan_bank_sort`, `sortable_bank_items`, `find_quest_junk` | [bank](bank.md#sorting-the-bank) |
 | `parse_combat_style`, `try_parse_combat_style`, `parse_interface_combat_style`, `resolve_combat_style`, `parse_range_style`, `describe_combat_style`, `resolve_split_combat_settings` | [side-tabs](side-tabs.md#combat-style-functions) |
 
 ### Constants
 
-`INVENTORY`, `EQUIPMENT`, `BANK`, `BANK_INVENTORY`, `INVENTORY_SIZE`, the skill constants (`ATTACK` ... `RUNECRAFT`), `LAYER_WALL`, `LAYER_WALL_DECOR`, `LAYER_GROUND`, `LAYER_GROUND_DECOR`, `COMBAT_TICKS`, `MAKE_X`, `MAKE_ALL`, `SA_MAX_ENERGY`, `PRAYER_NAMES`, `AUTOCAST_SPELLS`, `COMBAT_STYLE_OPTIONS`, `RANGE_STYLE_OPTIONS`, `NAV_PURE_WALK`, `NAV_WITH_TELES`, `BANK_LOCATIONS`, `USE_MAGE_BANK`, `USE_ZANARIS_BANK`, `SPELL_MAX_WILDERNESS`, `GLORY_MAX_WILDERNESS`, `PLAYER_FACE_BASE`, `OVERHEAD_TICKS`, `PROTECT_FROM_MAGIC`, `PROTECT_FROM_MISSILES`, `PROTECT_FROM_MELEE`, `GLOBAL_SETTINGS`, `CANT_REACH`, `COMMON_BANK_LOOT`, `RANDOM_EVENT_CASKET_ID`, `NEARBY_BANK_RADIUS`, `PERIODIC_BANK_SETTINGS`, `SELL_STACK_STEP`: see [Constants](constants.md).
+`INVENTORY`, `EQUIPMENT`, `BANK`, `BANK_INVENTORY`, `INVENTORY_SIZE`, the skill constants (`ATTACK` ... `RUNECRAFT`), `LAYER_WALL`, `LAYER_WALL_DECOR`, `LAYER_GROUND`, `LAYER_GROUND_DECOR`, `COMBAT_TICKS`, `MAKE_X`, `MAKE_ALL`, `SA_MAX_ENERGY`, `PRAYER_NAMES`, `AUTOCAST_SPELLS`, `COMBAT_STYLE_OPTIONS`, `RANGE_STYLE_OPTIONS`, `NAV_PURE_WALK`, `NAV_WITH_TELES`, `BANK_LOCATIONS`, `USE_MAGE_BANK`, `USE_ZANARIS_BANK`, `SPELL_MAX_WILDERNESS`, `GLORY_MAX_WILDERNESS`, `PLAYER_FACE_BASE`, `OVERHEAD_TICKS`, `PROTECT_FROM_MAGIC`, `PROTECT_FROM_MISSILES`, `PROTECT_FROM_MELEE`, `GLOBAL_SETTINGS`, `CANT_REACH`, `COMMON_BANK_LOOT`, `RANDOM_EVENT_CASKET_ID`, `NEARBY_BANK_RADIUS`, `PERIODIC_BANK_SETTINGS`, `SELL_STACK_STEP`, `CATEGORY_ORDER`, `QUEST_JUNK`, `BANK_INSERT_VARP`, `ARRANGE_SWAP_COM`, `ARRANGE_INSERT_COM`: see [Constants](constants.md).
 
 ### Hooks
 

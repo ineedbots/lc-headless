@@ -28,7 +28,7 @@ public:
     bool InteractGroundItem(u16 obj, s32 x, s32 z, u8 op);
     bool ItemOp(const InventoryItem_s& item, u8 op);
     bool InventoryButton(const InventoryItem_s& item, u8 op);
-    void MoveItem(u16 com, u16 fromSlot, u16 toSlot);
+    void MoveItem(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode = DragMode_e::Swap);
     bool UseItemOnNpc(const InventoryItem_s& item, u16 npcIndex);
     bool UseItemOnPlayer(const InventoryItem_s& item, u16 playerIndex);
     bool UseItemOnLoc(const InventoryItem_s& item, u16 loc, s32 x, s32 z);

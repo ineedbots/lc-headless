@@ -149,6 +149,8 @@ void PyObjects::FromItemType(py_OutRef out, const ObjType_s& type, const GameCac
     SetBool(object, "stackable", type.stackable);
     SetBool(object, "members", type.members);
     SetInt(object, "value", type.cost);
+    SetBool(object, "equippable", type.equippable);
+    SetBool(object, "stack_variant", type.stackVariant);
 
     if (type.noteOf)
     {

@@ -124,6 +124,7 @@ Raw reads, for what no facade covers.
 | `reader.inventory(com)` | The [`InvItem`](items.md#invitem)s of any inventory the server sent, such as `BANK` |
 | `reader.npc_type(id)` | An [`NpcType`](world.md#npctype--readernpc_typeid), or `None` |
 | `reader.item_type(id)` | An [`ItemType`](world.md#itemtype--readeritem_typeid), or `None` |
+| `reader.obj_catalog()` | rs2b0t's `reader.objCatalog`: every named obj in the cache as an `ObjRecord` (`id`, `name`, `cost`, `stackable`, `members`, `equippable`, `note_of`, `stack_variant`), read once and kept. The [market's catalog](market.md#the-catalog) is built from it |
 | `reader.loc_type(id)` | A [`LocType`](world.md#loctype--readerloc_typeid), or `None` |
 | `reader.item_ids(name)` | Every item id with that name in the cache, without regard to case |
 | `reader.npc_ids(name)` | The same for NPCs |
