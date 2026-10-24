@@ -467,12 +467,14 @@ ClueSolver. `SolveClue` is also wired into the bots that carry it: ArdyCakes, Ar
 
 ## 10. Phase 16: the quest engine, and the free-to-play quests
 
+Phases 16 and 17 are split into sub-phases, 16a to 16c and 17a to 17i, in [BotApiParityQuestPhases.md](BotApiParityQuestPhases.md). This section and the next say what the two phases port; that file says in what order, and what each sub-phase must show live.
+
 `rs2004.quests`, ported from `api/ai/quests/`:
 
 | Part | rs2b0t | Notes |
 |---|---|---|
 | The engine | `engine/QuestEngine.ts`, `queue.ts`, `provisioning.ts`, `watchdog.ts`, `trace.ts`, `types.ts` | The queue, parking with reasons, and the progress watchdog. Provisioning assembles each pack bank-first. A step is a `Record` with rs2b0t's `kind`s: `talk`, `grabGround`, `pickLoc`, `interactLoc`, `useOn`, `equip`, `withdraw`, `deposit`, `mineRock`, `buy`, `custom`, `wait` and `done` |
-| Execution | `exec/steps.ts`, `legs.ts`, `fundCoins.ts`, `garlic.ts`, `wool.ts` | On phase 11's primitives |
+| Execution | `exec/steps.ts`, `legs.ts`, `fundCoins.ts`, `garlic.ts`, `wool.ts` | On phase 11's primitives. `exec/primitives.ts`, `prompts.ts` and `prayer.ts` came with phase 15, which the clue engine needed |
 | Requirements | `EligibilityEvaluator.ts`, `RequirementChecker.ts`, `ItemChecker.ts`, `data/quests.ts` | The quest records are generated |
 | Kit | `gear.ts`, `armour.ts`, `weapons.ts`, `food.ts`, `prayer.ts`, `strike.ts`, `strikeCombat.ts`, `journalText.ts` | |
 | Barcrawl | `barcrawl/` | The barcrawl card, which some quests and bots need |
@@ -496,19 +498,14 @@ AIOQuester, ArravSupplier and Barcrawl.
 
 ## 11. Phase 17: the members' quests
 
-The other 45, in three batches. Each batch orders quests so that `EligibilityEvaluator` puts prerequisites first. Each quest's pitfalls in rs2b0t's `docs/decisions/quest-pitfalls-*.md` are read before porting it.
-
-| Batch | Quests |
-|---|---|
-| 17a | Druidic Ritual, Gertrude's Cat, Monk's Friend, Sheep Herder, Witch's House, Fishing Contest, Clock Tower, Plague City, Tree Gnome Village, Waterfall Quest, Jungle Potion, Tribal Totem, Hazeel Cult, Murder Mystery, Priest in Peril, Scorpion Catcher, Sea Slug Quest, Dwarf Cannon, Observatory Quest, Fight Arena, Merlin's Crystal, Lost City, Death Plateau, Big Chompy Bird Hunting, The Tourist Trap, Biohazard |
-| 17b | Nature Spirit, Elemental Workshop, Holy Grail, Hero's Quest, Family Crest, Temple of Ikov, Digsite Quest, The Grand Tree, Troll Stronghold, Eadgar's Ruse, Horror from the Deep, Shades of Mortton, Tai Bwo Wannai Trio, Watch Tower, Shilo Village |
-| 17c | Underground Pass, Regicide, The Fremennik Trials, Legends Quest |
+The other 45, in nine sub-phases, 17a to 17i, listed in [BotApiParityQuestPhases.md](BotApiParityQuestPhases.md). Each sub-phase only needs quests from earlier ones, so `EligibilityEvaluator` puts prerequisites first. Each quest's pitfalls in rs2b0t's `docs/decisions/quest-pitfalls-*.md` are read before porting it. The last, Legends' Quest, also lets the clue engine walk into the Kharazi Jungle and across Isafdar, which phase 15 left failing.
 
 FlourCollector comes with Murder Mystery, and RoguesPurse with Jungle Potion, since each imports its quest's constants.
 
-- **Done when:** for each batch,
+- **Done when:** for each sub-phase,
     - [ ] its quests' tests are ported and pass;
-    - [ ] against the local engine, AIOQuester completes every quest in the batch, on an account with the prerequisites done and skills set by debugproc.
+    - [ ] against the local engine, AIOQuester completes every quest in it, on an account with the prerequisites done and skills set by debugproc;
+    - [ ] whatever else that file lists for it.
 
 ---
 
@@ -549,8 +546,8 @@ The live checks run against the local engine, with the accounts and debugprocs t
 13. **The economy** (§7), and 9 bots.
 14. **Combat** (§8), and 13 bots.
 15. **The clue engine** (§9), ClueSolver, and the clue-carrying bots.
-16. **The quest engine and the free-to-play quests** (§10), and 3 bots.
-17. **The members' quests** (§11), in three batches, and 2 bots.
+16. **The quest engine and the free-to-play quests** (§10), in three sub-phases, and 3 bots.
+17. **The members' quests** (§11), in nine sub-phases, and 2 bots.
 18. **The account leveler** (§12).
 
 Phases 12 to 14 depend only on 10 and 11, and can go in any order. Phase 15 needs 12's jewellery teleports and 14's duels and combat helpers. Phase 16 needs 11's primitives and 12's quest gates.

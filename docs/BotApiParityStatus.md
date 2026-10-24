@@ -12,8 +12,8 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 | 13 | The economy: shops, mules, bank sorting, the market; 9 bots, and GatheringBot's mule hand-offs and feather buyout | Done |
 | 14 | Combat: the gear lists, `rs2004.hunting`, `duel`; 13 fighters | Done, with the open items below |
 | 15 | The clue engine and ClueSolver, wired into the seven bots that carry clues | Done, with the open items below |
-| 16 | The quest engine and the free-to-play quests | Not started |
-| 17 | The members' quests | Not started |
+| 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | Not started |
+| 17 | The members' quests, in sub-phases 17a–17i | Not started |
 | 18 | The account leveler | Not started |
 
 ## What's in place
