@@ -78,10 +78,10 @@ The quests, the shortest free-to-play ones, chosen to cover each kind of step wi
 - The clue engine's `hard-tier` test, which phase 15 left for the quest list.
 
 - **Done when:**
-    - [ ] Those tests are ported and pass.
-    - [ ] Live, AIOQuester takes a fresh account off Tutorial Island through all seven quests in one queue.
-    - [ ] Stopped mid-quest by ending the client, and started again, it picks the quest up where it stopped.
-    - [ ] A quest whose requirement isn't met is skipped with its reason, and the queue goes on.
+    - [x] Those tests are ported and pass, less the cases that wait for later quests (see the design doc's "As built: 16a").
+    - [x] Live, AIOQuester takes a fresh account off Tutorial Island through all seven quests in one queue. Black Knights' Fortress needs 12 quest points, which the other six don't make, so two came from Doric's Quest and Imp Catcher set complete by varp. It also took fixes to the walker's data and combat stats for its banquet hall.
+    - [x] Stopped mid-quest by ending the client, and started again, it picks the quest up where it stopped.
+    - [x] A quest whose requirement isn't met is skipped with its reason, and the queue goes on.
 
 ---
 

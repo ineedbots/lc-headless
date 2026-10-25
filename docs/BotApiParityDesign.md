@@ -494,6 +494,41 @@ AIOQuester, ArravSupplier and Barcrawl.
     - [ ] Against the local engine, AIOQuester takes a fresh account, off Tutorial Island with skills set by debugproc, through all 18 free-to-play quests in one queue. A quest that parks gives its reason, and is fixed or recorded with it here.
     - [ ] ArravSupplier banks a certificate from both gangs.
 
+### As built: 16a
+
+- **Where it lives.** `rs2004.quests` stays light, as `rs2004.quests.exec` is imported by bots outside quests, so nothing is re-exported from it; each module is imported by its full name, as rs2b0t's are:
+    - `types` (the records and eligibility's values), `data` (the 63 records, generated into `catalogs/_quests.py` by `export_rs2b0t.ts`), `eligibility` (rs2b0t's three checkers in one);
+    - `engine.types`, `engine.queue`, `engine.provisioning`, `engine.watchdog`, `engine.trace`, `engine.quest_engine`;
+    - `exec.steps`, `exec.legs`, `exec.wool`;
+    - the kit: `weapons`, `armour`, `strike`, `strike_combat`, `food`, `gear`, `journal_text`;
+    - `defs`, the quest list, and `defs.<file>` for each quest.
+
+  docs/scripting/quests.md documents them, and `scripts/typings/rs2004/quests/` has their stubs.
+- **The quest list loads lazily.** rs2b0t's `defs/index.ts` imports all 63 quests. `defs.QUEST_DEFS` holds each quest's record and a loader, a function with a static import, so `def_by_id` compiles a quest the first time the queue asks for it. `ORDER` keeps rs2b0t's whole order by file; a later sub-phase adds a quest by adding its loader.
+- **Shapes.** A step is a `Record` from `quest_step(kind, ...)`, its kinds in snake case (`grab_ground`, `scan_bank`), and journal statuses are `quests.status`'s (`'not_started'`, `'in_progress'`). A `QuestModule` is a class of plain attributes, never methods, since pocketpy calls a class's method over a function set on its instance. `QuestSnapshot.with_fields` stands for rs2b0t's `{...snap, field}`. A custom step's `run`, `read_stage`, `read_progress` and `exit` may each be a generator or not (`run_maybe`).
+- **AIOQuester.** `scripts/bots/aio_quester.py`, its logic in `bots/aioquester/`. The paint is the progress report, with rs2b0t's queue summary and blocked reasons, and the Skip button is the `skip` console command. Its Shield of Arrav, Hero's Quest and Legends settings come with those quests.
+- **Tests.** About 300 of rs2b0t's tests, in `tests/Stdlib/rs2b0t/quests/`, the AIOQuester ones beside the other bots', and `nav/test_quest_banks.py`, which reads the banks. Each spec file is a Catch2 section, so one runs alone with `-c <file>`. Left out or cut:
+    - failed-step's Goblin Diplomacy case waits for 16b. Its Doric fixture quest is Sheep Shearer here, next in the list.
+    - shilo-gear-lifecycle waits for Shilo Village (17d), and quest-gather's Witch's House cases for Witch's House.
+    - strike-geometry runs rs2b0t's engine pathfinder over its own pack.
+    - quest-banks and quest-gather check the quests ported so far, so they grow stricter with each sub-phase.
+    - The AIOQuester picker test expects the first name of our seven, not rs2b0t's Big Chompy Bird Hunting. The paint test, Legends' settings and arravSettings come later.
+    - talkThrough's door cases drive `reach.entity_op` through a fake scene, since `open_dialogue` opens doors through `reach` here.
+- **Departures from rs2b0t, each found live:**
+    - **Worn items count as held** in provisioning and the eligibility snapshot. A run restarted mid-Black Knights' Fortress came back wearing the disguise, read the pieces as missing must-have items, and gave the quest up within a second. rs2b0t counts the pack alone. `test_engine_failed_step.py` has the case.
+    - **Black Knights' Fortress's cabbage goes through `reach.loc_op`.** The Draynor field's gate starts shut on a fresh world, where every cabbage answers "I can't reach that!", and only `reach` opens it.
+    - **The walker's data** (`tools/nav/export_rs2b0t.ts`): `STAIR_FIXES` corrects two fortress ladders, which rs2b0t's stair edges place outside the walled strip and passage they serve on this engine. The one at (3021,3510) leads to the grill, and the one at (3022,3518) to the secret passage to the hole. `CROSSING_ADDITIONS` answers the fortress guard at the banquet hall door ("I don't care. I'm going in anyway."), the only way to that ladder. Each was probed live: a ladder climbed both ways, the guard's script read.
+    - `autocast.disarm()` joins the facade, for `strike_combat`, in place of rs2b0t's raw click on the toggle's component.
+- **The live checks** ran against the local engine, from scratch accounts:
+    - **The queue.** A fresh account came off Tutorial Island through the runtime's skip. A prep login gave it 2,000 coins and the iron chainbody and bronze med helm the fortress needs as must-have items. It also completed Doric's Quest and Imp Catcher by their varps (`setvar doricquest 100`, `setvar imp 2`). Those are 2 quest points, and the other six bring 10, which is the fortress's 12. `%qp` is recounted from the quest varps at every completion, so setting it directly doesn't hold. AIOQuester then ran Rune Mysteries, Sheep Shearer, The Restless Ghost, Cook's Assistant, Witch's Potion and Romeo & Juliet in one queue. Romeo & Juliet went through all seven journal stages from its journal oracle. Black Knights' Fortress waited BLOCKED, "needs 12 quest points (have N)", until Romeo & Juliet made 12, then provisioned its armour from the bank.
+    - **Black Knights' Fortress** found the fixes above over several restarts. Its banquet hall's knights attack anyone crossing it, which a fresh character doesn't survive and which the quest carries no food for, as rs2b0t's doesn't. So the account was given Attack, Strength, Defence and Hitpoints 30 before the run that finished it: through the hall, up the passage, the cabbage down the hole, and Sir Amik's 2,500 coins. That made 15 quest points.
+    - **Restarted mid-quest.** The client was ended during The Restless Ghost, with the amulet worn, and started again. The queue resumed The Restless Ghost, not the queue's start. The character had stayed in the swamp for the 60 seconds the server keeps a dropped player, while the restart's logins were refused, and died there. The engine took that as a death mid-quest, re-provisioned, re-equipped the amulet and finished it.
+    - **A blocked quest.** A second fresh account, queued Black Knights' Fortress and Cook's Assistant without the prep, logged the fortress BLOCKED with all three reasons (12 quest points, the chainbody, the helm) and went on to Cook's Assistant.
+- **Still open.**
+    - The fortress's grill is listened at once per process. rs2b0t keeps `listened` in memory, so a restart walks back to the grill, where the quest answers "I can't hear much right now.", before the hole.
+    - A step that fails while the character steps back and forth between two tiles never parks, as the tile counts as progress. The hole's step did that before the ladder fix. The watchdog is rs2b0t's.
+    - An empty ground spawn makes `grab_ground` fail at once each pass, so a quest whose spawn another player just took is parked three times and given up within about 30 seconds, sooner than the respawn. Only the egg step waits (`wait_if_missing`), as in rs2b0t. The blocked-quest check's Cook's Assistant lost the kitchen's pot to the full-queue account this way.
+
 ---
 
 ## 11. Phase 17: the members' quests

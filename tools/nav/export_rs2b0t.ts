@@ -103,7 +103,13 @@ if (!fs.existsSync(outDir)) {
 }
 write('edges.json', edges);
 write('teleports.json', [...SPELL_TELEPORTS, ...JEWELLERY_TELEPORTS]);
-write('crossings.json', SPECIAL_CROSSINGS);
+// Crossings rs2b0t's table lacks, found live on the 289 engine.
+const CROSSING_ADDITIONS = [
+    // Black Knights' Fortress: a fortress guard stops anyone entering the knights' banquet hall from the west, and only
+    // lets them through on this answer. The hall is the only way to the ladder up to the hole (phase 16a's live run).
+    { x: 3020, z: 3515, level: 0, locName: 'Door', action: 'Open', dialogue: { choose: ["I don't care. I'm going in anyway."] }, label: "Black Knights' Fortress banquet hall" },
+];
+write('crossings.json', [...SPECIAL_CROSSINGS, ...CROSSING_ADDITIONS]);
 write('danger_zones.json', KNOWN_DANGER_ZONES);
 write('banks.json', BANK_LOCATIONS.map((bank: { tile: { x: number; z: number; level: number }; approach?: { x: number; z: number; level: number } }) => ({
     ...bank,

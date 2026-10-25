@@ -12,15 +12,15 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 | 13 | The economy: shops, mules, bank sorting, the market; 9 bots, and GatheringBot's mule hand-offs and feather buyout | Done |
 | 14 | Combat: the gear lists, `rs2004.hunting`, `duel`; 13 fighters | Done, with the open items below |
 | 15 | The clue engine and ClueSolver, wired into the seven bots that carry clues | Done, with the open items below |
-| 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | Not started |
+| 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | 16a done (the engine, seven quests, AIOQuester), with the open items below; 16b and 16c not started |
 | 17 | The members' quests, in sub-phases 17a–17i | Not started |
 | 18 | The account leveler | Not started |
 
 ## What's in place
 
 - **Bots:** 68 files in `scripts/bots/`, one per rs2b0t bot, listed in [ScriptingApi.md](ScriptingApi.md#catalogs-and-behaviours). GatheringBot is the package `scripts/bots/gathering/`, with `miner.py`, `woodcutter.py` and `fisher.py` as its entries.
-- **Tests:** 495 C++ test cases, the stdlib's Python tests in `tests/Stdlib/`, and 1,718 of rs2b0t's own tests in `tests/Stdlib/rs2b0t/`, on `spec.py`'s describe/test/expect. Those reading the walker's data (`nav/`) run with the real cache (`RS2004_CACHE_DIR`).
-- **Live checks:** every phase 11 bot but ClimbingBoots has run against the local 289 engine without a script error, and each that banks has banked. Phase 12's: a glory Varrock to Draynor, Lumbridge to Karamja with no coins (it banks for the toll and fare), a quest-locked door left out of the route, EssMiner, and WildyAgility past its old stall. Phase 13's: BankSorter on a shuffled 200-item bank in insert mode, ShopBuyout buying Aubury's stock down and again after the restock, FlaxRunner's 8 hand-offs, Fisher's mule hand-off at Catherby, and MarketMaker selling iron ore and buying logs from a customer script over public chat. Phase 14's: every fighter for 30 minutes through a bank trip, JiveDragons at Taverley by range and under the shield and at Brimhaven under antifire and the shield, a range safespot never hit in 30 minutes, DuelArena's 14 duels between two accounts, and JiveKQ's four accounts killing the Kalphite Queen. Phase 15's: ClueSolver finishing easy, medium and hard trails, a hard one with a puzzle box and a dig guardian in one session, and one through the Duel Arena's pens beside a DuelArena clue helper.
+- **Tests:** 500 C++ test cases, the stdlib's Python tests in `tests/Stdlib/`, and about 2,000 of rs2b0t's own tests in `tests/Stdlib/rs2b0t/`, on `spec.py`'s describe/test/expect; the quest engine's and the quests' are in `quests/`. Those reading the walker's data (`nav/`) run with the real cache (`RS2004_CACHE_DIR`). One file runs alone with `Rs2004HeadlessTests "rs2b0t's ported Python tests pass" -c <file>`.
+- **Live checks:** every phase 11 bot but ClimbingBoots has run against the local 289 engine without a script error, and each that banks has banked. Phase 12's: a glory Varrock to Draynor, Lumbridge to Karamja with no coins (it banks for the toll and fare), a quest-locked door left out of the route, EssMiner, and WildyAgility past its old stall. Phase 13's: BankSorter on a shuffled 200-item bank in insert mode, ShopBuyout buying Aubury's stock down and again after the restock, FlaxRunner's 8 hand-offs, Fisher's mule hand-off at Catherby, and MarketMaker selling iron ore and buying logs from a customer script over public chat. Phase 14's: every fighter for 30 minutes through a bank trip, JiveDragons at Taverley by range and under the shield and at Brimhaven under antifire and the shield, a range safespot never hit in 30 minutes, DuelArena's 14 duels between two accounts, and JiveKQ's four accounts killing the Kalphite Queen. Phase 15's: ClueSolver finishing easy, medium and hard trails, a hard one with a puzzle box and a dig guardian in one session, and one through the Duel Arena's pens beside a DuelArena clue helper. Phase 16a's: AIOQuester taking a fresh account through all seven of its quests in one queue, resuming a quest after the client was ended mid-way, and skipping a quest it couldn't start with its reasons.
 
 ## Open items
 
@@ -37,6 +37,10 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 | GnomeMagicChopper's "Chopped" count stays 0, as rs2b0t counts it | Cosmetic; left as rs2b0t's |
 | ClimbingBoots not run live: needs Death Plateau | When a quested account exists (phase 17's quests) |
 | Live runs were 12 minutes, not the plan's 15 | — |
+| Black Knights' Fortress re-listens at the grill after a restart (rs2b0t keeps `listened` in memory) | Harmless; a stage oracle would fix it |
+| A step failing while the character steps between two tiles never parks, as the tile reads as progress (rs2b0t's watchdog) | When a quest hits it |
+| An empty ground spawn gives a quest up within about 30 seconds, before the respawn; only the egg step waits, as in rs2b0t | When a quest hits it alone, not two accounts racing for one spawn |
+| The walker's data needed fixes for this engine at Black Knights' Fortress (`STAIR_FIXES`, `CROSSING_ADDITIONS` in `tools/nav/export_rs2b0t.ts`) | More may turn up with each quest sub-phase |
 
 ## Working on it
 

@@ -11,3 +11,5 @@ rs2b0t's web walker data, exported by `tools/nav/export_rs2b0t.ts` and used by `
 | `banks.json` | Known banks and how to open the unusual ones |
 
 To refresh it from an rs2b0t checkout, run `bun tools/nav/export_rs2b0t.ts <rs2b0t folder> data/nav` and commit the result.
+
+rs2b0t derives its stair edges from its own engine's content. Where the 289 engine's differs, the exporter applies `STAIR_FIXES`, and `CROSSING_ADDITIONS` adds the crossings its table lacks. Each was found and checked live.
