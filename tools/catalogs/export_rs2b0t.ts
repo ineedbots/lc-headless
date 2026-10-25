@@ -4,8 +4,8 @@
 //
 //     bun tools/catalogs/export_rs2b0t.ts ../rs2b0t src/Script/Stdlib/rs2004/catalogs/_data.py
 //
-// It writes _shops.py, _items.py, _drops.py and _clues.py beside _data.py too: large tables read on first use. And the
-// market's tables, to ../market/_data.py.
+// It writes _shops.py, _items.py, _drops.py, _clues.py and _quests.py beside _data.py too: large tables read on first
+// use. And the market's tables, to ../market/_data.py.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,6 +47,7 @@ const killAnchors = await load('api/ai/clues/data/killAnchors.ts');
 const digAnchors = await load('api/ai/clues/data/digAnchors.ts');
 const challengeAnswers = await load('api/ai/clues/data/challengeAnswers.ts');
 const unreachable = await load('api/ai/clues/data/unreachable.ts');
+const quests = await load('api/ai/quests/data/quests.ts');
 
 const snake = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 
@@ -174,7 +175,10 @@ const clueTables: [string, string][] = [
     ['PACK_UNREACHABLE', pyIdRecord(unreachable.PACK_UNREACHABLE)],
 ];
 fs.writeFileSync(cluesFile, header + clueTables.map(([name, value]) => `\n${name} = ${value}\n`).join(''));
-console.log(`wrote ${tables.length} tables to ${outFile}, and the shop, item, drop and clue databases beside it`);
+// And the quest records, which the quest engine reads requirements and items from.
+const questsFile = path.join(path.dirname(outFile), '_quests.py');
+fs.writeFileSync(questsFile, plainHeader + `\nQUESTS = ${py(quests.QUESTS)}\n`);
+console.log(`wrote ${tables.length} tables to ${outFile}, and the shop, item, drop, clue and quest databases beside it`);
 
 const marketFile = path.join(path.dirname(outFile), '..', 'market', '_data.py');
 fs.mkdirSync(path.dirname(marketFile), { recursive: true });

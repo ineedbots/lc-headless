@@ -499,6 +499,16 @@ class _Autocast:
             say(f'autocast armed: {spell}')
         return armed
 
+    def disarm(self):
+        """Turns autocasting off with the toggle arm turned on, so a click attacks again. Use with yield from."""
+        if not self.armed():
+            return True
+        toggle = _select_button_reading(ATTACKSTYLE_MAGIC_VARP)
+        if toggle is None or not _core.click_component(toggle.id):
+            return False
+        disarmed = yield from execution.delay_until(lambda: not self.armed(), AUTOCAST_STEP_MS)
+        return disarmed
+
 
 def _select_button_reading(varp):
     for component in _components(COMBAT_TAB):

@@ -122,19 +122,24 @@ TEST_CASE("The standard library's Python tests pass", "[Stdlib]")
 }
 
 // rs2b0t's own tests keep its describe/test/expect; they import the bots from scripts/, as an account's script does.
-// Those that read the walker's data are real-cache tests.
+// Those that read the walker's data are real-cache tests. The quest engine's and the quests' are in quests/. Each
+// file is a section, so one runs alone with -c <file name>.
 TEST_CASE("rs2b0t's ported Python tests pass", "[Stdlib]")
 {
-    const auto files = Rs2b0tSpecs::GetFiles(Rs2b0tSpecs::GetFolder());
+    auto files = Rs2b0tSpecs::GetFiles(Rs2b0tSpecs::GetFolder());
     REQUIRE_FALSE(files.empty());
+    const auto quests = Rs2b0tSpecs::GetFiles(Rs2b0tSpecs::GetFolder() / "quests");
+    REQUIRE_FALSE(quests.empty());
+    files.insert(files.end(), quests.begin(), quests.end());
 
     for (const auto& file : files)
     {
-        CAPTURE(file.filename().string());
-
-        // A file is one run_specs call, so the watchdog bounds the whole file rather than one test.
-        auto fixture = StdlibFixture{SCRIPTS_FOLDER, 60s};
-        Rs2b0tSpecs::Run(fixture.vm, file);
+        DYNAMIC_SECTION(file.filename().string())
+        {
+            // A file is one run_specs call, so the watchdog bounds the whole file rather than one test.
+            auto fixture = StdlibFixture{SCRIPTS_FOLDER, 60s};
+            Rs2b0tSpecs::Run(fixture.vm, file);
+        }
     }
 }
 

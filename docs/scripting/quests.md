@@ -1,6 +1,6 @@
-# Quest steps: `rs2004.quests`
+# Quests: `rs2004.quests`
 
-rs2b0t's quest engine is built from small steps: talk to an NPC through its dialogue, walk to one across a ladder, act on a loc and answer what it asks. Bots outside quests use them too, so they come ahead of the engine itself. They're imported, not builtins:
+rs2b0t's quest engine, translated from its `api/ai/quests`. [The engine](#the-engine-rs2004questsengine) runs a queue of quests; each quest is [a module](#a-quest-rs2004questsdefs) whose `decide(snap)` names one [step](#steps-rs2004questsexecsteps) at a time. Under them are small steps of their own: talk to an NPC through its dialogue, walk to one across a ladder, act on a loc and answer what it asks. Bots outside quests use those too. Everything here is imported, not builtins, each module by its full name:
 
 ```python
 from rs2004.quests.exec import talk_through, goto_npc, NpcStop, LadderHop
@@ -99,3 +99,85 @@ A quest declares the protection prayer it fights under as `{'protect': 'melee', 
 | `protection_name(pray)`, `protection_level(pray)` | The same, for a declaration |
 | `PRAYER_POTION`, `PRAYER_POTION_IDS` | `'Prayer potion(4)'`, and the ids of every dose |
 | `quest_prayer_state` | The running quest's `current` declaration, whether it `warned` that the level is too low, and its `log` |
+
+## The engine: `rs2004.quests.engine`
+
+`QuestEngine(host)` is a `Task`. AIOQuester (`bots/aio_quester.py`) is its host, and any bot can be: the host has `log(m)`, `verbose()`, `food_item()`, `picked_ids()` (the record ids to run), `skip_pending()`, `consume_skip()`, `consume_death()`, `note_state(rows, running_id, step_desc, no_progress, parked)` and `finish(reason)`.
+
+Each pass the engine:
+1. reads the quest list and evaluates every quest (`rs2004.quests.eligibility`): `DONE`, `READY`, or `BLOCKED` with its reasons, such as `needs 12 quest points (have 10)`;
+2. takes the first picked quest that's `READY`, in the list's order, which puts prerequisites first;
+3. banks the pack to nothing before a quest that hasn't started, then banks whatever the quest won't use;
+4. provisions it bank-first: the record's items, the coin float (`COIN_FLOAT`, 1000, unless the module says otherwise), the food float and prayer potions, and asks the module's `gather` for whatever the bank can't cover;
+5. asks the module's `decide(snap)` for a step and runs it.
+
+A quest that makes no progress for 8 steps (`NO_PROGRESS_PARK`), or that waits on the same `wait` step 15 times, is parked with its reason and the queue goes on; parked 3 times, it's given up for the session. A step counts as progress when anything the snapshot shows changes: the journal, the stage or its flags, the tile, the pack, what's worn, or combat xp. A finished quest walks back to a bank before the next starts.
+
+| Module | Has |
+|---|---|
+| `quest_engine` | `QuestEngine`, `PROVISION_BANK`, `describe_step(step)` |
+| `types` | `QuestSnapshot`, `QuestModule`, `QuestProgress`, `QuestPrayer`, `QuestSustain`, `quest_step(kind, ...)`, `held_id`, `banked_id`, `has_flag`, `flag_value` |
+| `queue` | `next_quest`, `queue_rows`, `QueueRow` |
+| `provisioning` | `plan_provisioning`, `deposit_plan`, `float_draw_plan`, `coin_float_plan`, `buy_purse_top_up`, `should_freshen_pack`, `gp_short`, `COIN_FLOAT` |
+| `watchdog` | `progress_signature`, `ProgressWatchdog`, `NO_PROGRESS_WARN`, `NO_PROGRESS_PARK` |
+| `trace` | `StepTracker`, `format_duration`, `format_tile`, `inv_delta` |
+
+`rs2004.quests.data` has the records, `QUESTS` and `quest_record(id)`: all 63, generated from rs2b0t's `data/quests.ts`, so a prerequisite reads complete whether or not a module runs it yet.
+
+## A quest: `rs2004.quests.defs`
+
+A quest is `rs2004.quests.defs.<file>`, exporting a `QuestModule` of the same name, as rs2b0t's `defs/<file>.ts` does. `QUEST_DEFS` lists them in the queue's order, each with its record; `def_by_id(id)` loads a quest's module the first time it's asked for, so an account running one quest compiles one.
+
+```python
+from rs2004.quests.data import quest_record
+from rs2004.quests.engine.types import QuestModule, quest_step
+
+def decide(snap):
+    if snap.journal == 'complete':
+        return quest_step('done')
+    if snap.journal == 'not_started':
+        return quest_step('talk', stop=COOK)
+    ...
+
+cooksassistant = QuestModule(record=quest_record('cook'), bank=Tile(3093, 3243, 0), decide=decide, ...)
+```
+
+`decide(snap)` is a pure function of the snapshot, so a quest resumes from wherever it stopped, by a random event, a death or a client that ended. The snapshot has the journal status (`'not_started'`, `'in_progress'`, `'complete'` or `'unknown'`), the pack by lower-case name (`inv`) and by id (`inv_ids`), what's worn, the last bank read, the stage when the module reads one (`read_stage`, or `read_progress` for flags too), the tile, prayer, levels and free slots. `snap.with_fields({...})` copies it with fields changed.
+
+A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe` and `on_start`. See its docstring.
+
+Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`).
+
+## Steps: `rs2004.quests.exec.steps`
+
+`execute_step(step, hops, log)` runs one step. A step is a `Record` made by `quest_step(kind, ...)`, whose fields not set read as `None`:
+
+| Kind | Fields | Does |
+|---|---|---|
+| `talk` | `stop` | Walks to the `NpcStop` and talks it through |
+| `grab_ground` | `item`, `anchor`, `wait_if_missing` | Takes the item off the ground there; arriving at an empty spawn isn't a take |
+| `pick_loc` | `loc`, `op`, `item`, `anchor` | Picks from a loc until the item lands |
+| `interact_loc` | `loc`, `op`, `anchor`, `expect_item` | Uses a loc |
+| `use_on` | `item`, `target_kind` (`'npc'`, `'loc'` or `'item'`), `target`, `anchor`, `product` | Uses an item on a thing, and waits for the product |
+| `equip` | `item` | Wears it |
+| `scan_bank` | `bank` | Opens the bank, so the engine reads it |
+| `withdraw` | `items` (dicts of `name`, `qty` and an optional `id`), `bank` | Withdraws them |
+| `deposit` | `keep`, `keep_ids`, `exact_keep`, `bank` | Banks everything but what's kept |
+| `mine_rock` | `rock`, `item`, `qty`, `anchor` | Mines one ore |
+| `buy` | `item`, `qty`, `shop` (`npc`, `anchor`), `est_gp`, `bank` | Buys from the shop, drawing coins from the bank first when the purse is short |
+| `custom` | `name`, `run(log)` | Runs the quest's own leg, a generator giving `True` when it worked |
+| `wait` | `reason` | Waits two ticks |
+| `done` | | Nothing |
+
+A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool.
+
+## Kit
+
+| Module | Has |
+|---|---|
+| `rs2004.quests.weapons` | `MELEE_WEAPONS` and `PICKAXES` by tier, the dragon weapons' quest gates, and `best_held`, `best_banked`, `wielded_weapon`, `pack_weapon`, `live_best_weapon` |
+| `rs2004.quests.armour` | `QUEST_ARMOUR` and `armour_choice(snap, slot)`: what's worn, else the best wearable in the pack, else in the bank |
+| `rs2004.quests.strike` | `strike_spell(magic, count)` and `prepare_strikes(snap)`, the runes for 150 casts |
+| `rs2004.quests.strike_combat` | Casting Strikes from cover: `ready_strikes`, `take_strike_cover`, `cast_strike`, `cast_from_cover` |
+| `rs2004.quests.food`, `gear` | `quest_food.name`, `FOOD_FLOAT`, and `quest_loadout.current`, which AIOQuester sets |
+| `rs2004.quests.journal_text` | `normalize_journal(lines)`, a journal as one line to search |

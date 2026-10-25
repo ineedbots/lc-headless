@@ -561,6 +561,8 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 
 `rs2004.clues` is rs2b0t's clue engine: the clue database (`CLUE_DB`, `identify_step`), `SolveClue`, the task a bot adds to solve the clues it picks up, the `ClueExecutor` under it, the puzzle-box solver, the hard dig's guardian, and the Duel Arena and jungle travel a trail needs. See [clues.md](scripting/clues.md).
 
+`rs2004.quests` is rs2b0t's quest engine: the 63 quest records (`QUESTS`), eligibility, the `QuestEngine` task that queues, provisions and steps the quests with its progress watchdog, the steps and legs they're made of, and the quests themselves in `rs2004.quests.defs`, so far Cook's Assistant, Sheep Shearer, Rune Mysteries, The Restless Ghost, Witch's Potion, Black Knights' Fortress and Romeo & Juliet. See [quests.md](scripting/quests.md).
+
 `scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
 
 | Kind | rs2b0t | Here |
@@ -573,6 +575,7 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
 | Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py`. The three Ardougne bots solve the clues they pick up |
 | Treasure Trails | ClueSolver | `clue_solver.py`: solves the clue or opens the casket in the pack, then banks the reward |
+| Quests | AIOQuester | `aio_quester.py`, its logic in `bots/aioquester/`: runs a queue of quests on [`rs2004.quests`](scripting/quests.md). Its paint's Skip button is the `skip` console command, and the paint is its progress report |
 | Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
 | Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. GreenDragon, RockCrab and AutoFighter solve the clues they pick up, on [`rs2004.clues`](scripting/clues.md) |
 | Bosses and dragons | JiveDragons, JiveDemons, JiveKBD | `jive_dragons.py`, `jive_demons.py`, `jive_kbd.py`, on [`rs2004.hunting`](scripting/hunting.md). JiveDragons solves the hard clues the dragons drop |
@@ -804,7 +807,7 @@ This API is rs2b0t's, in Python's style, so a bot translates mostly line by line
 | `Game.tile()?.x` | `game.tile().x if game.tile() else None` |
 
 - Facades are lower-case (`Npcs` is `npcs`, `GroundItems` is `ground_items`), and camelCase is snake_case. A name that's a Python keyword gains a trailing underscore.
-- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, `RecoveryHints`, `EventSignal`, `SettingsStore` with the `Global` settings, `ScriptActivity`, and the catalogs and behaviours (`rs2004.catalogs`). [BotApiParityDesign.md](BotApiParityDesign.md) plans the rest, phase by phase.
+- What rs2b0t has that's here so far: bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, `RecoveryHints`, `EventSignal`, `SettingsStore` with the `Global` settings, `ScriptActivity`, the catalogs and behaviours (`rs2004.catalogs`), the clue engine (`rs2004.clues`), and the quest engine with its first quests (`rs2004.quests`). [BotApiParityDesign.md](BotApiParityDesign.md) plans the rest, phase by phase.
 - Differences:
     - a thing's `interact` walks to it first, as the webclient's does;
     - `npc.level` is its combat level, and every thing's level of the map is `thing.tile().level`;
