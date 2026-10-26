@@ -698,6 +698,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "loginIntervalSeconds"}, 60)).scripting.loginIntervalSeconds == 60s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 0)).scripting.killGraceSeconds == 0s);
         CHECK(ParseAccepted(SetKey({"scripting", "killGraceSeconds"}, 600)).scripting.killGraceSeconds == 600s);
+        CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 0)).scripting.connectAttempts == 0);
         CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 1)).scripting.connectAttempts == 1);
         CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 100)).scripting.connectAttempts == 100);
         CHECK(ParseAccepted(SetKey({"scripting", "reloginDelaySeconds"}, 0)).scripting.reloginDelaySeconds == 0s);
@@ -820,7 +821,6 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "loginIntervalSeconds"}, 61},
         {{"scripting", "killGraceSeconds"}, -1},
         {{"scripting", "killGraceSeconds"}, 601},
-        {{"scripting", "connectAttempts"}, 0},
         {{"scripting", "connectAttempts"}, -1},
         {{"scripting", "connectAttempts"}, 101},
         {{"scripting", "reloginDelaySeconds"}, -1},

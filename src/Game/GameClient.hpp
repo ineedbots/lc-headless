@@ -36,6 +36,7 @@ struct GameClientOptions_s
     bool autoReconnect = true;
     // Attempts at a login or a reconnect, enough with the doubling delay to ride out a server restart
     // of a couple of minutes. Only failures that trying again can fix are retried.
+    // 0 allows one initial login attempt and disables reconnects; ScriptingSettings_s::MAX_CONNECT_ATTEMPTS retries forever.
     u32 connectAttempts = 10;
     // The wait after the first failed attempt, doubling after each one up to maxRetryDelay.
     std::chrono::milliseconds retryDelay = 2s;

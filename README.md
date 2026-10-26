@@ -80,7 +80,7 @@ would look like
 | `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
 | `scripting.progressDirectory` | `progress` | Where progress reports are written |
 | `scripting.pollIntervalMs` | `10` | The longest the main loop waits between passes, 1 to 1000 ms |
-| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. The waits between them double from 2 s up to 30 s, so 10 cover about four minutes |
+| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. `0` allows one initial login attempt and disables retries and automatic reconnects; `100` retries indefinitely on temporary failures. The waits between attempts double from 2 s up to 30 s, so 10 cover about four minutes |
 | `scripting.reloginDelaySeconds` | `60` | How long an account waits before logging in again after its session ended unexpectedly, such as the server logging it out |
 
 ### `accounts/<name>.jsonc`: one file per account

@@ -213,7 +213,7 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 | `scripting.pollIntervalMs` | integer | `10` | 1 to 1000. The longest the main loop waits between passes |
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins, and between any two accounts' later login attempts (`LoginQueue`) |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
-| `scripting.connectAttempts` | integer | `10` | 1 to 100. Attempts at each login or reconnect before the account stops. The waits between them double from 2 s up to 30 s, so 10 cover about four minutes. Passed to `GameClientOptions_s::connectAttempts` |
+| `scripting.connectAttempts` | integer | `10` | 0 to 100 (`ScriptingSettings_s::MAX_CONNECT_ATTEMPTS`). `0` allows one initial login attempt and disables retries and automatic reconnects; `100` retries indefinitely on temporary failures. Other values limit attempts at each login or reconnect. The waits between attempts double from 2 s up to 30 s, so 10 cover about four minutes. Passed to `GameClientOptions_s::connectAttempts` |
 | `scripting.reloginDelaySeconds` | integer | `60` | 0 to 3600. How long an account waits before logging in afresh after its session ended unexpectedly, such as the server logging it out ([ScriptingDesign.md](ScriptingDesign.md)). Passed to `AccountOptions_s::reloginDelay` |
 | `scripting.progressDirectory` | string | `"progress"` | Not empty. Where progress reports are written, one file per account ([ScriptingDesign.md](ScriptingDesign.md) §12) |
 

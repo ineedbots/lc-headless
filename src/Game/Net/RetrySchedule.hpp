@@ -2,6 +2,7 @@
 
 // Counts the attempts at a login or a reconnect, and holds when the next one may start. The wait after
 // the first failed attempt is firstDelay, doubling after each one up to maxDelay.
+// ScriptingSettings_s::MAX_CONNECT_ATTEMPTS keeps attempts available indefinitely.
 class RetrySchedule
 {
 public:

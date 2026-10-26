@@ -159,6 +159,12 @@ void Account::Step(std::chrono::milliseconds maxWait)
         const auto ended = m_client.GetStatus() == ClientStatus_e::LoggedOut || m_client.GetStatus() == ClientStatus_e::Disconnected;
         if (ended && !IsStopping())
         {
+            if (m_options.client.connectAttempts == 0)
+            {
+                Fail("The server ended the session; reconnecting is disabled");
+                return;
+            }
+
             m_logger->Warning("The server ended the session; logging in again in {} s", GetReloginSeconds());
             BeginRelogin();
             return;
@@ -592,7 +598,7 @@ bool Account::StepRelog(Clock::time_point now)
 // A failure during the session, such as a desync, logs back in unless the account is on its way out anyway.
 void Account::Recover(std::string_view reason)
 {
-    if (IsStopping())
+    if (IsStopping() || m_options.client.connectAttempts == 0)
     {
         Fail(reason);
         return;

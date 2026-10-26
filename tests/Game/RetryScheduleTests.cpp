@@ -1,5 +1,6 @@
 #include "pch.hpp"
 
+#include "Config/Config_s.hpp"
 #include "Game/Net/RetrySchedule.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -42,6 +43,30 @@ TEST_CASE("RetrySchedule counts attempts up to the maximum", "[RetrySchedule]")
 
     schedule.BeginAttempt();
     CHECK(schedule.GetAttempt() == 2);
+    CHECK_FALSE(schedule.HasAttemptsLeft());
+}
+
+TEST_CASE("RetrySchedule never exhausts the unlimited attempt setting", "[RetrySchedule]")
+{
+    auto schedule = RetrySchedule{ScriptingSettings_s::MAX_CONNECT_ATTEMPTS, 2s, 30s};
+    for (auto i = 0; i < ScriptingSettings_s::MAX_CONNECT_ATTEMPTS * 3; ++i)
+    {
+        schedule.BeginAttempt();
+        CHECK(schedule.HasAttemptsLeft());
+    }
+
+    CHECK(schedule.GetDelay() == 30s);
+    schedule.Reset();
+    CHECK(schedule.GetAttempt() == 0);
+    CHECK(schedule.HasAttemptsLeft());
+    CHECK(schedule.GetDelay() == 2s);
+}
+
+TEST_CASE("RetrySchedule with zero attempts never schedules a retry", "[RetrySchedule]")
+{
+    auto schedule = RetrySchedule{0, 2s, 30s};
+    CHECK_FALSE(schedule.HasAttemptsLeft());
+    schedule.BeginAttempt();
     CHECK_FALSE(schedule.HasAttemptsLeft());
 }
 

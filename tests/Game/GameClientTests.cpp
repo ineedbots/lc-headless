@@ -387,6 +387,61 @@ TEST_CASE("GameClient reconnects when the connection drops", "[GameClient]")
     CHECK(server.GetErrors().empty());
 }
 
+TEST_CASE("GameClient with zero connect attempts tries the initial login only once", "[GameClient]")
+{
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{};
+    server.SetLoginStatus(5);
+    auto options = FastOptions();
+    options.connectAttempts = 0;
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+
+    CHECK_THROWS_AS(client.Login(), LoginError);
+    CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16});
+}
+
+TEST_CASE("GameClient keeps trying past the unlimited attempt setting", "[GameClient]")
+{
+    const auto reconnect = GENERATE(false, true);
+    auto capture = LogCapture{LogLevel_e::Info};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, Transport_e::Tcp};
+    auto options = FastOptions();
+    options.connectAttempts = ScriptingSettings_s::MAX_CONNECT_ATTEMPTS;
+    options.retryDelay = 0ms;
+    options.maxRetryDelay = 0ms;
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+
+    if (reconnect)
+    {
+        client.Login();
+        server.SetLoginStatus(5);
+        server.Close();
+    }
+    else
+    {
+        server.SetLoginStatus(5);
+        client.BeginLogin();
+    }
+
+    const auto deadline = Clock::now() + 30s;
+    while (Clock::now() < deadline && server.GetLoginOpcodes().size() <= ScriptingSettings_s::MAX_CONNECT_ATTEMPTS + 1)
+    {
+        client.Pump(1ms);
+    }
+
+    REQUIRE(server.GetLoginOpcodes().size() > ScriptingSettings_s::MAX_CONNECT_ATTEMPTS + 1);
+    CHECK(client.GetStatus() == ClientStatus_e::Connecting);
+
+    server.SetLoginStatus(2);
+    REQUIRE(PumpUntil(client, [&client]
+    {
+        return client.IsInGame();
+    }));
+    CHECK(client.GetLoginCount() == (reconnect ? u32{2} : u32{1}));
+    CHECK(server.GetErrors().empty());
+}
+
 TEST_CASE("GameClient takes turns reconnecting with the clients that share its login queue", "[GameClient]")
 {
     constexpr auto INTERVAL = 300ms;
@@ -491,7 +546,9 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
     auto server = FakeGameServer{};
     server.SetLoginStatus(3);
 
-    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    auto options = FastOptions();
+    options.connectAttempts = GENERATE(0u, 10u, static_cast<u32>(ScriptingSettings_s::MAX_CONNECT_ATTEMPTS));
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
 
     try
     {
@@ -505,6 +562,7 @@ TEST_CASE("GameClient reports a rejected login", "[GameClient]")
 
     CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
     CHECK_THROWS_AS(client.Send(client.GetPackets().NoTimeout()), std::runtime_error);
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16});
 }
 
 TEST_CASE("GameClient ends the session when the server logs it out", "[GameClient]")

@@ -434,14 +434,15 @@ void GameClient::StartAttempt()
 {
     m_retries.BeginAttempt();
     const auto attempt = m_retries.GetAttempt();
+    const auto maxAttempts = m_retries.GetMaxAttempts() == ScriptingSettings_s::MAX_CONNECT_ATTEMPTS ? "unlimited"s : std::to_string(m_retries.GetMaxAttempts());
 
     if (m_reconnecting)
     {
-        m_logger->Info("Reconnecting as {} (attempt {} of {})", m_account.username, attempt, m_retries.GetMaxAttempts());
+        m_logger->Info("Reconnecting as {} (attempt {} of {})", m_account.username, attempt, maxAttempts);
     }
     else if (attempt > 1)
     {
-        m_logger->Info("Logging in as {} (attempt {} of {})", m_account.username, attempt, m_retries.GetMaxAttempts());
+        m_logger->Info("Logging in as {} (attempt {} of {})", m_account.username, attempt, maxAttempts);
     }
     else
     {
@@ -573,7 +574,7 @@ void GameClient::BeginReconnect(std::string_view reason)
     Disconnect();
     m_logger->Warning("Connection lost: {}", reason);
 
-    if (!m_options.autoReconnect)
+    if (!m_options.autoReconnect || m_options.connectAttempts == 0)
     {
         throw ConnectionLostError{std::format("Connection lost: {}", reason)};
     }
@@ -590,7 +591,7 @@ void GameClient::BeginReconnect(std::string_view reason)
 bool GameClient::ScheduleRetry(std::string_view error, bool retryable)
 {
     const auto attempt = m_retries.GetAttempt();
-    const auto maxAttempts = m_retries.GetMaxAttempts();
+    const auto maxAttempts = m_retries.GetMaxAttempts() == ScriptingSettings_s::MAX_CONNECT_ATTEMPTS ? "unlimited"s : std::to_string(m_retries.GetMaxAttempts());
     if (m_reconnecting)
     {
         m_logger->Warning("Reconnect attempt {} of {} failed: {}", attempt, maxAttempts, error);

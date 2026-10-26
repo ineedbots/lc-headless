@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "RetrySchedule.hpp"
 
+#include "../../Config/Config_s.hpp"
+
 RetrySchedule::RetrySchedule(u32 maxAttempts, std::chrono::milliseconds firstDelay, std::chrono::milliseconds maxDelay)
     : m_maxAttempts{maxAttempts}
     , m_firstDelay{firstDelay}
@@ -16,7 +18,11 @@ void RetrySchedule::Reset()
 
 void RetrySchedule::BeginAttempt()
 {
-    ++m_attempt;
+    if (m_attempt < std::numeric_limits<u32>::max())
+    {
+        ++m_attempt;
+    }
+
     m_scheduled.reset();
 }
 
@@ -37,7 +43,7 @@ u32 RetrySchedule::GetMaxAttempts() const
 
 bool RetrySchedule::HasAttemptsLeft() const
 {
-    return m_attempt < m_maxAttempts;
+    return m_maxAttempts == ScriptingSettings_s::MAX_CONNECT_ATTEMPTS || m_attempt < m_maxAttempts;
 }
 
 std::chrono::milliseconds RetrySchedule::GetDelay() const

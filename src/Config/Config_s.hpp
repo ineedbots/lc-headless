@@ -28,13 +28,16 @@ struct ClientSettings_s
 
 struct ScriptingSettings_s
 {
+    static constexpr auto MAX_CONNECT_ATTEMPTS = 100;
+
     std::string accountsDirectory = "accounts";
     std::string scriptsDirectory = "scripts";
     std::chrono::milliseconds callTimeoutMs = 1000ms;
     std::chrono::milliseconds pollIntervalMs = 10ms;
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
-    // Per login or reconnect; the waits between them double from 2 s up to 30 s.
+    // Per login or reconnect; 0 disables retries and reconnects, MAX_CONNECT_ATTEMPTS retries forever.
+    // The waits between attempts double from 2 s up to 30 s.
     s32 connectAttempts = 10;
     std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";

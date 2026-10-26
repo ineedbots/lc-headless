@@ -387,6 +387,28 @@ TEST_CASE("An interrupt during a relog's wait ends the account logged out", "[Ac
     CHECK(fixture.server.GetLoginOpcodes().size() == 1);
 }
 
+TEST_CASE("An account with zero connect attempts stays stopped after its session ends", "[Account]")
+{
+    const auto options = AccountOptions_s{.client = {.connectAttempts = 0, .keepaliveInterval = 50ms}, .reloginDelay = 0s};
+    auto fixture = AccountFixture{"def loop():\n    return 100\n", 30s, options};
+    fixture.StepFor(200ms);
+
+    SECTION("the connection drops")
+    {
+        fixture.server.Close();
+    }
+
+    SECTION("the server logs it out")
+    {
+        fixture.server.Send(ServerProt_e::Logout);
+    }
+
+    REQUIRE(fixture.StepUntilFinished());
+    fixture.StepFor(200ms);
+    CHECK_FALSE(fixture.account->Succeeded());
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16});
+}
+
 TEST_CASE("An account whose reconnect attempts all fail stops", "[Account]")
 {
     const auto options = AccountOptions_s{.client = {.connectAttempts = 1, .retryDelay = 50ms, .keepaliveInterval = 50ms}, .reloginDelay = 100ms};
