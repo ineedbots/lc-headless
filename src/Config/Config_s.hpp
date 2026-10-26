@@ -37,8 +37,10 @@ struct ScriptingSettings_s
     std::chrono::seconds loginIntervalSeconds = 2s;
     std::chrono::seconds killGraceSeconds = 30s;
     // Per login or reconnect; 0 disables retries and reconnects, MAX_CONNECT_ATTEMPTS retries forever.
-    // The waits between attempts double from 2 s up to 30 s.
+    // The waits between attempts double from minRetryDelaySeconds up to maxRetryDelaySeconds.
     s32 connectAttempts = 10;
+    std::chrono::seconds minRetryDelaySeconds = 2s;
+    std::chrono::seconds maxRetryDelaySeconds = 30s;
     std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
 };

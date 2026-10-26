@@ -18,6 +18,7 @@
 #include "../Console/LogFile.hpp"
 #include "../Console/LogSinks.hpp"
 #include "../Console/Logger.hpp"
+#include "../Game/GameClient.hpp"
 #include "../Game/Nav/Navigation.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "CommandLine.hpp"
@@ -55,7 +56,11 @@ int Application::Run()
     auto runtime = ScriptRuntime{};
     const auto& scripting = m_config->scripting;
     const auto options = AccountOptions_s{
-        .client = {.connectAttempts = static_cast<u32>(scripting.connectAttempts)},
+        .client = {
+            .connectAttempts = static_cast<u32>(scripting.connectAttempts),
+            .retryDelay = scripting.minRetryDelaySeconds,
+            .maxRetryDelay = scripting.maxRetryDelaySeconds,
+        },
         .watchScripts = m_commandLine.watch,
         .waitForDebugger = m_commandLine.debugger,
         .navigation = m_navigation,

@@ -24,6 +24,7 @@ namespace
     constexpr auto MAX_LOGIN_INTERVAL = 60s;
     constexpr auto MAX_KILL_GRACE = 600s;
     constexpr auto MAX_RELOGIN_DELAY = 3600s;
+    constexpr auto MAX_RETRY_DELAY = 3600s;
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
     constexpr auto MAX_RUN_ENERGY = 100;
@@ -131,6 +132,9 @@ void ConfigValidator::Validate(const Config_s& config)
     Check(scripting.loginIntervalSeconds >= 0s && scripting.loginIntervalSeconds <= MAX_LOGIN_INTERVAL, "scripting.loginIntervalSeconds", std::format("must be from 0 to {}", MAX_LOGIN_INTERVAL.count()));
     Check(scripting.killGraceSeconds >= 0s && scripting.killGraceSeconds <= MAX_KILL_GRACE, "scripting.killGraceSeconds", std::format("must be from 0 to {}", MAX_KILL_GRACE.count()));
     Check(scripting.connectAttempts >= 0 && scripting.connectAttempts <= ScriptingSettings_s::MAX_CONNECT_ATTEMPTS, "scripting.connectAttempts", std::format("must be from 0 to {}", ScriptingSettings_s::MAX_CONNECT_ATTEMPTS));
+    Check(scripting.minRetryDelaySeconds >= 1s && scripting.minRetryDelaySeconds <= MAX_RETRY_DELAY, "scripting.minRetryDelaySeconds", std::format("must be from 1 to {}", MAX_RETRY_DELAY.count()));
+    Check(scripting.maxRetryDelaySeconds >= 1s && scripting.maxRetryDelaySeconds <= MAX_RETRY_DELAY, "scripting.maxRetryDelaySeconds", std::format("must be from 1 to {}", MAX_RETRY_DELAY.count()));
+    Check(scripting.maxRetryDelaySeconds >= scripting.minRetryDelaySeconds, "scripting.maxRetryDelaySeconds", "must be at least scripting.minRetryDelaySeconds");
     Check(scripting.reloginDelaySeconds >= 0s && scripting.reloginDelaySeconds <= MAX_RELOGIN_DELAY, "scripting.reloginDelaySeconds", std::format("must be from 0 to {}", MAX_RELOGIN_DELAY.count()));
     Check(!scripting.progressDirectory.empty(), "scripting.progressDirectory", "must be a folder path");
 }

@@ -80,7 +80,9 @@ would look like
 | `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
 | `scripting.progressDirectory` | `progress` | Where progress reports are written |
 | `scripting.pollIntervalMs` | `10` | The longest the main loop waits between passes, 1 to 1000 ms |
-| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. `0` allows one initial login attempt and disables retries and automatic reconnects; `100` retries indefinitely on temporary failures. The waits between attempts double from 2 s up to 30 s, so 10 cover about four minutes |
+| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. `0` allows one initial login attempt and disables retries and automatic reconnects; `100` retries indefinitely on temporary failures. The waits between attempts double from `minRetryDelaySeconds` up to `maxRetryDelaySeconds`; the defaults of 2 s and 30 s make 10 attempts cover about four minutes |
+| `scripting.minRetryDelaySeconds` | `2` | The wait after the first failed login or reconnect attempt, in seconds. Later waits double up to `maxRetryDelaySeconds`. Both settings accept 1 to 3600 |
+| `scripting.maxRetryDelaySeconds` | `30` | The maximum wait between retry attempts, in seconds; must be at least `minRetryDelaySeconds`. Set both to the same value for a fixed delay |
 | `scripting.reloginDelaySeconds` | `60` | How long an account waits before logging in again after its session ended unexpectedly, such as the server logging it out |
 
 ### `accounts/<name>.jsonc`: one file per account

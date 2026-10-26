@@ -39,6 +39,9 @@
         "killGraceSeconds": 30,
         // 0 disables retries and reconnects; 100 retries indefinitely on temporary failures.
         "connectAttempts": 10,
+        // Retry waits double from the minimum up to the maximum, in seconds.
+        "minRetryDelaySeconds": 2,
+        "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
         "progressDirectory": "progress"
     }

@@ -60,6 +60,8 @@ namespace
         "loginIntervalSeconds": 5,
         "killGraceSeconds": 60,
         "connectAttempts": 3,
+        "minRetryDelaySeconds": 3,
+        "maxRetryDelaySeconds": 45,
         "reloginDelaySeconds": 120,
         "progressDirectory": "reports"
     }
@@ -100,6 +102,8 @@ namespace
         "loginIntervalSeconds": 2,
         "killGraceSeconds": 30,
         "connectAttempts": 10,
+        "minRetryDelaySeconds": 2,
+        "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
         "progressDirectory": "progress"
     }
@@ -172,6 +176,8 @@ namespace
         {"scripting", "loginIntervalSeconds"},
         {"scripting", "killGraceSeconds"},
         {"scripting", "connectAttempts"},
+        {"scripting", "minRetryDelaySeconds"},
+        {"scripting", "maxRetryDelaySeconds"},
         {"scripting", "reloginDelaySeconds"},
         {"scripting", "progressDirectory"},
     };
@@ -295,6 +301,8 @@ namespace
         CHECK(config.scripting.loginIntervalSeconds == 5s);
         CHECK(config.scripting.killGraceSeconds == 60s);
         CHECK(config.scripting.connectAttempts == 3);
+        CHECK(config.scripting.minRetryDelaySeconds == 3s);
+        CHECK(config.scripting.maxRetryDelaySeconds == 45s);
         CHECK(config.scripting.reloginDelaySeconds == 120s);
         CHECK(config.scripting.progressDirectory == "reports");
     }
@@ -308,6 +316,8 @@ namespace
         CHECK(scripting.loginIntervalSeconds == 2s);
         CHECK(scripting.killGraceSeconds == 30s);
         CHECK(scripting.connectAttempts == 10);
+        CHECK(scripting.minRetryDelaySeconds == 2s);
+        CHECK(scripting.maxRetryDelaySeconds == 30s);
         CHECK(scripting.reloginDelaySeconds == 60s);
         CHECK(scripting.progressDirectory == "progress");
     }
@@ -481,6 +491,14 @@ TEST_CASE("ConfigFile structure", "[ConfigFile]")
             else if (key.key == "connectAttempts")
             {
                 CHECK(config.scripting.connectAttempts == 10);
+            }
+            else if (key.key == "minRetryDelaySeconds")
+            {
+                CHECK(config.scripting.minRetryDelaySeconds == 2s);
+            }
+            else if (key.key == "maxRetryDelaySeconds")
+            {
+                CHECK(config.scripting.maxRetryDelaySeconds == 30s);
             }
             else if (key.key == "reloginDelaySeconds")
             {
@@ -701,6 +719,8 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
         CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 0)).scripting.connectAttempts == 0);
         CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 1)).scripting.connectAttempts == 1);
         CHECK(ParseAccepted(SetKey({"scripting", "connectAttempts"}, 100)).scripting.connectAttempts == 100);
+        CHECK(ParseAccepted(SetKey({"scripting", "minRetryDelaySeconds"}, 1)).scripting.minRetryDelaySeconds == 1s);
+        CHECK(ParseAccepted(SetKey({"scripting", "maxRetryDelaySeconds"}, 3600)).scripting.maxRetryDelaySeconds == 3600s);
         CHECK(ParseAccepted(SetKey({"scripting", "reloginDelaySeconds"}, 0)).scripting.reloginDelaySeconds == 0s);
         CHECK(ParseAccepted(SetKey({"scripting", "reloginDelaySeconds"}, 3600)).scripting.reloginDelaySeconds == 3600s);
         CHECK(ParseAccepted(SetKey({"scripting", "progressDirectory"}, "logs/progress")).scripting.progressDirectory == "logs/progress");
@@ -739,6 +759,22 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
 
         CHECK(ParseAccepted(SetKey({"client", "cacheDirectory"}, "C:/rs/pack")).client.cacheDirectory == "C:/rs/pack");
     }
+}
+
+TEST_CASE("ConfigFile validates the retry backoff range", "[ConfigFile]")
+{
+    for (const auto seconds : {1, 3600})
+    {
+        const auto config = ParseAccepted(EditBase([seconds](nlohmann::json& json)
+        {
+            json["scripting"]["minRetryDelaySeconds"] = seconds;
+            json["scripting"]["maxRetryDelaySeconds"] = seconds;
+        }));
+        CHECK(config.scripting.minRetryDelaySeconds == std::chrono::seconds{seconds});
+        CHECK(config.scripting.maxRetryDelaySeconds == std::chrono::seconds{seconds});
+    }
+
+    CheckRejected(SetKey({"scripting", "minRetryDelaySeconds"}, 46), "scripting.maxRetryDelaySeconds");
 }
 
 TEST_CASE("ConfigFile names the revisions it supports", "[ConfigFile]")
@@ -823,6 +859,15 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "killGraceSeconds"}, 601},
         {{"scripting", "connectAttempts"}, -1},
         {{"scripting", "connectAttempts"}, 101},
+        {{"scripting", "minRetryDelaySeconds"}, 0},
+        {{"scripting", "minRetryDelaySeconds"}, -1},
+        {{"scripting", "minRetryDelaySeconds"}, 3601},
+        {{"scripting", "minRetryDelaySeconds"}, "2"},
+        {{"scripting", "maxRetryDelaySeconds"}, 0},
+        {{"scripting", "maxRetryDelaySeconds"}, -1},
+        {{"scripting", "maxRetryDelaySeconds"}, 3601},
+        {{"scripting", "maxRetryDelaySeconds"}, 2},
+        {{"scripting", "maxRetryDelaySeconds"}, "30"},
         {{"scripting", "reloginDelaySeconds"}, -1},
         {{"scripting", "reloginDelaySeconds"}, 3601},
         {{"scripting", "progressDirectory"}, ""},
