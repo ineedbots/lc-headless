@@ -33,6 +33,12 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client, std::move(net)}
     , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger}
 {
+    const auto& experience = m_config->scripting;
+    if (!experience.experienceDirectory.empty() && experience.experienceIntervalMinutes > std::chrono::minutes::zero())
+    {
+        m_experience.emplace(std::filesystem::path{experience.experienceDirectory}, m_account.name, experience.experienceIntervalMinutes, m_logger);
+    }
+
     if (m_account.script)
     {
         const auto& scripting = m_config->scripting;
@@ -180,6 +186,14 @@ void Account::Step(std::chrono::milliseconds maxWait)
         else if (status == ClientStatus_e::InGame)
         {
             StepIdle(now);
+        }
+
+        // Settled, not merely in game: the stats arrive a tick after the player is placed, and a sample
+        // taken before them would record a baseline of zeroes.
+        if (m_experience)
+        {
+            const auto& state = m_client.GetState();
+            m_experience->Step(now, state, status == ClientStatus_e::InGame && state.IsSettled());
         }
 
         if (!m_finished && m_killDeadline && now >= *m_killDeadline)

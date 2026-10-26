@@ -38,6 +38,10 @@ struct ScriptingSettings_s
     s32 connectAttempts = 10;
     std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
+    // Where each account's skill experience is logged: experience/<account>.jsonl, one sample per line.
+    // Empty, or an interval of 0, turns it off.
+    std::string experienceDirectory = "experience";
+    std::chrono::minutes experienceIntervalMinutes = 1min;
 };
 
 // client.jsonc.

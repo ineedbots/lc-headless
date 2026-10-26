@@ -61,7 +61,9 @@ namespace
         "killGraceSeconds": 60,
         "connectAttempts": 3,
         "reloginDelaySeconds": 120,
-        "progressDirectory": "reports"
+        "progressDirectory": "reports",
+        "experienceDirectory": "xp",
+        "experienceIntervalMinutes": 15
     }
 }
 )json"sv;
@@ -101,7 +103,9 @@ namespace
         "killGraceSeconds": 30,
         "connectAttempts": 10,
         "reloginDelaySeconds": 60,
-        "progressDirectory": "progress"
+        "progressDirectory": "progress",
+        "experienceDirectory": "experience",
+        "experienceIntervalMinutes": 1
     }
 }
 )json"sv;
@@ -174,6 +178,7 @@ namespace
         {"scripting", "connectAttempts"},
         {"scripting", "reloginDelaySeconds"},
         {"scripting", "progressDirectory"},
+        {"scripting", "experienceDirectory"},
     };
 
     nlohmann::json ParseJsonWithComments(std::string_view text)

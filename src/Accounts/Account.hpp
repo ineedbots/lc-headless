@@ -12,6 +12,7 @@
 #include "../Script/Host/ScriptHost.hpp"
 #include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
+#include "ExperienceLog.hpp"
 #include "ProgressReporter.hpp"
 
 struct AccountOptions_s
@@ -93,6 +94,8 @@ private:
     BotMessenger* m_messenger;
     GameClient m_client;
     ProgressReporter m_progress;
+    // Each account's skill experience, for whatever reads experience/<name>.jsonl. Absent when off.
+    std::optional<ExperienceLog> m_experience;
     std::optional<ScriptHost> m_script;
     bool m_started = false;
     bool m_finished = false;

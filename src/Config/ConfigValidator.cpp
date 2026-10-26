@@ -26,6 +26,7 @@ namespace
     constexpr auto MAX_CONNECT_ATTEMPTS = 100;
     constexpr auto MAX_RELOGIN_DELAY = 3600s;
     constexpr auto MAX_PROGRESS_REPORT_INTERVAL = std::chrono::minutes{24 * 60};
+    constexpr auto MAX_EXPERIENCE_INTERVAL = std::chrono::minutes{24 * 60};
     constexpr auto MAX_STALL_MINUTES = std::chrono::minutes{24 * 60};
     constexpr auto MAX_RUN_ENERGY = 100;
     constexpr auto NO_TLS_VERIFICATION = "NONE"sv;
@@ -134,6 +135,9 @@ void ConfigValidator::Validate(const Config_s& config)
     Check(scripting.connectAttempts >= 1 && scripting.connectAttempts <= MAX_CONNECT_ATTEMPTS, "scripting.connectAttempts", std::format("must be from 1 to {}", MAX_CONNECT_ATTEMPTS));
     Check(scripting.reloginDelaySeconds >= 0s && scripting.reloginDelaySeconds <= MAX_RELOGIN_DELAY, "scripting.reloginDelaySeconds", std::format("must be from 0 to {}", MAX_RELOGIN_DELAY.count()));
     Check(!scripting.progressDirectory.empty(), "scripting.progressDirectory", "must be a folder path");
+    // experienceDirectory may be empty: that turns the experience log off.
+    Check(scripting.experienceIntervalMinutes >= std::chrono::minutes{0} && scripting.experienceIntervalMinutes <= MAX_EXPERIENCE_INTERVAL, "scripting.experienceIntervalMinutes",
+          std::format("must be from 0 (off) to {}", MAX_EXPERIENCE_INTERVAL.count()));
 }
 
 void ConfigValidator::ValidateAccount(const AccountConfig_s& account)
