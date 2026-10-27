@@ -485,3 +485,36 @@ TEST_CASE("AccountRunner wakes for a connection's I/O, not only on its poll inte
     CHECK(succeeded);
     CHECK(Clock::now() - start < 3s);
 }
+
+TEST_CASE("AccountRunner waits between passes while a script's account reconnects", "[AccountRunner]")
+{
+    auto fixture = RunnerFixture{};
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py")});
+    auto droppedAt = std::optional<Clock::time_point>{};
+    auto waitingPasses = std::size_t{0};
+    const auto succeeded = runner->Run([&]
+    {
+        if (!droppedAt && CountLines(fixture.capture, "bot1", "loop") >= 2)
+        {
+            fixture.first.SetStalled(true);
+            fixture.first.Close();
+            droppedAt = Clock::now();
+        }
+
+        if (droppedAt)
+        {
+            ++waitingPasses;
+            if (Clock::now() - *droppedAt >= 500ms)
+            {
+                return 1u;
+            }
+        }
+
+        return fixture.TimedOut() ? 1u : 0u;
+    });
+
+    REQUIRE(droppedAt.has_value());
+    CHECK_FALSE(succeeded);
+    // With a 10ms poll interval, a reconnect should take dozens of passes, not thousands.
+    CHECK(waitingPasses < 200);
+}

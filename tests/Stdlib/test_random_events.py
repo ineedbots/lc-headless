@@ -76,6 +76,118 @@ def test_hostile_events_need_a_real_hit_and_a_nearby_event_monster():
     assert not is_hostile_event(1, 1, True)
 
 
+def test_zombie_targeting_us_is_detected_before_damage_but_other_players_are_safe():
+    for npc_id in range(419, 431):
+        assert is_hostile_event(npc_id, 1, False, ('player', 3), 3)
+        assert not is_hostile_event(npc_id, 1, True, ('player', 7), 3)
+    assert not is_hostile_event(419, 9, False, ('player', 3), 3)
+    assert not is_hostile_event(41, 1, True, ('player', 3), 3)
+    assert is_hostile_event(419, 1, True, None, 3)
+
+
+class Threat:
+    name = 'Zombie'
+    id = 419
+    index = 12
+    target = ('player', 3)
+
+    def tile(self):
+        return HERE
+
+    def distance(self):
+        return 1
+
+class Scene:
+    alive = True
+
+    def query(self):
+        return self
+
+    def where(self, predicate):
+        assert predicate(Threat())
+        return self
+
+    def nearest(self):
+        return Threat()
+
+    def get(self, index):
+        assert index == 12
+        return Threat() if self.alive else None
+
+class Core:
+    def get_pid(self):
+        return 3
+
+    def is_reachable(self, x, z):
+        return False
+
+class Game:
+    def set_run(self, enabled):
+        assert enabled
+
+
+def test_evade_retries_a_blocked_pen_and_only_returns_after_the_zombie_disappears():
+    import rs2004.random_events as events
+    from rs2004.traversal import traversal
+
+    scene = Scene()
+    calls = []
+
+    def walk(self, tile, **kwargs):
+        assert kwargs['use_teleport_catalog'] is False
+        if tile == HERE:
+            assert not scene.alive
+            calls.append('return')
+        else:
+            assert tile.distance_to(HERE) >= 20
+            calls.append('escape')
+        yield 'walk'
+        return False  # Simulate a refused gate and ensure we keep escaping.
+
+    def wait(predicate, timeout):
+        assert calls[-1] == 'escape'
+        assert timeout <= 1200
+        if len(calls) == 2:
+            scene.alive = False
+        yield 'wait'
+        return predicate()
+
+    saved = (events._core, events.npcs, events.game, events.local_tile,
+             type(traversal).walk_resilient, events.execution.delay_until)
+    try:
+        events._core, events.npcs, events.game = Core(), scene, Game()
+        events.local_tile = lambda: HERE
+        type(traversal).walk_resilient = walk
+        events.execution.delay_until = wait
+        guardian = events._RandomEvents()
+        assert list(guardian._evade('zombie', lambda message: None)) == ['walk', 'wait', 'walk', 'wait', 'walk']
+        assert calls == ['escape', 'escape', 'return']
+    except Exception as error:
+        (events._core, events.npcs, events.game, events.local_tile,
+         type(traversal).walk_resilient, events.execution.delay_until) = saved
+        raise error
+    (events._core, events.npcs, events.game, events.local_tile,
+     type(traversal).walk_resilient, events.execution.delay_until) = saved
+
+
+def test_hostile_events_are_never_put_on_the_give_up_cooldown():
+    import rs2004.random_events as events
+    guardian = events._RandomEvents()
+    guardian.attempts['evade:zombie'] = events.MAX_ATTEMPTS
+
+    def evade(self, name, say):
+        yield 'escaping'
+        return True
+
+    saved = (events._RandomEvents._evade, events._RandomEvents._detect_raw)
+    events._RandomEvents._evade = evade
+    events._RandomEvents._detect_raw = lambda self: Event('evade', 'zombie')
+    result = list(guardian._handle(Event('evade', 'zombie'), lambda message: None))
+    events._RandomEvents._evade, events._RandomEvents._detect_raw = saved
+    assert result == ['escaping']
+    assert 'evade:zombie' not in guardian.cooldown_until
+
+
 def test_an_ent_is_a_hijack_only_when_it_is_the_tree_being_chopped():
     assert is_ent_hijack(444, 12, 1, ('npc', 12), True)
     assert not is_ent_hijack(444, 12, 1, ('npc', 13), True)

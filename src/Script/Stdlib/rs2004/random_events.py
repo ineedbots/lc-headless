@@ -25,8 +25,7 @@ PLANT_REACH = 3
 DIALOG_REACH = 6
 HOSTILE_EVENT_NPC_IDS = list(range(391, 397)) + [408, 411] + list(range(413, 437)) + list(range(438, 444))
 HOSTILE_ENGAGE_DISTANCE = 8
-# An event monster chases until you're past its maxrange of 15 from where it spawned, beside you; rs2b0t's 12
-# leaves it chasing.
+# Leave a conservative margin beyond event monsters' home ranges and their spawn offset.
 EVADE_DISTANCE = 20
 ENT_NPC_IDS = list(range(444, 453))
 ENT_LIFE_MS = 60 * 600
@@ -41,7 +40,8 @@ MAX_ATTEMPTS = 4
 GIVE_UP_COOLDOWN_MS = 45000
 PICK_WAIT_MS = 80000
 # The maze and the mime hold you; a box or a lamp can't be dropped. These are retried rather than given up on.
-TRAPPED_KINDS = ['maze', 'mime', 'box', 'lamp']
+# Hostile monsters must also be retried: ignoring one lets the bot resume work under attack.
+TRAPPED_KINDS = ['maze', 'mime', 'box', 'lamp', 'evade']
 COMPASS = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
 MIN_FLEE_DIST = 4
 RING_STEP = 2
@@ -125,8 +125,12 @@ def handle_location(inventory_names, worn_names):
     return None
 
 
-def is_hostile_event(npc_id, distance, damaged):
-    """A hostile event monster near you that has really hit you."""
+def is_hostile_event(npc_id, distance, damaged, target=None, pid=-1):
+    """React to our attacker's target before its first hit; never flee someone else's event."""
+    if pid >= 0 and target is not None and target[0] == 'player':
+        if target[1] != pid:
+            return False
+        damaged = True
     return damaged and npc_id in HOSTILE_EVENT_NPC_IDS and distance <= HOSTILE_ENGAGE_DISTANCE
 
 
@@ -264,19 +268,19 @@ class _RandomEvents:
         self.gear_loss.update(held, _core.get_main_modal() != -1, _core.step_time(), fishing, _core.tick())
 
         pid = _core.get_pid()
+        damaged = _core.took_damage(4)
+        for npc in near:
+            if (npc.name or '').lower() in self.grind_targets:
+                continue
+            if is_hostile_event(npc.id, npc.distance(), damaged, npc.target, pid):
+                return Event('evade', (npc.name or 'event monster').lower())
+
         for npc in near:
             name = (npc.name or '').lower()
             if name in DIALOG_EVENT_NPCS and npc.distance() <= DIALOG_REACH and not targets_another_player(npc, pid):
                 return Event('dialog', name)
             if name in PICK_EVENT_NPCS and npc.distance() <= PLANT_REACH and plant_strategy(npc.actions()) == 'pick':
                 return Event('pick', name)
-
-        damaged = _core.took_damage(4)
-        for npc in near:
-            if (npc.name or '').lower() in self.grind_targets:
-                continue
-            if is_hostile_event(npc.id, npc.distance(), damaged):
-                return Event('evade', (npc.name or 'event monster').lower())
 
         me = _core.get_local_player()
         animating = me.animation != -1
@@ -413,24 +417,56 @@ class _RandomEvents:
         return True
 
     def _evade(self, name, say):
+        # Import lazily: traversal loads the shared navigation services at startup.
+        from rs2004.traversal import traversal, NAV_PURE_WALK
+
         here = local_tile()
-        threat = self._named(name)
+        pid = _core.get_pid()
+        threat = npcs.query().where(lambda n: (n.name or '').lower() == name and n.id in HOSTILE_EVENT_NPC_IDS
+                                    and not targets_another_player(n, pid)).nearest()
         if threat is None:
             return False
+        index, npc_id = threat.index, threat.id
+        origin = threat.tile()
+
+        def current_threat():
+            npc = npcs.get(index)
+            return npc if npc is not None and npc.id == npc_id else None
+
         say(f'random event: {name} attacking; moving away until it goes')
-        flee = None
-        for tile in flee_candidates(here, threat.tile(), EVADE_DISTANCE):
-            if _core.is_reachable(tile.x, tile.z):
-                flee = tile
+        route_attempt = 0
+        while current_threat() is not None:
+            position = local_tile()
+            threat = current_threat()
+            if threat is None:
                 break
-        if flee is None:
-            say('random event: nowhere to run to; waiting')
-            yield from execution.delay_ticks(10)
-            return False
-        yield from direct_navigator.walk_to(flee, 2, 30000, True)
-        gone = yield from execution.delay_until(lambda: self._named(name) is None, 45000)
-        say(f'random event: {name} gone' if gone else f'random event: {name} still here')
-        yield from direct_navigator.walk_to(here, 3, 40000)
+            # Short moves inside a fenced pen can leave the monster in pursuit.
+            # Keep destinations outside its home range, including the arrival radius.
+            candidates = [t for t in flee_candidates(position, threat.tile(), EVADE_DISTANCE)
+                          if t.distance_to(origin) >= EVADE_DISTANCE]
+            if position.distance_to(origin) < EVADE_DISTANCE or threat.distance() <= HOSTILE_ENGAGE_DISTANCE:
+                flee = None
+                for tile in candidates:
+                    if _core.is_reachable(tile.x, tile.z):
+                        flee = tile
+                        break
+                game.set_run(True)
+                if flee is not None:
+                    yield from direct_navigator.walk_to(flee, 1, 6000, True)
+                elif candidates:
+                    # Local reachability cannot open the chicken pen's gate.
+                    flee = candidates[route_attempt % len(candidates)]
+                    route_attempt += 1
+                    say(f'random event: {name}, escaping through obstacles toward {flee}')
+                    yield from traversal.walk_resilient(flee, radius=1, attempts=1, timeout_ms=12000,
+                                                       log=say, **NAV_PURE_WALK)
+            # Recheck promptly after a failed walk or a monster catching up. Never
+            # resume the bot (or walk back into the pen) while this threat remains.
+            yield from execution.delay_until(lambda: current_threat() is None, 1200)
+        say(f'random event: {name} gone')
+        if local_tile().distance_to(here) <= 64:
+            yield from traversal.walk_resilient(here, radius=3, attempts=2, timeout_ms=40000,
+                                               log=say, **NAV_PURE_WALK)
         return True
 
     def _hazard(self, name, at, say):

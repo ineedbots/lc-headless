@@ -237,7 +237,9 @@ std::optional<std::chrono::seconds> ScriptHost::TakeRelogRequest()
 
 std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
 {
-    if (!m_started || m_status != ScriptStatus_e::Running)
+    // Step cannot consume the deadline until the client is in game and settled. Exposing an
+    // overdue time during a reconnect would keep AccountRunner's network wait from blocking.
+    if (!IsActive())
     {
         return std::nullopt;
     }

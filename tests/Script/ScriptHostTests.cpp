@@ -220,6 +220,36 @@ def loop():
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
 }
 
+TEST_CASE("ScriptHost hides loop deadlines while the client cannot run the script", "[ScriptHost]")
+{
+    auto fixture = HostFixture{"def loop():\n    log('>', 'loop')\n    return 100\n"};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    REQUIRE(fixture.host->GetNextLoop().has_value());
+
+    SECTION("disconnected")
+    {
+        fixture.client.Disconnect();
+    }
+
+    SECTION("logging out")
+    {
+        fixture.client.RequestLogout(5s);
+    }
+
+    SECTION("waiting for placement to settle")
+    {
+        auto& state = const_cast<GameState_s&>(fixture.client.GetState());
+        state.placedTick = state.tick;
+    }
+
+    // An overdue deadline must not make the runner spin while Step cannot consume it.
+    CHECK_FALSE(fixture.host->GetNextLoop().has_value());
+    fixture.host->Step(start + 1s);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop"});
+    CHECK_FALSE(fixture.host->GetNextLoop().has_value());
+}
+
 TEST_CASE("ScriptHost waits for the delay a generator loop returns", "[ScriptHost]")
 {
     auto fixture = HostFixture{R"python(
