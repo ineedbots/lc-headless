@@ -92,8 +92,8 @@ The quests, the shortest free-to-play ones, chosen to cover each kind of step wi
 These bring the first fights (Delrith, Count Draynor), the first items gathered across the map, and Karamja's boat. Pirate's Treasure's `karamja.ts` also lets phase 11's `karamjaRecovery` test port.
 
 - **Done when:**
-    - [ ] Their tests are ported and pass, and `karamjaRecovery`'s.
-    - [ ] Live, AIOQuester finishes all nine in one queue, on an account with 16a's quests done.
+    - [x] Their tests are ported and pass, and `karamjaRecovery`'s.
+    - [x] Live, AIOQuester finishes all nine in one queue, on an account with 16a's quests done.
 
 ---
 

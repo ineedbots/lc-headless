@@ -1,0 +1,13 @@
+# quests/defs/piratestreasure/supplies.py: rs2b0t quest parity.
+from typing import Any, Callable, Optional
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestSnapshot, QuestProgress
+
+
+COIN_TARGET: Any
+COIN_LOW: Any
+def held_id(snap: QuestSnapshot, id: Any) -> Any: ...
+def banked_id(snap: QuestSnapshot, id: Any) -> Any: ...
+def worn_id(snap: QuestSnapshot, id: Any) -> Any: ...
+def kit(snap: QuestSnapshot, want_apron: Any, want_spade: Any) -> Any: ...

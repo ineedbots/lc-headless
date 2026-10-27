@@ -142,7 +142,7 @@ class QuestModule:
       one town, so naming its bank beats working it out; 'nearest' is for those that don't.
     - grind: the NPCs it fights, which the random-event guard leaves alone.
     - food: the food float to carry; gather: a function per lower-case item name, gather(snap, need), giving the step
-      that sources it; tools: lower-case names the spillover deposit keeps.
+      that sources it; tools: lower-case names the spillover deposit keeps, or a function returning them.
     - exit(log): walked once the quest is finished, before the retreat to a bank, for the quests that end somewhere
       the walker can't leave on its own; a generator giving True once a bank walk can start.
     - owns_inventory: the module makes every banking and loadout decision, restarts in bankless areas included.

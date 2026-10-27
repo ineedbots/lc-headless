@@ -146,7 +146,7 @@ cooksassistant = QuestModule(record=quest_record('cook'), bank=Tile(3093, 3243, 
 
 A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe` and `on_start`. See its docstring.
 
-Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`).
+Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`), plus Demon Slayer (`demonslayer`), Doric's Quest (`doric`), Imp Catcher (`impcatcher`), Goblin Diplomacy (`goblindiplomacy`), Vampire Slayer (`vampireslayer`), The Knight's Sword (`knightssword`), Ernest the Chicken (`ernest`), Pirate's Treasure (`piratestreasure`) and Prince Ali Rescue (`princeali`).
 
 ## Steps: `rs2004.quests.exec.steps`
 
@@ -169,7 +169,13 @@ Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer
 | `wait` | `reason` | Waits two ticks |
 | `done` | | Nothing |
 
-A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool.
+A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool. `rs2004.quests.exec.garlic.take_garlic(log)` climbs to Morgan's cupboard, opens it and searches for a clove; each climb or Open costs a pass, and it returns `True` once Garlic is held. Use it with `yield from`.
+
+Goblin Diplomacy's `tools` is a function returning the current keep list, including the configured food; the engine evaluates it before banking.
+
+Before mining blurite, The Knight's Sword acquires a usable pickaxe even if its iron bars came from the bank. It also draws up to five banked Lobsters, Swordfish or Tuna when available; missing food does not block the quest, and it never leaves the cave to top food back up.
+
+`rs2004.karamja_recovery.missing_boat_fare(from_, dest, coins, missing)` recognises a stranded traveller whose only missing route item is the 30-coin fare. `recover_boat_fare(dest, missing, log)` collects Luthas's payment, filling the plantation crate first when needed. `traversal.walk_to` calls it after an unfunded route fails, then retries the destination; available routes and teleports are tried first.
 
 ## Kit
 

@@ -561,7 +561,7 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 
 `rs2004.clues` is rs2b0t's clue engine: the clue database (`CLUE_DB`, `identify_step`), `SolveClue`, the task a bot adds to solve the clues it picks up, the `ClueExecutor` under it, the puzzle-box solver, the hard dig's guardian, and the Duel Arena and jungle travel a trail needs. See [clues.md](scripting/clues.md).
 
-`rs2004.quests` is rs2b0t's quest engine: the 63 quest records (`QUESTS`), eligibility, the `QuestEngine` task that queues, provisions and steps the quests with its progress watchdog, the steps and legs they're made of, and the quests themselves in `rs2004.quests.defs`, so far Cook's Assistant, Sheep Shearer, Rune Mysteries, The Restless Ghost, Witch's Potion, Black Knights' Fortress and Romeo & Juliet. See [quests.md](scripting/quests.md).
+`rs2004.quests` is rs2b0t's quest engine: the 63 quest records (`QUESTS`), eligibility, the `QuestEngine` task that queues, provisions and steps the quests with its progress watchdog, the steps and legs they're made of, and sixteen free-to-play quests in `rs2004.quests.defs`: phases 16a and 16b, including their supply gathering, puzzle and combat legs. Shield of Arrav and Dragon Slayer come in 16c. See [quests.md](scripting/quests.md).
 
 `scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
 

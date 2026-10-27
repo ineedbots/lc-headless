@@ -4,6 +4,7 @@ the queue asks for it, so an account running one quest compiles one."""
 
 from rs2004.quests.data import quest_record
 
+
 __all__ = ['ORDER', 'QuestDef', 'QUEST_DEFS', 'def_by_id', 'record_by_id']
 
 # rs2b0t's order, by file. Why: Hero's Quest follows Dragon Slayer; it's gated at 55 quest points and on Lost City,
@@ -68,8 +69,63 @@ def _blackknight():
     return blackknight
 
 
+def _demonslayer():
+    from rs2004.quests.defs.demonslayer import demonslayer
+    return demonslayer
+
+
+def _doric():
+    from rs2004.quests.defs.doric import doric
+    return doric
+
+
+def _impcatcher():
+    from rs2004.quests.defs.impcatcher import impcatcher
+    return impcatcher
+
+
+def _goblindiplomacy():
+    from rs2004.quests.defs.goblindiplomacy import goblindiplomacy
+    return goblindiplomacy
+
+
+def _vampireslayer():
+    from rs2004.quests.defs.vampireslayer import vampireslayer
+    return vampireslayer
+
+
+def _knightssword():
+    from rs2004.quests.defs.knightssword import knightssword
+    return knightssword
+
+
+def _ernest():
+    from rs2004.quests.defs.ernest import ernest
+    return ernest
+
+
+def _piratestreasure():
+    from rs2004.quests.defs.piratestreasure import piratestreasure
+    return piratestreasure
+
+
+def _princeali():
+    from rs2004.quests.defs.princeali import princeali
+    return princeali
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'demonslayer': ('demon', _demonslayer),
+    'doric': ('doric', _doric),
+    'impcatcher': ('imp', _impcatcher),
+    'goblindiplomacy': ('gobdip', _goblindiplomacy),
+    'vampireslayer': ('vampire', _vampireslayer),
+    'knightssword': ('squire', _knightssword),
+    'ernest': ('haunted', _ernest),
+    'piratestreasure': ('hunt', _piratestreasure),
+    'princeali': ('prince', _princeali),
+
     'runemysteries': ('runemysteries', _runemysteries),
     'sheepshearer': ('sheep', _sheepshearer),
     'restlessghost': ('priest', _restlessghost),

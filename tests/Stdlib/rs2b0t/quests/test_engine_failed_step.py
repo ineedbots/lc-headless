@@ -1,8 +1,7 @@
 """rs2b0t's test/api/ai/quests/engine/failed-step.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and expect.
 
-rs2b0t's fixture queues Rune Mysteries before Doric's Quest. Doric comes with phase 16b, so here Sheep Shearer, next in
-the list, is the quest the queue moves on to. 'goblin mail gathering keeps fighting when its step yields before the
-drop' waits for Goblin Diplomacy, in 16b too."""
+This fixture explicitly picks Rune Mysteries then Sheep Shearer; the goblin combat case uses 16b's real gather policy.
+"""
 
 from rs2004 import execution
 from rs2004.bank import bank, banking
@@ -488,3 +487,34 @@ def _worn_supplies():
 
 
 test('a worn mustHave item counts as held', _worn_supplies)
+
+
+def _goblin_progress():
+    from rs2004.entities import npcs, ground_items
+    from rs2004.catalogs.tasks import sustain
+    from rs2004.quests.defs.goblindiplomacy import goblin_mail_gather_step
+    engine, host = fixture()
+    S['coins'] = 500
+    S['combat'] = True
+    S['goblin_hp'] = 30
+    tile = Tile(2958, 3507, 0)
+    spy_on(game, 'tile', returns=tile)
+    spy_on(game, 'my_name', returns='quest-combat-fixture')
+    spy_on(ground_items, 'query', impl=querying(lambda: []))
+    def goblins():
+        return [Fake(id=100, index=1, name='Goblin', level=2, size=1, tile=lambda: Tile(2958,3508,0),
+                     distance=lambda: 1, actions=lambda: ['Attack'], in_combat=True, health=S['goblin_hp'],
+                     max_health=30, targets_me=lambda: True, targets_another_player=lambda: False, valid=lambda: True)]
+    spy_on(npcs, 'query', impl=querying(goblins))
+    spy_on(npcs, 'all', impl=goblins)
+    def fight_tick():
+        S['goblin_hp'] -= 1
+        S['xp'] += 4
+        yield
+    spy_on(sustain, 'run', impl=fight_tick)
+    stub(runemysteries, decide=lambda snap: goblin_mail_gather_step(snap))
+    run_wait(execute(engine,12))
+    expect(S['goblin_hp']).to_be_less_than(22)
+    expect(engine.running_id).to_be('runemysteries')
+    expect(engine._no_progress_count).to_be(0)
+test('goblin mail gathering keeps fighting when its step yields before the drop', _goblin_progress)

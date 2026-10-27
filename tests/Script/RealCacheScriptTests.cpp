@@ -257,17 +257,18 @@ TEST_CASE("rs2b0t's ported tests of the walker's data pass", "[RealCache]")
 
     for (const auto& file : files)
     {
-        CAPTURE(file.filename().string());
-
-        auto capture = LogCapture{};
-        auto map = WorldMap{cache};
-        auto client = GameClient{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()};
-        auto actions = GameActions{client};
-        auto state = Fixtures::PlacedState();
-        auto api = ScriptContext{state, map, actions, nullptr, {}, navigation};
-        auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts"}, capture.GetLogger()};
-        ScriptBindings::Bind(vm, api);
-        Rs2b0tSpecs::Run(vm, file);
-        ScriptBindings::Unbind(vm);
+        DYNAMIC_SECTION(file.filename().string())
+        {
+            auto capture = LogCapture{};
+            auto map = WorldMap{cache};
+            auto client = GameClient{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()};
+            auto actions = GameActions{client};
+            auto state = Fixtures::PlacedState();
+            auto api = ScriptContext{state, map, actions, nullptr, {}, navigation};
+            auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts", .callTimeout = 60s}, capture.GetLogger()};
+            ScriptBindings::Bind(vm, api);
+            Rs2b0tSpecs::Run(vm, file);
+            ScriptBindings::Unbind(vm);
+        }
     }
 }

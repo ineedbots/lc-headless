@@ -12,7 +12,7 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 | 13 | The economy: shops, mules, bank sorting, the market; 9 bots, and GatheringBot's mule hand-offs and feather buyout | Done |
 | 14 | Combat: the gear lists, `rs2004.hunting`, `duel`; 13 fighters | Done, with the open items below |
 | 15 | The clue engine and ClueSolver, wired into the seven bots that carry clues | Done, with the open items below |
-| 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | 16a done (the engine, seven quests, AIOQuester), with the open items below; 16b and 16c not started |
+| 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | 16a done (the engine, seven quests, AIOQuester), with the open items below; 16b done (nine more quests, garlic and Karamja fare recovery); 16c not started |
 | 17 | The members' quests, in sub-phases 17a–17i | Not started |
 | 18 | The account leveler | Not started |
 
@@ -26,7 +26,6 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 
 | Item | Where it goes |
 |---|---|
-| `karamjaRecovery.ts`: `missing_boat_fare`, `recover_boat_fare` (needs Pirate's Treasure's quest steps) | Phase 16 |
 | A refused crossing with another way past, to show the walker routing round it live (the Champions' Guild has none) | When one is found |
 | rs2b0t's tests that stub facades with `spyOn` (bank-chest, bank-id, bank-transfer, phase 13's `StableClosedPoll` with a window open, JiveMarketDumper's runtime, MarketMaker's `tasks.test`, the Shilo trip's fixtures): pocketpy ignores a method set on an instance | Needs a fake game state for Python tests, or C++ equivalents |
 | JiveKQ: one account stopped on a third restock with "Could not buy a Shantay pass" after buying one each earlier trip; the log doesn't say why | When it recurs, with the shop's state logged |

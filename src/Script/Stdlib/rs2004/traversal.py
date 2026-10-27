@@ -533,6 +533,17 @@ class _Traversal:
         outer = self._restore_retaliate
         self._restore_retaliate = False
         arrived = yield from self._walk_to(dest, radius, timeout_ms, max_expansions, use_teleport_catalog, policy, bank_item_counts, avoid_zones, log, force_repath, path_follow)
+        if not arrived and self.last_outcome in ['failed', 'unreachable'] and self.last_missing_gate_items:
+            from rs2004.karamja_recovery import recover_boat_fare
+            missing = self.last_missing_gate_items
+            outcome = self.last_outcome
+            say = log if log is not None else (lambda message: None)
+            earned = yield from recover_boat_fare(Tile.from_tile(dest), missing, say)
+            if earned:
+                arrived = yield from self._walk_to(dest, radius, timeout_ms, max_expansions, use_teleport_catalog, policy, bank_item_counts, avoid_zones, log, force_repath, path_follow)
+            else:
+                self.last_missing_gate_items = missing
+                self.last_outcome = outcome
         if self._restore_retaliate:
             game.set_auto_retaliate(True)
         self._restore_retaliate = outer

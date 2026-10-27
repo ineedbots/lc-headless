@@ -299,7 +299,8 @@ class QuestEngine(Task):
         step = None
         if id not in self._deposited:
             food_name = self.host.food_item()
-            keep = [i.name.lower() for i in module.record.items] + [t.lower() for t in (module.tools or [])]
+            tools = module.tools() if callable(module.tools) else module.tools
+            keep = [i.name.lower() for i in module.record.items] + [t.lower() for t in (tools or [])]
             if food_name:
                 keep.append(food_name.lower())
             spillover = deposit_plan(snap.inv, keep)

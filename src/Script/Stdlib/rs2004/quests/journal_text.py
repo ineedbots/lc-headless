@@ -25,4 +25,6 @@ def _strip_tags(text):
 def normalize_journal(lines):
     """The journal's lines (or one string) joined, without colour tags or pipes, spaces collapsed, lower case."""
     text = lines if isinstance(lines, str) else ' '.join(lines)
+    # pocketpy's character indexing fails on the loading ellipsis in journal placeholders.
+    text = text.replace('…', '...')
     return ' '.join(_strip_tags(text).replace('|', ' ').split()).lower()

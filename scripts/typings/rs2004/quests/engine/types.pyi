@@ -66,7 +66,7 @@ class QuestModule:
     grind: Optional[list[str]]
     food: Optional[int]
     gather: Optional[dict[str, Callable[[QuestSnapshot, int], Any]]]
-    tools: Optional[list[str]]
+    tools: Optional[list[str] | Callable[[], list[str]]]
     exit: Optional[Callable[[Callable[[str], None]], Any]]
     owns_inventory: bool
     food_ready: Optional[Callable[[QuestSnapshot], bool]]
