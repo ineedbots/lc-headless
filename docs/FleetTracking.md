@@ -104,11 +104,15 @@ The page refreshes every ten seconds, shows how old each file is, and has a Refr
 
 ## Starting and stopping the client
 
-The page is read-only unless it is given a client config:
+The page is read-only unless it is given client configs:
 
 ```sh
-python3 tools/fleet/server.py --config client.jsonc
+python3 tools/fleet/server.py --config client_w1.jsonc client_w2.jsonc client_w3.jsonc
 ```
+
+One process handles at most **16 scripted accounts**: `ScriptRuntime::MAX_VMS` is 16 and pocketpy's own
+VM table is `pk_all_vm[16]`. A larger fleet is run as one process per config — 45 accounts as three
+processes of 15 — and the page treats them as one fleet.
 
 A bar above the tabs then has **Launch client** and **Stop client**:
 
@@ -119,16 +123,17 @@ A bar above the tabs then has **Launch client** and **Stop client**:
 | during launch or stop | disabled | disabled |
 
 - **Launch** finds the built client (beside the repository, in a preset build folder, then `PATH`) and runs
-  `Rs2004Headless <config> --raw-console`, with its output appended to `logs/fleet.log`. It launches one
-  process; the accounts and scripts are whatever the account files say. It refuses while one is running.
-- **Stop** sends SIGINT, the client's graceful Ctrl+C path: scripts get `killGraceSeconds`, then accounts log
-  out. A second SIGINT follows after ten seconds to log every account out at once if the server is refusing
-  a logout in combat, and SIGKILL only if the process outlives both (forty seconds).
-- The last state is written to `logs/fleet.pid`, so restarting the page adopts the client it launched and
+  `Rs2004Headless <config> --raw-console` for **each** config, with output appended to
+  `logs/fleet-<config>.log`. It refuses while any is running.
+- **Stop** sends SIGINT to every process, the client's graceful Ctrl+C path: scripts get `killGraceSeconds`,
+  then accounts log out. A second SIGINT follows after ten seconds to log every account out at once if the
+  server is refusing a logout in combat, and SIGKILL only for a process that outlives both (forty seconds).
+- The status line shows how many of the configs are running, such as `running 3/3`.
+- The running pids are written to `logs/fleet.pid`, so restarting the page adopts the clients it launched and
   Stop still works. A client started any other way is not adopted and is never signalled.
 
-This is not the in-client script control described above: Launch starts a **new** client process, and Stop
-shuts it down. Switching scripts means stopping and launching again.
+This is not the in-client script control described above: Launch starts **new** client processes, and Stop
+shuts them down. Switching scripts means stopping and launching again.
 
 Without `--config` the page cannot start or stop anything: the bar is hidden, and `/api/launch` and
 `/api/stop` answer 403.
