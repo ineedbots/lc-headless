@@ -5,8 +5,8 @@
     python3 tools/fleet/server.py --config client.jsonc    # ... with Launch and Stop client
 
 Reads experience/, bank/, inventory/ and equipment/ from the repository root, and binds to loopback only.
-Without --config it starts and stops nothing; with it, the page may launch one client process and stop the
-one it launched. Ctrl+C ends the page, not the client.
+Without --config it starts and stops nothing; with it, the page launches one client process per config and
+stops the ones it launched. Ctrl+C ends the page, not the clients.
 
 Stdlib only.
 """
@@ -183,15 +183,25 @@ def inventory(account=None):
 
 
 
-# ---- the client: launch and stop, only with --config ----
+# ---- the clients: launch and stop, only with --config ----
 
-# The client config, absolute, or None in read-only mode.
-CONTROL_CONFIG = None
-# Set while this page has a client running or stopping: {'pid', 'status', 'startedAt', 'error'}.
-STATE = {'status': 'idle', 'pid': None, 'startedAt': None, 'error': ''}
-STATE_LOCK = threading.Lock()
-# The Popen for a client this page launched, so it can wait on and reap it. None for an adopted one.
-PROCESS = None
+# One absolute client config per process, from --config. Empty in read-only mode.
+CONTROL_CONFIGS = []
+BINARY_NAME = 'Rs2004Headless'
+# SIGINT is the client's graceful path. A second one, like a second Ctrl+C, logs every account out at once
+# when the first hasn't finished, which matters when the server refuses a logout in combat. SIGKILL is only
+# for one that outlives both.
+SECOND_INTERRUPT_SECONDS = 10
+STOP_TIMEOUT_SECONDS = 40
+
+# config path -> {'pid', 'startedAt'} for every client this page launched or adopted.
+RUNNING = {}
+# config path -> Popen, for the ones this page launched, so they can be waited on and reaped.
+PROCESSES = {}
+# '', 'launching' or 'stopping'; otherwise the state is derived from RUNNING.
+TRANSITION = ''
+ERROR = ''
+STATE_LOCK = threading.RLock()
 
 
 def find_binary():
@@ -210,8 +220,8 @@ def find_binary():
     return shutil.which(BINARY_NAME)
 
 
-def _is_our_client(pid):
-    """Whether the process is alive and is this config's client, so an unrelated pid is never adopted."""
+def _is_our_client(pid, config):
+    """Whether the process is alive and is that config's client, so an unrelated pid is never adopted."""
     if not pid or not os.path.isdir(f'/proc/{pid}'):
         return False
     try:
@@ -220,7 +230,7 @@ def _is_our_client(pid):
     except OSError:
         return False
     executable = os.path.basename(arguments[0]) if arguments else ''
-    return executable == BINARY_NAME and any(os.path.abspath(argument) == CONTROL_CONFIG for argument in arguments[1:])
+    return executable == BINARY_NAME and any(os.path.abspath(argument) == config for argument in arguments[1:])
 
 
 def _alive(pid):
@@ -241,11 +251,11 @@ def _alive(pid):
         return False
 
 
-def _write_pidfile(pid):
+def _write_pidfile():
     try:
         os.makedirs(LOGS_DIR, exist_ok=True)
         with open(PID_FILE, 'w') as handle:
-            json.dump({'pid': pid, 'config': CONTROL_CONFIG, 'startedAt': time.time()}, handle)
+            json.dump({'processes': [{'pid': entry['pid'], 'config': config, 'startedAt': entry['startedAt']} for config, entry in RUNNING.items()]}, handle)
     except OSError:
         pass
 
@@ -258,158 +268,186 @@ def _remove_pidfile():
 
 
 def _adopt():
-    """Take over a client this page launched before it was restarted, if its pidfile still names one."""
-    global PROCESS
+    """Take over clients this page launched before it was restarted, if their pidfile still names them."""
     try:
         with open(PID_FILE) as handle:
             saved = json.load(handle)
     except (OSError, ValueError):
         return
 
-    pid = saved.get('pid')
-    if _is_our_client(pid) and saved.get('config') == CONTROL_CONFIG:
-        with STATE_LOCK:
-            STATE.update({'status': 'running', 'pid': pid, 'startedAt': saved.get('startedAt'), 'error': ''})
+    entries = saved.get('processes') if isinstance(saved, dict) else None
+    if not isinstance(entries, list):
+        _remove_pidfile()
+        return
+
+    adopted = False
+    for entry in entries:
+        config = entry.get('config')
+        pid = entry.get('pid')
+        if config in CONTROL_CONFIGS and _is_our_client(pid, config):
+            RUNNING[config] = {'pid': pid, 'startedAt': entry.get('startedAt') or time.time()}
+            adopted = True
+
+    if adopted:
+        _write_pidfile()
     else:
         _remove_pidfile()
 
 
+def _prune():
+    """Drop clients that have exited, so the counts and the pidfile never name a dead process."""
+    changed = False
+    for config, entry in list(RUNNING.items()):
+        if not _alive(entry['pid']):
+            del RUNNING[config]
+            changed = True
+    if changed:
+        with STATE_LOCK:
+            _write_pidfile()
+
+
 def control_state():
     with STATE_LOCK:
-        state = dict(STATE)
-
-    if state['status'] in ('running', 'stopping') and state['pid'] and not _alive(state['pid']):
-        # It exited without the page noticing, such as a crash: report idle and let Launch work.
-        cleared = False
-        with STATE_LOCK:
-            if STATE['pid'] == state['pid']:
-                STATE.update({'status': 'idle', 'pid': None, 'startedAt': None})
-                cleared = True
-        if cleared:
-            _remove_pidfile()
-        state = {'status': 'idle', 'pid': None, 'startedAt': None, 'error': state.get('error', '')}
-
-    uptime = None
-    if state['startedAt'] and state['status'] in ('running', 'stopping'):
-        uptime = int(time.time() - state['startedAt'])
-
-    return {
-        'control': bool(CONTROL_CONFIG),
-        'status': state['status'],
-        'pid': state['pid'],
-        'uptimeSeconds': uptime,
-        'config': os.path.basename(CONTROL_CONFIG) if CONTROL_CONFIG else None,
-        'error': state.get('error') or '',
-    }
+        _prune()
+        status = TRANSITION or ('running' if RUNNING else 'idle')
+        uptime = None
+        if RUNNING:
+            uptime = int(time.time() - min(entry['startedAt'] for entry in RUNNING.values()))
+        processes = sorted(
+            ({'config': os.path.basename(config), 'pid': entry['pid'], 'uptimeSeconds': int(time.time() - entry['startedAt'])}
+             for config, entry in RUNNING.items()),
+            key=lambda item: item['config'])
+        return {
+            'control': bool(CONTROL_CONFIGS),
+            'status': status,
+            'running': len(RUNNING),
+            'total': len(CONTROL_CONFIGS),
+            'uptimeSeconds': uptime,
+            'processes': processes,
+            'error': ERROR,
+        }
 
 
-def launch_client():
-    global PROCESS
-    if not CONTROL_CONFIG:
-        return 403, {'error': 'read-only: start with --config <client.jsonc> to launch a client'}
+def launch_clients():
+    global TRANSITION, ERROR
+    if not CONTROL_CONFIGS:
+        return 403, {'error': 'read-only: start with --config <client.jsonc> ... to launch clients'}
 
     state = control_state()
-    if state['status'] != 'idle':
-        return 409, {**state, 'error': f"a client is already {state['status']}"}
+    if state['running'] or state['status'] in ('launching', 'stopping'):
+        return 409, {**state, 'error': 'clients are already running' if state['running'] else f"busy: {state['status']}"}
 
     binary = find_binary()
     if binary is None:
-        return 500, {'error': f'{BINARY_NAME} not found: build it, or put it on PATH'}
+        return 500, {**state, 'error': f'{BINARY_NAME} not found: build it, or put it on PATH'}
 
+    with STATE_LOCK:
+        TRANSITION = 'launching'
+        ERROR = ''
+
+    started = []
     try:
         os.makedirs(LOGS_DIR, exist_ok=True)
-        log = open(LOG_FILE, 'ab')
-        with STATE_LOCK:
-            STATE.update({'status': 'launching', 'pid': None, 'startedAt': time.time(), 'error': ''})
-        try:
-            process = subprocess.Popen([binary, CONTROL_CONFIG, '--raw-console'], cwd=ROOT, stdin=subprocess.DEVNULL,
-                                       stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-        finally:
-            log.close()
+        for config in CONTROL_CONFIGS:
+            stem = os.path.splitext(os.path.basename(config))[0]
+            log = open(os.path.join(LOGS_DIR, f'fleet-{stem}.log'), 'ab')
+            try:
+                process = subprocess.Popen([binary, config, '--raw-console'], cwd=ROOT, stdin=subprocess.DEVNULL,
+                                           stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            finally:
+                log.close()
+            PROCESSES[config] = process
+            RUNNING[config] = {'pid': process.pid, 'startedAt': time.time()}
+            started.append(config)
     except OSError as error:
+        for config in started:
+            _signal(RUNNING[config]['pid'], signal.SIGKILL)
+            try:
+                PROCESSES[config].wait(timeout=5)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+            RUNNING.pop(config, None)
+            PROCESSES.pop(config, None)
         with STATE_LOCK:
-            STATE.update({'status': 'idle', 'pid': None, 'startedAt': None, 'error': str(error)})
-        return 500, {**control_state(), 'error': f'could not start the client: {error}'}
+            TRANSITION = ''
+            ERROR = f'could not start a client: {error}'
+        return 500, control_state()
 
-    PROCESS = process
-    _write_pidfile(process.pid)
     with STATE_LOCK:
-        STATE.update({'status': 'running', 'pid': process.pid, 'startedAt': time.time(), 'error': ''})
+        TRANSITION = ''
+        _write_pidfile()
     return 200, control_state()
 
 
-def stop_client():
-    global PROCESS
-    if not CONTROL_CONFIG:
-        return 403, {'error': 'read-only: start with --config <client.jsonc> to stop a client'}
+def stop_clients():
+    global TRANSITION, ERROR
+    if not CONTROL_CONFIGS:
+        return 403, {'error': 'read-only: start with --config <client.jsonc> ... to stop clients'}
 
     state = control_state()
-    if state['status'] != 'running' or not state['pid']:
+    if not state['running']:
         return 409, {**state, 'error': 'no client is running'}
 
-    pid = state['pid']
     with STATE_LOCK:
-        STATE.update({'status': 'stopping', 'error': ''})
+        TRANSITION = 'stopping'
+        ERROR = ''
 
-    try:
-        os.killpg(pid, signal.SIGINT)
-    except OSError:
-        try:
-            os.kill(pid, signal.SIGINT)
-        except OSError as error:
+    for entry in list(RUNNING.values()):
+        if not _signal(entry['pid'], signal.SIGINT):
             with STATE_LOCK:
-                STATE.update({'status': 'running', 'error': f'could not signal the client: {error}'})
+                TRANSITION = ''
+                ERROR = 'could not signal a client'
             return 500, control_state()
 
-    threading.Thread(target=_wait_stopped, args=(pid,), daemon=True).start()
+    threading.Thread(target=_wait_stopped, daemon=True).start()
     return 202, control_state()
 
 
-def _wait_stopped(pid):
-    """Wait for SIGINT's graceful logout, then make sure it is gone, then report idle."""
-    global PROCESS
-    with STATE_LOCK:
-        process = PROCESS
+def _signal(pid, number):
+    try:
+        os.killpg(pid, number)
+        return True
+    except OSError:
+        try:
+            os.kill(pid, number)
+            return True
+        except OSError:
+            return False
 
+
+def _wait_stopped():
+    """Wait for SIGINT's graceful logout, then make sure every client is gone, then report idle."""
+    global TRANSITION, ERROR
+    pids = [(config, entry['pid']) for config, entry in list(RUNNING.items())]
     started = time.time()
     deadline = started + STOP_TIMEOUT_SECONDS
     second_sent = False
-    while time.time() < deadline and _alive(pid):
+
+    while time.time() < deadline and any(_alive(pid) for _, pid in pids):
         if not second_sent and time.time() - started >= SECOND_INTERRUPT_SECONDS:
             # Like the second Ctrl+C: log every account out now rather than wait for a combat lockout.
             second_sent = True
-            try:
-                os.killpg(pid, signal.SIGINT)
-            except OSError:
-                try:
-                    os.kill(pid, signal.SIGINT)
-                except OSError:
-                    pass
+            for _, pid in pids:
+                _signal(pid, signal.SIGINT)
         time.sleep(0.25)
 
-    if _alive(pid):
-        try:
-            os.killpg(pid, signal.SIGKILL)
-        except OSError:
+    for _, pid in pids:
+        if _alive(pid):
+            _signal(pid, signal.SIGKILL)
+
+    for config, _ in pids:
+        process = PROCESSES.pop(config, None)
+        if process is not None:
             try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
+                process.wait(timeout=5)
+            except (subprocess.TimeoutExpired, OSError):
                 pass
-        deadline = time.time() + 5
-        while time.time() < deadline and _alive(pid):
-            time.sleep(0.1)
+        RUNNING.pop(config, None)
 
-    if process is not None:
-        try:
-            process.wait(timeout=5)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
-
-    PROCESS = None
     with STATE_LOCK:
-        if STATE['pid'] == pid:
-            STATE.update({'status': 'idle', 'pid': None, 'startedAt': None, 'error': ''})
-            _remove_pidfile()
+        TRANSITION = ''
+        ERROR = ''
+        _remove_pidfile()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -451,32 +489,33 @@ class Handler(BaseHTTPRequestHandler):
             self.rfile.read(length)
 
         if path == '/api/launch':
-            code, payload = launch_client()
+            code, payload = launch_clients()
             self._send(code, payload)
         elif path == '/api/stop':
-            code, payload = stop_client()
+            code, payload = stop_clients()
             self._send(code, payload)
         else:
             self._send(404, {'error': 'not found'})
 
 
 def main():
-    global CONTROL_CONFIG
+    global CONTROL_CONFIGS
     parser = argparse.ArgumentParser(description='Local view of the fleet-tracking files, with optional client control.')
     parser.add_argument('--port', type=int, default=int(os.environ.get('FLEET_PORT', '8765')))
-    parser.add_argument('--config', metavar='CLIENT_JSONC',
-                        help='the client config Launch runs; without it the page is read-only')
+    parser.add_argument('--config', nargs='+', metavar='CLIENT_JSONC',
+                        help='client configs; Launch runs one process per config, Stop stops them all')
     args = parser.parse_args()
 
     if args.config:
-        config = os.path.abspath(args.config)
-        if not os.path.isfile(config):
-            parser.error(f'{args.config}: no such client config')
-        CONTROL_CONFIG = config
+        for name in args.config:
+            config = os.path.abspath(name)
+            if not os.path.isfile(config):
+                parser.error(f'{name}: no such client config')
+            CONTROL_CONFIGS.append(config)
         _adopt()
 
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
-    mode = f'control: {os.path.basename(CONTROL_CONFIG)}' if CONTROL_CONFIG else 'read-only'
+    mode = f'control: {", ".join(os.path.basename(c) for c in CONTROL_CONFIGS)}' if CONTROL_CONFIGS else 'read-only'
     print(f'Fleet view on http://127.0.0.1:{args.port}  ({mode})')
     try:
         server.serve_forever()

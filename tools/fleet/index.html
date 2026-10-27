@@ -284,7 +284,7 @@ $('bank-body').onclick = (event) => {
 
 // ---- launch and stop, only when the page was started with --config ----
 
-let control = { control:false, status:'idle', pid:null, uptimeSeconds:null, error:'' };
+let control = { control:false, status:'idle', running:0, total:0, uptimeSeconds:null, processes:[], error:'' };
 
 async function post(url) {
   const response = await fetch(url, { method:'POST' });
@@ -307,14 +307,16 @@ function renderControl() {
   if (!control.control) return;
 
   const status = control.status || 'idle';
+  const running = control.running || 0;
+  const total = control.total || 0;
   $('launch').disabled = status !== 'idle';
-  $('stop-client').disabled = status !== 'running';
+  $('stop-client').disabled = running === 0 || status === 'launching' || status === 'stopping';
 
-  const parts = [status];
-  if (control.uptimeSeconds !== null && control.uptimeSeconds !== undefined && (status === 'running' || status === 'stopping')) parts.push(duration(control.uptimeSeconds));
-  if (control.pid) parts.push(`pid ${control.pid}`);
+  const parts = [running > 0 ? `${status} ${running}/${total}` : status];
+  if (control.uptimeSeconds !== null && control.uptimeSeconds !== undefined && running > 0) parts.push(duration(control.uptimeSeconds));
   if (control.error) parts.push(control.error);
   $('control-status').textContent = parts.join(' · ');
+  $('control-status').title = (control.processes || []).map(process => `${process.config}: pid ${process.pid}`).join('\n');
 }
 
 async function loadControl() {
