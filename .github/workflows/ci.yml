@@ -1,7 +1,7 @@
 # Builds and tests every preset pair: Windows (MSVC, x64 and x86) and Linux (clang, x64 and arm64), in Debug and
 # Release. Each pair is its own check. Release builds treat warnings as errors, so a new warning fails the Release
-# checks only. A separate Linux Debug job collects native coverage. The real-cache tests skip, because the runners
-# have no game cache.
+# checks only. A separate Linux Debug job collects native and stdlib coverage. The real-cache tests skip, because
+# the runners have no game cache.
 name: CI
 
 on:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   coverage:
-    name: Native coverage (Linux x64)
+    name: Native and stdlib coverage (Linux x64)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +63,35 @@ jobs:
             build/linux-coverage/coverage/coverage.profdata
             build/linux-coverage/coverage/summary.txt
             build/linux-coverage/coverage/summary.json
+            build/linux-coverage/Testing/Temporary/
+          if-no-files-found: warn
+
+      - name: Test and report stdlib coverage
+        run: python3 tools/coverage/script.py --preset linux-coverage --no-build
+
+      - name: Publish stdlib coverage summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f build/linux-coverage/script-coverage/summary.txt ]; then
+            {
+              echo '### Stdlib line coverage (pocketpy)'
+              echo '```text'
+              cat build/linux-coverage/script-coverage/summary.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload stdlib coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stdlib-coverage-linux-x64
+          path: |
+            build/linux-coverage/script-coverage/html/
+            build/linux-coverage/script-coverage/coverage.lcov
+            build/linux-coverage/script-coverage/summary.txt
+            build/linux-coverage/script-coverage/summary.json
             build/linux-coverage/Testing/Temporary/
           if-no-files-found: warn
 

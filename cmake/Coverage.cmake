@@ -1,4 +1,5 @@
 option(RS2004_ENABLE_COVERAGE "Instrument native code for LLVM coverage" OFF)
+option(RS2004_ENABLE_SCRIPT_COVERAGE "Allow longer test runs with script tracing" OFF)
 
 if(RS2004_ENABLE_COVERAGE)
     if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

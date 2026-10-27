@@ -6,6 +6,7 @@
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/Script/HostFixture.hpp"
+#include "../Support/Script/ScriptCoverage.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 #include "../Support/TempFolder.hpp"
 
@@ -1413,7 +1414,9 @@ TEST_CASE("The example scripts and the ported bots load without warnings", "[Scr
             CAPTURE(entry.path().string());
 
             const auto file = std::filesystem::relative(entry.path(), scripts);
-            CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = scripts, .file = file}, capture.GetLogger()});
+            CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client,
+                                   {.scriptsDirectory = scripts, .file = file, .callTimeout = ScriptCoverage::AdjustTimeout(1s)},
+                                   capture.GetLogger()});
             ++loaded;
         }
     }

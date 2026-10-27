@@ -6,6 +6,7 @@
 #include "../LogCapture.hpp"
 #include "../TempFolder.hpp"
 #include "ScriptTestRuntime.hpp"
+#include "ScriptCoverage.hpp"
 
 #include "Config/Config_s.hpp"
 #include "Console/LogLevel_e.hpp"
@@ -43,6 +44,7 @@ HostFixture::HostFixture(std::string_view script, ScriptHostOptions_s options, c
 
     options.scriptsDirectory = folder.GetPath();
     options.file = "main.py";
+    options.callTimeout = ScriptCoverage::AdjustTimeout(options.callTimeout);
     host.emplace(ScriptTestRuntime::Get(), client, std::move(options), capture.GetLogger());
     client.Login();
 

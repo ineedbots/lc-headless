@@ -267,12 +267,44 @@ from a failed run are partial.
 The report includes authored C++ under `src/`, including headers and code not referenced by the tests.
 Tests, dependencies, and generated embedded Python are excluded. The application binary supplies coverage
 mappings for `main.cpp`, but is not run, so its entry point starts at zero coverage. C++ exercised by the
-embedded script tests contributes to native coverage; Python source coverage is not collected yet.
+embedded script tests contributes to native coverage. Python source coverage has its own report below.
 
 CI uploads the same report as the `native-coverage-linux-x64` artifact and publishes a summary. Coverage
 percentages are informational; test or collection failures fail the job. Real-cache tests skip without their
 cache environment variables, and hidden `[Slow]` tests are excluded from this baseline. Reports from runs with
 cache data can therefore differ from CI. Normal build and test presets do not enable instrumentation.
+
+### Stdlib script coverage
+
+Run with CPython on Linux or Windows (with the normal CMake/vcpkg build environment available):
+
+```sh
+python3 tools/coverage/script.py       # Windows: python tools/coverage/script.py
+```
+
+This uses the separate `linux-script-coverage` or `windows-script-coverage` Debug preset, builds the tests, and
+collects line trace events from the application's pocketpy VM while running the full CTest suite. LLVM tools
+are not required. Reports are written under `build/<preset>/script-coverage/`: `html/index.html`,
+`coverage.lcov`, `summary.txt`, and `summary.json`. Use `--parallel N` to change build/test parallelism or
+`--no-build` to reuse that build. Each collection clears its previous script profiles and reports.
+
+The denominator comes from compiling every embedded stdlib file and walking its bytecode and nested
+function declarations without executing them. Unimported modules and uncalled function bodies therefore
+remain uncovered. Compiler-generated implicit returns are excluded, matching pocketpy's trace events.
+The runner checks embedded sources against the checkout and fails if a rebuild is needed. Only
+`src/Script/Stdlib/**/*.py` contributes; script tests, example/account scripts and pocketpy's own modules are
+excluded. Counts represent line trace events, which pocketpy can coalesce, rather than exact statement counts.
+Script branch coverage is not collected.
+
+Tracing is test-only and opt-in through the runner. Normal application builds do not include the collector.
+Coverage presets allow 300 seconds per test instead of 60 to accommodate tracing overhead. Script fixtures
+also allow five times their normal VM watchdog duration while collecting coverage; VM deadline tests retain
+their original limits. Cache-dependent tests still skip without cache data, and hidden `[Slow]` tests are
+excluded. Test or collection errors fail the
+command; reports from failed test runs are marked partial. Percentages are informational.
+
+CI reuses the native coverage build with `python3 tools/coverage/script.py --preset linux-coverage --no-build`
+and uploads a separate `stdlib-coverage-linux-x64` artifact. Native and script percentages stay separate.
 
 ### Project layout
 

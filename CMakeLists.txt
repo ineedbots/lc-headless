@@ -107,9 +107,16 @@ target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     Catch2::Catch2WithMain)
 
 include(Catch)
+set(TEST_TIMEOUT 60)
+if(RS2004_ENABLE_SCRIPT_COVERAGE)
+    set(TEST_TIMEOUT 300)
+endif()
 catch_discover_tests(${PROJECT_NAME}Tests
     DISCOVERY_MODE PRE_TEST
-    PROPERTIES TIMEOUT 60)
+    PROPERTIES TIMEOUT ${TEST_TIMEOUT})
+
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/test-runtime-$<CONFIG>.json" CONTENT
+    "{\"tests\":\"$<TARGET_FILE:${PROJECT_NAME}Tests>\"}\n")
 
 configure_native_coverage(${PROJECT_NAME}Lib ${PROJECT_NAME} ${PROJECT_NAME}Tests)
 

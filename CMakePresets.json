@@ -49,11 +49,24 @@
             "name": "linux-coverage",
             "inherits": "linux-clang",
             "cacheVariables": {
-                "RS2004_ENABLE_COVERAGE": "ON"
+                "RS2004_ENABLE_COVERAGE": "ON",
+                "RS2004_ENABLE_SCRIPT_COVERAGE": "ON"
             }
+        },
+        {
+            "name": "linux-script-coverage",
+            "inherits": "linux-clang",
+            "cacheVariables": { "RS2004_ENABLE_SCRIPT_COVERAGE": "ON" }
+        },
+        {
+            "name": "windows-script-coverage",
+            "inherits": "windows-msvc",
+            "cacheVariables": { "RS2004_ENABLE_SCRIPT_COVERAGE": "ON" }
         }
     ],
     "buildPresets": [
+        { "name": "linux-script-coverage", "configurePreset": "linux-script-coverage", "configuration": "Debug" },
+        { "name": "windows-script-coverage", "configurePreset": "windows-script-coverage", "configuration": "Debug" },
         { "name": "linux-coverage", "configurePreset": "linux-coverage", "configuration": "Debug" },
         { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug" },
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release" },
@@ -63,6 +76,8 @@
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release" }
     ],
     "testPresets": [
+        { "name": "linux-script-coverage", "configurePreset": "linux-script-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
+        { "name": "windows-script-coverage", "configurePreset": "windows-script-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
         { "name": "linux-coverage", "configurePreset": "linux-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
         { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug",   "output": { "outputOnFailure": true } },
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release", "output": { "outputOnFailure": true } },

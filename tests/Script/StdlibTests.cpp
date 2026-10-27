@@ -2,6 +2,7 @@
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/Script/Rs2b0tSpecs.hpp"
+#include "../Support/Script/ScriptCoverage.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 
 #include "Cache/GameCache_s.hpp"
@@ -48,7 +49,11 @@ namespace
             , client{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
             , api{state, map, actions}
-            , vm{ScriptTestRuntime::Get(), {.scriptsDirectory = scripts, .callTimeout = callTimeout}, capture.GetLogger()}
+            // Trace callbacks add work to long-running Python tests. Deadline-specific VM tests
+            // use ScriptVm directly and keep their original watchdog limits.
+            , vm{ScriptTestRuntime::Get(),
+                 {.scriptsDirectory = scripts, .callTimeout = ScriptCoverage::AdjustTimeout(callTimeout)},
+                 capture.GetLogger()}
         {
             ScriptBindings::Bind(vm, api);
             ScriptBindings::SetSettings(vm, "{}");
