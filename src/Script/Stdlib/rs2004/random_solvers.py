@@ -190,6 +190,13 @@ def _lamp_button(skill):
     return None
 
 
+def lamp_confirm_root(main, texts):
+    """The root to click Confirm in, or None when the lamp interface has closed."""
+    if main is None or main < 0 or 'Confirm' not in texts:
+        return None
+    return main
+
+
 def rub_lamp(skill, log):
     """Rubs the lamp and spends it on the skill. Use with yield from."""
     if not inventory.contains('Lamp'):
@@ -205,7 +212,13 @@ def rub_lamp(skill, log):
         return False
     _core.click_component(_lamp_button(skill))
     yield from execution.delay_ticks(1)
-    _core.click_text('Confirm', _core.get_main_modal())
+    main = _core.get_main_modal()
+    texts = _core.get_texts(main) if main >= 0 else []
+    main = lamp_confirm_root(main, texts)
+    if main is None:
+        log('random event: the lamp interface closed before Confirm')
+        return False
+    _core.click_text('Confirm', main)
     used = yield from execution.delay_until(lambda: not inventory.contains('Lamp'), 4000)
     log(f'random event: rubbed the lamp for {skill}' if used else 'random event: the lamp was not used')
     return True

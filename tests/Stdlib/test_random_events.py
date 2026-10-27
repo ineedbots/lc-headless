@@ -7,6 +7,7 @@ from rs2004.random_events import pick_sacrificial, handle_location, is_hostile_e
 from rs2004.random_events import GearLossTracker, Event, random_events
 from rs2004.random_solvers import mime_answer, MIME_EMOTES, solve_cube, cube_label, CUBE_PARTS
 from rs2004.random_solvers import build_maze, solve_maze_route, door_passable, edge_key, LAMP_SKILLS
+from rs2004.random_solvers import lamp_confirm_root
 
 HERE = Tile(100, 100, 0)
 WEST_THREAT = Tile(98, 100, 0)
@@ -260,6 +261,12 @@ def test_the_strange_box_gives_up_on_what_it_cannot_tell():
 
 def test_every_lamp_skill_is_named_once():
     assert len(LAMP_SKILLS) == 19 and len(set(LAMP_SKILLS)) == 19
+
+
+def test_the_lamp_confirm_needs_a_live_interface_with_its_button():
+    assert lamp_confirm_root(70, ['Confirm']) == 70
+    assert lamp_confirm_root(-1, ['Confirm']) is None
+    assert lamp_confirm_root(70, []) is None
 
 
 WALL = 3626
