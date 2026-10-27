@@ -132,6 +132,20 @@ While it runs, the client takes commands typed into its console: `help` lists th
 
 The exit code is 0 only when every account logged out cleanly and no script failed.
 
+## Fleet tracking
+
+The client can write what each account is earning and holding to per-account JSON Lines files: skill
+levels and XP every minute, a bank's contents each time it opens, and the backpack and worn equipment as
+they change. `tools/fleet/server.py` is a local, read-only page over them — experience, banks and
+inventories, with XP an hour — that binds to `127.0.0.1` and is never started by the client:
+
+```sh
+python3 tools/fleet/server.py                  # http://127.0.0.1:8765
+```
+
+Every log is optional; its folder in `scripting` can be left empty to turn it off. The file formats, the
+keys and what each tab shows are in [docs/FleetTracking.md](docs/FleetTracking.md).
+
 ## Writing scripts
 
 You can find a full comprehensive reference at [docs/scripting/](docs/scripting/README.md).
@@ -278,7 +292,7 @@ scripts/                      bot scripts: examples/, and typings/ for editors
 accounts/                     account files (ignored by git) and the sample file
 ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0
 docs/                         design documents and protocol reference
-tools/                        data exporters for rs2b0t's walker and catalogs, and docker/ for the Linux build check
+tools/                        data exporters for rs2b0t's walker and catalogs, docker/ for the Linux build check, and fleet/ for the local fleet view
 thirdparty/                   licenses of the projects code was ported from
 ```
 
