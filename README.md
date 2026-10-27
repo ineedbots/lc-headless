@@ -350,3 +350,4 @@ Everything in `src/` except `main.cpp` builds into a static library. The client 
 - Plutonium (OpenRSC) - https://gitlab.com/openrsc/plutonium
 - rs2b0t - https://github.com/rs2b2t/rs2b0t
 - Claude (yes this is slopped)
+- Codex
