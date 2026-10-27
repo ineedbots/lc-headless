@@ -113,7 +113,7 @@ A script with `BOT = define_bot(name=...)` reads only `settings["<name>"]`, so o
 ## Running
 
 ```
-Rs2004Headless [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger] [--raw-console]
+Rs2004Headless [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger] [--profile] [--raw-console]
 ```
 
 | Argument | Effect |
@@ -121,7 +121,8 @@ Rs2004Headless [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--deb
 | `client.jsonc` | The config file to use. Defaults to `client.jsonc` in the working directory |
 | `--account <file>` | Runs only this account. Without it, every enabled file in the accounts folder runs |
 | `--watch` | Reloads a script, without logging out, whenever the script or a module it imports is saved. A script that fails stays logged in and idle until the next save |
-| `--debugger` | Waits for VS Code's pocketpy debugger to attach on `127.0.0.1:6110` before logging in. Needs `--account`, and can't be used with `--watch` |
+| `--debugger` | Waits for VS Code's pocketpy debugger to attach on `127.0.0.1:6110` before logging in. Needs `--account`, and can't be used with `--watch` or `--profile` |
+| `--profile` | Records Python line profiling for each scripted account. Works with `--account` and `--watch`; can't be used with `--debugger` |
 | `--raw-console` | Writes plain log lines, with no colors, prompt or other VT100 codes, and doesn't read console input, for a service or another program reading the output. Ctrl+C still works |
 
 While it runs, the client takes commands typed into its console: `help` lists them, `status` shows where each account is, and `quit` does what Ctrl+C does. Scripts can define their own.
@@ -133,6 +134,14 @@ While it runs, the client takes commands typed into its console: `help` lists th
 3. A third Ctrl+C closes any connection whose logout the server is still refusing. The server refuses a logout during combat and for 10 seconds after it.
 
 The exit code is 0 only when every account logged out cleanly and no script failed.
+
+**Script profiling.** Start with `Rs2004Headless client.jsonc --profile`, optionally adding `--account accounts/<name>.jsonc` to select one account. Reports go under `profiles/<run-id>/<account>/load-001/profiler_report.json`, relative to the working directory. The log gives the report path. Each watched reload creates a new `load-*` folder so results from different source versions stay separate.
+
+Measurements accumulate across imports, initialization, loops, resumed generators, and hooks. Profiling stops between calls into Python, excluding the account loop's idle waits. Reports are saved every 60 seconds while the application steps accounts, on Python errors, when the script stops, and before its VM is destroyed. A forced process termination can lose results since the last save. Write failures are logged and retried on the next save.
+
+To view a report, install the [PocketPy VS Code extension](https://pocketpy.github.io/features/profiling/) and run **pocketpy: Load Line Profiler Report**. Select the JSON report, then its sibling `sources/` folder as the source root. This contains snapshots of the script and imported modules, including the embedded `rs2004` library. Synthetic interpreter filenames such as `<bootstrap>` have no source snapshot.
+
+Profiling adds overhead and leaves `scripting.callTimeoutMs` unchanged, so an account close to its watchdog limit may time out while profiling. Use the report to find expensive lines, then measure again without `--profile`. PocketPy 2.2.0 uses `clock()` for timings: Windows measures elapsed time and Linux measures process CPU time, including native bindings accordingly. These are line timings, not a breakdown inside C++ bindings or directly comparable cross-platform benchmarks.
 
 ## Writing scripts
 

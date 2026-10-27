@@ -75,6 +75,10 @@ void ScriptHost::Step(Clock::time_point now)
 {
     m_context.GetControl().SetStepTime(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
     CheckForChanges(now);
+    if (m_vm)
+    {
+        m_vm->CheckpointProfile(now);
+    }
 
     if (m_status != ScriptStatus_e::Running)
     {
@@ -164,6 +168,7 @@ void ScriptHost::Finish(std::string_view reason)
     // A stop asked for while stopping changes nothing.
     static_cast<void>(m_context.GetControl().TakeStopRequest());
     SaveSettings();
+    m_vm->SaveProfile();
 }
 
 bool ScriptHost::HandlesKillSignal() const
@@ -250,7 +255,12 @@ std::optional<ScriptHost::Clock::time_point> ScriptHost::GetNextLoop() const
 
 void ScriptHost::Load()
 {
-    m_vm.emplace(m_runtime, ScriptVmOptions_s{.scriptsDirectory = m_options.scriptsDirectory, .callTimeout = m_options.callTimeout}, m_logger);
+    if (m_options.waitForDebugger && !m_options.profileDirectory.empty())
+    {
+        throw ScriptError{"Profiling and the debugger can't share a script VM"};
+    }
+    const auto profileDirectory = m_options.profileDirectory.empty() ? std::filesystem::path{} : m_options.profileDirectory / std::format("load-{:03}", ++m_profileLoad);
+    m_vm.emplace(m_runtime, ScriptVmOptions_s{.scriptsDirectory = m_options.scriptsDirectory, .callTimeout = m_options.callTimeout, .profileDirectory = profileDirectory}, m_logger);
     m_hooks.emplace(*m_vm, [this]
     {
         return m_status == ScriptStatus_e::Running;

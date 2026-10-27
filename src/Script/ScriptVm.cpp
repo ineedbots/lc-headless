@@ -21,6 +21,36 @@ namespace
 
     using PyText = std::unique_ptr<char, decltype(&py_free)>;
 
+    // Stop both controls before formatting an exception or returning to the account loop.
+    class ExecutionScope
+    {
+    public:
+        ExecutionScope(std::chrono::milliseconds timeout, bool profile)
+            : m_profile{profile}
+        {
+            if (m_profile)
+            {
+                py_profiler_begin();
+            }
+            py_watchdog_begin(timeout.count());
+        }
+
+        ~ExecutionScope()
+        {
+            py_watchdog_end();
+            if (m_profile)
+            {
+                py_profiler_end();
+            }
+        }
+
+        ExecutionScope(const ExecutionScope&) = delete;
+        ExecutionScope& operator=(const ExecutionScope&) = delete;
+
+    private:
+        bool m_profile;
+    };
+
     c11_sv ToSv(std::string_view text)
     {
         return c11_sv{text.data(), static_cast<int>(text.size())};
@@ -52,6 +82,14 @@ ScriptVm::ScriptVm(ScriptRuntime& runtime, ScriptVmOptions_s options, std::share
     {
         Activate();
         py_setvmctx(this);
+        if (!m_options.profileDirectory.empty())
+        {
+            // This VM owns its trace callback. In particular, a test coverage collector may have
+            // attached at VM creation; profiling takes its place for this VM only.
+            py_sys_settrace(nullptr, true);
+            py_profiler_reset();
+            m_logger->Info("Script profile: {}", std::filesystem::absolute(m_options.profileDirectory / "profiler_report.json").string());
+        }
 
         auto* callbacks = py_callbacks();
         callbacks->importfile = ImportFile;
@@ -62,6 +100,7 @@ ScriptVm::ScriptVm(ScriptRuntime& runtime, ScriptVmOptions_s options, std::share
     }
     catch (const std::exception&)
     {
+        SaveProfile();
         m_runtime.ReleaseSlot(m_slot);
         throw;
     }
@@ -71,6 +110,7 @@ ScriptVm::~ScriptVm()
 {
     Activate();
     FlushOutput();
+    SaveProfile();
     m_runtime.ReleaseSlot(m_slot);
 }
 
@@ -96,6 +136,7 @@ void ScriptVm::RunFile(const std::filesystem::path& relativePath)
 void ScriptVm::RunSource(std::string_view source, std::string_view filename, py_GlobalRef module)
 {
     Activate();
+    RecordProfileSource(filename, source);
 
     const auto sourceText = std::string{source};
     const auto filenameText = std::string{filename};
@@ -142,10 +183,61 @@ py_GlobalRef ScriptVm::LoadJson(const std::string& json)
 
 void ScriptVm::WaitForDebugger()
 {
+    if (!m_options.profileDirectory.empty())
+    {
+        throw ScriptError{"Profiling and the debugger can't share a script VM"};
+    }
     Activate();
     m_logger->Info("Waiting for VS Code's pocketpy debugger to attach on {}:{}", DEBUGGER_HOST, DEBUGGER_PORT);
     py_debugger_waitforattach(DEBUGGER_HOST, DEBUGGER_PORT);
     m_logger->Info("Debugger attached");
+}
+
+void ScriptVm::RecordProfileSource(std::string_view filename, std::string_view source)
+{
+    if (!m_options.profileDirectory.empty() && !filename.starts_with('<') && FileUtils::IsInsideFolder(std::filesystem::path{filename}))
+    {
+        m_profileSources.insert_or_assign(std::string{filename}, std::string{source});
+    }
+}
+
+void ScriptVm::SaveProfile() noexcept
+{
+    if (m_options.profileDirectory.empty())
+    {
+        return;
+    }
+    try
+    {
+        Activate();
+        const auto report = PyText{py_profiler_report(), &py_free};
+        if (!report)
+        {
+            throw std::runtime_error{"PocketPy returned no profiler report"};
+        }
+        std::filesystem::create_directories(m_options.profileDirectory);
+        for (const auto& [filename, source] : m_profileSources)
+        {
+            const auto path = m_options.profileDirectory / "sources" / filename;
+            std::filesystem::create_directories(path.parent_path());
+            FileUtils::ReplaceFile(path, source);
+        }
+        m_profileSources.clear();
+        FileUtils::ReplaceFile(m_options.profileDirectory / "profiler_report.json", report.get());
+    }
+    catch (const std::exception& e)
+    {
+        m_logger->Warning("Couldn't save script profile in {}: {}", m_options.profileDirectory.string(), e.what());
+    }
+}
+
+void ScriptVm::CheckpointProfile(std::chrono::steady_clock::time_point now)
+{
+    if (!m_options.profileDirectory.empty() && now >= m_nextProfileSave)
+    {
+        m_nextProfileSave = now + 60s;
+        SaveProfile();
+    }
 }
 
 py_GlobalRef ScriptVm::CallIn(py_GlobalRef module, std::string_view function, std::span<const py_Ref> args)
@@ -234,13 +326,15 @@ template <typename TCall>
 void ScriptVm::RunGuarded(TCall call)
 {
     const auto unwindPoint = py_peek(0);
-    py_watchdog_begin(m_options.callTimeout.count());
-
-    const auto succeeded = call();
-    py_watchdog_end();
+    auto succeeded = false;
+    {
+        const auto execution = ExecutionScope{m_options.callTimeout, !m_options.profileDirectory.empty()};
+        succeeded = call();
+    }
 
     if (!succeeded)
     {
+        SaveProfile();
         ThrowPythonError(unwindPoint);
     }
 }
@@ -351,6 +445,7 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
         // The standard library comes first, so a script can't shadow it. It isn't one of the script's files.
         if (const auto library = Stdlib::Find(path))
         {
+            GetCurrent().RecordProfileSource(path, *library);
             return CopyForPocketpy(*library, size);
         }
 
@@ -369,6 +464,7 @@ char* ScriptVm::ImportFile(const char* path, int* size) noexcept
             return nullptr;
         }
 
+        vm.RecordProfileSource(path, *source);
         return CopyForPocketpy(*source, size);
     }
     catch (const std::exception& e)

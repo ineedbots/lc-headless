@@ -56,6 +56,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .username = m_account.credentials.username,
                 .watchFiles = m_options.watchScripts,
                 .waitForDebugger = m_options.waitForDebugger,
+                .profileDirectory = m_options.profileDirectory.empty() ? std::filesystem::path{} : m_options.profileDirectory / m_account.name,
                 .navigation = m_options.navigation,
                 .randomEvents = m_account.randomEvents,
                 .stallMinutes = m_account.stallMinutes,

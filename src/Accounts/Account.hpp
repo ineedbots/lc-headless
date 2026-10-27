@@ -20,6 +20,8 @@ struct AccountOptions_s
     // Also keeps the account logged in while the script is failed.
     bool watchScripts = false;
     bool waitForDebugger = false;
+    // Empty unless --profile enabled this run.
+    std::filesystem::path profileDirectory;
     // Without it, scripts can't plan routes beyond the loaded area.
     std::shared_ptr<const Navigation> navigation;
     std::chrono::milliseconds reloginDelay = 60s;

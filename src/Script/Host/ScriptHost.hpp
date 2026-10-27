@@ -50,6 +50,7 @@ struct ScriptHostOptions_s
     // A script that fails then waits for the next change.
     bool watchFiles = false;
     bool waitForDebugger = false;
+    std::filesystem::path profileDirectory;
     // Without it, the script can't plan routes beyond the loaded area.
     std::shared_ptr<const Navigation> navigation;
     // The runtime's upkeep each server tick: the random event guardian, the stall guard (off at zero) and
@@ -148,6 +149,7 @@ private:
     // Set by a reconnect and cleared once the player is placed again, when on_reconnect is called.
     bool m_reconnectPending = false;
     u32 m_loginCount = 0;
+    u32 m_profileLoad = 0;
     u64 m_lastTick = 0;
     Clock::time_point m_nextWatch;
     // When on_start first ran, which progress reports count from.

@@ -54,6 +54,31 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
 int Application::Run()
 {
     auto runtime = ScriptRuntime{};
+    auto profileDirectory = std::filesystem::path{};
+    if (m_commandLine.profile)
+    {
+        const auto stamp = std::chrono::system_clock::now().time_since_epoch().count();
+        // create_directory reserves the name even when several fleet processes start together.
+        for (u32 attempt = 0;; ++attempt)
+        {
+            profileDirectory = std::filesystem::path{"profiles"} / std::format("{}-{}", stamp, attempt);
+            try
+            {
+                std::filesystem::create_directories("profiles");
+                if (std::filesystem::create_directory(profileDirectory))
+                {
+                    break;
+                }
+            }
+            catch (const std::filesystem::filesystem_error& e)
+            {
+                // Keep profiling in memory; the normal saves will retry this path.
+                m_logger->Warning("Couldn't create profile directory {}: {}", profileDirectory.string(), e.what());
+                break;
+            }
+        }
+        m_logger->Info("Script profiling enabled: reports in {} (profiling adds execution overhead)", std::filesystem::absolute(profileDirectory).string());
+    }
     const auto& scripting = m_config->scripting;
     const auto options = AccountOptions_s{
         .client = {
@@ -63,6 +88,7 @@ int Application::Run()
         },
         .watchScripts = m_commandLine.watch,
         .waitForDebugger = m_commandLine.debugger,
+        .profileDirectory = profileDirectory,
         .navigation = m_navigation,
         .reloginDelay = scripting.reloginDelaySeconds,
     };

@@ -10,6 +10,8 @@ struct ScriptVmOptions_s
 {
     std::filesystem::path scriptsDirectory;
     std::chrono::milliseconds callTimeout = 1000ms;
+    // Empty disables profiling. Contains a PocketPy report and matching sources otherwise.
+    std::filesystem::path profileDirectory;
 };
 
 // pocketpy runs one VM at a time, so every entry point switches to this one first, and values passed to Call
@@ -40,6 +42,9 @@ public:
     py_GlobalRef LoadJson(const std::string& json);
     // Blocks until VS Code's pocketpy debugger attaches, which then traces this VM. Once per process.
     void WaitForDebugger();
+    // Safe outside Python execution; failures are logged rather than stopping the script.
+    void SaveProfile() noexcept;
+    void CheckpointProfile(std::chrono::steady_clock::time_point now);
     // Runs the walker's route search, from a binding, with ROUTE_SEARCH_TIMEOUTS call timeouts. When it returns
     // in that time the rest of the call gets the usual timeout afresh; when it doesn't, the call stops with
     // TimeoutError, as any call that runs too long does.
@@ -65,6 +70,7 @@ private:
     [[nodiscard]] std::optional<std::filesystem::path> ResolveImport(std::string_view request) const;
     void AppendOutput(std::string_view text);
     void FlushOutput();
+    void RecordProfileSource(std::string_view filename, std::string_view source);
 
     static bool Log(int argc, py_StackRef argv) noexcept;
     static bool Debug(int argc, py_StackRef argv) noexcept;
@@ -80,6 +86,8 @@ private:
     s32 m_slot;
     std::string m_output;
     std::vector<std::filesystem::path> m_files;
+    std::map<std::string, std::string, std::less<>> m_profileSources;
+    std::chrono::steady_clock::time_point m_nextProfileSave = std::chrono::steady_clock::now() + 60s;
 };
 
 template <typename TSearch>

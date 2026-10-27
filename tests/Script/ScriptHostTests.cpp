@@ -24,6 +24,7 @@
 #include "Script/BotMessenger.hpp"
 #include "Script/Error/ScriptError.hpp"
 #include "Script/Host/ScriptHost.hpp"
+#include "Utils/FileUtils.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -31,6 +32,47 @@
 #include <nlohmann/json.hpp>
 
 using Catch::Matchers::ContainsSubstring;
+
+TEST_CASE("ScriptHost saves profile stop hooks and separates watched reloads", "[ScriptHost][Profiling]")
+{
+    const auto output = TempFolder{"rs2004-host-profiles"};
+    const auto source = "def loop():\n    return 1000\n\ndef on_stop(reason):\n    log('stopped')\n";
+    auto fixture = HostFixture{source, ScriptHostOptions_s{.watchFiles = true, .profileDirectory = output.GetPath()}};
+    const auto start = ScriptHost::Clock::now();
+    fixture.host->Step(start);
+    fixture.host->Finish("test stop");
+    const auto firstPath = output.GetPath() / "load-001/profiler_report.json";
+    REQUIRE(FileUtils::ReadText(firstPath).has_value());
+    const auto first = nlohmann::json::parse(*FileUtils::ReadText(firstPath));
+    bool stopRecorded = false;
+    for (const auto& line : first.at("records").at("main.py"))
+    {
+        if (line.at(0) == 5 && line.at(1).get<s64>() > 0)
+        {
+            stopRecorded = true;
+        }
+    }
+    CHECK(stopRecorded);
+    CHECK(FileUtils::ReadText(output.GetPath() / "load-001/sources/main.py") == source);
+
+    const auto replacement = "def loop():\n    return 2000\n";
+    fixture.folder.RewriteFile("main.py", replacement);
+    fixture.host->Step(start + ScriptHost::WATCH_INTERVAL);
+    fixture.host->Step(start + 2 * ScriptHost::WATCH_INTERVAL);
+    fixture.host->Finish("test reload stop");
+    CHECK(std::filesystem::exists(output.GetPath() / "load-002/profiler_report.json"));
+    CHECK(FileUtils::ReadText(output.GetPath() / "load-002/sources/main.py") == replacement);
+    CHECK(FileUtils::ReadText(output.GetPath() / "load-001/sources/main.py") == source);
+}
+
+TEST_CASE("ScriptHost preserves a profile when initial script loading fails", "[ScriptHost][Profiling]")
+{
+    const auto output = TempFolder{"rs2004-host-profile-errors"};
+    CHECK_THROWS_AS(HostFixture("raise ValueError('bad import')\n", ScriptHostOptions_s{.profileDirectory = output.GetPath()}), ScriptError);
+    const auto text = FileUtils::ReadText(output.GetPath() / "load-001/profiler_report.json");
+    REQUIRE(text.has_value());
+    CHECK(nlohmann::json::parse(*text).at("records").contains("main.py"));
+}
 
 namespace
 {

@@ -29,6 +29,7 @@ TEST_CASE("CommandLine reads its command line", "[CommandLine]")
     CHECK_FALSE(defaults.accountPath.has_value());
     CHECK_FALSE(defaults.watch);
     CHECK_FALSE(defaults.debugger);
+    CHECK_FALSE(defaults.profile);
     CHECK_FALSE(defaults.rawConsole);
 
     const auto everything = Parse({"live.jsonc", "--account", "accounts/bot1.jsonc", "--debugger"});
@@ -39,6 +40,8 @@ TEST_CASE("CommandLine reads its command line", "[CommandLine]")
     CHECK(Parse({"--watch"}).watch);
     CHECK(Parse({"--raw-console", "--watch"}).rawConsole);
     CHECK(Parse({"--watch", "--account", "accounts/bot1.jsonc"}).watch);
+    CHECK(Parse({"--profile"}).profile);
+    CHECK(Parse({"--profile", "--watch", "--account", "accounts/bot1.jsonc"}).profile);
 }
 
 TEST_CASE("CommandLine rejects a command line it can't use", "[CommandLine]")
@@ -48,4 +51,5 @@ TEST_CASE("CommandLine rejects a command line it can't use", "[CommandLine]")
     CHECK_THROWS_WITH(Parse({"--debugger"}), ContainsSubstring("--debugger needs --account"));
     CHECK_THROWS_WITH(Parse({"--account", "a.jsonc", "--watch", "--debugger"}), ContainsSubstring("can't be combined"));
     CHECK_THROWS_AS(Parse({"--debugger"}), std::invalid_argument);
+    CHECK_THROWS_WITH(Parse({"--profile", "--debugger", "--account", "a.jsonc"}), ContainsSubstring("both use the VM's trace callback"));
 }

@@ -24,6 +24,10 @@ CommandLine_s CommandLine::Parse(std::span<char* const> args)
         {
             commandLine.debugger = true;
         }
+        else if (arg == PROFILE_OPTION)
+        {
+            commandLine.profile = true;
+        }
         else if (arg == RAW_CONSOLE_OPTION)
         {
             commandLine.rawConsole = true;
@@ -36,6 +40,11 @@ CommandLine_s CommandLine::Parse(std::span<char* const> args)
         {
             commandLine.configPath = arg;
         }
+    }
+
+    if (commandLine.profile && commandLine.debugger)
+    {
+        throw std::invalid_argument{std::format("{} and {} can't be combined: both use the VM's trace callback", PROFILE_OPTION, DEBUGGER_OPTION)};
     }
 
     if (commandLine.watch && commandLine.debugger)

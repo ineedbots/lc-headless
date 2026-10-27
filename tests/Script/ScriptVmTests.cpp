@@ -7,12 +7,128 @@
 #include "Console/Logger.hpp"
 #include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptVm.hpp"
+#include "Script/Stdlib.hpp"
+#include "Utils/FileUtils.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <pocketpy.h>
+#include <nlohmann/json.hpp>
 
 using Catch::Matchers::ContainsSubstring;
+
+namespace
+{
+    nlohmann::json ReadProfile(const std::filesystem::path& directory)
+    {
+        const auto text = FileUtils::ReadText(directory / "profiler_report.json");
+        REQUIRE(text.has_value());
+        return nlohmann::json::parse(*text);
+    }
+
+    s64 ProfileHits(const nlohmann::json& report, std::string_view file)
+    {
+        s64 hits = 0;
+        for (const auto& line : report.at("records").at(std::string{file}))
+        {
+            hits += line.at(1).get<s64>();
+        }
+        return hits;
+    }
+}
+
+TEST_CASE("Script profiling accumulates calls and generator resumes with matching sources", "[ScriptVm][Profiling]")
+{
+    const auto folder = TempFolder{"rs2004-profile-tests"};
+    const auto output = folder.GetPath() / "profile";
+    folder.WriteFile("helper.py", "def answer():\n    return 42\n");
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = folder.GetPath(), .profileDirectory = output}, capture.GetLogger()};
+    const auto source = "import helper\nimport rs2004.geometry\n\ndef steps():\n    yield helper.answer()\n    yield 2\n\ngen = steps()\n\ndef step():\n    return next(gen)\n";
+    vm.RunSource(source, "main.py");
+    CHECK(py_toint(vm.Call("step")) == 42);
+    vm.SaveProfile();
+    const auto first = ReadProfile(output);
+    CHECK(first.at("CLOCKS_PER_SEC").get<s64>() > 0);
+    CHECK(ProfileHits(first, "helper.py") > 0);
+    CHECK(py_toint(vm.Call("step")) == 2);
+    vm.SaveProfile();
+    CHECK(ProfileHits(ReadProfile(output), "main.py") > ProfileHits(first, "main.py"));
+    CHECK(FileUtils::ReadText(output / "sources/main.py") == source);
+    CHECK(FileUtils::ReadText(output / "sources/helper.py") == "def answer():\n    return 42\n");
+    REQUIRE(Stdlib::Find("rs2004/geometry.py").has_value());
+    CHECK(FileUtils::ReadText(output / "sources/rs2004/geometry.py") == Stdlib::Find("rs2004/geometry.py"));
+    CHECK_THROWS_WITH(vm.WaitForDebugger(), ContainsSubstring("can't share"));
+}
+
+TEST_CASE("Script profiling saves errors and recovers after watchdog timeouts", "[ScriptVm][Profiling]")
+{
+    const auto folder = TempFolder{"rs2004-profile-errors"};
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.callTimeout = 50ms, .profileDirectory = folder.GetPath()}, capture.GetLogger()};
+    vm.RunSource("def fail():\n    raise ValueError('failure')\n\ndef spin():\n    while True:\n        pass\n\ndef answer():\n    return 42\n", "errors.py");
+    CHECK_THROWS_WITH(vm.Call("fail"), ContainsSubstring("ValueError"));
+    CHECK(ProfileHits(ReadProfile(folder.GetPath()), "errors.py") > 0);
+    CHECK_THROWS_WITH(vm.Call("spin"), ContainsSubstring("TimeoutError"));
+    CHECK(py_toint(vm.Call("answer")) == 42);
+    vm.SaveProfile();
+    CHECK(ProfileHits(ReadProfile(folder.GetPath()), "errors.py") > 0);
+}
+
+TEST_CASE("Script profiling keeps VMs isolated and writes before releasing a slot", "[ScriptVm][Profiling]")
+{
+    const auto folder = TempFolder{"rs2004-profile-vms"};
+    auto capture = LogCapture{};
+    auto& runtime = ScriptTestRuntime::Get();
+    {
+        auto first = ScriptVm{runtime, {.profileDirectory = folder.GetPath() / "first"}, capture.GetLogger()};
+        auto second = ScriptVm{runtime, {.profileDirectory = folder.GetPath() / "second"}, capture.GetLogger()};
+        first.RunSource("def answer():\n    return 1\n", "first.py");
+        second.RunSource("def answer():\n    return 2\n", "second.py");
+        CHECK(py_toint(first.Call("answer")) == 1);
+        CHECK(py_toint(second.Call("answer")) == 2);
+    }
+    const auto first = ReadProfile(folder.GetPath() / "first");
+    const auto second = ReadProfile(folder.GetPath() / "second");
+    CHECK(first.at("records").contains("first.py"));
+    CHECK_FALSE(first.at("records").contains("second.py"));
+    CHECK(second.at("records").contains("second.py"));
+    CHECK_FALSE(second.at("records").contains("first.py"));
+    {
+        auto disabled = ScriptVm{runtime, {}, capture.GetLogger()};
+        disabled.RunSource("pass\n", "disabled.py");
+        disabled.SaveProfile();
+    }
+    CHECK(ReadProfile(folder.GetPath() / "first") == first);
+}
+
+TEST_CASE("Script profiling checkpoints without resetting and tolerates write failures", "[ScriptVm][Profiling]")
+{
+    const auto folder = TempFolder{"rs2004-profile-save"};
+    const auto output = folder.GetPath() / "output";
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.profileDirectory = output}, capture.GetLogger()};
+    vm.RunSource("def answer():\n    return 42\n", "checkpoint.py");
+    CHECK_FALSE(std::filesystem::exists(output));
+    const auto now = std::chrono::steady_clock::now();
+    vm.CheckpointProfile(now + 61s);
+    const auto first = ReadProfile(output);
+    CHECK(py_toint(vm.Call("answer")) == 42);
+    vm.CheckpointProfile(now + 62s);
+    CHECK(ReadProfile(output) == first);
+    vm.CheckpointProfile(now + 122s);
+    CHECK(ProfileHits(ReadProfile(output), "checkpoint.py") > ProfileHits(first, "checkpoint.py"));
+
+    folder.WriteFile("blocked", "a file, not a directory");
+    auto blocked = ScriptVm{ScriptTestRuntime::Get(), {.profileDirectory = folder.GetPath() / "blocked"}, capture.GetLogger()};
+    blocked.RunSource("def answer():\n    return 7\n", "blocked.py");
+    CHECK_NOTHROW(blocked.SaveProfile());
+    CHECK(py_toint(blocked.Call("answer")) == 7);
+    CHECK(std::ranges::any_of(capture.GetEntries(), [](const auto& entry)
+    {
+        return entry.message.find("Couldn't save script profile") != std::string::npos;
+    }));
+}
 
 namespace
 {
