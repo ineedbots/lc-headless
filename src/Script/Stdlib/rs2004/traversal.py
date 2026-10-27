@@ -107,18 +107,25 @@ def _snake(name):
     return out
 
 
-def bank_unlocked(bank, settings=None):
+def bank_unlocked(bank, settings=None, quest_statuses=None):
     """Whether the account can use the bank: its skill level and quest, and, for a bank a script opts into
     (Zanaris, the Mage Arena), the setting it names: from settings, a dict of booleans, when given, and
-    otherwise the Global settings (use_zanaris_bank, use_mage_bank)."""
+    otherwise the Global settings (use_zanaris_bank, use_mage_bank). quest_statuses maps a quest's name to
+    its status, when the caller has already read the list, so it isn't read again."""
     needs = bank.get('requires')
     if not needs:
         return True
     skill = needs.get('skill')
     if skill is not None and skills.level(skill['name']) < skill['level']:
         return False
-    if needs.get('quest') is not None and quests.status(needs['quest']) != 'complete':
-        return False
+    quest = needs.get('quest')
+    if quest is not None:
+        if quest_statuses is None:
+            status = quests.status(quest)
+        else:
+            status = quest_statuses.get(quest, quest_statuses.get(quest.lower(), 'unknown'))
+        if status != 'complete':
+            return False
     setting = needs.get('setting')
     if setting is not None:
         if settings is not None:
@@ -132,17 +139,24 @@ def _bank_stand(bank):
     return Tile(stand['x'], stand['z'], stand['level'])
 
 
-def nearest_banks(tile, settings=None):
+def nearest_banks(tile, settings=None, quest_statuses=None):
     """The banks the account can use, nearest first, by straight-line distance whatever the level, as
-    rs2b0t ranks them."""
-    usable = [bank for bank in bank_locations() if bank_unlocked(bank, settings)]
+    rs2b0t ranks them. quest_statuses is world_state's quests map, when the caller has one: the quest
+    list is otherwise read once, not once per bank that needs a quest."""
+    locations = bank_locations()
+    if quest_statuses is None:
+        for bank in locations:
+            if (bank.get('requires') or {}).get('quest') is not None:
+                quest_statuses = {quest.name: quest.status for quest in quests.all()}
+                break
+    usable = [bank for bank in locations if bank_unlocked(bank, settings, quest_statuses)]
     usable.sort(key=lambda bank: (_bank_stand(bank).x - tile.x) ** 2 + (_bank_stand(bank).z - tile.z) ** 2)
     return usable
 
 
-def nearest_bank(tile, settings=None):
+def nearest_bank(tile, settings=None, quest_statuses=None):
     """The nearest bank the account can use, or None."""
-    banks = nearest_banks(tile, settings)
+    banks = nearest_banks(tile, settings, quest_statuses)
     return banks[0] if banks else None
 
 
@@ -667,15 +681,18 @@ class _Traversal:
         # Why: with no bank in view, a Varrock to Ardougne walk never withdrew its second fare, so it's assumed the
         # bank has every gate's item, and the withdrawals find out.
         bank_items = known if known else gate_item_candidates()
+        # Why: a walk plans several routes in one step, so the state and its quest list are read once here
+        # and passed on. Rebuilding both for every request is what tripped the script watchdog on a full
+        # fleet.
         state = world_state()
         direct_missing = missing_items_for_path(direct_waypoints, state) if direct is not None else self.last_missing_gate_items
         if direct is not None and len(direct_missing) == 0 and path_has_teleport(direct_waypoints):
             return False
-        stand_bank = nearest_bank(me)
+        stand_bank = nearest_bank(me, quest_statuses=state.get('quests'))
         if stand_bank is None:
             return False
         stand = _bank_tile(stand_bank)
-        to_bank = self._request(me, stand, max_expansions, policy, use_teleports, zones)
+        to_bank = self._request(me, stand, max_expansions, policy, use_teleports, zones, state=state)
         if not to_bank['ok'] or len(missing_items_for_path(_waypoints(to_bank), state)) > 0:
             return False
         bank_to_dest = self._request(stand, dest, max_expansions, policy, use_teleports, zones, virtualize_with_items(state, bank_items))
