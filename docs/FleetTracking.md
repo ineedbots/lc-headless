@@ -128,7 +128,9 @@ A bar above the tabs then has **Launch client** and **Stop client**:
 - **Stop** sends SIGINT to every process, the client's graceful Ctrl+C path: scripts get `killGraceSeconds`,
   then accounts log out. A second SIGINT follows after ten seconds to log every account out at once if the
   server is refusing a logout in combat, and SIGKILL only for a process that outlives both (forty seconds).
-- The status line shows how many of the configs are running, such as `running 3/3`.
+- The status line shows the clients and the accounts: `running · 3/3 clients · 45/45 in game`. The account
+  count is the latest status line of the experience logs, so it follows logins and logouts without polling
+  the clients.
 - The running pids are written to `logs/fleet.pid`, so restarting the page adopts the clients it launched and
   Stop still works. A client started any other way is not adopted and is never signalled.
 

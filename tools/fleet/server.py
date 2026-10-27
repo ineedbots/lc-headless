@@ -306,6 +306,33 @@ def _prune():
             _write_pidfile()
 
 
+def _accounts_total():
+    """Every account file the configured clients would load, for the in-game count's denominator."""
+    total = 0
+    for config in CONTROL_CONFIGS:
+        try:
+            with open(config) as handle:
+                text = handle.read()
+        except OSError:
+            continue
+        # The config is JSONC; the one key needed is quoted and on its own line.
+        for line in text.splitlines():
+            if '"accountsDirectory"' in line and ':' in line:
+                folder = line.split(':', 1)[1].strip().strip(',').strip().strip('"')
+                total += len(glob.glob(os.path.join(ROOT, folder, '*.jsonc')))
+    return total
+
+
+def _in_game():
+    """Accounts whose latest status line says they are in game."""
+    count = 0
+    for path in glob.glob(os.path.join(EXPERIENCE_DIR, '*.jsonl')):
+        latest = _read_jsonl(path, limit=1)
+        if latest and latest[-1].get('state') == 'ingame':
+            count += 1
+    return count
+
+
 def control_state():
     with STATE_LOCK:
         _prune()
@@ -322,6 +349,8 @@ def control_state():
             'status': status,
             'running': len(RUNNING),
             'total': len(CONTROL_CONFIGS),
+            'accountsTotal': _accounts_total() if CONTROL_CONFIGS else 0,
+            'accountsInGame': _in_game() if CONTROL_CONFIGS else 0,
             'uptimeSeconds': uptime,
             'processes': processes,
             'error': ERROR,

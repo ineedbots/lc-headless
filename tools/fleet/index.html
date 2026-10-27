@@ -162,7 +162,8 @@ function renderExperience() {
   const skills = experience.skills || [];
   $('experience-head').innerHTML = '<th>Account</th><th>Status</th>' + skills.map(s => `<th class="num">${SKILL_LABELS[s] || s}</th>`).join('') + '<th>Seen</th>';
 
-  $('experience-summary').textContent = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · ${skills.length} skills`;
+  const inGame = accounts.reduce((count, name) => count + (experience.accounts[name].state === 'ingame' ? 1 : 0), 0);
+  $('experience-summary').textContent = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · ${inGame} in game · ${skills.length} skills`;
   if (!accounts.length) {
     $('experience-body').innerHTML = '<tr><td class="empty">no experience files yet</td></tr>';
     return;
@@ -284,7 +285,7 @@ $('bank-body').onclick = (event) => {
 
 // ---- launch and stop, only when the page was started with --config ----
 
-let control = { control:false, status:'idle', running:0, total:0, uptimeSeconds:null, processes:[], error:'' };
+let control = { control:false, status:'idle', running:0, total:0, accountsTotal:0, accountsInGame:0, uptimeSeconds:null, processes:[], error:'' };
 
 async function post(url) {
   const response = await fetch(url, { method:'POST' });
@@ -312,7 +313,8 @@ function renderControl() {
   $('launch').disabled = status !== 'idle';
   $('stop-client').disabled = running === 0 || status === 'launching' || status === 'stopping';
 
-  const parts = [running > 0 ? `${status} ${running}/${total}` : status];
+  const parts = [running > 0 ? `${status} · ${running}/${total} clients` : status];
+  if (control.accountsTotal) parts.push(`${control.accountsInGame}/${control.accountsTotal} in game`);
   if (control.uptimeSeconds !== null && control.uptimeSeconds !== undefined && running > 0) parts.push(duration(control.uptimeSeconds));
   if (control.error) parts.push(control.error);
   $('control-status').textContent = parts.join(' · ');
