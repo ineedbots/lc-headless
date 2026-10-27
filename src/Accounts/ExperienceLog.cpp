@@ -9,6 +9,25 @@ namespace
 {
     constexpr auto EXTENSION = ".jsonl"sv;
 
+    std::string_view StatusName(ClientStatus_e status)
+    {
+        switch (status)
+        {
+        case ClientStatus_e::Disconnected:
+            return "disconnected";
+        case ClientStatus_e::Connecting:
+            return "connecting";
+        case ClientStatus_e::InGame:
+            return "ingame";
+        case ClientStatus_e::LoggingOut:
+            return "logging out";
+        case ClientStatus_e::LoggedOut:
+            return "logged out";
+        }
+
+        return "unknown";
+    }
+
     // A skill's name, in the log line, as a sentence would start it.
     std::string Title(std::string_view name)
     {
@@ -30,46 +49,69 @@ ExperienceLog::ExperienceLog(std::filesystem::path directory, std::string accoun
 {
 }
 
-void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, bool inGame)
+void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status, bool settled)
 {
-    if (m_interval <= std::chrono::minutes::zero() || !inGame)
+    if (m_interval <= std::chrono::minutes::zero())
     {
         return;
     }
 
-    const auto due = !m_nextSample || now >= *m_nextSample;
-    if (!due)
+    const auto statusName = StatusName(status);
+    const auto inGame = status == ClientStatus_e::InGame && settled;
+    const auto statusChanged = m_lastStatus != statusName;
+    const auto firstBaseline = inGame && !m_hasBaseline;
+    const auto due = inGame && m_hasBaseline && (!m_nextSample || now >= *m_nextSample);
+
+    if (!statusChanged && !firstBaseline && !due)
     {
         return;
     }
 
-    // The first sample is the baseline, and says so; later ones cover the time since.
-    const auto baseline = !m_nextSample;
-    const auto hours = baseline ? 0.0 : std::chrono::duration<double, std::ratio<3600>>{std::chrono::duration_cast<Clock::duration>(m_interval)}.count();
-    m_nextSample = now + m_interval;
-
-    WriteSample(std::chrono::system_clock::now(), state);
-
-    // A baseline has nothing to compare with; a sample with no gain has nothing to say.
-    if (!baseline && m_hasLastXp)
+    auto periodic = false;
+    if (firstBaseline)
     {
+        m_hasBaseline = true;
+        m_nextSample = now + m_interval;
+    }
+    else if (due)
+    {
+        periodic = true;
+        m_nextSample = now + m_interval;
+    }
+
+    WriteSample(std::chrono::system_clock::now(), state, statusName, inGame && settled);
+    m_lastStatus = std::string{statusName};
+
+    // A sample with no gain has nothing to say; a status line and a baseline have no window to compare.
+    if (periodic && m_hasLastXp)
+    {
+        const auto hours = std::chrono::duration<double, std::ratio<3600>>{std::chrono::duration_cast<Clock::duration>(m_interval)}.count();
         LogGains(state, hours);
     }
 
-    for (std::size_t i = 0; i < SKILL_NAMES.size(); ++i)
+    if (inGame)
     {
-        m_lastXp[i] = state.stats[i].xp;
-    }
+        for (std::size_t i = 0; i < SKILL_NAMES.size(); ++i)
+        {
+            m_lastXp[i] = state.stats[i].xp;
+        }
 
-    m_hasLastXp = true;
+        m_hasLastXp = true;
+    }
+    else
+    {
+        // The next login is a new run, with its own baseline; no rate crosses a logout.
+        m_hasBaseline = false;
+        m_nextSample.reset();
+    }
 }
 
-void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state)
+void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled)
 {
     auto line = std::string{};
     line.reserve(2048);
-    std::format_to(std::back_inserter(line), "{{\"time\":\"{:%Y-%m-%dT%H:%M:%SZ}\",\"account\":\"{}\",\"skills\":{{",
-                   std::chrono::floor<std::chrono::seconds>(time), m_accountName);
+    std::format_to(std::back_inserter(line), "{{\"time\":\"{:%Y-%m-%dT%H:%M:%SZ}\",\"account\":\"{}\",\"state\":\"{}\",\"settled\":{},\"skills\":{{",
+                   std::chrono::floor<std::chrono::seconds>(time), m_accountName, statusName, settled);
 
     for (std::size_t i = 0; i < SKILL_NAMES.size() && i < GameState_s::STAT_COUNT; ++i)
     {

@@ -42,9 +42,13 @@ file is also its history.
 ## Experience
 
 ```json
-{"time":"2026-10-27T13:25:49Z","account":"s18","skills":{"attack":{"level":31,"base":31,"xp":14848},"thieving":{"level":52,"base":52,"xp":943488},…}}
+{"time":"2026-10-27T13:25:49Z","account":"s18","state":"ingame","settled":true,"skills":{"attack":{"level":31,"base":31,"xp":14848},"thieving":{"level":52,"base":52,"xp":943488},…}}
 ```
 
+- `state` is the client's own: `connecting`, `ingame`, `logging out`, `logged out` or `disconnected`.
+  A line is written whenever it changes, so the last line always says where the account is.
+- `settled` is true once the player is placed and the stats for that tick have arrived. Only settled
+  in-game lines are used for rates; a status line or a logged-out one has no XP run.
 - All 19 skills, in the game's stat order, with the current level, base level and XP.
 - The first sample is the baseline, written once the player is **settled** in game — placed, and a tick
   after the tick that placed them. The stats arrive a tick after the player, so a sample taken before

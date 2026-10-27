@@ -43,6 +43,10 @@
   .bar { display:flex; align-items:center; gap:10px; padding:9px 18px; border-bottom:1px solid var(--line); background:#161a21; }
   button.tool:disabled { opacity:.4; cursor:not-allowed; border-color:var(--line); }
   button.danger:not(:disabled):hover { border-color:#f7768e; color:#f7768e; }
+  .badge { display:inline-block; border-radius:999px; padding:1px 7px; font-size:11px; border:1px solid var(--line); }
+  .badge.good { color:var(--good); border-color:#3f5a2f; }
+  .badge.warn { color:#e0af68; border-color:#5a4a2a; }
+  .badge.off { color:var(--dim); }
 </style>
 </head>
 <body>
@@ -156,7 +160,7 @@ const age = text => {
 function renderExperience() {
   const accounts = Object.keys(experience.accounts).sort();
   const skills = experience.skills || [];
-  $('experience-head').innerHTML = '<th>Account</th>' + skills.map(s => `<th class="num">${SKILL_LABELS[s] || s}</th>`).join('') + '<th>Seen</th>';
+  $('experience-head').innerHTML = '<th>Account</th><th>Status</th>' + skills.map(s => `<th class="num">${SKILL_LABELS[s] || s}</th>`).join('') + '<th>Seen</th>';
 
   $('experience-summary').textContent = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · ${skills.length} skills`;
   if (!accounts.length) {
@@ -174,7 +178,9 @@ function renderExperience() {
       if (metric === 'xp') return `<td class="num">${fmt(xp)}</td>`;
       return `<td class="num">${perHour === undefined ? '–' : rate(perHour)}</td>`;
     }).join('');
-    return `<tr><td class="name">${name}</td>${cells}<td class="age">${age(entry.time)}</td></tr>`;
+    const state = entry.state || 'unknown';
+    const css = state === 'ingame' ? 'good' : (state === 'connecting' || state === 'logging out' ? 'warn' : 'off');
+    return `<tr><td class="name">${name}</td><td><span class="badge ${css}">${state}</span><span class="age">${age(entry.stateTime)}</span></td>${cells}<td class="age">${age(entry.time)}</td></tr>`;
   }).join('');
 }
 

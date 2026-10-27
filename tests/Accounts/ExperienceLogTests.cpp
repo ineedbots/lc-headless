@@ -56,6 +56,11 @@ namespace
         {
         }
 
+        [[nodiscard]] std::vector<std::string> Lines() const
+        {
+            return ReadLines(log.GetPath());
+        }
+
         TempFolder folder;
         LogCapture capture{LogLevel_e::Verbose};
         ExperienceLog log;
@@ -78,7 +83,7 @@ TEST_CASE("ExperienceLog writes a baseline, then a sample each interval", "[Expe
     SetXp(state, "thieving", 496);
 
     const auto start = Clock::now();
-    fixture.log.Step(start, state, true);
+    fixture.log.Step(start, state, ClientStatus_e::InGame, true);
 
     const auto path = fixture.folder.GetPath() / "experience" / "s18.jsonl";
     REQUIRE(std::filesystem::exists(path));
@@ -87,16 +92,17 @@ TEST_CASE("ExperienceLog writes a baseline, then a sample each interval", "[Expe
     const auto baseline = ReadLines(path).front();
     CHECK(baseline.starts_with("{\"time\":\""));
     CHECK(baseline.find("\"account\":\"s18\"") != std::string::npos);
+    CHECK(baseline.find("\"state\":\"ingame\",\"settled\":true") != std::string::npos);
     CHECK(baseline.find("\"attack\":{\"level\":1,\"base\":1,\"xp\":1154}") != std::string::npos);
     CHECK(baseline.find("\"thieving\":{\"level\":1,\"base\":1,\"xp\":496}") != std::string::npos);
     CHECK(baseline.ends_with("}}"));
 
     // Not yet due.
-    fixture.log.Step(start + 4min, state, true);
+    fixture.log.Step(start + 4min, state, ClientStatus_e::InGame, true);
     CHECK(ReadLines(path).size() == 1);
 
     SetXp(state, "thieving", 496 + 600);
-    fixture.log.Step(start + 5min, state, true);
+    fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
     CHECK(ReadLines(path).size() == 2);
 }
 
@@ -109,12 +115,12 @@ TEST_CASE("ExperienceLog logs the skills that gained experience, and their rate"
     SetXp(state, "hitpoints", 500);
 
     const auto start = Clock::now();
-    fixture.log.Step(start, state, true);
+    fixture.log.Step(start, state, ClientStatus_e::InGame, true);
     CHECK_FALSE(HasExperienceLog(fixture.capture));
 
     SetXp(state, "attack", 150);
     SetXp(state, "thieving", 1000 + 1200);
-    fixture.log.Step(start + 5min, state, true);
+    fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
 
     // 5 minutes is 1/12 of an hour, so 50 xp is 600 an hour and 1200 is 14400.
     CHECK(HasExperienceLog(fixture.capture, "experience: Attack +50 xp (600 an hour), Thieving +1200 xp (14400 an hour)"));
@@ -127,31 +133,67 @@ TEST_CASE("ExperienceLog says nothing for a sample with no gain", "[ExperienceLo
     SetXp(state, "thieving", 1000);
 
     const auto start = Clock::now();
-    fixture.log.Step(start, state, true);
-    fixture.log.Step(start + 5min, state, true);
+    fixture.log.Step(start, state, ClientStatus_e::InGame, true);
+    fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
 
     CHECK_FALSE(HasExperienceLog(fixture.capture));
     CHECK(ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").size() == 2);
 }
 
-TEST_CASE("ExperienceLog writes nothing while the account is out of game", "[ExperienceLog]")
+TEST_CASE("ExperienceLog records the status while out of game, and samples once settled", "[ExperienceLog]")
 {
     auto fixture = ExperienceFixture{};
     auto state = GameState_s{};
     SetXp(state, "thieving", 1000);
 
     const auto start = Clock::now();
-    for (auto minute = 0; minute < 20; minute += 5)
-    {
-        fixture.log.Step(start + std::chrono::minutes{minute}, state, false);
-    }
+    fixture.log.Step(start, state, ClientStatus_e::Connecting, false);
+    fixture.log.Step(start + 5min, state, ClientStatus_e::Connecting, false);
 
-    CHECK_FALSE(std::filesystem::exists(fixture.folder.GetPath() / "experience" / "s18.jsonl"));
+    // A status change is written once; repeating it is not.
+    const auto path = fixture.folder.GetPath() / "experience" / "s18.jsonl";
+    REQUIRE(ReadLines(path).size() == 1);
+    CHECK(ReadLines(path).front().find("\"state\":\"connecting\",\"settled\":false") != std::string::npos);
 
-    // The first in-game sample is the baseline, whenever it comes.
-    fixture.log.Step(start + 21min, state, true);
-    CHECK(ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").size() == 1);
+    // The first settled sample is the baseline, whenever it comes.
+    fixture.log.Step(start + 6min, state, ClientStatus_e::InGame, true);
+    CHECK(ReadLines(path).size() == 2);
+    CHECK(ReadLines(path).back().find("\"state\":\"ingame\",\"settled\":true") != std::string::npos);
 }
+
+TEST_CASE("ExperienceLog writes a line when the account logs out", "[ExperienceLog]")
+{
+    auto fixture = ExperienceFixture{};
+    auto state = GameState_s{};
+    SetXp(state, "thieving", 1000);
+
+    const auto start = Clock::now();
+    fixture.log.Step(start, state, ClientStatus_e::InGame, true);
+    fixture.log.Step(start + 1min, state, ClientStatus_e::LoggingOut, false);
+    fixture.log.Step(start + 2min, state, ClientStatus_e::LoggedOut, false);
+
+    const auto lines = fixture.Lines();
+    REQUIRE(lines.size() == 3);
+    CHECK(lines[1].find("\"state\":\"logging out\"") != std::string::npos);
+    CHECK(lines[2].find("\"state\":\"logged out\"") != std::string::npos);
+}
+
+TEST_CASE("ExperienceLog starts a new baseline after a logout", "[ExperienceLog]")
+{
+    auto fixture = ExperienceFixture{};
+    auto state = GameState_s{};
+    SetXp(state, "thieving", 1000);
+
+    const auto start = Clock::now();
+    fixture.log.Step(start, state, ClientStatus_e::InGame, true);
+    fixture.log.Step(start + 1min, state, ClientStatus_e::LoggedOut, false);
+
+    // Back in game at a lower XP, as a relogin can be: no rate is computed across the logout.
+    SetXp(state, "thieving", 100);
+    fixture.log.Step(start + 2min, state, ClientStatus_e::InGame, true);
+    CHECK_FALSE(HasExperienceLog(fixture.capture));
+}
+
 
 TEST_CASE("ExperienceLog waits for the player's stats before taking its baseline", "[ExperienceLog]")
 {
@@ -161,8 +203,11 @@ TEST_CASE("ExperienceLog waits for the player's stats before taking its baseline
     // In game, but the stats packet hasn't arrived, so the account is not settled yet.
     const auto start = Clock::now();
     CHECK_FALSE(state.IsSettled());
-    fixture.log.Step(start, state, false);
-    CHECK_FALSE(std::filesystem::exists(fixture.folder.GetPath() / "experience" / "s18.jsonl"));
+    // In game, but not settled: only the status is recorded, with no XP baseline yet.
+    fixture.log.Step(start, state, ClientStatus_e::InGame, false);
+    const auto status = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl");
+    REQUIRE(status.size() == 1);
+    CHECK(status.front().find("\"state\":\"ingame\",\"settled\":false") != std::string::npos);
 
     // Placed and settled: now the baseline is worth recording.
     state.placed = true;
@@ -170,10 +215,11 @@ TEST_CASE("ExperienceLog waits for the player's stats before taking its baseline
     state.tick = 101;
     REQUIRE(state.IsSettled());
     SetXp(state, "thieving", 496);
-    fixture.log.Step(start + 1min, state, true);
+    fixture.log.Step(start + 1min, state, ClientStatus_e::InGame, true);
 
-    const auto line = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").front();
+    const auto line = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").back();
     CHECK(line.find("\"thieving\":{\"level\":1,\"base\":1,\"xp\":496}") != std::string::npos);
+    CHECK(line.find("\"state\":\"ingame\",\"settled\":true") != std::string::npos);
 }
 
 TEST_CASE("ExperienceLog writes every skill, in the game's order", "[ExperienceLog]")
@@ -187,7 +233,7 @@ TEST_CASE("ExperienceLog writes every skill, in the game's order", "[ExperienceL
         state.stats[i].baseLevel = 10;
     }
 
-    fixture.log.Step(Clock::now(), state, true);
+    fixture.log.Step(Clock::now(), state, ClientStatus_e::InGame, true);
 
     const auto line = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").front();
     auto previous = std::size_t{0};
@@ -208,7 +254,7 @@ TEST_CASE("ExperienceLog names the file after the account", "[ExperienceLog]")
     for (const auto& name : {"s18", "s40", "s60"})
     {
         auto log = ExperienceLog{folder.GetPath() / "experience", name, 5min, capture.GetLogger()};
-        log.Step(Clock::now(), GameState_s{}, true);
+        log.Step(Clock::now(), GameState_s{}, ClientStatus_e::InGame, true);
         CHECK(std::filesystem::exists(folder.GetPath() / "experience" / (std::string{name} + ".jsonl")));
         CHECK(log.GetPath().filename() == (std::string{name} + ".jsonl"));
     }
@@ -221,12 +267,12 @@ TEST_CASE("ExperienceLog appends across runs rather than truncating", "[Experien
     SetXp(state, "thieving", 1000);
 
     const auto start = Clock::now();
-    fixture.log.Step(start, state, true);
-    fixture.log.Step(start + 5min, state, true);
+    fixture.log.Step(start, state, ClientStatus_e::InGame, true);
+    fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
 
     // A fresh log, as a restarted client makes: the earlier samples are kept.
     auto restarted = ExperienceLog{fixture.folder.GetPath() / "experience", "s18", 5min, fixture.capture.GetLogger()};
-    restarted.Step(start + 10min, state, true);
+    restarted.Step(start + 10min, state, ClientStatus_e::InGame, true);
 
     CHECK(ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").size() == 3);
 }
@@ -243,9 +289,9 @@ TEST_CASE("ExperienceLog warns once when it can't write, and never throws", "[Ex
     auto state = GameState_s{};
     const auto start = Clock::now();
 
-    CHECK_NOTHROW(log.Step(start, state, true));
-    CHECK_NOTHROW(log.Step(start + 1min, state, true));
-    CHECK_NOTHROW(log.Step(start + 2min, state, true));
+    CHECK_NOTHROW(log.Step(start, state, ClientStatus_e::InGame, true));
+    CHECK_NOTHROW(log.Step(start + 1min, state, ClientStatus_e::InGame, true));
+    CHECK_NOTHROW(log.Step(start + 2min, state, ClientStatus_e::InGame, true));
 
     const auto warnings = std::ranges::count_if(capture.GetEntries(), [](const CapturedLog_s& entry)
     {

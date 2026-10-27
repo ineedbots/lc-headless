@@ -124,22 +124,28 @@ def _rate(history):
 
 
 def experience():
-    """Every account's skills, and what it is earning an hour, from the end of its log."""
+    """Every account's status and skills, and what it is earning an hour from its settled in-game samples."""
     accounts = {}
     for path in sorted(glob.glob(os.path.join(EXPERIENCE_DIR, '*.jsonl'))):
         account = os.path.basename(path)[:-len('.jsonl')]
-        # Enough for the whole rate window; the file itself may hold days.
-        history = _read_jsonl(path, limit=RATE_WINDOW_MINUTES + 1)
+        # Status lines are written on login, logout and so on, so the window needs room for them too.
+        history = _read_jsonl(path, limit=200)
         if not history:
             continue
 
+        # Rates come only from settled in-game samples; a status line or a logged-out sample has no XP run.
+        samples = [record for record in history if record.get('state') == 'ingame' and record.get('settled')]
         latest = history[-1]
+        skills = samples[-1] if samples else latest
         accounts[account] = {
-            'time': latest.get('time'),
-            'levels': {skill: latest.get('skills', {}).get(skill, {}).get('level', 0) for skill in SKILLS},
-            'xp': {skill: latest.get('skills', {}).get(skill, {}).get('xp', 0) for skill in SKILLS},
-            'rates': _rate(history),
-            'samples': len(history),
+            'state': latest.get('state', 'unknown'),
+            'stateTime': latest.get('time'),
+            'time': skills.get('time'),
+            'levels': {skill: skills.get('skills', {}).get(skill, {}).get('level', 0) for skill in SKILLS},
+            'xp': {skill: skills.get('skills', {}).get(skill, {}).get('xp', 0) for skill in SKILLS},
+            # A logged-out account keeps its last levels, but not a rate that looks live.
+            'rates': _rate(samples) if latest.get('state') == 'ingame' and latest.get('settled') else {},
+            'samples': len(samples),
         }
 
     return {'accounts': accounts, 'skills': SKILLS}

@@ -176,12 +176,23 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
     try
     {
-        if (StepRelog(Clock::now()))
+        const auto now = Clock::now();
+        const auto status = m_client.GetStatus();
+
+        // Before the early returns below: a logout, a disconnect and a relog are states worth recording too.
+        // Settled, not merely in game: the stats arrive a tick after the player is placed.
+        if (m_experience)
+        {
+            const auto& state = m_client.GetState();
+            m_experience->Step(now, state, status, state.IsSettled());
+        }
+
+        if (StepRelog(now))
         {
             return;
         }
 
-        const auto ended = m_client.GetStatus() == ClientStatus_e::LoggedOut || m_client.GetStatus() == ClientStatus_e::Disconnected;
+        const auto ended = status == ClientStatus_e::LoggedOut || status == ClientStatus_e::Disconnected;
         if (ended && !IsStopping())
         {
             m_logger->Warning("The server ended the session; logging in again in {} s", GetReloginSeconds());
@@ -191,13 +202,11 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
         UpdateFinished();
 
-        const auto status = m_client.GetStatus();
         if (m_finished || status == ClientStatus_e::LoggingOut)
         {
             return;
         }
 
-        const auto now = Clock::now();
         if (m_script)
         {
             StepScript(now);
@@ -205,14 +214,6 @@ void Account::Step(std::chrono::milliseconds maxWait)
         else if (status == ClientStatus_e::InGame)
         {
             StepIdle(now);
-        }
-
-        // Settled, not merely in game: the stats arrive a tick after the player is placed, and a sample
-        // taken before them would record a baseline of zeroes.
-        if (m_experience)
-        {
-            const auto& state = m_client.GetState();
-            m_experience->Step(now, state, status == ClientStatus_e::InGame && state.IsSettled());
         }
 
         if (status == ClientStatus_e::InGame)
