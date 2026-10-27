@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet</title>
+<style>
+  :root { --bg:#12151a; --panel:#1b1f27; --line:#2a303c; --text:#d8dee9; --dim:#9aa4b2; --accent:#7aa2f7; --good:#9ece6a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.45 ui-sans-serif, system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:2; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  h1 { font-size:15px; margin:0; letter-spacing:.02em; }
+  nav { display:flex; gap:4px; }
+  nav button { background:transparent; color:var(--dim); border:1px solid transparent; border-radius:6px; padding:6px 12px; cursor:pointer; font:inherit; }
+  nav button.active { background:var(--panel); color:var(--text); border-color:var(--line); }
+  #meta { margin-left:auto; color:var(--dim); font-size:12px; }
+  main { padding:18px; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  select, input, button.tool { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 9px; font:inherit; }
+  button.tool { cursor:pointer; }
+  button.tool:hover { border-color:var(--accent); }
+  .pill { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px 10px; color:var(--dim); font-size:12px; }
+  .wrap { overflow:auto; max-height:calc(100vh - 150px); border:1px solid var(--line); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  thead th { position:sticky; top:0; background:var(--panel); z-index:1; font-weight:600; color:var(--dim); }
+  tbody tr:hover { background:#1f2431; }
+  td.name { color:var(--text); font-weight:600; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .rate { display:block; color:var(--dim); font-size:11px; }
+  .age { color:var(--dim); font-size:11px; }
+  .empty { color:var(--dim); padding:24px; text-align:center; }
+  .clickable { cursor:pointer; }
+  .detail td { background:#171b22; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:2px 8px; font-size:12px; color:var(--dim); }
+  .hide { display:none; }
+  .cols { display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+  .card { flex:1 1 380px; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .card h2 { margin:0; padding:10px 12px; font-size:13px; background:var(--panel); color:var(--dim); font-weight:600; }
+  .msg { color:var(--dim); }
+  .error { color:#f7768e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fleet</h1>
+  <nav>
+    <button data-view="experience" class="active">Experience</button>
+    <button data-view="bank">Bank</button>
+    <button data-view="inventory">Inventory</button>
+  </nav>
+  <span id="meta">…</span>
+</header>
+
+<main>
+  <section id="view-experience">
+    <div class="row">
+      <span id="experience-summary" class="pill">…</span>
+      <label class="msg">Show
+        <select id="metric">
+          <option value="level">Level</option>
+          <option value="rate">XP an hour</option>
+          <option value="xp">XP</option>
+        </select>
+      </label>
+      <button id="refresh-experience" class="tool">Refresh</button>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr id="experience-head"></tr></thead>
+      <tbody id="experience-body"><tr><td class="empty">loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section id="view-bank" class="hide">
+    <div class="row">
+      <span id="bank-summary" class="pill">…</span>
+      <input id="bank-filter" placeholder="filter by name or id" style="min-width:240px">
+      <button id="refresh-bank" class="tool">Refresh</button>
+      <span class="msg">click an item for each account's share</span>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th>Item</th><th class="num">ID</th><th class="num">Stock</th><th class="num">Accounts</th></tr></thead>
+      <tbody id="bank-body"><tr><td class="empty">loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section id="view-inventory" class="hide">
+    <div class="row">
+      <label class="msg">Account <select id="account"></select></label>
+      <button id="refresh-inventory" class="tool">Refresh</button>
+      <span id="inventory-summary" class="pill">…</span>
+      <span id="equipment-summary" class="pill">…</span>
+    </div>
+    <div class="cols">
+      <div class="card">
+        <h2>Backpack</h2>
+        <table><thead><tr><th>Item</th><th class="num">ID</th><th class="num">Qty</th></tr></thead>
+          <tbody id="inventory-body"><tr><td class="empty">loading…</td></tr></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Worn equipment</h2>
+        <table><thead><tr><th>Item</th><th class="num">ID</th><th class="num">Qty</th></tr></thead>
+          <tbody id="equipment-body"><tr><td class="empty">loading…</td></tr></tbody></table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const REFRESH_MS = 10000;
+const SKILL_LABELS = { attack:'Atk', defence:'Def', strength:'Str', hitpoints:'HP', ranged:'Range', prayer:'Pray', magic:'Mage', cooking:'Cook', woodcutting:'WC', fletching:'Fletch', fishing:'Fish', firemaking:'FM', crafting:'Craft', smithing:'Smith', mining:'Mine', herblore:'Herb', agility:'Agility', thieving:'Thieve', runecraft:'RC' };
+
+let view = 'experience';
+let experience = { accounts:{}, skills:[] };
+let bank = { accounts:0, items:[] };
+let account = localStorage.getItem('fleet.account') || '';
+let metric = localStorage.getItem('fleet.metric') || 'level';
+let bankFilter = '';
+const openItems = new Set();
+
+async function getJSON(url) {
+  const response = await fetch(url, { cache:'no-store' });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.json();
+}
+
+const fmt = n => n === null || n === undefined ? '–' : Number(n).toLocaleString();
+const rate = n => {
+  if (n === null || n === undefined) return '–';
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return (n/1e6).toFixed(1) + 'm';
+  if (abs >= 1e3) return (n/1e3).toFixed(1) + 'k';
+  return String(n);
+};
+const age = text => {
+  if (!text) return '';
+  const then = Date.parse(text);
+  if (Number.isNaN(then)) return '';
+  const seconds = Math.max(0, (Date.now() - then) / 1000);
+  if (seconds < 90) return 'just now';
+  if (seconds < 5400) return `${Math.round(seconds/60)}m ago`;
+  return `${(seconds/3600).toFixed(1)}h ago`;
+};
+
+function renderExperience() {
+  const accounts = Object.keys(experience.accounts).sort();
+  const skills = experience.skills || [];
+  $('experience-head').innerHTML = '<th>Account</th>' + skills.map(s => `<th class="num">${SKILL_LABELS[s] || s}</th>`).join('') + '<th>Seen</th>';
+
+  $('experience-summary').textContent = `${accounts.length} account${accounts.length === 1 ? '' : 's'} · ${skills.length} skills`;
+  if (!accounts.length) {
+    $('experience-body').innerHTML = '<tr><td class="empty">no experience files yet</td></tr>';
+    return;
+  }
+
+  $('experience-body').innerHTML = accounts.map(name => {
+    const entry = experience.accounts[name];
+    const cells = skills.map(skill => {
+      const level = entry.levels[skill] ?? 0;
+      const xp = entry.xp[skill] ?? 0;
+      const perHour = entry.rates ? entry.rates[skill] : undefined;
+      if (metric === 'level') return `<td class="num">${level}<span class="rate">${perHour ? rate(perHour) + '/h' : ''}</span></td>`;
+      if (metric === 'xp') return `<td class="num">${fmt(xp)}</td>`;
+      return `<td class="num">${perHour === undefined ? '–' : rate(perHour)}</td>`;
+    }).join('');
+    return `<tr><td class="name">${name}</td>${cells}<td class="age">${age(entry.time)}</td></tr>`;
+  }).join('');
+}
+
+function renderBank() {
+  const filter = bankFilter.trim().toLowerCase();
+  const items = bank.items.filter(item => !filter || item.name.toLowerCase().includes(filter) || String(item.id).includes(filter));
+  $('bank-summary').textContent = `${bank.accounts} banks · ${bank.items.length} items`;
+  if (!items.length) {
+    $('bank-body').innerHTML = '<tr><td class="empty">no bank snapshots yet</td></tr>';
+    return;
+  }
+
+  const rows = [];
+  for (const item of items) {
+    const accounts = Object.entries(item.accounts).sort((a,b) => b[1]-a[1]);
+    rows.push(`<tr class="clickable" data-id="${item.id}">
+      <td class="name">${item.name}</td><td class="num">${item.id}</td><td class="num">${fmt(item.total)}</td><td class="num">${accounts.length}</td>
+    </tr>`);
+    if (openItems.has(item.id)) {
+      rows.push(`<tr class="detail"><td colspan="4"><div class="chips">${accounts.map(([name, qty]) => `<span class="chip">${name} ×${fmt(qty)}</span>`).join('')}</div></td></tr>`);
+    }
+  }
+  $('bank-body').innerHTML = rows.join('');
+}
+
+function itemRows(items, empty) {
+  if (!items || !items.length) return `<tr><td class="empty">${empty}</td></tr>`;
+  return items.map(item => `<tr><td class="name">${item.name}</td><td class="num">${item.id}</td><td class="num">${fmt(item.qty)}</td></tr>`).join('');
+}
+
+function renderInventory() {
+  $('inventory-summary').textContent = account ? `backpack ${account}` : 'no account';
+  $('equipment-summary').textContent = 'worn equipment';
+  if (!account) {
+    $('inventory-body').innerHTML = '<tr><td class="empty">no account selected</td></tr>';
+    $('equipment-body').innerHTML = '<tr><td class="empty"></td></tr>';
+    return;
+  }
+  getJSON(`/api/inventory?account=${encodeURIComponent(account)}`).then(data => {
+    const inv = data.inventory;
+    const equip = data.equipment;
+    $('inventory-summary').textContent = inv
+      ? `${account} · ${inv.used}/${inv.used + inv.free} slots${inv.bankOpen ? ' · bank open' : ''} · ${age(inv.time)}`
+      : `${account} · no backpack snapshot`;
+    $('equipment-summary').textContent = equip ? `worn ${equip.used} · ${age(equip.time)}` : 'worn equipment';
+    $('inventory-body').innerHTML = inv ? itemRows(inv.items, 'nothing carried') : '<tr><td class="empty">no backpack snapshot yet</td></tr>';
+    $('equipment-body').innerHTML = equip ? itemRows(equip.items, 'nothing worn') : '<tr><td class="empty">no equipment snapshot yet</td></tr>';
+  }).catch(error => {
+    $('inventory-body').innerHTML = `<tr><td class="empty error">${error.message}</td></tr>`;
+  });
+}
+
+async function loadExperience() {
+  try { experience = await getJSON('/api/experience'); renderExperience(); }
+  catch (e) { $('experience-body').innerHTML = `<tr><td class="empty error">${e.message}</td></tr>`; }
+}
+
+async function loadBank() {
+  try { bank = await getJSON('/api/bank'); renderBank(); }
+  catch (e) { $('bank-body').innerHTML = `<tr><td class="empty error">${e.message}</td></tr>`; }
+}
+
+async function loadAccounts() {
+  try {
+    const data = await getJSON('/api/inventory');
+    const select = $('account');
+    const names = data.accounts || [];
+    select.innerHTML = names.map(name => `<option value="${name}">${name}</option>`).join('');
+    if (names.length && !names.includes(account)) account = names[0];
+    select.value = account || '';
+    localStorage.setItem('fleet.account', account);
+  } catch (e) { /* the tab shows its own error when fetched */ }
+}
+
+function show(name) {
+  view = name;
+  if (location.hash !== `#${name}`) history.replaceState(null, '', `#${name}`);
+  for (const tab of document.querySelectorAll('nav button')) tab.classList.toggle('active', tab.dataset.view === name);
+  for (const section of ['experience','bank','inventory']) $(`view-${section}`).classList.toggle('hide', section !== name);
+  localStorage.setItem('fleet.view', name);
+  if (name === 'experience') loadExperience();
+  if (name === 'bank') loadBank();
+  if (name === 'inventory') { loadAccounts().then(renderInventory); }
+}
+
+for (const tab of document.querySelectorAll('nav button')) tab.onclick = () => show(tab.dataset.view);
+$('metric').value = metric;
+$('metric').onchange = () => { metric = $('metric').value; localStorage.setItem('fleet.metric', metric); renderExperience(); };
+$('bank-filter').oninput = (event) => { bankFilter = event.target.value; renderBank(); };
+$('account').onchange = (event) => { account = event.target.value; localStorage.setItem('fleet.account', account); renderInventory(); };
+$('refresh-experience').onclick = loadExperience;
+$('refresh-bank').onclick = loadBank;
+$('refresh-inventory').onclick = () => loadAccounts().then(renderInventory);
+$('bank-body').onclick = (event) => {
+  const row = event.target.closest('tr[data-id]');
+  if (!row) return;
+  const id = Number(row.dataset.id);
+  if (openItems.has(id)) openItems.delete(id); else openItems.add(id);
+  renderBank();
+};
+
+$('meta').textContent = `refreshes every ${REFRESH_MS/1000}s · read-only · 127.0.0.1`;
+const initialView = ['experience', 'bank', 'inventory'].includes(location.hash.slice(1)) ? location.hash.slice(1) : (localStorage.getItem('fleet.view') || 'experience');
+show(initialView);
+
+setInterval(() => {
+  if (document.hidden) return;
+  if (view === 'experience') loadExperience();
+  if (view === 'bank') loadBank();
+  if (view === 'inventory') loadAccounts().then(renderInventory);
+}, REFRESH_MS);
+</script>
+</body>
+</html>
