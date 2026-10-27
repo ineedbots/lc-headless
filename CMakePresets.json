@@ -44,9 +44,17 @@
                 "CMAKE_CXX_COMPILER": "clang++"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        },
+        {
+            "name": "linux-coverage",
+            "inherits": "linux-clang",
+            "cacheVariables": {
+                "RS2004_ENABLE_COVERAGE": "ON"
+            }
         }
     ],
     "buildPresets": [
+        { "name": "linux-coverage", "configurePreset": "linux-coverage", "configuration": "Debug" },
         { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug" },
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release" },
         { "name": "windows-x86-debug",   "configurePreset": "windows-msvc-x86", "configuration": "Debug" },
@@ -55,6 +63,7 @@
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release" }
     ],
     "testPresets": [
+        { "name": "linux-coverage", "configurePreset": "linux-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
         { "name": "windows-debug",   "configurePreset": "windows-msvc", "configuration": "Debug",   "output": { "outputOnFailure": true } },
         { "name": "windows-release", "configurePreset": "windows-msvc", "configuration": "Release", "output": { "outputOnFailure": true } },
         { "name": "windows-x86-debug",   "configurePreset": "windows-msvc-x86", "configuration": "Debug",   "output": { "outputOnFailure": true } },

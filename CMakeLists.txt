@@ -7,6 +7,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+include(cmake/Coverage.cmake)
+
 find_package(boost_asio CONFIG REQUIRED)
 find_package(boost_beast CONFIG REQUIRED)
 find_package(BZip2 REQUIRED)
@@ -108,6 +110,8 @@ include(Catch)
 catch_discover_tests(${PROJECT_NAME}Tests
     DISCOVERY_MODE PRE_TEST
     PROPERTIES TIMEOUT 60)
+
+configure_native_coverage(${PROJECT_NAME}Lib ${PROJECT_NAME} ${PROJECT_NAME}Tests)
 
 # The release archive is one folder laid out like the repository, with the files the client loads from its working
 # directory, so it runs from inside the folder with the default paths in client.jsonc.sample. The tests aren't installed.

@@ -248,6 +248,32 @@ The Catch2 tests don't need a server. The network tests run against a fake game 
 
 A few tests read a real game cache, and skip unless you point environment variables to the cache directory: `RS2004_CACHE_DIR` for a 289 cache (such as `<289 server>/engine/data/pack`), `RS2004_CACHE_DIR_274` for a 274 cache, and `RS2004_CACHE_DIR_225` for a 225 one (ex: `<255 server>/engine/data/pack/client`).
 
+### Native code coverage
+
+Native coverage uses a separate Linux Clang Debug build. Install Python 3 and LLVM's coverage tools
+(`sudo apt install python3 llvm libclang-rt-dev` on Ubuntu 24.04), with `llvm-cov` and `llvm-profdata` matching the compiler's
+major version. Keep `VCPKG_ROOT` set as for a normal build, then run from the repository root:
+
+```sh
+python3 tools/coverage/native.py
+```
+
+The command configures and builds the `linux-coverage` preset, runs CTest with four parallel workers, and writes
+`build/linux-coverage/coverage/html/index.html`, `coverage.lcov`, `summary.txt`, and `summary.json`. Use
+`--parallel N` to change build and test parallelism, or `--no-build` to collect from an existing coverage build.
+Each run clears its previous reports and profiles. Test failures still fail the command; any reports produced
+from a failed run are partial.
+
+The report includes authored C++ under `src/`, including headers and code not referenced by the tests.
+Tests, dependencies, and generated embedded Python are excluded. The application binary supplies coverage
+mappings for `main.cpp`, but is not run, so its entry point starts at zero coverage. C++ exercised by the
+embedded script tests contributes to native coverage; Python source coverage is not collected yet.
+
+CI uploads the same report as the `native-coverage-linux-x64` artifact and publishes a summary. Coverage
+percentages are informational; test or collection failures fail the job. Real-cache tests skip without their
+cache environment variables, and hidden `[Slow]` tests are excluded from this baseline. Reports from runs with
+cache data can therefore differ from CI. Normal build and test presets do not enable instrumentation.
+
 ### Project layout
 
 ```
