@@ -1,3 +1,5 @@
+import json
+
 import rs2004.routeplan as routes
 import rs2004.traversal as walker
 from rs2004.traversal import matches_landing, special_crossing_for_transport, pick_choice
@@ -71,6 +73,98 @@ def test_a_bank_a_script_opts_into_follows_the_global_setting():
     assert walker.bank_unlocked(zanaris)
     assert not walker.bank_unlocked(zanaris, {})
     settings_store.load({})
+
+
+class _FakeQuest:
+    def __init__(self, name, status):
+        self.name = name
+        self.status = status
+
+
+class _FakeQuestLog:
+    def __init__(self, statuses):
+        self.statuses = statuses
+        self.reads = 0
+
+    def all(self):
+        self.reads += 1
+        return [_FakeQuest(name, status) for name, status in self.statuses.items()]
+
+    def status(self, name):
+        return self.statuses.get(name, 'unknown')
+
+
+class _FakeCore:
+    def __init__(self):
+        self.requests = []
+
+    def find_world_path(self, text):
+        self.requests.append(json.loads(text))
+        return '{"ok": true, "cost": 1, "waypoints": []}'
+
+
+class _SkipPlan:
+    action = 'skip'
+
+
+def test_nearest_banks_reads_the_quest_list_once_for_every_gated_bank():
+    walker._banks = [
+        {'name': 'Canifis', 'tile': {'x': 3200, 'z': 3200, 'level': 0}, 'requires': {'quest': 'Priest in Peril'}},
+        {'name': 'Shilo', 'tile': {'x': 3201, 'z': 3201, 'level': 0}, 'requires': {'quest': 'Shilo Village'}},
+        {'name': 'Legends', 'tile': {'x': 3202, 'z': 3202, 'level': 0}, 'requires': {'quest': 'Legends Quest'}},
+        {'name': 'Plain', 'tile': {'x': 3203, 'z': 3203, 'level': 0}},
+    ]
+    log = _FakeQuestLog({'Priest in Peril': 'complete', 'Shilo Village': 'in_progress'})
+    original = walker.quests
+    walker.quests = log
+    names = [bank['name'] for bank in walker.nearest_banks(tile(3200, 3200))]
+    reads_once = log.reads
+    # A caller that already read the list, as world_state does, passes its statuses on: no read.
+    name = walker.nearest_bank(tile(3200, 3200), quest_statuses={'Priest in Peril': 'complete'})['name']
+    reads_after = log.reads
+    walker.quests = original
+    walker._banks = None
+    assert names == ['Canifis', 'Plain']
+    assert reads_once == 1
+    assert name == 'Canifis'
+    assert reads_after == 1
+
+
+def test_a_bank_check_builds_the_world_state_once():
+    built = []
+
+    def fake_world_state():
+        built.append({'members': False, 'skills': {}, 'items': {}, 'worn': {},
+                      'quests': {'Priest in Peril': 'complete'}, 'free_slots': 0, 'can_slash_web': False})
+        return built[-1]
+
+    walker._banks = [{'name': 'Canifis', 'tile': {'x': 3200, 'z': 3200, 'level': 0}, 'requires': {'quest': 'Priest in Peril'}}]
+    log = _FakeQuestLog({'Priest in Peril': 'complete'})
+    core = _FakeCore()
+    original = (walker._core, walker.world_state, walker.plan_bank_leg, walker.quests, walker.gate_item_candidates)
+    walker._core = core
+    walker.world_state = fake_world_state
+    walker.plan_bank_leg = lambda *args: _SkipPlan()
+    walker.quests = log
+    walker.gate_item_candidates = lambda: {}
+    walk = walker._Traversal()
+    check = walk._maybe_bank_for_route(tile(3200, 3200), tile(3210, 3210), None, [], 100, {}, False, [],
+                                       lambda message: None)
+    yielded = False
+    result = None
+    try:
+        next(check)
+        yielded = True
+    except StopIteration as stop:
+        result = stop.value
+    walker._core, walker.world_state, walker.plan_bank_leg, walker.quests, walker.gate_item_candidates = original
+    walker._banks = None
+    assert not yielded, 'a skipped bank plan should not yield'
+    assert result is False
+    assert len(built) == 1
+    assert log.reads == 0
+    assert core.requests[0]['state']['quests'] == {'Priest in Peril': 'complete'}
+    assert len(core.requests) == 2
 
 
 def test_rs2b0ts_walk_presets_and_teleports_off_by_default():
