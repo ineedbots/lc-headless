@@ -141,10 +141,12 @@ inventories, with XP an hour — that binds to `127.0.0.1` and is never started 
 
 ```sh
 python3 tools/fleet/server.py                  # http://127.0.0.1:8765
+python3 tools/fleet/server.py --config client.jsonc   # ... with Launch and Stop client
 ```
 
 Every log is optional; its folder in `scripting` can be left empty to turn it off. The file formats, the
-keys and what each tab shows are in [docs/FleetTracking.md](docs/FleetTracking.md).
+keys, what each tab shows and the optional launch/stop controls are in
+[docs/FleetTracking.md](docs/FleetTracking.md).
 
 ## Writing scripts
 

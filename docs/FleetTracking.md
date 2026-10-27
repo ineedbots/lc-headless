@@ -98,6 +98,37 @@ and starts or controls nothing.
 
 The page refreshes every ten seconds, shows how old each file is, and has a Refresh button per tab.
 
+## Starting and stopping the client
+
+The page is read-only unless it is given a client config:
+
+```sh
+python3 tools/fleet/server.py --config client.jsonc
+```
+
+A bar above the tabs then has **Launch client** and **Stop client**:
+
+| State | Launch | Stop |
+|---|---|---|
+| idle | enabled | disabled |
+| running | disabled | enabled |
+| during launch or stop | disabled | disabled |
+
+- **Launch** finds the built client (beside the repository, in a preset build folder, then `PATH`) and runs
+  `Rs2004Headless <config> --raw-console`, with its output appended to `logs/fleet.log`. It launches one
+  process; the accounts and scripts are whatever the account files say. It refuses while one is running.
+- **Stop** sends SIGINT, the client's graceful Ctrl+C path: scripts get `killGraceSeconds`, then accounts log
+  out. A second SIGINT follows after ten seconds to log every account out at once if the server is refusing
+  a logout in combat, and SIGKILL only if the process outlives both (forty seconds).
+- The last state is written to `logs/fleet.pid`, so restarting the page adopts the client it launched and
+  Stop still works. A client started any other way is not adopted and is never signalled.
+
+This is not the in-client script control described above: Launch starts a **new** client process, and Stop
+shuts it down. Switching scripts means stopping and launching again.
+
+Without `--config` the page cannot start or stop anything: the bar is hidden, and `/api/launch` and
+`/api/stop` answer 403.
+
 ## Turning it off
 
 | Want | Set |

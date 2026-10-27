@@ -40,6 +40,9 @@
   .card h2 { margin:0; padding:10px 12px; font-size:13px; background:var(--panel); color:var(--dim); font-weight:600; }
   .msg { color:var(--dim); }
   .error { color:#f7768e; }
+  .bar { display:flex; align-items:center; gap:10px; padding:9px 18px; border-bottom:1px solid var(--line); background:#161a21; }
+  button.tool:disabled { opacity:.4; cursor:not-allowed; border-color:var(--line); }
+  button.danger:not(:disabled):hover { border-color:#f7768e; color:#f7768e; }
 </style>
 </head>
 <body>
@@ -50,8 +53,14 @@
     <button data-view="bank">Bank</button>
     <button data-view="inventory">Inventory</button>
   </nav>
-  <span id="meta">…</span>
+  <span id="meta">refreshes every 10s · 127.0.0.1</span>
 </header>
+
+<section id="control" class="bar hide">
+  <button id="launch" class="tool">Launch client</button>
+  <button id="stop-client" class="tool danger" title="Stops the client and logs its accounts out">Stop client</button>
+  <span id="control-status" class="pill">…</span>
+</section>
 
 <main>
   <section id="view-experience">
@@ -267,9 +276,74 @@ $('bank-body').onclick = (event) => {
   renderBank();
 };
 
-$('meta').textContent = `refreshes every ${REFRESH_MS/1000}s · read-only · 127.0.0.1`;
+// ---- launch and stop, only when the page was started with --config ----
+
+let control = { control:false, status:'idle', pid:null, uptimeSeconds:null, error:'' };
+
+async function post(url) {
+  const response = await fetch(url, { method:'POST' });
+  let data = {};
+  try { data = await response.json(); } catch (e) { /* the status is enough */ }
+  if (!response.ok) throw new Error(data.error || `${response.status} ${response.statusText}`);
+  return data;
+}
+
+function duration(seconds) {
+  if (seconds === null || seconds === undefined) return '';
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds/60)}m`;
+  return `${Math.floor(seconds/3600)}h ${String(Math.floor((seconds%3600)/60)).padStart(2,'0')}m`;
+}
+
+function renderControl() {
+  $('control').classList.toggle('hide', !control.control);
+  $('meta').textContent = control.control ? 'refreshes every 10s · control · 127.0.0.1' : 'refreshes every 10s · read-only · 127.0.0.1';
+  if (!control.control) return;
+
+  const status = control.status || 'idle';
+  $('launch').disabled = status !== 'idle';
+  $('stop-client').disabled = status !== 'running';
+
+  const parts = [status];
+  if (control.uptimeSeconds !== null && control.uptimeSeconds !== undefined && (status === 'running' || status === 'stopping')) parts.push(duration(control.uptimeSeconds));
+  if (control.pid) parts.push(`pid ${control.pid}`);
+  if (control.error) parts.push(control.error);
+  $('control-status').textContent = parts.join(' · ');
+}
+
+async function loadControl() {
+  try { control = await getJSON('/api/control'); renderControl(); }
+  catch (e) { $('control-status').textContent = `control unavailable: ${e.message}`; }
+}
+
+$('launch').onclick = async () => {
+  $('launch').disabled = true;
+  $('control-status').textContent = 'launching…';
+  try {
+    control = await post('/api/launch');
+    renderControl();
+  } catch (e) {
+    $('control-status').textContent = `launch failed: ${e.message}`;
+    loadControl();
+  }
+};
+
+$('stop-client').onclick = async () => {
+  $('stop-client').disabled = true;
+  $('control-status').textContent = 'stopping…';
+  try {
+    control = await post('/api/stop');
+    renderControl();
+  } catch (e) {
+    $('control-status').textContent = `stop failed: ${e.message}`;
+    loadControl();
+  }
+};
+
 const initialView = ['experience', 'bank', 'inventory'].includes(location.hash.slice(1)) ? location.hash.slice(1) : (localStorage.getItem('fleet.view') || 'experience');
 show(initialView);
+loadControl();
+setInterval(() => { if (document.hidden) return; if (control.control) loadControl(); }, 2000);
 
 setInterval(() => {
   if (document.hidden) return;
