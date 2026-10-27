@@ -103,6 +103,12 @@ Config_s FakeGameServer::MakeConfig() const
     config.login.rsaModulus = BigUInt::Parse("0x" + std::string(RSA_MODULUS_HEX_DIGITS, 'f'));
     config.login.rsaExponent = BigUInt::Parse("1");
     config.login.revision = m_revision;
+    // The account-writer logs default to folders in the working directory, which for a test would be the
+    // repository. A test that wants one points it at its own temporary folder.
+    config.scripting.experienceDirectory.clear();
+    config.scripting.bankLogDirectory.clear();
+    config.scripting.inventoryDirectory.clear();
+    config.scripting.equipmentDirectory.clear();
     return config;
 }
 
