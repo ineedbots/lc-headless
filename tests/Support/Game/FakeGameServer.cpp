@@ -58,9 +58,9 @@ namespace
     }
 }
 
-FakeServerClient_s::FakeServerClient_s(Tcp::socket tcp, bool raw)
+FakeServerClient_s::FakeServerClient_s(Tcp::socket tcp, bool rawSocket)
     : socket{std::move(tcp)}
-    , raw{raw}
+    , raw{rawSocket}
 {
 }
 
