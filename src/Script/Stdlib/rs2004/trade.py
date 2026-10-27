@@ -366,6 +366,7 @@ class _Trade:
         item = self._pack_item(item_name, pick)
         if item is None:
             return False
+        before = sum([max(1, offer.count) for offer in self.my_offer() if offer.id == item.id])
         if n in FIXED_AMOUNTS and _option_number(item, f'Offer {n}') != -1:
             if not _use(item, f'Offer {n}'):
                 return False
@@ -375,7 +376,9 @@ class _Trade:
             opened = yield from execution.delay_until(lambda: _core.is_count_dialog_open(), COUNT_DIALOG_TIMEOUT_MS)
             if not opened or not _core.answer_count(n):
                 return False
-        offered = yield from execution.delay_until(lambda: sum([max(1, offer.count) for offer in self.my_offer()]) >= n, OFFER_TIMEOUT_MS)
+        offered = yield from execution.delay_until(
+            lambda: sum([max(1, offer.count) for offer in self.my_offer() if offer.id == item.id]) >= before + n,
+            OFFER_TIMEOUT_MS)
         return offered
 
     def remove_all(self):
