@@ -63,7 +63,11 @@ namespace
         "reloginDelaySeconds": 120,
         "progressDirectory": "reports",
         "experienceDirectory": "xp",
-        "experienceIntervalMinutes": 15
+        "experienceIntervalMinutes": 15,
+        "bankLogDirectory": "banks",
+        "inventoryDirectory": "bags",
+        "inventoryIntervalSeconds": 0,
+        "equipmentDirectory": "worn"
     }
 }
 )json"sv;
@@ -105,7 +109,11 @@ namespace
         "reloginDelaySeconds": 60,
         "progressDirectory": "progress",
         "experienceDirectory": "experience",
-        "experienceIntervalMinutes": 1
+        "experienceIntervalMinutes": 1,
+        "bankLogDirectory": "bank",
+        "inventoryDirectory": "inventory",
+        "inventoryIntervalSeconds": 5,
+        "equipmentDirectory": "equipment"
     }
 }
 )json"sv;

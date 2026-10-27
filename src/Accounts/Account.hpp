@@ -12,7 +12,9 @@
 #include "../Script/Host/ScriptHost.hpp"
 #include "../Script/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
+#include "BankLogger.hpp"
 #include "ExperienceLog.hpp"
+#include "ItemLog.hpp"
 #include "ProgressReporter.hpp"
 
 struct AccountOptions_s
@@ -96,6 +98,11 @@ private:
     ProgressReporter m_progress;
     // Each account's skill experience, for whatever reads experience/<name>.jsonl. Absent when off.
     std::optional<ExperienceLog> m_experience;
+    // The bank's contents, written each time one opens. Absent when off.
+    std::optional<BankLogger> m_bankLog;
+    // The backpack and the worn equipment, written as they change. Absent when off.
+    std::optional<ItemLog> m_inventory;
+    std::optional<ItemLog> m_equipment;
     std::optional<ScriptHost> m_script;
     bool m_started = false;
     bool m_finished = false;

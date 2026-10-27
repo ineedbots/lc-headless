@@ -39,6 +39,25 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
         m_experience.emplace(std::filesystem::path{experience.experienceDirectory}, m_account.name, experience.experienceIntervalMinutes, m_logger);
     }
 
+    if (!m_config->scripting.bankLogDirectory.empty())
+    {
+        // The bank is the cache's, so this needs no script and works for every bot.
+        m_bankLog.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.bankLogDirectory});
+    }
+
+    if (!m_config->scripting.inventoryDirectory.empty())
+    {
+        m_inventory.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.inventoryDirectory},
+                            ItemLog::Kind_e::Backpack, m_config->scripting.inventoryIntervalSeconds);
+    }
+
+    if (!m_config->scripting.equipmentDirectory.empty())
+    {
+        // Worn equipment changes rarely, so every change is worth a line.
+        m_equipment.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.equipmentDirectory},
+                            ItemLog::Kind_e::Equipment, 0s);
+    }
+
     if (m_account.script)
     {
         const auto& scripting = m_config->scripting;
@@ -194,6 +213,24 @@ void Account::Step(std::chrono::milliseconds maxWait)
         {
             const auto& state = m_client.GetState();
             m_experience->Step(now, state, status == ClientStatus_e::InGame && state.IsSettled());
+        }
+
+        if (status == ClientStatus_e::InGame)
+        {
+            if (m_bankLog)
+            {
+                m_bankLog->Step(m_client.GetState());
+            }
+
+            if (m_inventory)
+            {
+                m_inventory->Step(now, m_client.GetState());
+            }
+
+            if (m_equipment)
+            {
+                m_equipment->Step(now, m_client.GetState());
+            }
         }
 
         if (!m_finished && m_killDeadline && now >= *m_killDeadline)
