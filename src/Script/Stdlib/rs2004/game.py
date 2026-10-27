@@ -324,6 +324,11 @@ class _Reader:
     def main_modal(self):
         return _core.get_main_modal()
 
+    def main_modal_texts(self):
+        """The open main interface's text lines, or an empty list when it is shut."""
+        main = _core.get_main_modal()
+        return _core.get_texts(main) if main != -1 else []
+
     def modals(self):
         """rs2b0t's: the open modals' interface ids, main, side and chat, each -1 when shut."""
         return Modals(_core.get_main_modal(), _core.get_side_modal(), _core.get_chat_modal())

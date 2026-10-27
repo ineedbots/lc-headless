@@ -1,8 +1,9 @@
 """AIOQuester's food choice and queue summary: rs2b0t's AIOQuesterLogic.ts, and queueEntry, blockedEntries, focusRow,
-queueSummary and questClockRestarts from AIOQuesterPaint.ts (MIT, see thirdparty/rs2b0t). The gang, partner and
-reward settings (applyArravSettings, applyHeroSettings, applyLegendsSettings) come with Shield of Arrav, Hero's Quest
-and Legends' Quest."""
+queueSummary and questClockRestarts from AIOQuesterPaint.ts (MIT, see thirdparty/rs2b0t). Includes Shield of Arrav's
+gang and partner settings; Hero's Quest's partner and Legends' reward settings come with those quests."""
 
+import math
+from rs2004.quests.defs.shieldofarrav.config import arrav_config
 from rs2004.catalogs import Record, food_forms, food_heal_amount, should_eat_to_use_food
 
 # Tourist Trap can leave Baker's-stall Cakes in the pack even when the general food is Lobster. Implicit eligibility
@@ -120,3 +121,12 @@ def queue_summary(rows):
 def quest_clock_restarts(prev_id, next_id):
     """Whether the per-quest clock restarts for this state update."""
     return next_id is not None and next_id != prev_id
+
+ARRAV_GANG_OPTIONS = ['random', 'phoenix', 'blackarm']
+
+
+def apply_arrav_settings(raw):
+    arrav_config.gang = raw.gang if raw.gang in ARRAV_GANG_OPTIONS else 'random'
+    arrav_config.partner = raw.partner.strip()
+    count = raw.certs
+    arrav_config.cert_target = max(1, math.floor(count if math.isfinite(count) else 2))

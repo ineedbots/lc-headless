@@ -114,10 +114,10 @@ These bring the first fights (Delrith, Count Draynor), the first items gathered 
 **Tests:** the three parts', `arravSettings`, and the walker's `shieldOfArravTiles`.
 
 - **Done when:**
-    - [ ] Those tests are ported and pass.
-    - [ ] Live, two accounts finish Shield of Arrav as partners, one in each gang, and an account finishes Dragon Slayer.
-    - [ ] ArravSupplier banks a certificate from both gangs, and Barcrawl gets a card signed at every bar.
-    - [ ] AIOQuester takes a fresh account off Tutorial Island through all 18 free-to-play quests in one queue, with skills set by debugproc. This was phase 16's live check in the design doc.
+    - [x] Those tests are ported and pass.
+    - [x] Live, two accounts finish Shield of Arrav as partners, one in each gang, and an account finishes Dragon Slayer.
+    - [x] ArravSupplier banks a certificate from both gangs, and Barcrawl gets a card signed at every bar.
+    - [x] AIOQuester takes a fresh account off Tutorial Island through all 18 free-to-play quests in one queue, with skills set by debugproc. This was phase 16's live check in the design doc.
 
 ---
 

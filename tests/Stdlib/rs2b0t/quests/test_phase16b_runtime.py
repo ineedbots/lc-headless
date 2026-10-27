@@ -279,7 +279,7 @@ def goblin_disappears_after_attack():
     spy_on(game,'in_combat',returns=False)
     spy_on(_core,'step_time',returns=10000)
     spy_on(sustain,'run',impl=instant_ticks)
-    expect(run_wait(gd.farm_goblin_mail(lambda m:None))).to_be(False)
+    expect(run_wait(gd._farm_goblin_mail_tick(lambda m:None))).to_be(False)
     expect(state['gone']).to_be(True)
     expect(gd.goblin_mail_target_index).to_be(None)
 

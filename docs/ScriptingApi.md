@@ -234,7 +234,7 @@ An `InvItem` has `id`, `name`, `count`, `slot`, `noted` and `com` (the inventory
 | `direct_navigator` | Walking within the loaded area: `walk(dest, run=False)` (one routed walk; `False` when the tile is in view but can't be reached, and a tile beyond the loaded area is walked to in a straight line), `walk_to(dest, radius=2, timeout_ms=45000, run=False)` (a wait: walks, clicking again when it stalls, until within `radius`), `walk_path(points, run=False)` (up to 25 waypoints, each leg straight), `reachable(dest)`, `path(dest)` (the waypoints a walk would send), `destination()` |
 | `chat` | `say(text)`, `send_pm(name, text)`, `command(text)` (a `::command` for staff accounts, such as `command('tele 0,50,51,30,34')`) |
 | `friends`, `ignores` | `list()` (friends as `[(name, world)]`, world 0 when offline), `add(name)`, `remove(name)` |
-| `reader` | Raw reads, for what no facade covers yet: `varp(id)`, `pid()`, `main_modal()`, `side_modal()`, `chat_modal()` (-1 for none), `interface_open(id)`, `component_text(com)`, `count_dialog_open()`, `inventory(com)` (any inventory the server sends, such as `BANK`), `npc_type(id)`, `item_type(id)`, `loc_type(id)` |
+| `reader` | Raw reads, for what no facade covers yet: `varp(id)`, `pid()`, `main_modal()`, `main_modal_texts()` (the open main interface's lines, or `[]`), `side_modal()`, `chat_modal()` (-1 for none), `interface_open(id)`, `component_text(com)`, `count_dialog_open()`, `inventory(com)` (any inventory the server sends, such as `BANK`), `npc_type(id)`, `item_type(id)`, `loc_type(id)` |
 
 A destination is a `Tile`, or an `(x, z)` pair on your level.
 
@@ -561,7 +561,7 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 
 `rs2004.clues` is rs2b0t's clue engine: the clue database (`CLUE_DB`, `identify_step`), `SolveClue`, the task a bot adds to solve the clues it picks up, the `ClueExecutor` under it, the puzzle-box solver, the hard dig's guardian, and the Duel Arena and jungle travel a trail needs. See [clues.md](scripting/clues.md).
 
-`rs2004.quests` is rs2b0t's quest engine: the 63 quest records (`QUESTS`), eligibility, the `QuestEngine` task that queues, provisions and steps the quests with its progress watchdog, the steps and legs they're made of, and sixteen free-to-play quests in `rs2004.quests.defs`: phases 16a and 16b, including their supply gathering, puzzle and combat legs. Shield of Arrav and Dragon Slayer come in 16c. See [quests.md](scripting/quests.md).
+`rs2004.quests` is rs2b0t's quest engine: the 63 quest records (`QUESTS`), eligibility, the `QuestEngine` task that queues, provisions and steps the quests with its progress watchdog, the steps and legs they're made of, and all eighteen free-to-play quests in `rs2004.quests.defs`, including Shield of Arrav's partner trades and Dragon Slayer's supplies, maze, ship and combat legs. `rs2004.quests.barcrawl` supplies the standalone barcrawl, and `rs2004.partner_handoff` drives exact-item partner trades. See [quests.md](scripting/quests.md).
 
 `scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
 
@@ -575,6 +575,8 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
 | Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py`. The three Ardougne bots solve the clues they pick up |
 | Treasure Trails | ClueSolver | `clue_solver.py`: solves the clue or opens the casket in the pack, then banks the reward |
+| Quests | ArravSupplier | `arrav_supplier.py`, its logic in `bots/arravsupplier/`: prepares the Phoenix mission, joins both gangs, banks certificates without redeeming |
+| Quests | Barcrawl | `barcrawl.py`: obtains the card, visits all ten bars and hands it in |
 | Quests | AIOQuester | `aio_quester.py`, its logic in `bots/aioquester/`: runs a queue of quests on [`rs2004.quests`](scripting/quests.md). Its paint's Skip button is the `skip` console command, and the paint is its progress report |
 | Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
 | Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. GreenDragon, RockCrab and AutoFighter solve the clues they pick up, on [`rs2004.clues`](scripting/clues.md) |

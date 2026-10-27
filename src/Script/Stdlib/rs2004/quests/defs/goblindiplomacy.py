@@ -373,6 +373,22 @@ def goblin_mail_gather_step(snap, need=1):
 
 
 def farm_goblin_mail(log):
+    # A disengage grace period or a kill without a mail drop is still part of the same gathering attempt.
+    # Returning every tick let the quest watchdog park it before the five-second combat grace expired.
+    before = inventory.count('Goblin mail')
+    deadline = _core.step_time() + 90000
+    while _core.step_time() < deadline:
+        if execution.event_signal.pending():
+            return False
+        if inventory.count('Goblin mail') > before:
+            return True
+        yield from _farm_goblin_mail_tick(log)
+        yield from sustain.run()
+        yield from execution.delay_ticks(1)
+    return inventory.count('Goblin mail') > before
+
+
+def _farm_goblin_mail_tick(log):
     global goblin_mail_disengaged_at, goblin_mail_last_attack_at, goblin_mail_owner, goblin_mail_target_engaged, goblin_mail_target_index
     owner = game.my_name()
     if goblin_mail_owner != owner or not in_goblin_mail_field(game.tile()):
@@ -383,6 +399,8 @@ def farm_goblin_mail(log):
         reset_goblin_mail_combat()
         before = inventory.count('Goblin mail')
         if not (drop.interact('Take')):
+            log(f'could not take goblin mail at {drop.tile()} (actions {drop.actions()})')
+            yield from execution.delay_ticks(2)
             return False
         _result25 = yield from execution.delay_until(lambda: inventory.count('Goblin mail') > before, 6000)
         return _result25
@@ -394,9 +412,17 @@ def farm_goblin_mail(log):
         release_goblin_mail_target()
 
     def tracked_goblin():
-
-
-        return (None if goblin_mail_target_index is None else ((([npc for npc in npcs.all() if npc.index == goblin_mail_target_index and npc.name == 'Goblin' and any([(action.lower() == 'attack') for action in npc.actions()]) and npc.distance() <= 15 and npc.tile().distance_to(GOBLIN_FARM) <= 18] or [None])[0] if ([npc for npc in npcs.all() if npc.index == goblin_mail_target_index and npc.name == 'Goblin' and any([(action.lower() == 'attack') for action in npc.actions()]) and npc.distance() <= 15 and npc.tile().distance_to(GOBLIN_FARM) <= 18] or [None])[0] is not None else None)))
+        if goblin_mail_target_index is None:
+            return None
+        for npc in npcs.all():
+            if npc.index != goblin_mail_target_index or npc.name != 'Goblin':
+                continue
+            if npc.distance() > 15 or npc.tile().distance_to(GOBLIN_FARM) > 18:
+                continue
+            for action in npc.actions():
+                if action.lower() == 'attack':
+                    return npc
+        return None
 
     had_engaged_target = goblin_mail_target_index is not None and goblin_mail_target_engaged
     goblin = tracked_goblin()
@@ -516,7 +542,11 @@ def make_orange_dye(log):
         return True
     if not inventory.contains('Red dye'):
         if inventory.count('Redberries') < 3:
-            _result29 = yield from execute_step(Record({'kind': 'buy', 'item': 'Redberries', 'qty': 3, 'shop': PORT_SARIM_SHOP, 'est_gp': 60}), [], log)
+            before = inventory.count('Redberries')
+            _result29 = yield from execute_step(Record({'kind': 'buy', 'item': 'Redberries', 'qty': 3 - before, 'shop': PORT_SARIM_SHOP, 'est_gp': 60}), [], log)
+            # Wydin stocks one berry. An empty shelf must wait for restocking before retrying the quest step.
+            if inventory.count('Redberries') == before:
+                yield from execution.delay_ticks(20)
             return _result29
         if inventory.count('Coins') < 5:
             log('need ~5 coins for red dye')

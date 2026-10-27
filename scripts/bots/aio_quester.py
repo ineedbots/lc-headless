@@ -4,6 +4,7 @@
 # console's skip command gives up the running quest for the session.
 
 import time
+from rs2004.catalogs.record import Record
 
 from rs2004.catalogs import FOOD_OPTIONS, LOADOUT_SETTING, ContinueDialog, selected_loadout, sustain
 from rs2004.quests.defs import QUEST_DEFS, def_by_id
@@ -13,6 +14,7 @@ from rs2004.quests.gear import quest_loadout
 from rs2004.quests.prayer import prayer_upkeep, set_quest_prayer
 from bots.aioquester.logic import blocked_entries, quest_clock_restarts, queue_summary, resolve_sustain_policy
 from bots.aioquester.logic import select_sustain_consumable
+from bots.aioquester.logic import ARRAV_GANG_OPTIONS, apply_arrav_settings
 
 QUEST_OPTION_LABELS = {}
 for _d in QUEST_DEFS:
@@ -25,6 +27,9 @@ QUEST_OPTION_IDS = sorted([d.record.id for d in QUEST_DEFS], key=lambda id: QUES
 FALLBACK_FOOD = 'Lobster'
 
 AIO_SETTINGS = {
+    'arrav_gang': SettingDef('string', 'random', 'Shield of Arrav gang', options=ARRAV_GANG_OPTIONS),
+    'arrav_partner': SettingDef('string', '', 'Shield of Arrav partner', help='character name of the partner in the other gang'),
+    'arrav_certs': SettingDef('number', 2, 'Arrav certificates', min=1, help='certificates to mint before splitting with the partner'),
     'quests': SettingDef('string[]', [], 'Quest queue (empty = all)', options=QUEST_OPTION_IDS, option_labels=QUEST_OPTION_LABELS,
                          help='which implemented quests to complete; leave empty to run every implemented quest. Tick order does not matter, the queue runs the built-in order that puts prerequisites first'),
     'loadout': LOADOUT_SETTING,
@@ -86,6 +91,9 @@ class AIOQuester(TaskBot):
         self.command('skip', self.request_skip, help='give up the running quest for this session and go on with the queue')
 
         quest_loadout.current = selected_loadout(self.settings)
+        apply_arrav_settings(Record({'gang': self.settings.str('arrav_gang', 'random'),
+                                    'partner': self.settings.str('arrav_partner', ''),
+                                    'certs': self.settings.num('arrav_certs', 2)}))
         quest_food.name = self.food_item()
         # Why: the server runs one op per tick and drops the rest, so a pass spends its tick on food or on prayer, never
         # both, and food wins, as the fight it's losing is measured in hitpoints.
@@ -145,9 +153,14 @@ class AIOQuester(TaskBot):
             return
         self.status = f'consuming {selected.item.name} ({round(skills.hp_fraction() * 100)}% hp)'
         before = skills.effective('hitpoints')
+        name = selected.item.name
+        before_slots = len([item for item in inventory.items() if item.name == name])
         if not selected.item.interact(selected.action):
             return
-        yield from execution.delay_until(lambda: skills.effective('hitpoints') > before, 3000)
+        # Incoming damage can hide the heal in the same update. The consumed food still proves the action landed.
+        yield from execution.delay_until(lambda: skills.effective('hitpoints') > before or
+            len([item for item in inventory.items() if item.name == name]) < before_slots, 3000)
+        yield from execution.delay_ticks(1)
 
     def grind_targets(self):
         if self.running_id is None:

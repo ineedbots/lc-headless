@@ -219,7 +219,15 @@ class QuestEngine(Task):
 
         if self.running_id is None:
             selectable = set([id for id in picked if id not in self._blocked])
-            self.running_id = next_quest(self._order, selectable, elig, self._parked)
+            resume = []
+            for candidate in QUEST_DEFS:
+                if (candidate.record.id not in selectable or elig[candidate.record.id].status != 'READY'
+                        or quests.status(candidate.record.name) != 'in_progress'):
+                    continue
+                inside = getattr(candidate.module(), 'resume_at', None)
+                if inside is not None and inside(game.tile()):
+                    resume.append(candidate.record.id)
+            self.running_id = next_quest(resume or self._order, selectable, elig, self._parked)
         rows = self._apply_blocked(queue_rows(self._order, picked, elig, self._parked, self.running_id))
 
         if self.running_id is None:

@@ -144,9 +144,9 @@ cooksassistant = QuestModule(record=quest_record('cook'), bank=Tile(3093, 3243, 
 
 `decide(snap)` is a pure function of the snapshot, so a quest resumes from wherever it stopped, by a random event, a death or a client that ended. The snapshot has the journal status (`'not_started'`, `'in_progress'`, `'complete'` or `'unknown'`), the pack by lower-case name (`inv`) and by id (`inv_ids`), what's worn, the last bank read, the stage when the module reads one (`read_stage`, or `read_progress` for flags too), the tile, prayer, levels and free slots. `snap.with_fields({...})` copies it with fields changed.
 
-A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe` and `on_start`. See its docstring.
+A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe`, `on_start` and `resume_at(tile)`. The optional resume predicate gives a started quest priority when a restarted queue is inside its one-way area, such as Dragon Slayer's maze or Crandor. See its docstring.
 
-Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`), plus Demon Slayer (`demonslayer`), Doric's Quest (`doric`), Imp Catcher (`impcatcher`), Goblin Diplomacy (`goblindiplomacy`), Vampire Slayer (`vampireslayer`), The Knight's Sword (`knightssword`), Ernest the Chicken (`ernest`), Pirate's Treasure (`piratestreasure`) and Prince Ali Rescue (`princeali`).
+Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`), plus Demon Slayer (`demonslayer`), Doric's Quest (`doric`), Imp Catcher (`impcatcher`), Goblin Diplomacy (`goblindiplomacy`), Vampire Slayer (`vampireslayer`), The Knight's Sword (`knightssword`), Ernest the Chicken (`ernest`), Pirate's Treasure (`piratestreasure`), Prince Ali Rescue (`princeali`), Shield of Arrav (`shieldofarrav`) and Dragon Slayer (`dragonslayer`): all eighteen free-to-play quests.
 
 ## Steps: `rs2004.quests.exec.steps`
 
@@ -187,3 +187,16 @@ Before mining blurite, The Knight's Sword acquires a usable pickaxe even if its 
 | `rs2004.quests.strike_combat` | Casting Strikes from cover: `ready_strikes`, `take_strike_cover`, `cast_strike`, `cast_from_cover` |
 | `rs2004.quests.food`, `gear` | `quest_food.name`, `FOOD_FLOAT`, and `quest_loadout.current`, which AIOQuester sets |
 | `rs2004.quests.journal_text` | `normalize_journal(lines)`, a journal as one line to search |
+
+
+## Shield of Arrav and its supplier
+
+AIOQuester offers `arrav_gang` (`random`, `phoenix` or `blackarm`), `arrav_partner` (the other character's name) and `arrav_certs` (default 2). `random` hashes the character's name so restarting keeps the same gang. The two partners meet at Varrock east bank to trade the weapon-store key, the Black Arm shield half and one certificate. The Phoenix partner mints before splitting; neither side redeems until it has paid what it owes. A solo character can redeem a banked certificate; otherwise the quest parks with the missing partner named in its reason.
+
+`bots/arrav_supplier.py` is a separate certificate supplier. Start it on an unjoined character with coins banked and a Phoenix member named by `partner` to provide the first store key. It prepares Straven's mission before joining Black Arm, then uses the report on Straven to join Phoenix too. It collects both halves, mints and banks certificates until `cert_target` (default 10, minimum 2). It never redeems: redeeming would stop the supply. Proven mission and memberships are saved under `ArravSupplierState` for restarts.
+
+`rs2004.partner_handoff.run_handoff(spec)` moves one exact item ID between two named characters, waits through both trade screens and checks the pack after the trade closes. Its `Record` fields are `partner`, `rendezvous`, `id`, `name`, `giving`, `label` and `log`. Use it with `yield from`.
+
+## The barcrawl
+
+`bots/barcrawl.py` banks for coins, obtains Alfred Grimhand's card, visits all ten bars nearest first and hands the signed card to the Barbarian Outpost guard. It has no settings. `rs2004.quests.barcrawl.run_barcrawl.ensure_barcrawl(log, on_progress=None)` is the same tour for another bot or quest; `on_progress(signed, total)` reports the card's progress. The caller supplies coins (`BARCRAWL_GP` in `barcrawl_logic` includes travel money). `read_card(log=None)` returns a record with `remaining` bars and `done`, or `None` when unreadable. Both functions are generators. A completed card's refusal to Read because the character is too drunk counts as fully signed.

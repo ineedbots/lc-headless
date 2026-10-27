@@ -476,7 +476,12 @@ class _Banking:
         if route == 'scene-booth':
             say(f'bank: booth within {nearby_radius}; opening here')
             opened = yield from bank.open_nearest_access(fallback)
-            return opened
+            if opened:
+                return True
+            # A nearby booth can be behind a house door. The world route can open it; direct clicks cannot.
+            say('bank: nearby booth did not open; walking the bank route')
+            route = 'preset-stand' if stand is not None else 'nearest-fallback'
+            scene_booth = None
 
         if route == 'local-bank' and nearest is not None:
             say(f"bank: local {nearest['name']} bank; using it instead of the distant preset")

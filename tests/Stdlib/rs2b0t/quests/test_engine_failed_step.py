@@ -492,7 +492,7 @@ test('a worn mustHave item counts as held', _worn_supplies)
 def _goblin_progress():
     from rs2004.entities import npcs, ground_items
     from rs2004.catalogs.tasks import sustain
-    from rs2004.quests.defs.goblindiplomacy import goblin_mail_gather_step
+    from rs2004.quests.defs.goblindiplomacy import _farm_goblin_mail_tick
     engine, host = fixture()
     S['coins'] = 500
     S['combat'] = True
@@ -512,9 +512,20 @@ def _goblin_progress():
         S['xp'] += 4
         yield
     spy_on(sustain, 'run', impl=fight_tick)
-    stub(runemysteries, decide=lambda snap: goblin_mail_gather_step(snap))
+    stub(runemysteries, decide=lambda snap: quest_step('custom', name='farm goblin mail', run=_farm_goblin_mail_tick))
     run_wait(execute(engine,12))
     expect(S['goblin_hp']).to_be_less_than(22)
     expect(engine.running_id).to_be('runemysteries')
     expect(engine._no_progress_count).to_be(0)
 test('goblin mail gathering keeps fighting when its step yields before the drop', _goblin_progress)
+
+
+def resume_one_way_area():
+    engine, host = fixture()
+    stub(sheepshearer, resume_at=lambda tile: tile.x == 3093)
+    yield from engine.execute()
+    expect(engine.running_id).to_be('sheep')
+    expect(S['running']).to_be('sheep')
+
+
+test('a started quest inside its one-way area resumes before an earlier queue entry', resume_one_way_area)

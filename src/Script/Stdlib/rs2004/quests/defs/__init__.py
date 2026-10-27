@@ -114,8 +114,20 @@ def _princeali():
     return princeali
 
 
+def _shieldofarrav():
+    from rs2004.quests.defs.shieldofarrav import shieldofarrav
+    return shieldofarrav
+
+
+def _dragonslayer():
+    from rs2004.quests.defs.dragonslayer import dragonslayer
+    return dragonslayer
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'shieldofarrav': ('blackarmgang', _shieldofarrav),
+    'dragonslayer': ('dragon', _dragonslayer),
     'demonslayer': ('demon', _demonslayer),
     'doric': ('doric', _doric),
     'impcatcher': ('imp', _impcatcher),

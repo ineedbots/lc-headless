@@ -58,6 +58,7 @@ class QuestSustain:
     def __init__(self, foods: Optional[list[str]] = None, eat_below_hp: float = 0.5) -> None: ...
 
 class QuestModule:
+    resume_at: Optional[Callable[[Optional[Tile]], bool]]
     record: QuestRecord
     decide: Callable[[QuestSnapshot], Any]
     on_start: Optional[Callable[[], None]]
@@ -80,4 +81,4 @@ class QuestModule:
     def __init__(self, record: Any = None, decide: Any = None, on_start: Any = None, hops: Any = None, bank: Any = None, grind: Any = None,
                  food: Any = None, gather: Any = None, tools: Any = None, exit: Any = None, owns_inventory: bool = False, food_ready: Any = None,
                  read_stage: Any = None, read_progress: Any = None, sustain: Any = None, pray: Any = None, coin_float: Any = None,
-                 warn_readiness: Any = None, observe: Any = None) -> None: ...
+                 warn_readiness: Any = None, observe: Any = None, resume_at: Any = None) -> None: ...

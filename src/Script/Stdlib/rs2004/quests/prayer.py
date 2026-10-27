@@ -93,7 +93,10 @@ def prayer_upkeep():
     action = prayer_upkeep_action(game.in_combat(), prayer.active(name), prayer.available(name), prayer.points(), len(doses))
     if action == 'drink':
         _say(f'drinking a prayer dose ({prayer.points()}/{prayer.max()})')
-        return doses[0].interact('Drink')
+        result = doses[0].interact('Drink')
+        if result:
+            yield from execution.delay_ticks(1)
+        return result
     if action == 'protect':
         _say(f'raising {name} ({prayer.points()}/{prayer.max()})')
         result = yield from prayer.set(name, True)

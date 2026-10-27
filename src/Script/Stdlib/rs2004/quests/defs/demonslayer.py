@@ -13,6 +13,7 @@ from rs2004.quests.engine.provisioning import gp_short
 from rs2004.quests.engine.types import QuestModule
 from rs2004.quests.exec.primitives import goto_npc, is_underground, talk_through
 from rs2004.quests.exec.steps import execute_step
+from rs2004.quests.exec.prompts import drive_boxes, clear_boxes
 from rs2004.reach import reach
 from rs2004.tabs import quests
 from rs2004.traversal import traversal
@@ -251,7 +252,7 @@ def key_hunt(log):
         _v18 = (game.tile().level if game.tile() is not None else None)
         level = (_v18 if _v18 is not None else 0)
         bones = inventory.count('Bones')
-        if not (bones > 0 and inventory.is_full()):
+        if bones < BONES_NEEDED and not (bones > 0 and inventory.is_full()):
             if level == 1:
                 yield from reach.loc_op('Staircase', 'Climb-down', WIZ_L1_STAND, lambda: (((game.tile().level if game.tile() is not None else None) if (game.tile().level if game.tile() is not None else None) is not None else 0)) == 0, log=log)
                 return False
@@ -267,6 +268,11 @@ def key_hunt(log):
             return False
         before_hand = inventory.count('Bones')
         yield from talk_through('Traiborn', TRAIBORN.prefer, log)
+        # His ritual switches from chat to main-modal message boxes before handing over the key.
+        yield from drive_boxes(lambda: held_id(TRAIBORN_KEY_ID), 15000, TRAIBORN.prefer, log)
+        if held_id(TRAIBORN_KEY_ID):
+            yield from clear_boxes()
+            return True
         yield from execution.delay_ticks(2)
         if inventory.count('Bones') < before_hand or chat_dialog.is_open():
             last_bones = inventory.count('Bones')
@@ -344,6 +350,12 @@ def decide(snap):
         return Record({'kind': 'custom', 'name': 'fight Delrith', 'run': fight_delrith})
     if has(snap, 'Silverlight'):
         return Record({'kind': 'equip', 'item': 'Silverlight'})
+    keys = [TRAIBORN_KEY_ID, ROVIN_KEY_ID, DRAIN_KEY_ID]
+    banked = snap.bank_ids or {}
+    carried = snap.inv_ids or {}
+    draw = [{'name': 'Key', 'id': id, 'qty': 1} for id in keys if banked.get(id, 0) > 0 and carried.get(id, 0) == 0]
+    if draw:
+        return Record({'kind': 'withdraw', 'items': draw})
     return Record({'kind': 'custom', 'name': 'key hunt', 'run': key_hunt})
 
 

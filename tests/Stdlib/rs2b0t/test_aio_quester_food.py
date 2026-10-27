@@ -70,3 +70,22 @@ def _fn5():
 
 
 test('AIOQuester does not consume a stale selection after inventory changes', _fn5)
+
+
+def consumed_during_damage():
+    bot = fixture()
+    def consume(name, action):
+        S['pack'] = []
+        # The same update includes incoming damage, leaving HP unchanged.
+    S['pack'] = [Food('Cake', consume)]
+    results = []
+    def answered_by_inventory(cond, ms=0):
+        results.append(cond())
+        return results[-1]
+        yield
+    spy_on(execution, 'delay_until', impl=answered_by_inventory)
+    yield from bot.eat_once()
+    expect(results).to_equal([True])
+
+
+test('AIOQuester recognises consumed food when incoming damage masks its heal', consumed_during_damage)
