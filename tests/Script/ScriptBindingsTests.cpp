@@ -2,6 +2,7 @@
 #include "../Support/Cache/TestCache.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/Fixtures.hpp"
+#include "../Support/Game/TestWorld.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 
@@ -77,10 +78,10 @@ namespace
     class BindingFixture
     {
     public:
-        explicit BindingFixture(Revision_e revision = Revision_e::Rev289, bool withInterfaces = false)
+        explicit BindingFixture(Revision_e revision = Revision_e::Rev289, bool withInterfaces = false, std::shared_ptr<const Config_s> config = {})
             : cache{MakeCache(revision, withInterfaces)}
             , map{cache}
-            , client{MakeConfig(revision), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
+            , client{config ? std::move(config) : MakeConfig(revision), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
             , api{state, map, actions}
             , vm{ScriptTestRuntime::Get(), {}, capture.GetLogger()}
@@ -101,6 +102,17 @@ namespace
         void Run(std::string_view source)
         {
             vm.RunSource(source, "test.py");
+        }
+
+        void Login()
+        {
+            client.Login();
+            const auto deadline = std::chrono::steady_clock::now() + 5s;
+            while (client.GetState().messages.empty() && std::chrono::steady_clock::now() < deadline)
+            {
+                client.Pump(20ms);
+            }
+            REQUIRE(client.GetMap().IsLoaded());
         }
 
         LogCapture capture;
@@ -469,6 +481,119 @@ assert _core.talk_to_npc(npc) is False
 assert _core.interact_player(player, 1) is False
 assert _core.take_ground_item(ground) is False
 )python"));
+}
+
+TEST_CASE("Native action bindings resolve named menus and report unavailable options", "[ScriptBindings][ActionBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.playerOps[0] = PlayerOp_s{.text = "Trade with"};
+    fixture.state.inventories[701] = Inventory_s{.com = 701, .slots = {{.id = 526, .count = 1}}};
+    fixture.Run(R"python(
+import _core
+npc = npcs.query().first()
+player = players.query().first()
+ground = ground_items.query().first()
+item = inventory.first('Bones')
+make_item = _core.get_inventory_item_by_id(526, com=701)
+)python");
+    const auto [source, target] = GENERATE(
+        std::pair{"_core.interact_npc(npc, 'Dance')", "Chicken"},
+        std::pair{"_core.interact_player(player, 'Dance')", "a player"},
+        std::pair{"_core.interact_loc(1530, 3201, 3200, 'Dance')", "Door"},
+        std::pair{"_core.interact_ground_item(ground, 'Dance')", "Bones"},
+        std::pair{"_core.item_op(item, 'Dance')", "Bones"},
+        std::pair{"_core.inv_button(make_item, 'Dance')", "701"});
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring("ValueError") && ContainsSubstring(target) && ContainsSubstring("has no option 'Dance'"));
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_inventory_item_by_id(526).slot == 2\n"));
+}
+
+TEST_CASE("Native named NPC actions return false after the target disappears", "[ScriptBindings][ActionBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\nnpc = npcs.query().first()\n");
+    fixture.state.npcs.clear();
+    REQUIRE_NOTHROW(fixture.Run("assert _core.interact_npc(npc, 'Attack') is False\n"));
+}
+
+TEST_CASE("Native scenery bindings accept object and coordinate call forms", "[ScriptBindings][ActionBindingCoverage]")
+{
+    auto server = FakeGameServer{TestWorld::Send};
+    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig())};
+    fixture.Login();
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+door = locs.at(game.tile().translate(1, 0))
+assert _core.interact_loc(door, 'open') is True
+assert _core.interact_loc(door, op='Open') is True
+assert _core.interact_loc(door, 1) is True
+assert _core.interact_loc(1530, 3201, 3200, 'Open') is True
+assert _core.interact_loc_via([(3200,3200),(3200,3201)], 1530, 3201, 3200, 'Open') is True
+)python"));
+    fixture.client.Flush();
+    REQUIRE(server.WaitForPacket(ClientProt_e::OpLoc1, 5));
+    const auto packets = server.GetPackets(ClientProt_e::OpLoc1);
+    REQUIRE(packets.size() == 5);
+    for (const auto& packet : packets)
+    {
+        auto payload = Packet{packet.payload};
+        CHECK(payload.G2() == 3201);
+        CHECK(payload.G2() == 3200);
+        CHECK(payload.G2() == 1530);
+        CHECK(payload.GetAvailable() == 0);
+    }
+}
+
+TEST_CASE("Native scenery waypoint bindings validate paths and menu arguments", "[ScriptBindings][ActionBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\n");
+    const auto [source, type, message] = GENERATE(
+        std::tuple{"_core.interact_loc_via(7, 1530, 3201, 3200, 1)", "TypeError", "points must be a list"},
+        std::tuple{"_core.interact_loc_via([(3200,)], 1530, 3201, 3200, 1)", "TypeError", "points must hold (x, z) pairs"},
+        std::tuple{"_core.interact_loc_via([], -1, 3201, 3200, 1)", "ValueError", "id must be from"},
+        std::tuple{"_core.interact_loc_via([], 1530, 3201, 3200, 'Dance')", "ValueError", "has no option 'Dance'"},
+        std::tuple{"_core.interact_loc_via([], 1530, -1, 3200, 1)", "ValueError", "x must be from"});
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(type) && ContainsSubstring(message));
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_x() == 3200\n"));
+}
+
+TEST_CASE("Native spell and button bindings validate IDs before dispatch", "[ScriptBindings][ActionBindingCoverage]")
+{
+    auto server = FakeGameServer{TestWorld::Send};
+    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig())};
+    fixture.Login();
+    fixture.Run("import _core\n");
+    const auto [source, message] = GENERATE(
+        std::pair{"_core.cast_on_loc(-1, 1530, 3201, 3200)", "spell must be from"},
+        std::pair{"_core.cast_on_loc(1, 1530, 3201, -1)", "z must be from"},
+        std::pair{"_core.click_button(65536)", "com must be from"},
+        std::pair{"_core.set_run(1)", "run must be True or False"});
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(message));
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+assert _core.cast_on_loc(1, 1530, 3201, 3200) is None
+assert _core.click_button(2458) is None
+assert _core.set_run(False) is None
+assert _core.close_interfaces() is None
+)python"));
+    fixture.client.Flush();
+    REQUIRE(server.WaitForPacket(ClientProt_e::CloseModal));
+    const auto spells = server.GetPackets(ClientProt_e::OpLocT);
+    REQUIRE(spells.size() == 1);
+    auto spell = Packet{spells.front().payload};
+    CHECK(spell.G2() == 3201);
+    CHECK(spell.G2() == 3200);
+    CHECK(spell.G2() == 1530);
+    CHECK(spell.G2() == 1);
+    CHECK(spell.GetAvailable() == 0);
+    const auto buttons = server.GetPackets(ClientProt_e::IfButton);
+    REQUIRE(buttons.size() == 2);
+    auto click = Packet{buttons[0].payload};
+    CHECK(click.G2() == 2458);
+    auto run = Packet{buttons[1].payload};
+    CHECK(run.G2() == TestCache::RUN_OFF_BUTTON);
 }
 
 TEST_CASE("Native inventory bindings distinguish unseen containers from empty ones", "[ScriptBindings][BindingCoverage]")

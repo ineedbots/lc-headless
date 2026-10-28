@@ -34,6 +34,52 @@ TEST_CASE("FileUtils::ReplaceFile throws when it can't write", "[FileUtils]")
     CHECK_THROWS_AS(FileUtils::ReplaceFile(folder.GetPath() / "missing" / "account.jsonc", "text"), std::runtime_error);
 }
 
+TEST_CASE("FileUtils::ReadBytes preserves every byte and distinguishes empty from missing", "[FileUtils][FileUtilsCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-file-utils-tests"};
+    auto content = std::string{};
+    auto expected = std::vector<u8>{};
+    for (auto value = 0; value < 256; ++value)
+    {
+        content.push_back(static_cast<char>(value));
+        expected.push_back(static_cast<u8>(value));
+    }
+    folder.WriteFile("binary.dat", content);
+    folder.WriteFile("empty.dat", "");
+
+    CHECK(FileUtils::ReadBytes(folder.GetPath() / "binary.dat") == expected);
+    CHECK(FileUtils::ReadBytes(folder.GetPath() / "empty.dat") == std::vector<u8>{});
+    CHECK_FALSE(FileUtils::ReadBytes(folder.GetPath() / "missing.dat"));
+    CHECK_FALSE(FileUtils::ReadBytes(folder.GetPath()));
+}
+
+TEST_CASE("FileUtils::ReplaceFile cleans up when the destination is a directory", "[FileUtils][FileUtilsCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-file-utils-tests"};
+    const auto destination = folder.GetPath() / "destination";
+    std::filesystem::create_directory(destination);
+    folder.WriteFile("destination/keep.txt", "keep me");
+
+    CHECK_THROWS_AS(FileUtils::ReplaceFile(destination, "replacement"), std::runtime_error);
+    CHECK(std::filesystem::is_directory(destination));
+    CHECK(FileUtils::ReadText(destination / "keep.txt") == "keep me");
+    CHECK_FALSE(std::filesystem::exists(folder.GetPath() / "destination.tmp"));
+}
+
+TEST_CASE("FileUtils::ReplaceFile creates new files and truncates stale temporary content", "[FileUtils][FileUtilsCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-file-utils-tests"};
+    const auto path = folder.GetPath() / "new.dat";
+    folder.WriteFile("new.dat.tmp", "stale temporary content");
+
+    FileUtils::ReplaceFile(path, "\0\xff\n"sv);
+
+    CHECK(FileUtils::ReadBytes(path) == std::vector<u8>{0, 255, 10});
+    CHECK_FALSE(std::filesystem::exists(folder.GetPath() / "new.dat.tmp"));
+    FileUtils::ReplaceFile(path, "");
+    CHECK(FileUtils::ReadBytes(path) == std::vector<u8>{});
+}
+
 TEST_CASE("FileUtils::IsInsideFolder", "[FileUtils]")
 {
     CHECK(FileUtils::IsInsideFolder("main.py"));
