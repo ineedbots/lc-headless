@@ -679,6 +679,160 @@ TEST_CASE("Native interface filters reject invalid optional arguments", "[Script
     CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(type) && ContainsSubstring(message));
 }
 
+TEST_CASE("Native player geometry bindings preserve radius and rectangle boundaries", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+x, z = _core.get_position()
+assert (x,z) == (_core.get_x(),_core.get_z()) and _core.get_level() == 0
+assert _core.distance_to(x+3,z-4) == 4
+assert _core.distance(x,z,x+3,z-4) == 4
+assert _core.in_radius_of(x+3,z-4,4) and not _core.in_radius_of(x+3,z-4,3)
+assert _core.at(x,z) and not _core.at(x+1,z)
+assert _core.in_rect(x,z,1,1)
+assert not _core.in_rect(x-1,z,1,1) and not _core.in_rect(x,z-1,1,1)
+assert not _core.in_rect(x,z,0,1) and not _core.in_rect(x,z,1,0)
+)python"));
+}
+
+TEST_CASE("Native player bindings reflect missing appearance and changed session state", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.localPlayer.appearance.reset();
+    fixture.state.members = true;
+    fixture.state.runEnergy = 73;
+    fixture.state.runWeight = -12;
+    fixture.state.walkDestination.reset();
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.get_name() is None and _core.get_combat_level() == 0
+assert _core.is_placed() and _core.is_members()
+assert _core.get_run_energy() == 73 and _core.get_weight() == -12
+assert _core.get_walk_destination() is None and not _core.is_moving()
+assert _core.is_running()
+)python"));
+    fixture.state.placed = false;
+    fixture.state.members = false;
+    fixture.state.varps[173] = 0;
+    REQUIRE_NOTHROW(fixture.Run("assert not _core.is_placed() and not _core.is_members() and not _core.is_running()\n"));
+}
+
+TEST_CASE("Native hitpoint bindings handle zero base health and boosted health", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.stats[3] = Stat_s{.xp = 100, .level = 0, .baseLevel = 0};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.get_hp() == 0 and _core.get_max_hp() == 0 and _core.get_hp_percent() == 0
+assert _core.get_current_stat(3) == 0 and _core.get_max_stat(3) == 0 and _core.get_experience(3) == 100
+)python"));
+    fixture.state.stats[3] = Stat_s{.xp = 1154, .level = 12, .baseLevel = 10};
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_hp() == 12 and _core.get_max_hp() == 10 and _core.get_hp_percent() == 120\n"));
+    CHECK_THROWS_WITH(fixture.Run("_core.get_max_stat(-1)"), ContainsSubstring("ValueError"));
+    CHECK_THROWS_WITH(fixture.Run("_core.get_experience(25)"), ContainsSubstring("ValueError"));
+}
+
+TEST_CASE("Native damage bindings distinguish zero damage and inclusive tick windows", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.localPlayer.hits = {{.damage = 0, .tick = 50}, {.damage = 2, .tick = 46}};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.in_combat()
+assert _core.took_damage() and _core.took_damage(4)
+assert not _core.took_damage(3) and not _core.took_damage(0)
+)python"));
+    fixture.state.localPlayer.hits.clear();
+    REQUIRE_NOTHROW(fixture.Run("assert not _core.in_combat() and not _core.took_damage()\n"));
+    CHECK_THROWS_WITH(fixture.Run("_core.took_damage(-1)"), ContainsSubstring("ValueError"));
+    CHECK_THROWS_WITH(fixture.Run("_core.took_damage(1001)"), ContainsSubstring("ValueError"));
+    fixture.state.hintArrow = HintArrow_s{.kind = HintArrowKind_e::Player, .index = 20, .tile = Offset(1, 2), .height = 30};
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_hint_arrow() == ('player',20,3201,3202,0,30)\n"));
+}
+
+TEST_CASE("Native nearest NPC bindings apply combat filters and return None for misses", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.get_npc(7).name == 'Chicken' and _core.get_npc(9999) is None
+assert _core.get_nearest_npc_by_id((41,81), in_combat=True).index == 7
+assert _core.get_nearest_npc_by_id((41,81), in_combat=False).index == 8
+assert _core.get_nearest_npc_by_name(('Chicken','Cow'), in_combat=False).index == 8
+assert _core.get_nearest_npc_by_name('Chicken', reachable=True).index == 7
+assert _core.get_nearest_npc_by_id(9999) is None
+assert _core.get_nearest_npc_by_name('Missing') is None
+assert _core.get_nearest_npc_by_name('Cow', radius=4) is None
+assert _core.get_player_by_name('ZEZIMA').index == 20
+assert _core.get_player_by_name('Missing') is None
+)python"));
+    CHECK_THROWS_WITH(fixture.Run("_core.get_nearest_npc_by_id(in_combat=1)"), ContainsSubstring("TypeError") && ContainsSubstring("in_combat must be True or False"));
+}
+
+TEST_CASE("Native nearest scenery and ground item bindings preserve filter results", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.get_nearest_ground_item_by_id(526, reachable=True).id == 526
+assert _core.get_nearest_ground_item_by_name('Bones').count == 1
+assert _core.get_nearest_ground_item_by_id(995) is None
+assert _core.get_nearest_ground_item_by_name('Missing') is None
+assert _core.get_nearest_ground_item_by_name('Bones', radius=2) is None
+assert _core.get_nearest_loc_by_id(1530, layer=0, reachable=True).id == 1530
+assert _core.get_nearest_loc_by_name('Tree', layer=2).id == 1276
+assert _core.get_nearest_loc_by_id(1276, layer=0) is None
+assert _core.get_nearest_loc_by_name('Missing') is None
+)python"));
+}
+
+TEST_CASE("Native cache lookup bindings expose named types and omit unnamed catalog entries", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.find_type_ids('item','bones') == [526]
+assert _core.find_type_ids('npc','CHICKEN') == [41]
+assert _core.find_type_ids('loc','tree') == [1276]
+assert _core.find_type_ids('item','Missing') == []
+assert _core.get_item_type(9999) is None and _core.get_loc_type(9999) is None
+catalog = _core.get_item_catalog()
+assert [entry[0] for entry in catalog] == [526,995]
+assert catalog[0] == (526,'Bones',1,False,False,False,-1,False)
+assert catalog[1][1] == 'Coins' and catalog[1][3] is True
+)python"));
+    CHECK_THROWS_WITH(fixture.Run("_core.find_type_ids('player','Zezima')"), ContainsSubstring("ValueError") && ContainsSubstring("kind must be 'item', 'npc' or 'loc'"));
+}
+
+TEST_CASE("Native map bindings distinguish cached scenery from live scene changes", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+x,z = _core.get_position()
+assert _core.in_scene(x,z) and not _core.in_scene(x+500,z)
+assert _core.square_locs((x-2)//64,(z+3)//64,0) == [((x-2)%64,(z+3)%64,1276,10,0)]
+assert _core.square_locs((x-2)//64,(z+3)//64,1) == []
+assert _core.square_locs(0,0,0) == []
+)python"));
+    CHECK_THROWS_WITH(fixture.Run("_core.square_locs(0,0,4)"), ContainsSubstring("ValueError") && ContainsSubstring("level must be from"));
+}
+
+TEST_CASE("Native navigation bindings report unavailable world navigation", "[ScriptBindings][WorldBindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.nav_data('edges') is None
+assert _core.walk_tile(3200,3200,0) is None
+assert _core.find_world_path('{"from":[3200,3200,0],"to":[3201,3201,0]}') is None
+assert _core.can_step(3200,3200,3200,3201)
+assert not _core.can_step(3200,3200,3200,3202)
+)python"));
+    CHECK_THROWS_WITH(fixture.Run("_core.find_world_path('{}')"), ContainsSubstring("ValueError") && ContainsSubstring("route request is malformed"));
+}
+
 TEST_CASE("Script bindings expose the account's settings", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
