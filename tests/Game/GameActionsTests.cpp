@@ -15,6 +15,8 @@
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
 {
@@ -155,4 +157,170 @@ TEST_CASE("GameActions sends the op alone when there's no route", "[GameActions]
 
     REQUIRE(fixture.server.WaitForPacket(ClientProt_e::OpNpc2));
     CHECK(fixture.server.GetPackets(ClientProt_e::MoveOpClick).empty());
+}
+
+TEST_CASE("GameActions follows explicit loc waypoints before sending the interaction", "[GameActionsCoverage]")
+{
+    auto fixture = ActionsFixture{};
+    const auto waypoints = std::to_array<Tile_s>({Offset(0, -2), Offset(-4, -2), Offset(-4, 0)});
+    fixture.actions.InteractLocVia(waypoints, Offset(-3, 0), DOOR, 1);
+    fixture.client.Pump();
+
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::OpLoc1));
+    CHECK(fixture.GetMove(ClientProt_e::MoveOpClick) == std::vector<Tile_s>{waypoints.begin(), waypoints.end()});
+    CHECK(fixture.client.GetState().walkDestination == waypoints.back());
+    const auto packets = fixture.server.GetPackets(ClientProt_e::OpLoc1);
+    REQUIRE(packets.size() == 1);
+    auto packet = Packet{packets.front().payload};
+    CHECK(packet.G2() == Fixtures::HOME - 3);
+    CHECK(packet.G2() == Fixtures::HOME);
+    CHECK(packet.G2() == DOOR);
+    CHECK(packet.GetAvailable() == 0);
+}
+
+TEST_CASE("GameActions follows explicit ground item waypoints before sending the interaction", "[GameActionsCoverage]")
+{
+    auto fixture = ActionsFixture{};
+    const auto waypoints = std::to_array<Tile_s>({Offset(0, -2), Offset(4, -2)});
+    const auto target = Offset(4, -1);
+    fixture.actions.InteractGroundItemVia(waypoints, target, TestWorld::COINS, 3);
+    fixture.client.Pump();
+
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::OpObj3));
+    CHECK(fixture.GetMove(ClientProt_e::MoveOpClick) == std::vector<Tile_s>{waypoints.begin(), waypoints.end()});
+    CHECK(fixture.client.GetState().walkDestination == waypoints.back());
+    const auto packets = fixture.server.GetPackets(ClientProt_e::OpObj3);
+    REQUIRE(packets.size() == 1);
+    auto packet = Packet{packets.front().payload};
+    CHECK(packet.G2() == target.x);
+    CHECK(packet.G2() == target.z);
+    CHECK(packet.G2() == TestWorld::COINS);
+    CHECK(packet.GetAvailable() == 0);
+}
+
+TEST_CASE("GameActions rejects invalid explicit interactions before walking or sending an op", "[GameActionsCoverage]")
+{
+    const auto groundItem = GENERATE(false, true);
+    auto fixture = ActionsFixture{};
+    const auto before = fixture.client.GetState().walkDestination;
+    const auto waypoints = std::to_array<Tile_s>({Offset(0, -2)});
+    SECTION("an invalid operation cannot start an approach")
+    {
+        if (groundItem)
+        {
+            CHECK_THROWS_AS(fixture.actions.InteractGroundItemVia(waypoints, Offset(1, 1), TestWorld::COINS, 0), std::invalid_argument);
+        }
+        else
+        {
+            CHECK_THROWS_AS(fixture.actions.InteractLocVia(waypoints, Offset(-3, 0), DOOR, 0), std::invalid_argument);
+        }
+    }
+    SECTION("an empty path cannot send an interaction")
+    {
+        if (groundItem)
+        {
+            CHECK_THROWS_AS(fixture.actions.InteractGroundItemVia({}, Offset(1, 1), TestWorld::COINS, 1), std::invalid_argument);
+        }
+        else
+        {
+            CHECK_THROWS_AS(fixture.actions.InteractLocVia({}, Offset(-3, 0), DOOR, 1), std::invalid_argument);
+        }
+    }
+    CHECK(fixture.client.GetState().walkDestination == before);
+    // A following button packet is a barrier: all preceding actions have reached the server.
+    fixture.actions.ClickButton(700);
+    fixture.client.Pump();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    CHECK(fixture.server.GetPackets(ClientProt_e::MoveOpClick).empty());
+    CHECK(fixture.server.GetPackets(ClientProt_e::OpLoc1).empty());
+    CHECK(fixture.server.GetPackets(ClientProt_e::OpObj1).empty());
+}
+
+TEST_CASE("GameActions rejects interactions with players outside the view", "[GameActionsCoverage]")
+{
+    auto fixture = ActionsFixture{};
+    const auto before = fixture.client.GetState().walkDestination;
+    const auto absent = u16{1000};
+    const auto item = ItemRef_s{.obj = TestWorld::LOGS, .slot = 0, .com = TestWorld::INVENTORY};
+    const auto reason = Catch::Matchers::ContainsSubstring("Player 1000 isn't in view");
+    CHECK_THROWS_WITH(fixture.actions.InteractPlayer(absent, 1), reason);
+    CHECK_THROWS_WITH(fixture.actions.UseItemOnPlayer(item, absent), reason);
+    CHECK_THROWS_WITH(fixture.actions.CastOnPlayer(1152, absent), reason);
+    CHECK(fixture.client.GetState().walkDestination == before);
+    fixture.actions.ClickButton(700);
+    fixture.client.Pump();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    CHECK(fixture.server.GetPackets(ClientProt_e::MoveOpClick).empty());
+    CHECK(fixture.server.GetPackets(ClientProt_e::OpPlayer1).empty());
+    CHECK(fixture.server.GetPackets(ClientProt_e::OpPlayerU).empty());
+    CHECK(fixture.server.GetPackets(ClientProt_e::OpPlayerT).empty());
+}
+
+TEST_CASE("GameActions ignores components without an immediate button action", "[GameActionsCoverage]")
+{
+    const auto type = GENERATE(ButtonType_e::None, ButtonType_e::Target);
+    auto fixture = ActionsFixture{};
+    fixture.actions.ClickComponent(701, type);
+    fixture.actions.ClickButton(700);
+    fixture.client.Pump();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::IfButton));
+    const auto packets = fixture.server.GetPackets(ClientProt_e::IfButton);
+    REQUIRE(packets.size() == 1);
+    auto packet = Packet{packets.front().payload};
+    CHECK(packet.G2() == 700);
+    CHECK(fixture.server.GetPackets(ClientProt_e::ResumePauseButton).empty());
+    CHECK(fixture.server.GetPackets(ClientProt_e::CloseModal).empty());
+}
+
+TEST_CASE("GameActions closes interfaces without adding a movement request", "[GameActionsCoverage]")
+{
+    auto fixture = ActionsFixture{};
+    const auto before = fixture.client.GetState().walkDestination;
+    fixture.actions.CloseInterfaces();
+    fixture.client.Pump();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::CloseModal));
+    const auto packets = fixture.server.GetPackets(ClientProt_e::CloseModal);
+    REQUIRE(packets.size() == 1);
+    CHECK(packets.front().payload.empty());
+    CHECK(fixture.client.GetState().walkDestination == before);
+}
+
+TEST_CASE("GameActions finds inventory items and distinguishes absent items from absent inventories", "[GameActionsCoverage]")
+{
+    auto fixture = ActionsFixture{};
+    CHECK_FALSE(fixture.actions.FindItem(999, TestWorld::LOGS));
+    CHECK_FALSE(fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::COINS));
+    const auto logs = fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::LOGS);
+    REQUIRE(logs);
+    CHECK(logs->obj == TestWorld::LOGS);
+    CHECK(logs->com == TestWorld::INVENTORY);
+    CHECK(logs->slot == 0);
+}
+
+TEST_CASE("GameActions inventory lookup selects the first matching slot and follows server updates", "[GameActionsCoverage]")
+{
+    auto fixture = ActionsFixture{};
+    const auto items = std::to_array<std::pair<u16, s32>>({{0, 0}, {TestWorld::COINS, 10}, {TestWorld::COINS, 20}});
+    fixture.server.Send(ServerProt_e::UpdateInvFull, Fixtures::UpdateInvFull(TestWorld::INVENTORY, items));
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && !fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::COINS))
+    {
+        fixture.client.Pump(PUMP_STEP);
+    }
+    const auto coins = fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::COINS);
+    REQUIRE(coins);
+    CHECK(coins->obj == TestWorld::COINS);
+    CHECK(coins->com == TestWorld::INVENTORY);
+    CHECK(coins->slot == 1);
+    CHECK_FALSE(fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::LOGS));
+
+    fixture.server.Send(ServerProt_e::UpdateInvFull, Fixtures::UpdateInvFull(TestWorld::INVENTORY, {}));
+    const auto clearDeadline = Clock::now() + WAIT;
+    while (Clock::now() < clearDeadline && fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::COINS))
+    {
+        fixture.client.Pump(PUMP_STEP);
+    }
+    CHECK_FALSE(fixture.actions.FindItem(TestWorld::INVENTORY, TestWorld::COINS));
+    REQUIRE(fixture.client.GetState().FindInventory(TestWorld::INVENTORY) != nullptr);
+    CHECK(fixture.client.GetState().FindInventory(TestWorld::INVENTORY)->slots.empty());
 }
