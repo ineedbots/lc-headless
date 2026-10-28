@@ -7,6 +7,7 @@
 
 #include "Accounts/Account.hpp"
 #include "Config/AccountFile.hpp"
+#include "Game/Protocol/ServerProt.hpp"
 #include "Utils/FileUtils.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -86,6 +87,83 @@ def loop():
         Config_s config;
         std::unique_ptr<Account> account;
     };
+}
+
+TEST_CASE("An account contains errors that prevent its first connection from starting", "[AccountRecoveryCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    fixture.config.server.port = 0;
+    fixture.Make();
+    CHECK_NOTHROW(fixture.account->Start());
+    CHECK(fixture.account->IsStarted());
+    CHECK(fixture.account->IsFinished());
+    CHECK_FALSE(fixture.account->Succeeded());
+    CHECK(fixture.account->DescribeOutcome() == "failed");
+    CHECK(fixture.HasMessage("The account has stopped: Connection options: port must not be 0"));
+    CHECK(fixture.server.GetLoginOpcodes().empty());
+}
+
+TEST_CASE("An account recovers from a protocol error with a fresh login", "[AccountRecoveryCoverage]")
+{
+    const auto scripted = GENERATE(false, true);
+    auto fixture = LifecycleFixture{};
+    const auto script = "def on_start():\n    log('started once')\n\ndef on_reconnect():\n    log('recovered session')\n\ndef loop():\n    return 1000\n";
+    fixture.Make(scripted ? std::optional<std::string_view>{script} : std::nullopt, false,
+                 {.client = {.retryDelay = 10ms}, .reloginDelay = 0ms});
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&] { return fixture.account->GetClient().GetState().IsSettled(); }));
+    if (scripted) REQUIRE(fixture.Until([&] { return fixture.HasMessage("started once"); }));
+    fixture.server.Send(ServerProt_e::PlayerInfo, {});
+    REQUIRE(fixture.Until([&] { return fixture.account->GetClient().GetLoginCount() == 2 && fixture.account->GetClient().GetState().IsSettled(); }));
+    CHECK_FALSE(fixture.account->IsFinished());
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16, 16});
+    CHECK(std::ranges::any_of(fixture.capture.GetEntries(), [](const auto& entry)
+    {
+        return entry.message.find("logging in again in 0 s") != std::string::npos;
+    }));
+    if (scripted)
+    {
+        REQUIRE(fixture.Until([&] { return fixture.HasMessage("recovered session"); }));
+        CHECK(std::ranges::count_if(fixture.capture.GetEntries(), [](const auto& entry) { return entry.message == "started once"; }) == 1);
+    }
+    fixture.account->Interrupt();
+    REQUIRE(fixture.Until([&] { return fixture.account->IsFinished(); }));
+    CHECK(fixture.account->Succeeded());
+}
+
+TEST_CASE("An account stops after a protocol error when recovery is disabled or it is logging out", "[AccountRecoveryCoverage]")
+{
+    const auto stopping = GENERATE(false, true);
+    auto fixture = LifecycleFixture{};
+    fixture.server.SetIgnoreLogout(true);
+    fixture.Make(std::nullopt, false, {.client = {.connectAttempts = stopping ? 10u : 0u}});
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&] { return fixture.account->GetClient().GetState().IsSettled(); }));
+    if (stopping)
+    {
+        fixture.account->Interrupt();
+        CHECK(fixture.account->DescribeStatus() == "logging out, no script");
+    }
+    fixture.server.Send(ServerProt_e::PlayerInfo, {});
+    REQUIRE(fixture.Until([&] { return fixture.account->IsFinished(); }));
+    CHECK_FALSE(fixture.account->Succeeded());
+    CHECK(fixture.account->DescribeOutcome() == "failed");
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16});
+    CHECK(fixture.account->GetClient().GetStatus() == ClientStatus_e::Disconnected);
+}
+
+TEST_CASE("An account fails when the fresh login after protocol recovery is rejected", "[AccountRecoveryCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    fixture.Make(std::nullopt, false, {.client = {.connectAttempts = 1}, .reloginDelay = 0ms});
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&] { return fixture.account->GetClient().GetState().IsSettled(); }));
+    fixture.server.SetLoginStatus(3);
+    fixture.server.Send(ServerProt_e::PlayerInfo, {});
+    REQUIRE(fixture.Until([&] { return fixture.account->IsFinished(); }));
+    CHECK_FALSE(fixture.account->Succeeded());
+    CHECK(fixture.account->DescribeOutcome() == "failed");
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16, 16});
 }
 
 TEST_CASE("An unstarted account ignores steps and interrupts and reports its pending state", "[AccountLifecycleCoverage]")

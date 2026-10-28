@@ -1,8 +1,10 @@
 #include "pch.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
+#include "../Support/Game/BitWriter.hpp"
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/Io/FakeSocks5Proxy.hpp"
+#include "../Support/Io/TestServer.hpp"
 #include "../Support/LogCapture.hpp"
 
 #include "Cache/GameCache_s.hpp"
@@ -14,10 +16,14 @@
 #include "Console/Logger.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
+#include "Game/Error/ProtocolError.hpp"
+#include "Game/Error/ConnectionLostError.hpp"
 #include "Game/InputTracker.hpp"
 #include "Game/Net/Error/LoginError.hpp"
 #include "Game/Net/LoginQueue.hpp"
 #include "Game/Protocol/ClientProt.hpp"
+#include "Game/Protocol/Base37.hpp"
+#include "Game/Protocol/WordPack.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/State/GameEvent_s.hpp"
 #include "Game/State/GameState_s.hpp"
@@ -26,6 +32,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
 {
@@ -66,6 +73,164 @@ namespace
     {
         return std::make_shared<const Config_s>(server.MakeConfig());
     }
+}
+
+TEST_CASE("GameClient cleans up a login that fails before connecting", "[GameClient][ClientFailureCoverage]")
+{
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{};
+    auto config = server.MakeConfig();
+    config.server.port = 0;
+    auto client = GameClient{std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger()};
+    CHECK_THROWS_AS(client.BeginLogin(), std::invalid_argument);
+    CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+    CHECK(client.GetLoginCount() == 0);
+    CHECK_NOTHROW(client.Pump());
+    CHECK_NOTHROW(client.RequestLogout());
+    CHECK(server.GetLoginOpcodes().empty());
+}
+
+TEST_CASE("GameClient abandons a login when its transport closes before the seed arrives", "[GameClient][ClientFailureCoverage]")
+{
+    const auto reset = GENERATE(false, true);
+    auto capture = LogCapture{};
+    auto server = TestServer{[reset](ServerSession& session) -> boost::asio::awaitable<void>
+    {
+        static_cast<void>(co_await session.Receive());
+        if (reset) session.Reset();
+        else session.Drop();
+    }, ServerMode_e::Tcp};
+    auto config = Config_s{};
+    config.server = {.transport = Transport_e::Tcp, .host = "127.0.0.1", .port = server.GetPort()};
+    auto options = FastOptions();
+    options.connectAttempts = 0;
+    auto client = GameClient{std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+    client.BeginLogin();
+    const auto advance = [&]
+    {
+        const auto deadline = Clock::now() + WAIT;
+        while (client.GetStatus() == ClientStatus_e::Connecting && Clock::now() < deadline)
+        {
+            client.Pump();
+            std::this_thread::sleep_for(1ms);
+        }
+    };
+    if (reset) CHECK_THROWS_AS(advance(), std::runtime_error);
+    else CHECK_THROWS_WITH(advance(), Catch::Matchers::ContainsSubstring("The connection closed during login"));
+    CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+    CHECK(client.GetLoginCount() == 0);
+    CHECK(server.GetRecord().accepted == 1);
+    CHECK_NOTHROW(client.Pump());
+}
+
+TEST_CASE("GameClient disconnects and propagates a malformed server packet", "[GameClient][ClientFailureCoverage]")
+{
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    server.Send(ServerProt_e::PlayerInfo, {});
+    CHECK_THROWS_AS(PumpUntil(client, [] { return false; }), ProtocolError);
+    CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+    CHECK(client.GetLoginCount() == 1);
+    CHECK_NOTHROW(client.Pump());
+    CHECK_NOTHROW(client.RequestLogout());
+    CHECK_THROWS_AS(client.Send(client.GetPackets().NoTimeout()), std::runtime_error);
+}
+
+TEST_CASE("GameClient detects a silent server while the transport remains open", "[GameClient][ClientFailureCoverage]")
+{
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto options = FastOptions();
+    options.autoReconnect = false;
+    options.serverSilenceTimeout = 100ms;
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    CHECK_THROWS_WITH(PumpUntil(client, [] { return false; }), Catch::Matchers::ContainsSubstring("nothing from the server for 100 ms"));
+    CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+    CHECK(client.GetLoginCount() == 1);
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16});
+}
+
+TEST_CASE("GameClient reports a permanent rejection during reconnect", "[GameClient][ClientFailureCoverage]")
+{
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    server.SetLoginStatus(3);
+    server.Close();
+    CHECK_THROWS_WITH(PumpUntil(client, [] { return false; }), Catch::Matchers::ContainsSubstring("and reconnecting failed"));
+    CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
+    CHECK(client.GetLoginCount() == 1);
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 18});
+}
+
+TEST_CASE("GameClient treats a lost connection during logout as a completed session", "[GameClient][ClientFailureCoverage]")
+{
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev289, transport};
+    server.SetIgnoreLogout(true);
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    client.RequestLogout();
+    client.Flush();
+    REQUIRE(server.WaitForPacket(ClientProt_e::IfButton));
+    server.Close();
+    REQUIRE(PumpUntil(client, [&] { return client.GetStatus() == ClientStatus_e::LoggedOut; }));
+    CHECK(client.GetLoginCount() == 1);
+    CHECK(server.GetLoginOpcodes() == std::vector<u8>{16});
+}
+
+TEST_CASE("GameClient logs each kind of incoming chat once with its sender", "[GameClient][ClientFailureCoverage]")
+{
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{TestWorld::Send};
+    auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    const auto before = client.GetState().messageCount;
+    server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("Mule:tradereq:"));
+    server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("Rival:duelreq:"));
+    auto privateMessage = Packet{};
+    privateMessage.P8(std::bit_cast<s64>(Base37::Encode("friend")));
+    privateMessage.P4(123);
+    privateMessage.P1(0);
+    privateMessage.PData(WordPack::Pack("hi"));
+    server.Send(ServerProt_e::MessagePrivate, Fixtures::ToBytes(privateMessage));
+    auto bits = BitWriter{};
+    bits.Put(1, 1).Put(2, 0).Put(8, 0).Put(11, 2047);
+    auto extended = Packet{};
+    extended.P1(0x08 | 0x40);
+    extended.PJStr("Ouch!");
+    extended.P1(0);
+    extended.P1(0);
+    extended.P1(0);
+    const auto chat = WordPack::Pack("hello");
+    extended.P1(static_cast<s32>(chat.size()));
+    extended.PData(chat);
+    server.Send(ServerProt_e::PlayerInfo, Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(extended)));
+    REQUIRE(PumpUntil(client, [&] { return client.GetState().messageCount == before + 5; }));
+    const auto messages = std::array{
+        "[trade request] Mule: wishes to trade with you.",
+        "[duel request] Rival: wishes to duel with you.",
+        "[private] Friend: Hi",
+        "[say] Bot: Ouch!",
+        "[public] Bot: Hello ",
+    };
+    client.Pump();
+    for (const auto* message : messages)
+    {
+        INFO(message);
+        CHECK(std::ranges::count_if(capture.GetEntries(), [message](const auto& entry) { return entry.message == message; }) == 1);
+    }
+    CHECK(client.GetState().messageCount == before + 5);
 }
 
 TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")

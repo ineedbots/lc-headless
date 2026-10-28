@@ -159,9 +159,92 @@ namespace
     {
         co_await session.Delay(30s);
     }
+
+    boost::asio::awaitable<bool> ReceiveProxyRequest(ServerSession& session, std::size_t expected)
+    {
+        auto received = std::size_t{0};
+        while (received < expected)
+        {
+            const auto bytes = co_await session.Receive();
+            if (!bytes) co_return false;
+            received += bytes->size();
+        }
+        co_return received == expected;
+    }
+
+    // Stops at one of the five reads in a password-authenticated domain-name exchange. Returning
+    // leaves the proxy session open, so the caller can either sever it or wait for client cancellation.
+    Awaitable ReachProxyReply(ServerSession& session, int phase)
+    {
+        if (!co_await ReceiveProxyRequest(session, 4)) co_return;
+        if (phase == 0) co_return;
+        auto reply = std::vector<u8>{5, 2};
+        co_await session.Send(reply);
+        if (!co_await ReceiveProxyRequest(session, 8)) co_return;
+        if (phase == 1) co_return;
+        reply = {1, 0};
+        co_await session.Send(reply);
+        // example.invalid is 15 bytes: version, command, reserved, type, length, name, port.
+        if (!co_await ReceiveProxyRequest(session, 22)) co_return;
+        if (phase == 2) co_return;
+        reply = {5, 0, 0, 3};
+        co_await session.Send(reply);
+        if (phase == 3) co_return;
+        reply = {4};
+        co_await session.Send(reply);
+    }
 }
 
 static_assert(std::derived_from<ConnectionClosedError, ConnectionError>);
+
+TEST_CASE("Connection reports proxy EOF and reset at every reply stage", "[Connection][ProxyFailureCoverage]")
+{
+    const auto phase = GENERATE(0, 1, 2, 3, 4);
+    const auto reset = GENERATE(false, true);
+    auto proxy = TestServer{[phase, reset](ServerSession& session) -> Awaitable
+    {
+        co_await ReachProxyReply(session, phase);
+        if (reset) session.Reset();
+        else session.Drop();
+    }, ServerMode_e::Tcp};
+    auto capture = LogCapture{};
+    const auto loop = NetLoop::Create();
+    auto options = MakeTcpOptions(43594);
+    options.host = "example.invalid";
+    options.proxy = Socks5Proxy_s{.host = LOOPBACK, .port = proxy.GetPort(), .username = "usr", .password = "pw"};
+    auto connection = Connection{*loop, options, capture.GetLogger()};
+    const auto failure = GetFailure([&] { static_cast<void>(connection.WaitOpen(WAIT)); });
+    INFO(failure);
+    CHECK_THAT(failure, Catch::Matchers::ContainsSubstring(std::format("SOCKS5 proxy {}:{}:", LOOPBACK, proxy.GetPort())));
+    if (!reset) CHECK_THAT(failure, Catch::Matchers::ContainsSubstring("closed the connection during the exchange"));
+    CHECK(failure.find("usr") == std::string::npos);
+    CHECK(GetOutcome([&] { static_cast<void>(connection.Pump()); }) == Outcome_e::Failed);
+}
+
+TEST_CASE("Connection cancels a pending proxy reply at every handshake stage", "[Connection][ProxyFailureCoverage]")
+{
+    const auto phase = GENERATE(0, 1, 2, 3, 4);
+    const auto reached = std::make_shared<std::atomic<bool>>(false);
+    auto proxy = TestServer{[phase, reached](ServerSession& session) -> Awaitable
+    {
+        co_await ReachProxyReply(session, phase);
+        reached->store(true);
+        co_await session.ReceiveUntilClosed();
+    }, ServerMode_e::Tcp};
+    const auto loop = NetLoop::Create();
+    auto options = MakeTcpOptions(43594);
+    options.host = "example.invalid";
+    options.proxy = Socks5Proxy_s{.host = LOOPBACK, .port = proxy.GetPort(), .username = "usr", .password = "pw"};
+    auto connection = Connection{*loop, options, MakeConsoleLogger()};
+    const auto deadline = Clock::now() + WAIT;
+    while (!reached->load() && Clock::now() < deadline) static_cast<void>(connection.WaitOpen(10ms));
+    REQUIRE(reached->load());
+    CHECK_FALSE(connection.WaitOpen(10ms));
+    connection.Close();
+    CHECK(connection.WaitClosed(WAIT));
+    CHECK(connection.Pump() == ConnectionState_e::Closed);
+    CHECK(proxy.WaitFor([](const auto& record) { return record.ended == 1; }));
+}
 
 TEST_CASE("Connection rejects bad options before connecting", "[Connection]")
 {

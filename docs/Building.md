@@ -124,9 +124,12 @@ Each run clears its previous reports and profiles. Test failures still fail the 
 from a failed run are partial.
 
 The report includes authored C++ under `src/`, including headers and code not referenced by the tests.
-Tests, dependencies, and generated embedded Python are excluded. The application binary supplies coverage
-mappings for `main.cpp`, but is not run, so its entry point starts at zero coverage. C++ exercised by the
-embedded script tests contributes to native coverage. Python source coverage has its own report below.
+Tests, dependencies, and generated embedded Python are excluded. Application tests launch the built client
+in temporary working directories with synthetic caches and a loopback server. These child processes inherit
+the coverage environment, so startup, shutdown and `main.cpp` contribute to the report too. The test target
+builds the client executable as a dependency. Linux terminal tests use private pseudo-terminals to check raw
+input and terminal restoration. C++ exercised by the embedded script tests contributes to native coverage.
+Python source coverage has its own report below.
 
 CI uploads the same report as the `native-coverage-linux-x64` artifact and publishes a summary. Coverage
 percentages are informational; test or collection failures fail the job. Real-cache tests skip without their

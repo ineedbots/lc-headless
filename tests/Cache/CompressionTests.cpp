@@ -6,6 +6,7 @@
 #include "Cache/Error/CacheError.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
@@ -94,4 +95,33 @@ TEST_CASE("Compression rejects damaged gzip and output over the limit", "[Compre
 
     const auto atLimit = std::vector<u8>(CacheStore::MAX_FILE_SIZE);
     CHECK(Compression::Gunzip(GzipWithoutVersion(atLimit)).size() == CacheStore::MAX_FILE_SIZE);
+}
+
+TEST_CASE("Compression rejects gzip that still has output after filling the largest buffer", "[Compression][CompressionFailureCoverage]")
+{
+    const auto data = std::vector<u8>(CacheStore::MAX_FILE_SIZE * 2, 'x');
+    CHECK_THROWS_WITH(Compression::Gunzip(GzipWithoutVersion(data)), ContainsSubstring("gzip data unpacks to more than 2000000 bytes"));
+    CHECK(Compression::Gunzip(GzipWithoutVersion(std::array<u8, 3>{1, 2, 3})) == std::vector<u8>{1, 2, 3});
+}
+
+TEST_CASE("Compression checks gzip payload and size checksums", "[Compression][CompressionFailureCoverage]")
+{
+    const auto trailerOffset = GENERATE(std::size_t{8}, std::size_t{4});
+    const auto data = MakeData(20'000);
+    auto packed = GzipWithoutVersion(data);
+    packed[packed.size() - trailerOffset] ^= 1;
+    CHECK_THROWS_WITH(Compression::Gunzip(packed), ContainsSubstring("gzip data is damaged (Z_DATA_ERROR)"));
+    CHECK(Compression::Gunzip(GzipWithoutVersion(data)) == data);
+}
+
+TEST_CASE("Compression rejects a damaged bzip2 block checksum and truncated trailer", "[Compression][CompressionFailureCoverage]")
+{
+    const auto data = MakeData(1000);
+    const auto packed = CacheWriter::Bzip2Headerless(data);
+    auto damaged = packed;
+    // The headerless stream begins with its six-byte block marker, followed by the block CRC.
+    damaged[6] ^= 1;
+    CHECK_THROWS_WITH(Compression::Bunzip2(damaged, data.size()), ContainsSubstring("bzip2 data is damaged (BZ_DATA_ERROR)"));
+    CHECK_THROWS_WITH(Compression::Bunzip2(std::span{packed}.first(packed.size() - 5), data.size()), ContainsSubstring("bzip2 data ends early"));
+    CHECK(Compression::Bunzip2(packed, data.size()) == data);
 }
