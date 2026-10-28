@@ -1197,6 +1197,39 @@ TEST_CASE("Connection over raw TCP", "[Connection][network]")
     }
 }
 
+TEST_CASE("Connection cancels a TLS handshake waiting for the server", "[Connection][network][tls][HostResilienceCoverage]")
+{
+    const auto loop = NetLoop::Create();
+    auto capture = LogCapture{};
+    // Read the ClientHello as raw TCP and keep the socket open without a TLS reply.
+    const auto server = TestServer{[](ServerSession& session) -> Awaitable
+    {
+        co_await session.Receive();
+        co_await session.ReceiveUntilClosed();
+    }, ServerMode_e::Tcp};
+    const auto options = ConnectionOptions_s{.transport = Transport_e::Wss, .host = LOOPBACK, .port = server.GetPort(), .tlsCaFile = "NONE"};
+    auto connection = Connection{*loop, options, capture.GetLogger()};
+    const auto deadline = Clock::now() + WAIT;
+    while (server.GetRecord().messages.empty() && Clock::now() < deadline)
+    {
+        connection.Pump();
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE_FALSE(server.GetRecord().messages.empty());
+    CHECK_FALSE(connection.WaitOpen(0ms));
+    CHECK(Measure([&] { connection.Close(); }) < AT_ONCE);
+    REQUIRE(connection.WaitClosed(WAIT));
+    loop->Settle(Clock::now() + WAIT);
+    CHECK(connection.Pump() == ConnectionState_e::Closed);
+    // Cancelling a TLS handshake may end the underlying TCP socket with FIN or reset.
+    CHECK(server.WaitFor([](const ServerRecord_s& record) { return record.ended == 1; }));
+    CHECK(GetOutcome([&] { connection.Send(std::array<u8, 1>{1}); }) == Outcome_e::Closed);
+    CHECK(std::ranges::none_of(capture.GetEntries(), [](const auto& entry)
+    {
+        return entry.message.starts_with("Connection failed:");
+    }));
+}
+
 TEST_CASE("Connection over TLS", "[Connection][network][tls]")
 {
     const auto loop = NetLoop::Create();

@@ -33,6 +33,76 @@
 
 using Catch::Matchers::ContainsSubstring;
 
+TEST_CASE("ScriptHost contains upkeep failures and finishes the script once", "[ScriptHost][HostResilienceCoverage]")
+{
+    auto fixture = HostFixture{R"python(
+import builtins
+
+def broken_upkeep():
+    raise ValueError('upkeep unavailable')
+
+def on_start():
+    builtins._rt_upkeep = broken_upkeep
+
+def on_stop(reason):
+    log('>', reason)
+
+def loop():
+    log('>', 'loop should not run')
+    return 1000
+)python"};
+    const auto start = ScriptHost::Clock::now();
+    CHECK_NOTHROW(fixture.host->Step(start));
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
+    CHECK(fixture.HasLog(LogLevel_e::Error, "the upkeep (the random event guardian, stall guard or run manager)"));
+    CHECK(fixture.HasLog(LogLevel_e::Error, "ValueError: upkeep unavailable"));
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"the script failed"});
+    fixture.SendTick();
+    CHECK_NOTHROW(fixture.host->Step(start + 1s));
+    CHECK_NOTHROW(fixture.host->Finish("finished again"));
+    CHECK(fixture.GetScriptLines().size() == 1);
+}
+
+TEST_CASE("ScriptHost rejects profiling together with debugger attachment before creating output", "[ScriptHost][HostResilienceCoverage]")
+{
+    const auto output = TempFolder{"rs2004-host-profile-debugger"};
+    const auto path = output.GetPath() / "profile";
+    CHECK_THROWS_WITH(HostFixture("def loop():\n    return 1000\n", ScriptHostOptions_s{.waitForDebugger = true, .profileDirectory = path}),
+                      "Profiling and the debugger can't share a script VM");
+    CHECK_FALSE(std::filesystem::exists(path));
+    // A rejected host must not leave the shared runtime or its bindings unusable.
+    auto healthy = HostFixture{"def loop():\n    log('>', 'healthy')\n    stop_script()\n"};
+    healthy.host->Step(ScriptHost::Clock::now());
+    CHECK(healthy.GetScriptLines() == std::vector<std::string>{"healthy"});
+    CHECK(healthy.host->GetStatus() == ScriptStatus_e::Stopped);
+}
+
+TEST_CASE("ScriptHost warns about malformed setting saves and consumes them once", "[ScriptHost][HostResilienceCoverage]")
+{
+    auto saves = std::vector<SettingSave_s>{};
+    auto fixture = HostFixture{R"python(
+import _core
+
+def on_start():
+    _core.save_setting('Miner', 'rock', '{')
+
+def loop():
+    log('>', 'running')
+    return 1000
+)python", ScriptHostOptions_s{.onSettingSave = [&saves](const SettingSave_s& save) { saves.push_back(save); }}};
+    const auto start = ScriptHost::Clock::now();
+    fixture.host->Step(start);
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
+    CHECK(fixture.HasLog(LogLevel_e::Warning, "A saved setting couldn't be kept for a reload:"));
+    REQUIRE(saves.size() == 1);
+    CHECK(saves[0].name == "Miner");
+    CHECK(saves[0].key == "rock");
+    CHECK(saves[0].valueJson == "{");
+    fixture.host->Step(start + 1ms);
+    CHECK(saves.size() == 1);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"running"});
+}
+
 TEST_CASE("ScriptHost drops malformed bot messages and continues draining the queue", "[ScriptHost][HostFailureCoverage]")
 {
     auto fixture = HostFixture{R"python(

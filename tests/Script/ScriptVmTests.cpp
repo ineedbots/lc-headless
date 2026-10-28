@@ -38,6 +38,40 @@ namespace
     }
 }
 
+#ifdef __linux__
+TEST_CASE("ScriptVm reports filesystem import failures and recovers for a later import", "[ScriptVm][HostResilienceCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-import-filesystem-errors"};
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = folder.GetPath()}, capture.GetLogger()};
+    const auto path = folder.GetPath() / "loop.py";
+    std::filesystem::create_symlink("loop.py", path);
+    CHECK_THROWS_WITH(vm.RunSource("import loop", "main.py"), ContainsSubstring("ImportError"));
+    CHECK(std::ranges::any_of(capture.GetEntries(), [](const auto& entry)
+    {
+        return entry.level == LogLevel_e::Warning && entry.message.find("Can't import ") != std::string::npos;
+    }));
+    std::filesystem::remove(path);
+    folder.WriteFile("loop.py", "value = 42\n");
+    CHECK_NOTHROW(vm.RunSource("import loop\nassert loop.value == 42\n", "main.py"));
+}
+
+TEST_CASE("ScriptVm treats a file read error as a missing module and can retry", "[ScriptVm][HostResilienceCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-import-read-errors"};
+    const auto path = folder.GetPath() / "unreadable.py";
+    // This is a regular procfs file that opens successfully but fails a read at offset zero with EIO.
+    std::filesystem::create_symlink("/proc/self/mem", path);
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = folder.GetPath()}, capture.GetLogger()};
+    CHECK_THROWS_WITH(vm.RunSource("import unreadable", "main.py"), ContainsSubstring("ImportError"));
+    CHECK(std::ranges::find(vm.GetFiles(), path) != vm.GetFiles().end());
+    std::filesystem::remove(path);
+    folder.WriteFile("unreadable.py", "value = 7\n");
+    CHECK_NOTHROW(vm.RunSource("import unreadable\nassert unreadable.value == 7\n", "main.py"));
+}
+#endif
+
 TEST_CASE("Script profiling accumulates calls and generator resumes with matching sources", "[ScriptVm][Profiling]")
 {
     const auto folder = TempFolder{"rs2004-profile-tests"};

@@ -5,6 +5,19 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#ifdef __linux__
+TEST_CASE("FileUtils handles a file that opens but fails during reading", "[FileUtils][HostResilienceCoverage]")
+{
+    // procfs exposes this as a regular file; reading offset zero produces EIO rather than EOF.
+    REQUIRE(std::filesystem::is_regular_file("/proc/self/mem"));
+    CHECK_FALSE(FileUtils::ReadText("/proc/self/mem").has_value());
+    CHECK_FALSE(FileUtils::ReadBytes("/proc/self/mem").has_value());
+    const auto folder = TempFolder{"rs2004-read-after-error"};
+    folder.WriteFile("healthy.txt", "healthy");
+    CHECK(FileUtils::ReadText(folder.GetPath() / "healthy.txt") == "healthy");
+}
+#endif
+
 TEST_CASE("FileUtils::ReadText reads a whole file as it is", "[FileUtils]")
 {
     const auto folder = TempFolder{"rs2004-file-utils-tests"};
