@@ -89,6 +89,36 @@ namespace
     }
 }
 
+TEST_CASE("ServerPacketReader retains a byte-sized frame while waiting for its length", "[ServerPacketReader][CompletionCoverage]")
+{
+    auto framer = ServerFramer{};
+    const auto bytes = framer.Frame(196, {'o', 'k', '\n'});
+    auto reader = ServerPacketReader{SEED, PROTOCOL};
+    reader.Append(std::span{bytes}.first(1));
+    CHECK_FALSE(reader.Next().has_value());
+    CHECK_FALSE(reader.Next().has_value());
+    CHECK(reader.GetBuffered() == 0);
+    reader.Append(std::span{bytes}.subspan(1));
+    CheckPacket(reader.Next(), ServerProt_e::MessageGame, {'o', 'k', '\n'});
+    CHECK_FALSE(reader.Next().has_value());
+}
+
+TEST_CASE("ServerPacketReader compacts a large consumed prefix without losing the next frame", "[ServerPacketReader][CompletionCoverage]")
+{
+    auto framer = ServerFramer{};
+    const auto payload = std::vector<u8>(5000, 42);
+    const auto first = framer.Frame(59, payload);
+    const auto second = framer.Frame(196, {'o', 'k', '\n'});
+    auto reader = ServerPacketReader{SEED, PROTOCOL};
+    reader.Append(Join({first, std::vector<u8>{second[0]}}));
+    CheckPacket(reader.Next(), ServerProt_e::IfSetText, payload);
+    CHECK(reader.GetBuffered() == 1);
+    CHECK_FALSE(reader.Next().has_value());
+    reader.Append(std::span{second}.subspan(1));
+    CheckPacket(reader.Next(), ServerProt_e::MessageGame, {'o', 'k', '\n'});
+    CHECK(reader.GetBuffered() == 0);
+}
+
 TEST_CASE("ServerPacketReader frames each size kind", "[ServerPacketReader]")
 {
     auto framer = ServerFramer{};

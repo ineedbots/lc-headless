@@ -18,6 +18,13 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <nlohmann/json.hpp>
 
+TEST_CASE("ConfigFile reports a config path that exists but cannot be read as a file", "[ConfigFile][CompletionCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-config-directory"};
+    auto capture = LogCapture{};
+    CHECK_THROWS_WITH(ConfigFile::Load(folder.GetPath(), *capture.GetLogger()), "Failed to read config file " + folder.GetPath().string());
+}
+
 namespace
 {
     constexpr auto EXAMPLE = R"json({

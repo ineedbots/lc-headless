@@ -51,6 +51,8 @@ public:
     void SetStalled(bool stalled);
     // Sent in the same write as the success reply, standing in for a server that speaks first.
     void SetGreetingWithReply(std::vector<u8> bytes);
+    // Route the requested port to a local fixture port, retaining the original request in the record.
+    void SetForwardPort(u16 port);
 
 private:
     struct Settings_s
@@ -60,6 +62,7 @@ private:
         Socks5AddressType_e boundAddress = Socks5AddressType_e::Ipv4;
         bool stalled = false;
         std::vector<u8> greeting;
+        std::optional<u16> forwardPort;
     };
 
     boost::asio::awaitable<void> Accept();

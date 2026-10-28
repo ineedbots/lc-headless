@@ -89,6 +89,50 @@ def loop():
     };
 }
 
+TEST_CASE("An idle account emits a summary after its reporting interval and stays logged in", "[Account][CompletionCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    fixture.Make();
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&] { return fixture.account->GetClient().IsInGame(); }));
+    const auto count = [&]
+    {
+        return std::ranges::count_if(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+        {
+            return entry.message.starts_with("Nearest NPCs:");
+        });
+    };
+    CHECK(count() == 0);
+    const auto deadline = Account::Clock::now() + Account::SUMMARY_INTERVAL + 2s;
+    while (count() == 0 && !fixture.account->IsFinished() && Account::Clock::now() < deadline) fixture.account->Step(20ms);
+    CHECK(count() == 1);
+    fixture.account->Step(0ms);
+    CHECK(count() == 1);
+    CHECK(fixture.account->GetClient().IsInGame());
+    fixture.account->Interrupt();
+    CHECK(fixture.Until([&] { return fixture.account->IsFinished(); }));
+    CHECK(fixture.account->Succeeded());
+}
+
+TEST_CASE("An account preserves existing settings defaults or runs without a settings file", "[Account][CompletionCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    auto withFile = false;
+    SECTION("in-memory account") {}
+    SECTION("defaults already persisted")
+    {
+        withFile = true;
+        fixture.folder.WriteFile("bot1.jsonc", R"({"script":{"file":"main.py","settings":{"Miner":{"count":5}}}})");
+    }
+    fixture.Make("class Miner(LoopingBot):\n    def loop(self):\n        return 1000\n\nBOT = define_bot(name='Miner', create=Miner, settings_schema={'count': SettingDef('number', 5)})\n", withFile);
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&] { return fixture.account->GetClient().IsInGame(); }));
+    CHECK(std::ranges::none_of(fixture.capture.GetEntries(), [](const CapturedLog_s& entry) { return entry.level >= LogLevel_e::Warning; }));
+    fixture.account->Interrupt();
+    CHECK(fixture.Until([&] { return fixture.account->IsFinished(); }));
+    CHECK(fixture.account->Succeeded());
+}
+
 TEST_CASE("An account contains errors that prevent its first connection from starting", "[AccountRecoveryCoverage]")
 {
     auto fixture = LifecycleFixture{};

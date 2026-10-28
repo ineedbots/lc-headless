@@ -34,6 +34,30 @@ namespace
     }
 }
 
+TEST_CASE("JagArchive rejects an archive body without its entry count", "[JagArchive][CompletionCoverage]")
+{
+    const auto bodySize = GENERATE(std::size_t{0}, std::size_t{1});
+    CHECK_THROWS_WITH(JagArchive{std::vector<u8>(6 + bodySize)}, "archive ends before its entry count");
+}
+
+TEST_CASE("JagArchive rejects unequal entry sizes in a whole-compressed archive", "[JagArchive][CompletionCoverage]")
+{
+    auto body = Packet{};
+    body.P2(1);
+    body.P4(JagArchive::HashName("entry"));
+    body.P3(2);
+    body.P3(1);
+    body.P1(42);
+    const auto packed = CacheWriter::Bzip2Headerless(body.GetData());
+    auto bytes = Packet{};
+    bytes.P3(static_cast<s32>(body.GetLength()));
+    bytes.P3(static_cast<s32>(packed.size()));
+    bytes.PData(packed);
+    const auto archive = JagArchive{ToBytes(bytes)};
+    CHECK_THROWS_WITH(archive.Read("entry"), "entry: is 1 bytes, but its listed size is 2");
+    CHECK_FALSE(archive.Read("missing").has_value());
+}
+
 TEST_CASE("JagArchive hashes names as the webclient does", "[JagArchive]")
 {
     CHECK(JagArchive::HashName("loc.dat") == 682978269);

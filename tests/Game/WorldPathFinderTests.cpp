@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../Support/TempFolder.hpp"
 
 #include "Cache/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
@@ -111,6 +112,44 @@ namespace
 
         return false;
     }
+}
+
+TEST_CASE("Navigation names missing data files and distinguishes an unknown data name", "[Navigation][CompletionCoverage]")
+{
+    const auto cache = MakeCache();
+    const auto folder = TempFolder{"rs2004-navigation-missing-files"};
+    folder.WriteFile("edges.json", "[]");
+    for (const auto name : Navigation::DATA_FILES) folder.WriteFile(std::format("{}.json", name), "[]");
+    const auto missing = GENERATE("edges"sv, "teleports"sv, "crossings"sv, "banks"sv, "danger_zones"sv);
+    const auto path = folder.GetPath() / std::format("{}.json", missing);
+    std::filesystem::remove(path);
+    CHECK_THROWS_WITH(Navigation(cache, folder.GetPath()), path.string() + ": can't be read");
+    folder.WriteFile(std::format("{}.json", missing), "[]");
+    const auto navigation = Navigation{cache, folder.GetPath()};
+    CHECK(navigation.GetData(missing).has_value() == (missing != "edges"));
+    CHECK_FALSE(navigation.GetData("missing").has_value());
+    CHECK_FALSE(Navigation(cache, "[]", "[]").GetData("banks").has_value());
+}
+
+TEST_CASE("Navigation reports which graph file contains malformed JSON", "[Navigation][CompletionCoverage]")
+{
+    const auto cache = MakeCache();
+    CHECK_THROWS_WITH(Navigation(cache, "{", "[]"), ContainsSubstring("edges.json:"));
+    CHECK_THROWS_WITH(Navigation(cache, "[]", "{"), ContainsSubstring("teleports.json:"));
+}
+
+TEST_CASE("Navigation enforces free inventory slots on graph edges", "[Navigation][CompletionCoverage]")
+{
+    const auto cache = MakeCache();
+    const auto navigation = Navigation{cache, R"json([
+        {"kind":"stair", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3210,"z":3211,"level":1}, "cost":1,
+         "requires":{"freeSlots":2}}
+    ])json", "[]"};
+    auto options = NavFindOptions_s{.maxExpansions = 5000, .state = NavState_s{}};
+    options.state->freeSlots = 1;
+    CHECK_FALSE(WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options).ok);
+    options.state->freeSlots = 2;
+    CHECK(WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options).ok);
 }
 
 TEST_CASE("WorldPathFinder applies teleport policy to graph edges without a teleport catalog", "[WorldPathFinder][FramingCoverage]")

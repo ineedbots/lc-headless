@@ -312,6 +312,22 @@ TEST_CASE("GameClient logs in, tracks the world and logs out", "[GameClient]")
     CHECK(server.GetErrors().empty());
 }
 
+TEST_CASE("GameClient identifies which 225 map file differs from the server", "[GameClient][CompletionCoverage]")
+{
+    const auto landDiffers = GENERATE(false, true);
+    auto capture = LogCapture{};
+    auto server = FakeGameServer{TestWorld::Send, Revision_e::Rev225};
+    auto cache = std::make_shared<GameCache_s>();
+    cache->revision = Revision_e::Rev225;
+    cache->mapCrcs[u16{(50 << 8) | 50}] = {.land = landDiffers ? 99 : TestWorld::SQUARE_225.landCrc, .locs = landDiffers ? TestWorld::SQUARE_225.locCrc : 99};
+    auto client = GameClient{MakeConfig(server), cache, FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
+    client.Login();
+    REQUIRE(PumpUntil(client, [&] { return !client.GetState().messages.empty(); }));
+    const auto expected = std::format("Map square 50_50's {} differ from the server's; walks there may route through changed scenery", landDiffers ? "land" : "locs");
+    CHECK(std::ranges::any_of(capture.GetEntries(), [&](const CapturedLog_s& entry) { return entry.level == LogLevel_e::Warning && entry.message == expected; }));
+    CHECK(client.IsInGame());
+}
+
 TEST_CASE("GameClient logs in to a 225 server and answers each rebuild", "[GameClient]")
 {
     const auto transport = GENERATE(Transport_e::Ws, Transport_e::Tcp);

@@ -1,8 +1,29 @@
 #include "pch.hpp"
 
 #include "Cache/TextPool.hpp"
+#include "Cache/Error/CacheError.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+
+TEST_CASE("TextPool rejects option id overflow while keeping existing options usable", "[TextPool][CompletionCoverage]")
+{
+    auto pool = TextPool{};
+    for (auto id = u32{1}; id <= std::numeric_limits<u16>::max(); ++id)
+    {
+        REQUIRE(pool.InternOption(std::format("option {}", id)) == id);
+    }
+    CHECK(pool.GetOptionCount() == 65536);
+    CHECK_THROWS_AS(pool.InternOption("overflow"), CacheError);
+    CHECK_THROWS_WITH(pool.InternOption("overflow"), "the types have more than 65535 distinct options");
+    CHECK(pool.GetOptionCount() == 65536);
+    CHECK(pool.InternOption("option 65535") == 65535);
+    CHECK(pool.GetOption(1) == "option 1");
+    CHECK(pool.GetOption(65535) == "option 65535");
+    CHECK(pool.InternOption("") == TextPool::NO_OPTION);
+    pool.FinishInterning();
+    CHECK(pool.GetOption(65535) == "option 65535");
+}
 
 TEST_CASE("TextPool stores each distinct string once", "[TextPool]")
 {

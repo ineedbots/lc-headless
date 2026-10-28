@@ -31,6 +31,28 @@ def loop():
     }
 }
 
+TEST_CASE("ProgressReporter survives a write failure and retries at the next interval", "[ProgressReporter][CompletionCoverage]")
+{
+    auto fixture = HostFixture{COUNTER};
+    const auto blocked = fixture.folder.GetPath() / "blocked";
+    fixture.folder.WriteFile("blocked", "keep this file");
+    const auto path = blocked / "report.txt";
+    auto reporter = ProgressReporter{1min, path, fixture.capture.GetLogger()};
+    const auto start = Clock::now();
+    fixture.host->Step(start);
+    reporter.Step(start, *fixture.host);
+    CHECK_NOTHROW(reporter.Step(start + 1min, *fixture.host));
+    CHECK(fixture.HasLog(LogLevel_e::Warning, "The progress report wasn't saved:"));
+    CHECK(fixture.HasLog(LogLevel_e::Info, "Progress: Reports: 1"));
+    CHECK(fixture.host->IsActive());
+    std::filesystem::remove(blocked);
+    reporter.Step(start + 119s, *fixture.host);
+    CHECK_FALSE(std::filesystem::exists(path));
+    reporter.Step(start + 2min, *fixture.host);
+    CHECK(std::filesystem::is_regular_file(path));
+    CHECK(fixture.HasLog(LogLevel_e::Info, "Progress: Reports: 2"));
+}
+
 TEST_CASE("ProgressReporter reports an interval after the script started, then an interval after each report", "[ProgressReporter]")
 {
     auto fixture = HostFixture{COUNTER};

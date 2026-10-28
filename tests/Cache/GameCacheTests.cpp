@@ -17,6 +17,8 @@ TEST_CASE("GameCache_s finds names by id", "[GameCache]")
     CHECK(cache.FindLocName(1276) == "Tree");
     CHECK(cache.FindNpcName(-1).empty());
     CHECK(cache.FindObjName(99999).empty());
+    CHECK(cache.FindComponent(-1) == nullptr);
+    CHECK(cache.FindComponent(std::numeric_limits<s32>::min()) == nullptr);
 }
 
 TEST_CASE("GameCache_s finds ids by name, in any case", "[GameCache]")

@@ -19,6 +19,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace
 {
@@ -429,6 +430,31 @@ TEST_CASE("PLAYER_INFO hits from a later tick replace the earlier ones", "[Playe
     REQUIRE(state.localPlayer.hits.size() == 1);
     CHECK(state.localPlayer.hits[0].damage == 3);
     CHECK(state.localPlayer.hits[0].tick == 2);
+}
+
+TEST_CASE("NPC_INFO rejects trailing bytes and duplicate tracked indexes", "[NpcInfoDecoder][CompletionCoverage]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    const auto indexBits = revision == Revision_e::Rev225 ? 13 : 14;
+    auto state = Fixtures::PlacedState();
+    auto decoder = NpcInfoDecoder{Protocol{revision}};
+    SECTION("unexpected bytes after the terminator")
+    {
+        auto bits = BitWriter{};
+        bits.Put(8, 0).Put(indexBits, (1 << indexBits) - 1);
+        auto bytes = bits.GetBytes();
+        bytes.insert(bytes.end(), 4, 0);
+        CHECK_THROWS_WITH(decoder.Decode(bytes, state), "NPC_INFO has 4 bytes left after the last extended block");
+    }
+    SECTION("adding an NPC which is still tracked")
+    {
+        state.npcs = {MakeNpc(100, 50, Offset(1, 0))};
+        auto bits = BitWriter{};
+        bits.Put(8, 1).Put(1, 0).Put(indexBits, 100).Put(11, 50).Put(5, 0).Put(5, 0);
+        if (revision != Revision_e::Rev225) bits.Put(1, 0);
+        bits.Put(1, 0);
+        CHECK_THROWS_WITH(decoder.Decode(bits.GetBytes(), state), "NPC_INFO adds NPC 100, which is already tracked");
+    }
 }
 
 TEST_CASE("NPC_INFO adds, moves and removes NPCs", "[NpcInfoDecoder]")

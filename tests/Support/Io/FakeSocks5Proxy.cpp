@@ -165,6 +165,12 @@ void FakeSocks5Proxy::SetGreetingWithReply(std::vector<u8> bytes)
     m_settings.greeting = std::move(bytes);
 }
 
+void FakeSocks5Proxy::SetForwardPort(u16 port)
+{
+    const auto lock = std::scoped_lock{m_mutex};
+    m_settings.forwardPort = port;
+}
+
 asio::awaitable<void> FakeSocks5Proxy::Accept()
 {
     while (true)
@@ -203,7 +209,7 @@ asio::awaitable<void> FakeSocks5Proxy::Serve(Tcp::socket client)
     const auto executor = client.get_executor();
     auto resolver = Tcp::resolver{executor};
     auto target = Tcp::socket{executor};
-    auto [connectError, endpoints] = co_await resolver.async_resolve(Tcp::v4(), request->host, std::to_string(request->port), AS_TUPLE);
+    auto [connectError, endpoints] = co_await resolver.async_resolve(Tcp::v4(), request->host, std::to_string(settings.forwardPort.value_or(request->port)), AS_TUPLE);
     if (!connectError)
     {
         const auto [error, endpoint] = co_await asio::async_connect(target, endpoints, AS_TUPLE);

@@ -16,6 +16,13 @@ namespace
     using W = QueryWorld;
 }
 
+TEST_CASE("Menus describes unnamed cached items by their id", "[Menus][CompletionCoverage]")
+{
+    auto cache = GameCache_s{};
+    TestCache::AddObj(cache, 60000, "");
+    CHECK_THROWS_WITH(Menus::FindItemOp(cache, 60000, "Bury"), "item 60000 has no option 'Bury'; its options are Drop (5)");
+}
+
 TEST_CASE("Menus chooses options by their text", "[Menus]")
 {
     auto world = QueryWorld{};

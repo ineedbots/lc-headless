@@ -144,6 +144,25 @@ namespace
     };
 }
 
+TEST_CASE("ScriptActions forwards explicit walking waypoints and the run flag", "[ScriptActions][CompletionCoverage]")
+{
+    auto fixture = ActionSession{};
+    const auto here = fixture.state.localPlayer.tile;
+    const auto points = std::array{Tile_s{.x = here.x + 1, .z = here.z + 2, .level = here.level}, Tile_s{.x = here.x + 5, .z = here.z - 1, .level = here.level}};
+    fixture.actions.WalkPath(points, true);
+    fixture.client.Flush();
+    REQUIRE(fixture.server.WaitForPacket(ClientProt_e::MoveGameClick));
+    const auto packets = fixture.server.GetPackets(ClientProt_e::MoveGameClick);
+    REQUIRE(packets.size() == 1);
+    auto expected = Packet{};
+    expected.P1(1);
+    expected.P2(points[0].x);
+    expected.P2(points[0].z);
+    expected.P1(4);
+    expected.P1(-3);
+    CHECK(packets[0].payload == std::vector<u8>(expected.GetData().begin(), expected.GetData().end()));
+}
+
 TEST_CASE("ScriptActions reject stale inventory references for every item action", "[ScriptActions]")
 {
     auto f = ActionsFixture{};

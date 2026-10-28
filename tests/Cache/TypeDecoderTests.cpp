@@ -371,6 +371,54 @@ TEST_CASE("TypeDecoder makes banknotes from their linked objs", "[TypeDecoder]")
     CHECK_THROWS_WITH(DecodeObjs({note(5)}, text), ContainsSubstring("obj 0: its certlink 5 isn't an obj"));
 }
 
+TEST_CASE("An unnamed noted object still receives a readable examine description", "[TypeDecoder][CompletionCoverage]")
+{
+    auto text = TextPool{};
+    const auto objs = DecodeObjs({std::vector<u8>{0}, std::vector<u8>{97, 0, 0, 98, 0, 0, 0}}, text);
+    REQUIRE(objs.size() == 2);
+    CHECK(objs[1].name.empty());
+    CHECK(objs[1].examine == "Swap this note at any bank for a .");
+    CHECK(objs[1].noteOf == std::optional<u16>{0});
+    CHECK(objs[1].stackable);
+}
+
+TEST_CASE("LocTypeDecoder reports an unknown opcode with its definition id", "[TypeDecoder][CompletionCoverage]")
+{
+    auto text = TextPool{};
+    CHECK_THROWS_WITH(DecodeLocs({std::vector<u8>{200, 0}}, text), "loc 0: unknown opcode 200");
+}
+
+TEST_CASE("Dropped opcode descriptions skip their declared payload and reject truncation", "[TypeDecoder][CompletionCoverage]")
+{
+    const auto first = GENERATE(u8{0}, u8{100}, u8{253});
+    const auto table = std::array{DroppedOpcodes_s::Drop(first, 2), DroppedOpcodes_s::DropCounted(first + 1, 2), DroppedOpcodes_s::DropRange(first + 2, first + 2, 1)};
+    const auto bytes = std::to_array<u8>({11, 22, 2, 33, 44, 55, 66, 77, 88});
+    auto packet = Packet{bytes};
+    CHECK(TypeDecoder::SkipDropped(packet, first, table));
+    CHECK(packet.GetPos() == 2);
+    CHECK(TypeDecoder::SkipDropped(packet, first + 1, table));
+    CHECK(packet.GetPos() == 7);
+    CHECK(TypeDecoder::SkipDropped(packet, first + 2, table));
+    CHECK(packet.G1() == 88);
+    const auto atEnd = packet.GetPos();
+    CHECK_FALSE(TypeDecoder::SkipDropped(packet, first == 0 ? 255 : first - 1, table));
+    CHECK(packet.GetPos() == atEnd);
+    CHECK_THROWS_WITH(TypeDecoder::SkipDropped(packet, first, table), "value runs past the end");
+}
+
+TEST_CASE("Revisioned opcode factories preserve added and removed revision boundaries", "[TypeDecoder][CompletionCoverage]")
+{
+    const auto opcode = GENERATE(u8{1}, u8{100}, u8{255});
+    const auto added = std::array{RevisionedOpcode_s::AddedIn(opcode, Revision_e::Rev274)};
+    CHECK_FALSE(TypeDecoder::HasOpcode(Revision_e::Rev225, opcode, added));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev274, opcode, added));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev289, opcode, added));
+    const auto removed = std::array{RevisionedOpcode_s::RemovedIn(opcode, Revision_e::Rev289)};
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev225, opcode, removed));
+    CHECK(TypeDecoder::HasOpcode(Revision_e::Rev274, opcode, removed));
+    CHECK_FALSE(TypeDecoder::HasOpcode(Revision_e::Rev289, opcode, removed));
+}
+
 TEST_CASE("Every type decoder rejects incomplete framing before reading definitions", "[TypeDecoder][FramingCoverage]")
 {
     const auto kind = GENERATE("loc"sv, "npc"sv, "obj"sv, "varp"sv);

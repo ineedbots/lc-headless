@@ -9,6 +9,10 @@
 #include "Game/Nav/Navigation.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Utils/FileUtils.hpp"
+#include "Script/ScriptVm.hpp"
+
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/write.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -160,6 +164,61 @@ TEST_CASE("Application explains missing and empty account directories", "[Applic
     INFO(result.output);
     CHECK(result.exitCode == EXIT_FAILURE);
     CHECK_THAT(result.output, ContainsSubstring(missing ? "no accounts folder" : "no enabled account files"));
+}
+
+TEST_CASE("Application resumes a scripted account after debugger configuration", "[Application][CompletionCoverage]")
+{
+    using Tcp = boost::asio::ip::tcp;
+    auto fixture = ApplicationFixture{};
+    auto io = boost::asio::io_context{};
+    const auto endpoint = Tcp::endpoint{boost::asio::ip::make_address(ScriptVm::DEBUGGER_HOST), ScriptVm::DEBUGGER_PORT};
+    auto probe = Tcp::acceptor{io};
+    probe.open(Tcp::v4());
+    auto error = boost::system::error_code{};
+    probe.bind(endpoint, error);
+    if (error) SKIP("The debugger's fixed port is already in use");
+    probe.close();
+    auto configured = false;
+    auto response = std::string{};
+    auto debugger = std::jthread{[&](std::stop_token stop)
+    {
+        auto socket = Tcp::socket{io};
+        auto ec = boost::system::error_code{};
+        const auto deadline = std::chrono::steady_clock::now() + 10s;
+        while (!stop.stop_requested() && std::chrono::steady_clock::now() < deadline)
+        {
+            socket.connect(endpoint, ec);
+            if (!ec) break;
+            socket.close(ec);
+            std::this_thread::sleep_for(10ms);
+        }
+        if (!socket.is_open()) return;
+        const auto message = std::string{R"({"seq":1,"type":"request","command":"configurationDone","arguments":{}})"};
+        const auto frame = std::format("Content-Length: {}\r\n\r\n{}", message.size(), message);
+        boost::asio::write(socket, boost::asio::buffer(frame), ec);
+        if (ec) return;
+        configured = true;
+        socket.non_blocking(true, ec);
+        auto bytes = std::array<char, 4096>{};
+        while (!ec && !stop.stop_requested())
+        {
+            const auto count = socket.read_some(boost::asio::buffer(bytes), ec);
+            if (!ec) response.append(bytes.data(), count);
+            else if (ec == boost::asio::error::would_block || ec == boost::asio::error::try_again) ec.clear();
+            std::this_thread::sleep_for(1ms);
+        }
+    }};
+    const auto result = fixture.Run({"--raw-console", "--debugger", "--account", "accounts/bot.jsonc"});
+    debugger.request_stop();
+    debugger.join();
+    INFO(result.output);
+    INFO(response);
+    REQUIRE(configured);
+    CHECK_THAT(response, ContainsSubstring("configurationDone"));
+    CHECK(result.exitCode == EXIT_SUCCESS);
+    CHECK_THAT(result.output, ContainsSubstring("Debugger attached"));
+    CHECK_THAT(result.output, ContainsSubstring("application loop"));
+    CHECK_THAT(result.output, ContainsSubstring("Logging out: the script stopped the account"));
 }
 
 TEST_CASE("Application requires a scripted account for the debugger", "[Application][ApplicationCoverage]")

@@ -15,6 +15,21 @@ namespace
     using W = QueryWorld;
 }
 
+TEST_CASE("InteractionRoutes gives scenery with unknown metadata a one-tile area target", "[InteractionRoutes][CompletionCoverage]")
+{
+    auto world = QueryWorld{};
+    const auto tile = W::Offset(0, 6);
+    world.state.locChanges.push_back({.tile = tile, .layer = LocLayer_e::Ground, .id = 60000, .shape = LocShape::CENTREPIECE_STRAIGHT});
+    ++world.state.sceneChangeCount;
+    world.map.Update(world.state);
+    const auto target = InteractionRoutes::FindLocTarget(world.map, tile, 60000);
+    REQUIRE(target.has_value());
+    CHECK(target->kind == RouteKind_e::Area);
+    CHECK(target->width == 1);
+    CHECK(target->length == 1);
+    CHECK(InteractionRoutes::FindLocRoute(world.map, W::Offset(0, 0), tile, 60000).has_value());
+}
+
 TEST_CASE("InteractionRoutes walks to a tile, or as near to it as can be reached", "[InteractionRoutes]")
 {
     const auto world = QueryWorld{};

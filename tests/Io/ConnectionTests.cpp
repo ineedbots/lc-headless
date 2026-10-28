@@ -9,6 +9,7 @@
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Io/Connection.hpp"
+#include "Io/AsioLink.hpp"
 #include "Io/ConnectionOptions_s.hpp"
 #include "Io/Error/ConnectionClosedError.hpp"
 #include "Io/Error/ConnectionError.hpp"
@@ -196,6 +197,27 @@ namespace
 }
 
 static_assert(std::derived_from<ConnectionClosedError, ConnectionError>);
+
+TEST_CASE("Asio cancels each transport during hostname lookup and TCP connection", "[Connection][CompletionCoverage]")
+{
+    const auto transport = GENERATE(Transport_e::Ws, Transport_e::Wss, Transport_e::Tcp);
+    const auto handlers = GENERATE(1, 2);
+    CAPTURE(static_cast<int>(transport), handlers);
+    auto loop = AsioNetLoop{};
+    auto io = boost::asio::io_context{};
+    auto capture = LogCapture{};
+    const auto server = TestServer{{}, ServerMode_e::Tcp};
+    const auto options = ConnectionOptions_s{.transport = transport, .host = LOOPBACK, .port = server.GetPort(), .tlsCaFile = "NONE"};
+    auto link = std::make_shared<AsioLink>(loop, io, options, capture.GetLogger());
+    link->Start();
+    for (auto count = 0; count < handlers; ++count) REQUIRE(io.run_one_for(WAIT) == 1);
+    REQUIRE(link->GetStatus().state == ConnectionState_e::Connecting);
+    link->Close();
+    io.run_for(WAIT);
+    CHECK(link->GetStatus().state == ConnectionState_e::Closed);
+    CHECK_FALSE(link->GetStatus().failed);
+    CHECK(std::as_const(*link).GetReceived().Available() == 0);
+}
 
 TEST_CASE("Connection reports proxy EOF and reset at every reply stage", "[Connection][ProxyFailureCoverage]")
 {
@@ -1324,6 +1346,66 @@ TEST_CASE("Connection over TLS treats a truncated stream as a close", "[Connecti
     {
         static_cast<void>(connection.WaitAvailable(1, WAIT));
     }) == Outcome_e::Closed);
+}
+
+TEST_CASE("Connection omits a scheme's default port from the WebSocket host header", "[Connection][CompletionCoverage]")
+{
+    const auto tls = GENERATE(false, true);
+    const auto loop = NetLoop::Create();
+    auto capture = LogCapture{};
+    const auto server = TestServer{Echo, ServerMode_e::WebSocket, tls};
+    auto proxy = FakeSocks5Proxy{};
+    proxy.SetForwardPort(server.GetPort());
+    const auto port = tls ? u16{443} : u16{80};
+    const auto options = ConnectionOptions_s{.transport = tls ? Transport_e::Wss : Transport_e::Ws, .host = LOOPBACK, .port = port, .tlsCaFile = "NONE", .proxy = Socks5Proxy_s{.host = LOOPBACK, .port = proxy.GetPort()}};
+    auto connection = Connection{*loop, options, capture.GetLogger()};
+    REQUIRE(connection.WaitOpen(WAIT));
+    const auto handshakes = server.GetRecord().handshakes;
+    REQUIRE(handshakes.size() == 1);
+    CHECK(handshakes[0].host == LOOPBACK);
+    const auto requests = proxy.GetRecord().requests;
+    REQUIRE(requests.size() == 1);
+    CHECK(requests[0].port == port);
+    connection.Send(std::array<u8, 2>{7, 8});
+    REQUIRE(connection.WaitAvailable(2, WAIT));
+    CHECK(ReadAll(connection) == std::vector<u8>{7, 8});
+    connection.Close();
+    CHECK(connection.WaitClosed(WAIT));
+}
+
+TEST_CASE("Connection drains queued TCP writes in their original order", "[Connection][CompletionCoverage]")
+{
+    const auto loop = NetLoop::Create();
+    auto capture = LogCapture{};
+    auto release = std::atomic<bool>{false};
+    const auto size = std::size_t{8} * 1024 * 1024;
+    const auto server = TestServer{[&](ServerSession& session) -> Awaitable
+    {
+        const auto deadline = Clock::now() + WAIT;
+        while (!release && Clock::now() < deadline) co_await session.Delay(1ms);
+        auto received = std::size_t{0};
+        while (received < size + 3)
+        {
+            const auto bytes = co_await session.Receive();
+            if (!bytes) co_return;
+            received += bytes->size();
+        }
+        co_await session.Send({1});
+        co_await session.ReceiveUntilClosed();
+    }, ServerMode_e::Tcp};
+    auto connection = Connection{*loop, MakeTcpOptions(server.GetPort()), capture.GetLogger()};
+    REQUIRE(connection.WaitOpen(WAIT));
+    connection.Send(std::vector<u8>(size, 42));
+    connection.Send(std::array<u8, 3>{1, 2, 3});
+    release = true;
+    REQUIRE(connection.WaitAvailable(1, WAIT));
+    CHECK(ReadAll(connection) == std::vector<u8>{1});
+    const auto received = GetStream(server);
+    REQUIRE(received.size() == size + 3);
+    CHECK(std::ranges::all_of(std::span{received}.first(size), [](u8 byte) { return byte == 42; }));
+    CHECK(std::vector<u8>(received.end() - 3, received.end()) == std::vector<u8>{1, 2, 3});
+    connection.Close();
+    CHECK(connection.WaitClosed(WAIT));
 }
 
 TEST_CASE("Connection through a SOCKS5 proxy", "[Connection][network][Socks5]")

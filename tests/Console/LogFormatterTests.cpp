@@ -8,6 +8,12 @@
 
 namespace
 {
+    std::source_location BareFileLocation()
+    {
+#line 1 "Bare.cpp"
+        return std::source_location::current();
+#line 17 "LogFormatterTests.cpp"
+    }
     std::chrono::system_clock::time_point GetSampleTime()
     {
         return std::chrono::sys_days{2026y / std::chrono::October / 5} + 18h + 34min + 12s + 345ms;
@@ -17,6 +23,12 @@ namespace
     {
         return {.level = level, .time = time, .location = location, .message = "hello"};
     }
+}
+
+TEST_CASE("LogFormatter preserves a source filename that has no directory", "[LogFormatter][CompletionCoverage]")
+{
+    const auto entry = MakeEntry(LogLevel_e::Info, GetSampleTime(), BareFileLocation());
+    CHECK(LogFormatter::FormatLine(entry) == "2026-10-05T18:34:12.345Z INFO    hello [Bare.cpp:1]");
 }
 
 TEST_CASE("LogFormatter::FormatLine", "[LogFormatter]")

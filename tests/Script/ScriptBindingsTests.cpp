@@ -20,6 +20,9 @@
 #include "Game/Tile_s.hpp"
 #include "Script/Bindings/ScriptBindings.hpp"
 #include "Script/Error/ScriptError.hpp"
+#include "Script/Convert/PyArgs.hpp"
+#include "Script/Convert/PyValue.hpp"
+#include "Script/Error/ScriptTypeError.hpp"
 #include "Script/ScriptContext.hpp"
 #include "Script/ScriptVm.hpp"
 
@@ -162,6 +165,19 @@ namespace
             state.social.ignores = {Base37::Encode("spammer")};
         }
     };
+}
+
+TEST_CASE("Native conversion errors preserve a usable script VM", "[ScriptBindings][CompletionCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("class Example:\n    def __init__(self):\n        self.present = 42\n\ndef example():\n    return Example()\n");
+    const auto value = fixture.vm.Call("example");
+    CHECK(py_toint(PyValue::GetField(value, "present")) == 42);
+    CHECK_THROWS_WITH(PyValue::GetField(value, "missing"), "the object has no missing attribute");
+    CHECK_THROWS_AS(PyArgs::ToLoc(value, "target"), ScriptTypeError);
+    CHECK_THROWS_WITH(PyArgs::ToLoc(value, "target"), "target must be a Loc, not Example");
+    CHECK_NOTHROW(fixture.Run("assert example().present == 42\n"));
+    CHECK_FALSE(fixture.api.SendBotMessage("another account", "{}").has_value());
 }
 
 TEST_CASE("Native reachability bindings distinguish nearby targets from unloaded tiles", "[ScriptBindings][BindingBoundaryCoverage]")

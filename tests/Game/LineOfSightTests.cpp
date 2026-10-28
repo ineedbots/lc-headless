@@ -39,6 +39,13 @@ namespace
     }
 }
 
+TEST_CASE("A shallow sight ray checks the tile entered when it crosses a row boundary", "[LineOfSight][CompletionCoverage]")
+{
+    CHECK(Sees(CollisionMap{SIZE}, One(1, 1), One(8, 4)));
+    CHECK_FALSE(Sees(WithLoc(3, 2, true), One(1, 1), One(8, 4)));
+    CHECK(Sees(WithLoc(3, 2, false), One(1, 1), One(8, 4)));
+}
+
 TEST_CASE("Open ground is seen along a row, a column and a diagonal", "[LineOfSight]")
 {
     const auto open = CollisionMap{SIZE};

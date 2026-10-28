@@ -13,6 +13,20 @@ namespace
     using W = QueryWorld;
 }
 
+TEST_CASE("EntityQuery compares multiple scenery candidates when selecting the nearest", "[EntityQuery][CompletionCoverage]")
+{
+    auto world = QueryWorld{};
+    world.state.locChanges.push_back({.tile = W::Offset(0, 8), .layer = LocLayer_e::Ground, .id = W::TREE, .shape = 10});
+    ++world.state.sceneChangeCount;
+    world.map.Update(world.state);
+    const auto query = EntityQuery{world.state, world.map};
+    const auto candidates = query.GetLocs({}, std::nullopt);
+    REQUIRE(candidates.size() > 1);
+    const auto nearest = query.GetNearestLoc({}, std::nullopt, false);
+    REQUIRE(nearest.has_value());
+    CHECK(nearest->tile != W::Offset(0, 8));
+}
+
 TEST_CASE("EntityQuery finds NPCs by id and radius", "[EntityQuery]")
 {
     auto world = QueryWorld{};
