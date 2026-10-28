@@ -5,6 +5,7 @@
 #include "Game/Map/LocShape.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace
 {
@@ -240,6 +241,35 @@ TEST_CASE("CollisionMap reaches wall decor as the webclient's testWDecor does", 
         CAPTURE(reach.shape, reach.angle, reach.dx, reach.dz);
         CHECK(ReachesWallDecor(map, reach) == reach.reaches);
     }
+}
+
+TEST_CASE("CollisionMap reaches every side of L walls with orientation-specific clipping", "[CollisionMap][CollisionReachCoverage]")
+{
+    const auto angle = GENERATE(WEST, NORTH, EAST, SOUTH);
+    // west, north, east, south: the two sides formed by the corner are usable even when clipped.
+    const auto sides = std::to_array<std::pair<s32, s32>>({{-1, 0}, {0, 1}, {1, 0}, {0, -1}});
+    for (auto side = std::size_t{0}; side < sides.size(); ++side)
+    {
+        CAPTURE(angle, side);
+        const auto [dx, dz] = sides[side];
+        auto map = CollisionMap{};
+        CHECK(map.CanReachWall(X + dx, Z + dz, X, Z, LocShape::WALL_L, angle));
+        map.BlockGround(X + dx, Z + dz);
+        const auto cornerSide = side == angle || side == (angle + 1u) % sides.size();
+        CHECK(map.CanReachWall(X + dx, Z + dz, X, Z, LocShape::WALL_L, angle) == cornerSide);
+    }
+}
+
+TEST_CASE("CollisionMap diagonal wall interactions obey the standing tile's facing wall", "[CollisionMap][CollisionReachCoverage]")
+{
+    const auto [dx, dz, facing] = GENERATE(
+        std::tuple{-1, 0, EAST}, std::tuple{0, 1, SOUTH},
+        std::tuple{1, 0, WEST}, std::tuple{0, -1, NORTH});
+    auto map = CollisionMap{};
+    CHECK(map.CanReachWall(X + dx, Z + dz, X, Z, LocShape::WALL_DIAGONAL, WEST));
+    map.AddWall(X + dx, Z + dz, LocShape::WALL_STRAIGHT, facing, false);
+    CHECK_FALSE(map.CanReachWall(X + dx, Z + dz, X, Z, LocShape::WALL_DIAGONAL, WEST));
+    CHECK_FALSE(map.CanReachWall(X + 1, Z + 1, X, Z, LocShape::WALL_DIAGONAL, WEST));
 }
 
 TEST_CASE("CollisionMap reaches areas as the webclient's testLoc does", "[CollisionMap]")

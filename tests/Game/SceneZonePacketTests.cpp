@@ -3,6 +3,7 @@
 #include "../Support/LogCapture.hpp"
 
 #include "Game/Decode/ServerPacketDecoder.hpp"
+#include "Game/Decode/ZoneDecoder.hpp"
 #include "Game/Error/ProtocolError.hpp"
 #include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
@@ -56,6 +57,93 @@ namespace
         packet.P1(64);
         return packet;
     }
+}
+
+TEST_CASE("Active zones include the radius boundary and exclude other levels", "[SceneZonePackets][ZoneCleanupCoverage]")
+{
+    const auto state = Fixtures::PlacedState();
+    const auto [dx, dz, level, expected] = GENERATE(
+        std::tuple{-24, -24, 0, true}, std::tuple{31, 31, 0, true},
+        std::tuple{-25, 0, 0, false}, std::tuple{32, 0, 0, false},
+        std::tuple{0, -25, 0, false}, std::tuple{0, 32, 0, false},
+        std::tuple{0, 0, 1, false});
+    CAPTURE(dx, dz, level);
+    CHECK(ZoneDecoder::IsActive(state, {.x = Fixtures::HOME + dx, .z = Fixtures::HOME + dz, .level = level}) == expected);
+}
+
+TEST_CASE("Active zones stop at the build area even near its edges", "[SceneZonePackets][ZoneCleanupCoverage]")
+{
+    auto state = Fixtures::PlacedState();
+    const auto local = GENERATE(0, BuildArea_s::SIZE - 1);
+    state.localPlayer.tile = {.x = Fixtures::BASE + local, .z = Fixtures::BASE + local};
+    CHECK(ZoneDecoder::IsActive(state, state.localPlayer.tile));
+    const auto outside = local == 0 ? Fixtures::BASE - 1 : Fixtures::BASE + BuildArea_s::SIZE;
+    CHECK_FALSE(ZoneDecoder::IsActive(state, {.x = outside, .z = state.localPlayer.tile.z}));
+    CHECK_FALSE(ZoneDecoder::IsActive(state, {.x = state.localPlayer.tile.x, .z = outside}));
+}
+
+TEST_CASE("Zone pruning removes stale state once and waits for placement and loading", "[SceneZonePackets][ZoneCleanupCoverage]")
+{
+    auto state = Fixtures::PlacedState();
+    const auto home = state.localPlayer.tile;
+    const auto far = Tile_s{.x = home.x + 32, .z = home.z};
+    const auto upstairs = Tile_s{.x = home.x, .z = home.z, .level = 1};
+    state.groundItems = {{.tile = home, .id = 995}, {.tile = far, .id = 526}, {.tile = upstairs, .id = 1511}};
+    state.locChanges = {{.tile = home, .id = 1530}, {.tile = far, .id = -1}, {.tile = upstairs, .id = 1276}};
+    state.sceneChangeCount = 10;
+    const auto ready = GENERATE(0, 1, 2);
+    state.placed = ready != 0;
+    state.buildArea.loaded = ready != 1;
+    ZoneDecoder::PruneInactive(state);
+    if (ready != 2)
+    {
+        CHECK(state.groundItems.size() == 3);
+        CHECK(state.locChanges.size() == 3);
+        CHECK(state.sceneChangeCount == 10);
+        state.placed = true;
+        state.buildArea.loaded = true;
+        ZoneDecoder::PruneInactive(state);
+    }
+    REQUIRE(state.groundItems.size() == 1);
+    CHECK(state.groundItems.front().id == 995);
+    REQUIRE(state.locChanges.size() == 1);
+    CHECK(state.locChanges.front().id == 1530);
+    CHECK(state.sceneChangeCount == 11);
+    ZoneDecoder::PruneInactive(state);
+    CHECK(state.sceneChangeCount == 11);
+    state.groundItems.push_back({.tile = far, .id = 526});
+    ZoneDecoder::PruneInactive(state);
+    CHECK(state.groundItems.size() == 1);
+    CHECK(state.sceneChangeCount == 11);
+}
+
+TEST_CASE("Zone resets preserve neighboring zones and other floors", "[SceneZonePackets][ZoneCleanupCoverage]")
+{
+    auto state = Fixtures::PlacedState();
+    auto decoder = ZoneDecoder{Protocol{Revision_e::Rev289}};
+    const auto bytes = Fixtures::Zone(48, 48);
+    auto zone = Packet{bytes};
+    decoder.SetZone(zone);
+    const auto home = state.localPlayer.tile;
+    const auto edge = Tile_s{.x = home.x + 7, .z = home.z + 7};
+    const auto next = Tile_s{.x = home.x + 8, .z = home.z};
+    const auto upstairs = Tile_s{.x = home.x, .z = home.z, .level = 1};
+    for (const auto& tile : {home, edge, next, upstairs})
+    {
+        state.groundItems.push_back({.tile = tile, .id = 995});
+        state.locChanges.push_back({.tile = tile, .id = 1530});
+    }
+    state.sceneChangeCount = 12;
+    decoder.ResetZone(state);
+    REQUIRE(state.groundItems.size() == 2);
+    REQUIRE(state.locChanges.size() == 2);
+    CHECK(state.groundItems[0].tile == next);
+    CHECK(state.groundItems[1].tile == upstairs);
+    CHECK(state.locChanges[0].tile == next);
+    CHECK(state.locChanges[1].tile == upstairs);
+    CHECK(state.sceneChangeCount == 13);
+    decoder.ResetZone(state);
+    CHECK(state.sceneChangeCount == 13);
 }
 
 TEST_CASE("Scene animation resets affect every entity and preserve their other state", "[SceneZonePackets]")
