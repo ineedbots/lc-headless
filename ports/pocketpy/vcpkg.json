@@ -1,6 +1,7 @@
 {
     "name": "pocketpy",
     "version": "2.2.0",
+    "port-version": 1,
     "description": "A lightweight Python 3.x interpreter in C11 for embedding, built as a static library with the watchdog enabled.",
     "homepage": "https://github.com/pocketpy/pocketpy",
     "license": "MIT",

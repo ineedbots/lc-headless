@@ -30,6 +30,14 @@ vcpkg_replace_string("${SOURCE_PATH}/src/public/PyException.c"
     py_newnil(&frame_dump->locals);
     py_newnil(&frame_dump->globals);")
 
+# A yielded generator detaches its frame without VM__pop_frame (which would destroy it). It must still
+# send the matching trace event: resuming sends PUSH again. Otherwise the profiler retains suspended
+# frames, eventually dereferencing a cleared prev_line when a later, empty hook ends profiling.
+vcpkg_replace_string("${SOURCE_PATH}/src/interpreter/generator.c"
+    "    if(res == RES_YIELD) {"
+    "    if(res == RES_YIELD) {
+        if(vm->trace_info.func) vm->trace_info.func(vm->top_frame, TRACE_EVENT_POP);")
+
 # The watchdog's deadline uses clock(), which is wall time on Windows but CPU time on Linux, so on Linux
 # a call blocked in a binding never times out. It's moved to the monotonic clock, in 64-bit nanoseconds
 # because clock_t is a 32-bit long on Windows.

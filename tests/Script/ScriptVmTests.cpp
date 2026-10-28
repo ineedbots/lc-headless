@@ -61,6 +61,23 @@ TEST_CASE("Script profiling accumulates calls and generator resumes with matchin
     CHECK_THROWS_WITH(vm.WaitForDebugger(), ContainsSubstring("can't share"));
 }
 
+TEST_CASE("Script profiling balances suspended generators before an empty hook", "[ScriptVm][Profiling]")
+{
+    const auto folder = TempFolder{"rs2004-profile-yields"};
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.profileDirectory = folder.GetPath()}, capture.GetLogger()};
+    vm.RunSource("def child():\n    yield 1\n    yield 2\n\ndef parent():\n    yield from child()\n\ngen = parent()\n\ndef step():\n    return next(gen)\n\ndef hook():\n    pass\n", "yielding.py");
+    CHECK(py_toint(vm.Call("step")) == 1);
+    // While the tutorial guardian is suspended, tick dispatch can return without any more Python work.
+    CHECK_NOTHROW(vm.Call("hook"));
+    CHECK(py_toint(vm.Call("step")) == 2);
+    CHECK_NOTHROW(vm.Call("hook"));
+    CHECK_THROWS_WITH(vm.Call("step"), ContainsSubstring("StopIteration"));
+    CHECK_NOTHROW(vm.Call("hook"));
+    vm.SaveProfile();
+    CHECK(ProfileHits(ReadProfile(folder.GetPath()), "yielding.py") > 0);
+}
+
 TEST_CASE("Script profiling saves errors and recovers after watchdog timeouts", "[ScriptVm][Profiling]")
 {
     const auto folder = TempFolder{"rs2004-profile-errors"};
