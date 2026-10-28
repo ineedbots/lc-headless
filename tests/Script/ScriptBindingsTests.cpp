@@ -35,7 +35,7 @@ namespace
         return {.x = Fixtures::HOME + dx, .z = Fixtures::HOME + dz, .level = 0};
     }
 
-    std::shared_ptr<const GameCache_s> MakeCache(Revision_e revision)
+    std::shared_ptr<const GameCache_s> MakeCache(Revision_e revision, bool withInterfaces)
     {
         auto cache = GameCache_s{};
         cache.revision = revision;
@@ -46,6 +46,20 @@ namespace
         TestCache::AddObj(cache, 995, "Coins").stackable = true;
         TestCache::AddLoc(cache, 1530, "Door", {"Open"});
         TestCache::AddLoc(cache, 1276, "Tree", {"Chop down"});
+
+        if (withInterfaces)
+        {
+            TestCache::SetChatInterfaces(cache);
+            TestCache::SetTradeScreen(cache);
+            TestCache::AddComponents(cache, {
+                {.id = 700, .root = 700, .type = ComponentType_e::Layer, .width = 480, .height = 300,
+                    .children = {{.id = 701, .x = 20, .y = 20}, {.id = 702, .x = 62, .y = 20}, {.id = 703, .x = 200, .y = 100}}},
+                {.id = 701, .root = 700, .type = ComponentType_e::Inv, .width = 4, .height = 1, .marginX = 10,
+                    .options = {"Make", "Make 5", "Make 10"}},
+                {.id = 702, .root = 700, .type = ComponentType_e::Model, .width = 32, .height = 32},
+                {.id = 703, .root = 700, .type = ComponentType_e::InvText, .width = 1, .height = 1},
+            });
+        }
 
         const auto locs = std::to_array<TestLoc_s>({{.id = 1276, .tile = Offset(-2, 3), .shape = 10}});
         TestCache::SetMap(cache, locs);
@@ -63,8 +77,8 @@ namespace
     class BindingFixture
     {
     public:
-        explicit BindingFixture(Revision_e revision = Revision_e::Rev289)
-            : cache{MakeCache(revision)}
+        explicit BindingFixture(Revision_e revision = Revision_e::Rev289, bool withInterfaces = false)
+            : cache{MakeCache(revision, withInterfaces)}
             , map{cache}
             , client{MakeConfig(revision), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
@@ -488,6 +502,181 @@ TEST_CASE("Native social bindings surface offline errors and leave queries usabl
     CAPTURE(source);
     CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
     REQUIRE_NOTHROW(fixture.Run("assert _core.get_friends() == [('Zezima', 2)]\nassert _core.get_ignores() == ['Spammer']\n"));
+}
+
+TEST_CASE("Native component bindings expose cache fields and server overrides", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.interfaces.mainModal = TestCache::TRADE_SCREEN;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+root = _core.get_component(300)
+assert root.id == 300 and root.root == 300 and root.layer is None
+assert root.type == 'layer' and root.button is None and root.visible
+assert root.children == [301,302,303,304,306,307,308,309]
+label = _core.get_component(302)
+assert label.layer == 300 and label.type == 'text' and label.text == 'Accept'
+assert label.colour == 0x00C000 and label.x == 239 and label.y == 181
+assert label.width == 39 and label.height == 14 and label.options is None
+assert label.item is None and label.varp is None and label.value is None
+assert label.target_verb is None and label.target_name is None
+button = _core.get_component(301)
+assert button.button == 'ok' and button.button_text == 'Ok'
+assert _core.get_component(9999) is None
+)python"));
+    fixture.state.interfaces.components[TestCache::TRADE_ACCEPT_LABEL].text = "Accepted";
+    fixture.state.interfaces.components[TestCache::TRADE_ACCEPT_LABEL].colour = 0x123456;
+    fixture.state.interfaces.components[TestCache::TRADE_ACCEPT_LABEL].position = ComponentPosition_s{.x = -10, .y = 20};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+label = _core.get_component(302)
+assert label.text == 'Accepted' and label.colour == 0x123456
+assert label.x == -10 and label.y == 20
+)python"));
+}
+
+TEST_CASE("Native component filters honour hidden ancestors and selected roots", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.interfaces.mainModal = TestCache::TRADE_SCREEN;
+    fixture.state.interfaces.sideModal = TestCache::TRADE_SIDE;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert [c.id for c in _core.find_components(text='aCcEpT')] == [302]
+assert [c.id for c in _core.find_components(button='close', root=300)] == [303]
+assert _core.find_components(text='Accept', button='close') == []
+assert _core.find_components(text='Accept', root=340) == []
+assert _core.find_components(text='Waiting') == []
+assert _core.get_component(304).hidden and not _core.get_component(305).visible
+assert len(_core.get_interface(300)) == 10
+assert _core.get_interface(9999) == []
+)python"));
+    fixture.state.interfaces.components[TestCache::TRADE_STATUS_LAYER].hidden = false;
+    REQUIRE_NOTHROW(fixture.Run("assert [c.id for c in _core.find_components(text='Waiting')] == [305]\n"));
+    fixture.state.interfaces.mainModal = -1;
+    REQUIRE_NOTHROW(fixture.Run("assert _core.find_components(text='Accept', root=300) == []\n"));
+}
+
+TEST_CASE("Native interface roots deduplicate modals, overlays and tabs", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    auto& interfaces = fixture.state.interfaces;
+    interfaces.mainModal = TestCache::TRADE_SCREEN;
+    interfaces.sideModal = TestCache::TRADE_SIDE;
+    interfaces.chatModal = TestCache::DIALOGUE;
+    interfaces.overlay = TestCache::TRADE_SCREEN;
+    interfaces.tabs[0] = TestCache::TRADE_SIDE;
+    interfaces.tabs[14] = 700;
+    interfaces.modalChanges = 17;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.get_open_interfaces() == [300,340,310,700]
+assert _core.get_tab_interface(0) == 340 and _core.get_tab_interface(14) == 700
+assert _core.get_tab_interface(1) == -1 and _core.modal_changes() == 17
+assert not _core.can_set_run() and not _core.is_appearance_screen_open()
+)python"));
+    const auto invalid = GENERATE(-1, 15);
+    CHECK_THROWS_WITH(fixture.Run(std::format("_core.get_tab_interface({})", invalid)), ContainsSubstring("ValueError") && ContainsSubstring("tab must be from 0 to 14"));
+}
+
+TEST_CASE("Native dialogue bindings expose visible texts, choices and continue buttons", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.interfaces.chatModal = TestCache::DIALOGUE;
+    fixture.state.interfaces.components[TestCache::DIALOGUE_TEXT].text = "@blu@Hello there.";
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.find_continue() == 312
+assert _core.get_chat_texts() == ['Hello there.', 'Click here to continue']
+assert _core.get_texts(310) == _core.get_chat_texts()
+assert _core.get_chat_options() == []
+)python"));
+    fixture.state.interfaces.components[TestCache::DIALOGUE_CONTINUE].hidden = true;
+    REQUIRE_NOTHROW(fixture.Run("assert _core.find_continue() is None\n"));
+    fixture.state.interfaces.chatModal = TestCache::OPTIONS;
+    fixture.state.interfaces.components[TestCache::OPTION_ONE].text = "Yes, please.";
+    fixture.state.interfaces.components[TestCache::OPTION_TWO].text = "No, thanks.";
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_chat_options() == [(321,'Yes, please.'),(322,'No, thanks.')]\n"));
+    fixture.state.interfaces.components[TestCache::OPTION_TWO].hidden = true;
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_chat_options() == [(321,'Yes, please.')]\n"));
+    fixture.state.interfaces.chatModal = -1;
+    REQUIRE_NOTHROW(fixture.Run("assert _core.find_continue() is None\nassert _core.get_chat_options() == []\nassert _core.get_chat_texts() == []\n"));
+}
+
+TEST_CASE("Native make bindings preserve product names and quantity button mappings", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.interfaces.mainModal = -1;
+    fixture.state.interfaces.chatModal = TestCache::MAKE_MENU;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+products = _core.get_make_products()
+assert len(products) == 1
+assert products[0][0] == 'Oak Long Bow' and products[0][1] == -1
+assert products[0][2] == [(-1,331),(10,332),(5,333),(1,334)]
+assert _core.get_chat_options() == []
+)python"));
+    fixture.state.interfaces.chatModal = -1;
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_make_products() == []\nassert _core.get_make_panel() == []\n"));
+}
+
+TEST_CASE("Native make panel bindings retain source item counts and overlaid product IDs", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.interfaces.mainModal = 700;
+    fixture.state.inventories[701] = Inventory_s{.com = 701, .slots = {{.id = 995, .count = 250}, {.id = 526, .count = 3}, {}}};
+    fixture.state.interfaces.components[702].model = ComponentModel_s{.kind = ComponentModelKind_e::Object, .id = 995};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+panel = _core.get_make_panel()
+assert len(panel) == 2
+assert isinstance(panel[0][0], InvItem)
+assert (panel[0][0].com,panel[0][0].slot,panel[0][0].id,panel[0][0].count,panel[0][1]) == (701,0,995,250,995)
+assert (panel[1][0].com,panel[1][0].slot,panel[1][0].id,panel[1][0].count,panel[1][1]) == (701,1,526,3,995)
+assert _core.get_component(702).item == 995
+inventories = _core.get_inventories(700)
+assert inventories == [(701,'inv',20,['Make','Make 5','Make 10',None,None]),(703,'invtext',200,[None]*5)]
+)python"));
+    fixture.state.interfaces.components[701].hidden = true;
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_make_panel() == []\n"));
+}
+
+TEST_CASE("Native inventory component bindings preserve sparse operation slots", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.state.interfaces.mainModal = TestCache::TRADE_SCREEN;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+offers = _core.get_inventories(300)
+assert len(offers) == 2
+assert offers[0][0:2] == (306,'inv') and offers[1][0:2] == (307,'inv')
+assert offers[0][3] == ['Remove 1','Remove 5','Remove 10','Remove All','Remove X']
+assert offers[1][3] == [None]*5
+component = _core.get_component(306)
+assert component.options == offers[0][3]
+assert _core.get_inventories(9999) == []
+)python"));
+}
+
+TEST_CASE("Native player menu bindings preserve absent options and server text", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    const auto revision = GENERATE(Revision_e::Rev274, Revision_e::Rev289);
+    auto fixture = BindingFixture{revision};
+    fixture.state.playerOps[0] = PlayerOp_s{.text = "Trade with"};
+    fixture.state.playerOps[4] = PlayerOp_s{.text = "Follow", .deprioritised = true};
+    REQUIRE_NOTHROW(fixture.Run("import _core\nassert _core.get_player_menu() == ['Trade with',None,None,None,'Follow']\n"));
+    fixture.state.playerOps = {};
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_player_menu() == [None]*5\n"));
+}
+
+TEST_CASE("Native interface filters reject invalid optional arguments", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    fixture.Run("import _core\n");
+    const auto [source, type, message] = GENERATE(
+        std::tuple{"_core.find_components(text=1)", "TypeError", "text must be a str"},
+        std::tuple{"_core.find_components(button=1)", "TypeError", "button must be a str"},
+        std::tuple{"_core.find_components(root=-1)", "ValueError", "root must be from"});
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(type) && ContainsSubstring(message));
 }
 
 TEST_CASE("Script bindings expose the account's settings", "[ScriptBindings]")
