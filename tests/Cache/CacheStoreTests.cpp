@@ -10,6 +10,21 @@
 
 using Catch::Matchers::ContainsSubstring;
 
+TEST_CASE("CacheStore reports a file truncated after opening and can read again after restoration", "[CacheStore][CacheReadFailureCoverage]")
+{
+    const auto folder = TempFolder{"rs2004-cache-read-failure"};
+    auto writer = CacheWriter{};
+    const auto bytes = std::vector<u8>(1300, 42);
+    writer.Put(0, 1, bytes);
+    const auto written = writer.Write(folder.GetPath());
+    auto store = CacheStore{folder.GetPath()};
+    std::filesystem::resize_file(folder.GetPath() / CacheStore::DAT_FILE, CacheStore::SECTOR_SIZE);
+    CHECK_THROWS_WITH(store.Read(0, 1), ContainsSubstring("main_file_cache.dat: read failed at sector 1"));
+    CacheWriter::WriteStore(folder.GetPath(), written);
+    CHECK(store.Read(0, 1) == bytes);
+    CHECK(store.Read(0, 1) == bytes);
+}
+
 namespace
 {
     constexpr auto FILE_ID_OFFSET = std::size_t{0};

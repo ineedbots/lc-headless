@@ -164,6 +164,45 @@ namespace
     };
 }
 
+TEST_CASE("Native reachability bindings distinguish nearby targets from unloaded tiles", "[ScriptBindings][BindingBoundaryCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+here = game.tile()
+assert _core.can_reach_entity(here.x, here.z + 1)
+assert _core.can_reach_ground_item(here.x, here.z + 1)
+assert not _core.can_reach_entity(0, 0)
+assert not _core.can_reach_ground_item(0, 0)
+)python"));
+    for (const auto function : {"can_reach_entity", "can_reach_ground_item"})
+    {
+        CHECK_THROWS_WITH(fixture.Run(std::format("_core.{}(-1, 3200)", function)), ContainsSubstring("ValueError") && ContainsSubstring("x must be from"));
+        CHECK_THROWS_WITH(fixture.Run(std::format("_core.{}(3200, 'north')", function)), ContainsSubstring("TypeError") && ContainsSubstring("z must be an int"));
+        REQUIRE_NOTHROW(fixture.Run(std::format("assert _core.{}(game.tile().x, game.tile().z + 1)", function)));
+    }
+}
+
+TEST_CASE("Native entity conversion retains identity when metadata has not arrived", "[ScriptBindings][BindingBoundaryCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.npcs[0].type = 65535;
+    fixture.state.players[0].appearance.reset();
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+unknown = npcs.all()[0]
+assert unknown.index == 7 and unknown.id == 65535
+assert unknown.name is None and unknown.level == 0 and unknown.size == 1
+assert unknown.tile() == game.tile().translate(2, 0)
+assert unknown.actions() == [] and unknown.health == 2
+player = players.all()[0]
+assert player.index == 20 and player.name is None and player.combat_level == 0
+assert player.tile() == game.tile().translate(1, -1)
+)python"));
+    fixture.state.npcs[0].type = 41;
+    fixture.state.players[0].appearance = Appearance_s{.name = "Returned", .combatLevel = 42};
+    REQUIRE_NOTHROW(fixture.Run("assert npcs.all()[0].name == 'Chicken'\nassert players.all()[0].name == 'Returned'\nassert players.all()[0].combat_level == 42\n"));
+}
+
 TEST_CASE("Script bindings report the configured revision", "[ScriptBindings]")
 {
     const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
