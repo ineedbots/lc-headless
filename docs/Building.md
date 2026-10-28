@@ -107,6 +107,16 @@ major version. Keep `VCPKG_ROOT` set as for a normal build, then run from the re
 python3 tools/coverage/native.py
 ```
 
+To include real-cache tests with revision 289 in `data/cache` and the older revisions in its `225` and
+`274` subdirectories, set their paths before collecting coverage:
+
+```sh
+export RS2004_CACHE_DIR="$PWD/data/cache"
+export RS2004_CACHE_DIR_225="$PWD/data/cache/225"
+export RS2004_CACHE_DIR_274="$PWD/data/cache/274"
+python3 tools/coverage/native.py
+```
+
 The command configures and builds the `linux-coverage` preset, runs CTest with four parallel workers, and writes
 `build/linux-coverage/coverage/html/index.html`, `coverage.lcov`, `summary.txt`, and `summary.json`. Use
 `--parallel N` to change build and test parallelism, or `--no-build` to collect from an existing coverage build.

@@ -11,6 +11,7 @@
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"
 #include "Game/State/GameState_s.hpp"
+#include "Game/State/EntityStatus.hpp"
 #include "Game/State/Interfaces_s.hpp"
 #include "Game/State/Zone_s.hpp"
 #include "Game/Tile_s.hpp"
@@ -503,4 +504,24 @@ TEST_CASE("The real caches time their animations", "[RealCache]")
     {
         return length > 0;
     }));
+}
+
+TEST_CASE("Real cache animation lengths expire entity animations on the correct tick", "[RealCache][SeqDecoder]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    const auto& cache = RealCache::Require(revision);
+    CAPTURE(static_cast<u16>(revision));
+    constexpr auto WOODCUTTING_BRONZE_AXE = 879;
+    const auto length = cache.FindSeqLength(WOODCUTTING_BRONZE_AXE);
+    REQUIRE(length.has_value());
+    // The swing finishes during the sixth tick, shared by these revisions.
+    auto entity = Entity_s{};
+    entity.animation = {.id = WOODCUTTING_BRONZE_AXE, .delay = 0, .tick = 100};
+    CHECK(EntityStatus::GetAnimation(entity, 105, length) == WOODCUTTING_BRONZE_AXE);
+    CHECK(EntityStatus::GetAnimation(entity, 106, length) == -1);
+    entity.animation.delay = 30;
+    CHECK(EntityStatus::GetAnimation(entity, 106, length) == WOODCUTTING_BRONZE_AXE);
+    CHECK(EntityStatus::GetAnimation(entity, 107, length) == -1);
+    CHECK_FALSE(cache.FindSeqLength(-1).has_value());
+    CHECK_FALSE(cache.FindSeqLength(static_cast<s32>(cache.seqLengths.size())).has_value());
 }
