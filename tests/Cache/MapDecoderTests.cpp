@@ -8,6 +8,7 @@
 #include "Cache/TextPool.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
@@ -87,6 +88,31 @@ namespace
 
         return "no error";
     }
+}
+
+TEST_CASE("MapDecoder accepts a loc file when the square has no land file", "[MapDecoder][MapBoundaryCoverage]")
+{
+    const auto placements = std::to_array<LocPlacement_s>({{.id = 0, .x = 12, .z = 34, .shape = GROUND_DECOR}});
+    const auto square = MapDecoder::DecodeSquare(SQUARE, {}, CacheWriter::MakeLocFile(placements), MakeNamedTypes(1));
+    REQUIRE(square.GetLocs().size() == 1);
+    CHECK(square.GetLocs()[0].GetX() == 12);
+    CHECK(square.GetLocs()[0].GetZ() == 34);
+    CHECK(square.GetLocs()[0].GetShape() == GROUND_DECOR);
+    for (auto level = 0; level < MapSquare::LEVELS; ++level) CHECK_FALSE(square.IsBlocked(level, 12, 34));
+}
+
+TEST_CASE("MapDecoder rejects loc levels outside the four-level map", "[MapDecoder][MapBoundaryCoverage]")
+{
+    const auto level = GENERATE(4, 7);
+    const auto placements = std::to_array<LocPlacement_s>({{.id = 0, .level = level, .shape = WALL}});
+    CHECK(DecodeError({}, CacheWriter::MakeLocFile(placements), MakeNamedTypes(1)) == std::format("square 50_50 locs: loc 0 is on level {}", level));
+}
+
+TEST_CASE("MapDecoder rejects loc shapes past the last supported shape", "[MapDecoder][MapBoundaryCoverage]")
+{
+    const auto shape = GENERATE(u8{23}, u8{63});
+    const auto placements = std::to_array<LocPlacement_s>({{.id = 0, .shape = shape}});
+    CHECK(DecodeError({}, CacheWriter::MakeLocFile(placements), MakeNamedTypes(1)) == std::format("square 50_50 locs: loc 0 has shape {}", shape));
 }
 
 TEST_CASE("MapDecoder reads map_index", "[MapDecoder]")

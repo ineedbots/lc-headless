@@ -635,6 +635,19 @@ assert _core.close_interfaces() is None
     CHECK(run.G2() == TestCache::RUN_OFF_BUTTON);
 }
 
+TEST_CASE("Native inventory fullness follows occupied slots rather than item counts", "[ScriptBindings][InventoryBoundaryCoverage]")
+{
+    auto fixture = BindingFixture{};
+    auto& slots = fixture.state.inventories.at(TestCache::INVENTORY).slots;
+    slots.assign(static_cast<std::size_t>(fixture.cache->inventorySize), {.id = 995, .count = 1});
+    REQUIRE_NOTHROW(fixture.Run("import _core\nassert _core.is_inventory_full()\nassert _core.get_empty_slots() == 0\n"));
+    slots[3] = {};
+    slots[0].count = 1'000'000;
+    REQUIRE_NOTHROW(fixture.Run("assert not _core.is_inventory_full()\nassert _core.get_empty_slots() == 1\n"));
+    slots.clear();
+    REQUIRE_NOTHROW(fixture.Run(std::format("assert not _core.is_inventory_full()\nassert _core.get_empty_slots() == {}\n", fixture.cache->inventorySize)));
+}
+
 TEST_CASE("Native inventory bindings distinguish unseen containers from empty ones", "[ScriptBindings][BindingCoverage]")
 {
     auto fixture = BindingFixture{};

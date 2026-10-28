@@ -4,7 +4,9 @@
 #include "Config/JsoncEditor.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -262,4 +264,36 @@ TEST_CASE("JsoncEditor sets members of objects the path lacks by adding them", "
 
     const auto notObject = R"json({"script": {"settings": {"Miner": 5}}})json";
     CHECK_THROWS_MATCHES(JsoncEditor::Set(notObject, MINER_PATH, R"json({"rock": "Iron rocks"})json"), ConfigError, Catch::Matchers::Message("script.settings.Miner: must be an object"));
+}
+
+TEST_CASE("JsoncEditor Set rejects non-object roots before attempting an edit", "[JsoncEditor][JsoncBoundaryCoverage]")
+{
+    const auto root = GENERATE("[]", "null", "42", "\"text\"");
+    CHECK_THROWS_MATCHES(JsoncEditor::Set(root, MINER_PATH, R"({"rock": "Iron rocks"})"), ConfigError,
+                        Catch::Matchers::Message("the top level must be an object"));
+}
+
+TEST_CASE("JsoncEditor adds members to an object containing only an inline block comment", "[JsoncEditor][JsoncBoundaryCoverage]")
+{
+    const auto path = std::vector<std::string>{};
+    const auto edit = JsoncEditor::AddMissing("{/* keep */}", path, R"({"value": 7})");
+    CHECK(edit.text == "{/* keep */\n    \"value\": 7\n}");
+    CHECK(edit.added == std::vector<std::string>{"value"});
+    CHECK(nlohmann::json::parse(edit.text, nullptr, true, true).at("value") == 7);
+    CHECK(JsoncEditor::AddMissing(edit.text, path, R"({"value": 9})").text == edit.text);
+}
+
+TEST_CASE("JsoncEditor preserves a trailing block comment spanning multiple lines", "[JsoncEditor][JsoncBoundaryCoverage]")
+{
+    const auto path = std::vector<std::string>{};
+    const auto text = "{\n  \"old\": 1 /* keep\n     this block */\n}\n";
+    const auto comment = std::string{"/* keep\n     this block */"};
+    const auto edit = JsoncEditor::AddMissing(text, path, R"({"new": [2, 3]})");
+    const auto value = nlohmann::json::parse(edit.text, nullptr, true, true);
+    CHECK(value.at("old") == 1);
+    CHECK(value.at("new") == nlohmann::json::array({2, 3}));
+    REQUIRE(edit.text.find(comment) != std::string::npos);
+    CHECK(edit.text.find(comment, edit.text.find(comment) + comment.size()) == std::string::npos);
+    CHECK(edit.added == std::vector<std::string>{"new"});
+    CHECK(JsoncEditor::AddMissing(edit.text, path, R"({"new": []})").text == edit.text);
 }

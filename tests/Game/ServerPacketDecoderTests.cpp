@@ -669,6 +669,38 @@ TEST_CASE("ServerPacketDecoder counts changes to the build area and loc changes"
     CHECK(state.sceneChangeCount == before + 4);
 }
 
+TEST_CASE("ServerPacketDecoder preserves player options when an invalid option slot arrives", "[ServerPacketDecoder][PlayerPacketBoundaryCoverage]")
+{
+    const auto index = GENERATE(u8{0}, u8{6}, u8{255});
+    auto fixture = DecoderFixture{};
+    fixture.state.playerOps[0] = PlayerOp_s{.text = "Trade with", .deprioritised = true};
+    auto packet = Packet{};
+    packet.P1(index);
+    packet.P1(0);
+    packet.PJStr("Attack");
+    REQUIRE_NOTHROW(fixture.Decode(ServerProt_e::SetPlayerOp, packet));
+    REQUIRE(fixture.state.playerOps[0].has_value());
+    CHECK(fixture.state.playerOps[0]->text == "Trade with");
+    CHECK(fixture.state.playerOps[0]->deprioritised);
+    for (auto i = std::size_t{1}; i < fixture.state.playerOps.size(); ++i) CHECK_FALSE(fixture.state.playerOps[i]);
+}
+
+TEST_CASE("ServerPacketDecoder updates multiway and minimap state without disturbing the destination", "[ServerPacketDecoder][PlayerPacketBoundaryCoverage]")
+{
+    auto fixture = DecoderFixture{};
+    fixture.state.walkDestination = HomeOffset(4, 5);
+    for (const auto flag : {u8{1}, u8{0}, u8{2}, u8{255}})
+    {
+        fixture.Decode(ServerProt_e::SetMultiway, std::vector<u8>{flag});
+        CHECK(fixture.state.multiway == (flag == 1));
+        fixture.Decode(ServerProt_e::MinimapToggle, std::vector<u8>{flag});
+        CHECK(fixture.state.minimapState == flag);
+        CHECK(fixture.state.walkDestination == HomeOffset(4, 5));
+    }
+    CHECK_THROWS_AS(fixture.Decode(ServerProt_e::SetMultiway), ProtocolError);
+    CHECK_THROWS_AS(fixture.Decode(ServerProt_e::MinimapToggle), ProtocolError);
+}
+
 TEST_CASE("ServerPacketDecoder tracks hints, options and the map flag", "[ServerPacketDecoder]")
 {
     auto fixture = DecoderFixture{};
