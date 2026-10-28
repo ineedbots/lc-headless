@@ -291,6 +291,160 @@ TEST_CASE("ServerPacketDecoder records component changes", "[ServerPacketDecoder
     CHECK(component.position->y == 20);
 }
 
+TEST_CASE("Interface packets replace models without retaining object zoom", "[ServerPacketDecoder][InterfacePackets]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    CAPTURE(static_cast<u16>(revision));
+    auto fixture = DecoderFixture{revision};
+    fixture.state.tick = 42;
+
+    fixture.Decode(ServerProt_e::IfSetObject, std::vector<u8>{0, 100, 0x05, 0xE7, 0x01, 0x90});
+    const auto& component = fixture.state.interfaces.components.at(100);
+    REQUIRE(component.model.has_value());
+    CHECK(component.model->kind == ComponentModelKind_e::Object);
+    CHECK(component.model->id == 1511);
+    CHECK(component.model->zoom == 400);
+    CHECK(component.tick == 42);
+
+    fixture.state.tick = 43;
+    SECTION("a generic model replaces the object")
+    {
+        fixture.Decode(ServerProt_e::IfSetModel, std::vector<u8>{0, 100, 0x12, 0x34});
+        REQUIRE(component.model.has_value());
+        CHECK(component.model->kind == ComponentModelKind_e::Model);
+        CHECK(component.model->id == 0x1234);
+    }
+    SECTION("an NPC head replaces the object")
+    {
+        fixture.Decode(ServerProt_e::IfSetNpcHead, std::vector<u8>{0, 100, 0, 50});
+        REQUIRE(component.model.has_value());
+        CHECK(component.model->kind == ComponentModelKind_e::NpcHead);
+        CHECK(component.model->id == 50);
+    }
+    SECTION("a player head needs no model ID")
+    {
+        fixture.Decode(ServerProt_e::IfSetPlayerHead, std::vector<u8>{0, 100});
+        REQUIRE(component.model.has_value());
+        CHECK(component.model->kind == ComponentModelKind_e::PlayerHead);
+        CHECK(component.model->id == 0);
+    }
+    CHECK(component.model->zoom == 0);
+    CHECK(component.tick == 43);
+    CHECK_FALSE(component.text.has_value());
+}
+
+TEST_CASE("Interface packets update animation and scrolling independently", "[ServerPacketDecoder][InterfacePackets]")
+{
+    auto fixture = DecoderFixture{};
+    fixture.state.tick = 80;
+    auto text = Packet{};
+    text.P2(100);
+    text.PJStr("Keep this text");
+    fixture.Decode(ServerProt_e::IfSetText, text);
+    fixture.Decode(ServerProt_e::IfSetAnim, std::vector<u8>{0, 100, 0x03, 0x6F});
+    const auto& component = fixture.state.interfaces.components.at(100);
+    CHECK(component.animation == 879);
+
+    fixture.state.tick = 81;
+    fixture.Decode(ServerProt_e::IfSetScrollPos, std::vector<u8>{0, 100, 0xFF, 0xFE});
+    CHECK(component.scrollPosition == 65534);
+    CHECK(component.animation == 879);
+    CHECK(component.text == "Keep this text");
+    CHECK(component.tick == 81);
+
+    fixture.state.tick = 82;
+    fixture.Decode(ServerProt_e::IfSetAnim, std::vector<u8>{0, 100, 0xFF, 0xFF});
+    CHECK(component.animation == -1);
+    CHECK(component.scrollPosition == 65534);
+    CHECK(component.tick == 82);
+    CHECK_FALSE(component.model.has_value());
+}
+
+TEST_CASE("Interface visibility and colour updates preserve other component fields", "[ServerPacketDecoder][InterfacePackets]")
+{
+    auto fixture = DecoderFixture{};
+    fixture.Decode(ServerProt_e::IfSetPosition, std::vector<u8>{0, 100, 0x80, 0, 0x7F, 0xFF});
+    fixture.Decode(ServerProt_e::IfSetHide, std::vector<u8>{0, 100, 1});
+    const auto& component = fixture.state.interfaces.components.at(100);
+    CHECK(component.hidden == true);
+
+    const auto visible = GENERATE(u8{0}, u8{2}, u8{255});
+    fixture.Decode(ServerProt_e::IfSetHide, std::vector<u8>{0, 100, visible});
+    CHECK(component.hidden == false);
+
+    // Exercise each RGB555 channel separately, then together.
+    const auto [packed, rgb] = GENERATE(std::pair{u16{0}, u32{0}},
+        std::pair{u16{0x7C00}, u32{0xF80000}}, std::pair{u16{0x03E0}, u32{0x00F800}},
+        std::pair{u16{0x001F}, u32{0x0000F8}}, std::pair{u16{0x7FFF}, u32{0xF8F8F8}});
+    auto colour = Packet{};
+    colour.P2(100);
+    colour.P2(packed);
+    fixture.Decode(ServerProt_e::IfSetColour, colour);
+    CHECK(component.colour == rgb);
+    REQUIRE(component.position.has_value());
+    CHECK(component.position->x == -32768);
+    CHECK(component.position->y == 32767);
+}
+
+TEST_CASE("Interface packets keep tutorial and overlay state separate from modals", "[ServerPacketDecoder][InterfacePackets]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    auto fixture = DecoderFixture{revision};
+    fixture.Decode(ServerProt_e::IfOpenMain, std::vector<u8>{0, 90});
+    const auto events = fixture.state.eventCount;
+    const auto changes = fixture.state.interfaces.modalChanges;
+    const auto& interfaces = fixture.state.interfaces;
+
+    fixture.Decode(ServerProt_e::IfOpenOverlay, std::vector<u8>{0x01, 0x90});
+    fixture.Decode(ServerProt_e::TutOpen, std::vector<u8>{0x01, 0x91});
+    fixture.Decode(ServerProt_e::TutFlash, std::vector<u8>{14});
+    CHECK(interfaces.overlay == 400);
+    CHECK(interfaces.tutorialComponent == 401);
+    CHECK(interfaces.flashingTab == 14);
+
+    fixture.Decode(ServerProt_e::IfOpenOverlay, std::vector<u8>{0xFF, 0xFF});
+    fixture.Decode(ServerProt_e::TutOpen, std::vector<u8>{0xFF, 0xFF});
+    CHECK(interfaces.overlay == -1);
+    CHECK(interfaces.tutorialComponent == -1);
+    CHECK(interfaces.mainModal == 90);
+    CHECK(interfaces.modalChanges == changes);
+    CHECK(fixture.state.eventCount == events);
+}
+
+TEST_CASE("Interface tab packets reject out of range tabs without changing valid tabs", "[ServerPacketDecoder][InterfacePackets]")
+{
+    auto fixture = DecoderFixture{};
+    fixture.Decode(ServerProt_e::IfSetTab, std::vector<u8>{0, 90, 14});
+    CHECK(fixture.state.interfaces.tabs.back() == 90);
+    const auto before = fixture.state.interfaces.tabs;
+    const auto invalid = GENERATE(u8{15}, u8{255});
+    fixture.Decode(ServerProt_e::IfSetTab, std::vector<u8>{0, 91, invalid});
+    CHECK(fixture.state.interfaces.tabs == before);
+    const auto entries = fixture.capture.GetEntries();
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0].level == LogLevel_e::Warning);
+    CHECK(entries[0].message.find("IF_SETTAB") != std::string::npos);
+    CHECK(fixture.state.interfaces.components.empty());
+}
+
+TEST_CASE("Interface model and position packets reject incomplete or trailing fields", "[ServerPacketDecoder][InterfacePackets]")
+{
+    const auto prot = GENERATE(ServerProt_e::IfSetObject, ServerProt_e::IfSetModel,
+        ServerProt_e::IfSetNpcHead, ServerProt_e::IfSetPlayerHead,
+        ServerProt_e::IfSetPosition, ServerProt_e::IfSetAnim, ServerProt_e::IfSetScrollPos);
+    CAPTURE(static_cast<int>(prot));
+    const auto size = prot == ServerProt_e::IfSetPlayerHead ? 2u :
+        (prot == ServerProt_e::IfSetObject || prot == ServerProt_e::IfSetPosition ? 6u : 4u);
+    for (auto length = 0u; length < size; ++length)
+    {
+        CAPTURE(length);
+        auto fixture = DecoderFixture{};
+        CHECK_THROWS_AS(fixture.Decode(prot, std::vector<u8>(length, 0)), ProtocolError);
+    }
+    auto fixture = DecoderFixture{};
+    CHECK_THROWS_AS(fixture.Decode(prot, std::vector<u8>(size + 1, 0)), ProtocolError);
+}
+
 TEST_CASE("ServerPacketDecoder records messages", "[ServerPacketDecoder]")
 {
     auto fixture = DecoderFixture{};
