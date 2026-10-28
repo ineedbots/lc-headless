@@ -46,6 +46,32 @@ namespace
     }
 }
 
+TEST_CASE("InterfaceView handles a missing ancestor without making an orphan visible", "[InterfaceView][NativeBoundaryCoverage]")
+{
+    auto cache = MakeCache();
+    auto interfaces = Interfaces_s{};
+    interfaces.chatModal = OPTIONS;
+    cache.components.at(OPTIONS).parent = 999;
+    const auto view = InterfaceView{cache, interfaces};
+    const auto& root = cache.components.at(OPTIONS);
+    const auto& child = cache.components.at(OPTION_ONE);
+    CHECK_FALSE(view.IsVisible(root));
+    CHECK_FALSE(view.IsVisible(child));
+    CHECK(view.FindText("option1").empty());
+    CHECK(view.ButtonAt(child) == nullptr);
+    const auto rootPosition = view.GetPosition(root);
+    CHECK(rootPosition.x == 0);
+    CHECK(rootPosition.y == 0);
+    const auto childPosition = view.GetPosition(child);
+    CHECK(childPosition.x == 0);
+    CHECK(childPosition.y == 31);
+    CHECK(Ids(view.GetTree(OPTIONS)) == std::vector<u16>{OPTIONS, TITLE, OPTION_ONE, OPTION_TWO});
+
+    cache.components.at(OPTIONS).parent.reset();
+    CHECK(view.IsVisible(child));
+    CHECK(view.ButtonAt(child) == &child);
+}
+
 TEST_CASE("InterfaceView lists the open interfaces once each", "[InterfaceView]")
 {
     const auto cache = MakeCache();

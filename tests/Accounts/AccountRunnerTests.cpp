@@ -264,6 +264,35 @@ TEST_CASE("AccountRunner loads every script before the first login", "[AccountRu
     CHECK(fixture.second.GetLoginOpcodes().empty());
 }
 
+TEST_CASE("AccountRunner cancels queued logins on interrupt", "[AccountRunner][NativeBoundaryCoverage]")
+{
+    auto fixture = RunnerFixture{};
+    fixture.config.scripting.loginIntervalSeconds = 60s;
+    auto accounts = std::vector<AccountConfig_s>{MakeAccount("bot1", nullptr, std::nullopt), MakeAccount("bot2", &fixture.second, std::nullopt)};
+    SECTION("one waiting account") {}
+    SECTION("two waiting accounts")
+    {
+        accounts.push_back(MakeAccount("bot3", &fixture.second, std::nullopt));
+    }
+    auto runner = fixture.MakeRunner(std::move(accounts));
+    const auto count = runner->GetAccountCount();
+    REQUIRE(count >= 2);
+    static_cast<void>(runner->Run([&]
+    {
+        return runner->GetAccount(0).GetClient().IsInGame() || fixture.TimedOut() ? 1u : 0u;
+    }));
+    fixture.ReportProblems();
+    CHECK_FALSE(fixture.TimedOut());
+    CHECK(runner->GetAccount(0).Succeeded());
+    for (auto index = std::size_t{1}; index < count; ++index)
+    {
+        CHECK_FALSE(runner->GetAccount(index).IsStarted());
+    }
+    CHECK(fixture.second.GetLoginOpcodes().empty());
+    const auto expected = count == 2 ? "Interrupted; 1 account won't log in" : "Interrupted; 2 accounts won't log in";
+    CHECK(CountLines(fixture.capture, "", expected) == 1);
+}
+
 TEST_CASE("AccountRunner spaces the logins out", "[AccountRunner]")
 {
     auto fixture = RunnerFixture{};

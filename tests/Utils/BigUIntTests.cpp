@@ -108,6 +108,24 @@ TEST_CASE("BigUInt::ModPow", "[BigUInt]")
     CHECK(result == BigUInt::Parse(testCase.result));
 }
 
+TEST_CASE("BigUInt modular exponentiation carries and borrows across uneven limb counts", "[BigUInt][NativeBoundaryCoverage]")
+{
+    // Expected values computed independently with Python's three-argument pow.
+    const auto sample = GENERATE(
+        ModPowCase_s{"0x1000000000000000000000001", "37", "0xffffffffffffffffffffffffffffff61", "0x18bfa65387499755d00bb534591fa0d7"},
+        ModPowCase_s{"0xffffffffffffffffffffffffffffff60", "2", "0xffffffffffffffffffffffffffffff61", "1"},
+        ModPowCase_s{"0xffffffffffffffffffffffff", "17", "0x100000000000000000000000000000033", "0xf1ba87f6526fc5b9c9da51c355a20895"},
+        ModPowCase_s{"0x10000000000000001", "65537", "0x100000000000000000000000000000033", "0xab2627e3b978a5d029cba38dee0dcdbf"});
+    CAPTURE(sample.base, sample.exponent, sample.modulus);
+    const auto base = BigUInt::Parse(sample.base);
+    const auto modulus = BigUInt::Parse(sample.modulus);
+    const auto result = BigUInt::ModPow(base, BigUInt::Parse(sample.exponent), modulus);
+    CHECK(result == BigUInt::Parse(sample.result));
+    CHECK(result < modulus);
+    CHECK(base == BigUInt::Parse(sample.base));
+    CHECK(modulus == BigUInt::Parse(sample.modulus));
+}
+
 TEST_CASE("BigUInt::ModPow rejects operands the server couldn't decrypt", "[BigUInt]")
 {
     const auto two = BigUInt::Parse("2");

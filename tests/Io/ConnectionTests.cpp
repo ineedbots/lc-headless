@@ -372,6 +372,51 @@ TEST_CASE("Connection opens and exchanges data", "[Connection][network]")
     }
 }
 
+TEST_CASE("Connection peeking preserves buffered bytes through graceful closure", "[Connection][network][NativeBoundaryCoverage]")
+{
+    const auto tcp = GENERATE(false, true);
+    const auto loop = NetLoop::Create();
+    const auto logger = MakeConsoleLogger();
+    const auto server = TestServer{[](ServerSession& session) -> Awaitable
+    {
+        co_await session.Send({11, 22, 33, 44});
+        co_await session.ReceiveUntilClosed();
+    }, tcp ? ServerMode_e::Tcp : ServerMode_e::WebSocket};
+    auto connection = Connection{*loop, tcp ? MakeTcpOptions(server.GetPort()) : MakeOptions(server.GetPort()), logger};
+    CHECK_NOTHROW(connection.WaitOpen());
+    REQUIRE(connection.WaitAvailable(4, WAIT));
+
+    auto prefix = std::array<u8, 2>{};
+    connection.Peek(prefix);
+    CHECK(prefix == std::array<u8, 2>{11, 22});
+    CHECK(connection.Available() == 4);
+    auto oversized = std::array<u8, 5>{};
+    CHECK_THROWS_AS(connection.Peek(oversized), std::out_of_range);
+    CHECK(connection.Available() == 4);
+    connection.Read(prefix);
+    CHECK(connection.Available() == 2);
+    connection.Peek(prefix);
+    CHECK(prefix == std::array<u8, 2>{33, 44});
+
+    connection.Close();
+    CHECK_NOTHROW(connection.WaitClosed());
+    CHECK(connection.Pump() == ConnectionState_e::Closed);
+    connection.Peek(prefix);
+    CHECK(prefix == std::array<u8, 2>{33, 44});
+    CHECK(ReadAll(connection) == std::vector<u8>{33, 44});
+    CHECK(connection.Available() == 0);
+    CHECK_THROWS_AS(connection.Peek(prefix), std::out_of_range);
+}
+
+TEST_CASE("Connection blocking open reports connection failures", "[Connection][network][NativeBoundaryCoverage]")
+{
+    const auto loop = NetLoop::Create();
+    auto connection = Connection{*loop, MakeTcpOptions(TestServer::FindClosedPort()), MakeConsoleLogger()};
+    CHECK(GetOutcome([&] { connection.WaitOpen(); }) == Outcome_e::Failed);
+    connection.Close();
+    CHECK_NOTHROW(connection.WaitClosed());
+}
+
 TEST_CASE("Connection reports a failure to connect", "[Connection][network]")
 {
     const auto loop = NetLoop::Create();

@@ -32,6 +32,22 @@ namespace
     }
 }
 
+TEST_CASE("ClientPackets encodes idle notifications and plain chat for every revision", "[ClientPackets][NativeBoundaryCoverage]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    const auto protocol = Protocol{revision};
+    const auto packets = ClientPackets{protocol};
+    const auto idle = packets.IdleTimer();
+    CHECK(idle.prot == ClientProt_e::IdleTimer);
+    CHECK(idle.payload.empty());
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, idle));
+
+    const auto chat = packets.MessagePublic("hello");
+    CHECK(chat.prot == ClientProt_e::MessagePublic);
+    CHECK(chat.payload == Bytes({0, 0, 0x61, 0xBB, 0x40}));
+    CHECK_NOTHROW(ClientPacketWriter::Validate(protocol, chat));
+}
+
 TEST_CASE("ClientPackets builds moves", "[ClientPackets]")
 {
     SECTION("a game click with a later waypoint offset from the start")
