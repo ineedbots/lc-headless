@@ -33,6 +33,93 @@
 
 using Catch::Matchers::ContainsSubstring;
 
+TEST_CASE("ScriptHost drops malformed bot messages and continues draining the queue", "[ScriptHost][HostFailureCoverage]")
+{
+    auto fixture = HostFixture{R"python(
+def on_bot_message(sender, message):
+    log('>', sender, message['count'])
+
+def loop():
+    log('>', 'loop')
+    return 1000
+)python"};
+    CHECK(fixture.host->ReceiveBotMessage({.sender = "broken", .json = "{"}));
+    CHECK(fixture.host->ReceiveBotMessage({.sender = "mule", .json = R"({"count": 42})"}));
+    const auto start = ScriptHost::Clock::now();
+    fixture.host->Step(start);
+    CHECK(fixture.HasLog(LogLevel_e::Warning, "Dropped a bot message from broken that couldn't be read"));
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"mule 42", "loop"});
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
+    fixture.host->Step(start + 1ms);
+    CHECK(fixture.GetScriptLines().size() == 2);
+    CHECK(fixture.host->ReceiveBotMessage({.sender = "later", .json = R"({"count": 7})"}));
+    fixture.host->Step(start + 2ms);
+    CHECK(fixture.GetScriptLines().back() == "later 7");
+}
+
+TEST_CASE("ScriptHost contains shutdown callback failures and finishes only once", "[ScriptHost][HostFailureCoverage]")
+{
+    const auto failingHook = GENERATE("stop", "finish");
+    auto fixture = HostFixture{R"python(
+def record(name, reason):
+    log('>', name, reason)
+    if name == settings.fail:
+        raise ValueError('shutdown failure')
+
+def on_start():
+    events.on('script_finish', lambda e: record('finish', e.reason))
+
+def on_stop(reason):
+    record('stop', reason)
+
+def loop():
+    stop_script()
+)python", nlohmann::json{{"fail", failingHook}}.dump()};
+    fixture.host->Step(ScriptHost::Clock::now());
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Stopped);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"stop the script stopped", "finish the script stopped"});
+    CHECK(fixture.HasLog(LogLevel_e::Error, "Script error while the script stopped"));
+    CHECK(fixture.HasLog(LogLevel_e::Error, "ValueError: shutdown failure"));
+    CHECK_NOTHROW(fixture.host->Finish("second finish"));
+    CHECK(fixture.GetScriptLines().size() == 2);
+}
+
+TEST_CASE("ScriptHost fails a throwing progress hook without returning a partial report", "[ScriptHost][HostFailureCoverage]")
+{
+    auto fixture = HostFixture{R"python(
+def on_progress_report():
+    raise ValueError('report unavailable')
+
+def on_stop(reason):
+    log('>', reason)
+
+def loop():
+    return 1000
+)python"};
+    const auto start = ScriptHost::Clock::now();
+    fixture.host->Step(start);
+    REQUIRE(fixture.host->HasProgressReport());
+    CHECK_FALSE(fixture.host->RunProgressReport(start + 1s).has_value());
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
+    CHECK(fixture.HasLog(LogLevel_e::Error, "report unavailable"));
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"the script failed"});
+    CHECK_FALSE(fixture.host->RunProgressReport(start + 2s).has_value());
+    CHECK(fixture.GetScriptLines().size() == 1);
+}
+
+TEST_CASE("ScriptHost retains saved settings across reload without a persistence callback", "[ScriptHost][HostFailureCoverage]")
+{
+    auto fixture = HostFixture{"def on_start():\n    settings_store.save('Miner', 'rock', 'Iron rocks')\n\ndef loop():\n    return 1000\n",
+                               ScriptHostOptions_s{.watchFiles = true}};
+    const auto start = ScriptHost::Clock::now();
+    fixture.host->Step(start);
+    fixture.folder.RewriteFile("main.py", "def on_start():\n    log('>', settings_store.saved('Miner', 'rock'))\n\ndef loop():\n    return 1000\n");
+    fixture.host->Step(start + ScriptHost::WATCH_INTERVAL);
+    fixture.host->Step(start + 2 * ScriptHost::WATCH_INTERVAL);
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{"Iron rocks"});
+    CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
+}
+
 TEST_CASE("ScriptHost saves profile stop hooks and separates watched reloads", "[ScriptHost][Profiling]")
 {
     const auto output = TempFolder{"rs2004-host-profiles"};

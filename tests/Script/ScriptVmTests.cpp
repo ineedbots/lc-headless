@@ -11,6 +11,7 @@
 #include "Utils/FileUtils.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <pocketpy.h>
 #include <nlohmann/json.hpp>
@@ -237,6 +238,40 @@ TEST_CASE("ScriptVm sends print, log and debug to its logger", "[ScriptVm]")
 
     REQUIRE_FALSE(capture.GetEntries().empty());
     CHECK(capture.GetEntries().back().message == "partial");
+}
+
+TEST_CASE("ScriptVm recovers when converting a log argument to text fails", "[ScriptVm][VmFailureCoverage]")
+{
+    const auto function = GENERATE("log", "debug");
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), {}, capture.GetLogger()};
+    vm.RunSource(R"python(
+class Broken:
+    def __str__(self):
+        raise ValueError('cannot format')
+
+def answer():
+    return 42
+)python", "log-error.py");
+    CHECK_THROWS_WITH(vm.RunSource(std::string{function} + "('partial', Broken(), 'tail')\n", "log-error.py"), ContainsSubstring("ValueError: cannot format"));
+    CHECK(GetLines(capture).empty());
+    CHECK(py_toint(vm.Call("answer")) == 42);
+    CHECK_NOTHROW(vm.RunSource("log('recovered')\n", "recovered.py"));
+    CHECK(GetLines(capture) == std::vector<LogLine>{{LogLevel_e::Info, "recovered"}});
+    CHECK(&vm.GetLogger() == capture.GetLogger().get());
+}
+
+TEST_CASE("ScriptVm flushes partial print output without duplicating it at destruction", "[ScriptVm][VmFailureCoverage]")
+{
+    auto capture = LogCapture{};
+    {
+        auto vm = ScriptVm{ScriptTestRuntime::Get(), {}, capture.GetLogger()};
+        vm.RunSource("print('partial', end='', flush=True)\n", "flush.py");
+        CHECK(GetLines(capture) == std::vector<LogLine>{{LogLevel_e::Info, "partial"}});
+        vm.RunSource("print('', end='', flush=True)\nprint('next')\n", "flush.py");
+        CHECK(GetLines(capture) == std::vector<LogLine>{{LogLevel_e::Info, "partial"}, {LogLevel_e::Info, "next"}});
+    }
+    CHECK(GetLines(capture) == std::vector<LogLine>{{LogLevel_e::Info, "partial"}, {LogLevel_e::Info, "next"}});
 }
 
 TEST_CASE("ScriptVm keeps each script's globals to itself", "[ScriptVm]")
