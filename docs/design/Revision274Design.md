@@ -341,7 +341,7 @@ The other likely mistake is a store from the wrong one of the two store revision
 | `client.jsonc.sample` | `// 289, 274 or 225. client.cacheDirectory must hold the same revision's cache.` |
 | `README.md` | The intro, the requirements, the `login.revision` and `client.cacheDirectory` rows, and `tcp-protocol-274.md` in the document table |
 | `ConfigDesign.md` | The `login.revision` rows and the validation table's cases |
-| `ScriptingApi.md` | `revision()` lists 274. A "Revision 274" note beside the 225 one: the catalogs and nav data are 289's, and anything added after 274 doesn't exist there |
+| `scripting/README.md` | `revision()` lists 274. A "Revision 274" note beside the 225 one: the catalogs and nav data are 289's, and anything added after 274 doesn't exist there |
 
 ---
 

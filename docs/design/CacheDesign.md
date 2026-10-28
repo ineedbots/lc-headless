@@ -1064,7 +1064,7 @@ public:
 
 ## 12. Script API
 
-Phase 2 adds names and types, phase 3 scenery, and phase 4 reachability and routes. ScriptingApi.md, the stubs in `scripts/typings/__builtins__.pyi` and the prelude's classes change with each phase.
+Phase 2 adds names and types, phase 3 scenery, and phase 4 reachability and routes. scripting/README.md, the stubs in `scripts/typings/__builtins__.pyi` and the prelude's classes change with each phase.
 
 ### Objects
 
@@ -1111,7 +1111,7 @@ Names are exactly as the cache has them, case included.
 
 ### Porting from plutonium
 
-The porting lists in ScriptingDesign §6 and ScriptingApi.md change:
+The porting lists in ScriptingDesign §6 and scripting/README.md change:
 
 - `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists.
 - `get_item_name(id)` becomes `get_item_type(id).name`.
@@ -1138,7 +1138,7 @@ ScriptingDesign §10's "Packet-only world" item, ScriptingApi's Limits section, 
 | `ServerPacketDecoder`, `ZoneDecoder` | Increase `sceneChangeCount`. `GetLayer` moves to `LocShape` | 3 |
 | `GameActions` | Routes (§11), and `WalkTo` returns `bool` | 4 |
 | README | Requirements (the cache instead of the CRCs), configuration, the limits under "Writing scripts", the project layout and the documentation table | 1–4 |
-| ConfigDesign.md, ScriptingDesign.md, ScriptingApi.md | §9 and §12 | 1–4 |
+| ConfigDesign.md, ScriptingDesign.md, scripting/README.md | §9 and §12 | 1–4 |
 | Tests | Every `GameClient`, `Account` and `AccountRunner` a test builds gets `std::make_shared<const GameCache_s>()`. `NetTests` passes CRCs 1 to 9 directly instead of through `login.crcs`. `ConfigFileTests` loses the CRC cases and gains `cacheDirectory` and the leftover-key warning | 1 |
 | `CacheLoader`, `MapSquare`, `GameCache_s`, `ConfigFile` (`client.decodedCacheFile`), `.gitignore` (`cache.bin`) | §17 | 5 |
 
@@ -1272,7 +1272,7 @@ Phase 5 has its own check (§17).
 **Phase 2: definitions.** Scripts see names and options.
 
 1. `<unordered_set>` in the PCH, `TextPool`, the type structs and `TypeDecoder`, with their tests. The loader decodes `config`, and the real-cache type checks are added.
-2. Names, types, options by text and the `_by_name` functions in the script API, with ScriptingApi.md and the stubs.
+2. Names, types, options by text and the `_by_name` functions in the script API, with scripting/README.md and the stubs.
 
 **Phase 3: maps and scenery.** Scripts see scenery the server never changed.
 

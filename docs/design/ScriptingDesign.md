@@ -67,7 +67,7 @@ rs2004-headless/
 │   └── examples/                   walker.py, chicken_killer.py
 ├── docs/
 │   ├── ScriptingDesign.md          this file
-│   └── ScriptingApi.md             the script author's reference, like plutonium's API.md
+│   └── scripting/README.md             the script author's reference, like plutonium's API.md
 ├── src/
 │   ├── Script/
 │   │   ├── ScriptRuntime.hpp/.cpp  py_initialize/py_finalize, the 16 VM slots, the import and print callbacks
@@ -305,7 +305,7 @@ The option numbers behind the conveniences and the component constants were chec
 - `walk_path_to(x, z)` becomes `walk_to(x, z)`, `calculate_path_to(x, z)` becomes `find_path(x, z)`, and `is_reachable(x, z)` exists. Routes come from the game cache's collision ([CacheDesign.md](CacheDesign.md) §11), inside the build area only.
 - `get_item_name(id)` becomes `get_item_type(id).name`.
 - `get_nearest_object_by_id` becomes `get_nearest_loc_by_id`, and `at_object(obj)` becomes `interact_loc(loc, 1)`.
-- ScriptingApi.md's porting table lists the other renames. What's still missing (long paths, the bank, shop, trade and dialogue helpers, and others) is planned in [BotApiDesign.md](BotApiDesign.md).
+- scripting/python-dialect.md's porting table lists the other renames. What's still missing (long paths, the bank, shop, trade and dialogue helpers, and others) is planned in [BotApiDesign.md](BotApiDesign.md).
 - Fatigue and sleeping are RSC-only and have no equivalent. The option menu isn't: 2004's multiple-choice dialogues are chat interfaces whose options the server sets as text.
 
 ---
@@ -437,7 +437,7 @@ The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared
     - no `re`, and no pip packages;
     - `import` only finds `scripts/` and `scripts/lib/`.
 
-  `ScriptingApi.md` lists these for script authors.
+  `scripting/README.md` lists these for script authors.
 - **One slow script delays everyone**, up to `callTimeoutMs`. This is the cost of a single thread, and the watchdog bounds it.
 
 ---
@@ -545,7 +545,7 @@ Scripts in one process can send each other messages, as plutonium's can.
 
 - It needs `--account`, naming an account with a script. Before running the script, the host calls `py_debugger_waitforattach("127.0.0.1", 6110)`, which waits for VS Code to attach. `Application` installs its Ctrl+C handler only after the scripts have loaded, so Ctrl+C still ends the process during the wait.
 - The attach configuration's `sourceFolder` is the scripts folder. The extension sends breakpoint paths relative to it, and pocketpy matches them against the script's file name, which is relative to the scripts folder too.
-- pocketpy's debugger belongs to the whole process, which brings limits that `ScriptingApi.md` lists:
+- pocketpy's debugger belongs to the whole process, which brings limits that `scripting/README.md` lists:
     - A paused script pauses the process. The server hears nothing from the client meanwhile, so a long pause may end in a reconnect.
     - pocketpy turns the watchdog off while a debugger is attached.
     - An uncaught exception stops in the debugger and stays stopped, because pocketpy never returns from it.
@@ -565,7 +565,7 @@ Scripts in one process can send each other messages, as plutonium's can.
     - Work: `GameEvent_s`, the log in `GameState_s`, and emitting from the decoders.
     - Done when: the event tests pass and the existing 113 tests still pass.
 3. **One scripted account.**
-    - Work: `PyConvert`, `ScriptApi`, `ScriptBindings`, `ScriptHost`, `Account`, the config changes, the named logger, the example scripts, `__builtins__.pyi` and `ScriptingApi.md`. It also covers checking the option numbers and component IDs against the engine.
+    - Work: `PyConvert`, `ScriptApi`, `ScriptBindings`, `ScriptHost`, `Account`, the config changes, the named logger, the example scripts, `__builtins__.pyi` and `scripting/README.md`. It also covers checking the option numbers and component IDs against the engine.
     - Done when: `--account accounts/test.jsonc` runs an example script against the local engine that walks, attacks an NPC and picks up its drop, and a script error logs a traceback and logs out cleanly.
 4. **Many accounts.**
     - Work: `AccountRunner`, the non-blocking `GameClient` (§8), and Ctrl+C with `on_kill_signal`.

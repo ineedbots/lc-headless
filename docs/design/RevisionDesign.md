@@ -1,6 +1,6 @@
 # Revision Design
 
-Plan for connecting to servers of more than one revision. Today the client speaks only revision 289. This plan adds revision 225 and makes every part that touches the wire or the cache revision-aware, so a later revision is added the same way. Revision 225 is the base protocol: code written for 225 runs for every revision, and anything a later revision changes sits in a branch on the protocol's revision. Scripts can ask which revision they're on with `game.revision()`. The work ships in five phases (§13), plus an optional sixth for maps sent over the wire. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It changes the config ([ConfigDesign.md](ConfigDesign.md)), the cache loader ([CacheDesign.md](CacheDesign.md)) and the script API ([ScriptingApi.md](../ScriptingApi.md)). The 289 wire format is in [tcp-protocol-289.md](tcp-protocol-289.md); this plan lists only where 225 differs from it.
+Plan for connecting to servers of more than one revision. Today the client speaks only revision 289. This plan adds revision 225 and makes every part that touches the wire or the cache revision-aware, so a later revision is added the same way. Revision 225 is the base protocol: code written for 225 runs for every revision, and anything a later revision changes sits in a branch on the protocol's revision. Scripts can ask which revision they're on with `game.revision()`. The work ships in five phases (§13), plus an optional sixth for maps sent over the wire. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It changes the config ([ConfigDesign.md](ConfigDesign.md)), the cache loader ([CacheDesign.md](CacheDesign.md)) and the script API ([scripting/README.md](../scripting/README.md)). The 289 wire format is in [tcp-protocol-289.md](tcp-protocol-289.md); this plan lists only where 225 differs from it.
 
 Reference sources, beside this repository:
 
@@ -410,7 +410,7 @@ The optional real-cache test (§12) checks each one resolves to the component th
 | `rs2004/game.py` | `_Game.revision()`: `"""The server revision this client speaks: 225 or 289."""` |
 | Typings | `def revision(self) -> int: ...` in `__builtins__.pyi` and `rs2004/__init__.pyi` |
 | `Menus::GetPlayerMenu` | 225 has no `SET_PLAYER_OP`; its webclient's player menu is fixed. For 225 the menu is `Duel-with`, `Attack`, `Follow`, `Trade with` (ops 1 to 4); for 289 it comes from `playerOps`, as today. The server still decides whether an op is allowed where the player is |
-| `ScriptingApi.md` | `revision()` in the `game` row; a note that `members` is always false on 225 and that ops 5 and drag-insert raise there |
+| `scripting/README.md` | `revision()` in the `game` row; a note that `members` is always false on 225 and that ops 5 and drag-insert raise there |
 
 ---
 
@@ -463,7 +463,7 @@ Each phase builds and passes every test on both presets before the next starts.
 - The fixed player menu.
 - `Rev225` joins `SUPPORTED_REVISIONS`.
 - A live run against a local 225 server, from a scratch `client.jsonc` pointing at the 225 cache and RSA key: log in, walk, bank, chat, trade, stay logged in across at least two tracking windows, and confirm the CHAT `rights` numbering (§7).
-- `README.md`, `client.jsonc.sample`, `ConfigDesign.md` and `ScriptingApi.md` updated.
+- `README.md`, `client.jsonc.sample`, `ConfigDesign.md` and `scripting/README.md` updated.
 
 ### Phase 5: the 225 reference
 

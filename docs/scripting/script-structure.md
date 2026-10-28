@@ -332,7 +332,7 @@ The client then calls `on_stop`, logs the traceback, and logs the account out, u
 
 ## Timing rules
 
-- Every account in a process runs on one thread. Each call into a script, and each stretch of a generator between two waits, may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. A route search inside `traversal` gets five times that.
+- Every account in a process runs on one thread. Each call into a script, and each stretch of a generator between two waits, may run for at most `scripting.callTimeoutMs` (1000 ms by default) before it's stopped with `TimeoutError`. A route search inside `traversal` gets five times that; the call gets its usual time afresh once the search returns.
 - `time.sleep()` raises `RuntimeError`, since it would stall every account. Wait with [`execution`](waiting.md) instead.
 - Each pass of the main loop, the client: (1) calls hooks and subscribers for everything that arrived, events first, then chat messages, then messages from other scripts and console commands; (2) calls `on_tick` if a server tick passed; (3) calls `on_progress_report` if one is due; (4) runs the client's [upkeep](upkeep.md) once a tick; (5) steps `loop()` if what it waits for has happened.
 - When the random-event guardian or the stall guard takes over, the `loop()` generator that was waiting is dropped, and `loop()` starts afresh once they finish. A dropped connection or a `relog()` doesn't drop it: the wait carries on once the player is placed again. A long loop can ask [`event_signal.pending()`](waiting.md#event_signal) and stop at a safe point first.

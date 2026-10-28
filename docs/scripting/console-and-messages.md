@@ -2,7 +2,11 @@
 
 ## Console commands
 
-The client reads each line typed into its console while it runs. A script can add its own commands.
+The client reads each line typed into its console while it runs. In a terminal, it keeps a `> ` prompt on the bottom line and prints log lines above it, so they never run into what you're typing. The left and right arrows, Home, End, Backspace and Delete edit the line, Ctrl+U and Ctrl+K clear it before and after the cursor, and Up and Down go back through the last 100 lines entered. The terminal needs to understand VT100 codes, as the Windows 10 and later console, Windows Terminal and Linux terminals do. When the input is piped in instead, lines are read as they come, with no prompt.
+
+In a terminal, log lines are colored by level: verbose cyan, info in the terminal's own color, warnings yellow and errors red. Output redirected to a file stays plain, and setting `NO_COLOR` turns the colors off. `--raw-console` turns off the colors, the prompt and console input altogether, and `client.logFile` in `client.jsonc` appends every log line to a file too, as plain text.
+
+A script can add its own commands.
 
 ### `console.command(name, handler, help=None)`
 
@@ -46,6 +50,8 @@ A command added at module level lasts as long as the script. In a bot, `self.com
 - Like a hook, a handler can't wait: one that returns a generator stops the script with `TypeError`. An exception in it stops the script too, so check `args` before using them.
 
 ### Built-in commands
+
+Use `@<account>` to target applicable built-in commands too: `@mule status`, `@mule help`, `@mule say hi` or `@mule quit`. An account quit before its login turn never logs in. `loglevel` always applies to the whole process.
 
 | Command | Does |
 |---|---|
@@ -104,3 +110,5 @@ Progress at 2026-10-08T14:20:00Z, 1h 20m after the script started
 - Names and values are shown with `str()`, in the dict's order.
 - Returning anything but a `dict` stops the script with `TypeError`.
 - A report that falls due while the account is reconnecting waits until it's back.
+
+For a complete script with commands and messages, see [`walker.py`](../../scripts/examples/walker.py).

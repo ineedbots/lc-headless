@@ -1,6 +1,6 @@
 # Bot API Design
 
-Plan for a script API with the abilities of rs2b0t's bot API, written the way Python is: rs2b0t's facades, query builder, bot classes, world walker, random-event guardian and catalogs, with snake_case names, and generators where rs2b0t awaits. The client hasn't been released, so this replaces today's flat API ([ScriptingApi.md](../ScriptingApi.md)) outright; nothing keeps the old names. plutonium-rsc's abilities are a subset of rs2b0t's, and its scripts port through a table in ScriptingApi.md. rs2b0t's quest and clue engines are left for a later project. The work comes in nine phases after a docs fix (§14). Code style follows [CONVENTIONS.md](CONVENTIONS.md). It extends the interface decoding in [CacheDesign.md](CacheDesign.md) §6, the paths in CacheDesign §10–11, and the runtime, events and API in [ScriptingDesign.md](ScriptingDesign.md) §3–6, whose naming rule it replaces.
+Plan for a script API with the abilities of rs2b0t's bot API, written the way Python is: rs2b0t's facades, query builder, bot classes, world walker, random-event guardian and catalogs, with snake_case names, and generators where rs2b0t awaits. The client hasn't been released, so this replaces today's flat API ([scripting/README.md](../scripting/README.md)) outright; nothing keeps the old names. plutonium-rsc's abilities are a subset of rs2b0t's, and its scripts port through a table in scripting/README.md. rs2b0t's quest and clue engines are left for a later project. The work comes in nine phases after a docs fix (§14). Code style follows [CONVENTIONS.md](CONVENTIONS.md). It extends the interface decoding in [CacheDesign.md](CacheDesign.md) §6, the paths in CacheDesign §10–11, and the runtime, events and API in [ScriptingDesign.md](ScriptingDesign.md) §3–6, whose naming rule it replaces.
 
 > All nine phases are done. [BotApiParityDesign.md](BotApiParityDesign.md) plans the rest of rs2b0t from phase 10, including what §1 leaves out for now: the quest and clue engines, and the market.
 
@@ -99,7 +99,7 @@ tests/Stdlib/                   Python tests, run in a VM by tests/Script/Stdlib
 - **The stdlib** is the `rs2004` package in `src/Script/Stdlib/`. `cmake/EmbedStdlib.cmake` embeds each file as a byte array, since MSVC limits a string literal to 64 KB, and regenerates them when a `.py` file changes. The import callback resolves `rs2004` before `scripts/` and `scripts/lib/`, so a script can't shadow it, and its files aren't watched with the script's. A failure in the stdlib carries its own file and line, as a script's does.
 - **Builtins.** At startup each VM imports the stdlib's public modules and puts their names in `builtins`, as the API is today, so scripts need no imports. Catalogs, which have hundreds of names, stay in their module: `from rs2004.catalogs import nearest_bank`.
 - **Ported code** keeps rs2b0t's MIT notice. Each ported module names the rs2b0t file it came from, which is also where a reader goes to compare behaviour.
-- **pocketpy's dialect** constrains the stdlib as it does scripts (ScriptingApi.md, Python dialect). The ones that shaped phase 1:
+- **pocketpy's dialect** constrains the stdlib as it does scripts (scripting/python-dialect.md, Python dialect). The ones that shaped phase 1:
     - a parameter takes a keyword only when it has a default, so every parameter a script might name has one (`define_bot(name=None, create=None, ...)`, `SettingDef(type=None, default=None, ...)`);
     - a default must be a literal;
     - an instance attribute doesn't override a class's method, so `Task` keeps its callables as `_validate` and `_execute`;
@@ -381,7 +381,7 @@ As built, in `rs2004/reach.py` and `rs2004/messages.py`:
 - **Patterns.** pocketpy has no `re`, so a message pattern is text, matched as part of the message without regard to case, or a callable. `CANT_REACH` is text, and `WRONG_SIDE` a callable that knows both spellings.
 - **Doors are walls.** rs2b0t's barrier test is the name alone (`/door|gate/`), which in Lumbridge's kitchen took the trapdoor for the door in the way and opened it. A barrier must also be in the wall layer.
 - **Until phase 6.** The stand is walked to by `direct_navigator`, which can't open doors, so it must be reachable; reach opens the door between the stand and the target.
-- **pocketpy closures.** A function nested two deep can't read the outermost function's variables. Where a builtin of the same name exists, such as `id`, it quietly gets the builtin. `loc_op`'s `id` filter hit this, so it copies the value into a local. A `symtable` scan finds no other case in the stdlib, and ScriptingApi.md's Python dialect section warns scripts about it.
+- **pocketpy closures.** A function nested two deep can't read the outermost function's variables. Where a builtin of the same name exists, such as `id`, it quietly gets the builtin. `loc_op`'s `id` filter hit this, so it copies the value into a local. A `symtable` scan finds no other case in the stdlib, and scripting/python-dialect.md's Python dialect section warns scripts about it.
 - **Done when:**
     - [x] The barrier rules, the message mark and `CanStep` have tests; `CanStep` agrees with the search's step rules around a door and a blocked tile.
     - [x] Against the local engine, from outside Lumbridge's shut kitchen door, `loc_op` searched a crate inside after the server's "I can't reach that!", opening the door; `npc_dialog` reached the Cook by searching the scene and opening the door; and a target with no door in front gave `'unreachable'`.
@@ -574,10 +574,10 @@ The planners are pure, so their rs2b0t tests port with them. Item and object nam
 ## 14. Implementation order
 
 0. **Docs.**
-    - Work: this document, and the porting sections of ScriptingApi.md and ScriptingDesign §6.
+    - Work: this document, and the porting sections of scripting/README.md and ScriptingDesign §6.
     - Done when: the porting table names the swapped damage hooks and every rename that exists today.
 1. **The runtime** (§4). Done.
-2. **Entities, items and the game** (§5). Done; ScriptingApi.md is rewritten for the new shape, and grows with each later phase.
+2. **Entities, items and the game** (§5). Done; scripting/README.md is rewritten for the new shape, and grows with each later phase.
 3. **Interfaces from the cache** (§6). Done.
 4. **Dialogue, make menus, bank, shop, trade and tabs** (§7). Done.
 5. **Reach** (§8). Done.
@@ -591,4 +591,4 @@ Each phase's "Done when" is in its section. The end-to-end check translates thre
 - `CowKiller`: combat, loot and periodic banking;
 - `BankFletcher`: make menus and Make X.
 
-The ScriptingApi.md porting tables then map every rs2b0t export this design covers, and every name in plutonium's `script.go`, to its Python name, or mark it not ported, with the reason.
+The scripting/README.md porting tables then map every rs2b0t export this design covers, and every name in plutonium's `script.go`, to its Python name, or mark it not ported, with the reason.

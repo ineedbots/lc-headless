@@ -1,5 +1,5 @@
 # Declarations of what the client adds to every script's builtins, for editors only: Pylance and Pyright
-# read this file, the client never does. See docs/ScriptingApi.md for what each one does.
+# read this file, the client never does. See docs/scripting/README.md for what each one does.
 
 from typing import Any, Callable, Generator, Generic, Optional, Sequence, TypeVar, Union
 

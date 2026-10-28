@@ -1,6 +1,70 @@
 # Scripting API reference
 
-The complete reference for writing Python scripts for rs2004-headless: every builtin function, object, constant, event and hook a script can use. For a guided introduction, start with [ScriptingApi.md](../ScriptingApi.md); for working examples, read `scripts/examples/`, and for rs2b0t's bots, ported, `scripts/bots/`.
+The complete reference for writing Python scripts for rs2004-headless: every builtin function, object, constant, event and hook a script can use. Start with the quick start below, then use the topic pages for details. The API follows rs2b0t's bot API in Python's style: facades, chained queries and cooperative waits with `yield from`. The implementation plans are in [ScriptingDesign.md](../design/ScriptingDesign.md) and [BotApiDesign.md](../design/BotApiDesign.md).
+
+## Quick start
+
+First configure the server, RSA key and matching cache as described in [Configuration](../Configuration.md).
+
+1. Copy `accounts/example.jsonc.sample` to `accounts/<name>.jsonc` and fill in the username and password. The file name becomes the account's name in log lines.
+2. Point `script.file` at a script, relative to `scripting.scriptsDirectory` (default `scripts/`), such as `examples/chicken_killer.py`.
+3. Run `Rs2004Headless client.jsonc` (use `.\Rs2004Headless.exe` in PowerShell or `./Rs2004Headless` on Linux) to run every enabled file in `accounts/`, logging them in `scripting.loginIntervalSeconds` apart, or add `--account accounts/<name>.jsonc` to run just that one. One process runs up to 16 scripted accounts.
+
+An account file can have its own `server` section to log into another world of the same revision. The section replaces the process-wide server section; see [account overrides](../Configuration.md#account-overrides).
+
+Ctrl+C asks each script to finish (see [lifecycle hooks](script-structure.md#lifecycle-hooks)). A second Ctrl+C logs every account out at once, and one more closes any connection whose logout the server is still refusing. The exit code is 0 when every account logged out cleanly and no script failed.
+
+While it runs, the client takes commands typed into its console: `help` lists them, `status` shows where each account is, and `quit` does what Ctrl+C does. Scripts can add commands of their own (see [Console commands](console-and-messages.md#console-commands)).
+
+Each account retries temporary login failures and reconnects independently while other accounts keep playing. Retry limits and delays are configurable; see [Retries and reconnects](../Running.md#retries-and-reconnects).
+
+A script is a bot, as in rs2b0t's API: either a class set with `BOT = define_bot(...)`, or a module-level `loop()` with `on_*` hooks, which runs as a `LoopingBot`. It finds things with queries, acts on what it finds, and returns how long to wait before `loop()` runs again:
+
+```python
+def on_start():
+    log('Starting at', game.tile())
+
+def loop():
+    if game.in_combat():
+        return 600          # the next server tick
+
+    chicken = npcs.query().name('Chicken').within(8).where(lambda npc: not npc.in_combat).nearest()
+    if chicken is not None and chicken.interact('Attack'):
+        # Wait until the fight starts, or 3 seconds.
+        yield from execution.delay_until(lambda: game.in_combat(), 3000)
+
+def on_server_message(msg):
+    if msg.startswith('Oh dear'):
+        stop_account()
+```
+
+The same as a bot, with its settings declared, and tasks chosen in priority order:
+
+```python
+class Fighter(TaskBot):
+    def on_start(self):
+        self.add(
+            Task(lambda: game.in_combat(), lambda: None, label='fight'),
+            Task(lambda: True, self.attack, label='attack'),
+        )
+
+    def attack(self):
+        target = npcs.query().name(self.settings.npc).within(8).where(lambda npc: not npc.in_combat).nearest()
+        if target is not None and target.interact('Attack'):
+            yield from execution.delay_ticks(2)
+
+BOT = define_bot(name='Fighter', create=Fighter, settings_schema={'npc': SettingDef('string', 'Chicken')})
+```
+
+[`scripts/examples/`](../../scripts/examples) has complete scripts:
+
+- `chicken_killer.py` is a `TaskBot` that kills chickens, collects feathers and optionally buries bones. Set `combat_style`, `start_location` and `bury_bones` under `script.settings["Chicken Killer"]`; `radius` controls the fighting area, and the bot walks back when outside it.
+- `power_miner.py` is a `LoopingBot` that mines and drops the ore.
+- `walker.py` is a module-level script that walks a loop of tiles, optionally for a set number of laps, telling a partner account about each one. Its `laps` console command changes the number of laps, and like every script it has `pause` and `resume`.
+
+All three make progress reports. `scripts/bots/` has rs2b0t's bots, ported (see [Catalogs and behaviours](catalogs.md#ported-bots)).
+
+For working on a script, `--watch` reloads it whenever you save it, and `--debugger` lets VS Code debug it (see [Working on a script](python-dialect.md#working-on-a-script)).
 
 ## Pages
 
@@ -22,12 +86,12 @@ The complete reference for writing Python scripts for rs2004-headless: every bui
 | [Upkeep](upkeep.md) | Random events, `random_events`, `run_manager`, the stall guard, Tutorial Island |
 | [Console and messages](console-and-messages.md) | `console`, `Command`, `send_bot_message`, progress reports |
 | [Constants](constants.md) | Every builtin constant and its value |
-| [Catalogs](catalogs.md) | `rs2004.catalogs`: rs2b0t's data tables, planners and tasks |
+| [Catalogs](catalogs.md) | `rs2004.catalogs`: rs2b0t's data tables, planners, tasks and the ported bot table |
 | [The market](market.md) | `rs2004.market`: the tradeable catalog, price books, appraising a trade, the chat protocol |
 | [Hunting](hunting.md) | `rs2004.hunting`: the dragon sites, the safespot and chase fight tasks, lairs entered and left, the bank trip, and the decisions under them |
 | [Clues](clues.md) | `rs2004.clues`: the clue database, `SolveClue` for a bot that carries clues, the executor, the puzzle box, the guardian, and the travel a trail needs |
 | [Quest steps](quests.md) | `rs2004.quests.exec`: talking to NPCs, walking to them across ladders, and answering what locs and doors ask; `rs2004.quests.prayer` |
-| [Python, imports, tools and porting](python-dialect.md) | pocketpy's dialect, imports, `--watch`, `--debugger`, revisions, porting from rs2b0t |
+| [Python, imports, tools and porting](python-dialect.md) | pocketpy's dialect, imports, `--watch`, `--debugger`, revisions, porting from rs2b0t and plutonium |
 
 ## Conventions used in this reference
 

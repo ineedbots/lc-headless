@@ -24,6 +24,7 @@ Item, NPC and scenery names in the tables are the 289 cache's, and a test checks
 - [Loadouts](#loadouts)
 - [Trading partners](#trading-partners)
 - [Tasks](#tasks)
+- [Ported bots](#ported-bots)
 
 ### Callable arguments
 
@@ -592,3 +593,37 @@ After the `death` event, gets `needs` back (when given) and walks back within `r
 ### `sustain`
 
 Upkeep that a long wait must keep doing, such as eating: `sustain.set(hook)` once, then `yield from sustain.run()` inside your waits. `hook` may be a generator function; a run already in progress is skipped.
+
+## Data source
+
+The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with Bun against an rs2b0t checkout. It writes the embedded catalog data in `src/Script/Stdlib/rs2004/catalogs/_data.py`, `_shops.py` and `_clues.py`.
+
+## Ported bots
+
+`scripts/bots/` has rs2b0t's bots translated with them, one file per bot as rs2b0t registers it. An account file names one as `bots/miner.py`, and another bot can import one, `from bots.miner import BOT`, to run it as a `ScriptActivity`.
+
+| Kind | rs2b0t | Here |
+|---|---|---|
+| Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, tick manipulation (off until rs2b0t ships it), the Fisher's mule hand-offs (gatherer, mule, cooker, supplier) and the Fishing Guild feather and Shilo supply runs |
+| Gathering | CoalTrucks, EssMiner, FlaxPicker, FlaxAIO, GnomeMagicChopper | `coal_trucks.py`, `ess_miner.py`, `flax_picker.py`, `flax_aio.py`, `gnome_magic_chopper.py` |
+| Skilling | BankFletcher, CookBot, DartFletcher, Firemaker, FlaxSpinner, GemCutter, HerbCleaner, HerbloreSecondaries, PotionMaker, LeatherCrafter, SmelterBot, SmithingBot, Superheater, TannerBot, VialFiller, BoneBurier, ClimbingBoots | `bank_fletcher.py` and the rest, each named as rs2b0t names it in snake_case |
+| Jewellery and caskets | JiveBalls, JiveCaskets, JiveCrafting, JiveEnchanter | `jive_balls.py`, `jive_caskets.py`, `jive_crafting.py`, `jive_enchanter.py` |
+| Runecrafting | RuneCrafter, NatureCrafter | `rune_crafter.py`, `nature_crafter.py`. NatureCrafter's paint button is the `gobank` console command |
+| Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
+| Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py`. The three Ardougne bots solve the clues they pick up |
+| Treasure Trails | ClueSolver | `clue_solver.py`: solves the clue or opens the casket in the pack, then banks the reward |
+| Quests | ArravSupplier | `arrav_supplier.py`, its logic in `bots/arravsupplier/`: prepares the Phoenix mission, joins both gangs, banks certificates without redeeming |
+| Quests | Barcrawl | `barcrawl.py`: obtains the card, visits all ten bars and hands it in |
+| Quests | AIOQuester | `aio_quester.py`, its logic in `bots/aioquester/`: runs a queue of quests on [`rs2004.quests`](quests.md). Its paint's Skip button is the `skip` console command, and the paint is its progress report |
+| Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
+| Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. GreenDragon, RockCrab and AutoFighter solve the clues they pick up, on [`rs2004.clues`](clues.md) |
+| Bosses and dragons | JiveDragons, JiveDemons, JiveKBD | `jive_dragons.py`, `jive_demons.py`, `jive_kbd.py`, on [`rs2004.hunting`](hunting.md). JiveDragons solves the hard clues the dragons drop |
+| Duel Arena | Duel Arena Combat Trainer (DuelArena) | `duel_arena.py`, its logic in `bots/duelarena/`: two accounts duel each other to train Attack, Strength and Defence |
+| Movement and magic | WalkTo, DoorOpener, AIO Teleport, Alcher | `walk_to.py`, `door_opener.py`, `aio_teleport.py`, `alcher.py` |
+| Shops and trading | ShopBuyout, ShopRunner, MarketMaker, JiveMarketDumper, MuleTrader | `shop_buyout.py`, `shop_runner.py`, `market_maker.py` (its logic in `bots/marketmaker/`), `jive_market_dumper.py`, `mule_trader.py` |
+| Two-account | FlaxRunner, MuleCrafter | `flax_runner.py` (a runner picks, a spinner spins), `mule_crafter.py` (a crafter and its mules) |
+| Four-account | JiveKQ | `jive_kq.py`, its parts in `bots/jivekq/`: four accounts in one client kill the Kalphite Queen together, talking over `send_bot_message` |
+| Utility | BankSorter | `bank_sorter.py` |
+| Event looting | WanderLooter | `wander_looter.py`, its logic and tasks in `bots/wanderlooter/`: wanders and picks up drops by exact name (Pumpkin by default), without fighting, and leaves alone drops where it took damage |
+
+`scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.

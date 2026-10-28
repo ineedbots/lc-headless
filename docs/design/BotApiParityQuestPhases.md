@@ -49,7 +49,7 @@ This replaces the design doc's three batches (17a to 17c there), which put 26, 1
     - `~cq` leaves some sub-stage varbits unset, as phase 15 found with Watchtower's market. One that a quest reads is set with `setvar` and recorded under the sub-phase's "As built" in the design doc.
 
   A quest that parks gives its reason. It's fixed, or recorded with that reason in the design doc.
-- **Docs and stubs.** `scripts/typings/rs2004/quests/`, `docs/scripting/quests.md`, ScriptingApi.md's porting table and BotApiParityStatus.md, with each sub-phase.
+- **Docs and stubs.** `scripts/typings/rs2004/quests/`, `docs/scripting/quests.md`, scripting/python-dialect.md's porting table and BotApiParityStatus.md, with each sub-phase.
 
 ---
 

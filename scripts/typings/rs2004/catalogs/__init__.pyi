@@ -1,4 +1,4 @@
-# rs2004.catalogs: rs2b0t's world catalogs and behaviours. See docs/ScriptingApi.md, "Catalogs and behaviours".
+# rs2004.catalogs: rs2b0t's world catalogs and behaviours. See docs/scripting/catalogs.md.
 
 from typing import Any, Callable, Optional, Sequence, Union
 

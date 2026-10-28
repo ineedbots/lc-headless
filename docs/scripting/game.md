@@ -115,6 +115,7 @@ Raw reads, for what no facade covers.
 | `reader.varp(id)` | A player variable's value |
 | `reader.pid()` | Your index in the server's player list |
 | `reader.main_modal()` | The main interface's id, such as the bank's, or -1 |
+| `reader.main_modal_texts()` | The open main interface's text lines, or `[]` when none is open |
 | `reader.side_modal()` | The interface replacing the side tabs, or -1 |
 | `reader.chat_modal()` | The chat box interface, such as a dialogue, or -1 |
 | `reader.modals()` | rs2b0t's: all three, as an object with `main`, `side` and `chat` |

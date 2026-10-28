@@ -613,4 +613,4 @@ Phases 12 to 14 depend only on 10 and 11, and can go in any order. Phase 15 need
 
 With each phase:
 - `scripts/typings/__builtins__.pyi` and `docs/scripting/` gain what it adds.
-- The porting table in ScriptingApi.md maps each rs2b0t module it ports to its Python home, and each bot to its file in `scripts/bots/`.
+- The porting tables in scripting/python-dialect.md and scripting/catalogs.md maps each rs2b0t module it ports to its Python home, and each bot to its file in `scripts/bots/`.
