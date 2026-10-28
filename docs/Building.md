@@ -172,6 +172,44 @@ Archives go to `build/packages/`: ZIP on Windows and TGZ on Linux. Packaging inc
 
 The [release workflow](../.github/workflows/release.yml) builds and tests Windows x64/x86 and Linux x64/arm64 before packaging. A version tag must match the version in `CMakeLists.txt`; an optional prerelease suffix marks a prerelease. Running CPack locally creates an archive without publishing it.
 
+## Project layout
+
+```
+src/
+├── main.cpp
+├── Application/              startup, the command line, Ctrl+C
+├── Accounts/                 each account's lifecycle, the main loop over all accounts, console commands, progress reports
+├── Config/                   client.jsonc and the account files: the structs, parsing, rules, the JSONC editor
+├── Console/                  the logger, log files and console output, console input and its commands
+├── Script/
+│   ├── (root)                pocketpy runtime and interpreters, what the bindings reach, messages between scripts
+│   ├── Bindings/             the _core functions, one class per area
+│   ├── Convert/              Python values to and from C++
+│   └── Host/                 one account's script: its schedule, hooks and events
+├── Cache/                    reading the server's cache: the store, archives, definitions, map squares, login CRCs, the logout button
+├── Game/
+│   ├── GameClient            login, reconnects, logout, polling the connection
+│   ├── Map/                  each account's collision map and scenery, and the route search
+│   ├── Nav/                  the world graph and the long-distance walker's data
+│   ├── Query/                searches over the game state: entities, inventories, the player, reachability
+│   ├── Menu/, Interface/     menu ops, interfaces and dialogue
+│   ├── Net/                  login handshake, reading and writing packets
+│   ├── Protocol/             opcodes, client packet builders, text encodings
+│   ├── Decode/               turns server packets (including player, NPC and zone updates) into game state
+│   └── State/                the game state, and the event log that script hooks receive
+├── Io/                       network transport, packet buffer, ISAAC cipher
+└── Utils/                    shared helpers: strings, files, big integers for RSA, file watcher
+tests/                        Catch2 tests in the same folders as src/; Support/ holds the fake game server and other helpers
+scripts/                      bot scripts: bots/, examples/, and typings/ for editors
+accounts/                     account files (ignored by git) and the sample file
+ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0
+docs/                         user guides, scripting reference, and design/ for designs and protocol references
+tools/                        data exporters for rs2b0t's walker and catalogs, and docker/ for the Linux build check
+thirdparty/                   licenses of the projects code was ported from
+```
+
+Everything in `src/` except `main.cpp` builds into a static library. The client and the tests both link that library, so the tests run the same code that ships.
+
 ## Build troubleshooting
 
 | Failure | Check |
