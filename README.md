@@ -8,7 +8,7 @@ A headless (shell/packet) game client for LostCity private servers (2004scape, *
 
 - **289, 274 and 225 protocols.**
 - **WebSocket, secure WebSocket and raw TCP**, each optionally through a **SOCKS5** proxy, set for the whole process or per account.
-- **The game cache.** It loads the server's cache once per process and shares it with every account. The login CRCs are computed from it, scripts get the names and options of NPCs, items and scenery, scenery the server never changed is known, and walks and interactions route around walls as the webclient does.
+- **Loading the game cache.** It loads the server's cache once per process and shares it with every account. The login CRCs are computed from it, scripts get the names and options of NPCs, items and scenery, scenery the server never changed is known, and walks and interactions route around walls as the webclient does.
 - **Python scripting** on an embedded [pocketpy](https://github.com/pocketpy/pocketpy) interpreter, with [rs2b0t](https://github.com/rs2b2t/rs2b0t)'s bot API in Python's style: `npcs`, `inventory`, `bank` and the other facades, chained queries, `LoopingBot`, `TaskBot` and `TreeBot`, a world walker, random-event solvers and typed settings.
 - **Several accounts per process.** Each account has its own interpreter and its own log name, and logins are spaced a few seconds apart. An account can log into a different world from the others.
 - **Tools for script authors:**
@@ -16,9 +16,12 @@ A headless (shell/packet) game client for LostCity private servers (2004scape, *
   - messages between scripts, and console commands of a script's own
   - reloading a script when it's saved (`--watch`)
   - a [VS Code debugger](https://pocketpy.github.io/features/debugging/#attach-to-an-embedded-application) (`--debugger`)
+  - [script profiling](https://pocketpy.github.io/features/profiling/) (`--profile`)
   - type stubs for Pylance and Pyright
 
 ![SCRIPT DEBUGGER](assets/debug.jpg)
+
+![SCRIPT PROFILING](assets/profile.png)
 
 ## Requirements
 
@@ -80,7 +83,7 @@ would look like
 | `scripting.killGraceSeconds` | `30` | How long scripts have to finish after Ctrl+C |
 | `scripting.progressDirectory` | `progress` | Where progress reports are written |
 | `scripting.pollIntervalMs` | `10` | The longest the main loop waits between passes, 1 to 1000 ms |
-| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. `0` allows one initial login attempt and disables retries and automatic reconnects; `100` retries indefinitely on temporary failures. The waits between attempts double from `minRetryDelaySeconds` up to `maxRetryDelaySeconds`; the defaults of 2 s and 30 s make 10 attempts cover about four minutes |
+| `scripting.connectAttempts` | `10` | Attempts at each login or reconnect before the account gives up. `0` allows only one initial login attempt and no further attempts; `100` retries indefinitely on temporary failures. |
 | `scripting.minRetryDelaySeconds` | `2` | The wait after the first failed login or reconnect attempt, in seconds. Later waits double up to `maxRetryDelaySeconds`. Both settings accept 1 to 3600 |
 | `scripting.maxRetryDelaySeconds` | `30` | The maximum wait between retry attempts, in seconds; must be at least `minRetryDelaySeconds`. Set both to the same value for a fixed delay |
 | `scripting.reloginDelaySeconds` | `60` | How long an account waits before logging in again after its session ended unexpectedly, such as the server logging it out |
@@ -135,13 +138,7 @@ While it runs, the client takes commands typed into its console: `help` lists th
 
 The exit code is 0 only when every account logged out cleanly and no script failed.
 
-**Script profiling.** Start with `Rs2004Headless client.jsonc --profile`, optionally adding `--account accounts/<name>.jsonc` to select one account. Reports go under `profiles/<run-id>/<account>/load-001/profiler_report.json`, relative to the working directory. The log gives the report path. Each watched reload creates a new `load-*` folder so results from different source versions stay separate.
-
-Measurements accumulate across imports, initialization, loops, resumed generators, and hooks. Profiling stops between calls into Python, excluding the account loop's idle waits. Reports are saved every 60 seconds while the application steps accounts, on Python errors, when the script stops, and before its VM is destroyed. A forced process termination can lose results since the last save. Write failures are logged and retried on the next save.
-
-To view a report, install the [PocketPy VS Code extension](https://pocketpy.github.io/features/profiling/) and run **pocketpy: Load Line Profiler Report**. Select the JSON report, then its sibling `sources/` folder as the source root. This contains snapshots of the script and imported modules, including the embedded `rs2004` library. Synthetic interpreter filenames such as `<bootstrap>` have no source snapshot.
-
-Profiling adds overhead and leaves `scripting.callTimeoutMs` unchanged, so an account close to its watchdog limit may time out while profiling. Use the report to find expensive lines, then measure again without `--profile`. PocketPy 2.2.0 uses `clock()` for timings: Windows measures elapsed time and Linux measures process CPU time, including native bindings accordingly. These are line timings, not a breakdown inside C++ bindings or directly comparable cross-platform benchmarks.
+See [Script profiling](docs/ProfilingAndCoverage.md#script-profiling) for recording and viewing line profiling reports.
 
 ## Writing scripts
 
@@ -257,63 +254,7 @@ The Catch2 tests don't need a server. The network tests run against a fake game 
 
 A few tests read a real game cache, and skip unless you point environment variables to the cache directory: `RS2004_CACHE_DIR` for a 289 cache (such as `<289 server>/engine/data/pack`), `RS2004_CACHE_DIR_274` for a 274 cache, and `RS2004_CACHE_DIR_225` for a 225 one (ex: `<255 server>/engine/data/pack/client`).
 
-### Native code coverage
-
-Native coverage uses a separate Linux Clang Debug build. Install Python 3 and LLVM's coverage tools
-(`sudo apt install python3 llvm libclang-rt-dev` on Ubuntu 24.04), with `llvm-cov` and `llvm-profdata` matching the compiler's
-major version. Keep `VCPKG_ROOT` set as for a normal build, then run from the repository root:
-
-```sh
-python3 tools/coverage/native.py
-```
-
-The command configures and builds the `linux-coverage` preset, runs CTest with four parallel workers, and writes
-`build/linux-coverage/coverage/html/index.html`, `coverage.lcov`, `summary.txt`, and `summary.json`. Use
-`--parallel N` to change build and test parallelism, or `--no-build` to collect from an existing coverage build.
-Each run clears its previous reports and profiles. Test failures still fail the command; any reports produced
-from a failed run are partial.
-
-The report includes authored C++ under `src/`, including headers and code not referenced by the tests.
-Tests, dependencies, and generated embedded Python are excluded. The application binary supplies coverage
-mappings for `main.cpp`, but is not run, so its entry point starts at zero coverage. C++ exercised by the
-embedded script tests contributes to native coverage. Python source coverage has its own report below.
-
-CI uploads the same report as the `native-coverage-linux-x64` artifact and publishes a summary. Coverage
-percentages are informational; test or collection failures fail the job. Real-cache tests skip without their
-cache environment variables, and hidden `[Slow]` tests are excluded from this baseline. Reports from runs with
-cache data can therefore differ from CI. Normal build and test presets do not enable instrumentation.
-
-### Stdlib script coverage
-
-Run with CPython on Linux or Windows (with the normal CMake/vcpkg build environment available):
-
-```sh
-python3 tools/coverage/script.py       # Windows: python tools/coverage/script.py
-```
-
-This uses the separate `linux-script-coverage` or `windows-script-coverage` Debug preset, builds the tests, and
-collects line trace events from the application's pocketpy VM while running the full CTest suite. LLVM tools
-are not required. Reports are written under `build/<preset>/script-coverage/`: `html/index.html`,
-`coverage.lcov`, `summary.txt`, and `summary.json`. Use `--parallel N` to change build/test parallelism or
-`--no-build` to reuse that build. Each collection clears its previous script profiles and reports.
-
-The denominator comes from compiling every embedded stdlib file and walking its bytecode and nested
-function declarations without executing them. Unimported modules and uncalled function bodies therefore
-remain uncovered. Compiler-generated implicit returns are excluded, matching pocketpy's trace events.
-The runner checks embedded sources against the checkout and fails if a rebuild is needed. Only
-`src/Script/Stdlib/**/*.py` contributes; script tests, example/account scripts and pocketpy's own modules are
-excluded. Counts represent line trace events, which pocketpy can coalesce, rather than exact statement counts.
-Script branch coverage is not collected.
-
-Tracing is test-only and opt-in through the runner. Normal application builds do not include the collector.
-Coverage presets allow 300 seconds per test instead of 60 to accommodate tracing overhead. Script fixtures
-also allow five times their normal VM watchdog duration while collecting coverage; VM deadline tests retain
-their original limits. Cache-dependent tests still skip without cache data, and hidden `[Slow]` tests are
-excluded. Test or collection errors fail the
-command; reports from failed test runs are marked partial. Percentages are informational.
-
-CI reuses the native coverage build with `python3 tools/coverage/script.py --preset linux-coverage --no-build`
-and uploads a separate `stdlib-coverage-linux-x64` artifact. Native and script percentages stay separate.
+See [Profiling and coverage](docs/ProfilingAndCoverage.md) for native code and stdlib script coverage instructions.
 
 ### Project layout
 

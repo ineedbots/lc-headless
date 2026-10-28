@@ -1,6 +1,6 @@
 # Revision Design
 
-Plan for connecting to servers of more than one revision. Today the client speaks only revision 289. This plan adds revision 225 and makes every part that touches the wire or the cache revision-aware, so a later revision is added the same way. Revision 225 is the base protocol: code written for 225 runs for every revision, and anything a later revision changes sits in a branch on the protocol's revision. Scripts can ask which revision they're on with `game.revision()`. The work ships in five phases (§13), plus an optional sixth for maps sent over the wire. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It changes the config ([ConfigDesign.md](ConfigDesign.md)), the cache loader ([CacheDesign.md](CacheDesign.md)) and the script API ([ScriptingApi.md](ScriptingApi.md)). The 289 wire format is in [tcp-protocol-289.md](tcp-protocol-289.md); this plan lists only where 225 differs from it.
+Plan for connecting to servers of more than one revision. Today the client speaks only revision 289. This plan adds revision 225 and makes every part that touches the wire or the cache revision-aware, so a later revision is added the same way. Revision 225 is the base protocol: code written for 225 runs for every revision, and anything a later revision changes sits in a branch on the protocol's revision. Scripts can ask which revision they're on with `game.revision()`. The work ships in five phases (§13), plus an optional sixth for maps sent over the wire. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It changes the config ([ConfigDesign.md](ConfigDesign.md)), the cache loader ([CacheDesign.md](CacheDesign.md)) and the script API ([ScriptingApi.md](../ScriptingApi.md)). The 289 wire format is in [tcp-protocol-289.md](../tcp-protocol-289.md); this plan lists only where 225 differs from it.
 
 Reference sources, beside this repository:
 
@@ -467,7 +467,7 @@ Each phase builds and passes every test on both presets before the next starts.
 
 ### Phase 5: the 225 reference
 
-`docs/tcp-protocol-225.md`: the 225 wire reference, written as differences from [tcp-protocol-289.md](tcp-protocol-289.md), with Appendix A's tables, §5's login and §6 to §9's payloads. The README's document table links it.
+`docs/tcp-protocol-225.md`: the 225 wire reference, written as differences from [tcp-protocol-289.md](../tcp-protocol-289.md), with Appendix A's tables, §5's login and §6 to §9's payloads. The README's document table links it.
 
 ### Phase 6, optional: maps over the wire
 

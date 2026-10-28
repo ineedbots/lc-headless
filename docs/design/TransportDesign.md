@@ -8,14 +8,14 @@ Plan for the client's network transport. Boost.Beast and Asio replace IXWebSocke
 
 All three phases are built.
 
-This plan replaces two documents. WebSocketDesign.md describes the IXWebSocket transport built today; it is deleted when phase 1 lands. ProxyDesign.md planned SOCKS5 as a patch to IXWebSocket and was never built; its config, message and test decisions carry over into §2 and §9, and the file is deleted with this plan. Both stay readable in git history: where this plan says "WebSocketDesign §n", it means `git show 878e4dd:docs/WebSocketDesign.md`. Code style follows [CONVENTIONS.md](CONVENTIONS.md). The transport logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)) and is configured through `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)).
+This plan replaces two documents. WebSocketDesign.md describes the IXWebSocket transport built today; it is deleted when phase 1 lands. ProxyDesign.md planned SOCKS5 as a patch to IXWebSocket and was never built; its config, message and test decisions carry over into §2 and §9, and the file is deleted with this plan. Both stay readable in git history: where this plan says "WebSocketDesign §n", it means `git show 878e4dd:docs/WebSocketDesign.md`. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). The transport logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)) and is configured through `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)).
 
 Reference sources:
 
 - Boost 1.92 (the `builtin-baseline` in `vcpkg.json`): Asio's `io_context`, `co_spawn` and `ssl::stream`, and Beast's `websocket::stream`
 - OpenSSL 3.6.5, from the same baseline
 - RFC 6455 (WebSocket), RFC 1928 (SOCKS5), RFC 1929 (SOCKS5 username and password)
-- [tcp-protocol-289.md](tcp-protocol-289.md), Endpoints and Transport, and [tcp-protocol-225.md](tcp-protocol-225.md): what the engine expects of a WebSocket client and a TCP client
+- [tcp-protocol-289.md](../tcp-protocol-289.md), Endpoints and Transport, and [tcp-protocol-225.md](../tcp-protocol-225.md): what the engine expects of a WebSocket client and a TCP client
 - curl's `lib/socks.c`: how a widely used client treats replies that bend the RFCs (§9)
 
 ---
@@ -705,7 +705,7 @@ while (true)
 
 ### What the engine expects
 
-From [tcp-protocol-289.md](tcp-protocol-289.md), Endpoints and Transport, and the same for 225 and 274:
+From [tcp-protocol-289.md](../tcp-protocol-289.md), Endpoints and Transport, and the same for 225 and 274:
 
 - The node port is 43594 by default. The client sends no upgrade and no frames, and the login and game bytes are exactly those it sends over WebSocket.
 - **Login requests must not share a read.** The server processes one negotiation request per socket data callback, so the client must send each request only after the reply to the one before. `LoginHandshake` already does: it sends the seed request, waits for the seed, then sends the login. This becomes a requirement, written in the class's comment, rather than a side effect.
@@ -1040,10 +1040,10 @@ New cases are tagged `[Socks5]`, and also `[network]` where they open sockets.
 
 Phase 1:
 
-- [README.md](../README.md): the `server` rows (transport, host, port), the dependency line (Boost.Beast and Asio, OpenSSL), the `Io/` line in the source tree, and the documents table: `TransportDesign.md` in place of `WebSocketDesign.md`.
+- [README.md](../../README.md): the `server` rows (transport, host, port), the dependency line (Boost.Beast and Asio, OpenSSL), the `Io/` line in the source tree, and the documents table: `TransportDesign.md` in place of `WebSocketDesign.md`.
 - [ConfigDesign.md](ConfigDesign.md): the opening paragraph, the layout note about `WebSocketUrl`, the `server` rows, the default serialization, the validation code, the TLS note, and the implementation-order line that names IXWebSocket.
 - [LoggerDesign.md](LoggerDesign.md): its opening line's mention of IXWebSocket's I/O thread, and the `WebSocketClient` case in its tests.
-- [CONVENTIONS.md](CONVENTIONS.md):
+- [CONVENTIONS.md](../CONVENTIONS.md):
     - §5: an abstract class may stand in front of an implementation whose header must stay out of shared headers, because a forward declaration isn't allowed. `NetLoop` and `Link` are the examples.
     - §8: coroutines are for Asio I/O sequences only, and one that outlives its caller takes a `std::shared_ptr` to what it uses as a by-value parameter, never as `this` or a lambda capture.
 - WebSocketDesign.md is deleted.

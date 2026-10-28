@@ -10,7 +10,7 @@ not listed below. Almost every opcode is different, so both opcode tables are gi
 Every layout here was read from the 225 engine's encoders and decoders and checked against its
 webclient's decoders. Entity info comes from a prebuilt `@2004scape/rsbuf` package whose source isn't
 in `225server`, so its layout rests on the webclient's `getPlayerPos*`, `getNpcPos*` and
-`ClientPlayer.setAppearance`. [RevisionDesign.md](RevisionDesign.md) is how this client supports both
+`ClientPlayer.setAppearance`. [RevisionDesign.md](design/RevisionDesign.md) is how this client supports both
 revisions.
 
 ## Contents
@@ -373,7 +373,7 @@ each saying where it goes in the file and how long the file is, then `DATA_LAND_
 `m{x}_{z}` and `l{x}_{z}` files, each a `u32` unpacked size and headerless bzip2. The login CRCs are `0`
 and the CRC32 of `title`, `config`, `interface`, `media`, `models`, `textures`, `wordenc` and `sounds`, a
 missing file skipped and the rest moved up. Some definition opcodes and interface fields differ from
-289's. [CacheDesign.md](CacheDesign.md) §18 has the details.
+289's. [CacheDesign.md](design/CacheDesign.md) §18 has the details.
 
 ## Source Map
 

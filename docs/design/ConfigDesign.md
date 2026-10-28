@@ -1,6 +1,6 @@
 # Config Design
 
-Design and test plan for `ConfigFile`, which loads the client's settings from a JSON file with comments, and points to the committed `client.jsonc.sample` when there is none. It replaces the reference client's INI config. The settings structs are converted in both directions with nlohmann/json's `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, so a missing key takes its default, and a validation pass checks the rules their types don't carry. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8, parses RSA keys with `BigUInt` ([PacketDesign.md](PacketDesign.md) §5), and logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)).
+Design and test plan for `ConfigFile`, which loads the client's settings from a JSON file with comments, and points to the committed `client.jsonc.sample` when there is none. It replaces the reference client's INI config. The settings structs are converted in both directions with nlohmann/json's `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`, so a missing key takes its default, and a validation pass checks the rules their types don't carry. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8, parses RSA keys with `BigUInt` ([PacketDesign.md](PacketDesign.md) §5), and logs through `Logger` ([LoggerDesign.md](LoggerDesign.md)).
 
 > The `server` section changed after this plan was built: `transport`, `host` and `port` replaced `url`, and IXWebSocket went with it ([TransportDesign.md](TransportDesign.md) §2). §3 and §4 describe the keys as they are now. The differences in §5 and the test plan in §6 keep the `url` they were written with; the tests in `tests/Config/` hold the current cases.
 
@@ -837,7 +837,7 @@ The tests work in a fresh folder under `std::filesystem::temp_directory_path()`,
 
 ## 7. Implementation order
 
-This comes after `BigUInt` ([PacketDesign.md](PacketDesign.md) §8 step 3) and the IXWebSocket dependency ([WebSocketDesign.md](WebSocketDesign.md) §7 step 1).
+This comes after `BigUInt` ([PacketDesign.md](PacketDesign.md) §8 step 3) and the IXWebSocket dependency ([WebSocketDesign.md](../WebSocketDesign.md) §7 step 1).
 
 1. **Dependencies:**
     - Add `nlohmann-json` to `vcpkg.json` and `find_package` it.

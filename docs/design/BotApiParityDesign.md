@@ -7,7 +7,7 @@ Plan for porting the rest of rs2b0t. [BotApiDesign.md](BotApiDesign.md)'s nine p
 - the clue and quest engines;
 - every bundled bot.
 
-It keeps BotApiDesign's shape (§1–3 there): rs2b0t's names in snake_case, `yield from` where rs2b0t awaits, and a Python standard library over the C++ core. It replaces that document's "Not ported" row for the quest and clue engines and the market. Phases continue its numbering, from 10. Code style follows [CONVENTIONS.md](CONVENTIONS.md).
+It keeps BotApiDesign's shape (§1–3 there): rs2b0t's names in snake_case, `yield from` where rs2b0t awaits, and a Python standard library over the C++ core. It replaces that document's "Not ported" row for the quest and clue engines and the market. Phases continue its numbering, from 10. Code style follows [CONVENTIONS.md](../CONVENTIONS.md).
 
 The gap below was measured against rs2b0t at `46a83506` (2026-10-20). rs2b0t keeps moving, so each phase starts by measuring again at its tip (§4, the coverage tool).
 

@@ -28,7 +28,7 @@ struct AccountOptions_s
 };
 
 // Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is
-// in docs/ScriptingDesign.md §8.
+// in docs/design/ScriptingDesign.md §8.
 class Account
 {
 public:

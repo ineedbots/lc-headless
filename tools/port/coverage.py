@@ -1,6 +1,6 @@
 """Lists what of rs2b0t (MIT, see thirdparty/rs2b0t) the standard library doesn't have yet, by the snake_case
 names of rs2b0t's exports. A name counts as ported when it appears in the stdlib or the stubs; NOT_PORTED
-lists what's left out on purpose (docs/BotApiParityDesign.md §1). Run with CPython:
+lists what's left out on purpose (docs/design/BotApiParityDesign.md §1). Run with CPython:
 
     python -I tools/port/coverage.py ../rs2b0t                  # the public API, index.d.ts
     python -I tools/port/coverage.py ../rs2b0t api/thieving     # each module under src/bot/api/thieving

@@ -1,5 +1,5 @@
 // Translates rs2b0t's TypeScript (MIT, see thirdparty/rs2b0t) into a first draft of the stdlib's Python, for a
-// person to finish (docs/BotApiParityDesign.md §2). It uses rs2b0t's own TypeScript compiler and type
+// person to finish (docs/design/BotApiParityDesign.md §2). It uses rs2b0t's own TypeScript compiler and type
 // checker, so it knows which calls wait: an await becomes yield from where the callee returns a Promise and
 // this client's function waits too, which the stubs say (-> Wait[...]). What it can't translate it marks with
 // "# ts2py:" for the person to fix. Run with Bun from the repository:

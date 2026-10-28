@@ -11,7 +11,7 @@ almost every opcode is different, so both opcode tables are given whole.
 Every layout here was read from the 274 engine's encoders and decoders and checked against its
 webclient. The two engines' `network/` folders differ only in the opcode tables, the two inventory
 encoders, and two handlers' server-side checks; their `rsbuf/` entity-info encoders are byte-identical.
-[Revision274Design.md](Revision274Design.md) is how this client supports 274.
+[Revision274Design.md](design/Revision274Design.md) is how this client supports 274.
 
 ## Contents
 
@@ -231,7 +231,7 @@ value range differs:
 274's cache is 289's store: `main_file_cache.dat` and `.idx0` to `.idx4` in the engine's `data/pack`,
 with the login CRCs of files 0 to 8 of store 0, `map_index` in `versionlist`, and 289's interface format.
 Its definitions lack four opcodes 289 has: loc `77` (multiloc), obj `115` (team), and varp `12` and
-`13`. [CacheDesign.md](CacheDesign.md) §19 has the details.
+`13`. [CacheDesign.md](design/CacheDesign.md) §19 has the details.
 
 ## Source Map
 

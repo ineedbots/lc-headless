@@ -4,7 +4,7 @@ refuses to load. Run with CPython over files or folders:
     python -I tools/port/lint.py src/Script/Stdlib scripts
 
 It exits with 1 when it finds something. Each rule comes from a probe of pocketpy 2.2 (see
-docs/BotApiParityDesign.md §4, "As built").
+docs/design/BotApiParityDesign.md §4, "As built").
 """
 
 import ast
