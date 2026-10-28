@@ -10,7 +10,9 @@
 #include "Game/Nav/WorldPathFinder.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <nlohmann/json.hpp>
 
 using Catch::Matchers::ContainsSubstring;
 
@@ -222,6 +224,168 @@ TEST_CASE("WorldPathFinder ends beside a goal that can't be stood on, and report
 
     const auto start = fixture.Find({.x = 100, .z = 100, .level = 0}, At(1, 1));
     CHECK_THAT(start.reason, ContainsSubstring("not walkable"));
+}
+
+TEST_CASE("WorldPathFinder applies jewellery inventory and catalog requirements", "[WorldPathFinder][WorldPathCoverage]")
+{
+    const auto cache = MakeCache();
+    const auto navigation = Navigation{cache, "[]", R"json([
+        {"teleportId":"ring", "family":"jewellery", "to":{"x":3260,"z":3201,"level":0},
+         "cost":8, "itemNameMatch":["Ring of dueling", "Games necklace"]}
+    ])json"};
+    const auto [catalog, hasState, name, count, permitted] = GENERATE(
+        std::tuple{std::optional<bool>{true}, true, "ring of dueling(8)", 1, true},
+        std::tuple{std::optional<bool>{true}, true, "games necklace(1)", 1, true},
+        std::tuple{std::optional<bool>{true}, true, "ring of dueling(8)", 0, false},
+        std::tuple{std::optional<bool>{true}, true, "gold ring", 1, false},
+        std::tuple{std::optional<bool>{true}, false, "ring of dueling(8)", 1, false},
+        std::tuple{std::optional<bool>{}, true, "ring of dueling(8)", 1, false},
+        std::tuple{std::optional<bool>{false}, true, "ring of dueling(8)", 1, false});
+    auto options = NavFindOptions_s{};
+    options.useTeleportCatalog = catalog;
+    if (hasState)
+    {
+        options.state.emplace().items[name] = count;
+    }
+    const auto path = WorldPathFinder::FindPath(navigation, At(1, 1), At(60, 1), options);
+    REQUIRE(path.ok);
+    CHECK(path.cost == (permitted ? 8 : 59));
+    REQUIRE(path.waypoints.size() >= 2);
+    CHECK((path.waypoints[1].teleport != nullptr) == permitted);
+    CHECK(path.waypoints.back().point == At(60, 1));
+}
+
+TEST_CASE("WorldPathFinder filters teleport IDs and minimum journey distance", "[WorldPathFinder][WorldPathCoverage]")
+{
+    const auto fixture = Fixture{};
+    auto options = NavFindOptions_s{.state = MakeState(1, 1)};
+    options.policy.useTeleports = true;
+    const auto [allowed, minimum, usesTeleport] = GENERATE(
+        std::tuple{"far", 59, true}, std::tuple{"far", 60, false}, std::tuple{"other", 0, false});
+    options.policy.allowTeleportIds = {allowed};
+    options.policy.distanceBeforeTeleport = minimum;
+    const auto path = fixture.Find(At(1, 1), At(60, 1), options);
+    REQUIRE(path.ok);
+    CHECK((path.cost < 20) == usesTeleport);
+    CHECK(path.waypoints.back().point == At(60, 1));
+}
+
+TEST_CASE("WorldPathFinder rejects teleport landings without a floor", "[WorldPathFinder][WorldPathCoverage]")
+{
+    const auto cache = MakeCache();
+    const auto navigation = Navigation{cache, "[]", R"json([
+        {"teleportId":"missing", "to":{"x":3300,"z":3201,"level":0}, "cost":1}
+    ])json"};
+    const auto path = WorldPathFinder::FindPath(navigation, At(1, 1), At(60, 1), {});
+    REQUIRE(path.ok);
+    CHECK(path.cost == 59);
+    CHECK(std::ranges::none_of(path.waypoints, [](const NavWaypoint_s& point) { return point.teleport != nullptr; }));
+}
+
+TEST_CASE("WorldPathFinder respects inclusive wilderness teleport limits", "[WorldPathFinder][WorldPathCoverage]")
+{
+    auto cache = GameCache_s{};
+    cache.squares.try_emplace(MapSquare::GetId(50, 55), u8{50}, u8{55}, MapSquare::BlockedTiles{}, std::vector<MapLoc_s>{});
+    const auto navigation = Navigation{cache, "[]", R"json([
+        {"teleportId":"wild", "to":{"x":3260,"z":3521,"level":0}, "cost":1,
+         "origin":{"maxWildernessLevel":1}}
+    ])json"};
+    const auto [startZ, permitted] = GENERATE(std::pair{3527, true}, std::pair{3528, false});
+    const auto path = WorldPathFinder::FindPath(navigation, {.x = 3201, .z = startZ}, {.x = 3260, .z = 3521}, {});
+    REQUIRE(path.ok);
+    CHECK(path.cost == (permitted ? 1 : 59));
+    CHECK((path.waypoints[1].teleport != nullptr) == permitted);
+}
+
+TEST_CASE("WorldPathFinder reports wilderness bands at map and level boundaries", "[WorldPathFinder][WorldPathCoverage]")
+{
+    const auto [x, z, level, expected] = GENERATE(
+        std::tuple{2943, 3520, 0, 0}, std::tuple{2944, 3520, 0, 1},
+        std::tuple{3391, 3527, 3, 1}, std::tuple{3392, 3520, 0, 0},
+        std::tuple{3200, 3519, 0, 0}, std::tuple{3200, 3528, 0, 2},
+        std::tuple{3200, 6399, 0, 360}, std::tuple{3200, 6400, 0, 0},
+        std::tuple{3200, 3520, -1, 0}, std::tuple{3200, 3520, 4, 0},
+        std::tuple{3200, 9919, 0, 0}, std::tuple{3200, 9920, 0, 1},
+        std::tuple{3200, 9928, 0, 2}, std::tuple{3200, 9920, 1, 0},
+        std::tuple{3200, 12799, 0, 360}, std::tuple{3200, 12800, 0, 0});
+    CAPTURE(x, z, level);
+    CHECK(WorldPathFinder::GetWildernessLevel({.x = x, .z = z, .level = level}) == expected);
+}
+
+TEST_CASE("WorldPathFinder honors ship and shortcut policies on cross-level hops", "[WorldPathFinder][WorldPathCoverage]")
+{
+    const auto kind = GENERATE("ship", "gangplank", "shortcut");
+    const auto cache = MakeCache();
+    auto edges = nlohmann::json::parse(EDGES);
+    edges[0]["kind"] = kind;
+    edges[0].erase("requires");
+    const auto navigation = Navigation{cache, edges.dump(), "[]"};
+    auto options = NavFindOptions_s{};
+    const auto allowed = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 11, 1), options);
+    REQUIRE(allowed.ok);
+    CHECK(allowed.cost == 6);
+    REQUIRE(allowed.waypoints.back().edge != nullptr);
+    CHECK(allowed.waypoints.back().edge->kind == kind);
+    options.policy.useShips = false;
+    options.policy.useShortcuts = false;
+    const auto refused = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 11, 1), options);
+    CHECK_FALSE(refused.ok);
+    CHECK(refused.reason == "unreachable");
+}
+
+TEST_CASE("WorldPathFinder snaps blocked starts and preserves isolated walkable starts", "[WorldPathFinder][WorldPathCoverage]")
+{
+    SECTION("a blocked start snaps to a nearby tile with an exit")
+    {
+        const auto cache = MakeCache();
+        const auto navigation = Navigation{cache, "[]", "[]"};
+        const auto path = WorldPathFinder::FindPath(navigation, At(BOOTH, BOOTH), At(45, 40), {});
+        REQUIRE(path.ok);
+        const auto start = path.waypoints.front().point;
+        CHECK(start != At(BOOTH, BOOTH));
+        CHECK(navigation.GetMap().IsWalkable(start.x, start.z, start.level));
+        CHECK(std::max(std::abs(start.x - (BASE + BOOTH)), std::abs(start.z - (BASE + BOOTH))) == 1);
+        CHECK(path.waypoints.back().point == At(45, 40));
+    }
+    SECTION("an isolated tile remains a valid zero-length route")
+    {
+        auto cache = GameCache_s{};
+        auto blocked = MapSquare::BlockedTiles{};
+        blocked.set();
+        blocked.reset(MapSquare::GetBit(0, 10, 10));
+        blocked.reset(MapSquare::GetBit(0, 50, 50));
+        cache.squares.try_emplace(MapSquare::GetId(SQUARE, SQUARE), u8{SQUARE}, u8{SQUARE}, blocked, std::vector<MapLoc_s>{});
+        const auto navigation = Navigation{cache, "[]", "[]"};
+        const auto here = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 10), {});
+        REQUIRE(here.ok);
+        CHECK(here.cost == 0);
+        REQUIRE(here.waypoints.size() == 1);
+        CHECK(here.waypoints.front().point == At(10, 10));
+        const auto unreachable = WorldPathFinder::FindPath(navigation, At(10, 10), At(50, 50), {});
+        CHECK_FALSE(unreachable.ok);
+        CHECK(unreachable.reason == "unreachable");
+    }
+}
+
+TEST_CASE("WorldPathFinder falls back to nearby floor around a large blocked goal", "[WorldPathFinder][WorldPathCoverage]")
+{
+    auto cache = GameCache_s{};
+    auto blocked = MapSquare::BlockedTiles{};
+    for (auto x = 37; x <= 43; ++x)
+    {
+        for (auto z = 37; z <= 43; ++z)
+        {
+            blocked.set(MapSquare::GetBit(0, x, z));
+        }
+    }
+    cache.squares.try_emplace(MapSquare::GetId(SQUARE, SQUARE), u8{SQUARE}, u8{SQUARE}, blocked, std::vector<MapLoc_s>{});
+    const auto navigation = Navigation{cache, "[]", "[]"};
+    const auto path = WorldPathFinder::FindPath(navigation, At(20, 40), At(40, 40), {});
+    REQUIRE(path.ok);
+    CHECK(path.cost == 15);
+    const auto end = path.waypoints.back().point;
+    CHECK(navigation.GetMap().IsWalkable(end.x, end.z, end.level));
+    CHECK(std::max(std::abs(end.x - (BASE + 40)), std::abs(end.z - (BASE + 40))) == 5);
 }
 
 TEST_CASE("NavJson reads route requests and writes routes", "[WorldPathFinder]")
