@@ -1,4 +1,4 @@
-"""Bank transfers over delayed server snapshots, using the real bank implementation."""
+"""Bank transfers and opening over delayed server updates, using the real bank implementation."""
 
 import rs2004.bank as vault
 from rs2004 import execution
@@ -475,3 +475,365 @@ def test_close_waits_for_acknowledgement_and_times_out_if_ignored():
         assert not world.run(world.bank.close(1000))
         assert world.open
         assert world.now == 1000
+
+
+class AccessTarget:
+    def __init__(self, world, name='Bank booth', ops=None, distance=3, response='open'):
+        self.world = world
+        self.name = name
+        self.ops = ['Use-quickly'] if ops is None else ops
+        self.dist = distance
+        self.response = response
+        self.refusals = 0
+        self.position = Tile(3093, 3243)
+
+    def actions(self):
+        return self.ops
+
+    def distance(self):
+        return self.dist
+
+    def tile(self):
+        return self.position
+
+    def interact(self, op):
+        assert op in self.ops
+        self.world.interactions.append((self.name, op))
+        if self.refusals > 0:
+            self.refusals -= 1
+            return False
+        self.world.scene_pending = self.response
+        return True
+
+
+class AccessQuery:
+    def __init__(self, items):
+        self.items = list(items)
+
+    def name(self, name):
+        return self.where(lambda item: item.name.lower() == name.lower())
+
+    def action(self, op):
+        return self.where(lambda item: op.lower() in [a.lower() for a in item.actions()])
+
+    def where(self, predicate):
+        self.items = [i for i in self.items if predicate(i)]
+        return self
+
+    def nearest(self):
+        self.items.sort(key=lambda item: item.distance())
+        return self.items[0] if self.items else None
+
+
+class AccessEntities:
+    def __init__(self, world, field):
+        self.world = world
+        self.field = field
+
+    def query(self):
+        return AccessQuery(getattr(self.world, self.field))
+
+
+class AccessDialogue:
+    def __init__(self, world):
+        self.world = world
+        self.open = False
+        self.choices = []
+        self.continued = 0
+        self.chosen = []
+        self.continue_opens = True
+        self.choose_opens = True
+
+    def is_open(self):
+        return self.open
+
+    def can_continue(self):
+        return self.open and not self.choices
+
+    def options(self):
+        return self.choices
+
+    def continue_(self):
+        assert self.can_continue()
+        self.continued += 1
+        self.open = False
+        self.world.scene_pending = 'open' if self.continue_opens else None
+        yield execution.Ticks(1)
+
+    def choose_option(self, choice):
+        assert any([choice.lower() in option.lower() for option in self.choices])
+        self.chosen.append(choice)
+        self.open = False
+        self.choices = []
+        self.world.scene_pending = 'open' if self.choose_opens else None
+        yield execution.Ticks(1)
+
+
+class OpeningWorld(BankWorld):
+    def __init__(self):
+        super().__init__()
+        self.open = False
+        self.objects = []
+        self.people = []
+        self.interactions = []
+        self.walks = []
+        self.scene_pending = None
+        self.revealed = None
+        self.dialogue = AccessDialogue(self)
+
+    def __enter__(self):
+        super().__enter__()
+        self.access_saved = (vault.locs, vault.npcs, vault.chat_dialog, vault.direct_navigator, vault.bank)
+        vault.locs = AccessEntities(self, 'objects')
+        vault.npcs = AccessEntities(self, 'people')
+        vault.chat_dialog = self.dialogue
+        vault.direct_navigator = self
+        vault.bank = self.bank
+        return self
+
+    def __exit__(self, *args):
+        vault.locs, vault.npcs, vault.chat_dialog, vault.direct_navigator, vault.bank = self.access_saved
+        super().__exit__(*args)
+
+    def walk_to(self, tile, radius, timeout):
+        self.walks.append((tile, radius, timeout))
+        yield execution.Ticks(1)
+        for target in self.objects:
+            target.dist = 1
+        return True
+
+    def advance(self):
+        super().advance()
+        response = self.scene_pending
+        self.scene_pending = None
+        if response == 'open':
+            self.open = True
+        elif response == 'dialogue':
+            self.dialogue.open = True
+        elif response == 'reveal':
+            self.objects = [self.revealed]
+
+
+def test_open_nearest_selects_an_actionable_booth_and_waits_for_open():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, ops=[], distance=0), AccessTarget(world, distance=4, response=None), AccessTarget(world, distance=2)]
+        assert world.run(world.bank.open_nearest())
+        assert world.interactions == [('Bank booth', 'Use-quickly')]
+        assert len(world.waits) == 1
+        assert world.walks == []
+
+
+def test_opening_an_already_open_bank_does_not_interact_or_walk():
+    with OpeningWorld() as world:
+        world.open = True
+        assert world.run(world.bank.open_booth(Tile(3093, 3243)))
+        assert world.run(world.bank.open_nearest())
+        assert world.run(world.bank.open_nearest_access({'name': 'Bank chest', 'op': 'Use'}))
+        assert world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Bank'}))
+        assert world.interactions == []
+        assert world.walks == []
+        assert world.waits == []
+
+
+def test_open_booth_waits_for_a_missing_booth_to_appear():
+    with OpeningWorld() as world:
+        world.events = [('objects', [AccessTarget(world)])]
+        assert world.run(world.bank.open_booth(Tile(3093, 3243)))
+        assert isinstance(world.waits[0], execution.Ticks)
+        assert world.waits[0].count == 2
+        assert len(world.interactions) == 1
+
+
+def test_missing_booth_has_bounded_retries_and_nearest_fails_immediately():
+    with OpeningWorld() as world:
+        assert not world.run(world.bank.open_nearest())
+        assert world.waits == []
+        assert not world.run(world.bank.open_booth(Tile(3093, 3243)))
+        assert len(world.waits) == 4
+        assert world.interactions == []
+
+
+def test_refused_booth_interaction_walks_to_the_stand_before_retrying():
+    with OpeningWorld() as world:
+        booth = AccessTarget(world)
+        booth.refusals = 1
+        world.objects = [booth]
+        stand = Tile(3092, 3243)
+        assert world.run(world.bank.open_booth(stand))
+        assert len(world.interactions) == 2
+        assert world.walks == [(stand, 1, vault.STAND_TIMEOUT_MS)]
+
+
+def test_nearest_booth_steps_beside_a_distant_target_after_refusal():
+    with OpeningWorld() as world:
+        booth = AccessTarget(world)
+        booth.refusals = 1
+        world.objects = [booth]
+        assert world.run(world.bank.open_nearest())
+        assert world.walks == [(booth.tile(), 1, vault.STAND_TIMEOUT_MS)]
+        assert len(world.interactions) == 2
+
+
+def test_adjacent_refusals_exhaust_attempts_without_walking():
+    with OpeningWorld() as world:
+        booth = AccessTarget(world, distance=1)
+        booth.refusals = 100
+        world.objects = [booth]
+        assert not world.run(world.bank.open_nearest())
+        assert len(world.interactions) == vault.OPEN_ATTEMPTS
+        assert world.walks == []
+        assert world.waits == []
+
+
+def test_silent_booth_times_out_each_attempt_instead_of_reporting_open():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, distance=1, response=None)]
+        assert not world.run(world.bank.open_nearest())
+        assert len(world.interactions) == vault.OPEN_ATTEMPTS
+        assert world.now == vault.OPEN_ATTEMPTS * vault.OPEN_TIMEOUT_MS
+        assert not world.open
+
+
+def test_booth_continues_a_greeting_before_the_bank_opens():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, response='dialogue')]
+        assert world.run(world.bank.open_nearest())
+        assert world.dialogue.continued == 1
+        assert world.open
+
+
+def test_greeting_without_a_following_bank_does_not_report_success():
+    with OpeningWorld() as world:
+        world.dialogue.continue_opens = False
+        target = AccessTarget(world, response='dialogue')
+        assert not world.run(world.bank._open_with(target, 'Use-quickly'))
+        assert world.dialogue.continued == 1
+        assert world.now >= vault.ADJACENT_OPEN_TIMEOUT_MS
+
+
+def test_booth_action_selection_uses_available_use_or_bank_options():
+    for ops in [['Examine', 'Use'], ['Examine', 'Bank'], ['Open'], ['Use', 'Use-quickly']]:
+        with OpeningWorld() as world:
+            world.objects = [AccessTarget(world, ops=ops)]
+            assert world.run(world.bank.open_nearest())
+            assert world.interactions == [('Bank booth', ops[-1])]
+
+
+def test_closed_chest_is_opened_before_using_the_revealed_chest():
+    for spelling in ['openFirst', 'open_first']:
+        with OpeningWorld() as world:
+            world.objects = [AccessTarget(world, 'Closed chest', ['Open'], response='reveal')]
+            world.revealed = AccessTarget(world, 'Bank chest', ['Use'])
+            access = {'name': 'Bank chest', 'op': 'Use', spelling: {'name': 'Closed chest', 'op': 'Open'}}
+            assert world.run(vault.open_bank_access({'access': access}, {}))
+            assert world.interactions == [('Closed chest', 'Open'), ('Bank chest', 'Use')]
+
+
+def test_already_usable_chest_skips_the_open_first_action():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, 'Bank chest', ['Use'])]
+        access = {'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': 'Closed chest', 'op': 'Open'}}
+        assert world.run(world.bank.open_nearest_access(access))
+        assert world.interactions == [('Bank chest', 'Use')]
+
+
+def test_missing_or_refused_closed_chest_does_not_use_another_object():
+    for missing in [True, False]:
+        with OpeningWorld() as world:
+            closed = AccessTarget(world, 'Closed chest', ['Open'])
+            closed.refusals = 1
+            world.objects = [] if missing else [closed]
+            access = {'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': 'Closed chest', 'op': 'Open'}}
+            assert not world.run(world.bank.open_nearest_access(access))
+            assert world.waits == []
+            assert not world.open
+
+
+def test_opening_a_chest_can_open_the_bank_directly():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, 'Closed chest', ['Open'])]
+        access = {'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': 'Closed chest', 'op': 'Open'}}
+        assert world.run(world.bank.open_nearest_access(access))
+        assert world.interactions == [('Closed chest', 'Open')]
+
+
+def test_chest_that_never_opens_times_out_without_bank_success():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, 'Closed chest', ['Open'], response=None)]
+        access = {'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': 'Closed chest', 'op': 'Open'}}
+        assert not world.run(world.bank.open_nearest_access(access))
+        assert world.now == vault.OPEN_TIMEOUT_MS
+        assert world.interactions == [('Closed chest', 'Open')]
+
+
+def test_banker_access_uses_the_requested_npc_action():
+    with OpeningWorld() as world:
+        world.people = [AccessTarget(world, 'Banker', ['Talk-to'], distance=0), AccessTarget(world, 'Banker', ['Bank'])]
+        assert world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Bank'}))
+        assert world.interactions == [('Banker', 'Bank')]
+        assert world.dialogue.continued == 0
+
+
+def test_banker_access_continues_dialogue_and_matches_the_bank_choice():
+    for spelling in ['npcAccess', 'npc_access']:
+        with OpeningWorld() as world:
+            world.people = [AccessTarget(world, 'Banker', ['Talk-to'], response='dialogue')]
+            world.dialogue.choices = ['Show me my BANK account, please.', 'Goodbye.']
+            destination = {spelling: {'name': 'Banker', 'op': 'Talk-to', 'choose': 'bank account'}}
+            assert world.run(vault.open_bank_access(destination, {}))
+            assert world.dialogue.chosen == ['bank account']
+            assert world.interactions == [('Banker', 'Talk-to')]
+    with OpeningWorld() as world:
+        world.people = [AccessTarget(world, 'Banker', ['Talk-to'], response='dialogue')]
+        assert world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Talk-to'}))
+        assert world.dialogue.continued == 1
+
+
+def test_existing_banker_dialogue_does_not_interact_with_the_npc_again():
+    with OpeningWorld() as world:
+        world.dialogue.open = True
+        world.dialogue.choices = ['Bank, please.', 'Leave.']
+        assert world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Talk-to', 'choose': 'Bank'}))
+        assert world.interactions == []
+        assert world.dialogue.chosen == ['Bank']
+
+
+def test_missing_and_unresponsive_bankers_have_bounded_retries():
+    with OpeningWorld() as world:
+        assert not world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Bank'}))
+        assert len(world.waits) == 3
+        assert world.interactions == []
+    with OpeningWorld() as world:
+        world.people = [AccessTarget(world, 'Banker', ['Bank'], response=None)]
+        assert not world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Bank'}))
+        assert len(world.interactions) == 3
+        assert world.now == 3 * (6000 + 3000)
+
+
+def test_unrelated_banker_options_are_never_selected():
+    with OpeningWorld() as world:
+        world.people = [AccessTarget(world, 'Banker', ['Talk-to'], response='dialogue')]
+        world.dialogue.choices = ['Tell me about yourself.', 'Goodbye.']
+        assert not world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Talk-to', 'choose': 'bank'}))
+        assert world.dialogue.chosen == []
+        assert world.dialogue.continued == 0
+        assert len(world.interactions) == 1
+
+
+def test_accepted_banker_choice_without_an_open_bank_still_fails():
+    with OpeningWorld() as world:
+        world.people = [AccessTarget(world, 'Banker', ['Talk-to'], response='dialogue')]
+        world.dialogue.choices = ['Bank, please.']
+        world.dialogue.choose_opens = False
+        world.dialogue.continue_opens = False
+        assert not world.run(world.bank.open_npc_access({'name': 'Banker', 'op': 'Talk-to', 'choose': 'Bank'}))
+        assert world.dialogue.chosen == ['Bank']
+        assert len(world.interactions) == 3
+        assert not world.open
+
+
+def test_bank_access_without_destination_uses_the_fallback_object():
+    with OpeningWorld() as world:
+        world.objects = [AccessTarget(world, 'Bank chest', ['Use'])]
+        assert world.run(vault.open_bank_access(None, {'name': 'Bank chest', 'op': 'Use'}))
+        assert world.interactions == [('Bank chest', 'Use')]
