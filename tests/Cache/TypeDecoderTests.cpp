@@ -371,6 +371,61 @@ TEST_CASE("TypeDecoder makes banknotes from their linked objs", "[TypeDecoder]")
     CHECK_THROWS_WITH(DecodeObjs({note(5)}, text), ContainsSubstring("obj 0: its certlink 5 isn't an obj"));
 }
 
+TEST_CASE("Every type decoder rejects incomplete framing before reading definitions", "[TypeDecoder][FramingCoverage]")
+{
+    const auto kind = GENERATE("loc"sv, "npc"sv, "obj"sv, "varp"sv);
+    CAPTURE(kind);
+    const auto decode = [kind](const TypeFiles_s& files)
+    {
+        auto text = TextPool{};
+        if (kind == "loc") return LocTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        if (kind == "npc") return NpcTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        if (kind == "obj") return ObjTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        return VarpTypeDecoder::Decode(files.dat, files.idx, Revision_e::Rev289).size();
+    };
+    const auto complete = CacheWriter::MakeTypeFiles({std::vector<u8>{0}});
+    auto files = complete;
+    auto expected = std::string{};
+    SECTION("a zero-byte data header")
+    {
+        files.dat.clear();
+        expected = std::format("{0}.dat or {0}.idx is too short for its count", kind);
+    }
+    SECTION("a one-byte data header")
+    {
+        files.dat.resize(1);
+        expected = std::format("{0}.dat or {0}.idx is too short for its count", kind);
+    }
+    SECTION("a zero-byte index header")
+    {
+        files.idx.clear();
+        expected = std::format("{0}.dat or {0}.idx is too short for its count", kind);
+    }
+    SECTION("a one-byte index header")
+    {
+        files.idx.resize(1);
+        expected = std::format("{0}.dat or {0}.idx is too short for its count", kind);
+    }
+    SECTION("a missing size entry")
+    {
+        files.idx.resize(2);
+        expected = std::format("{}.idx is 2 bytes, too short for 1 sizes", kind);
+    }
+    SECTION("a partial size entry")
+    {
+        files.idx.resize(3);
+        expected = std::format("{}.idx is 3 bytes, too short for 1 sizes", kind);
+    }
+    SECTION("a definition larger than the data file")
+    {
+        files.idx.back() = 2;
+        expected = std::format("{0} 0: runs past the end of {0}.dat", kind);
+    }
+    CHECK_THROWS_AS(decode(files), CacheError);
+    CHECK_THROWS_WITH(decode(files), expected);
+    CHECK(decode(complete) == 1);
+}
+
 TEST_CASE("TypeDecoder rejects definitions that don't decode to their size", "[TypeDecoder]")
 {
     SECTION("an unknown opcode")

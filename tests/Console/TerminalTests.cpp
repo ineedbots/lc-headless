@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "Application/InterruptSignal.hpp"
 #include "Console/Terminal.hpp"
 #include "Console/ConsoleInput.hpp"
 
@@ -163,21 +164,37 @@ TEST_CASE("Terminal reports the end of a closed pseudo-terminal", "[Terminal][Te
     CHECK_FALSE(result.has_value());
 }
 
-TEST_CASE("ConsoleInput edits terminal lines and releases its reader after closing", "[ConsoleInput][TerminalCoverage]")
+TEST_CASE("ConsoleInput edits terminal lines, forwards interrupt keys and releases its reader after closing", "[ConsoleInput][TerminalCoverage][FramingCoverage]")
 {
     const auto term = EnvironmentValue{"TERM", "xterm"};
+    const auto previous = std::signal(SIGINT, SIG_IGN);
+    struct RestoreSignal
+    {
+        decltype(previous) handler;
+        ~RestoreSignal() { std::signal(SIGINT, handler); }
+    } restoreSignal{previous};
+    const auto before = InterruptSignal::GetCount();
+    InterruptSignal::Install();
     auto interactive = false;
     auto released = false;
     auto lines = std::vector<std::string>{};
     auto original = termios{};
     auto restored = termios{};
     auto settingsRead = false;
+    auto keySignalsDisabled = false;
     {
         auto terminal = PseudoTerminal{};
         settingsRead = tcgetattr(STDIN_FILENO, &original) == 0;
         auto input = ConsoleInput::ReadStdin();
         interactive = input->IsInteractive();
-        const auto keys = std::string{"status\rhelx\x7fp\r"};
+        // Some terminals pass Ctrl+C through as a byte instead of generating a signal themselves.
+        auto raw = termios{};
+        if (tcgetattr(STDIN_FILENO, &raw) == 0)
+        {
+            raw.c_lflag &= ~static_cast<tcflag_t>(ISIG);
+            keySignalsDisabled = tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0;
+        }
+        const auto keys = std::string{"\x03status\rhelx\x7fp\r"};
         const auto written = write(terminal.master, keys.data(), keys.size());
         if (written == static_cast<ssize_t>(keys.size()))
         {
@@ -210,6 +227,8 @@ TEST_CASE("ConsoleInput edits terminal lines and releases its reader after closi
         released = weak.expired();
     }
     CHECK(interactive);
+    CHECK(keySignalsDisabled);
+    CHECK(InterruptSignal::GetCount() == before + 1);
     CHECK(lines == std::vector<std::string>{"status", "help"});
     CHECK(released);
     REQUIRE(settingsRead);

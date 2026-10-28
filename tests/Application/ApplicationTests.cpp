@@ -122,6 +122,23 @@ TEST_CASE("Application supplies a piped console and writes a log file", "[Applic
     CHECK_THAT(*log, ContainsSubstring("application loop"));
 }
 
+TEST_CASE("Application accepts a UTF-8 BOM and CRLF commands from piped input", "[Application][FramingCoverage]")
+{
+    auto fixture = ApplicationFixture{};
+    const auto result = fixture.Run({}, "\xEF\xBB\xBFhelp\r\nhelp\r\n");
+    INFO(result.output);
+    CHECK(result.exitCode == EXIT_SUCCESS);
+    CHECK_THAT(result.output, ContainsSubstring("for the console commands"));
+    CHECK_THAT(result.output, ContainsSubstring("application loop"));
+    CHECK(result.output.find("Unknown command") == std::string::npos);
+    const auto first = result.output.find("Console commands:");
+    REQUIRE(first != std::string::npos);
+    const auto second = result.output.find("Console commands:", first + 1);
+    REQUIRE(second != std::string::npos);
+    CHECK(result.output.find("Console commands:", second + 1) == std::string::npos);
+    CHECK(fixture.server.GetErrors().empty());
+}
+
 TEST_CASE("Application returns failure for a script error", "[Application][ApplicationCoverage]")
 {
     auto fixture = ApplicationFixture{};

@@ -113,6 +113,49 @@ namespace
     }
 }
 
+TEST_CASE("WorldPathFinder applies teleport policy to graph edges without a teleport catalog", "[WorldPathFinder][FramingCoverage]")
+{
+    const auto cache = MakeCache();
+    const auto navigation = Navigation{cache, R"json([
+        {"kind":"teleport", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3210,"z":3211,"level":1}, "cost":1}
+    ])json", "[]"};
+    auto options = NavFindOptions_s{.maxExpansions = 5000, .useTeleportCatalog = false};
+    const auto allowed = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options);
+    REQUIRE(allowed.ok);
+    REQUIRE(allowed.waypoints.size() >= 2);
+    REQUIRE(allowed.waypoints[1].edge != nullptr);
+    CHECK(allowed.waypoints[1].edge->kind == "teleport");
+    CHECK(allowed.cost == 10);
+
+    options.policy.useTeleports = false;
+    const auto denied = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options);
+    CHECK_FALSE(denied.ok);
+    CHECK(denied.reason == "unreachable");
+    CHECK(denied.waypoints.empty());
+}
+
+TEST_CASE("WorldPathFinder refuses a hop landing in an avoided zone and uses another stair", "[WorldPathFinder][FramingCoverage]")
+{
+    const auto cache = MakeCache();
+    const auto navigation = Navigation{cache, R"json([
+        {"kind":"stair", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3210,"z":3211,"level":1}, "cost":1},
+        {"kind":"stair", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3220,"z":3211,"level":1}, "cost":20}
+    ])json", "[]"};
+    auto options = NavFindOptions_s{};
+    const auto normal = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options);
+    REQUIRE(normal.ok);
+    REQUIRE(normal.waypoints.size() >= 2);
+    CHECK(normal.waypoints[1].point == At(10, 11, 1));
+    options.avoidZones.push_back({.minX = BASE + 10, .maxX = BASE + 10, .minZ = BASE + 11, .maxZ = BASE + 11, .level = 1});
+    const auto avoiding = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options);
+    REQUIRE(avoiding.ok);
+    REQUIRE(avoiding.waypoints.size() >= 2);
+    REQUIRE(avoiding.waypoints[1].edge != nullptr);
+    CHECK(avoiding.waypoints[1].point == At(20, 11, 1));
+    CHECK(avoiding.cost > normal.cost);
+    CHECK(avoiding.waypoints.back().point == At(10, 20, 1));
+}
+
 TEST_CASE("WorldPathFinder walks across open ground, keeping only the turns", "[WorldPathFinder]")
 {
     const auto fixture = Fixture{};
