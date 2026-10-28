@@ -1,6 +1,6 @@
 # Cache Design
 
-Plan for loading the revision-289 game cache once per process and sharing it, read-only, with every account. The client computes the nine login CRCs from the cache, so `login.crcs` leaves `client.jsonc`. The cache also lifts the packet-only limits in [ScriptingDesign.md](ScriptingDesign.md) §10: scripts get names and options for NPCs, items and scenery, they see scenery the server never changed, and walks route around walls. The work ships in four phases, plus an optional fifth that lets several processes share one copy (§16, §17). Revision 225's cache, a folder of loose files, came later and is in §18; revision 274's, which is 289's store with fewer definition opcodes, is in §19. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It reads bytes and computes CRCs with `Packet` ([PacketDesign.md](PacketDesign.md) §3), adds a key to `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)), and extends the script API ([ScriptingDesign.md](ScriptingDesign.md) §6).
+Plan for loading the revision-289 game cache once per process and sharing it, read-only, with every account. The client computes the nine login CRCs from the cache, so `login.crcs` leaves `client.jsonc`. The cache also lifts the packet-only limits in [ScriptingDesign.md](ScriptingDesign.md) §10: scripts get names and options for NPCs, items and scenery, they see scenery the server never changed, and walks route around walls. The work ships in four phases, plus an optional fifth that lets several processes share one copy (§16, §17). Revision 225's cache, a folder of loose files, came later and is in §18; revision 274's, which is 289's store with fewer definition opcodes, is in §19. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It reads bytes and computes CRCs with `Packet` ([PacketDesign.md](PacketDesign.md) §3), adds a key to `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)), and extends the script API ([ScriptingDesign.md](ScriptingDesign.md) §6).
 
 > The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
 
@@ -33,7 +33,7 @@ Reference sources, in `289server/` beside this repository:
 | Maps | Per square: a bitset of the tiles that block walking, and the locs a bot can use, as 6-byte records sorted by tile. A loc is kept when its type has a name or an option, or when it adds collision. The other 39% are decoration, dropped at load (§7.4). Bridges are resolved at load too, so each loc and blocked tile is stored on the level the player sees it on |
 | Text | Names and examine text are `std::string_view`s into a `TextPool` that stores each distinct string once. Options are `u16` ids into one table of the distinct option strings (219 in the 289 cache), because most of a type's five option slots are empty. The definitions take under 1 MB |
 | Per account | A `WorldMap`, owned by `GameClient`, holds the build area's collision on four levels. It's rebuilt from the shared squares plus the account's `locChanges` whenever the build area or a loc change moves on. It costs about 170 KB per account |
-| Paths | A port of the webclient's `tryMove`: a breadth-first search over the build area, with the webclient's rules for reaching walls, wall decor and sized locs (`forceapproach` included), cut to 25 turning points. The server walks those waypoints in straight lines ([tcp-protocol-289.md](../tcp-protocol-289.md#movement)), so routing is the client's job |
+| Paths | A port of the webclient's `tryMove`: a breadth-first search over the build area, with the webclient's rules for reaching walls, wall decor and sized locs (`forceapproach` included), cut to 25 turning points. The server walks those waypoints in straight lines ([tcp-protocol-289.md](tcp-protocol-289.md#movement)), so routing is the client's job |
 | Scripts | Names and options on `Npc`, `Item`, `GroundItem` and `Loc`; type lookups; scenery queries; options chosen by their text; `is_reachable`, `find_path` and `reachable=` filters; a `walk_to` that routes. `walk_to` and `get_loc_at` keep their signatures but see more (§12) |
 | Compression | JAG archives use bzip2 without its header, and map files are gzip. Both come from vcpkg (`bzip2`, `zlib`) and are called only from `Compression.cpp` |
 | Errors | Malformed input throws `CacheError`, a `std::runtime_error`. `CacheLoader::Load` adds the folder and the file it was reading. Messages follow ConfigDesign's form: lowercase, no trailing period. Looking up an unknown id returns `nullptr` |
@@ -261,7 +261,7 @@ private:
 crcs[i] = Packet::GetCrc(store 0, file i)    for i from 0 to 8; 0 when the file isn't there
 ```
 
-- This is the engine's `makeCrcs`. The engine compares the CRC32 of the 36 bytes, so a cache that differs from the server's in any archive gets status 6 ([tcp-protocol-289.md](../tcp-protocol-289.md#login-responses)).
+- This is the engine's `makeCrcs`. The engine compares the CRC32 of the 36 bytes, so a cache that differs from the server's in any archive gets status 6 ([tcp-protocol-289.md](tcp-protocol-289.md#login-responses)).
 - Files past 8 in store 0 are ignored, because the login carries nine CRCs.
 - The 289 cache gives `0x00000000`, `0xde5b3345`, `0x6026f8fe`, `0x07550309`, `0x9a13636e`, `0xca2717bd`, `0x368f1792`, `0x1b1fb6b2` and `0xa7129379`, the nine values in ConfigDesign's example.
 - They're stored as `std::array<s32, GameCache_s::CRC_COUNT>`, the type `login.crcs` had, so `LoginHandshake` writes them with `P4` as before.
@@ -1056,7 +1056,7 @@ public:
 | Ground item interactions | Tile on the item's tile, and when that fails, Area 1x1 on it, as the webclient does | The op alone |
 | `WalkPath` and the `*Via` overloads | The caller's waypoints, unchanged | Not applicable |
 
-- The server already follows a moving NPC or player each tick ([tcp-protocol-289.md](../tcp-protocol-289.md#movement)), so the route only has to get the walk started.
+- The server already follows a moving NPC or player each tick ([tcp-protocol-289.md](tcp-protocol-289.md#movement)), so the route only has to get the walk started.
 - `WalkTo` returning `bool` is the one signature change in `GameActions`. `ScriptApi::WalkTo` passes the result on.
 - A walk without a route is logged at Verbose, with its start and destination.
 

@@ -1,6 +1,6 @@
 # Revision 274 Design
 
-Plan for connecting to revision-274 servers. It follows [RevisionDesign.md](RevisionDesign.md) §14, "Adding a revision later", and keeps that plan's rules (§2.3 there): 225 is the base, a later revision's difference is a `>=` branch on the first supported revision that has it, and whether a packet exists is asked of the opcode table. Code style follows [CONVENTIONS.md](../CONVENTIONS.md).
+Plan for connecting to revision-274 servers. It follows [RevisionDesign.md](RevisionDesign.md) §14, "Adding a revision later", and keeps that plan's rules (§2.3 there): 225 is the base, a later revision's difference is a `>=` branch on the first supported revision that has it, and whether a packet exists is asked of the opcode table. Code style follows [CONVENTIONS.md](CONVENTIONS.md).
 
 One finding shapes the whole plan: 274 is 289's protocol with its own opcode numbers. Diffing the two engines and the two webclients finds only:
 
@@ -394,7 +394,7 @@ The `Rev274` thresholds in §6, `CacheLoader`'s and `InterfaceDecoder`'s branche
 
 ### Phase 6: the 274 reference
 
-`docs/tcp-protocol-274.md`, written as differences from [tcp-protocol-289.md](../tcp-protocol-289.md): Appendix A's tables, the two inventory payloads, chat effects, and the cache's definition opcodes. The README's document table links it.
+`docs/design/tcp-protocol-274.md`, written as differences from [tcp-protocol-289.md](tcp-protocol-289.md): Appendix A's tables, the two inventory payloads, chat effects, and the cache's definition opcodes. The README's document table links it.
 
 ---
 

@@ -1,8 +1,8 @@
 # Revision 225 TCP Protocol
 
 This page is the wire reference for this repository's revision-225 engine
-([`225server/engine`](../../225server/engine/src)) and its webclient
-([`225server/webclient`](../../225server/webclient/src)), written as the differences from
+([`225server/engine`](../../../225server/engine/src)) and its webclient
+([`225server/webclient`](../../../225server/webclient/src)), written as the differences from
 [tcp-protocol-289.md](tcp-protocol-289.md). Anything this page doesn't mention is the same in both
 revisions: the conventions, the encodings, ISAAC, the framing, the zone sub-packets, and every payload
 not listed below. Almost every opcode is different, so both opcode tables are given whole.
@@ -10,7 +10,7 @@ not listed below. Almost every opcode is different, so both opcode tables are gi
 Every layout here was read from the 225 engine's encoders and decoders and checked against its
 webclient's decoders. Entity info comes from a prebuilt `@2004scape/rsbuf` package whose source isn't
 in `225server`, so its layout rests on the webclient's `getPlayerPos*`, `getNpcPos*` and
-`ClientPlayer.setAppearance`. [RevisionDesign.md](design/RevisionDesign.md) is how this client supports both
+`ClientPlayer.setAppearance`. [RevisionDesign.md](RevisionDesign.md) is how this client supports both
 revisions.
 
 ## Contents
@@ -373,17 +373,17 @@ each saying where it goes in the file and how long the file is, then `DATA_LAND_
 `m{x}_{z}` and `l{x}_{z}` files, each a `u32` unpacked size and headerless bzip2. The login CRCs are `0`
 and the CRC32 of `title`, `config`, `interface`, `media`, `models`, `textures`, `wordenc` and `sounds`, a
 missing file skipped and the rest moved up. Some definition opcodes and interface fields differ from
-289's. [CacheDesign.md](design/CacheDesign.md) §18 has the details.
+289's. [CacheDesign.md](CacheDesign.md) §18 has the details.
 
 ## Source Map
 
 | Topic | Engine | Webclient |
 |---|---|---|
-| Server opcode table | [`ServerGameProt.ts`](../../225server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../225server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../225server/webclient/src/io/ServerProt.ts) |
-| Client opcode table | [`ClientGameProt.ts`](../../225server/engine/src/network/game/client/ClientGameProt.ts) | [`ClientProt.ts`](../../225server/webclient/src/io/ClientProt.ts) |
-| Payloads | [`server/codec/`](../../225server/engine/src/network/game/server/codec), [`client/codec/`](../../225server/engine/src/network/game/client/codec) | [`Client.ts`](../../225server/webclient/src/client/Client.ts) `tcpIn` |
-| Login | [`World.ts`](../../225server/engine/src/engine/World.ts) `onClientData`, `processLogins`; [`web.ts`](../../225server/engine/src/web.ts) | [`Client.ts`](../../225server/webclient/src/client/Client.ts) `login` |
-| Entity info | `@2004scape/rsbuf` | [`Client.ts`](../../225server/webclient/src/client/Client.ts) `getPlayerPos*`, `getNpcPos*`; [`ClientPlayer.ts`](../../225server/webclient/src/dash3d/ClientPlayer.ts) `setAppearance` |
-| Input tracking | [`InputTracking.ts`](../../225server/engine/src/engine/entity/tracking/InputTracking.ts), [`EventTrackingHandler.ts`](../../225server/engine/src/network/game/client/handler/EventTrackingHandler.ts) | [`InputTracking.ts`](../../225server/webclient/src/client/InputTracking.ts) |
-| Maps | [`RebuildGetMapsHandler.ts`](../../225server/engine/src/network/game/client/handler/RebuildGetMapsHandler.ts), [`PreloadedPacks.ts`](../../225server/engine/src/cache/PreloadedPacks.ts) | [`Client.ts`](../../225server/webclient/src/client/Client.ts) `REBUILD_NORMAL`, `DATA_*` |
-| Cache CRCs | [`CrcTable.ts`](../../225server/engine/src/cache/CrcTable.ts) | |
+| Server opcode table | [`ServerGameProt.ts`](../../../225server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../../225server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../../225server/webclient/src/io/ServerProt.ts) |
+| Client opcode table | [`ClientGameProt.ts`](../../../225server/engine/src/network/game/client/ClientGameProt.ts) | [`ClientProt.ts`](../../../225server/webclient/src/io/ClientProt.ts) |
+| Payloads | [`server/codec/`](../../../225server/engine/src/network/game/server/codec), [`client/codec/`](../../../225server/engine/src/network/game/client/codec) | [`Client.ts`](../../../225server/webclient/src/client/Client.ts) `tcpIn` |
+| Login | [`World.ts`](../../../225server/engine/src/engine/World.ts) `onClientData`, `processLogins`; [`web.ts`](../../../225server/engine/src/web.ts) | [`Client.ts`](../../../225server/webclient/src/client/Client.ts) `login` |
+| Entity info | `@2004scape/rsbuf` | [`Client.ts`](../../../225server/webclient/src/client/Client.ts) `getPlayerPos*`, `getNpcPos*`; [`ClientPlayer.ts`](../../../225server/webclient/src/dash3d/ClientPlayer.ts) `setAppearance` |
+| Input tracking | [`InputTracking.ts`](../../../225server/engine/src/engine/entity/tracking/InputTracking.ts), [`EventTrackingHandler.ts`](../../../225server/engine/src/network/game/client/handler/EventTrackingHandler.ts) | [`InputTracking.ts`](../../../225server/webclient/src/client/InputTracking.ts) |
+| Maps | [`RebuildGetMapsHandler.ts`](../../../225server/engine/src/network/game/client/handler/RebuildGetMapsHandler.ts), [`PreloadedPacks.ts`](../../../225server/engine/src/cache/PreloadedPacks.ts) | [`Client.ts`](../../../225server/webclient/src/client/Client.ts) `REBUILD_NORMAL`, `DATA_*` |
+| Cache CRCs | [`CrcTable.ts`](../../../225server/engine/src/cache/CrcTable.ts) | |

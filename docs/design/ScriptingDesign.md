@@ -1,6 +1,6 @@
 # Scripting Design
 
-Plan for running Python scripts that drive the headless client, modelled on plutonium-rsc's scripting. A script defines `loop()`, which returns how many milliseconds to wait before it is called again, plus optional `on_*` hooks for things that happen in game. It reads the game through a flat set of global functions and acts through them too. One process runs several accounts, each with its own client and its own isolated interpreter. Code style follows [CONVENTIONS.md](../CONVENTIONS.md).
+Plan for running Python scripts that drive the headless client, modelled on plutonium-rsc's scripting. A script defines `loop()`, which returns how many milliseconds to wait before it is called again, plus optional `on_*` hooks for things that happen in game. It reads the game through a flat set of global functions and acts through them too. One process runs several accounts, each with its own client and its own isolated interpreter. Code style follows [CONVENTIONS.md](CONVENTIONS.md).
 
 > The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
 

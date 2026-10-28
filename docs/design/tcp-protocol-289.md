@@ -1,8 +1,8 @@
 # Revision 289 TCP Protocol
 
 This page is the wire reference for this repository's revision-289 engine
-([`289server/engine`](../../289server/engine/src)) and its webclient
-([`289server/webclient`](../../289server/webclient/src)). It covers the login handshake, packet
+([`289server/engine`](../../../289server/engine/src)) and its webclient
+([`289server/webclient`](../../../289server/webclient/src)). It covers the login handshake, packet
 framing, and the payload layout of every in-game opcode in both directions, so that a headless
 client can decode everything the server sends and build every request the webclient can send.
 It is not a general RuneScape protocol specification. The cache CRCs, RSA public key, and
@@ -101,9 +101,9 @@ one packet per message. The server sets `maxPayload` to 1600 bytes and disables 
 does not match it.
 
 The TCP listener enables `TCP_NODELAY` and has a 30-second socket inactivity timeout.
-See [`TcpServer.ts`](../../289server/engine/src/server/tcp/TcpServer.ts),
-[`web.ts`](../../289server/engine/src/web.ts), and
-[`ClientStream.ts`](../../289server/webclient/src/io/ClientStream.ts).
+See [`TcpServer.ts`](../../../289server/engine/src/server/tcp/TcpServer.ts),
+[`web.ts`](../../../289server/engine/src/web.ts), and
+[`ClientStream.ts`](../../../289server/webclient/src/io/ClientStream.ts).
 
 ## Login Negotiation
 
@@ -180,11 +180,11 @@ this implementation exactly; the source does not use an OAEP or PKCS#1 v1.5 padd
 block. The key must correspond to the engine's configured private key. In the
 webclient build, its public values are `LOGIN_RSAN` and `LOGIN_RSAE`.
 
-See [`Client.ts`](../../289server/webclient/src/client/Client.ts),
-[`Packet.ts` in the webclient](../../289server/webclient/src/io/Packet.ts),
-[`JsUtil.ts`](../../289server/webclient/src/util/JsUtil.ts), and the engine's
-[`World.onClientData`](../../289server/engine/src/engine/World.ts) and
-[`Packet.rsadec`](../../289server/engine/src/io/Packet.ts) implementations.
+See [`Client.ts`](../../../289server/webclient/src/client/Client.ts),
+[`Packet.ts` in the webclient](../../../289server/webclient/src/io/Packet.ts),
+[`JsUtil.ts`](../../../289server/webclient/src/util/JsUtil.ts), and the engine's
+[`World.onClientData`](../../../289server/engine/src/engine/World.ts) and
+[`Packet.rsadec`](../../../289server/engine/src/io/Packet.ts) implementations.
 
 ### Login Responses
 
@@ -252,18 +252,18 @@ synchronized. An unknown server opcode cannot be skipped, because its length is 
 it as fatal. The first login response is not an in-game packet and is not ISAAC-transformed.
 
 Opcode IDs and declared sizes live in the engine's
-[`ClientGameProt.ts`](../../289server/engine/src/network/game/client/ClientGameProt.ts),
-[`ServerGameProt.ts`](../../289server/engine/src/network/game/server/ServerGameProt.ts), and
-[`ServerGameZoneProt.ts`](../../289server/engine/src/network/game/server/ServerGameZoneProt.ts),
-and in the webclient's [`ServerProt.ts`](../../289server/webclient/src/io/ServerProt.ts) and
-[`ClientProt.ts`](../../289server/webclient/src/io/ClientProt.ts).
+[`ClientGameProt.ts`](../../../289server/engine/src/network/game/client/ClientGameProt.ts),
+[`ServerGameProt.ts`](../../../289server/engine/src/network/game/server/ServerGameProt.ts), and
+[`ServerGameZoneProt.ts`](../../../289server/engine/src/network/game/server/ServerGameZoneProt.ts),
+and in the webclient's [`ServerProt.ts`](../../../289server/webclient/src/io/ServerProt.ts) and
+[`ClientProt.ts`](../../../289server/webclient/src/io/ClientProt.ts).
 
 ## Session Lifecycle
 
 ### Tick Phases
 
 Each world tick runs these phases in order
-([`World.ts`](../../289server/engine/src/engine/World.ts)):
+([`World.ts`](../../../289server/engine/src/engine/World.ts)):
 
 1. World queues and scripts.
 2. Client input: each player's buffered client packets are decoded, subject to the per-tick
@@ -335,9 +335,9 @@ by `IDLE_TIMER`. A headless client that intends to remain logged in should send
 `NO_TIMEOUT` when otherwise idle and should not send `IDLE_TIMER` unless it intends
 to request idle logout.
 
-See [`NetworkPlayer.ts`](../../289server/engine/src/engine/entity/NetworkPlayer.ts),
-[`World.ts`](../../289server/engine/src/engine/World.ts), and
-[`IdleTimerHandler.ts`](../../289server/engine/src/network/game/client/handler/IdleTimerHandler.ts).
+See [`NetworkPlayer.ts`](../../../289server/engine/src/engine/entity/NetworkPlayer.ts),
+[`World.ts`](../../../289server/engine/src/engine/World.ts), and
+[`IdleTimerHandler.ts`](../../../289server/engine/src/network/game/client/handler/IdleTimerHandler.ts).
 
 ### Clean Logout
 
@@ -358,10 +358,10 @@ as protocol state.
 
 Abrupt TCP close is not equivalent to clean logout: the engine detects the lost
 connection and applies its disconnect grace/timeout handling. See
-[`IfButtonHandler.ts`](../../289server/engine/src/network/game/client/handler/IfButtonHandler.ts),
-[`Logout.ts`](../../289server/engine/src/network/game/server/model/Logout.ts),
-[`World.removePlayer`](../../289server/engine/src/engine/World.ts), and the current
-project's [`cleanLogout.ts`](../../e2e/lib/cleanLogout.ts).
+[`IfButtonHandler.ts`](../../../289server/engine/src/network/game/client/handler/IfButtonHandler.ts),
+[`Logout.ts`](../../../289server/engine/src/network/game/server/model/Logout.ts),
+[`World.removePlayer`](../../../289server/engine/src/engine/World.ts), and the current
+project's [`cleanLogout.ts`](../../../e2e/lib/cleanLogout.ts).
 
 ## Server-to-Client Opcodes
 
@@ -574,7 +574,7 @@ packets.
 Stat IDs: 0 attack, 1 defence, 2 strength, 3 hitpoints, 4 ranged, 5 prayer, 6 magic, 7 cooking,
 8 woodcutting, 9 fletching, 10 fishing, 11 firemaking, 12 crafting, 13 smithing, 14 mining,
 15 herblore, 16 agility, 17 thieving, 18 and 19 unused, 20 runecraft
-([`PlayerStat.ts`](../../289server/engine/src/engine/entity/PlayerStat.ts)). The base level is
+([`PlayerStat.ts`](../../../289server/engine/src/engine/entity/PlayerStat.ts)). The base level is
 the highest `L` such that `xp >= table[L - 2]`, where for `i` in 0-98 the table accumulates
 `floor(L + 300 * 2^(L / 7))` over `L = 1..i+1` and divides the running sum by 4 (see
 `levelExperience` in the webclient).
@@ -615,7 +615,7 @@ loaded. Entity positions from `PLAYER_INFO` and `NPC_INFO` continue across a reb
 `PLAYER_INFO` arrives every tick. It moves the local player, updates the tracked player list,
 adds new players, and carries "extended info" blocks (appearance, animation, chat, damage, and
 so on). The payload is a bit stream followed by a byte section. The engine builds it in
-[`rsbuf/info.ts`](../../289server/engine/src/network/rsbuf/info.ts); the webclient decodes it in
+[`rsbuf/info.ts`](../../../289server/engine/src/network/rsbuf/info.ts); the webclient decodes it in
 `Client.getPlayerPos`.
 
 ### Client State Required
@@ -677,7 +677,7 @@ one extended block follows; otherwise the loop ends because fewer than 11 bits r
 Then advance to the next byte boundary (`bytePos = (bitPos + 7) >> 3`).
 
 Direction codes (3 bits), from
-[`ClientEntity.moveCode`](../../289server/webclient/src/dash3d/ClientEntity.ts):
+[`ClientEntity.moveCode`](../../../289server/webclient/src/dash3d/ClientEntity.ts):
 
 | Code | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|---|---|---|---|
@@ -832,7 +832,7 @@ standalone or enclosed.
 
 `info` packs the loc shape and rotation: `shape = info >> 2` (0-22) and `angle = info & 3`. The
 shape selects the layer
-([`LocShape.ts`](../../289server/webclient/src/dash3d/LocShape.ts)):
+([`LocShape.ts`](../../../289server/webclient/src/dash3d/LocShape.ts)):
 
 | Shapes | Layer |
 |---|---|
@@ -936,7 +936,7 @@ need to send them.
 ## Client-to-Server Payloads
 
 Layouts are given as the webclient writes them and the engine decoders read them
-([`codec/`](../../289server/engine/src/network/game/client/codec)). Variable-length (`-1`)
+([`codec/`](../../../289server/engine/src/network/game/client/codec)). Variable-length (`-1`)
 packets carry a `u8` length after the opcode; compute it from the bytes actually written.
 
 ### Movement
@@ -962,12 +962,12 @@ The `MOVE_MINIMAPCLICK` trailer is ignored by the server. The webclient sends `u
 `u8 mouseY`, `u16 cameraYaw`, `u8 57`, `u8 minimapAngle`, `u8 minimapZoom`, `u8 89`,
 `u16 sceneX`, `u16 sceneZ`, `u8 tryNearest`, and `u8 63`. Any 14 bytes are accepted.
 
-Server behavior ([`MoveClickHandler.ts`](../../289server/engine/src/network/game/client/handler/MoveClickHandler.ts)):
+Server behavior ([`MoveClickHandler.ts`](../../../289server/engine/src/network/game/client/handler/MoveClickHandler.ts)):
 
 - The start waypoint must be within 104 tiles of the player, or the request is rejected with
   `UNSET_MAP_FLAG`.
 - With `NODE_CLIENT_ROUTEFINDER` enabled (the default, `clientRoutefinder: true` in
-  [`WorldConfig.ts`](../../289server/engine/src/util/WorldConfig.ts)), the server queues the
+  [`WorldConfig.ts`](../../../289server/engine/src/util/WorldConfig.ts)), the server queues the
   client's waypoints and walks toward each one in a straight line (naive movement). It does not
   route around obstacles, so a client without collision data must send waypoints that avoid
   walls itself. With the option disabled, the server runs its own pathfinder to the last
@@ -1060,7 +1060,7 @@ The webclient strips typed prefixes from the text and sends them as the two numb
 | 149 | `EVENT_APPLET_FOCUS` | `u8 focused` | |
 
 The engine only records the `EVENT_*` packets when input tracking has been turned on for the
-player ([`InputTracking.ts`](../../289server/engine/src/engine/entity/tracking/InputTracking.ts)).
+player ([`InputTracking.ts`](../../../289server/engine/src/engine/entity/tracking/InputTracking.ts)).
 Nothing in the engine requires them. A headless client may omit them all.
 
 ### Anticheat Packets
@@ -1087,7 +1087,7 @@ and the webclient's constant payloads, for completeness:
 
 ### Per-Tick Decode Limits
 
-[`ClientGameProtCategory.ts`](../../289server/engine/src/network/game/client/ClientGameProtCategory.ts)
+[`ClientGameProtCategory.ts`](../../../289server/engine/src/network/game/client/ClientGameProtCategory.ts)
 caps how many packets the server decodes per player per tick:
 
 | Category | Limit | Packets |
@@ -1139,7 +1139,7 @@ repeat n times:
 ### Base-37 Names
 
 `name37` packs a name of up to 12 characters into a `u64`
-([`JString.toUserhash`](../../289server/webclient/src/datastruct/JString.ts)). Trim the name,
+([`JString.toUserhash`](../../../289server/webclient/src/datastruct/JString.ts)). Trim the name,
 then for each of the first 12 characters: `value = value * 37 + code`, where `a`-`z` and
 `A`-`Z` give 1-26, `0`-`9` give 27-36, and anything else (including space and `_`) gives 0.
 Finally divide by 37 while the value is a nonzero multiple of 37, which strips trailing
@@ -1151,7 +1151,7 @@ invalid.
 ### WordPack Text
 
 Chat text is packed into 4-bit nibbles, high nibble first
-([`WordPack.ts`](../../289server/engine/src/wordenc/WordPack.ts)). The character table has 61
+([`WordPack.ts`](../../../289server/engine/src/wordenc/WordPack.ts)). The character table has 61
 entries:
 
 ```text
@@ -1175,16 +1175,16 @@ characters. A padding nibble decodes as a trailing space. Both sides then apply 
 ### ISAAC
 
 The opcode cipher is standard ISAAC (Bob Jenkins) on 32-bit words
-([`Isaac.ts`](../../289server/webclient/src/io/Isaac.ts)). The four seed words fill the first
+([`Isaac.ts`](../../../289server/webclient/src/io/Isaac.ts)). The four seed words fill the first
 four of the 256 seed slots, and the rest are zero. Initialisation mixes with the golden ratio
 `0x9e3779b9` and runs one generation round. Outputs are taken from the result array from index
 255 down to 0, and a new round runs when it is exhausted. The headless client's
-[`isaac.cpp`](../../headless-client/src/isaac.cpp) matches this and is pinned by a zero-seed
+[`isaac.cpp`](../../../headless-client/src/isaac.cpp) matches this and is pinned by a zero-seed
 test vector.
 
 ## Headless Client Implementation Notes
 
-These notes are for extending [`headless-client/src/protocol.cpp`](../../headless-client/src/protocol.cpp),
+These notes are for extending [`headless-client/src/protocol.cpp`](../../../headless-client/src/protocol.cpp),
 which today frames server packets and discards their payloads.
 
 ### Known Gap
@@ -1194,7 +1194,7 @@ sends standalone `OBJ_ADD` packets whenever a zone containing a dropped item com
 the client currently fails with "unknown server opcode 60" in any area with ground items. Add it
 first. All other 68 opcodes match the engine and webclient tables. Consider replacing the switch
 with a 256-entry size table, with a sentinel for "never sent", mirrored from
-[`ServerProtSizes`](../../289server/webclient/src/io/ServerProt.ts) and covered by a test that
+[`ServerProtSizes`](../../../289server/webclient/src/io/ServerProt.ts) and covered by a test that
 checks every opcode in the table above.
 
 ### Suggested Structure
@@ -1231,8 +1231,8 @@ Every packet must be framed and consumed; this is only the order in which to dec
 ### Testing
 
 - Build fixtures from the engine's encoders: each server packet's bytes are produced by one
-  `encode` method in [`server/codec/`](../../289server/engine/src/network/game/server/codec) (or
-  [`rsbuf/info.ts`](../../289server/engine/src/network/rsbuf/info.ts) for entity info), so every
+  `encode` method in [`server/codec/`](../../../289server/engine/src/network/game/server/codec) (or
+  [`rsbuf/info.ts`](../../../289server/engine/src/network/rsbuf/info.ts) for entity info), so every
   decoder can be tested byte for byte without a running server.
 - For entity info, cover: local walk, run, and teleport; tracked-list removal by a short
   `count`; removal by type 3; new entries with negative `dx`/`dz`; a packet with no extended
@@ -1246,14 +1246,14 @@ Every packet must be framed and consumed; this is only the order in which to dec
 
 | Topic | Engine | Webclient |
 |---|---|---|
-| Login | [`World.onClientData`, `processLogins`](../../289server/engine/src/engine/World.ts) | [`Client.login`](../../289server/webclient/src/client/Client.ts) |
-| Server opcode table | [`ServerGameProt.ts`](../../289server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../289server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../289server/webclient/src/io/ServerProt.ts) |
-| Server payloads | [`server/codec/`](../../289server/engine/src/network/game/server/codec) | `Client.tcpIn`, `Client.zonePacket` in [`Client.ts`](../../289server/webclient/src/client/Client.ts) |
-| Player and NPC info | [`rsbuf/info.ts`](../../289server/engine/src/network/rsbuf/info.ts), [`rsbuf/messages.ts`](../../289server/engine/src/network/rsbuf/messages.ts), [`rsbuf/prot.ts`](../../289server/engine/src/network/rsbuf/prot.ts) | `Client.getPlayerPos`, `Client.getNpcPos`; [`ClientPlayer.ts`](../../289server/webclient/src/dash3d/ClientPlayer.ts), [`ClientNpc.ts`](../../289server/webclient/src/dash3d/ClientNpc.ts) |
-| Appearance | `Player.generateAppearance` in [`Player.ts`](../../289server/engine/src/engine/entity/Player.ts) | `ClientPlayer.setAppearance` |
-| Zones | [`Zone.ts`](../../289server/engine/src/engine/zone/Zone.ts), [`BuildArea.ts`](../../289server/engine/src/engine/entity/BuildArea.ts) | `Client.zonePacket`, [`LocShape.ts`](../../289server/webclient/src/dash3d/LocShape.ts) |
-| Client opcode table | [`ClientGameProt.ts`](../../289server/engine/src/network/game/client/ClientGameProt.ts), [`ClientGameProtRepository.ts`](../../289server/engine/src/network/game/client/ClientGameProtRepository.ts) | [`ClientProt.ts`](../../289server/webclient/src/io/ClientProt.ts) |
-| Client payloads | [`client/codec/`](../../289server/engine/src/network/game/client/codec), [`client/handler/`](../../289server/engine/src/network/game/client/handler) | `Client.doAction`, `Client.tryMove`, `Client.interactWithLoc` |
-| Per-tick output | [`NetworkPlayer.ts`](../../289server/engine/src/engine/entity/NetworkPlayer.ts), `World.processClientsOut` | - |
-| Primitives | [`io/Packet.ts`](../../289server/engine/src/io/Packet.ts) | [`io/Packet.ts`](../../289server/webclient/src/io/Packet.ts), [`io/Isaac.ts`](../../289server/webclient/src/io/Isaac.ts) |
-| Text and names | [`wordenc/WordPack.ts`](../../289server/engine/src/wordenc/WordPack.ts) | [`datastruct/JString.ts`](../../289server/webclient/src/datastruct/JString.ts) |
+| Login | [`World.onClientData`, `processLogins`](../../../289server/engine/src/engine/World.ts) | [`Client.login`](../../../289server/webclient/src/client/Client.ts) |
+| Server opcode table | [`ServerGameProt.ts`](../../../289server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../../289server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../../289server/webclient/src/io/ServerProt.ts) |
+| Server payloads | [`server/codec/`](../../../289server/engine/src/network/game/server/codec) | `Client.tcpIn`, `Client.zonePacket` in [`Client.ts`](../../../289server/webclient/src/client/Client.ts) |
+| Player and NPC info | [`rsbuf/info.ts`](../../../289server/engine/src/network/rsbuf/info.ts), [`rsbuf/messages.ts`](../../../289server/engine/src/network/rsbuf/messages.ts), [`rsbuf/prot.ts`](../../../289server/engine/src/network/rsbuf/prot.ts) | `Client.getPlayerPos`, `Client.getNpcPos`; [`ClientPlayer.ts`](../../../289server/webclient/src/dash3d/ClientPlayer.ts), [`ClientNpc.ts`](../../../289server/webclient/src/dash3d/ClientNpc.ts) |
+| Appearance | `Player.generateAppearance` in [`Player.ts`](../../../289server/engine/src/engine/entity/Player.ts) | `ClientPlayer.setAppearance` |
+| Zones | [`Zone.ts`](../../../289server/engine/src/engine/zone/Zone.ts), [`BuildArea.ts`](../../../289server/engine/src/engine/entity/BuildArea.ts) | `Client.zonePacket`, [`LocShape.ts`](../../../289server/webclient/src/dash3d/LocShape.ts) |
+| Client opcode table | [`ClientGameProt.ts`](../../../289server/engine/src/network/game/client/ClientGameProt.ts), [`ClientGameProtRepository.ts`](../../../289server/engine/src/network/game/client/ClientGameProtRepository.ts) | [`ClientProt.ts`](../../../289server/webclient/src/io/ClientProt.ts) |
+| Client payloads | [`client/codec/`](../../../289server/engine/src/network/game/client/codec), [`client/handler/`](../../../289server/engine/src/network/game/client/handler) | `Client.doAction`, `Client.tryMove`, `Client.interactWithLoc` |
+| Per-tick output | [`NetworkPlayer.ts`](../../../289server/engine/src/engine/entity/NetworkPlayer.ts), `World.processClientsOut` | - |
+| Primitives | [`io/Packet.ts`](../../../289server/engine/src/io/Packet.ts) | [`io/Packet.ts`](../../../289server/webclient/src/io/Packet.ts), [`io/Isaac.ts`](../../../289server/webclient/src/io/Isaac.ts) |
+| Text and names | [`wordenc/WordPack.ts`](../../../289server/engine/src/wordenc/WordPack.ts) | [`datastruct/JString.ts`](../../../289server/webclient/src/datastruct/JString.ts) |

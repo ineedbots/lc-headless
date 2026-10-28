@@ -6,6 +6,8 @@ A headless (shell/packet) game client for LostCity private servers (2004scape, *
 
 ## Features
 
+See the [detailed feature guide](docs/Features.md) for capabilities, revision differences and scripting tools.
+
 - **289, 274 and 225 protocols.**
 - **WebSocket, secure WebSocket and raw TCP**, each optionally through a **SOCKS5** proxy, set for the whole process or per account.
 - **Loading the game cache.** It loads the server's cache once per process and shares it with every account. The login CRCs are computed from it, scripts get the names and options of NPCs, items and scenery, scenery the server never changed is known, and walks and interactions route around walls as the webclient does.
@@ -25,6 +27,8 @@ A headless (shell/packet) game client for LostCity private servers (2004scape, *
 
 ## Requirements
 
+See the [requirements guide](docs/Requirements.md) for platform compatibility and the server files to gather before setup.
+
 - The client, either from a [GitHub release](../../releases) or [built from source](#building):
   - Windows 10 or 11, x64 or x86, with the [Visual C++ redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
   - Linux, x64 or arm64, with glibc 2.38 or higher and libstdc++ from GCC 13.2 or higher (`GLIBCXX_3.4.32`), such as Ubuntu 24.04 or later.
@@ -32,6 +36,8 @@ A headless (shell/packet) game client for LostCity private servers (2004scape, *
 - That server's RSA public key (modulus and exponent), and a copy of its game cache (see [Configuration](#configuration)).
 
 ## Configuration
+
+See the [configuration guide](docs/Configuration.md) for setup examples, account overrides, validation rules and troubleshooting.
 
 The client reads two kinds of JSON (with comments) configuration files. Paths are relative to the working directory.
 
@@ -115,6 +121,8 @@ A script with `BOT = define_bot(name=...)` reads only `settings["<name>"]`, so o
 
 ## Running
 
+See the [running guide](docs/Running.md) for a first login, console commands, reconnects and script development workflows.
+
 ```
 Rs2004Headless [client.jsonc] [--account accounts/<name>.jsonc] [--watch] [--debugger] [--profile] [--raw-console]
 ```
@@ -137,8 +145,6 @@ While it runs, the client takes commands typed into its console: `help` lists th
 3. A third Ctrl+C closes any connection whose logout the server is still refusing. The server refuses a logout during combat and for 10 seconds after it.
 
 The exit code is 0 only when every account logged out cleanly and no script failed.
-
-See [Script profiling](docs/ProfilingAndCoverage.md#script-profiling) for recording and viewing line profiling reports.
 
 ## Writing scripts
 
@@ -199,6 +205,8 @@ The randoms events will be detected and solved automatically and run will set ac
 
 ## Building
 
+See the [build guide](docs/Building.md) for toolchain setup, platform presets, tests, packaging and troubleshooting.
+
 ### Requirements for building
 
 - One of these:
@@ -254,8 +262,6 @@ The Catch2 tests don't need a server. The network tests run against a fake game 
 
 A few tests read a real game cache, and skip unless you point environment variables to the cache directory: `RS2004_CACHE_DIR` for a 289 cache (such as `<289 server>/engine/data/pack`), `RS2004_CACHE_DIR_274` for a 274 cache, and `RS2004_CACHE_DIR_225` for a 225 one (ex: `<255 server>/engine/data/pack/client`).
 
-See [Profiling and coverage](docs/ProfilingAndCoverage.md) for native code and stdlib script coverage instructions.
-
 ### Project layout
 
 ```
@@ -293,6 +299,13 @@ thirdparty/                   licenses of the projects code was ported from
 ```
 
 Everything in `src/` except `main.cpp` builds into a static library. The client and the tests both link that library, so the tests run the same code that ships.
+
+## TODO
+
+- Remove this section when points are completed
+- Phase 17 and 18 of the rs2b0t parity design (the p2p quests and account leveler)
+- Better code coverage
+- CI code coverage
 
 ## Credits
 

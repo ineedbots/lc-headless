@@ -1,6 +1,6 @@
 # Logger Design
 
-Design and test plan for `Logger`, the log the client's classes write to. The application creates one at startup and shares it, through `std::shared_ptr`, with every class that logs. It has four levels, `Verbose`, `Info`, `Warning` and `Error`, and can be called from any thread. Code style follows [CONVENTIONS.md](../CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8: the static library, Catch2, and the test presets. [TransportDesign.md](TransportDesign.md) and [ConfigDesign.md](ConfigDesign.md) log through it.
+Design and test plan for `Logger`, the log the client's classes write to. The application creates one at startup and shares it, through `std::shared_ptr`, with every class that logs. It has four levels, `Verbose`, `Info`, `Warning` and `Error`, and can be called from any thread. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It builds on the project setup in [PacketDesign.md](PacketDesign.md) §7.5 and §8: the static library, Catch2, and the test presets. [TransportDesign.md](TransportDesign.md) and [ConfigDesign.md](ConfigDesign.md) log through it.
 
 > The examples below use `WebSocketClient`, the IXWebSocket transport this plan was written against, with its I/O thread and its `WebSocket ...` messages. [TransportDesign.md](TransportDesign.md) replaced it with `Connection`, which runs on the caller's thread and logs `Connecting to ...`, `Connection open` and the like. The logger itself is unchanged.
 

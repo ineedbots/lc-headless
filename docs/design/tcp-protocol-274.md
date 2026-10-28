@@ -1,8 +1,8 @@
 # Revision 274 TCP Protocol
 
 This page is the wire reference for this repository's revision-274 engine
-([`274server/engine`](../../274server/engine/src)) and its webclient
-([`274server/webclient`](../../274server/webclient/src)), written as the differences from
+([`274server/engine`](../../../274server/engine/src)) and its webclient
+([`274server/webclient`](../../../274server/webclient/src)), written as the differences from
 [tcp-protocol-289.md](tcp-protocol-289.md). Anything this page doesn't mention is the same in both
 revisions: the endpoints, the login, the framing, ISAAC, the session lifecycle, entity info, the zone
 sub-packets, and every payload not listed below. 274 has exactly 289's packets at the same lengths, but
@@ -11,7 +11,7 @@ almost every opcode is different, so both opcode tables are given whole.
 Every layout here was read from the 274 engine's encoders and decoders and checked against its
 webclient. The two engines' `network/` folders differ only in the opcode tables, the two inventory
 encoders, and two handlers' server-side checks; their `rsbuf/` entity-info encoders are byte-identical.
-[Revision274Design.md](design/Revision274Design.md) is how this client supports 274.
+[Revision274Design.md](Revision274Design.md) is how this client supports 274.
 
 ## Contents
 
@@ -231,17 +231,17 @@ value range differs:
 274's cache is 289's store: `main_file_cache.dat` and `.idx0` to `.idx4` in the engine's `data/pack`,
 with the login CRCs of files 0 to 8 of store 0, `map_index` in `versionlist`, and 289's interface format.
 Its definitions lack four opcodes 289 has: loc `77` (multiloc), obj `115` (team), and varp `12` and
-`13`. [CacheDesign.md](design/CacheDesign.md) §19 has the details.
+`13`. [CacheDesign.md](CacheDesign.md) §19 has the details.
 
 ## Source Map
 
 | Topic | Engine | Webclient |
 |---|---|---|
-| Server opcode table | [`ServerGameProt.ts`](../../274server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../274server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../274server/webclient/src/io/ServerProt.ts) |
-| Client opcode table | [`ClientGameProt.ts`](../../274server/engine/src/network/game/client/ClientGameProt.ts) | [`ClientProt.ts`](../../274server/webclient/src/io/ClientProt.ts) |
-| Inventory payloads | [`UpdateInvFullEncoder.ts`](../../274server/engine/src/network/game/server/codec/UpdateInvFullEncoder.ts), [`UpdateInvPartialEncoder.ts`](../../274server/engine/src/network/game/server/codec/UpdateInvPartialEncoder.ts) | [`Client.ts`](../../274server/webclient/src/client/Client.ts) `UPDATE_INV_FULL`, `UPDATE_INV_PARTIAL` |
-| Chat effects | [`MessagePublicHandler.ts`](../../274server/engine/src/network/game/client/handler/MessagePublicHandler.ts) | [`Client.ts`](../../274server/webclient/src/client/Client.ts) `wave:`, `scroll:` |
-| Login | [`World.ts`](../../274server/engine/src/engine/World.ts), [`web.ts`](../../274server/engine/src/web.ts) | [`Client.ts`](../../274server/webclient/src/client/Client.ts) `login` |
-| Entity info | [`rsbuf/`](../../274server/engine/src/network/rsbuf) | [`Client.ts`](../../274server/webclient/src/client/Client.ts) `getPlayerPos*`, `getNpcPos*`; [`ClientPlayer.ts`](../../274server/webclient/src/dash3d/ClientPlayer.ts) |
-| Definitions | [`cache/config/`](../../274server/engine/src/cache/config) | [`config/`](../../274server/webclient/src/config) |
-| Cache CRCs | [`CrcTable.ts`](../../274server/engine/src/cache/CrcTable.ts) | |
+| Server opcode table | [`ServerGameProt.ts`](../../../274server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../../274server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../../274server/webclient/src/io/ServerProt.ts) |
+| Client opcode table | [`ClientGameProt.ts`](../../../274server/engine/src/network/game/client/ClientGameProt.ts) | [`ClientProt.ts`](../../../274server/webclient/src/io/ClientProt.ts) |
+| Inventory payloads | [`UpdateInvFullEncoder.ts`](../../../274server/engine/src/network/game/server/codec/UpdateInvFullEncoder.ts), [`UpdateInvPartialEncoder.ts`](../../../274server/engine/src/network/game/server/codec/UpdateInvPartialEncoder.ts) | [`Client.ts`](../../../274server/webclient/src/client/Client.ts) `UPDATE_INV_FULL`, `UPDATE_INV_PARTIAL` |
+| Chat effects | [`MessagePublicHandler.ts`](../../../274server/engine/src/network/game/client/handler/MessagePublicHandler.ts) | [`Client.ts`](../../../274server/webclient/src/client/Client.ts) `wave:`, `scroll:` |
+| Login | [`World.ts`](../../../274server/engine/src/engine/World.ts), [`web.ts`](../../../274server/engine/src/web.ts) | [`Client.ts`](../../../274server/webclient/src/client/Client.ts) `login` |
+| Entity info | [`rsbuf/`](../../../274server/engine/src/network/rsbuf) | [`Client.ts`](../../../274server/webclient/src/client/Client.ts) `getPlayerPos*`, `getNpcPos*`; [`ClientPlayer.ts`](../../../274server/webclient/src/dash3d/ClientPlayer.ts) |
+| Definitions | [`cache/config/`](../../../274server/engine/src/cache/config) | [`config/`](../../../274server/webclient/src/config) |
+| Cache CRCs | [`CrcTable.ts`](../../../274server/engine/src/cache/CrcTable.ts) | |

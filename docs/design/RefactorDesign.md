@@ -1,6 +1,6 @@
 # Refactor Design
 
-Plan for reorganizing `src/` and `tests/` so each file has one job, each folder holds one subsystem, and code used in several places is written once. Nothing a user or a script sees changes: the client connects, plays and logs as it does today, `client.jsonc` and account files read the same, and the Python API keeps every name. §11 lists the few things that do change: two message texts, and where a progress report falls within a step. Code style follows [CONVENTIONS.md](../CONVENTIONS.md); this plan applies its file rules (§1, §5) to code written before they were followed everywhere. The work ships in eleven phases (§12). Each phase builds with zero warnings and passes every test before the next one starts.
+Plan for reorganizing `src/` and `tests/` so each file has one job, each folder holds one subsystem, and code used in several places is written once. Nothing a user or a script sees changes: the client connects, plays and logs as it does today, `client.jsonc` and account files read the same, and the Python API keeps every name. §11 lists the few things that do change: two message texts, and where a progress report falls within a step. Code style follows [CONVENTIONS.md](CONVENTIONS.md); this plan applies its file rules (§1, §5) to code written before they were followed everywhere. The work ships in eleven phases (§12). Each phase builds with zero warnings and passes every test before the next one starts.
 
 What it fixes, by example:
 
@@ -716,7 +716,7 @@ Phases 1 to 6 are low risk: they move code and replace exact copies. Phases 7 an
 
 ## 13. Effect on the docs and the other plans
 
-[CONVENTIONS.md](../CONVENTIONS.md) changes in phase 1, so the guide matches this project:
+[CONVENTIONS.md](CONVENTIONS.md) changes in phase 1, so the guide matches this project:
 
 - §1: only `pch.hpp` and `main.cpp` must stay at the root of `src/`, and `Application.hpp` / `.cpp` live in `src/Application/` with the code that supports them. The example tree and §11's checklist follow.
 - The examples' `Core/` paths become this project's folders:
