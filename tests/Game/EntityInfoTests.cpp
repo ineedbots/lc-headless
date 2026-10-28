@@ -233,6 +233,67 @@ TEST_CASE("PLAYER_INFO adds new players relative to the local player", "[PlayerI
     }
 }
 
+TEST_CASE("PLAYER_INFO reads forced movement for local and tracked players", "[PlayerInfoDecoder][ExactMoveCoverage]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    auto state = Fixtures::PlacedState();
+    state.tick = 50;
+    state.localPlayer.tile.level = 2;
+    state.players = {MakePlayer(7, Tile_s{.x = HOME.x + 1, .z = HOME.z + 1, .level = 1})};
+    auto decoder = PlayerInfoDecoder{Protocol{revision}};
+    auto bits = BitWriter{};
+    bits.Put(1, 1).Put(2, 0).Put(8, 1).Put(1, 1).Put(2, 0).Put(11, 2047);
+    auto extended = Packet{};
+    for (const auto offset : {0, 10})
+    {
+        extended.P1(0x80);
+        extended.P1(0x02);
+        extended.P1(40 + offset);
+        extended.P1(41 + offset);
+        extended.P1(42 + offset);
+        extended.P1(43 + offset);
+        extended.P2(300 + offset);
+        extended.P2(600 + offset);
+        extended.P1(offset == 0 ? 0 : 3);
+    }
+
+    decoder.Decode(WithExtended(bits, extended), state);
+    REQUIRE(state.localPlayer.exactMove.has_value());
+    REQUIRE(state.players.size() == 1);
+    REQUIRE(state.players[0].exactMove.has_value());
+    for (const auto* player : {&state.localPlayer, &state.players[0]})
+    {
+        const auto offset = player == &state.localPlayer ? 0 : 10;
+        const auto& move = *player->exactMove;
+        CHECK(move.start == Tile_s{.x = Fixtures::BASE + 40 + offset, .z = Fixtures::BASE + 41 + offset, .level = player->tile.level});
+        CHECK(move.end == Tile_s{.x = Fixtures::BASE + 42 + offset, .z = Fixtures::BASE + 43 + offset, .level = player->tile.level});
+        CHECK(move.startCycle == 300 + offset);
+        CHECK(move.endCycle == 600 + offset);
+        CHECK(move.direction == (offset == 0 ? 0 : 3));
+        CHECK(move.tick == 51);
+    }
+    CHECK(state.localPlayer.tile == Tile_s{.x = HOME.x, .z = HOME.z, .level = 2});
+    CHECK(state.players[0].tile == Tile_s{.x = HOME.x + 1, .z = HOME.z + 1, .level = 1});
+}
+
+TEST_CASE("PLAYER_INFO rejects incomplete forced movement without publishing it", "[PlayerInfoDecoder][ExactMoveCoverage]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    auto bits = BitWriter{};
+    bits.Put(1, 1).Put(2, 0).Put(8, 0).Put(11, 2047);
+    const auto extended = std::to_array<u8>({0x80, 0x02, 40, 41, 42, 43, 1, 44, 2, 88, 3});
+    for (auto size = std::size_t{2}; size < extended.size(); ++size)
+    {
+        CAPTURE(static_cast<u16>(revision), size);
+        auto state = Fixtures::PlacedState();
+        auto decoder = PlayerInfoDecoder{Protocol{revision}};
+        const auto payload = Fixtures::Concat(bits.GetBytes(), std::span{extended}.first(size));
+        CHECK_THROWS_AS(decoder.Decode(payload, state), std::out_of_range);
+        CHECK_FALSE(state.localPlayer.exactMove.has_value());
+        CHECK(state.localPlayer.tile == HOME);
+    }
+}
+
 TEST_CASE("PLAYER_INFO reads extended blocks", "[PlayerInfoDecoder]")
 {
     auto state = Fixtures::PlacedState();

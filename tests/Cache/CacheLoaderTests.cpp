@@ -7,6 +7,7 @@
 #include "Cache/CacheStore.hpp"
 #include "Cache/Error/CacheError.hpp"
 #include "Cache/GameCache_s.hpp"
+#include "Cache/JagArchive.hpp"
 #include "Cache/MapSquare.hpp"
 #include "Config/Revision_e.hpp"
 #include "Console/LogLevel_e.hpp"
@@ -17,6 +18,23 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 using Catch::Matchers::ContainsSubstring;
+
+namespace
+{
+    std::vector<u8> WithSequence(std::vector<u8> config)
+    {
+        const auto archive = JagArchive{std::move(config)};
+        auto entries = std::vector<ArchiveEntry_s>{};
+        for (const auto name : {"loc.dat", "loc.idx", "npc.dat", "npc.idx", "obj.dat", "obj.idx", "varp.dat", "varp.idx"})
+        {
+            entries.push_back({.name = name, .data = archive.Read(name).value()});
+        }
+
+        // One sequence with frame 7, whose delay must come from the animation file.
+        entries.push_back({.name = "seq.dat", .data = {0, 1, 1, 1, 0, 7, 255, 255, 0, 0, 0}});
+        return CacheWriter::MakeArchive(entries, false);
+    }
+}
 
 namespace
 {
@@ -418,6 +436,79 @@ TEST_CASE("CacheLoader tells each layout given the other revision what it expect
         CHECK_THROWS_WITH(CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev274, *fixture.capture.GetLogger()),
                           fixture.Prefix(Revision_e::Rev274) + "main_file_cache.dat not found; for revision 274, set client.cacheDirectory to the folder that holds the server's cache");
     }
+}
+
+TEST_CASE("CacheLoader ignores unrelated and malformed 225 map names", "[CacheLoader][CacheResilienceCoverage]")
+{
+    auto fixture = FolderFixture{};
+    for (const auto name : {"README", "m50", "m_50", "m50_", "m-1_50", "m256_50", "m50_256", "m50_50.bak", "l999999999999999999999_50", "l50_50_1"})
+    {
+        fixture.files.emplace(std::string{"maps/"} + name, std::vector<u8>{255});
+    }
+
+    CacheWriter::WriteFolder(fixture.folder.GetPath(), fixture.files);
+    // A valid-looking name still has to be a regular file.
+    std::filesystem::create_directory(fixture.folder.GetPath() / "maps/m51_51");
+    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev225, *fixture.capture.GetLogger());
+    CHECK(cache.squares.size() == 1);
+    CHECK(cache.mapCrcs.size() == 1);
+    REQUIRE(cache.FindSquare(50, 50) != nullptr);
+    CHECK(cache.FindSquare(50, 50)->GetLocs().size() == 2);
+    CHECK(fixture.capture.GetEntries().size() == 1);
+}
+
+TEST_CASE("CacheLoader skips absent and version-only animation files", "[CacheLoader][CacheResilienceCoverage]")
+{
+    auto fixture = LoaderFixture{};
+    fixture.writer.Put(CacheStore::ARCHIVES, 2, WithSequence(fixture.writer.Get(CacheStore::ARCHIVES, 2)));
+    // File 0 is absent, file 1 has just a version, and file 2 is an empty, valid frame group.
+    fixture.writer.Put(CacheStore::ANIMS, 1, {0, 1});
+    fixture.writer.Put(CacheStore::ANIMS, 2, CacheWriter::Gzip(std::array<u8, 10>{}));
+    static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
+
+    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger());
+    CHECK(cache.FindSeqLength(0) == std::optional<u32>{1});
+    CHECK(cache.FindLoc(0)->name == "Door");
+    CHECK_FALSE(fixture.HasLog(LogLevel_e::Warning, "can't read the anim frames"));
+}
+
+TEST_CASE("CacheLoader preserves a usable cache when store animation frames are damaged", "[CacheLoader][CacheResilienceCoverage]")
+{
+    auto fixture = LoaderFixture{};
+    fixture.writer.Put(CacheStore::ARCHIVES, 2, WithSequence(fixture.writer.Get(CacheStore::ARCHIVES, 2)));
+    fixture.writer.Put(CacheStore::ANIMS, 0, {1, 2, 3, 0, 1});
+    static_cast<void>(fixture.writer.Write(fixture.folder.GetPath()));
+
+    const auto cache = CacheLoader::Load(fixture.folder.GetPath(), Revision_e::Rev289, *fixture.capture.GetLogger());
+    CHECK(cache.seqLengths.empty());
+    CHECK_FALSE(cache.FindSeqLength(0).has_value());
+    CHECK(cache.FindLoc(0)->name == "Door");
+    CHECK(cache.FindSquare(50, 50) != nullptr);
+    CHECK(fixture.HasLog(LogLevel_e::Warning, "can't read the anim frames"));
+    CHECK(fixture.HasLog(LogLevel_e::Warning, "store 2 file 0 (anim)"));
+}
+
+TEST_CASE("CacheLoader preserves a usable 225 cache when animation entries are missing", "[CacheLoader][CacheResilienceCoverage]")
+{
+    auto fixture = FolderFixture{};
+    fixture.files.at("config") = WithSequence(fixture.files.at("config"));
+    SECTION("missing models archive")
+    {
+        fixture.files.erase("models");
+    }
+    SECTION("missing frame entry")
+    {
+        fixture.files.at("models") = CacheWriter::MakeArchive({{.name = "unrelated", .data = {0}}}, false);
+    }
+
+    const auto cache = fixture.Load();
+    CHECK(cache.seqLengths.empty());
+    CHECK_FALSE(cache.FindSeqLength(0).has_value());
+    CHECK(cache.FindLoc(0)->name == "Door");
+    CHECK(cache.FindSquare(50, 50) != nullptr);
+    REQUIRE(fixture.capture.GetEntries().size() == 2);
+    CHECK(fixture.capture.GetEntries().front().level == LogLevel_e::Warning);
+    CHECK_THAT(fixture.capture.GetEntries().front().message, ContainsSubstring("can't read the anim frames"));
 }
 
 TEST_CASE("CacheLoader's cache keeps its text when moved", "[CacheLoader]")
