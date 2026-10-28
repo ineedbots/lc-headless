@@ -330,6 +330,166 @@ assert not bones.valid() and bones.interact('Take') is False
 )python");
 }
 
+TEST_CASE("Native query bindings accept tuple filters and preserve empty results", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert [n.index for n in _core.get_npcs(ids=(41, 81))] == [7, 8]
+assert [n.index for n in _core.get_npcs(names=('Cow', 'Chicken'))] == [7, 8]
+assert [n.index for n in _core.get_npcs(ids=41, radius=2)] == [7]
+assert _core.get_npcs(ids=(9999,), radius=0) == []
+assert _core.get_npcs(names=['Missing']) == []
+assert _core.get_inventory_count_by_id((995, 526)) == 251
+assert _core.get_inventory_item_by_id((526,)).slot == 2
+assert _core.get_inventory_item_by_id(9999) is None
+assert _core.get_inventory_count_by_name(('Coins', 'Bones')) == 251
+assert _core.get_inventory_item_by_name(('Missing', 'Bones')).id == 526
+assert _core.get_inventory_item_by_name(['Missing']) is None
+assert _core.get_inventory_count_by_id([], com=9999) == 0
+)python"));
+}
+
+TEST_CASE("Native query bindings reject malformed filter sequences", "[ScriptBindings][BindingCoverage]")
+{
+    const auto [source, type, message] = GENERATE(
+        std::tuple{"_core.get_npcs(ids=[41, 'Cow'])", "TypeError", "ids must be an int"},
+        std::tuple{"_core.get_npcs(ids=(41, -1))", "ValueError", "ids must be from"},
+        std::tuple{"_core.get_npcs(ids=2147483648)", "ValueError", "ids must be from"},
+        std::tuple{"_core.get_npcs(names=[])", "ValueError", "names must have at least one name"},
+        std::tuple{"_core.get_npcs(names=())", "ValueError", "names must have at least one name"},
+        std::tuple{"_core.get_npcs(names=('Cow', 41))", "TypeError", "names must be a str"},
+        std::tuple{"_core.get_npcs(radius=-1)", "ValueError", "radius must be from"},
+        std::tuple{"_core.get_npcs(radius='near')", "TypeError", "radius must be an int"},
+        std::tuple{"_core.get_locs(layer=4)", "ValueError", "layer must be from"},
+        std::tuple{"_core.get_locs(layer='wall')", "TypeError", "layer must be an int"});
+    CAPTURE(source);
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\n");
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(type) && ContainsSubstring(message));
+    // A rejected call must leave the VM usable for the next query.
+    REQUIRE_NOTHROW(fixture.Run("assert len(_core.get_npcs(ids=41)) == 1\n"));
+}
+
+TEST_CASE("Native action bindings validate byte arrays for appearance changes", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\n");
+    const auto [source, type, message] = GENERATE(
+        std::tuple{"_core.set_appearance(False, 7, [0]*5)", "TypeError", "kits must be a list of 7 numbers"},
+        std::tuple{"_core.set_appearance(False, [0]*6, [0]*5)", "ValueError", "kits must hold 7 numbers"},
+        std::tuple{"_core.set_appearance(False, (0,0,0,0,0,0,-1), [0]*5)", "ValueError", "kits must be from 0 to 255"},
+        std::tuple{"_core.set_appearance(False, [0]*7, [0,0,0,0,256])", "ValueError", "colours must be from 0 to 255"},
+        std::tuple{"_core.set_appearance(False, [0]*7, [0,0,0,0,'red'])", "TypeError", "colours must be an int"},
+        std::tuple{"_core.set_appearance(1, [0]*7, [0]*5)", "TypeError", "female must be True or False"});
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(type) && ContainsSubstring(message));
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+assert _core.set_appearance(False, [0]*7, [0]*5) is False
+assert _core.set_appearance(True, (0,1,2,3,4,5,255), (0,1,2,3,255)) is False
+)python"));
+}
+
+TEST_CASE("Native movement bindings reject malformed points and coordinates", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\n");
+    const auto [source, type, message] = GENERATE(
+        std::tuple{"_core.walk_path(42)", "TypeError", "points must be a list of (x, z) points"},
+        std::tuple{"_core.walk_path([1])", "TypeError", "points must hold (x, z) pairs"},
+        std::tuple{"_core.walk_path([(1,2,3)])", "TypeError", "points must hold (x, z) pairs"},
+        std::tuple{"_core.walk_path(([1,'north'],))", "TypeError", "points must be an int"},
+        std::tuple{"_core.walk_to(-1, 0)", "ValueError", "x must be from"},
+        std::tuple{"_core.walk_to(0, -1)", "ValueError", "z must be from"},
+        std::tuple{"_core.answer_count(-1)", "ValueError", "value must be from"},
+        std::tuple{"_core.click_text('Continue', root=65536)", "ValueError", "root must be from"});
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(type) && ContainsSubstring(message));
+}
+
+TEST_CASE("Native action bindings reject wrong target classes and ambiguous loc calls", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\ndoor = locs.at(game.tile().translate(1, 0))\n");
+    const auto [source, message] = GENERATE(
+        std::pair{"_core.interact_npc(7, [])", "op must be an int or a str"},
+        std::pair{"_core.interact_npc(7, 0)", "op must be from 1 to 5"},
+        std::pair{"_core.interact_loc(door, 1, 2)", "interact_loc takes a Loc and an op"},
+        std::pair{"_core.interact_loc(door, 1, op=2)", "interact_loc takes a Loc and an op"},
+        std::pair{"_core.take_ground_item(inventory.first('Coins'))", "item must be a GroundItem"},
+        std::pair{"_core.cast_on_item(1, door)", "item must be an InvItem"},
+        std::pair{"_core.cast_on_player(1, door)", "player must be a Player or its index"});
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring(message));
+}
+
+TEST_CASE("Native action bindings reject stale references across item and spell actions", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run(R"python(
+import _core
+item = inventory.first('Bones')
+coins = inventory.first('Coins')
+npc = npcs.query().first()
+player = players.query().first()
+ground = ground_items.query().first()
+)python");
+    fixture.state.inventories.clear();
+    fixture.state.npcs.clear();
+    fixture.state.players.clear();
+    fixture.state.groundItems.clear();
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+assert _core.item_op(item, 1) is False
+assert _core.inv_button(item, 1) is False
+assert _core.drop_item(item) is False
+assert _core.use_item_on_npc(item, npc) is False
+assert _core.use_item_on_player(item, player) is False
+assert _core.use_item_on_loc(item, 1530, 3201, 3200) is False
+assert _core.use_item_on_ground_item(item, ground) is False
+assert _core.use_item_on_item(item, coins) is False
+assert _core.cast_on_npc(1, npc) is False
+assert _core.cast_on_player(1, player) is False
+assert _core.cast_on_ground_item(1, ground) is False
+assert _core.cast_on_item(1, item) is False
+assert _core.talk_to_npc(npc) is False
+assert _core.interact_player(player, 1) is False
+assert _core.take_ground_item(ground) is False
+)python"));
+}
+
+TEST_CASE("Native inventory bindings distinguish unseen containers from empty ones", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.inventories.at(TestCache::INVENTORY).tick = 47;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+import _core
+assert _core.has_inventory(INVENTORY)
+assert _core.inventory_tick(INVENTORY) == 47
+assert not _core.has_inventory(BANK)
+assert _core.inventory_tick(BANK) == -1
+assert _core.get_inventory(BANK) == []
+)python"));
+    fixture.state.inventories[TestCache::INVENTORY].slots.clear();
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+assert _core.has_inventory(INVENTORY)
+assert _core.get_inventory() == []
+assert _core.get_inventory_count_by_name('Coins') == 0
+assert _core.get_inventory_item_by_name('Coins') is None
+)python"));
+}
+
+TEST_CASE("Native social bindings surface offline errors and leave queries usable", "[ScriptBindings][BindingCoverage]")
+{
+    auto fixture = BindingFixture{};
+    fixture.Run("import _core\n");
+    const auto source = GENERATE("_core.say('Hello')", "_core.send_pm('Zezima', 'Hello')",
+        "_core.command('test')", "_core.add_friend('Zezima')", "_core.remove_friend('Zezima')",
+        "_core.add_ignore('Spammer')", "_core.remove_ignore('Spammer')");
+    CAPTURE(source);
+    CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
+    REQUIRE_NOTHROW(fixture.Run("assert _core.get_friends() == [('Zezima', 2)]\nassert _core.get_ignores() == ['Spammer']\n"));
+}
+
 TEST_CASE("Script bindings expose the account's settings", "[ScriptBindings]")
 {
     auto fixture = BindingFixture{};
