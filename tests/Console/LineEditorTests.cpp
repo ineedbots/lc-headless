@@ -3,6 +3,7 @@
 #include "Console/LineEditor.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace
 {
@@ -136,4 +137,102 @@ TEST_CASE("LineEditor keeps at most MAX_HISTORY lines", "[LineEditor]")
     }
 
     CHECK(editor.GetLine() == "1");
+}
+
+TEST_CASE("LineEditor buffers multibyte characters across every byte boundary", "[LineEditor][ConsoleCoverage]")
+{
+    const auto character = std::string{GENERATE("\xC3\xA9", "\xE2\x82\xAC", "\xF0\x9F\x98\x80")};
+    auto editor = LineEditor{};
+    CHECK(editor.Feed("a").empty());
+    for (auto i = std::size_t{0}; i < character.size(); ++i)
+    {
+        CHECK(editor.Feed(std::string_view{character}.substr(i, 1)).empty());
+        CHECK(editor.GetLine() == (i + 1 == character.size() ? "a" + character : "a"));
+    }
+    CHECK(editor.Feed("!").empty());
+    CHECK(editor.Feed(Keys({LEFT, LEFT})).empty());
+    CHECK(editor.GetCursor() == 1);
+    CHECK(editor.Render() == "\r\x1B[2K> a" + character + "!\x1B[2D");
+    CHECK(editor.Feed(RIGHT).empty());
+    CHECK(editor.GetCursor() == 1 + character.size());
+    CHECK(editor.Feed(BACKSPACE).empty());
+    CHECK(editor.GetLine() == "a!");
+    CHECK(editor.GetCursor() == 1);
+}
+
+TEST_CASE("LineEditor deletes multibyte characters without consuming adjacent text", "[LineEditor][ConsoleCoverage]")
+{
+    auto editor = LineEditor{};
+    CHECK(editor.Feed("a\xE2\x82\xAC" "b\xF0\x9F\x98\x80").empty());
+    CHECK(editor.Feed(Keys({HOME, RIGHT, DELETE_KEY})).empty());
+    CHECK(editor.GetLine() == "ab\xF0\x9F\x98\x80");
+    CHECK(editor.GetCursor() == 1);
+    CHECK(editor.Feed(Keys({RIGHT, DELETE_KEY})).empty());
+    CHECK(editor.GetLine() == "ab");
+    CHECK(editor.GetCursor() == 2);
+}
+
+TEST_CASE("LineEditor recognises alternate home and end keys", "[LineEditor][ConsoleCoverage]")
+{
+    const auto home = GENERATE("\x01", "\x1B[1~", "\x1B[7~", "\x1BOH");
+    const auto end = GENERATE("\x05", "\x1B[4~", "\x1B[8~", "\x1BOF");
+    auto editor = LineEditor{};
+    CHECK(editor.Feed("abc").empty());
+    CHECK(editor.Feed(home).empty());
+    CHECK(editor.GetCursor() == 0);
+    CHECK(editor.Feed("<").empty());
+    CHECK(editor.Feed(end).empty());
+    CHECK(editor.GetCursor() == 4);
+    CHECK(editor.Feed(">").empty());
+    CHECK(editor.GetLine() == "<abc>");
+}
+
+TEST_CASE("LineEditor editing keys do nothing at empty line boundaries", "[LineEditor][ConsoleCoverage]")
+{
+    auto editor = LineEditor{};
+    CHECK(editor.Feed(Keys({LEFT, RIGHT, BACKSPACE, DELETE_KEY, UP, DOWN, "\b\x0B\x15"})).empty());
+    CHECK(editor.GetLine().empty());
+    CHECK(editor.GetCursor() == 0);
+    CHECK(editor.Feed("a").empty());
+    CHECK(editor.Feed(Keys({RIGHT, DELETE_KEY})).empty());
+    CHECK(editor.GetLine() == "a");
+    CHECK(editor.Feed(Keys({HOME, LEFT, BACKSPACE})).empty());
+    CHECK(editor.GetLine() == "a");
+    CHECK(editor.GetCursor() == 0);
+}
+
+TEST_CASE("LineEditor drops stray continuation and invalid leading bytes", "[LineEditor][ConsoleCoverage]")
+{
+    auto editor = LineEditor{};
+    CHECK(editor.Feed("\x80\xBF\xF8\xFF\t\x02").empty());
+    CHECK(editor.GetLine().empty());
+    CHECK(editor.Feed("ok\n") == std::vector<std::string>{"ok"});
+}
+
+TEST_CASE("LineEditor discards oversized unfinished escapes and resumes typing", "[LineEditor][ConsoleCoverage]")
+{
+    auto editor = LineEditor{};
+    CHECK(editor.Feed("safe\x1B[").empty());
+    CHECK(editor.Feed(std::string(13, '1')).empty());
+    CHECK(editor.GetLine() == "safe");
+    CHECK(editor.Feed("1").empty());
+    CHECK(editor.Feed(" text\n") == std::vector<std::string>{"safe text"});
+}
+
+TEST_CASE("LineEditor treats split CRLF as one enter and retains the following line", "[LineEditor][ConsoleCoverage]")
+{
+    auto editor = LineEditor{};
+    CHECK(editor.Feed("one\r") == std::vector<std::string>{"one"});
+    CHECK(editor.Feed("").empty());
+    CHECK(editor.Feed("\nsecond").empty());
+    CHECK(editor.GetLine() == "second");
+    CHECK(editor.Feed("\n") == std::vector<std::string>{"second"});
+    CHECK(editor.Feed("\n") == std::vector<std::string>{""});
+}
+
+TEST_CASE("LineEditor renders entered text without leaving a cursor offset", "[LineEditor][ConsoleCoverage]")
+{
+    CHECK(LineEditor::RenderEntered("hello") == "\r\x1B[2K> hello\r\n");
+    CHECK(LineEditor::RenderEntered("") == "\r\x1B[2K> \r\n");
+    CHECK(LineEditor::Erase() == "\r\x1B[2K");
 }
