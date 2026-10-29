@@ -75,7 +75,7 @@ def run_handoff(spec):
     giving = spec.giving
     label = spec.label
     log = spec.log
-    confirmed = False
+    confirmed = Record({'value': False})
     # Why: an item moved into the offer is gone from the pack view, so a give is believed only once the window is shut and the pack reads back.
     # Why: the baseline is taken with no window open, because declining an open trade to grab one kills the partner's handshake.
     before = (None if trade.active() else inventory.count_by_id(id))
@@ -90,7 +90,7 @@ def run_handoff(spec):
         if trade.active() or not pack_readable():
             return False
         # Why: a giver that keeps one of two is still a giver, so "gone from the pack" is the wrong test.
-        return (confirmed if before is None else now < before)
+        return (confirmed.value if before is None else now < before)
 
     if landed():
         return True
@@ -122,7 +122,7 @@ def run_handoff(spec):
         who = trade.partner()
         if who is not None and not names_match(who, partner):
             log(f'declining a trade from \'{who}\' — not the configured partner')
-            trade.decline()
+            yield from trade.decline()
             return False
         screen = ('confirm' if trade.on_confirm_screen() else 'offer')
 
@@ -135,7 +135,7 @@ def run_handoff(spec):
             last = state
         if trade.on_confirm_screen():
             trade.accept()
-            confirmed = True
+            confirmed.value = True
             yield from execution.delay_until(lambda: not trade.active(), SCREEN_MS)
             continue
         if giving and not offered:
@@ -143,7 +143,7 @@ def run_handoff(spec):
             _w4 = yield from trade.offer(name, 1, lambda slot: slot.id == id)
             if not (_w4):
                 log(f'could not offer {name} ({id})')
-                trade.decline()
+                yield from trade.decline()
                 return False
             offered = True
             continue
@@ -159,7 +159,7 @@ def run_handoff(spec):
     yield from execution.delay_until(lambda: not trade.active(), SCREEN_MS)
     yield from execution.delay_ticks(2)
     if not landed():
-        log(f'{label} did not move a {name} (offered={offered} confirmed={confirmed})')
+        log(f'{label} did not move a {name} (offered={offered} confirmed={confirmed.value})')
         return False
     log(f'{label} moved a {name}')
     return True

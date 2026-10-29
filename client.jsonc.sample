@@ -33,6 +33,7 @@
     "scripting": {
         "accountsDirectory": "accounts",
         "scriptsDirectory": "scripts",
+        // 0 disables the Python watchdog; otherwise 10 to 60000 milliseconds.
         "callTimeoutMs": 1000,
         "pollIntervalMs": 10,
         "loginIntervalSeconds": 2,
