@@ -45,17 +45,13 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 | [Running](docs/Running.md) | Command-line options, console commands, reconnects, shutdown and script profiling |
 | [Scripting](docs/scripting/README.md) | Quick start, examples and the full Python API reference |
 | [Building](docs/Building.md) | Toolchains, build presets, tests, coverage, packaging and project layout |
+| [Development workflow](docs/design/DevelopmentWorkflow.md) | Branch policy, release promotion and commit messages |
 | [Design documents](docs/design/) | Implementation plans, code conventions and protocol references |
 
 ## TODO
 
 - Remove this section when points are completed
 - Phase 17 and 18 of the rs2b0t parity design (the p2p quests and account leveler)
-- Better code coverage
-- CI code coverage
-- Proper workflow
-  - master, develop protected branches, feature branches with PRs
-  - proper git commit messages
 
 ## Credits
 
