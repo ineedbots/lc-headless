@@ -10,6 +10,24 @@
 
 using Catch::Matchers::ContainsSubstring;
 
+#ifdef __linux__
+TEST_CASE("CacheStore reports a short read from an index file", "[CacheStore][CompletionCoverage]")
+{
+    // sysfs files advertise a page of data but return only their current text. This deterministically
+    // exercises a short read without racing a thread that truncates the index between stat and read.
+    const auto source = std::filesystem::path{"/sys/devices/system/cpu/online"};
+    if (!std::filesystem::is_regular_file(source)) SKIP("This Linux environment has no CPU online sysfs file");
+    const auto folder = TempFolder{"rs2004-short-index-read"};
+    auto writer = CacheWriter{};
+    writer.Put(0, 1, {1, 2, 3});
+    static_cast<void>(writer.Write(folder.GetPath()));
+    const auto index = folder.GetPath() / CacheStore::GetIndexFileName(0);
+    std::filesystem::remove(index);
+    std::filesystem::create_symlink(source, index);
+    CHECK_THROWS_WITH(CacheStore{folder.GetPath()}, "main_file_cache.idx0: read failed");
+}
+#endif
+
 TEST_CASE("CacheStore reports a file truncated after opening and can read again after restoration", "[CacheStore][CacheReadFailureCoverage]")
 {
     const auto folder = TempFolder{"rs2004-cache-read-failure"};
