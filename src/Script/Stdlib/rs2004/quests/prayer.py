@@ -2,6 +2,7 @@
 declares its prayer as {protect: 'melee', 'magic' or 'missiles', potions: doses to carry}; set_quest_prayer points
 the upkeep at it, and prayer_upkeep, which the prompts call between boxes, spends a tick on it when one's needed."""
 
+from rs2004 import execution
 from rs2004.game import game
 from rs2004.items import inventory
 from rs2004.tabs import PROTECT_FROM_MAGIC, PROTECT_FROM_MELEE, PROTECT_FROM_MISSILES, prayer
