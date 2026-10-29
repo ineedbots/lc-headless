@@ -52,8 +52,38 @@ RATE_WINDOW_MINUTES = 15
 MIN_RATE_SECONDS = 60
 
 
+def _read_jsonl_tail(path, count):
+    """The last count complete records, read backwards from the end.
+
+    Why: some of these files are megabytes and a page refresh only needs the newest record per account."""
+    try:
+        with open(path, 'rb') as handle:
+            handle.seek(0, 2)
+            pos = handle.tell()
+            block = b''
+            while pos > 0 and block.count(b'\n') <= count:
+                step = min(65536, pos)
+                pos -= step
+                handle.seek(pos)
+                block = handle.read(step) + block
+            lines = [line for line in block.split(b'\n') if line.strip()]
+            records = []
+            for line in lines[-count:]:
+                try:
+                    records.append(json.loads(line.decode('utf-8', 'replace')))
+                except ValueError:
+                    continue
+            return records
+    except OSError:
+        return []
+
+
 def _read_jsonl(path, limit=None):
     """Every complete line of a JSONL file, newest last. A line being written is skipped."""
+    if limit is not None and limit <= 100:
+        tail = _read_jsonl_tail(path, limit)
+        if tail:
+            return tail
     records = []
     try:
         with open(path, encoding='utf-8', errors='replace') as handle:
