@@ -272,6 +272,39 @@ TEST_CASE("CollisionMap diagonal wall interactions obey the standing tile's faci
     CHECK_FALSE(map.CanReachWall(X + 1, Z + 1, X, Z, LocShape::WALL_DIAGONAL, WEST));
 }
 
+TEST_CASE("CollisionMap straight walls remain reachable only from their face when adjoining floor is blocked", "[CollisionMap]")
+{
+    const auto angle = GENERATE(WEST, NORTH, EAST, SOUTH);
+    const auto sides = std::to_array<std::pair<s32, s32>>({{-1, 0}, {0, 1}, {1, 0}, {0, -1}});
+    for (auto side = std::size_t{0}; side < sides.size(); ++side)
+    {
+        CAPTURE(angle, side);
+        const auto [dx, dz] = sides[side];
+        auto map = CollisionMap{};
+        CHECK(map.CanReachWall(X + dx, Z + dz, X, Z, LocShape::WALL_STRAIGHT, angle) == (side != (angle + 2u) % 4));
+        map.BlockGround(X + dx, Z + dz);
+        CHECK(map.CanReachWall(X + dx, Z + dz, X, Z, LocShape::WALL_STRAIGHT, angle) == (side == angle));
+    }
+}
+
+TEST_CASE("CollisionMap wall decor checks the facing wall for every rotation and offset", "[CollisionMap]")
+{
+    const auto angle = GENERATE(WEST, NORTH, EAST, SOUTH);
+    const auto shape = GENERATE(LocShape::WALLDECOR_DIAGONAL_OFFSET, LocShape::WALLDECOR_DIAGONAL_NOOFFSET, LocShape::WALLDECOR_DIAGONAL_BOTH);
+    const auto sides = std::to_array<std::pair<s32, s32>>({{-1, 0}, {0, 1}, {1, 0}, {0, -1}});
+    for (auto side = std::size_t{0}; side < sides.size(); ++side)
+    {
+        CAPTURE(angle, shape, side);
+        const auto [dx, dz] = sides[side];
+        const auto firstSide = (angle + (shape == LocShape::WALLDECOR_DIAGONAL_NOOFFSET ? 0u : 2u)) % 4;
+        const auto allowed = shape == LocShape::WALLDECOR_DIAGONAL_BOTH || side == firstSide || side == (firstSide + 1) % 4;
+        auto map = CollisionMap{};
+        CHECK(map.CanReachWallDecor(X + dx, Z + dz, X, Z, shape, angle) == allowed);
+        map.AddWall(X + dx, Z + dz, LocShape::WALL_STRAIGHT, static_cast<u8>((side + 2) % 4), false);
+        CHECK_FALSE(map.CanReachWallDecor(X + dx, Z + dz, X, Z, shape, angle));
+    }
+}
+
 TEST_CASE("CollisionMap reaches areas as the webclient's testLoc does", "[CollisionMap]")
 {
     auto map = CollisionMap{};

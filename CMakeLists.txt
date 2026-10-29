@@ -80,7 +80,10 @@ add_custom_command(
 target_sources(${PROJECT_NAME}Lib PRIVATE ${STDLIB_SOURCE})
 
 add_executable(${PROJECT_NAME})
-target_sources(${PROJECT_NAME} PRIVATE src/main.cpp)
+add_library(${PROJECT_NAME}Main OBJECT src/main.cpp)
+configure_project_target(${PROJECT_NAME}Main)
+target_link_libraries(${PROJECT_NAME}Main PRIVATE ${PROJECT_NAME}Lib)
+target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}Main>)
 if(WIN32)
     target_sources(${PROJECT_NAME} PRIVATE src/main.rc)
 endif()
@@ -92,6 +95,11 @@ enable_testing()
 add_executable(${PROJECT_NAME}Tests)
 target_sources(${PROJECT_NAME}Tests PRIVATE ${TEST_SOURCES})
 configure_project_target(${PROJECT_NAME}Tests)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Terminal tests inject one-shot syscall failures through GNU linker wrappers.
+    target_link_options(${PROJECT_NAME}Tests PRIVATE
+        "LINKER:--wrap=tcgetattr" "LINKER:--wrap=tcsetattr" "LINKER:--wrap=read")
+endif()
 # The example script tests load the repository's scripts folder.
 target_compile_definitions(${PROJECT_NAME}Tests PRIVATE RS2004_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(${PROJECT_NAME}Tests PRIVATE RS2004_APPLICATION_PATH="$<TARGET_FILE:${PROJECT_NAME}>")
@@ -120,7 +128,7 @@ catch_discover_tests(${PROJECT_NAME}Tests
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/test-runtime-$<CONFIG>.json" CONTENT
     "{\"tests\":\"$<TARGET_FILE:${PROJECT_NAME}Tests>\"}\n")
 
-configure_native_coverage(${PROJECT_NAME}Lib ${PROJECT_NAME} ${PROJECT_NAME}Tests)
+configure_native_coverage(${PROJECT_NAME}Lib ${PROJECT_NAME} ${PROJECT_NAME}Tests ${PROJECT_NAME}Main)
 
 # The release archive is one folder laid out like the repository, with the files the client loads from its working
 # directory, so it runs from inside the folder with the default paths in client.jsonc.sample. The tests aren't installed.

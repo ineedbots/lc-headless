@@ -121,13 +121,16 @@ The command configures and builds the `linux-coverage` preset, runs CTest with f
 `build/linux-coverage/coverage/html/index.html`, `coverage.lcov`, `summary.txt`, and `summary.json`. Use
 `--parallel N` to change build and test parallelism, or `--no-build` to collect from an existing coverage build.
 Each run clears its previous reports and profiles. Test failures still fail the command; any reports produced
-from a failed run are partial.
+from a failed run are partial. LLVM coverage warnings also fail collection, including mapping warnings
+that LLVM reports with exit status zero. After coverage build changes, rebuild before using `--no-build`.
 
 The report includes authored C++ under `src/`, including headers and code not referenced by the tests.
 Tests, dependencies, and generated embedded Python are excluded. Application tests launch the built client
 in temporary working directories with synthetic caches and a loopback server. These child processes inherit
 the coverage environment, so startup, shutdown and `main.cpp` contribute to the report too. The test target
-builds the client executable as a dependency. Linux terminal tests use private pseudo-terminals to check raw
+builds the client executable as a dependency. Collection uses the whole-archive test binary plus the small
+`main.cpp` object to avoid conflicting duplicate constexpr mappings from the full client binary.
+Linux terminal tests use private pseudo-terminals to check raw
 input and terminal restoration. C++ exercised by the embedded script tests contributes to native coverage.
 Python source coverage has its own report below.
 

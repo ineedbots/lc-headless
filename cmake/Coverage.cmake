@@ -7,12 +7,12 @@ if(RS2004_ENABLE_COVERAGE)
     endif()
 endif()
 
-function(configure_native_coverage library application tests)
+function(configure_native_coverage library application tests entrypoint)
     if(NOT RS2004_ENABLE_COVERAGE)
         return()
     endif()
 
-    foreach(target IN ITEMS ${library} ${application} ${tests})
+    foreach(target IN ITEMS ${library} ${entrypoint} ${tests})
         target_compile_options(${target} PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     endforeach()
     foreach(target IN ITEMS ${application} ${tests})
@@ -23,11 +23,13 @@ function(configure_native_coverage library application tests)
     # CMake applies this feature to the existing library link without linking it a second time.
     set_property(TARGET ${tests} PROPERTY LINK_LIBRARY_OVERRIDE_${library} WHOLE_ARCHIVE)
 
-    # The application contributes main.cpp; only the test executable is run by the collector.
+    # The entrypoint object contributes main.cpp without the application's duplicate, unused
+    # constexpr mappings, which conflict with the helpers' runtime mappings in the tests.
     file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/coverage-$<CONFIG>.json" CONTENT
 "{
   \"compiler\": \"${CMAKE_CXX_COMPILER}\",
   \"application\": \"$<TARGET_FILE:${application}>\",
+  \"entrypoint\": \"$<FILTER:$<TARGET_OBJECTS:${entrypoint}>,EXCLUDE,[.]pch$>\",
   \"tests\": \"$<TARGET_FILE:${tests}>\"
 }
 ")

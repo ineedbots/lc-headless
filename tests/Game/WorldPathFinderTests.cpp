@@ -470,6 +470,54 @@ TEST_CASE("WorldPathFinder falls back to nearby floor around a large blocked goa
     CHECK(std::max(std::abs(end.x - (BASE + 40)), std::abs(end.z - (BASE + 40))) == 5);
 }
 
+TEST_CASE("WorldPathFinder does not jump to an unreachable island beside a blocked goal", "[WorldPathFinder]")
+{
+    auto cache = GameCache_s{};
+    auto blocked = MapSquare::BlockedTiles{};
+    blocked.set();
+    for (const auto [x, z] : {std::pair{10, 10}, {10, 11}, {40, 41}, {41, 41}, {41, 40}})
+    {
+        blocked.reset(MapSquare::GetBit(0, x, z));
+    }
+    cache.squares.try_emplace(MapSquare::GetId(SQUARE, SQUARE), u8{SQUARE}, u8{SQUARE}, blocked, std::vector<MapLoc_s>{});
+    const auto navigation = Navigation{cache, "[]", "[]"};
+    const auto path = WorldPathFinder::FindPath(navigation, At(10, 10), At(40, 40), {});
+    CHECK_FALSE(path.ok);
+    CHECK(path.reason == "unreachable");
+    CHECK(path.waypoints.empty());
+}
+
+TEST_CASE("NavGraph preserves door metadata and gates parsed currency and quest requirements", "[WorldPathFinder][NavGraph]")
+{
+    const auto cache = MakeCache();
+    const auto navigation = Navigation{cache, R"json([
+        {"kind":"door", "from":{"x":3210,"z":3210}, "to":{"x":3210,"z":3211,"level":1}, "cost":6,
+         "locId":1530, "openLocId":1531, "toTile":{"x":3210,"z":3211},
+         "requires":{"currency":{"name":"Coins","amount":10},
+                     "quests":[{"quest":"Cook's Assistant","minStatus":"started","maxStatus":"complete"}]}},
+        {"kind":"door", "from":{"x":-1,"z":-1}, "to":{"x":3210,"z":3211}, "cost":1},
+        {"kind":"door", "from":{"x":3210,"z":3210}, "to":{"x":-1,"z":-1}, "cost":1}
+    ])json",
+                                       "[]"};
+    const auto& graph = navigation.GetGraph();
+    CHECK(graph.GetEdgeCount() == 1);
+    CHECK(graph.GetDoorCount() == 1);
+    const auto edges = graph.GetEdgesFrom(NavGraph::GetNodeId(BASE + 10, BASE + 10, 0));
+    REQUIRE(edges.size() == 1);
+    CHECK(edges[0]->locId == 1530);
+    CHECK(edges[0]->openLocId == 1531);
+    CHECK(edges[0]->toTile == std::pair{BASE + 10, BASE + 11});
+    REQUIRE(edges[0]->requirement.has_value());
+    auto state = NavState_s{};
+    state.items["coins"] = 9;
+    state.quests["cook's assistant"] = "started";
+    CHECK(edges[0]->requirement->Check(state) == "need 10 Coins (have 9)");
+    state.items["coins"] = 10;
+    CHECK_FALSE(edges[0]->requirement->Check(state).has_value());
+    state.quests.clear();
+    CHECK(edges[0]->requirement->Check(state).has_value());
+}
+
 TEST_CASE("NavJson reads route requests and writes routes", "[WorldPathFinder]")
 {
     const auto request = NavJson::ParseRequest(R"json({

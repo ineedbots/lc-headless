@@ -20,10 +20,19 @@ BUILD = ROOT / "build" / "linux-coverage"
 
 def run(command, **kwargs):
     display = command
-    if "-sources" in command:
+    coverage_command = "-sources" in command
+    if coverage_command:
         display = command[:command.index("-sources")] + ["-sources", "<project sources>"]
+        kwargs.update(stderr=subprocess.PIPE, text=True)
     print("+ " + " ".join(map(str, display)), flush=True)
-    return subprocess.run(command, cwd=ROOT, check=True, **kwargs)
+    result = subprocess.run(command, cwd=ROOT, check=False, **kwargs)
+    if coverage_command and result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    result.check_returncode()
+    # LLVM can report mapping mismatches but still return success, even with --fatal-warnings.
+    if coverage_command and "warning:" in result.stderr:
+        raise RuntimeError("LLVM coverage emitted warnings; the report cannot be trusted")
+    return result
 
 
 def major_version(tool):
@@ -49,9 +58,10 @@ def collect(manifest, output, parallel):
     major = major_version(compiler)
     profdata = llvm_tool("llvm-profdata", compiler, major)
     cov = llvm_tool("llvm-cov", compiler, major)
-    for key in ("application", "tests"):
-        if not Path(manifest[key]).is_file():
-            raise RuntimeError(f"Missing {key}: {manifest[key]}; build linux-coverage first")
+    for key in ("application", "tests", "entrypoint"):
+        path = manifest.get(key)
+        if not path or not Path(path).is_file():
+            raise RuntimeError(f"Missing {key}: {path or 'not in coverage manifest'}; rebuild linux-coverage first")
 
     # Only clear this runner's fixed output directory, never a caller-supplied path.
     if output.exists():
@@ -79,7 +89,8 @@ def collect(manifest, output, parallel):
     # Explicit source selection excludes tests, dependencies and generated embedded Python.
     sources = sorted(str(path) for path in (ROOT / "src").rglob("*")
                      if path.suffix in (".cpp", ".hpp"))
-    common = [manifest["tests"], "-object", manifest["application"], "-instr-profile", str(merged)]
+    common = [manifest["tests"], "-object", manifest["entrypoint"], "-instr-profile", str(merged),
+              "--fatal-warnings"]
     selection = ["-sources", *sources]
     summary = run([cov, "report", *common, *selection], stdout=subprocess.PIPE, text=True).stdout
     (output / "summary.txt").write_text(summary, encoding="utf-8")

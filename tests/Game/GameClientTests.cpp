@@ -323,7 +323,7 @@ TEST_CASE("GameClient identifies which 225 map file differs from the server", "[
     auto client = GameClient{MakeConfig(server), cache, FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
     REQUIRE(PumpUntil(client, [&] { return !client.GetState().messages.empty(); }));
-    const auto expected = std::format("Map square 50_50's {} differ from the server's; walks there may route through changed scenery", landDiffers ? "land" : "locs");
+    const auto expected = std::format("Map square 50_50's {} from the server's; walks there may route through changed scenery", landDiffers ? "land differs" : "locs differ");
     CHECK(std::ranges::any_of(capture.GetEntries(), [&](const CapturedLog_s& entry) { return entry.level == LogLevel_e::Warning && entry.message == expected; }));
     CHECK(client.IsInGame());
 }
