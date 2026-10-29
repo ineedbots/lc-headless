@@ -29,7 +29,8 @@ def run(command, **kwargs):
     if coverage_command and result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     result.check_returncode()
-    # LLVM can report mapping mismatches but still return success, even with --fatal-warnings.
+    # LLVM can report mapping mismatches but still return success. Check stderr directly
+    # because --fatal-warnings is not supported by every llvm-cov version.
     if coverage_command and "warning:" in result.stderr:
         raise RuntimeError("LLVM coverage emitted warnings; the report cannot be trusted")
     return result
@@ -89,8 +90,7 @@ def collect(manifest, output, parallel):
     # Explicit source selection excludes tests, dependencies and generated embedded Python.
     sources = sorted(str(path) for path in (ROOT / "src").rglob("*")
                      if path.suffix in (".cpp", ".hpp"))
-    common = [manifest["tests"], "-object", manifest["entrypoint"], "-instr-profile", str(merged),
-              "--fatal-warnings"]
+    common = [manifest["tests"], "-object", manifest["entrypoint"], "-instr-profile", str(merged)]
     selection = ["-sources", *sources]
     summary = run([cov, "report", *common, *selection], stdout=subprocess.PIPE, text=True).stdout
     (output / "summary.txt").write_text(summary, encoding="utf-8")
