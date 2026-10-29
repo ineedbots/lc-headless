@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../Support/TempFile.hpp"
 
 #include "Console/ConsoleInput.hpp"
 #include "Console/ConsoleLogScope.hpp"
@@ -57,7 +58,7 @@ TEST_CASE("ConsoleInput prints a complete line to a supplied stream", "[ConsoleI
 {
     auto input = ConsoleInput{};
     CHECK_FALSE(input.IsInteractive());
-    const auto file = std::unique_ptr<std::FILE, decltype(&std::fclose)>{std::tmpfile(), &std::fclose};
+    const auto file = MakeTempFile();
     REQUIRE(file != nullptr);
     input.Print(file.get(), "hello");
     input.Print(file.get(), "");

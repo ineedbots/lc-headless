@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "../Support/TempFile.hpp"
 #include "../Support/TempFolder.hpp"
 
 #include "Console/ConsoleInput.hpp"
@@ -37,7 +38,7 @@ namespace
     public:
         explicit StreamCapture(std::FILE* stream)
             : m_stream{stream}
-            , m_file{std::tmpfile(), &std::fclose}
+            , m_file{MakeTempFile()}
         {
             if (!m_file)
             {
