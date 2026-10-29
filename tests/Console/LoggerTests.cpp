@@ -6,6 +6,8 @@
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 
+#include <barrier>
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -487,33 +489,39 @@ TEST_CASE("Logger GetDefault is safe while another thread sets the default", "[L
 {
     constexpr auto THREAD_COUNT = 4;
     constexpr auto SWAP_COUNT = 100;
+    constexpr auto ENTRIES_PER_SWAP = 10;
 
     auto first = LogCapture{};
     auto second = LogCapture{};
     const auto scope = DefaultLoggerScope{first.GetLogger()};
-    auto isStopping = std::atomic<bool>{false};
+    // Bound captured output independently of scheduler delays and keep readers active for every swap.
+    auto round = std::barrier{THREAD_COUNT + 1};
     auto callCounts = std::array<u64, THREAD_COUNT>{};
 
     auto threads = std::vector<std::thread>{};
     for (auto thread = 0; thread < THREAD_COUNT; ++thread)
     {
-        threads.emplace_back([&isStopping, &callCount = callCounts[thread]]
+        threads.emplace_back([&round, &callCount = callCounts[thread]]
         {
-            while (!isStopping)
+            for (auto swap = 0; swap < SWAP_COUNT; ++swap)
             {
-                Logger::GetDefault()->Info("x");
-                ++callCount;
+                round.arrive_and_wait();
+                for (auto entry = 0; entry < ENTRIES_PER_SWAP; ++entry)
+                {
+                    Logger::GetDefault()->Info("x");
+                    ++callCount;
+                }
+                round.arrive_and_wait();
             }
         });
     }
 
     for (auto swap = 0; swap < SWAP_COUNT; ++swap)
     {
-        std::this_thread::sleep_for(1ms);
+        round.arrive_and_wait();
         Logger::SetDefault(swap % 2 == 0 ? second.GetLogger() : first.GetLogger());
+        round.arrive_and_wait();
     }
-
-    isStopping = true;
 
     for (auto& thread : threads)
     {
@@ -526,7 +534,7 @@ TEST_CASE("Logger GetDefault is safe while another thread sets the default", "[L
         made += count;
     }
 
-    CHECK(made > 0);
+    CHECK(made == THREAD_COUNT * SWAP_COUNT * ENTRIES_PER_SWAP);
     CHECK(first.GetEntries().size() + second.GetEntries().size() == made);
 }
 

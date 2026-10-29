@@ -144,8 +144,18 @@ def _search(start, start_gap, group, frozen):
 
 def solve_puzzle(board):
     """The slots to click, in order, to solve the board, each sliding its piece into the gap beside it; None for
-    a board that isn't one."""
+    a malformed or unsolvable board."""
     if not _is_valid_board(board):
+        return None
+    # On this odd-width board, legal moves preserve inversion parity when the gap is ignored.
+    # Reject impossible reads before the grouped search spends a script deadline exploring them.
+    tiles = [value for value in board if value is not None]
+    inversions = 0
+    for i in range(len(tiles)):
+        for j in range(i + 1, len(tiles)):
+            if tiles[i] > tiles[j]:
+                inversions += 1
+    if inversions % 2 != 0:
         return None
     work = list(board)
     frozen = [False] * PUZZLE_SIZE
