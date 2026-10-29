@@ -180,6 +180,6 @@ And in `client.jsonc`, under `scripting`:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `callTimeoutMs` | 1000 | How long one call into a script may run |
+| `callTimeoutMs` | 1000 | How long one call into a script may run, in milliseconds; 0 disables the watchdog |
 | `killGraceSeconds` | 30 | How long after `on_kill_signal` the account logs out anyway |
 | `progressDirectory` | `progress` | Where progress reports are written |

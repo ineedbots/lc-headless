@@ -32,7 +32,10 @@ namespace
             {
                 py_profiler_begin();
             }
-            py_watchdog_begin(timeout.count());
+            if (timeout != 0ms)
+            {
+                py_watchdog_begin(timeout.count());
+            }
         }
 
         ~ExecutionScope()

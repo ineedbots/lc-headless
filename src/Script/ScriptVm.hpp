@@ -9,6 +9,7 @@
 struct ScriptVmOptions_s
 {
     std::filesystem::path scriptsDirectory;
+    // Zero disables the Python watchdog, including route search deadlines.
     std::chrono::milliseconds callTimeout = 1000ms;
     // Empty disables profiling. Contains a PocketPy report and matching sources otherwise.
     std::filesystem::path profileDirectory;
@@ -93,6 +94,11 @@ private:
 template <typename TSearch>
 auto ScriptVm::RunRouteSearch(TSearch search)
 {
+    if (m_options.callTimeout == 0ms)
+    {
+        return search();
+    }
+
     const auto limit = m_options.callTimeout * ROUTE_SEARCH_TIMEOUTS;
     const auto started = std::chrono::steady_clock::now();
     py_watchdog_begin(limit.count());

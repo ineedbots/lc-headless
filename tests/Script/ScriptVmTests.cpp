@@ -434,6 +434,32 @@ TEST_CASE("ScriptVm's watchdog stops a script that runs too long", "[ScriptVm]")
     CHECK_THROWS_WITH(vm.RunSource("while True:\n    pass\n", "top.py"), ContainsSubstring("TimeoutError"));
 }
 
+TEST_CASE("ScriptVm disables its watchdog when the call timeout is zero", "[ScriptVm]")
+{
+    auto capture = LogCapture{};
+    auto vm = ScriptVm{ScriptTestRuntime::Get(), ScriptVmOptions_s{.callTimeout = 0ms}, capture.GetLogger()};
+    vm.Activate();
+    py_bind(vm.GetMain(), "search(ms)", SlowSearch);
+    // Use finite work so a regression fails with TimeoutError rather than hanging the test.
+    // clang-format off
+    REQUIRE_NOTHROW(vm.RunSource("import time\n"
+                                "def busy():\n"
+                                "    end = time.time() + 0.03\n"
+                                "    while time.time() < end:\n"
+                                "        pass\n"
+                                "    return 42\n"
+                                "def search_then():\n"
+                                "    search(30)\n"
+                                "    return busy()\n"
+                                "busy()\n",
+        "unlimited.py"));
+    // clang-format on
+
+    CHECK(py_toint(vm.Call("busy")) == 42);
+    CHECK(py_toint(vm.Call("search_then")) == 42);
+    CHECK(py_toint(vm.Call("busy")) == 42);
+}
+
 TEST_CASE("ScriptVm gives the walker's route search more than a call's timeout", "[ScriptVm]")
 {
     auto capture = LogCapture{};

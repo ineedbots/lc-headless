@@ -127,7 +127,7 @@ void ConfigValidator::Validate(const Config_s& config)
     const auto& scripting = config.scripting;
     Check(!scripting.accountsDirectory.empty(), "scripting.accountsDirectory", "must be a folder path");
     Check(!scripting.scriptsDirectory.empty(), "scripting.scriptsDirectory", "must be a folder path");
-    Check(scripting.callTimeoutMs >= MIN_CALL_TIMEOUT && scripting.callTimeoutMs <= MAX_CALL_TIMEOUT, "scripting.callTimeoutMs", std::format("must be from {} to {}", MIN_CALL_TIMEOUT.count(), MAX_CALL_TIMEOUT.count()));
+    Check(scripting.callTimeoutMs == 0ms || (scripting.callTimeoutMs >= MIN_CALL_TIMEOUT && scripting.callTimeoutMs <= MAX_CALL_TIMEOUT), "scripting.callTimeoutMs", std::format("must be 0 (disabled) or from {} to {}", MIN_CALL_TIMEOUT.count(), MAX_CALL_TIMEOUT.count()));
     Check(scripting.pollIntervalMs >= MIN_POLL_INTERVAL && scripting.pollIntervalMs <= MAX_POLL_INTERVAL, "scripting.pollIntervalMs", std::format("must be from {} to {}", MIN_POLL_INTERVAL.count(), MAX_POLL_INTERVAL.count()));
     Check(scripting.loginIntervalSeconds >= 0s && scripting.loginIntervalSeconds <= MAX_LOGIN_INTERVAL, "scripting.loginIntervalSeconds", std::format("must be from 0 to {}", MAX_LOGIN_INTERVAL.count()));
     Check(scripting.killGraceSeconds >= 0s && scripting.killGraceSeconds <= MAX_KILL_GRACE, "scripting.killGraceSeconds", std::format("must be from 0 to {}", MAX_KILL_GRACE.count()));

@@ -715,6 +715,7 @@ TEST_CASE("ConfigFile accepts valid values", "[ConfigFile]")
     {
         CHECK(ParseAccepted(SetKey({"scripting", "accountsDirectory"}, "C:/bots/accounts")).scripting.accountsDirectory == "C:/bots/accounts");
         CHECK(ParseAccepted(SetKey({"scripting", "scriptsDirectory"}, "../scripts")).scripting.scriptsDirectory == "../scripts");
+        CHECK(ParseAccepted(SetKey({"scripting", "callTimeoutMs"}, 0)).scripting.callTimeoutMs == 0ms);
         CHECK(ParseAccepted(SetKey({"scripting", "callTimeoutMs"}, 10)).scripting.callTimeoutMs == 10ms);
         CHECK(ParseAccepted(SetKey({"scripting", "callTimeoutMs"}, 60000)).scripting.callTimeoutMs == 60000ms);
         CHECK(ParseAccepted(SetKey({"scripting", "pollIntervalMs"}, 1)).scripting.pollIntervalMs == 1ms);
@@ -855,6 +856,8 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {{"scripting", "accountsDirectory"}, ""},
         {{"scripting", "accountsDirectory"}, 5},
         {{"scripting", "scriptsDirectory"}, ""},
+        {{"scripting", "callTimeoutMs"}, -1},
+        {{"scripting", "callTimeoutMs"}, 1},
         {{"scripting", "callTimeoutMs"}, 9},
         {{"scripting", "callTimeoutMs"}, 60001},
         {{"scripting", "callTimeoutMs"}, "1000"},
@@ -1051,7 +1054,7 @@ TEST_CASE("ConfigFile::Load", "[ConfigFile]")
     SECTION("puts the file's path in front of the message")
     {
         auto json = ParseJsonWithComments(EXAMPLE);
-        json["scripting"]["callTimeoutMs"] = 0;
+        json["scripting"]["callTimeoutMs"] = 9;
         WriteFile(path, json.dump());
 
         CHECK_THROWS_AS(ConfigFile::Load(path, logger), ConfigError);

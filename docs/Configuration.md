@@ -103,7 +103,7 @@ All values below are integers except directory paths. Units are part of each key
 | `accountsDirectory` | `accounts` | Nonempty path to account files. |
 | `scriptsDirectory` | `scripts` | Nonempty path to scripts and imported modules. |
 | `progressDirectory` | `progress` | Nonempty path to progress reports. |
-| `callTimeoutMs` | `1000` | 10–60000; watchdog limit for a call into Python. |
+| `callTimeoutMs` | `1000` | 0 disables the Python watchdog; otherwise 10–60000 ms per call. |
 | `pollIntervalMs` | `10` | 1–1000; longest main-loop wait between passes. |
 | `loginIntervalSeconds` | `2` | 0–60; spacing between accounts' login attempts, including retries. |
 | `killGraceSeconds` | `30` | 0–600; grace period after the first stop signal. |

@@ -211,7 +211,7 @@ The single `ConfigFile` this section first described was split by job ([Refactor
 | `client.logFile` | string | `""` | Where log lines are appended as plain text, at `logLevel`, as well as the console. Its folder is made if need be. Empty for no file. Lines logged while the config file loads come before it opens, so they're only on the console |
 | `scripting.accountsDirectory` | string | `"accounts"` | Not empty. The folder of account files, relative to the working directory |
 | `scripting.scriptsDirectory` | string | `"scripts"` | Not empty. Where script files and their imports are found |
-| `scripting.callTimeoutMs` | integer | `1000` | 10 to 60000. How long one call into a script may run; the walker's route search may take 5 times it (`ScriptVm::ROUTE_SEARCH_TIMEOUTS`). Stored as `std::chrono::milliseconds` |
+| `scripting.callTimeoutMs` | integer | `1000` | 0 disables the watchdog; otherwise 10 to 60000. How long one call into a script may run; the walker's route search may take 5 times it (`ScriptVm::ROUTE_SEARCH_TIMEOUTS`). Stored as `std::chrono::milliseconds` |
 | `scripting.pollIntervalMs` | integer | `10` | 1 to 1000. The longest the main loop waits between passes |
 | `scripting.loginIntervalSeconds` | integer | `2` | 0 to 60. The gap between account logins, and between any two accounts' later login attempts (`LoginQueue`) |
 | `scripting.killGraceSeconds` | integer | `30` | 0 to 600. How long a script that handles Ctrl+C has to stop its account |
@@ -432,7 +432,7 @@ Application::Application(const std::filesystem::path& configPath, std::shared_pt
 
 ```
 Fatal error: client.jsonc: not found; copy client.jsonc.sample there and fill it in
-Fatal error: client.jsonc: scripting.callTimeoutMs: must be from 10 to 60000
+Fatal error: client.jsonc: scripting.callTimeoutMs: must be 0 (disabled) or from 10 to 60000
 ```
 
 ```cpp
@@ -637,9 +637,9 @@ m_connection.emplace(*m_net, MakeOptions(m_config->server), m_logger);
     - The paths in `Validate` are written out by hand. A test for each rule (§6.5) catches a path that no longer matches its member after a rename.
 - **TLS.** `tlsCaFile` matters only for `wss`. With `ws` it's stored as written and unused, without a warning, so switching between a local `ws` server and a remote `wss` one doesn't touch it. With `wss` and `NONE`, `Parse` logs `Warning` through the logger it was given: `Config disables TLS certificate verification (server.tlsCaFile is NONE)`.
 - **Error messages.**
-    - Every message from `Parse` but a syntax error reads `{path}: {problem}`, such as `scripting.callTimeoutMs: must be from 10 to 60000`.
+    - Every message from `Parse` but a syntax error reads `{path}: {problem}`, such as `scripting.callTimeoutMs: must be 0 (disabled) or from 10 to 60000`.
     - Messages never contain a value from the file.
-    - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: scripting.callTimeoutMs: must be from 10 to 60000` reads as one line.
+    - They read like other exception messages: no trailing period, and lowercase, so that `client.jsonc: scripting.callTimeoutMs: must be 0 (disabled) or from 10 to 60000` reads as one line.
 - **Logging.**
     - The TLS warning is logged while the file loads, before `Application` calls `SetLevel` with `logLevel`. It therefore shows at the threshold the logger was created with, `Info` from `main`, even when the file sets `"error"`. That is deliberate: a problem in the file that sets the level should still be visible.
 - **Adding a setting.**
@@ -700,7 +700,7 @@ Those warnings are gone now, and with them their cases: a leftover key is just a
 ### 6.1 Strategy
 
 - **Inputs.**
-    - Most cases change one key of the §3 example and leave the rest valid. The test parses the example with nlohmann (`nlohmann::json::parse(EXAMPLE, nullptr, true, true)`), edits it (`json["scripting"]["callTimeoutMs"] = 0`, `json["account"].erase("password")`), and passes `json.dump()` to `ConfigFile::Parse`.
+    - Most cases change one key of the §3 example and leave the rest valid. The test parses the example with nlohmann (`nlohmann::json::parse(EXAMPLE, nullptr, true, true)`), edits it (`json["scripting"]["callTimeoutMs"] = 9`, `json["account"].erase("password")`), and passes `json.dump()` to `ConfigFile::Parse`.
     - Cases that need exact text, such as syntax errors and duplicate keys, are raw string literals with a delimiter that JSON can't end early: `R"json(...)json"`.
 - **Logging.** Every test holds a `LogCapture` ([LoggerDesign.md](LoggerDesign.md) §6.1) and passes `*capture.GetLogger()` to `Parse` and `Load`, so warnings never reach the console. The tables write `Parse(text)` and `Load(path)` and leave that argument out. Where a row says "no log entries" or names a warning, the test checks the capture.
 - **Failures.** A failure must be a `ConfigError` (`REQUIRE_THROWS_AS`), and its message must contain the key's dotted path (`REQUIRE_THROWS_WITH` with `ContainsSubstring`). The rest of the message isn't checked, except for §6.3's line and column, §6.6's secrets and §6.8's first-run message.
@@ -818,7 +818,7 @@ The tests work in a fresh folder under `std::filesystem::temp_directory_path()`,
 
 - The §3 example, written to a file: `Load` returns the same members as §6.2.
 - The same file with CRLF line endings and a BOM: loads.
-- A file whose `scripting.callTimeoutMs` is 0: `ConfigError` whose message starts with the path and `: `, and contains `scripting.callTimeoutMs`.
+- A file whose `scripting.callTimeoutMs` is 9: `ConfigError` whose message starts with the path and `: `, and contains `scripting.callTimeoutMs`.
 - **Missing file.** A path that doesn't exist throws a `ConfigError` whose message contains the path and `not found`, and no file is created.
 
 ### 6.9 Tooling
