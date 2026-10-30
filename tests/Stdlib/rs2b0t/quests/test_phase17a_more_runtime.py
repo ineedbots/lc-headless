@@ -246,3 +246,31 @@ def raft_landing():
 
 
 test('the raft confirms movement from a copied departure tile', raft_landing)
+
+
+def alomone_reengages_after_food():
+    state = {'face': None, 'ticks': 0, 'attacks': 0}
+    def attack(op):
+        assert op == 'Attack'
+        state['attacks'] += 1
+        state['face'] = ('npc', 9)
+        return True
+    npc = Fake(index=9, name='Alomone', distance=lambda: 1, actions=lambda: ['Attack'], interact=attack)
+    spy_on(cult.traversal, 'walk_resilient', impl=lambda *args, **kwargs: result(True))
+    spy_on(cult.npcs, 'query', impl=querying(lambda: [npc]))
+    spy_on(cult.npcs, 'all', impl=lambda: [npc] if state['ticks'] < 2 else [])
+    spy_on(cult.game, 'facing', impl=lambda: state['face'])
+    spy_on(cult.game, 'set_combat_style', returns=True)
+    def feed():
+        state['face'] = None
+        yield
+    def tick(count):
+        state['ticks'] += 1
+        yield
+    spy_on(cult.sustain, 'run', impl=feed)
+    spy_on(execution, 'delay_ticks', impl=tick)
+    expect(run_wait(cult.slay_alomone(lambda message: None))).to_be(True)
+    expect(state['attacks']).to_be(3)
+
+
+test('Alomone combat re-engages after eating clears the attack', alomone_reengages_after_food)

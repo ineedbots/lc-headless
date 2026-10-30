@@ -64,6 +64,7 @@ def decide(snap):
 
 fishingcontest = QuestModule(**{
     'record': quest_record('fishingcompo'),
+    'resume_at': in_compound,
     'bank': 'nearest',
     'food': 8,
     'tools': [

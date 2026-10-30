@@ -134,7 +134,7 @@ All twelve quest modules and both bots are implemented, with lazy queue registra
 - **Done when:**
     - [x] Their tests are ported and pass, and RoguesPurse's.
     - [ ] Live, AIOQuester finishes all twelve in one queue.
-    - [ ] FlourCollector and RoguesPurse each bank a load.
+    - [x] FlourCollector and RoguesPurse each bank a load (28 pots of flour and 27 herbs on scratch accounts).
 
 ---
 

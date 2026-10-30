@@ -146,14 +146,19 @@ def kill_target(npc, name):
     _w9 = npc.interact('Attack')
     if not (_w9):
         return False
-    _w10 = yield from execution.delay_until(lambda: game.in_combat(), 5000)
+    _w10 = yield from execution.delay_until(lambda: game.in_combat() or not any([n.index == idx for n in npcs.all()]), 5000)
     if not (_w10):
         return False
     deadline = _core.step_time() + 90000
     while _core.step_time() < deadline:
-        if not any([n.index == idx and name in (n.name or '').lower() for n in npcs.all()]):
+        current = ([n for n in npcs.all() if n.index == idx and name in (n.name or '').lower()] or [None])[0]
+        if current is None:
             return True
         yield from sustain.run()
+        # Eating clears our attack even while the NPC keeps its target and health bar.
+        if game.facing() != ('npc', idx):
+            if not current.interact('Attack'):
+                return False
         yield from execution.delay_ticks(1)
     return False
 
@@ -405,7 +410,7 @@ def bank_early_essence(log):
     _w53 = yield from open_bank_leg('priestperil: essence-bank — no known bank', VARROCK_EAST_BANK, log)
     if not (_w53):
         return False
-    yield from bank.deposit_all_matching(lambda name, id: name.lower() == 'rune essence', log)
+    yield from bank.deposit_all_matching(lambda name, id: name.lower() == 'rune essence')
     yield from execution.delay_until(lambda: inventory.count('Rune essence') == 0, 6000)
     return False
 

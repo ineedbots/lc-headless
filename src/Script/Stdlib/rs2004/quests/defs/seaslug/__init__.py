@@ -113,6 +113,7 @@ def decide(snap):
 
 seaslug = QuestModule(**{
     'record': quest_record('seaslug'),
+    'resume_at': lambda tile: on_platform(tile) or on_island(tile),
     'bank': SS_TILE.BANK,
     'tools': ['torch', 'damp sticks', 'dry sticks', 'broken glass', 'swamp paste', 'coins'],
     'read_progress': read_sea_slug_progress,

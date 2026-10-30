@@ -144,6 +144,33 @@ def priest_attack():
 test('Priest in Peril accepts the synchronous NPC attack result', priest_attack)
 
 
+def priest_reengages_after_food():
+    state = {'face': None, 'ticks': 0, 'attacks': 0}
+    def attack(op):
+        assert op == 'Attack'
+        state['attacks'] += 1
+        state['face'] = ('npc', 7)
+        return True
+    npc = Fake(index=7, name='Monk of Zamorak', interact=attack)
+    spy_on(priest.npcs, 'all', impl=lambda: [npc] if state['ticks'] < 2 else [])
+    spy_on(game, 'facing', impl=lambda: state['face'])
+    spy_on(game, 'in_combat', returns=True)
+    spy_on(execution, 'delay_until', impl=instant_until)
+    def feed():
+        state['face'] = None
+        yield
+    def tick(count):
+        state['ticks'] += 1
+        yield
+    spy_on(priest.sustain, 'run', impl=feed)
+    spy_on(execution, 'delay_ticks', impl=tick)
+    expect(run_wait(priest.kill_target(npc, 'monk of zamorak'))).to_be(True)
+    expect(state['attacks']).to_be(3)
+
+
+test('Priest in Peril re-engages its live target after eating clears the attack', priest_reengages_after_food)
+
+
 def priest_guardian_landing():
     state = {'settled': False}
     npc = Fake(name='Temple guardian', distance=lambda: 1, actions=lambda: ['Attack'])
@@ -162,6 +189,22 @@ def priest_guardian_landing():
 
 
 test('Priest in Peril settles the trapdoor landing before looking for the guardian', priest_guardian_landing)
+
+
+def priest_banks_early_essence():
+    spy_on(priest, 'walk_to', impl=lambda *args: result(True))
+    spy_on(priest, 'open_bank_leg', impl=lambda *args: result(True))
+    def deposit(predicate):
+        expect(predicate('Rune essence', 1436)).to_be(True)
+        expect(predicate('Bucket', 1925)).to_be(False)
+        yield
+    spy_on(bank, 'deposit_all_matching', impl=deposit)
+    spy_on(inventory, 'count', returns=0)
+    spy_on(execution, 'delay_until', impl=instant_until)
+    expect(run_wait(priest.bank_early_essence(lambda message: None))).to_be(False)
+
+
+test('Priest in Peril banks early essence through the native deposit helper signature', priest_banks_early_essence)
 
 
 def trap_message():

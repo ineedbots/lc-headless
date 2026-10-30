@@ -282,10 +282,14 @@ def slay_alomone(log):
     log('hazeelcult: fighting Alomone for the Carnillean armour')
     deadline = _core.step_time() + 90000
     while _core.step_time() < deadline:
-        if not any([n.index == index and n.name == 'Alomone' for n in npcs.all()]):
+        current = ([n for n in npcs.all() if n.index == index and n.name == 'Alomone'] or [None])[0]
+        if current is None:
             return True
         # Why: `Sustain.run` pumps the host's eat hook, so a fight held inside one custom step never eats without this.
         yield from sustain.run()
+        if game.facing() != ('npc', index):
+            if not current.interact('Attack'):
+                return False
         yield from execution.delay_ticks(1)
     log('hazeelcult: Alomone outlasted the fight budget')
     return False
@@ -434,6 +438,7 @@ def decide(snap):
 
 hazeelcult = QuestModule(
     record=quest_record('hazeelcult'),
+    resume_at=lambda tile: in_hideout(tile) or at_cave_mouth(tile),
     bank=QUEST_BANK,
     hops=HOPS,
     food=6,
