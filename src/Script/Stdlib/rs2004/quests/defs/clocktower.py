@@ -270,7 +270,8 @@ def cross_rat_gate(log):
     def _fn16():
         t = game.tile()
         return t is not None and in_white_room(t)
-    crossed = yield from execution.delay_until(_fn16, 6000)
+    # The gate's mesbox suspends the crossing until its continue is acknowledged.
+    crossed = yield from drive_until(_fn16, [], log, 6000)
     if crossed:
         # Why: the gate teleports you, and every obj query reads blank for about a tick after the region changes.
         yield from settle_scene()
@@ -441,6 +442,7 @@ def decide(snap):
 
 clocktower = QuestModule(
     record=quest_record('cog'),
+    resume_at=lambda tile: in_white_room(tile) or in_blue_room(tile) or in_pen(tile),
     bank=QUEST_BANK,
     hops=HOPS,
     tools=['cog', 'rat poison', 'bucket', 'bucket of water'],

@@ -92,7 +92,7 @@ test('RoguesPurse banking mode preserves the identified herb', purse_cycle('bank
 def purse_bank_load():
     bot = RoguesPurse()
     bot.banked = 0
-    state = {'herbs': 27}
+    state = {'herbs': 27, 'deposited': False}
     spy_on(chat_dialog, 'can_continue', returns=False)
     spy_on(inventory, 'count_by_id', impl=lambda id: state['herbs'] if id == PURSE.id else 0)
     import bots.rogues_purse as module
@@ -100,17 +100,37 @@ def purse_bank_load():
     spy_on(banking, 'open', impl=lambda *args, **kwargs: result(True))
     def deposit(predicate):
         assert predicate('Rogues purse', 1534) and not predicate('Coins', 995)
-        state['herbs'] = 0
-        return True
+        state['deposited'] = True
         yield
     spy_on(bank, 'deposit_all_matching', impl=deposit)
-    spy_on(bank, 'close', impl=instant_ticks)
+    def close():
+        if state['deposited']:
+            state['herbs'] = 0
+        yield
+    spy_on(bank, 'close', impl=close)
     expect(run_wait(bot.bank_load())).to_be(True)
     expect(bot.banked).to_be(27)
     expect(bot.need_fare).to_be(True)
 
 
 test('RoguesPurse banks a load while preserving its return fare', purse_bank_load)
+
+
+def purse_refused_deposit():
+    bot = RoguesPurse()
+    bot.banked = 0
+    spy_on(chat_dialog, 'can_continue', returns=False)
+    spy_on(inventory, 'count_by_id', impl=lambda id: 27 if id == PURSE.id else 0)
+    import bots.rogues_purse as module
+    spy_on(module, 'leave_pothole', impl=lambda log: result(True))
+    spy_on(banking, 'open', impl=lambda *args, **kwargs: result(True))
+    spy_on(bank, 'deposit_all_matching', impl=lambda predicate: result(None))
+    spy_on(bank, 'close', impl=instant_ticks)
+    expect(run_wait(bot.bank_load())).to_be(False)
+    expect(bot.banked).to_be(0)
+
+
+test('RoguesPurse does not count a refused deposit as a banked load', purse_refused_deposit)
 
 
 def priest_attack():
@@ -122,6 +142,26 @@ def priest_attack():
 
 
 test('Priest in Peril accepts the synchronous NPC attack result', priest_attack)
+
+
+def priest_guardian_landing():
+    state = {'settled': False}
+    npc = Fake(name='Temple guardian', distance=lambda: 1, actions=lambda: ['Attack'])
+    spy_on(priest, 'walk_to', impl=lambda *args: result(True))
+    spy_on(priest.locs, 'query', impl=querying(lambda: []))
+    spy_on(priest.npcs, 'query', impl=querying(lambda: [npc] if state['settled'] else []))
+    def settle():
+        state['settled'] = True
+        yield
+    spy_on(priest, 'settle_scene', impl=settle)
+    attacked = spy_on(priest, 'kill_target', impl=lambda npc, name: result(True))
+    spy_on(priest, 'goto_npc', impl=lambda *args: result(True))
+    spy_on(priest, 'talk_through', impl=lambda *args: result(True))
+    run_wait(priest.early_leg(lambda message: None))
+    expect(len(attacked.calls)).to_be(1)
+
+
+test('Priest in Peril settles the trapdoor landing before looking for the guardian', priest_guardian_landing)
 
 
 def trap_message():

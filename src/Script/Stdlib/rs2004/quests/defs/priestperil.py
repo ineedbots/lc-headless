@@ -14,6 +14,7 @@ from rs2004.items import inventory
 from rs2004.tabs import quests
 from rs2004.quests.exec.primitives import drive_dialog, goto_npc, is_underground, talk_through, walk_with_hops
 from rs2004.quests.exec.steps import execute_step, open_bank_leg
+from rs2004.quests.exec.prompts import settle_scene
 from rs2004.quests.data import QUESTS
 from rs2004.quests.engine.types import QuestModule, QuestProgress
 from rs2004.quests.data import quest_record
@@ -171,6 +172,7 @@ def early_leg(log):
     _w14 = yield from walk_to(DOG_TILE, 8, log)
     if not (_w14):
         return False
+    yield from settle_scene()
     dog = npcs.query().name('Temple guardian').action('Attack').within(12).nearest()
     if dog:
         log('priestperil: attacking Temple guardian')

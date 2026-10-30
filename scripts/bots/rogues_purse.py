@@ -167,12 +167,16 @@ class RoguesPurse(LoopingBot):
         if not opened:
             return False
         before = inventory.count_by_id(PURSE.id)
-        deposited = yield from bank.deposit_all_matching(lambda name, id: id == PURSE.id)
-        if deposited:
-            self.banked += max(0, before - inventory.count_by_id(PURSE.id))
+        try:
+            yield from bank.deposit_all_matching(lambda name, id: id == PURSE.id)
+        except Exception as error:
+            yield from bank.close()
+            raise error
         yield from bank.close()
+        deposited = max(0, before - inventory.count_by_id(PURSE.id))
+        self.banked += deposited
         self.need_fare = True
-        return deposited
+        return deposited > 0
 
     def recovery_anchor(self):
         return PURSE.stand

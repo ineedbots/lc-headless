@@ -180,6 +180,32 @@ def cog_place():
 test('placing a cog keeps its colour available inside the result predicate', cog_place)
 
 
+def rat_gate_message():
+    state = {'tile': Tile(2579, 9656), 'clicked': False}
+    spy_on(clock.traversal, 'walk_resilient', impl=lambda *args, **kwargs: result(True))
+    spy_on(clock.game, 'tile', impl=lambda: state['tile'])
+    def click(op):
+        assert op == 'Go-through'
+        state['clicked'] = True
+        return True
+    spy_on(clock, 'loc_by_id', returns=Fake(interact=click))
+    def drive(expect, prefer, log, timeout):
+        assert state['clicked'] and not expect()
+        state['tile'] = Tile(2578, 9656)
+        assert expect()
+        return True
+        yield
+    driven = spy_on(clock, 'drive_until', impl=drive)
+    spy_on(clock, 'settle_scene', impl=instant_ticks)
+    expect(run_wait(clock.cross_rat_gate(lambda message: None))).to_be(True)
+    expect(len(driven.calls)).to_be(1)
+    expect(clock.clocktower.resume_at(state['tile'])).to_be(True)
+    expect(clock.clocktower.resume_at(Tile(2655, 3283))).to_be(False)
+
+
+test('the rat gate drives its message before waiting for the crossing', rat_gate_message)
+
+
 def bankless_armour():
     snap = QuestSnapshot(journal='in_progress', progress=cult.parse_hazeel_journal(
         'I managed to enter the hideout, kill the cult leader'), tile=Tile(2609, 9669), bank_known=False)
