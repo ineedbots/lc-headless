@@ -124,8 +124,80 @@ def _dragonslayer():
     return dragonslayer
 
 
+def _druidicritual():
+    from rs2004.quests.defs.druidicritual import druidicritual
+    return druidicritual
+
+
+def _monksfriend():
+    from rs2004.quests.defs.monksfriend import monksfriend
+    return monksfriend
+
+
+def _gertrudescat():
+    from rs2004.quests.defs.gertrudescat import gertrudescat
+    return gertrudescat
+
+
+def _junglepotion():
+    from rs2004.quests.defs.junglepotion import junglepotion
+    return junglepotion
+
+
+def _clocktower():
+    from rs2004.quests.defs.clocktower import clocktower
+    return clocktower
+
+
+def _hazeelcult():
+    from rs2004.quests.defs.hazeelcult import hazeelcult
+    return hazeelcult
+
+
+def _witchshouse():
+    from rs2004.quests.defs.witchshouse import witchshouse
+    return witchshouse
+
+
+def _fishingcontest():
+    from rs2004.quests.defs.fishingcontest import fishingcontest
+    return fishingcontest
+
+
+def _murder():
+    from rs2004.quests.defs.murder import murder
+    return murder
+
+
+def _seaslug():
+    from rs2004.quests.defs.seaslug import seaslug
+    return seaslug
+
+
+def _priestperil():
+    from rs2004.quests.defs.priestperil import priestperil
+    return priestperil
+
+
+def _tribaltotem():
+    from rs2004.quests.defs.tribaltotem import tribaltotem
+    return tribaltotem
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'witchshouse': ('ball', _witchshouse),
+    'fishingcontest': ('fishingcompo', _fishingcontest),
+    'murder': ('murder', _murder),
+    'seaslug': ('seaslug', _seaslug),
+    'priestperil': ('priestperil', _priestperil),
+    'tribaltotem': ('totem', _tribaltotem),
+    'clocktower': ('cog', _clocktower),
+    'hazeelcult': ('hazeelcult', _hazeelcult),
+    'junglepotion': ('junglepotion', _junglepotion),
+    'gertrudescat': ('fluffs', _gertrudescat),
+    'druidicritual': ('druid', _druidicritual),
+    'monksfriend': ('drunkmonk', _monksfriend),
     'shieldofarrav': ('blackarmgang', _shieldofarrav),
     'dragonslayer': ('dragon', _dragonslayer),
     'demonslayer': ('demon', _demonslayer),

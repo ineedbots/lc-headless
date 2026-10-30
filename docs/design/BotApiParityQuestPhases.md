@@ -129,10 +129,12 @@ None needs a members' quest except Jungle Potion, which needs Druidic Ritual fro
 
 **Bots:** FlourCollector (88 lines), which imports Murder Mystery's areas, and RoguesPurse (445), which imports Jungle Potion's stages.
 
+All twelve quest modules and both bots are implemented, with lazy queue registration, upstream tests, runtime integration checks, cache checks and stubs. All live acceptance checks pass. See the design doc's "As built: 17a" for the implementation and scratch-account evidence.
+
 - **Done when:**
-    - [ ] Their tests are ported and pass, and RoguesPurse's.
-    - [ ] Live, AIOQuester finishes all twelve in one queue.
-    - [ ] FlourCollector and RoguesPurse each bank a load.
+    - [x] Their tests are ported and pass, and RoguesPurse's.
+    - [x] Live, AIOQuester finishes all twelve in one queue (21 quest points including Rune Mysteries for essence-mine access; development restarts installed fixes).
+    - [x] FlourCollector and RoguesPurse each bank a load (28 pots of flour and 27 herbs on scratch accounts).
 
 ---
 

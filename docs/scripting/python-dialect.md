@@ -102,6 +102,21 @@ Use `--profile` to record Python line timings, optionally with `--watch`. See [S
 
 The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 
+| rs2b0t quest module | Python module |
+|---|---|
+| `api/ai/quests/defs/druidicritual.ts` | `rs2004.quests.defs.druidicritual` |
+| `api/ai/quests/defs/monksfriend.ts` | `rs2004.quests.defs.monksfriend` |
+| `api/ai/quests/defs/gertrudescat.ts` | `rs2004.quests.defs.gertrudescat` |
+| `api/ai/quests/defs/junglepotion.ts` | `rs2004.quests.defs.junglepotion` |
+| `api/ai/quests/defs/clocktower.ts` | `rs2004.quests.defs.clocktower` |
+| `api/ai/quests/defs/hazeelcult.ts` | `rs2004.quests.defs.hazeelcult` |
+| `api/ai/quests/defs/witchshouse/` | `rs2004.quests.defs.witchshouse` |
+| `api/ai/quests/defs/fishingcontest/` | `rs2004.quests.defs.fishingcontest` |
+| `api/ai/quests/defs/murder/` | `rs2004.quests.defs.murder` |
+| `api/ai/quests/defs/seaslug/` | `rs2004.quests.defs.seaslug` |
+| `api/ai/quests/defs/priestperil.ts` | `rs2004.quests.defs.priestperil` |
+| `api/ai/quests/defs/tribaltotem.ts` | `rs2004.quests.defs.tribaltotem` |
+
 | TypeScript | Python |
 |---|---|
 | `class Miner extends LoopingBot { loop() {...} }` | `class Miner(LoopingBot): def loop(self): ...` |

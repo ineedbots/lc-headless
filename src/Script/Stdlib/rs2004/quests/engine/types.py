@@ -155,7 +155,7 @@ class QuestModule:
     - warn_readiness(): a one-off advisory when the quest starts, or None.
     - observe(snap, step): extra log lines when it decides a step, or on death.
     - on_start(): called once, when the quest first runs.
-    - resume_at(tile): prioritise this started quest when a restarted queue is inside its one-way area."""
+    - resume_at(tile): prioritise this started quest inside its one-way area and defer generic banking until outside."""
 
     # Why: the members are plain attributes, never methods, since pocketpy calls a class's method over a function set
     # on its instance.

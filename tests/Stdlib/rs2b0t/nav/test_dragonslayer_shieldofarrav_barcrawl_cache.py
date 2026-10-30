@@ -1,4 +1,4 @@
-"""Phase 16c's exact items, NPCs and objects against the real revision-289 cache."""
+"""Check Dragon Slayer, Shield of Arrav and barcrawl targets against the real 289 cache."""
 from rs2004.quests.defs.dragonslayer.areas import DS_ID, DS_ITEM
 from rs2004.quests.defs.dragonslayer.maze import MAZE_NPC
 from rs2004.quests.defs.shieldofarrav.areas import SOA_ID, SOA_LOC

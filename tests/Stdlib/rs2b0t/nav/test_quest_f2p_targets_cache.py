@@ -1,4 +1,4 @@
-"""Phase 16b's item, NPC and loc names against the real 289 cache."""
+"""Check free-to-play quest item, NPC and loc names against the real 289 cache."""
 from rs2004.quests.defs import def_by_id
 from rs2004.quests.defs.ernest.areas import EC_ID, EC_NAME
 from rs2004.quests.defs.knightssword.areas import KS_ID, KS_NAME

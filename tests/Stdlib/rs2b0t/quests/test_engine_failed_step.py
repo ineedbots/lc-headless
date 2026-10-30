@@ -192,6 +192,28 @@ def row_status(id):
     return None
 
 
+def resumed_sealed_area():
+    engine, host = fixture()
+    engine._provisioned.discard('runemysteries')
+    engine._deposited.discard('runemysteries')
+    engine._freshened.discard('runemysteries')
+    stub(runemysteries, resume_at=lambda tile: tile.x == 2936, read_stage=lambda: 1)
+    spy_on(game, 'tile', returns=Tile(2936, 3461, 0))
+    S['ok'] = True
+    yield from engine.execute()
+    expect(S['attempts']).to_be(1)
+    expect(S['bank_actions']).to_equal([])
+    expect('runemysteries' in engine._provisioned).to_be(False)
+    expect('runemysteries' in engine._deposited).to_be(False)
+    spy_on(game, 'tile', returns=Tile(3093, 3243, 0))
+    yield from engine.execute()
+    expect(S['attempts']).to_be(1)
+    expect('open' in S['bank_actions']).to_be(True)
+
+
+test('a resumed sealed area defers banking without retiring mainland provisioning', resumed_sealed_area)
+
+
 # The oracle tests: does not park when the eighth false step advances only flags, or only the stage.
 
 def read_flags():

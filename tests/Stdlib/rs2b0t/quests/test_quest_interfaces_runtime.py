@@ -1,4 +1,4 @@
-"""Exercise phase 16c at the journal, banking and card interfaces."""
+"""Exercise quest journal, banking and card interfaces."""
 import _core
 from rs2004 import execution
 from rs2004.game import reader, game as maze_game

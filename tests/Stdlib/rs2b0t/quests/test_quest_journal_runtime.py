@@ -1,4 +1,4 @@
-"""Exercise the live journal boundary and garlic source used by phase 16b."""
+"""Exercise the live quest journal boundary and garlic source."""
 import _core
 from rs2004 import execution
 from rs2004.game import reader, game

@@ -144,9 +144,35 @@ cooksassistant = QuestModule(record=quest_record('cook'), bank=Tile(3093, 3243, 
 
 `decide(snap)` is a pure function of the snapshot, so a quest resumes from wherever it stopped, by a random event, a death or a client that ended. The snapshot has the journal status (`'not_started'`, `'in_progress'`, `'complete'` or `'unknown'`), the pack by lower-case name (`inv`) and by id (`inv_ids`), what's worn, the last bank read, the stage when the module reads one (`read_stage`, or `read_progress` for flags too), the tile, prayer, levels and free slots. `snap.with_fields({...})` copies it with fields changed.
 
-A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe`, `on_start` and `resume_at(tile)`. The optional resume predicate gives a started quest priority when a restarted queue is inside its one-way area, such as Dragon Slayer's maze or Crandor. See its docstring.
+A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe`, `on_start` and `resume_at(tile)`. The optional resume predicate gives a started quest priority when a restarted queue is inside its one-way area, such as Dragon Slayer's maze or Crandor, or the witch's garden and shed. Generic banking waits until the quest leaves that area. See its docstring.
 
 Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`), plus Demon Slayer (`demonslayer`), Doric's Quest (`doric`), Imp Catcher (`impcatcher`), Goblin Diplomacy (`goblindiplomacy`), Vampire Slayer (`vampireslayer`), The Knight's Sword (`knightssword`), Ernest the Chicken (`ernest`), Pirate's Treasure (`piratestreasure`), Prince Ali Rescue (`princeali`), Shield of Arrav (`shieldofarrav`) and Dragon Slayer (`dragonslayer`): all eighteen free-to-play quests.
+
+Druidic Ritual (`druidicritual`, record id `druid`) and Monk's Friend (`monksfriend`, record id `drunkmonk`) are the first members' modules. Both expose pure `decide(snap)` functions and journal parsers. Druidic Ritual recovers missing meat bank-first and enchants one species at a time; Monk's Friend sources the blanket, water and logs and waits for the party to finish.
+
+Four more members' modules expose `read_progress()` and a pure `decide(snap)`:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `gertrudescat` | `fluffs` | Sources milk and seasoned sardines, searches the six NPC crates and reunites Fluffs with her kitten. Retrieves a banked kitten before searching again |
+| `junglepotion` | `junglepotion` | Requires Druidic Ritual. Picks and identifies the five exact herb ids, with mainland food and boat fares provisioned before departure |
+| `clocktower` | `cog` | Collects and places the four cogs, including cooling the black cog and poisoning the rat pen. Leaves each sealed room through its own ladder |
+| `hazeelcult` | `hazeelcult` | Runs the Carnillean side. Refuses a character already committed to the cult side with a reason, sets the valves, retrieves the armour and searches Jones' cupboard |
+
+Their `parse_gertrudes_cat_journal`, `parse_jungle_journal`, `parse_clock_tower_journal` and `parse_hazeel_journal` functions return `QuestProgress` or `None`.
+
+The remaining phase-17a modules are also registered:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `witchshouse` | `ball` | Reads journal rewinds, sources gloves and cheese, opens the mouse door, reads the diary, follows guarded garden crossings and casts Strikes through all four experiment forms |
+| `fishingcontest` | `fishingcompo` | Sources the pass, garlic, rod, spade and worms; drives the gate conversation, stashes garlic at the pipe, catches carp and returns the trophy |
+| `murder` | `murder` | Uses thread colour and exact evidence ids to match fingerprints, prove the suspect's poison story false and report to the guard |
+| `seaslug` | `seaslug` | Repairs Holgart's boat, finds Kennith and Kent, lights a torch on the platform and operates the panel and crane |
+| `priestperil` | `priestperil` | Uses temple doors, held keys and water to locate its phase, then supplies Drezel with essence, withdrawing banked essence or mining it with a held or banked pickaxe |
+| `tribaltotem` | `totem` | Relabels the delivery crate, enters by Cromperty's teleport, solves the KURT lock from its displayed letters, investigates the stairs and retrieves the totem |
+
+The four packages retain their upstream areas, journal and execution modules. Fishing Contest's journal reader returns a stage; Witch's House, Murder Mystery, Sea Slug and Tribal Totem return `QuestProgress`. Priest in Peril reads its phase through interactions and inventory. Its mining fallback needs Rune Mysteries completed and a held or banked pickaxe when no essence is banked. All twelve phase-17a quests have completed in one live queue, and FlourCollector and RoguesPurse have each banked a full load.
 
 ## Steps: `rs2004.quests.exec.steps`
 
