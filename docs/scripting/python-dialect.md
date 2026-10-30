@@ -102,6 +102,11 @@ Use `--profile` to record Python line timings, optionally with `--watch`. See [S
 
 The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 
+| rs2b0t quest module | Python module |
+|---|---|
+| `api/ai/quests/defs/druidicritual.ts` | `rs2004.quests.defs.druidicritual` |
+| `api/ai/quests/defs/monksfriend.ts` | `rs2004.quests.defs.monksfriend` |
+
 | TypeScript | Python |
 |---|---|
 | `class Miner extends LoopingBot { loop() {...} }` | `class Miner(LoopingBot): def loop(self): ...` |

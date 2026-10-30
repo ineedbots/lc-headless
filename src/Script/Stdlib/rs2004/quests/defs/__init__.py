@@ -124,8 +124,20 @@ def _dragonslayer():
     return dragonslayer
 
 
+def _druidicritual():
+    from rs2004.quests.defs.druidicritual import druidicritual
+    return druidicritual
+
+
+def _monksfriend():
+    from rs2004.quests.defs.monksfriend import monksfriend
+    return monksfriend
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'druidicritual': ('druid', _druidicritual),
+    'monksfriend': ('drunkmonk', _monksfriend),
     'shieldofarrav': ('blackarmgang', _shieldofarrav),
     'dragonslayer': ('dragon', _dragonslayer),
     'demonslayer': ('demon', _demonslayer),

@@ -566,6 +566,15 @@ FlourCollector comes with Murder Mystery, and RoguesPurse with Jungle Potion, si
     - [ ] against the local engine, AIOQuester completes every quest in it, on an account with the prerequisites done and skills set by debugproc;
     - [ ] whatever else that file lists for it.
 
+### As built: 17a (in progress)
+
+- **Initial slice.** Druidic Ritual (`defs/druidicritual.py`) and Monk's Friend (`defs/monksfriend.py`) are ported from rs2b0t `4417d0b7`, using `ts2py.ts` followed by hand fixes. Their generated quest records are registered lazily under `druid` and `drunkmonk`, so AIOQuester offers both and keeps the established queue order. The members batch remains twelve quests and two bots; this slice does not complete it.
+- **Stage and recovery.** Both read rendered journals rather than server-only varps, normalise colour tags and pipes, and close the journal modal after reading. Druidic Ritual scans the bank before hunting missing meat, accepts raw or enchanted forms, frees pack space and exits the dungeon before recovering missing supplies. Its long combat waits pump sustain. Monk's Friend waits for the hidden ladder, identifies the blanket by id, sources a jug and axe bank-first, fills water through the prompt driver and waits for the party to turn the quest list green.
+- **Runtime differences.** List statuses and step kinds use snake case. Withdrawal rows are dictionaries for the shared executor; quest modules use `QuestModule`. The jug filler drives its returned generator, and the first cauldron approach drives the dungeon hop before returning for another pass, replacing the upstream Promise chain.
+- **Verification.** The two upstream files contribute 62 specs, with nine additional runtime specs for the stage readers, registry, withdrawal executor, jug filler, dungeon approach and combat upkeep. Two real-cache specs check the named items, NPCs and locs and the exact creature, cauldron, blanket and sink ids. Stubs and scripting docs cover both modules. Live verification is pending; no phase-17a live completion is claimed.
+- **Checks run.** Debug builds successfully. CTest reports zero failures across 798 configured cases, with 26 cache-dependent cases skipped; the new cache specs pass separately with `RS2004_CACHE_DIR=data/cache`. Porting lint over the stdlib, scripts and tests, coverage for both upstream modules and `git diff --check` pass.
+- **Remaining.** Gertrude's Cat, Witch's House, Fishing Contest, Clock Tower, Hazeel Cult, Murder Mystery, Priest in Peril, Tribal Totem, Sea Slug Quest and Jungle Potion; FlourCollector and RoguesPurse; then the twelve-quest queue and both banking checks live on scratch accounts.
+
 ---
 
 ## 12. Phase 18: the account leveler
