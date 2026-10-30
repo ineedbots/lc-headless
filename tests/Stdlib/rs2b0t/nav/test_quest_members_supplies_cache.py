@@ -1,4 +1,4 @@
-"""The first phase 17a quests' targets against the real 289 cache."""
+"""Check members quest gathering supplies and targets against the real 289 cache."""
 from rs2004.quests.defs import def_by_id
 from rs2004.quests.defs.druidicritual import RITUAL_MEATS, CAULDRON_ID, SUIT_OF_ARMOUR_ID
 from rs2004.quests.defs.monksfriend import AXES, BLANKET_OBJ, JUG_OBJ, JUG_WATER_OBJ, SINK_LOC

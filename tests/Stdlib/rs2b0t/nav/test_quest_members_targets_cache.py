@@ -1,4 +1,4 @@
-"""Exact targets for the rest of phase 17a, including both gathering bots."""
+"""Check members quest targets and both gathering bots against the real cache."""
 import _core
 from rs2004.quests.defs import def_by_id
 from rs2004.quests.defs.witchshouse.areas import WH_OBJ, WH_NAME, WH_LOC, EXPERIMENT_IDS, EXPERIMENT_NAMES

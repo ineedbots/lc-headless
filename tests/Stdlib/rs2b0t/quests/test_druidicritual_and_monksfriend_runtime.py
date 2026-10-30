@@ -1,4 +1,4 @@
-"""Exercise phase 17a's stage readers and custom legs through the runtime facades."""
+"""Exercise Druidic Ritual and Monk's Friend through the runtime facades."""
 import _core
 import rs2004.quests.defs.druidicritual as ritual
 import rs2004.quests.defs.monksfriend as monk
