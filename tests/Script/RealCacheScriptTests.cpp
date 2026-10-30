@@ -110,6 +110,28 @@ assert special.bar_component() == -1
     // clang-format on
 }
 
+TEST_CASE("Quest eligibility and journal lookup fit within the default watchdog", "[RealCache]")
+{
+    auto fixture = RealCacheFixture{};
+    // Exercise repeated prerequisite, eligibility and journal lookups against the full quest tab.
+    // Keep the default one-second watchdog rather than the longer timeout used by the ported specs.
+    // clang-format off
+    REQUIRE_NOTHROW(fixture.vm.RunSource(R"python(
+from rs2004.quests.engine.quest_engine import QuestEngine
+from rs2004.quests.defs import QUEST_DEFS
+
+engine = QuestEngine(None)
+def read_quest_pass():
+    player = engine._read_player_state()
+    for definition in QUEST_DEFS:
+        assert quests.status(definition.record.name) in ('not_started', 'unknown')
+    assert quests._find("Doric's Quest") is not None
+for i in range(10):
+    read_quest_pass()
+)python", "quest_watchdog.py"));
+    // clang-format on
+}
+
 TEST_CASE("The stdlib finds the real cache's special attack bar and autocast spells", "[RealCache]")
 {
     auto fixture = RealCacheFixture{};
