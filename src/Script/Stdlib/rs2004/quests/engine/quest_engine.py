@@ -274,7 +274,11 @@ class QuestEngine(Task):
         if prayed:
             return
 
-        freshened = yield from self._freshen_pack(module, id, snap, rows)
+        # A resumed quest must escape its sealed area before generic banking can run.
+        inside_resume = module.resume_at is not None and module.resume_at(snap.tile)
+        freshened = False
+        if not inside_resume:
+            freshened = yield from self._freshen_pack(module, id, snap, rows)
         if freshened:
             return
 
@@ -305,7 +309,7 @@ class QuestEngine(Task):
             return
 
         step = None
-        if id not in self._deposited:
+        if id not in self._deposited and not inside_resume:
             food_name = self.host.food_item()
             tools = module.tools() if callable(module.tools) else module.tools
             keep = [i.name.lower() for i in module.record.items] + [t.lower() for t in (tools or [])]
@@ -323,7 +327,7 @@ class QuestEngine(Task):
                 self._refresh_bank_counts(True)
                 yield from modals.close_if_open()
                 return
-        if id not in self._provisioned:
+        if id not in self._provisioned and not inside_resume:
             step = self._provision_step(module, id, snap, picked, elig)
             if step is None:
                 return

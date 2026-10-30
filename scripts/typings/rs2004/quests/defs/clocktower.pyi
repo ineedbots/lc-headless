@@ -1,0 +1,13 @@
+from typing import Optional, Sequence
+from __builtins__ import Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+COG_STAGE: Record
+COG_OBJ: Record
+clocktower: QuestModule
+
+def parse_clock_tower_journal(lines: str | Sequence[str]) -> Optional[QuestProgress]: ...
+def read_clock_tower_progress() -> Wait[Optional[QuestProgress]]: ...
+def gather_water(snap: QuestSnapshot) -> Record: ...
+def decide(snap: QuestSnapshot) -> Record: ...
