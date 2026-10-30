@@ -47,5 +47,12 @@ def _fn6():
         expect(rows[3].reasons).to_equal(['qp'])
     test('def order, picked only, RUNNING and PARKED stamped over eligibility', _fn7)
 
+    def completed_while_returning():
+        elig = {key: value for key, value in [e('runemysteries', 'DONE'), e('doric', 'READY')]}
+        rows = queue_rows(ORDER, set(['runemysteries', 'doric']), elig, set(['runemysteries']), 'runemysteries')
+        expect([r.status for r in rows]).to_equal(['DONE', 'READY'])
+        expect(next_quest(ORDER, set(['runemysteries', 'doric']), elig, set())).to_be('doric')
+    test('server completion stays DONE while the active quest returns to a bank', completed_while_returning)
+
 
 describe('queueRows', _fn6)
