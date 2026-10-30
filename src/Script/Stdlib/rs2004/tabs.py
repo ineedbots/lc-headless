@@ -106,15 +106,27 @@ def quest_status(colour):
 class _Quests:
     """The quest list. Only the list's colours, the quest points and the journals are on the wire."""
 
+    def __init__(self):
+        self._lookup_key = None
+        self._by_name = {}
+
     def all(self):
         return [Quest(clean_text(c.text), quest_status(c.colour), c.id) for c in _components(QUEST_TAB) if c.type == 'text' and c.button == 'ok' and c.text]
 
     def _find(self, name):
         wanted = name.strip().lower()
-        for quest in self.all():
-            if quest.name.lower() == wanted:
-                return quest
-        return None
+        # An engine pass checks every prerequisite and quest before opening its journal. Build the list once
+        # per host step, whose state is fixed, and refresh after yielding so incoming colours stay current.
+        key = (_core.step_time(), _tab(QUEST_TAB))
+        if key != self._lookup_key:
+            by_name = {}
+            for quest in self.all():
+                key_name = quest.name.lower()
+                if key_name not in by_name:
+                    by_name[key_name] = quest
+            self._by_name = by_name
+            self._lookup_key = key
+        return self._by_name.get(wanted)
 
     def status(self, name):
         quest = self._find(name)

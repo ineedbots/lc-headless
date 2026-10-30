@@ -29,6 +29,8 @@ class TabWorld(PatchWorld):
             500: [piece(70, button='ok')],
         }
         self.clicks = []
+        self.interface_reads = 0
+        self.quest_root = 300
 
     def __enter__(self):
         PatchWorld.__enter__(self)
@@ -37,12 +39,13 @@ class TabWorld(PatchWorld):
         return self
 
     def get_tab_interface(self, tab):
-        return {0: self.combat_root, 2: 300, 5: 200, 6: 400}.get(tab, -1)
+        return {0: self.combat_root, 2: self.quest_root, 5: 200, 6: 400}.get(tab, -1)
 
     def get_open_interfaces(self):
         return [self.combat_root, 200, 300, 400]
 
     def get_interface(self, root):
+        self.interface_reads += 1
         return self.components.get(root, [])
 
     def get_texts(self, root):
@@ -128,6 +131,40 @@ def test_journal_waits_for_new_modal_and_handles_missing_or_failed_open():
         assert world.run(tabs.quests.journal("Cook's Assistant")) == []
         world.accept = True
         assert world.run(tabs.quests.journal("Cook's Assistant")) == ['Quest complete']
+
+
+def test_quest_lookups_share_one_scan_and_refresh_after_server_updates():
+    with TabWorld() as world:
+        journal = tabs._Quests()
+        world.components[300][0].colour = 0xFF0000
+        for i in range(100):
+            assert journal.status(" COOK'S ASSISTANT ") == 'not_started'
+            assert journal.status('missing') == 'unknown'
+        assert world.interface_reads == 1
+        for colour, status in [(0xFFFF00, 'in_progress'), (0x00FF00, 'complete')]:
+            world.now += 500
+            world.components[300][0].colour = colour
+            assert journal.status("Cook's Assistant") == status
+        assert world.interface_reads == 3
+        assert world.run(journal.journal("Cook's Assistant")) == ['Quest complete']
+        assert world.clicks == [50]
+
+
+def test_quest_lookup_refreshes_when_its_tab_loads_or_changes():
+    with TabWorld() as world:
+        journal = tabs._Quests()
+        world.quest_root = -1
+        assert journal.status("Cook's Assistant") == 'unknown'
+        world.quest_root = 300
+        assert journal.status("Cook's Assistant") == 'complete'
+        world.components[301] = [piece(51, type='text', text="Doric's Quest", button='ok', colour=0xFFFF00)]
+        world.quest_root = 301
+        assert journal.status("Cook's Assistant") == 'unknown'
+        assert journal.status("Doric's Quest") == 'in_progress'
+        world.now += 500
+        world.components[301][0].text = '@gre@Renamed quest'
+        assert journal.status("Doric's Quest") == 'unknown'
+        assert journal.status('renamed quest') == 'in_progress'
 
 
 def test_special_arms_once_and_reports_rejected_or_silent_server():
