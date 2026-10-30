@@ -56,14 +56,17 @@ def _fn9():
     test('page 3 hands over the wool', _fn12)
 describe('Ned makes the wig in three picks', _fn9)
 
+def keli_picks(page, want):
+    def run():
+        expect(pick_preferred(page, KELI_PRINT.prefer)).to_be(want)
+    return run
+
+
 def _fn13():
     PAGES = [['Heard of you? You are famous in RuneScape!', 'I have heard a little, but I think Katrine is tougher.', 'I have heard rumours that you kill people.', 'No I have never really heard of you.'], ['I think Katrine is still tougher.', 'What is your latest plan then?', 'You must have trained a lot for this work.', 'I should not disturb someone as tough as you.'], ['Ah I see. You must have been very skillful.', 'Thats great, are you sure they will pay?', 'Can you be sure they will not try to get him out?', 'I should not disturb someone as tough as you.'], ['Could I see the key please?', 'That is a good way to keep secrets.', 'I should not disturb someone as tough as you.'], ['Could I touch the key for a moment?', 'I should not disturb someone as tough as you.']]
     WANT = ['Heard of you? You are famous in RuneScape!', 'What is your latest plan then?', 'Can you be sure they will not try to get him out?', 'Could I see the key please?', 'Could I touch the key for a moment?']
     for i in range(len(PAGES)):
-
-        def _fn14():
-            expect(pick_preferred(PAGES[i], KELI_PRINT.prefer)).to_be(WANT[i])
-        test(f'page {i + 1} picks "{WANT[i]}"', _fn14)
+        test(f'page {i + 1} picks "{WANT[i]}"', keli_picks(PAGES[i], WANT[i]))
 
     def _fn15():
         for page in PAGES:

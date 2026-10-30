@@ -20,6 +20,53 @@ def test(name, body):
 it = test
 
 
+class _RowCase:
+    """One row's test: the body called with the row's entries, or the row itself when it isn't a list."""
+
+    def __init__(self, body, row):
+        self.body = body
+        self.row = row
+
+    def __call__(self):
+        if isinstance(self.row, (list, tuple)):
+            return self.body(*self.row)
+        return self.body(self.row)
+
+
+def _row_name(name, row):
+    """Bun's test.each name: %s, %i, %d and %p take the row's entries in turn, and $field reads a field."""
+    entries = list(row) if isinstance(row, (list, tuple)) else [row]
+    out = ''
+    i = 0
+    used = 0
+    while i < len(name):
+        if name[i] == '%' and i + 1 < len(name) and name[i + 1] in 'sidp':
+            out += str(entries[used]) if used < len(entries) else ''
+            used += 1
+            i += 2
+            continue
+        if name[i] == '$':
+            j = i + 1
+            while j < len(name) and (name[j].lower() != name[j].upper() or name[j] == '_'):
+                j += 1
+            field = name[i + 1:j]
+            value = getattr(row, field, None) if not isinstance(row, dict) else row.get(field)
+            out += str(value)
+            i = j
+            continue
+        out += name[i]
+        i += 1
+    return out
+
+
+def test_each(rows):
+    """rs2b0t's test.each(rows)(name, body): a test per row."""
+    def register(name, body):
+        for row in rows:
+            test(_row_name(name, row), _RowCase(body, row))
+    return register
+
+
 def before_each(body):
     _BEFORE.append(body)
 

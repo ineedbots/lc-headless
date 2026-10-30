@@ -257,6 +257,136 @@ def two_level_closures(source, path):
     return found
 
 
+# Why: JavaScript assigns an outer let from inside a function, where Python binds a new local and leaves the outer
+# one alone, so ts2py's drafts lose the write silently: Fight Arena's stage cache never held a stage, and Troll
+# Stronghold's walk guard forgot that its prayer was up.
+def rebound_outer_names(tree):
+    """A function assigning a module variable without global, or its enclosing function's variable without
+    nonlocal. Only plain assignments count: a loop or comprehension variable reusing a name is the usual Python."""
+    def bound(target):
+        if isinstance(target, ast.Name):
+            return {target.id}
+        if isinstance(target, (ast.Tuple, ast.List)):
+            return set().union(*[bound(e) for e in target.elts]) if target.elts else set()
+        if isinstance(target, ast.Starred):
+            return bound(target.value)
+        return set()
+
+    module_vars = set()
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        for t in targets:
+            module_vars.update(bound(t))
+
+    def own_nodes(fn):
+        stack = list(fn.body)
+        while stack:
+            node = stack.pop()
+            yield node
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+                stack.extend(ast.iter_child_nodes(node))
+
+    def assigned(fn):
+        names = set()
+        declared = set()
+        for node in own_nodes(fn):
+            if isinstance(node, (ast.Global, ast.Nonlocal)):
+                declared.update(node.names)
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, (ast.AugAssign, ast.AnnAssign)) else []
+            for t in targets:
+                names.update(bound(t))
+        return names - declared
+
+    def params(fn):
+        a = fn.args
+        return {x.arg for x in a.posonlyargs + a.args + a.kwonlyargs} | {x.arg for x in [a.vararg, a.kwarg] if x}
+
+    def meant_outer(fn, name):
+        """Whether the function reads the name before it writes it, or only writes it: either way it meant the
+        outer one. A local that's written and then read is an ordinary shadow."""
+        reads = []
+        writes = []
+        for node in own_nodes(fn):
+            if isinstance(node, ast.AugAssign) and name in bound(node.target):
+                reads.append((node.lineno, node.col_offset))
+            if isinstance(node, ast.Name) and node.id == name:
+                (reads if isinstance(node.ctx, ast.Load) else writes).append((node.lineno, node.col_offset))
+            if isinstance(node, ast.Assign) and any(name in bound(t) for t in node.targets):
+                if any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(node.value)):
+                    reads.append((node.lineno, -1))
+        if not reads:
+            return True
+        return min(reads) < min(writes)
+
+    found = []
+
+    def walk(node, enclosing):
+        for child in ast.iter_child_nodes(node):
+            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                walk(child, enclosing)
+                continue
+            mine = {name for name in assigned(child) - params(child) if meant_outer(child, name)}
+            for name in sorted(mine & module_vars):
+                found.append((child.lineno, f'{child.name} assigns {name} as a new local; the module variable needs global'))
+            if enclosing is not None:
+                outer = assigned(enclosing) | params(enclosing)
+                for name in sorted((mine & outer) - module_vars):
+                    found.append((child.lineno, f"{child.name} assigns {name} as a new local; {enclosing.name}'s needs nonlocal or a holder"))
+            walk(child, child)
+
+    walk(tree, None)
+    return found
+
+
+# Why: a closure reads its loop's variable when it runs, not when it's made, and a spec's test() runs its body after
+# the loop has ended, so every test of a for-loop of cases checked the last case: Fight Arena's journal stages did.
+def loop_closures(tree):
+    """A def made in a for loop's body and handed to test() there, reading the loop's variable."""
+    found = []
+    for loop in ast.walk(tree):
+        if not isinstance(loop, ast.For):
+            continue
+        names = {n.id for n in ast.walk(loop.target) if isinstance(n, ast.Name)}
+        deferred = set()
+        for statement in loop.body:
+            for call in ast.walk(statement):
+                if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == 'test':
+                    deferred.update(a.id for a in call.args if isinstance(a, ast.Name))
+        for statement in loop.body:
+            for fn in ast.walk(statement):
+                if not isinstance(fn, ast.FunctionDef) or fn.name not in deferred:
+                    continue
+                own = {a.arg for a in fn.args.args}
+                inner = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)} - own
+                for name in sorted(names & inner):
+                    found.append((fn.lineno, f'{fn.name} reads the loop variable {name} when test() runs it, after the loop has moved on; pass it to a function that returns the closure'))
+    return found
+
+
+# Why: ts2py flattens rs2b0t's options objects into parameters, and an option can share a module function's name:
+# Observatory Quest's supply(snap, planks, ...) then called its own boolean planks(snap).
+def shadowed_callees(tree):
+    """A parameter named like a module-level function or import that the function's body both reads and calls."""
+    module_callables = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            module_callables.add(node.name)
+        elif isinstance(node, ast.ImportFrom):
+            module_callables.update(a.asname or a.name for a in node.names)
+    found = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef):
+            continue
+        names = {a.arg for a in fn.args.args + fn.args.kwonlyargs} & module_callables
+        callees = {id(c.func) for c in ast.walk(fn) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+        # A callback parameter is only ever called; one also read as a value is the option that hid the function.
+        names = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and id(n) not in callees} & names
+        for call in ast.walk(fn):
+            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id in names:
+                found.append((call.lineno, f'{fn.name} calls {call.func.id}, which its parameter of that name hides'))
+    return sorted(set(found))
+
+
 def nested_ternaries(tree, source):
     """A conditional expression holding another without brackets, which pocketpy won't parse."""
     found = []
@@ -332,7 +462,11 @@ def core_builtins():
     if _CORE_BUILTINS is None:
         repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         python_layer = set()
+        # Why: a quest's module is imported by its full name, never a builtin, so its own BANK doesn't hide the binding.
+        quest_defs = os.path.join('rs2004', 'quests', 'defs') + os.sep
         for path in files([os.path.join(repo, 'src', 'Script', 'Stdlib')]):
+            if quest_defs in os.path.normpath(path):
+                continue
             with open(path, encoding='utf-8') as f:
                 tree = ast.parse(f.read(), path)
             for node in tree.body:
@@ -386,7 +520,7 @@ def lint(path):
     link_parents(tree)
     finder = Finder(path)
     finder.visit(tree)
-    found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path)
+    found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path) + rebound_outer_names(tree) + loop_closures(tree) + shadowed_callees(tree)
     return sorted(set(found + undefined_names(tree, path) + shadowed_methods(tree)))
 
 
