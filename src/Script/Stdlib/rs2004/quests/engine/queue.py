@@ -31,7 +31,10 @@ def queue_rows(order, picked, elig, parked, running_id):
         if id not in picked:
             continue
         el = elig.get(id)
-        if id == running_id:
+        # Completion comes from the server; the engine can still be returning to a bank.
+        if el is not None and el.status == 'DONE':
+            rows.append(QueueRow(id, el.name, 'DONE', el.reasons))
+        elif id == running_id:
             rows.append(QueueRow(id, el.name if el is not None else id, 'RUNNING', []))
         elif el is None:
             rows.append(QueueRow(id, id, 'UNKNOWN', ['eligibility not evaluated yet']))
