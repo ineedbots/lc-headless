@@ -14,7 +14,7 @@ from rs2004.reach import talk_op
 from rs2004.tabs import PROTECT_FROM_MAGIC, prayer
 from rs2004.traversal import traversal
 
-__all__ = ['enter_deep_dungeon', 'leave_deep_dungeon', 'cross_secret_wall']
+__all__ = ['locked_in', 'leave_cell', 'enter_deep_dungeon', 'leave_deep_dungeon', 'cross_secret_wall']
 
 WALK_MS = 300000
 KILL_MS = 90000
@@ -109,9 +109,12 @@ def open_loc(loc_id, op, expect, what, log):
     return _result7
 
 
-def in_cell():
-    at = here()
+def cell_holds(at):
     return at is not None and at.level == 0 and at.z <= SC_TILE.JAIL_CELL.z and at.x >= 2928 and at.x <= 2934 and at.z >= 9683
+
+
+def in_cell():
+    return cell_holds(here())
 
 
 # Why: Velrak has no `wanderrange` and drifts 5 tiles around a walled cell, and the shared talk primitive answers an out-of-reach NPC by opening the cell door and walking back out.
@@ -170,18 +173,38 @@ def fetch_dusty_key(log):
     if not got:
         log('scorpcatcher: Velrak handed over no dusty key')
         return False
-    # Why: the cell is a dead end, so the leg has to be back in the corridor before anything else routes from here.
-    _result16 = yield from open_loc(SC_ID.JAIL_DOOR, 'Open', lambda: not in_cell(), 'cell door', log)
+    _result16 = yield from leave_cell(log)
     return _result16
 
 
+# Why: the cell is a dead end, so the leg has to be back in the corridor before anything else routes from here.
+# Why: Velrak wanders the cell and the talk follows him, which left the door 6 tiles off live, past open_loc's reach.
+def leave_cell(log):
+    """Step to the tile inside the cell door and open it, by scene steps, since nothing routes out of the cell."""
+    if not in_cell():
+        return True
+    yield from direct_navigator.walk_to(SC_TILE.JAIL_CELL, 0, 10000)
+    _result = yield from open_loc(SC_ID.JAIL_DOOR, 'Open', lambda: not in_cell(), 'cell door', log)
+    return _result
+
+
 # Why: the entrance corridor from the Taverley ladder runs x 2881-2887 in the same z band as the deep half with only rock at x 2888 between, so a plain "west of the gate" box would count the way in.
-def in_deep_dungeon():
+def deep_dungeon_holds(at):
     """West of the dusty-key gate: the far half at x <= 2880, and the blue dragon cave east of it."""
-    at = here()
     if at is None or at.level != 0 or at.z < 9700:
         return False
     return at.x <= 2880 or (at.x >= 2890 and at.x <= SC_TILE.DEEP_DUNGEON.x and at.z <= 9815)
+
+
+def in_deep_dungeon():
+    return deep_dungeon_holds(here())
+
+
+# Why: Velrak's cell and the half behind the dusty-key gate have no booth, and a restart inside either spent minutes
+# routing to the bank before the quest could leave; the engine defers banking inside these.
+def locked_in(tile):
+    """Whether the tile is in a pocket only the quest's own legs leave."""
+    return cell_holds(tile) or deep_dungeon_holds(tile)
 
 
 # Why: blue dragons hit 30 through the corridor between the gate and the coffins and 50 when they roll through the defence check, which Protect from Magic caps at 10.

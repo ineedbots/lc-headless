@@ -5,6 +5,7 @@ from rs2004.game import skills
 from rs2004.quests.barcrawl.barcrawl_logic import BARCRAWL_CARD, BARCRAWL_GP
 from rs2004.quests.defs.scorpcatcher.areas import ANTIPOISON_DOSES, ANTIPOISON_GP, CAGE_ID, CAGE_NAME, EVERY_CAGE, EVERY_SCORPION, SCORPION_LABEL, SC_ITEM, SC_STAGE, SC_TILE, THORMAC, caught_in
 from rs2004.quests.defs.scorpcatcher.journal import read_scorpion_progress
+from rs2004.quests.defs.scorpcatcher.dungeon import locked_in
 from rs2004.quests.defs.scorpcatcher.legs import CATCH_LEG, ask_the_seer
 from rs2004.quests.food import FOOD_FLOAT
 from rs2004.quests.engine.types import QuestModule
@@ -64,6 +65,7 @@ def warn_readiness():
 
 scorpcatcher = QuestModule(**{
     'record': quest_record('scorpcatcher'),
+    'resume_at': locked_in,
     'bank': SC_TILE.BANK,
     'food': FOOD_FLOAT,
     'coin_float': max(1000, BARCRAWL_GP * 2 + ANTIPOISON_GP),

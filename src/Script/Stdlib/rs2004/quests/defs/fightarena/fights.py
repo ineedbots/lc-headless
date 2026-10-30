@@ -12,6 +12,7 @@ from rs2004.items import inventory
 from rs2004.quests.defs.fightarena.areas import FA_NPC, pocket_of
 from rs2004.quests.strike_combat import ARENA_COVER, at_cover, cast_from_cover, cast_strike, ready_strikes, take_strike_cover
 from rs2004.tabs import prayer
+from rs2004.traversal import traversal
 
 __all__ = ['FA_FIGHT', 'PROTECT_MELEE', 'PROTECT_LEVEL', 'fight_won', 'run_fight']
 
@@ -26,6 +27,10 @@ PROTECT_MELEE = 'protect from melee'
 PROTECT_LEVEL = 43
 SEARCH_RADIUS = 20
 MISSING_TO_WIN = 3
+# Why: the arena scorpion hunts within 2 tiles and its straight chase stops at the cover rock, so live it sat 8 tiles
+# off the lane for every lure; Protect from Melee holds each beast's hits at nothing, which makes the open field safe.
+LURES_BEFORE_OPEN_FIELD = 2
+OPEN_FIELD_RANGE = 6
 
 
 # Why: an empty scene before the first swing means the server hasn't released the beast yet.
@@ -87,6 +92,8 @@ def fight_rounds(fight, log):
     reported = -1
     swings = 0
     missing = 0
+    lures = 0
+    open_field = False
     for i in range(fight.guard):
         if event_signal.pending():
             log(f'{fight.what}: yielding to a random event')
@@ -121,6 +128,17 @@ def fight_rounds(fight, log):
         if now - reported >= 40:
             reported = now
             log(f"{fight.what}: hp={skills.effective('hitpoints')}/{skills.level('hitpoints')}" + f' prayer={prayer.points()} attacks={swings} at ({npc.tile().x},{npc.tile().z})')
+        if open_field:
+            here = game.tile()
+            # Why: off the lane on purpose; Bouncer is two tiles wide, and beside the cover his origin falls outside it.
+            if here is None or not cast_from_cover(here, npc, False):
+                yield from traversal.walk_resilient(npc.tile(), radius=OPEN_FIELD_RANGE, attempts=1, timeout_ms=10000, log=log)
+                continue
+            _w6 = yield from cast_strike(here, npc, log, False)
+            if _w6:
+                swings += 1
+            yield from execution.delay_ticks(1)
+            continue
         if not at_cover(cover):
             yield from take_strike_cover(cover, log)
             return 'stuck'
@@ -130,6 +148,11 @@ def fight_rounds(fight, log):
                 return current is not None and cast_from_cover(cover, current)
             arrived = yield from execution.delay_until_ticks(_fn4, 12)
             if not arrived:
+                lures += 1
+                if lures > LURES_BEFORE_OPEN_FIELD:
+                    log(f'{fight.what}: never came round the rock — casting in the open under Protect from Melee')
+                    open_field = True
+                    continue
                 log(f'{fight.what}: luring back around the rock')
                 yield from take_strike_cover(cover, log, lambda: target(fight.npc_id))
             continue

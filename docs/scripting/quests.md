@@ -184,11 +184,11 @@ The phase-17b modules are registered too:
 | `waterfall` | `waterfall` | Self-funds when the purse and bank are empty, reads the book, recovers Glarial's pebble, amulet and urn, solves the rune pillars and pours the ashes, bankless inside the falls |
 | `scorpcatcher` | `scorpcatcher` | Requires the barcrawl card for the outpost. Reads which scorpions are caught from the cage's id, held or banked, and takes the dusty key, the dragon corridor and the monastery |
 | `observatory` | `itgronigen` | Fetches sand, ore, planks and seaweed in map order, smelts the glass and bar in one furnace visit, kills the keep's guard for the lens mould and looks through the telescope |
-| `fightarena` | `arena` | Wears the Khazard disguise, buys the Khali brew for the keys, fights the ogre, scorpion and Bouncer with Strikes from cover, and keeps the last stage it read |
+| `fightarena` | `arena` | Wears the Khazard disguise, buys the Khali brew for the keys, fights the ogre, scorpion and Bouncer with Strikes from cover, or in the open under Protect from Melee when a beast won't come round the rock, and keeps the last stage it read |
 | `merlinscrystal` | `arthur` | Talks to the knights, rides the crate into the fortress for Morgan's brief, makes the black candle, takes Excalibur from the Lady of the Lake and summons Thrantax to break the crystal |
 | `lostcity` | `zanaris` | Reveals Shamus, sails to Entrana without restricted gear, kills the tree spirit with Strikes from the fungus safespot (`lostcity_combat`), crafts five Dramen staves and enters Zanaris |
 
-Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight` and `attackable`, so `rs2004.quests.defs.trollstronghold.combat` and `areas` are ported ahead of the quest itself, which phase 17c adds. The phase-17b modules are ported and pass rs2b0t's tests and the cache checks; their live acceptance run is still to come.
+Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight` and `attackable`, so `rs2004.quests.defs.trollstronghold.combat` and `areas` are ported ahead of the quest itself, which phase 17c adds. All nine phase-17b quests have completed in one live queue.
 
 ## Steps: `rs2004.quests.exec.steps`
 

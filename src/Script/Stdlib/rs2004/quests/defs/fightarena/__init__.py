@@ -1,7 +1,7 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/fightarena/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
-from rs2004.quests.defs.fightarena.areas import FA_NPC, FA_OBJ, FA_TILE, pocket_of
+from rs2004.quests.defs.fightarena.areas import FA_NPC, FA_OBJ, FA_TILE, pocket_of, walled_in
 from rs2004.quests.defs.fightarena.fights import FA_FIGHT
 from rs2004.quests.defs.fightarena.journal import FA_STAGE, read_fight_arena_stage
 from rs2004.quests.defs.fightarena.legs import enter_arena_by_door2, enter_arena_by_guard, enter_building, fight_with_release, flee_arena, leave_building, search_chest, talk_and_land, talk_by_id, unlock_jeremy, unwearable, wear_khazard
@@ -194,6 +194,7 @@ def decide(snap):
 FOOD = 8
 fightarena = QuestModule(**{
     'record': quest_record('arena'),
+    'resume_at': walled_in,
     'pray': Record({'protect': 'melee', 'potions': 2}),
     'bank': FA_TILE.YANILLE_BANK,
     'food': FOOD,

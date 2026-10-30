@@ -3,6 +3,7 @@ from __builtins__ import Tile, Wait
 from rs2004.catalogs.record import Record
 from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
 
+def walled_in(tile: Any) -> Any: ...
 FA_NPC: Record
 FA_OBJ: Record
 FA_ITEM: Record

@@ -3,7 +3,7 @@
 from rs2004.catalogs.record import Record
 from rs2004.geometry import Tile
 
-__all__ = ['FA_NPC', 'FA_OBJ', 'FA_ITEM', 'FA_LOC', 'FA_TILE', 'FA_AREA', 'pocket_of']
+__all__ = ['walled_in', 'FA_NPC', 'FA_OBJ', 'FA_ITEM', 'FA_LOC', 'FA_TILE', 'FA_AREA', 'pocket_of']
 
 FA_NPC = Record({
     'GUARD1': 253,
@@ -62,3 +62,10 @@ def pocket_of(tile):
     if in_rect(tile, FA_AREA.BUILDING):
         return 'building'
     return 'outside'
+
+
+# Why: every crossing out of these is a scripted door the walker has no edge for, and a restart inside spent minutes
+# trying to reach a bank before the quest could leave; the engine defers banking inside them.
+def walled_in(tile):
+    """Whether the tile is in a pocket only Fight Arena's own legs leave."""
+    return pocket_of(tile) != 'outside'

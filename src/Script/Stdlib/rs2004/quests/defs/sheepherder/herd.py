@@ -11,7 +11,7 @@ from rs2004.quests.defs.sheepherder.areas import GATE_ZONE, PEN, SHEEP_SPAWN, in
 from rs2004.quests.defs.sheepherder.herd_path import HERD_DIRS, herd_cost, herd_directions, herd_plan
 from rs2004.traversal import traversal
 
-__all__ = ['sheep_in_pen', 'clear_refusal', 'herd_to_pen']
+__all__ = ['SceneGrid', 'sheep_in_pen', 'clear_refusal', 'herd_to_pen']
 
 # Why: the shortest route is 31 pushes and the longest 58, and drift near a sheep's spawn roughly triples that (90 pushes on the 31-tile leg live).
 PROD_BUDGET = 260
@@ -25,10 +25,38 @@ STRAY_LIMIT = 6
 PINNED_WAIT = 3
 PINNED_LIMIT = 8
 LOCK_RADIUS = 5
-SCENE_GRID = Record({
-    'walkable': lambda x, z: reachability.walkable(Tile(x, z, 0)),
-    'can_step': lambda x, z, dx, dz: reachability.can_step(Tile(x, z, 0), Tile(x + dx, z + dz, 0)),
-})
+
+
+class SceneGrid:
+    """The loaded scene's walking, as herd_path reads it, remembered per tile until reset."""
+
+    # Why: one push plans over about 4,000 tiles, and asking the client for each on every plan outran the script's
+    # step budget live; the leg's fences don't move.
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._walkable = {}
+        self._steps = {}
+
+    def walkable(self, x, z):
+        key = x * 100000 + z
+        known = self._walkable.get(key)
+        if known is None:
+            known = reachability.walkable(Tile(x, z, 0))
+            self._walkable[key] = known
+        return known
+
+    def can_step(self, x, z, dx, dz):
+        key = (x * 100000 + z) * 16 + (dx + 1) * 4 + (dz + 1)
+        known = self._steps.get(key)
+        if known is None:
+            known = reachability.can_step(Tile(x, z, 0), Tile(x + dx, z + dz, 0))
+            self._steps[key] = known
+        return known
+
+
+SCENE_GRID = SceneGrid()
 
 
 def copies(n):
@@ -54,9 +82,12 @@ def route_cost(npc):
 
 # Why: a sheep in a trap has no route and the other 2 copies carry the same quest bit, so the leg fetches one of those and skips the 500-tick teleport wait.
 def pick_sheep(n):
-    """The copy with the shortest push route home, ignoring any that no push can move."""
+    """The copy with the shortest push route home, ignoring any that no push can move. Use with yield from."""
     best = None
-    for npc in copies(n):
+    for i, npc in enumerate(copies(n)):
+        # Why: each copy is a full route search, so each gets a step of its own.
+        if i > 0:
+            yield from execution.delay_ticks(1)
         cost = route_cost(npc)
         if cost is None:
             continue
@@ -72,7 +103,7 @@ def sheep_in_pen(n):
 # Why: an npc only enters the client's list within about 15 tiles, so "not in the scene" says where you're standing.
 def find_sheep(n, log):
     """Walk to the sheep's map spawn when no copy of it is both in range and movable."""
-    here = pick_sheep(n)
+    here = yield from pick_sheep(n)
     if here:
         return here
     log(f'sheepherder: no movable {sheep_name(n)} in range — walking to its field at ({SHEEP_SPAWN[n].x},{SHEEP_SPAWN[n].z})')
@@ -80,7 +111,8 @@ def find_sheep(n, log):
     if not (_w4):
         return None
     yield from execution.delay_ticks(2)
-    found = pick_sheep(n)
+    SCENE_GRID.reset()
+    found = yield from pick_sheep(n)
     if not found:
         # Why: `npc_del` on the map spawn queues a respawn, so an empty field means wait.
         log(f'sheepherder: {sheep_name(n)} not at its field — waiting out the respawn')
@@ -173,20 +205,22 @@ def push_once(n, npc, dir, log):
 
 def herd_to_pen(n, log):
     """Push one sheep out to the tiles west of the gate and then over it. Why: the route is re-derived from the sheep's tile on every push, since its ai_timer returns it to wander mode and it drifts back toward spawn."""
+    SCENE_GRID.reset()
     first = yield from find_sheep(n, log)
     if not first:
         return False
     _w6 = yield from traversal.walk_resilient(first.tile(), radius=APPROACH_RADIUS, attempts=3, timeout_ms=180000, log=log)
     if not (_w6):
         return False
-    _v7 = pick_sheep(n)
+    _v7 = yield from pick_sheep(n)
     last = ((_v7 if _v7 is not None else first)).tile()
     stuck = 0
     pinned = 0
     strayed = 0
     for push in range(PROD_BUDGET):
-        _v8 = near_last(n, last)
-        sheep = (_v8 if _v8 is not None else pick_sheep(n))
+        sheep = near_last(n, last)
+        if sheep is None:
+            sheep = yield from pick_sheep(n)
         if not sheep:
             log(f'sheepherder: lost {sheep_name(n)} mid-herd')
             return False

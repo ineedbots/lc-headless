@@ -9,7 +9,7 @@ from rs2004.items import inventory
 from rs2004.quests.barcrawl.run_barcrawl import ensure_barcrawl
 from rs2004.quests.defs.scorpcatcher.antipoison import cure_poison, poison_mark, stock_antipoison
 from rs2004.quests.defs.scorpcatcher.areas import ABBOT, EVERY_CAGE, SCORPION_NPC, SC_ID, SC_TILE, SEER, caught_in
-from rs2004.quests.defs.scorpcatcher.dungeon import cross_secret_wall, enter_deep_dungeon, leave_deep_dungeon
+from rs2004.quests.defs.scorpcatcher.dungeon import cross_secret_wall, enter_deep_dungeon, leave_cell, leave_deep_dungeon
 from rs2004.quests.exec.primitives import goto_npc, open_dialogue, pick_preferred, talk_through
 from rs2004.quests.exec.prompts import drive_until, settle_scene
 from rs2004.quests.journal_text import normalize_journal
@@ -119,6 +119,10 @@ def catch_outpost_scorpion(log):
 
 def catch_taverley_scorpion(log):
     """Taverley: the dusty key, the dragon corridor, then the wall by the 2 coffins."""
+    # Why: a run stopped in Velrak's cell can't route anywhere, the antipoison trip included.
+    _w8 = yield from leave_cell(log)
+    if not (_w8):
+        return False
     yield from stock_antipoison(log)
     mark = poison_mark()
     _w9 = yield from enter_deep_dungeon(log)
