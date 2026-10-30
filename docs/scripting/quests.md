@@ -148,7 +148,7 @@ A `QuestModule`'s other fields say what the engine should do for it: `bank`, `ho
 
 Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`), plus Demon Slayer (`demonslayer`), Doric's Quest (`doric`), Imp Catcher (`impcatcher`), Goblin Diplomacy (`goblindiplomacy`), Vampire Slayer (`vampireslayer`), The Knight's Sword (`knightssword`), Ernest the Chicken (`ernest`), Pirate's Treasure (`piratestreasure`), Prince Ali Rescue (`princeali`), Shield of Arrav (`shieldofarrav`) and Dragon Slayer (`dragonslayer`): all eighteen free-to-play quests.
 
-Druidic Ritual (`druidicritual`, record id `druid`) and Monk's Friend (`monksfriend`, record id `drunkmonk`) are the first members' modules. Both expose pure `decide(snap)` functions and journal parsers. Druidic Ritual recovers missing meat bank-first and enchants one species at a time; Monk's Friend sources the blanket, water and logs and waits for the party to finish. Live validation of these ports is pending.
+Druidic Ritual (`druidicritual`, record id `druid`) and Monk's Friend (`monksfriend`, record id `drunkmonk`) are the first members' modules. Both expose pure `decide(snap)` functions and journal parsers. Druidic Ritual recovers missing meat bank-first and enchants one species at a time; Monk's Friend sources the blanket, water and logs and waits for the party to finish.
 
 Four more members' modules expose `read_progress()` and a pure `decide(snap)`:
 
@@ -159,7 +159,7 @@ Four more members' modules expose `read_progress()` and a pure `decide(snap)`:
 | `clocktower` | `cog` | Collects and places the four cogs, including cooling the black cog and poisoning the rat pen. Leaves each sealed room through its own ladder |
 | `hazeelcult` | `hazeelcult` | Runs the Carnillean side. Refuses a character already committed to the cult side with a reason, sets the valves, retrieves the armour and searches Jones' cupboard |
 
-Their `parse_gertrudes_cat_journal`, `parse_jungle_journal`, `parse_clock_tower_journal` and `parse_hazeel_journal` functions return `QuestProgress` or `None`. Live validation remains pending.
+Their `parse_gertrudes_cat_journal`, `parse_jungle_journal`, `parse_clock_tower_journal` and `parse_hazeel_journal` functions return `QuestProgress` or `None`.
 
 The remaining phase-17a modules are also registered:
 
@@ -172,7 +172,7 @@ The remaining phase-17a modules are also registered:
 | `priestperil` | `priestperil` | Uses temple doors, held keys and water to locate its phase, then supplies Drezel with essence, withdrawing banked essence or mining it with a held or banked pickaxe |
 | `tribaltotem` | `totem` | Relabels the delivery crate, enters by Cromperty's teleport, solves the KURT lock from its displayed letters, investigates the stairs and retrieves the totem |
 
-The four packages retain their upstream areas, journal and execution modules. Fishing Contest's journal reader returns a stage; Witch's House, Murder Mystery, Sea Slug and Tribal Totem return `QuestProgress`. Priest in Peril reads its phase through interactions and inventory. These ports await live acceptance.
+The four packages retain their upstream areas, journal and execution modules. Fishing Contest's journal reader returns a stage; Witch's House, Murder Mystery, Sea Slug and Tribal Totem return `QuestProgress`. Priest in Peril reads its phase through interactions and inventory. Its mining fallback needs Rune Mysteries completed and a held or banked pickaxe when no essence is banked. All twelve phase-17a quests have completed in one live queue, and FlourCollector and RoguesPurse have each banked a full load.
 
 ## Steps: `rs2004.quests.exec.steps`
 

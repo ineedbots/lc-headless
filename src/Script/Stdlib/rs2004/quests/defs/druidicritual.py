@@ -129,12 +129,14 @@ def take_meat_drop(meat):
     return _result2
 
 
-def wait_with_upkeep(expect, timeout_ms):
+def wait_with_upkeep(expect, timeout_ms, target=None):
     deadline = _core.step_time() + timeout_ms
     while not expect():
         if _core.step_time() >= deadline:
             return False
         yield from sustain.run()
+        if target is not None and target.valid() and game.facing() != ('npc', target.index):
+            target.interact('Attack')
         yield from execution.delay_ticks(1)
     return True
 
@@ -152,7 +154,8 @@ def hunt_meat(meat, log):
     if _w5:
         return True
     if game.in_combat():
-        yield from wait_with_upkeep(lambda: not game.in_combat(), 120000)
+        attacker = npcs.query().action('Attack').where(lambda n: n.targets_me()).within(15).nearest()
+        yield from wait_with_upkeep(lambda: not game.in_combat() or (attacker is not None and not attacker.valid()), 120000, attacker)
         _result6 = yield from take_meat_drop(meat)
         return _result6
     target = npcs.query().where(lambda n: n.id == meat.npc_id and not n.in_combat and not n.targets_another_player()).action('Attack').within(15).nearest()
@@ -161,10 +164,11 @@ def hunt_meat(meat, log):
         yield from execution.delay_ticks(2)
         return False
     game.set_combat_style('strength')
+    yield from execution.delay_ticks(1)
     log(f'attacking {meat.npc} for {meat.raw}')
     if not (target.interact('Attack')):
         return False
-    yield from wait_with_upkeep(lambda: ground_items.query().name(meat.raw).within(15).nearest() is not None or not target.valid(), 120000)
+    yield from wait_with_upkeep(lambda: ground_items.query().name(meat.raw).within(15).nearest() is not None or not target.valid(), 120000, target)
     _result7 = yield from take_meat_drop(meat)
     return _result7
 
@@ -187,7 +191,7 @@ def fight_living_suit(log):
             log('the animated Suit of armour did not engage — yielding safely')
             return True
     log('defeating the animated Suit of armour guarding the cauldron')
-    yield from wait_with_upkeep(lambda: not game.in_combat() or not suit.valid(), 120000)
+    yield from wait_with_upkeep(lambda: not game.in_combat() or not suit.valid(), 120000, suit)
     return True
 
 

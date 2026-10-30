@@ -139,3 +139,23 @@ def combat_upkeep():
 
 
 test('long ritual waits pump upkeep and stop at their deadline', combat_upkeep)
+
+
+def ritual_recovers_attack():
+    state = {'ticks': 0, 'attacks': 0}
+    def attack(op):
+        assert op == 'Attack'
+        state['attacks'] += 1
+        return True
+    target = Fake(index=7, valid=lambda: state['ticks'] < 2, interact=attack)
+    spy_on(ritual.game, 'facing', returns=None)
+    def tick(count):
+        state['ticks'] += count
+        yield
+    spy_on(execution, 'delay_ticks', impl=tick)
+    spy_on(sustain, 'run', impl=instant_ticks)
+    expect(run_wait(ritual.wait_with_upkeep(lambda: not target.valid(), 120000, target))).to_be(True)
+    expect(state['attacks']).to_be(2)
+
+
+test('ritual combat reissues a cleared attack until the tracked NPC disappears', ritual_recovers_attack)

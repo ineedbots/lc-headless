@@ -208,7 +208,7 @@ test('Priest in Peril banks early essence through the native deposit helper sign
 
 
 def trap_message():
-    spy_on(reader, 'chat_modal_texts', returns=['There is a trap in these stairs.'])
+    spy_on(_core, 'get_chat_texts', returns=['There is a trap in these stairs.'])
     spy_on(reader, 'main_modal_texts', returns=[])
     def prompt(step, log):
         expect(step.expect()).to_be(True)
@@ -257,7 +257,7 @@ def combination_dial():
         assert button == totem.DIAL_DOWN[0]
         state['letter'] = 'Z'
         return True
-    spy_on(reader, 'if_text', impl=lambda id: state['letter'])
+    spy_on(_core, 'get_component_text', impl=lambda id: state['letter'])
     spy_on(_core, 'click_component', impl=click)
     spy_on(execution, 'delay_until', impl=instant_until)
     expect(run_wait(totem.set_dial(0, 'Z', lambda message: None))).to_be(True)

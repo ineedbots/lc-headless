@@ -2,7 +2,7 @@
 
 from rs2004 import execution
 from rs2004.catalogs.record import Record
-from rs2004.dialogue import modals
+from rs2004.dialogue import chat_dialog, modals
 from rs2004.entities import locs
 from rs2004.game import game, reader
 from rs2004.geometry import Tile
@@ -150,7 +150,7 @@ def mark_crate(log):
 
 
 def dial_letter(index):
-    text = reader.if_text(DIAL_TEXT[index])
+    text = reader.component_text(DIAL_TEXT[index])
     if text is None:
         return None
     cleaned = text.strip().upper()
@@ -216,7 +216,7 @@ def disarm_trap(log):
     state = {'found': False}
 
     def noted():
-        if not state['found'] and any([TRAP_FOUND in t.lower() for t in list(reader.chat_modal_texts()) + list(reader.main_modal_texts())]):
+        if not state['found'] and any([TRAP_FOUND in t.lower() for t in list(chat_dialog.texts()) + list(reader.main_modal_texts())]):
             state['found'] = True
         return state['found']
 
@@ -329,6 +329,7 @@ def decide(snap):
 
 tribaltotem = QuestModule(**{
     'record': quest_record('totem'),
+    'resume_at': in_mansion,
     'bank': QUEST_BANK,
     'tools': ['address label', 'totem', 'coins'],
     'read_progress': read_tribal_totem_progress,

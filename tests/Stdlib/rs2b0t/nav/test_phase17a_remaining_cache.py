@@ -1,4 +1,5 @@
 """Exact targets for the rest of phase 17a, including both gathering bots."""
+import _core
 from rs2004.quests.defs import def_by_id
 from rs2004.quests.defs.witchshouse.areas import WH_OBJ, WH_NAME, WH_LOC, EXPERIMENT_IDS, EXPERIMENT_NAMES
 from rs2004.quests.defs.fishingcontest.areas import FC_ID, RED_VINE_LOCS, FC_NPC
@@ -49,3 +50,16 @@ def targets():
 
 
 test('quest creatures, shops, herbs, evidence and puzzle targets exist in the cache', targets)
+
+
+def garden_corridor():
+    # rs2b0t's witchshouse-patrol.test.ts checks its collision.lcnav.gz here (MIT, see thirdparty/rs2b0t).
+    from rs2004.quests.defs.witchshouse.patrol import garden_legs, GARDEN_ENTRY, FOUNTAIN_STAND
+    for leg in garden_legs(GARDEN_ENTRY, FOUNTAIN_STAND):
+        for tile in leg:
+            found = _core.walk_tile(tile.x, tile.z, tile.level)
+            expect(found is not None, str(tile)).to_be(True)
+            expect(found[0], str(tile)).to_be(1)
+
+
+test('every planned witch garden corridor tile is walkable in the native map', garden_corridor)

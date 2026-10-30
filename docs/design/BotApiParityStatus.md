@@ -13,7 +13,7 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 | 14 | Combat: the gear lists, `rs2004.hunting`, `duel`; 13 fighters | Done, with the open items below |
 | 15 | The clue engine and ClueSolver, wired into the seven bots that carry clues | Done, with the open items below |
 | 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | 16a done (the engine, seven quests, AIOQuester), with the open items below; 16b done (nine more quests, garlic and Karamja fare recovery); 16c done (paired Arrav, Dragon Slayer, supplier, barcrawl and the fresh-account eighteen-quest queue) |
-| 17 | The members' quests, in sub-phases 17a–17i | 17a implemented: all twelve quest modules and both bots, with upstream, runtime and cache tests; live verification is in progress |
+| 17 | The members' quests, in sub-phases 17a–17i | 17a done: all twelve quests completed in one live queue, and both gatherers banked full loads; 17b–17i not started |
 | 18 | The account leveler | Not started |
 
 ## What's in place
