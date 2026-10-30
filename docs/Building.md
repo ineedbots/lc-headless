@@ -162,7 +162,7 @@ excluded. Counts represent line trace events, which pocketpy can coalesce, rathe
 Script branch coverage is not collected.
 
 Tracing is test-only and opt-in through the runner. Normal application builds do not include the collector.
-Coverage presets allow 300 seconds per test instead of 60 to accommodate tracing overhead. Script fixtures
+Coverage presets allow 300 seconds per test instead of 120 to accommodate tracing overhead. Script fixtures
 also allow five times their normal VM watchdog duration while collecting coverage; VM deadline tests retain
 their original limits. Cache-dependent tests still skip without cache data, and hidden `[Slow]` tests are
 excluded. Test or collection errors fail the

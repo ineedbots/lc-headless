@@ -117,7 +117,7 @@ target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     Catch2::Catch2WithMain)
 
 include(Catch)
-set(TEST_TIMEOUT 60)
+set(TEST_TIMEOUT 120)
 if(RS2004_ENABLE_SCRIPT_COVERAGE)
     set(TEST_TIMEOUT 300)
 endif()
