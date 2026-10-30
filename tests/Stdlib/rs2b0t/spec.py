@@ -184,8 +184,8 @@ class Fake:
 
 
 class FakeQuery:
-    """An entity query over a list of fakes: name, action, where, within, nearest, first and results. A fake is
-    named by its name field and offers its actions()."""
+    """An entity query over a list of fakes: name, action, where, within, nearest, first, count, exists and results. A
+    fake is named by its name field and offers its actions()."""
 
     def __init__(self, rows):
         self.rows = rows
@@ -217,6 +217,12 @@ class FakeQuery:
     def first(self):
         return self.nearest()
 
+    def count(self):
+        return len(self.rows)
+
+    def exists(self):
+        return len(self.rows) > 0
+
     def results(self):
         return list(self.rows)
 
@@ -224,6 +230,47 @@ class FakeQuery:
 def querying(supply):
     """A query() that reads supply() afresh each time."""
     return lambda: FakeQuery(supply())
+
+
+class FakeChat:
+    """A chat dialog that plays pages in order: 'continue', or a list of options. chosen records each option picked
+    and on_choose(text) runs after it; install(chat_dialog) puts it over the dialog's calls until the test ends."""
+
+    def __init__(self, pages=None):
+        self.pages = list(pages) if pages is not None else []
+        self.chosen = []
+        self.on_choose = None
+
+    def is_open(self):
+        return len(self.pages) > 0
+
+    def can_continue(self):
+        return len(self.pages) > 0 and self.pages[0] == 'continue'
+
+    def options(self):
+        if len(self.pages) == 0 or self.pages[0] == 'continue':
+            return []
+        return list(self.pages[0])
+
+    def continue_(self):
+        if len(self.pages) > 0:
+            self.pages.pop(0)
+        return True
+        yield
+
+    def choose_option(self, text):
+        self.chosen.append(text)
+        if len(self.pages) > 0:
+            self.pages.pop(0)
+        if self.on_choose is not None:
+            self.on_choose(text)
+        return True
+        yield
+
+    def install(self, chat_dialog):
+        for name in ['is_open', 'can_continue', 'options', 'continue_', 'choose_option']:
+            spy_on(chat_dialog, name, impl=getattr(self, name))
+        return self
 
 
 def instant_until(cond, timeout_ms=6000):
