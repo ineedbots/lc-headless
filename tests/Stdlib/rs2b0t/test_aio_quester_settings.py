@@ -30,7 +30,7 @@ test('AIO quest options keep stable IDs but display canonical quest names', _fn2
 def _fn4():
     names = [QUEST_OPTION_LABELS.get(id) for id in AIO_SETTINGS['quests'].options or []]
     expect(names).to_equal(sorted(list(names)))
-    expect(names[0]).to_be("Black Knight's Fortress")
+    expect(names[0]).to_be('Biohazard')
     expect(QUEST_DEFS[0].record.name).not_.to_be(names[0])
 
 
