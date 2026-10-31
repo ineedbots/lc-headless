@@ -631,6 +631,14 @@ FlourCollector comes with Murder Mystery, and RoguesPurse with Jungle Potion, si
 - **Found live, left alone.** Three deaths came before the fixes above: two to the troll pass on the way to the Troll General, one on Trollheim. Each was recovered by the engine. Two of them cost the rune scimitar and helm, so the harness gave a spare set twice, and two prayer potions, as support stock. Leaving the mourners' headquarters with the distillator, a mourner on the corridor tile blocked the client's path for about 40 seconds, as rs2b0t's Biohazard pitfall describes, until it moved.
 - **Live acceptance.** All five completed on `p17c1030a` in one AIOQuester queue, with development restarts to install the fixes above: Death Plateau, Troll Stronghold (Dad in 13 attacks and the General in 13, both cell keys pickpocketed, Mad Eadgar freed before Godric), Eadgar's Ruse, Plague City and Biohazard. At 03:23 UTC on 31 October 2026 (30 October local) the harness logged the queue drained and every quest's status `complete`, at 11 quest points. ClimbingBoots then ran 12 minutes on the same account with Death Plateau done, walking back without the Falador teleport (Magic 13). It bought 224 boots over 8 trips and banked seven full loads, without a script error. This closes the open item from phase 11. Logs and the harnesses are under `build/phase17c-live`.
 - **Verification after the live fixes.** Release builds, and with the 289, 274 and 225 caches set all 800 cases pass.
+- **Coverage follow-up.** rs2b0t's tests reach the decisions but hardly the legs that play the game. Five runtime spec files drive those legs against spied facades: `test_plaguecity_runtime.py`, `test_biohazard_runtime.py`, `test_deathplateau_runtime.py`, `test_trollstronghold_quest_runtime.py` and `test_eadgar_runtime.py`, 63 scenarios in all. They cover:
+    - Ardougne's crossings between its pockets, the headquarters door and both sides of the wall, the distraction, the stew, the mourner fight and the smuggle through Varrock's gate;
+    - Harold's room, his dice through every verdict, the climbing stake, Burthorpe's stairs, Saba's cave, Tenzing's door, the stone balls and both certificates;
+    - the troll pass under its guard, the boots, Dad, the General, the cell keys and the prisoners;
+    - the scarecrow's gathering, the parrot, the thistle and the potion, the storeroom and the guarded talks;
+    - all five journal readers, with Eadgar's freed-Eadgar cache.
+
+  Each leg runs through its success and its failures. With all three local cache revisions set, whole-file line coverage across the 36 stdlib files changed from `develop` rises from 4,607/6,828 (67.47%) to 6,593/6,828 (96.56%), and the whole stdlib from 43,495/48,115 (90.40%) to 45,481/48,115 (94.53%). These are automated test measurements, excluding live acceptance, script branches and bots under `scripts/`.
 
 ---
 
