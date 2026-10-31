@@ -882,7 +882,15 @@ class Translator {
         }
         if (ts.isIdentifier(node)) return this.valueName(node.text);
         if (ts.isArrayBindingPattern(node)) {
-            return node.elements.map((e: Node) => (ts.isOmittedExpression(e) ? '_' : this.bindingTarget(e.name))).join(', ');
+            // Why: pocketpy never stores _, so a skipped entry gets a numbered name that the item tuple a find or
+            // filter gives back can read.
+            const names = node.elements.map((e: Node, i: number) => (ts.isOmittedExpression(e) ? `_${i + 1}` : this.bindingTarget(e.name)));
+            // Why: [id] over a [number, number] pair binds the first entry, and a bare `id` would be the whole pair,
+            // so a tuple's remaining entries get names of their own.
+            const arity = tupleArity(node);
+            while (arity !== null && names.length < arity) names.push(`_${names.length + 1}`);
+            if (names.length === 1 && arity === null) this.flag(`a one-element array pattern: ${names[0]} is the whole element here, not its first entry`, node);
+            return names.join(', ');
         }
         this.flag('an object pattern here');
         return '_o';
@@ -974,6 +982,11 @@ class Translator {
         }
         if (kind === 'map' && method === 'set' && e.arguments.length === 2) {
             return `${this.expr(callee.expression)}[${this.expr(e.arguments[0])}] = ${this.expr(e.arguments[1])}`;
+        }
+        // Why: push(...xs) would be append(*xs), which appends only the one element pocketpy hands it.
+        if (kind === 'array' && method === 'push' && e.arguments.some((a: Node) => ts.isSpreadElement(a))) {
+            const parts = e.arguments.map((a: Node) => (ts.isSpreadElement(a) ? `list(${this.expr(a.expression)})` : `[${this.expr(a)}]`));
+            return `${this.expr(callee.expression)}.extend(${parts.join(' + ')})`;
         }
         if (kind === 'array' && method === 'push' && e.arguments.length > 1) {
             return `${this.expr(callee.expression)}.extend([${e.arguments.map((a: Node) => this.expr(a)).join(', ')}])`;
@@ -1311,6 +1324,19 @@ class Translator {
         this.emit('');
     }
 
+    // A function imported from another file whose object parameter its own draft spreads, so this file's calls of
+    // it spread theirs the same way.
+    private importedOptions(callee: Node): Param[] | undefined {
+        let symbol = checker.getSymbolAtLocation(callee);
+        if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+        const decl = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+        if (!decl || decl.getSourceFile() === this.sf) return undefined;
+        const fn = ts.isFunctionDeclaration(decl) ? decl : ts.isVariableDeclaration(decl) && decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) ? decl.initializer : null;
+        if (!fn) return undefined;
+        const options = this.optionsParameter(fn);
+        return options ? [...this.leadingParams(fn), ...options.params] : undefined;
+    }
+
     private leadingParams(node: Node): Param[] {
         return node.parameters.slice(0, -1).map((p: Node) => ({ name: ts.isIdentifier(p.name) ? this.valueName(p.name.text) : '_', optional: !!(p.questionToken || p.initializer) }));
     }
@@ -1346,6 +1372,8 @@ class Translator {
         // A caller passing an object it already has, a Tile say, would need it taken apart at the call, so only
         // a parameter rs2b0t always passes as a literal is spread.
         const fnName = node.name && ts.isIdentifier(node.name) ? node.name.text : ts.isVariableDeclaration(node.parent) ? node.parent.name.getText() : null;
+        // Why: an unnamed function is a callback, and whatever calls it (reduce, flatMap) hands it the whole object.
+        if (!fnName) return null;
         const index = node.parameters.length - 1;
         if (fnName && callsNamed(fnName).some((c: Node) => c.arguments.length > index && !ts.isObjectLiteralExpression(c.arguments[index]))) return null;
         const optional = (p: any) => !!(p.flags & ts.SymbolFlags.Optional) || !!last.questionToken || !!last.initializer;
@@ -1367,6 +1395,12 @@ class Translator {
             const optional = p.questionToken || p.initializer;
             const literal = p.initializer ? literalDefault(p.initializer) : null;
             out.push(optional ? `${name}=${literal ?? 'None'}` : name);
+        }
+        // Why: JavaScript drops the arguments a callback doesn't declare (`() => undefined` as a log), and Python
+        // raises on them. pocketpy can't put *_args after a defaulted parameter, so those are left as they are.
+        const plain = !node.parameters.some((p: Node) => p.dotDotDotToken || p.questionToken || p.initializer);
+        if (!method && !options && plain && (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && contextualArity(node) > node.parameters.length) {
+            out.push('*_args');
         }
         if (options) {
             for (const prop of options.params) out.push(prop.optional ? `${prop.name}=None` : prop.name);
@@ -1605,6 +1639,11 @@ class Translator {
         const type = checker.getNonNullableType(checker.getTypeAtLocation(e));
         const symbol = type?.getSymbol?.() ?? type?.symbol;
         return symbol ? symbol.name : null;
+    }
+
+    // Why: iterating a Map gives its [key, value] entries in JavaScript and its keys in Python.
+    private entries(node: Node, text: string): string {
+        return this.collectionKind(node) === 'map' ? `${text}.items()` : text;
     }
 
     // What kind of collection a value is, from its type: 'array', 'set', 'map', 'string' or null.
@@ -1977,7 +2016,7 @@ class Translator {
         const stub = this.stubFor(e);
         let params: Param[] | undefined = stub?.params;
         if (!params && ts.isIdentifier(callee)) {
-            params = this.expanded.get(this.valueName(callee.text));
+            params = this.expanded.get(this.valueName(callee.text)) ?? this.importedOptions(callee);
         }
         if (ts.isPropertyAccessExpression(callee) && callee.expression.getText() === 'ScriptRunner') {
             const method = callee.name.text;
@@ -2195,10 +2234,6 @@ class Translator {
             // only the value it gives is bracketed.
             const target = bound;
             const item = bound.includes(',') ? `(${bound})` : bound;
-            // Why: ([needle]) => binds the element's first entry, which a bare name would read as the whole element.
-            if (first && ts.isArrayBindingPattern(first) && !bound.includes(',')) {
-                this.flag(`a one-element destructured parameter: ${bound} is the element here, not its first entry`, e);
-            }
             const index = lambda?.parameters[1] ? this.bindingTarget(lambda.parameters[1].name) : null;
             const loop = index ? `for ${index}, ${item} in enumerate(${of})` : `for ${target} in ${of}`;
             const body = lambda ? this.expr(lambda.body) : fn ? `${this.expr(fn)}(${item})` : item;
@@ -2401,7 +2436,7 @@ class Translator {
             case 'Set':
                 return args.length ? `set(${args[0]})` : 'set()';
             case 'Map':
-                return args.length ? `{_k: _v for _k, _v in ${args[0]}}` : '{}';
+                return args.length ? `{_k: _v for _k, _v in ${this.entries(e.arguments[0], args[0])}}` : '{}';
             case 'Array':
                 return args.length ? `[None] * ${args[0]}` : '[]';
             case 'Error':
@@ -2556,6 +2591,20 @@ class Translator {
         return name;
     }
 
+    // A named function given as a property, { observe }, that declares fewer parameters than the property's type
+    // passes: JavaScript drops the rest, and Python raises on them.
+    private flagShortSignature(p: Node): void {
+        const value = ts.isShorthandPropertyAssignment(p) ? p.name : ts.isPropertyAssignment(p) ? p.initializer : null;
+        if (!value || !ts.isIdentifier(value)) return;
+        let symbol = ts.isShorthandPropertyAssignment(p) ? checker.getShorthandAssignmentValueSymbol(p) : checker.getSymbolAtLocation(value);
+        if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+        const decl = symbol?.valueDeclaration;
+        if (!decl || !ts.isFunctionDeclaration(decl) || decl.parameters.some((q: Node) => q.dotDotDotToken)) return;
+        if (contextualArity(value) > decl.parameters.length) {
+            this.flag(`${value.text} declares fewer parameters than its callers pass, which Python refuses: add the rest with defaults`, p);
+        }
+    }
+
     private objectLiteral(e: Node): string {
         if (e.properties.length === 0) return this.isDictLike(e) ? '{}' : 'Record({})';
         const dict = this.isDictLike(e);
@@ -2596,6 +2645,7 @@ class Translator {
                 run.push(items[items.length - 1]);
                 continue;
             }
+            this.flagShortSignature(p);
             const rawKey = p.name.getText();
             const key = ts.isComputedPropertyName(p.name) ? this.expr(p.name.expression) : pyString(dict ? unquote(rawKey) : snake(unquote(rawKey)));
             const value = ts.isShorthandPropertyAssignment(p) ? this.identifier(p.name) : this.expr(p.initializer);
@@ -2700,7 +2750,7 @@ class Translator {
             if (ts.isSpreadElement(x)) {
                 if (plain.length) parts.push(`[${plain.join(', ')}]`);
                 plain = [];
-                parts.push(`list(${this.expr(x.expression)})`);
+                parts.push(`list(${this.entries(x.expression, this.expr(x.expression))})`);
             } else {
                 plain.push(this.expr(x));
             }
@@ -2842,6 +2892,39 @@ function literalDefault(e: Node): string | null {
             return null;
         case k.Identifier:
             return e.text === 'undefined' ? 'None' : null;
+    }
+    return null;
+}
+
+const ARRAY_CALLBACK_METHODS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex', 'findLast', 'some', 'every', 'forEach', 'reduce', 'sort', 'toSorted']);
+
+// The most arguments the function a value is passed as may be called with: 0 when there's no such type, and
+// effectively unbounded for a rest parameter.
+function contextualArity(value: Node): number {
+    // The array methods become loops and comprehensions that pass exactly what the callback declares.
+    const call = value.parent;
+    if (call && ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) && ARRAY_CALLBACK_METHODS.has(call.expression.name.text)) return 0;
+    const type = checker.getContextualType(value);
+    if (!type) return 0;
+    let most = 0;
+    for (const sig of checker.getNonNullableType(type).getCallSignatures?.() ?? []) {
+        const params = sig.getParameters();
+        const rest = sig.getDeclaration?.()?.parameters?.some((p: Node) => p.dotDotDotToken);
+        most = Math.max(most, rest ? Number.MAX_SAFE_INTEGER : params.length);
+    }
+    return most;
+}
+
+// The length of the tuple an array pattern destructures, or null when it isn't a tuple of known length.
+function tupleArity(pattern: Node): number | null {
+    for (const at of [pattern.parent, pattern]) {
+        if (!at) continue;
+        const type = checker.getNonNullableType(checker.getTypeAtLocation(at));
+        if (checker.isTupleType(type)) {
+            const target = type.target ?? type;
+            if (target.hasRestElement || target.minLength !== target.fixedLength) return null;
+            return checker.getTypeArguments(type).length;
+        }
     }
     return null;
 }

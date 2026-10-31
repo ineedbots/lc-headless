@@ -11,6 +11,7 @@ Scripts run on pocketpy 2.2, a subset of Python 3. Most everyday Python works; t
 - Generator expressions don't exist: write `any([x for x in xs])`, not `any(x for x in xs)`.
 - `yield from` may only be a statement, or the right side of an assignment. Not `if (yield from wait()):`; write `ok = yield from wait()` then `if ok:`.
 - In unpacking, a starred name must come last (`first, *rest = items`), and only lists and tuples unpack.
+- `_` is never stored: `for id, _ in pairs` skips the value, and reading `_` afterwards is a `NameError`. Name a value you read.
 - Strings side by side aren't joined, f-strings included: `'a' 'b'` is an error. Join them with `+`.
 - A parenthesised import can't have a trailing comma.
 - Avoid chained comparisons such as `a < b < c`; write `a < b and b < c`.
@@ -18,6 +19,7 @@ Scripts run on pocketpy 2.2, a subset of Python 3. Most everyday Python works; t
 ### Functions and classes
 
 - A parameter can be passed by keyword only when it has a default value, and a default must be a literal: `timeout=6000`, not `timeout=TIMEOUT`.
+- A function called with more arguments than it declares raises, where JavaScript drops the extras. A callback such as a step's `run(log)` or a quest's `gather(snap, need)` takes every argument it's handed, even one it ignores.
 - A function can read the variables of the function it's defined in, but not of one further out. A lambda inside a nested function that uses the outer function's variable fails, or quietly gets a builtin of the same name, such as `id` or `min`. Copy the value into a local of the nested function first.
 - Classes must be defined at module level, not inside a function.
 - A class has at most one base class.

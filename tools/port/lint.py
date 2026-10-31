@@ -123,6 +123,9 @@ class Finder(ast.NodeVisitor):
     def visit_Name(self, node):
         if node.id == 'match':
             self.report(node, 'match is a keyword in pocketpy')
+        # pocketpy never stores _, so binding it discards the value and reading it is a NameError.
+        if node.id == '_' and isinstance(node.ctx, ast.Load):
+            self.report(node, '_ is never stored in pocketpy; reading it is a NameError, so give the value a name')
         self.generic_visit(node)
 
     def visit_arg(self, node):

@@ -20,7 +20,7 @@ def ascending(category, names):
     expect(Record({
         'category': category,
         'gaps': gaps,
-        'fell_through': [_ for i, _ in enumerate(names) if ranks[i] == UNRANKED],
+        'fell_through': [name for i, name in enumerate(names) if ranks[i] == UNRANKED],
     })).to_equal(Record({'category': category, 'gaps': [], 'fell_through': []}))
 
 
