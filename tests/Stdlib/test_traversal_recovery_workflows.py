@@ -312,6 +312,23 @@ def test_missing_door_can_be_crossed_when_passable_and_failed_open_is_bounded():
         assert any(['did not open' in line for line in world.logs])
 
 
+def test_a_door_that_walks_you_through_and_shuts_again_counts_as_crossed():
+    with RouteWorld() as world:
+        door = Entity(world, 'Door', ['Open'])
+        world.loc_items = [door]
+
+        # Tenzing's door: the script moves you to the far side and the loc never reads open.
+        def walk_through(action):
+            world.here = Tile(3202, 3200)
+            return True
+
+        door.on_interact = walk_through
+        transport = {'kind': 'door', 'loc_name': 'Door', 'action': 'Open', 'loc_x': 3200, 'loc_z': 3200}
+        walk = walker._Traversal()
+        assert world.run(walk._cross_door(world.here, Tile(3202, 3200), transport, world.logs.append))
+        assert not any(['did not open' in line for line in world.logs])
+
+
 def test_post_quest_unlock_failed_walk_missing_npc_and_silent_talk():
     for failure in ['walk', 'missing', 'silent', 'continue']:
         with RouteWorld() as world:

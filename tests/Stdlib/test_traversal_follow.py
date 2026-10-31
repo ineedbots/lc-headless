@@ -272,3 +272,26 @@ def test_a_route_ending_short_of_the_destination_reports_closest():
         assert world.run(walk.walk_to(Tile(3210, 3200), radius=0, timeout_ms=10000))
         assert walk.last_outcome == 'closest'
         assert world.clicks == [] and world.waits == []
+
+
+def test_a_route_being_followed_pumps_sustain_every_pass_as_rs2b0ts_walk_executor_does():
+    from rs2004.catalogs.tasks import sustain
+    with WalkWorld() as world:
+        eaten = []
+        world.move = False
+
+        def slow_start():
+            if len(world.waits) >= 3:
+                world.move = True
+                world.on_wait = None
+
+        world.on_wait = slow_start
+        sustain.set(lambda: eaten.append(world.ticks))
+        try:
+            walk = walker._Traversal()
+            assert world.run(walk.walk_to(Tile(3210, 3200), radius=0, timeout_ms=10000))
+        except Exception as e:
+            sustain.set(None)
+            raise e
+        sustain.set(None)
+        assert len(eaten) >= 3
