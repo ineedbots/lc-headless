@@ -136,6 +136,7 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 | `api/ai/quests/defs/plaguecity/` | `rs2004.quests.defs.plaguecity` |
 | `api/ai/quests/defs/biohazard/` | `rs2004.quests.defs.biohazard` |
 | `adapter/ClientAdapter.ts`'s `modalButtons`, `mainModalButtonNearText` | `reader.modal_buttons`, `reader.main_modal_button_near_text` |
+| `adapter/ClientAdapter.ts`'s `chatModalTexts` | `reader.chat_modal_texts` |
 
 | TypeScript | Python |
 |---|---|

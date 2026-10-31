@@ -89,6 +89,19 @@ def main_modal_lines():
 test('main modal text reads only the currently open interface', main_modal_lines)
 
 
+def chat_modal_lines():
+    state = {'id': -1}
+    spy_on(_core, 'get_chat_modal', impl=lambda: state['id'])
+    texts = spy_on(_core, 'get_texts', impl=lambda id: ['You need a Mining level of 20'] if id == 229 else [])
+    expect(reader.chat_modal_texts()).to_equal([])
+    expect(len(texts.calls)).to_be(0)
+    state['id'] = 229
+    expect(reader.chat_modal_texts()).to_equal(['You need a Mining level of 20'])
+
+
+test("chat modal text reads a ~mesbox's lines only while one is open", chat_modal_lines)
+
+
 def supplier_preparation():
     from bots import arrav_supplier as supplier
     from rs2004.settings import settings_store
