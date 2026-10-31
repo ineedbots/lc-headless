@@ -74,11 +74,16 @@ def custom_name(step):
     return (step.name if step.kind == 'custom' else None)
 
 
+def reads_stage(stage, page):
+    def run():
+        progress = parse_sea_slug_journal(page)
+        expect(progress.stage if progress is not None else None).to_be(float(stage))
+    return run
+
+
 def _fn3():
     for stage, page in PAGE.items():
-        def _fn4():
-            expect((parse_sea_slug_journal(page).stage if parse_sea_slug_journal(page) is not None else None)).to_be(float(stage))
-        test(f'reads the stage {stage} page back as stage {stage}', _fn4)
+        test(f'reads the stage {stage} page back as stage {stage}', reads_stage(stage, page))
 
     def _fn5():
         expect((parse_sea_slug_journal(PASTE_HELD).stage if parse_sea_slug_journal(PASTE_HELD) is not None else None)).to_be(SS_STAGE.SPOKEN_HOLGART)

@@ -116,6 +116,18 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 | `api/ai/quests/defs/seaslug/` | `rs2004.quests.defs.seaslug` |
 | `api/ai/quests/defs/priestperil.ts` | `rs2004.quests.defs.priestperil` |
 | `api/ai/quests/defs/tribaltotem.ts` | `rs2004.quests.defs.tribaltotem` |
+| `api/ai/quests/defs/dwarfcannon/` | `rs2004.quests.defs.dwarfcannon` |
+| `api/ai/quests/defs/sheepherder/` | `rs2004.quests.defs.sheepherder` |
+| `api/ai/quests/defs/treegnome/` | `rs2004.quests.defs.treegnome` |
+| `api/ai/quests/defs/waterfall.ts` | `rs2004.quests.defs.waterfall` |
+| `api/ai/quests/defs/scorpcatcher/` | `rs2004.quests.defs.scorpcatcher` |
+| `api/ai/quests/defs/observatory/` | `rs2004.quests.defs.observatory` |
+| `api/ai/quests/defs/fightarena/` | `rs2004.quests.defs.fightarena` |
+| `api/ai/quests/defs/merlinscrystal.ts` | `rs2004.quests.defs.merlinscrystal` |
+| `api/ai/quests/defs/lostcity.ts` | `rs2004.quests.defs.lostcity` |
+| `api/ai/quests/defs/lostcityCombat.ts` | `rs2004.quests.defs.lostcity_combat` |
+| `api/ai/quests/defs/trollstronghold/areas.ts` | `rs2004.quests.defs.trollstronghold.areas` |
+| `api/ai/quests/defs/trollstronghold/combat.ts` | `rs2004.quests.defs.trollstronghold.combat` |
 
 | TypeScript | Python |
 |---|---|

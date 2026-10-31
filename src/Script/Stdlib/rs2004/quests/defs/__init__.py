@@ -184,8 +184,62 @@ def _tribaltotem():
     return tribaltotem
 
 
+def _dwarfcannon():
+    from rs2004.quests.defs.dwarfcannon import dwarfcannon
+    return dwarfcannon
+
+
+def _sheepherder():
+    from rs2004.quests.defs.sheepherder import sheepherder
+    return sheepherder
+
+
+def _treegnome():
+    from rs2004.quests.defs.treegnome import treegnome
+    return treegnome
+
+
+def _waterfall():
+    from rs2004.quests.defs.waterfall import waterfall
+    return waterfall
+
+
+def _scorpcatcher():
+    from rs2004.quests.defs.scorpcatcher import scorpcatcher
+    return scorpcatcher
+
+
+def _observatory():
+    from rs2004.quests.defs.observatory import observatory
+    return observatory
+
+
+def _fightarena():
+    from rs2004.quests.defs.fightarena import fightarena
+    return fightarena
+
+
+def _merlinscrystal():
+    from rs2004.quests.defs.merlinscrystal import merlinscrystal
+    return merlinscrystal
+
+
+def _lostcity():
+    from rs2004.quests.defs.lostcity import lostcity
+    return lostcity
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'dwarfcannon': ('mcannon', _dwarfcannon),
+    'sheepherder': ('sheepherder', _sheepherder),
+    'treegnome': ('tree', _treegnome),
+    'waterfall': ('waterfall', _waterfall),
+    'scorpcatcher': ('scorpcatcher', _scorpcatcher),
+    'observatory': ('itgronigen', _observatory),
+    'fightarena': ('arena', _fightarena),
+    'merlinscrystal': ('arthur', _merlinscrystal),
+    'lostcity': ('zanaris', _lostcity),
     'witchshouse': ('ball', _witchshouse),
     'fishingcontest': ('fishingcompo', _fishingcontest),
     'murder': ('murder', _murder),

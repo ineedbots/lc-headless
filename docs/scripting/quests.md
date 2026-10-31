@@ -174,6 +174,22 @@ The remaining phase-17a modules are also registered:
 
 The four packages retain their upstream areas, journal and execution modules. Fishing Contest's journal reader returns a stage; Witch's House, Murder Mystery, Sea Slug and Tribal Totem return `QuestProgress`. Priest in Peril reads its phase through interactions and inventory. Its mining fallback needs Rune Mysteries completed and a held or banked pickaxe when no essence is banked. All twelve phase-17a quests have completed in one live queue, and FlourCollector and RoguesPurse have each banked a full load.
 
+The phase-17b modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `dwarfcannon` | `mcannon` | Replaces the six railings, takes the remains from the watchtower, rescues the dwarf child from the goblin cave and repairs the cannon one named part at a time |
+| `sheepherder` | `sheepherder` | Buys the plague suit, fetches the prod, prods each sheep into the enclosure along a route searched again from the sheep's tile every push, poisons it and burns its exact remains |
+| `treegnome` | `tree` | Brings Montai the logs, fires the ballista at height 4, x 3, y 5, takes the orb from the stronghold chest and kills the Khazard warlord under Protect from Melee |
+| `waterfall` | `waterfall` | Self-funds when the purse and bank are empty, reads the book, recovers Glarial's pebble, amulet and urn, solves the rune pillars and pours the ashes, bankless inside the falls |
+| `scorpcatcher` | `scorpcatcher` | Requires the barcrawl card for the outpost. Reads which scorpions are caught from the cage's id, held or banked, and takes the dusty key, the dragon corridor and the monastery |
+| `observatory` | `itgronigen` | Fetches sand, ore, planks and seaweed in map order, smelts the glass and bar in one furnace visit, kills the keep's guard for the lens mould and looks through the telescope |
+| `fightarena` | `arena` | Wears the Khazard disguise, buys the Khali brew for the keys, fights the ogre, scorpion and Bouncer with Strikes from cover, or in the open under Protect from Melee when a beast won't come round the rock, and keeps the last stage it read |
+| `merlinscrystal` | `arthur` | Talks to the knights, rides the crate into the fortress for Morgan's brief, makes the black candle, takes Excalibur from the Lady of the Lake and summons Thrantax to break the crystal |
+| `lostcity` | `zanaris` | Reveals Shamus, sails to Entrana without restricted gear, kills the tree spirit with Strikes from the fungus safespot (`lostcity_combat`), crafts five Dramen staves and enters Zanaris |
+
+Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight` and `attackable`, so `rs2004.quests.defs.trollstronghold.combat` and `areas` are ported ahead of the quest itself, which phase 17c adds. All nine phase-17b quests have completed in one live queue.
+
 ## Steps: `rs2004.quests.exec.steps`
 
 `execute_step(step, hops, log)` runs one step. A step is a `Record` made by `quest_step(kind, ...)`, whose fields not set read as `None`:

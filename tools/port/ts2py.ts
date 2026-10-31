@@ -167,6 +167,17 @@ const MODULES: Record<string, string> = {
     'api/ai/quests/prayer': 'rs2004.quests.prayer',
 };
 
+const QUEST_DEFS_PREFIX = 'api/ai/quests/defs/';
+
+// rs2b0t's defs/<quest>/<file> is rs2004.quests.defs.<quest>.<file>, and a package's index is the package.
+function questDefsModule(module: string): string {
+    const parts = module.slice(QUEST_DEFS_PREFIX.length).split('/').map(snake);
+    if (parts.length > 1 && parts[parts.length - 1] === 'index') {
+        parts.pop();
+    }
+    return ['rs2004.quests.defs', ...parts].join('.');
+}
+
 // Modules a headless client leaves out: their imports are dropped, and calls into them marked.
 const LEFT_OUT = ['paint/', 'panel/', 'multibox/', 'input/', 'runtime/diag/', 'api/ai/clues/cluePaint'];
 
@@ -608,12 +619,29 @@ class Translator {
         if (clause.name) {
             names.push(this.identifier(clause.name));
         }
+        // A renamed import ({ normalizeJournal as normalize }) is found by the name its module exports.
+        const exported = new Map<string, string>();
         for (const element of clause.namedBindings?.elements ?? []) {
             if (!element.isTypeOnly && !this.isTypeOnlySymbol(element.name)) {
-                names.push(this.identifier(element.name));
+                const name = this.identifier(element.name);
+                names.push(name);
+                if (element.propertyName) {
+                    exported.set(name, this.identifier(element.propertyName));
+                }
             }
         }
         if (names.length === 0) {
+            return;
+        }
+        const imported = (name: string, as: string = name): string =>
+            exported.has(name) && exported.get(name) !== as ? `${exported.get(name)} as ${as}` : as;
+        // A quest's own files map by path: several quests export the same names (FALADOR_WEST_BANK, in_cave), so the
+        // name index would import another quest's.
+        if (stdlibMode && module.startsWith(QUEST_DEFS_PREFIX)) {
+            const target = questDefsModule(module);
+            for (const name of names) {
+                this.addImport(target, imported(name, this.valueName(name)));
+            }
             return;
         }
         const target = MODULES[module];
@@ -622,9 +650,9 @@ class Translator {
         if (stdlibMode && (target === 'builtins' || target === 'rs2004.catalogs' || target === undefined)) {
             const missing: string[] = [];
             for (const name of names) {
-                const home = STDLIB_EXPORTS.get(name);
+                const home = STDLIB_EXPORTS.get(exported.get(name) ?? name);
                 if (home) {
-                    this.addImport(home, name);
+                    this.addImport(home, imported(name));
                 } else if (fs.existsSync(path.join(stdlibRoot, 'rs2004', `${name}.py`))) {
                     this.addImport('rs2004', name);
                 } else {
@@ -644,7 +672,7 @@ class Translator {
             return;
         }
         for (const name of names) {
-            this.addImport(target, this.valueName(name));
+            this.addImport(target, imported(name, this.valueName(name)));
         }
     }
 
@@ -1084,6 +1112,24 @@ class Translator {
                 }
             }
         }
+        // for (let i = 0; i < n && more; i++) is a range that stops early.
+        if (init && ts.isVariableDeclarationList(init) && init.declarations.length === 1 && cond && ts.isBinaryExpression(cond)
+            && cond.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken && ts.isBinaryExpression(cond.left)
+            && cond.left.operatorToken.kind === ts.SyntaxKind.LessThanToken && inc && ts.isPostfixUnaryExpression(inc)
+            && inc.operator === ts.SyntaxKind.PlusPlusToken) {
+            const decl = init.declarations[0];
+            const name = decl.name.getText();
+            if (cond.left.left.getText() === name && inc.operand.getText() === name) {
+                const start = decl.initializer ? this.expr(decl.initializer) : '0';
+                this.emit(`for ${snake(name)} in range(${start === '0' ? '' : start + ', '}${this.expr(cond.left.right)}):`);
+                this.depth++;
+                this.emit(`if not (${this.condition(cond.right)}):`);
+                this.emit('    break');
+                this.blockStatements(node.statement);
+                this.depth--;
+                return;
+            }
+        }
         if (init) {
             if (ts.isVariableDeclarationList(init)) {
                 for (const d of init.declarations) this.variable(d, false);
@@ -1091,14 +1137,31 @@ class Translator {
                 this.expressionStatement(init);
             }
         }
+        // Why: a continue would skip an increment at the bottom, so with one in the body it runs at the top of
+        // every pass after the first.
+        if (inc && containsContinue(node.statement)) {
+            const first = this.fresh('first');
+            this.emit(`${first} = True`);
+            this.emit('while True:');
+            this.depth++;
+            this.emit(`if not ${first}:`);
+            this.depth++;
+            this.expressionStatement(inc);
+            this.depth--;
+            this.emit(`${first} = False`);
+            if (cond) {
+                this.emit(`if not (${this.condition(cond)}):`);
+                this.emit('    break');
+            }
+            this.blockStatements(node.statement);
+            this.depth--;
+            return;
+        }
         this.emit(`while ${cond ? this.condition(cond) : 'True'}:`);
         this.depth++;
         this.blockStatements(node.statement);
         if (inc) this.expressionStatement(inc);
         this.depth--;
-        if (containsContinue(node.statement)) {
-            this.emit(this.todo('a continue in this loop skips its increment', node));
-        }
     }
 
     private tryStatement(node: Node): void {
@@ -1648,7 +1711,14 @@ class Translator {
                     this.pre(`    ${holder} = ${no.value}`);
                     return holder;
                 }
-                return `(${this.expr(e.whenTrue)} if ${this.expr(e.condition)} else ${this.expr(e.whenFalse)})`;
+                {
+                    // Why: a lambda takes everything after its colon, so (lambda: a if c else None) is always a lambda.
+                    const branch = (node: Node): string => {
+                        const text = this.expr(node);
+                        return text.startsWith('lambda') ? `(${text})` : text;
+                    };
+                    return `(${branch(e.whenTrue)} if ${this.expr(e.condition)} else ${branch(e.whenFalse)})`;
+                }
             case k.ArrowFunction:
             case k.FunctionExpression:
                 return this.arrow(e);
@@ -1850,7 +1920,13 @@ class Translator {
         const callee = e.expression;
         const optionalCall = !!e.questionDotToken;
         const special = this.tentative(() => this.builtinCall(e));
-        if (special !== null) return special;
+        if (special !== null) {
+            // Why: x?.toLowerCase() is a JavaScript method, which builtinCall translates without its ?. guard.
+            if (ts.isPropertyAccessExpression(callee) && callee.questionDotToken) {
+                return `(${special} if ${this.expr(callee.expression)} is not None else None)`;
+            }
+            return special;
+        }
         const stub = this.stubFor(e);
         let params: Param[] | undefined = stub?.params;
         if (!params && ts.isIdentifier(callee)) {
@@ -1864,6 +1940,9 @@ class Translator {
             if (method === 'paintControls') return 'None';
             this.flag(`ScriptRunner.${method}`, e);
             return 'None';
+        }
+        if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'each' && /^(test|it)$/.test(callee.expression.getText())) {
+            return `test_each(${this.argList(e)})`;
         }
         if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'on' && e.arguments.length === 2 && ts.isStringLiteral(e.arguments[0])) {
             return `${this.expr(callee.expression)}.on(${pyString(eventName(e.arguments[0].text))}, ${this.expr(e.arguments[1])})`;
@@ -2063,17 +2142,25 @@ class Translator {
         if (kind === 'array' || kind === null) {
             const lambda = fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && !ts.isBlock(fn.body) ? fn : null;
             // A destructured parameter, ([name, runes]) =>, is a tuple in the comprehension.
-            const bound = lambda?.parameters[0] ? this.bindingTarget(lambda.parameters[0].name) : '_x';
+            const first = lambda?.parameters[0]?.name;
+            const bound = first ? this.bindingTarget(first) : '_x';
+            // pocketpy can't parse a loop target in brackets, so the loop's tuple is bare (for name, runes in ...) and
+            // only the value it gives is bracketed.
+            const target = bound;
             const item = bound.includes(',') ? `(${bound})` : bound;
+            // Why: ([needle]) => binds the element's first entry, which a bare name would read as the whole element.
+            if (first && ts.isArrayBindingPattern(first) && !bound.includes(',')) {
+                this.flag(`a one-element destructured parameter: ${bound} is the element here, not its first entry`, e);
+            }
             const index = lambda?.parameters[1] ? this.bindingTarget(lambda.parameters[1].name) : null;
-            const loop = index ? `for ${index}, ${item} in enumerate(${of})` : `for ${item} in ${of}`;
+            const loop = index ? `for ${index}, ${item} in enumerate(${of})` : `for ${target} in ${of}`;
             const body = lambda ? this.expr(lambda.body) : fn ? `${this.expr(fn)}(${item})` : item;
             switch (method) {
                 case 'map':
                     if (kind === 'array' || lambda) return `[${body} ${loop}]`;
                     break;
                 case 'filter':
-                    if (kind === 'array' || lambda) return fn?.getText() === 'Boolean' ? `[${item} for ${item} in ${of} if ${item}]` : `[${item} ${loop} if ${body}]`;
+                    if (kind === 'array' || lambda) return fn?.getText() === 'Boolean' ? `[${item} for ${target} in ${of} if ${item}]` : `[${item} ${loop} if ${body}]`;
                     break;
                 case 'find':
                     if (kind === 'array' || lambda) return `([${item} ${loop} if ${body}] or [None])[0]`;
@@ -2111,6 +2198,15 @@ class Translator {
                 case 'concat':
                     if (kind === 'array') return [of, ...args].map(a => `list(${a})`).join(' + ');
                     break;
+                case 'fill': {
+                    // Array(n).fill(v), rs2b0t's tests' list of n copies.
+                    const owner = callee.expression;
+                    if ((ts.isCallExpression(owner) || ts.isNewExpression(owner)) && owner.expression.getText() === 'Array' && owner.arguments?.length === 1 && args.length === 1) {
+                        const count = this.expr(owner.arguments[0]);
+                        return `[${args[0]}] * ${/^[\w.]+$/.test(count) ? count : `(${count})`}`;
+                    }
+                    break;
+                }
                 case 'push':
                     if (kind === 'array' && args.length === 1) return `${of}.append(${args[0]})`;
                     break;

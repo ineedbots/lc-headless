@@ -34,18 +34,18 @@ def at_cover(tile):
     return here is not None and tile == here
 
 
-def cast_from_cover(spot, target):
-    """Whether a Strike from spot reaches target: in range, on its level, in sight, and inside the lane the cover
-    is for."""
+def cast_from_cover(spot, target, lane=True):
+    """Whether a Strike from spot reaches target: in range, on its level, in sight, and, with lane, inside the lane
+    the cover is for."""
     centre = target.network_tile()
     origin = body_origin(centre, target.size)
     tile = Tile(origin.x, origin.z, centre.level)
     distance = max(tile.x - spot.x, spot.x - tile.x - target.size + 1, tile.z - spot.z, spot.z - tile.z - target.size + 1)
     if tile.level != spot.level or distance > 10 or distance < 1:
         return False
-    if spot == ARENA_COVER and not ((tile.x >= 2596 and tile.z >= 3166 and tile.z <= 3168) or (tile.x >= 2594 and tile.z == 3169)):
+    if lane and spot == ARENA_COVER and not ((tile.x >= 2596 and tile.z >= 3166 and tile.z <= 3168) or (tile.x >= 2594 and tile.z == 3169)):
         return False
-    if spot == EXPERIMENT_COVER and EXPERIMENT_TRAP != tile:
+    if lane and spot == EXPERIMENT_COVER and EXPERIMENT_TRAP != tile:
         return False
     return reachability.line_of_sight(spot, tile, target.size)
 
@@ -117,7 +117,7 @@ def _same_npc(target):
     return None
 
 
-def _cast_and_watch(spot, target, spell, before, state):
+def _cast_and_watch(spot, target, spell, before, state, lane=True):
     if not game.cast_on_npc(spell, target):
         return False
     for tick in range(10):
@@ -128,7 +128,7 @@ def _cast_and_watch(spot, target, spell, before, state):
             state.returning = direct_navigator.walk(spot)
             return False
         current = _same_npc(target)
-        if game.auto_retaliate_on() or autocast.armed() or (current is not None and not cast_from_cover(spot, current)):
+        if game.auto_retaliate_on() or autocast.armed() or (current is not None and not cast_from_cover(spot, current, lane)):
             game.set_auto_retaliate(False)
             return False
         if tick >= 5 and inventory.count('Mind rune') < before:
@@ -138,10 +138,10 @@ def _cast_and_watch(spot, target, spell, before, state):
     return False
 
 
-def cast_strike(spot, target, log):
+def cast_strike(spot, target, log, lane=True):
     """Casts the best Strike at target from spot and waits for the runes to go. Off cover or out of sight, it gives
     up and steps back onto its own tile, so the cast isn't walked into. Use with yield from."""
-    if event_signal.pending() or game.auto_retaliate_on() or not at_cover(spot) or not cast_from_cover(spot, target):
+    if event_signal.pending() or game.auto_retaliate_on() or not at_cover(spot) or not cast_from_cover(spot, target, lane):
         return False
     spell = strike_spell(skills.effective('magic'), lambda rune: inventory.count(rune))
     if spell is None:
@@ -149,7 +149,7 @@ def cast_strike(spot, target, log):
         return False
     before = inventory.count('Mind rune')
     state = _Cast()
-    cast = yield from _cast_and_watch(spot, target, spell, before, state)
+    cast = yield from _cast_and_watch(spot, target, spell, before, state, lane)
     # Why: rs2b0t's finally: a cast that didn't land leaves the player walking at the target, so stand still.
     if not state.settled and not state.returning:
         here = game.tile()

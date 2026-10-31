@@ -144,9 +144,11 @@ All twelve quest modules and both bots are implemented, with lazy queue registra
 
 They bring Fight Arena's fights, Lost City's tree spirit (`lostcityCombat.ts`), and Zanaris.
 
+All nine modules are ported, registered and tested, with Troll Stronghold's combat and areas ported ahead for Observatory Quest, and all nine completed live in one queue. See the design doc's "As built: 17b".
+
 - **Done when:**
-    - [ ] Their tests are ported and pass.
-    - [ ] Live, AIOQuester finishes all nine in one queue.
+    - [x] Their tests are ported and pass (the safespot test's engine-pathfinder half stays with rs2b0t; see "As built: 17b").
+    - [x] Live, AIOQuester finishes all nine in one queue (development restarts installed fixes to Sheep Herder, Scorpion Catcher and Fight Arena).
 
 ---
 

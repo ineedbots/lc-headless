@@ -55,6 +55,12 @@ def _fn2():
 describe('Metal key duel safety', _fn2)
 
 
+def route_area_is(tile, area):
+    def run():
+        expect(desert_camp_route_area(tile)).to_be(area)
+    return run
+
+
 def _fn8():
     cases = [
         [Record({'x': 3309, 'z': 3120, 'level': 0}), 'shantayNorth'],
@@ -72,9 +78,7 @@ def _fn8():
         [Record({'x': 3218, 'z': 9618, 'level': 0}), 'unsupported'],
     ]
     for tile, area in cases:
-        def _fn9():
-            expect(desert_camp_route_area(tile)).to_be(area)
-        test(f'{tile.x},{tile.z},{tile.level} is {area}', _fn9)
+        test(f'{tile.x},{tile.z},{tile.level} is {area}', route_area_is(tile, area))
 
 
 describe('Desert Mining Camp route areas', _fn8)

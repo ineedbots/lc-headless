@@ -20,6 +20,53 @@ def test(name, body):
 it = test
 
 
+class _RowCase:
+    """One row's test: the body called with the row's entries, or the row itself when it isn't a list."""
+
+    def __init__(self, body, row):
+        self.body = body
+        self.row = row
+
+    def __call__(self):
+        if isinstance(self.row, (list, tuple)):
+            return self.body(*self.row)
+        return self.body(self.row)
+
+
+def _row_name(name, row):
+    """Bun's test.each name: %s, %i, %d and %p take the row's entries in turn, and $field reads a field."""
+    entries = list(row) if isinstance(row, (list, tuple)) else [row]
+    out = ''
+    i = 0
+    used = 0
+    while i < len(name):
+        if name[i] == '%' and i + 1 < len(name) and name[i + 1] in 'sidp':
+            out += str(entries[used]) if used < len(entries) else ''
+            used += 1
+            i += 2
+            continue
+        if name[i] == '$':
+            j = i + 1
+            while j < len(name) and (name[j].lower() != name[j].upper() or name[j] == '_'):
+                j += 1
+            field = name[i + 1:j]
+            value = getattr(row, field, None) if not isinstance(row, dict) else row.get(field)
+            out += str(value)
+            i = j
+            continue
+        out += name[i]
+        i += 1
+    return out
+
+
+def test_each(rows):
+    """rs2b0t's test.each(rows)(name, body): a test per row."""
+    def register(name, body):
+        for row in rows:
+            test(_row_name(name, row), _RowCase(body, row))
+    return register
+
+
 def before_each(body):
     _BEFORE.append(body)
 
@@ -137,8 +184,8 @@ class Fake:
 
 
 class FakeQuery:
-    """An entity query over a list of fakes: name, action, where, within, nearest, first and results. A fake is
-    named by its name field and offers its actions()."""
+    """An entity query over a list of fakes: name, action, where, within, nearest, first, count, exists and results. A
+    fake is named by its name field and offers its actions()."""
 
     def __init__(self, rows):
         self.rows = rows
@@ -170,6 +217,12 @@ class FakeQuery:
     def first(self):
         return self.nearest()
 
+    def count(self):
+        return len(self.rows)
+
+    def exists(self):
+        return len(self.rows) > 0
+
     def results(self):
         return list(self.rows)
 
@@ -177,6 +230,47 @@ class FakeQuery:
 def querying(supply):
     """A query() that reads supply() afresh each time."""
     return lambda: FakeQuery(supply())
+
+
+class FakeChat:
+    """A chat dialog that plays pages in order: 'continue', or a list of options. chosen records each option picked
+    and on_choose(text) runs after it; install(chat_dialog) puts it over the dialog's calls until the test ends."""
+
+    def __init__(self, pages=None):
+        self.pages = list(pages) if pages is not None else []
+        self.chosen = []
+        self.on_choose = None
+
+    def is_open(self):
+        return len(self.pages) > 0
+
+    def can_continue(self):
+        return len(self.pages) > 0 and self.pages[0] == 'continue'
+
+    def options(self):
+        if len(self.pages) == 0 or self.pages[0] == 'continue':
+            return []
+        return list(self.pages[0])
+
+    def continue_(self):
+        if len(self.pages) > 0:
+            self.pages.pop(0)
+        return True
+        yield
+
+    def choose_option(self, text):
+        self.chosen.append(text)
+        if len(self.pages) > 0:
+            self.pages.pop(0)
+        if self.on_choose is not None:
+            self.on_choose(text)
+        return True
+        yield
+
+    def install(self, chat_dialog):
+        for name in ['is_open', 'can_continue', 'options', 'continue_', 'choose_option']:
+            spy_on(chat_dialog, name, impl=getattr(self, name))
+        return self
 
 
 def instant_until(cond, timeout_ms=6000):
