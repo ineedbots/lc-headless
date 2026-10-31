@@ -7,12 +7,13 @@ from rs2004 import execution
 from rs2004.entities import local_tile
 from rs2004.events import SKILL_NAMES
 from rs2004.geometry import Tile
+from rs2004.interfaces import interfaces
 from rs2004.tabs import COM_MODE_VARP, RETALIATE_VARP, _select_button, combat_styles, parse_combat_style
 from rs2004.tabs import resolve_combat_style, spell_button, teleport_button, try_parse_combat_style
 
 __all__ = [
     'game', 'skills', 'reader', 'chat', 'friends', 'ignores', 'direct_navigator', 'retaliate_on_from_varp', 'PLAYER_FACE_BASE',
-    'facing_player', 'OVERHEAD_TICKS', 'HintArrow', 'ObjRecord',
+    'facing_player', 'OVERHEAD_TICKS', 'HintArrow', 'ModalButton', 'ObjRecord',
 ]
 
 _SKILL_INDEXES = {name: index for index, name in SKILL_NAMES.items()}
@@ -296,6 +297,21 @@ class Modals:
         return f'Modals({self.main}, {self.side}, {self.chat})'
 
 
+class ModalButton:
+    """A button under a modal root: com_id, label (its caption), menu (its menu word), hidden (it or a layer above
+    it hidden), and pause (a continue button, which resumes a suspended script rather than firing if_button)."""
+
+    def __init__(self, com_id, label, menu, hidden, pause):
+        self.com_id = com_id
+        self.label = label
+        self.menu = menu
+        self.hidden = hidden
+        self.pause = pause
+
+    def __repr__(self):
+        return f'ModalButton({self.com_id}, {repr(self.label)}, hidden={self.hidden}, pause={self.pause})'
+
+
 class _Reader:
     """Raw reads, for what no facade covers yet."""
 
@@ -328,6 +344,22 @@ class _Reader:
         """The open main interface's text lines, or an empty list when it is shut."""
         main = _core.get_main_modal()
         return _core.get_texts(main) if main != -1 else []
+
+    # Why: the server arms a button with if_sethide and drops a press on a hidden one without a message, so a caller
+    # waits for hidden to clear; it picks the button by caption, since a root's children aren't numbered in order.
+    def modal_buttons(self, root):
+        """rs2b0t's modalButtons: every button under the root but close buttons, as ModalButtons."""
+        return [ModalButton(c.id, c.text or '', c.button_text or '', not c.visible, c.button == 'continue')
+                for c in _core.get_interface(root) if c.button is not None and c.button != 'close']
+
+    def main_modal_button_near_text(self, label):
+        """rs2b0t's mainModalButtonNearText: the ok, target or select button nearest the main modal's first text
+        containing label, or -1."""
+        main = _core.get_main_modal()
+        if main == -1:
+            return -1
+        found = interfaces.button_near_text(label, main)
+        return found if found is not None else -1
 
     def modals(self):
         """rs2b0t's: the open modals' interface ids, main, side and chat, each -1 when shut."""

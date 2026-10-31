@@ -116,6 +116,8 @@ Raw reads, for what no facade covers.
 | `reader.pid()` | Your index in the server's player list |
 | `reader.main_modal()` | The main interface's id, such as the bank's, or -1 |
 | `reader.main_modal_texts()` | The open main interface's text lines, or `[]` when none is open |
+| `reader.modal_buttons(root)` | rs2b0t's `modalButtons`: every button under that interface but close buttons, each a `ModalButton` with `com_id`, `label` (its caption), `menu`, `hidden` (it or a layer above it hidden, as `if_sethide` arms it) and `pause` (a continue button, which `_core.click_component` answers with a resume) |
+| `reader.main_modal_button_near_text(label)` | rs2b0t's `mainModalButtonNearText`: the button nearest the main interface's first text containing `label`, or -1 |
 | `reader.side_modal()` | The interface replacing the side tabs, or -1 |
 | `reader.chat_modal()` | The chat box interface, such as a dialogue, or -1 |
 | `reader.modals()` | rs2b0t's: all three, as an object with `main`, `side` and `chat` |
