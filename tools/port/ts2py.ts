@@ -676,6 +676,35 @@ class Translator {
         }
     }
 
+    // `export { a, b } from './journal.js'`: a quest's index re-exports its files' names, and its tests import them
+    // from the package, so the draft imports them and lists them in __all__.
+    private reExport(node: Node): void {
+        if (node.isTypeOnly || !node.moduleSpecifier || !node.exportClause || !ts.isNamedExports(node.exportClause)) {
+            return;
+        }
+        const module = this.moduleOf(node.moduleSpecifier.text);
+        if (module === null) {
+            return;
+        }
+        const names = node.exportClause.elements
+            .filter((element: Node) => !element.isTypeOnly && !this.isTypeOnlySymbol(element.name))
+            .map((element: Node) => this.valueName(this.identifier(element.name)));
+        if (names.length === 0) {
+            return;
+        }
+        if (!stdlibMode || !module.startsWith(QUEST_DEFS_PREFIX)) {
+            this.emit(this.todo(`re-export ${names.join(', ')} from ${module}`));
+            return;
+        }
+        const target = questDefsModule(module);
+        for (const name of names) {
+            this.addImport(target, name);
+            if (!this.exported.includes(name)) {
+                this.exported.push(name);
+            }
+        }
+    }
+
     private addImport(module: string, name: string): void {
         const set = this.imports.get(module) ?? new Set();
         set.add(name);
@@ -715,6 +744,7 @@ class Translator {
             case k.TypeAliasDeclaration:
                 return;
             case k.ExportDeclaration:
+                this.reExport(node);
                 return;
             case k.FunctionDeclaration:
                 this.functionDeclaration(node, top);
@@ -1004,6 +1034,23 @@ class Translator {
             this.emit(`${name} = yield from ${this.expr(e)}`);
             this.emit(`return ${name}`);
             return;
+        }
+        // `return a && call()` resolves the call's Promise too, so the short circuit becomes a test before the yield.
+        if (this.scopes.at(-1)?.generator && ts.isBinaryExpression(e)) {
+            const k = ts.SyntaxKind;
+            const operator = e.operatorToken.kind;
+            let right = e.right;
+            while (ts.isParenthesizedExpression(right)) right = right.expression;
+            if ((operator === k.AmpersandAmpersandToken || operator === k.BarBarToken) && ts.isCallExpression(right) && this.waitsHere(right)) {
+                const left = this.fresh('c');
+                this.emit(`${left} = ${this.expr(e.left)}`);
+                this.emit(operator === k.AmpersandAmpersandToken ? `if not (${left}):` : `if ${left}:`);
+                this.emit(`    return ${left}`);
+                const name = this.fresh('result');
+                this.emit(`${name} = yield from ${this.expr(right)}`);
+                this.emit(`return ${name}`);
+                return;
+            }
         }
         this.emit(`return ${this.expr(e)}`);
     }
