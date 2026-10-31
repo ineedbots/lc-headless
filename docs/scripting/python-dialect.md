@@ -136,6 +136,10 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 | `api/ai/quests/defs/plaguecity/` | `rs2004.quests.defs.plaguecity` |
 | `api/ai/quests/defs/biohazard/` | `rs2004.quests.defs.biohazard` |
 | `adapter/ClientAdapter.ts`'s `modalButtons`, `mainModalButtonNearText` | `reader.modal_buttons`, `reader.main_modal_button_near_text` |
+| `api/ai/quests/defs/druidspirit/` | `rs2004.quests.defs.druidspirit` |
+| `api/ai/quests/defs/mortton/` | `rs2004.quests.defs.mortton` |
+| `api/ai/quests/defs/tbwt/` | `rs2004.quests.defs.tbwt` |
+| `api/ai/quests/defs/shilo/` | `rs2004.quests.defs.shilo` |
 | `adapter/ClientAdapter.ts`'s `chatModalTexts` | `reader.chat_modal_texts` |
 
 | TypeScript | Python |

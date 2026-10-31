@@ -1,0 +1,9 @@
+from typing import Any, Callable, Optional, Sequence
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+TB_FLAG: Record
+def parse_tbwt_journal(lines: str | Sequence[str]) -> Optional[set[str]]: ...
+def reset_tbwt_progress_cache() -> Any: ...
+def read_tbwt_progress() -> Wait[Any]: ...
