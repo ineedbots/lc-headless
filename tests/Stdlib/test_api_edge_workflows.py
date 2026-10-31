@@ -69,6 +69,13 @@ def test_equipment_each_supported_action_waits_for_worn_item():
             assert world.pack == [] and len(world.worn) == 1 and world.now == 500
 
 
+def test_equipment_already_worn_is_done_without_an_op():
+    with EquipmentWorld() as world:
+        world.worn = [world.item(['Remove'])]
+        assert world.run(items.equipment.equip('Test gear'))
+        assert world.ops == [] and world.waits == []
+
+
 def test_equipment_missing_item_or_equip_action_does_nothing():
     with EquipmentWorld() as world:
         assert world.run(items.equipment.equip('missing')) is False

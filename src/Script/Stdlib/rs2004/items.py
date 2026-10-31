@@ -105,7 +105,10 @@ class _Equipment:
         return len(_named(self.items(), name)) > 0
 
     def equip(self, name):
-        """Wields, wears or equips the item from the backpack, and waits for it to be worn. Use with yield from."""
+        """Wields, wears or equips the item from the backpack, and waits for it to be worn; True at once when it's
+        already worn, as rs2b0t's. Use with yield from."""
+        if self.contains(name):
+            return True
         item = inventory.first(name)
         if item is None:
             return False
