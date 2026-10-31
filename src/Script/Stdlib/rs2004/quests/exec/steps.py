@@ -110,7 +110,28 @@ def _grab_ground(step, log):
     if taken:
         return True
     if step.wait_if_missing:
-        yield from execution.delay_ticks(2)
+        # Why: rs2b0t paused 2 ticks, so a quest whose only spawn another pick had just emptied failed 8 steps inside one
+        # respawn and parked 3 times: Plague City's single bucket spawn gave the quest up in 15 seconds. It waits here.
+        respawned = yield from _await_spawn(step.item)
+        if respawned:
+            taken = yield from _try_take(step.item)
+            return taken
+    return False
+
+
+# Long enough for a ground spawn's respawn, which the server counts in ticks; upkeep is pumped meanwhile.
+RESPAWN_WAIT_TICKS = 200
+
+
+def _await_spawn(item):
+    from rs2004.catalogs.tasks import sustain
+    for _ in range(RESPAWN_WAIT_TICKS):
+        if ground_items.query().name(item).within(12).nearest() is not None:
+            return True
+        if execution.event_signal.pending():
+            return False
+        yield from sustain.run()
+        yield from execution.delay_ticks(1)
     return False
 
 

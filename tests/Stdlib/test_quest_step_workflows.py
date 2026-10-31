@@ -179,9 +179,18 @@ def test_ground_gather_requeries_after_walking_and_requires_item_arrival():
 
 def test_ground_gather_does_not_report_success_for_arrival_at_empty_spawn():
     with QuestWorld() as world:
-        assert world.execute('grab_ground', item='Egg', anchor=Tile(3000, 3000), wait_if_missing=True) is False
+        import rs2004.quests.exec.steps as steps
+        cap = steps.RESPAWN_WAIT_TICKS
+        steps.RESPAWN_WAIT_TICKS = 5
+        try:
+            assert world.execute('grab_ground', item='Egg', anchor=Tile(3000, 3000), wait_if_missing=True) is False
+        except Exception as e:
+            steps.RESPAWN_WAIT_TICKS = cap
+            raise e
+        steps.RESPAWN_WAIT_TICKS = cap
         assert world.actions == [] and world.count('Egg') == 0
-        assert world.waits[-1].count == 2
+        # It waits a tick at a time for the respawn, rather than rs2b0t's single 2-tick pause.
+        assert [w.count for w in world.waits[-5:]] == [1, 1, 1, 1, 1]
 
 
 def test_ground_take_rejected_or_unacknowledged_is_failure():
