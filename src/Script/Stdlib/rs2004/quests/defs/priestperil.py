@@ -528,7 +528,7 @@ def mine_essence(log):
     return False
 
 
-def gather_bucket():
+def gather_bucket(snap=None, need=1):
     return Record({'kind': 'buy', 'item': 'Bucket', 'qty': 1, 'shop': VARROCK_GENERAL, 'est_gp': 15})
 
 

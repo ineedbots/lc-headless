@@ -913,3 +913,11 @@ def journal_stage():
 
 
 test('the stage comes from the quest list, or the journal, whose page is closed after', journal_stage)
+
+
+def reads_book_with_log():
+    spy_on(wf, 'live_item', returns=None)
+    expect(run_wait(wf.read_book(lambda message: None))).to_be(False)
+
+
+test("reading the book takes the log a custom step's run is handed", reads_book_with_log)

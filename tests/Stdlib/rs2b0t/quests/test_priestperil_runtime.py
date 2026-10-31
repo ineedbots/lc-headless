@@ -202,3 +202,13 @@ def missing_mining_tools():
 
 
 test('Priest parks after all three banked pickaxe choices fail', missing_mining_tools)
+
+
+def gathers_bucket():
+    gather = priest.priestperil.gather.get('bucket')
+    step = gather(None, 1)
+    expect(step.kind).to_be('buy')
+    expect(step.item).to_be('Bucket')
+
+
+test('the bucket gather takes the snapshot and need the engine passes', gathers_bucket)

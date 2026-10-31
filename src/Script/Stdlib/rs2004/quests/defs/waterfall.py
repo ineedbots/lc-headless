@@ -694,7 +694,7 @@ def leave_hudon_mound(log):
     return _result37
 
 
-def read_book():
+def read_book(log=None):
     book = live_item(ITEM.BOOK)
     if not book or not (book.interact('Read')):
         return False
