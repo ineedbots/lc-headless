@@ -92,6 +92,15 @@ for (const edge of activateTransportRows([...allTransportRows(), ...stairs])) {
     });
 }
 
+// Edges rs2b0t's data lacks, found live on the 289 engine.
+const EDGE_ADDITIONS = [
+    // Shilo Village: the quest ends at the dolmen in Bervirius' tomb, whose only way out is the climbing rocks
+    // (`oploc1,zqhandholds` teleports a climber to 0_43_46_12_32 and steps them east), so the retreat to a bank and
+    // the next quest in the queue had no route out of it (phase 17d's live run).
+    { kind: 'dungeon', from: { x: 2764, z: 9376, level: 0 }, to: { x: 2765, z: 2976, level: 0 }, cost: edgeCostForKind('dungeon'), locName: 'Climbing rocks', action: 'Climb', locX: 2765, locZ: 9376, locId: 2236, toTile: { x: 2765, z: 2976 } },
+];
+edges.push(...EDGE_ADDITIONS);
+
 const write = (name: string, value: unknown) => {
     const text = JSON.stringify(plain(value));
     fs.writeFileSync(path.join(outDir, name), text + '\n');
@@ -108,6 +117,8 @@ const CROSSING_ADDITIONS = [
     // Black Knights' Fortress: a fortress guard stops anyone entering the knights' banquet hall from the west, and only
     // lets them through on this answer. The hall is the only way to the ladder up to the hole (phase 16a's live run).
     { x: 3020, z: 3515, level: 0, locName: 'Door', action: 'Open', dialogue: { choose: ["I don't care. I'm going in anyway."] }, label: "Black Knights' Fortress banquet hall" },
+    // Shilo Village: the climb out of Bervirius' tomb is an Agility roll, and a fall drops the climber back beside it.
+    { x: 2764, z: 9376, level: 0, locName: 'Climbing rocks', action: 'Climb', toTile: { x: 2765, z: 2976, level: 0 }, arrivalRadius: 2, retryOnGameMessage: { message: { pattern: 'you fall!', flags: 'i' }, attempts: 4, reason: 'Agility roll failed' }, label: "Bervirius' tomb climbing rocks (phase 17d)" },
 ];
 write('crossings.json', [...SPECIAL_CROSSINGS, ...CROSSING_ADDITIONS]);
 write('danger_zones.json', KNOWN_DANGER_ZONES);
