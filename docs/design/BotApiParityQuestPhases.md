@@ -160,10 +160,12 @@ Two chains: Plague City then Biohazard in West Ardougne, and Death Plateau, Trol
 
 **Tests:** the quests', and the walker's `script-travel-corpus`, which reads Troll Stronghold's areas.
 
+All five modules are ported, registered and tested, and all five completed live in one queue; `script-travel-corpus` tests rs2b0t's own benchmarking tool and is left out. See the design doc's "As built: 17c".
+
 - **Done when:**
-    - [ ] Those tests are ported and pass.
-    - [ ] Live, AIOQuester finishes all five in one queue.
-    - [ ] ClimbingBoots runs live, on an account with Death Plateau done (an open item since phase 13).
+    - [x] Those tests are ported and pass (less `script-travel-corpus`; see "As built: 17c").
+    - [x] Live, AIOQuester finishes all five in one queue (development restarts installed fixes to the walker, the grab step, `equip`, Death Plateau and Eadgar's Ruse).
+    - [x] ClimbingBoots runs live, on an account with Death Plateau done (224 boots bought over 8 trips in 12 minutes).
 
 ---
 

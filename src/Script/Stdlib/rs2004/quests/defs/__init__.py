@@ -229,8 +229,38 @@ def _lostcity():
     return lostcity
 
 
+def _deathplateau():
+    from rs2004.quests.defs.deathplateau import deathplateau
+    return deathplateau
+
+
+def _trollstronghold():
+    from rs2004.quests.defs.trollstronghold import trollstronghold
+    return trollstronghold
+
+
+def _eadgar():
+    from rs2004.quests.defs.eadgar import eadgar
+    return eadgar
+
+
+def _plaguecity():
+    from rs2004.quests.defs.plaguecity import plaguecity
+    return plaguecity
+
+
+def _biohazard():
+    from rs2004.quests.defs.biohazard import biohazard
+    return biohazard
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'deathplateau': ('death', _deathplateau),
+    'trollstronghold': ('troll', _trollstronghold),
+    'eadgar': ('eadgar', _eadgar),
+    'plaguecity': ('elena', _plaguecity),
+    'biohazard': ('biohazard', _biohazard),
     'dwarfcannon': ('mcannon', _dwarfcannon),
     'sheepherder': ('sheepherder', _sheepherder),
     'treegnome': ('tree', _treegnome),

@@ -33,7 +33,7 @@ What you wear.
 |---|---|
 | `equipment.items()` | The worn items, as `InvItem`s; `slot` is the equipment slot |
 | `equipment.contains(name)` | Whether an item with that name is worn |
-| `equipment.equip(name)` | **Wait.** Uses the backpack item's Wield, Wear or Equip option, whichever it has, then waits up to 3 seconds for it to be worn. Gives `True` once it is; `False` when it isn't in the backpack, has no such option, or didn't go on in time |
+| `equipment.equip(name)` | **Wait.** Uses the backpack item's Wield, Wear or Equip option, whichever it has, then waits up to 3 seconds for it to be worn. Gives `True` once it is, and at once when it's already worn, as rs2b0t's does; `False` when it isn't in the backpack, has no such option, or didn't go on in time |
 | `equipment.unequip(name)` | **Wait.** Removes the worn item into the backpack and waits up to 3 seconds. Gives `True` once it's off |
 
 ```python

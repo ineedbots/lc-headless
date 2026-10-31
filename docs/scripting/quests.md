@@ -188,7 +188,21 @@ The phase-17b modules are registered too:
 | `merlinscrystal` | `arthur` | Talks to the knights, rides the crate into the fortress for Morgan's brief, makes the black candle, takes Excalibur from the Lady of the Lake and summons Thrantax to break the crystal |
 | `lostcity` | `zanaris` | Reveals Shamus, sails to Entrana without restricted gear, kills the tree spirit with Strikes from the fungus safespot (`lostcity_combat`), crafts five Dramen staves and enters Zanaris |
 
-Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight` and `attackable`, so `rs2004.quests.defs.trollstronghold.combat` and `areas` are ported ahead of the quest itself, which phase 17c adds. All nine phase-17b quests have completed in one live queue.
+Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight` and `attackable`, so `rs2004.quests.defs.trollstronghold.combat` and `areas` were ported ahead of the quest itself. All nine phase-17b quests have completed in one live queue.
+
+The phase-17c modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `deathplateau` | `death` | Asks Eohric and Harold about the night guard, buys Harold the ale and a Blurberry special, bets past his purse at dice until he writes the IOU, reads the combination and places the five stone balls; then Saba, Tenzing, Dunstan's spiked boots and Denulth's certificate, Tenzing's supplies, and the secret path scouted off the thrower trolls' approach |
+| `trollstronghold` | `troll` | Needs Death Plateau complete. Wears the climbing boots and the loadout, fights Dad to his forfeit and a Troll General for the prison key under Protect from Melee, steals the cell keys (Thieving 30) or kills the woken guards, and frees Mad Eadgar before Godric |
+| `eadgar` | `eadgar` | Needs Troll Stronghold and Mad Eadgar freed, and frees him first when the journal says he isn't. Catches the drunk parrot, hides it under the prison rack, gathers the scarecrow (logs, chickens, grain and a robe), brews the troll potion from a banked ranarr weed, fetches the fake man and the storeroom key and takes the goutweed; every Trollheim leg holds Protect from Missiles against the throwers |
+| `plaguecity` | `elena` | Digs into the sewer from Edmond's garden after four pours, pulls the grill with the rope, follows Jethick, the Rehnisons and Milli, gets the clerk's audience with Bravek, makes his hangover cure and frees Elena with the warrant |
+| `biohazard` | `biohazard` | Needs Plague City. Distracts the mourners with the pigeons, poisons their stew over the fence, takes the doctors' gown and the sick mourner's key for the distillator, sends the vials with the errand boys, crosses Varrock's east gate in the priest suit to Guidor and confronts King Lathas |
+
+Each keeps rs2b0t's package. Plague City and Biohazard walk out of West Ardougne, the mourners' headquarters and the sewer before any bank leg, since none has a bank. Troll Stronghold and Eadgar's Ruse bank only below the stile; above it they wear what they carry and go on. Death Plateau's dice game reads the panel's buttons with `reader.modal_buttons` and presses them with `_core.click_component`, which sends a pause button's resume.
+
+All five phase-17c quests have completed in one live queue. Eadgar's Ruse departs from rs2b0t in drawing two prayer potions for the Trollheim crossings, and Death Plateau in closing Harold's menu before it reads the IOU.
 
 ## Steps: `rs2004.quests.exec.steps`
 
@@ -197,7 +211,7 @@ Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight
 | Kind | Fields | Does |
 |---|---|---|
 | `talk` | `stop` | Walks to the `NpcStop` and talks it through |
-| `grab_ground` | `item`, `anchor`, `wait_if_missing` | Takes the item off the ground there; arriving at an empty spawn isn't a take |
+| `grab_ground` | `item`, `anchor`, `wait_if_missing` | Takes the item off the ground there; arriving at an empty spawn isn't a take. With `wait_if_missing` it waits up to 200 ticks for the spawn to come back, where rs2b0t paused 2 |
 | `pick_loc` | `loc`, `op`, `item`, `anchor` | Picks from a loc until the item lands |
 | `interact_loc` | `loc`, `op`, `anchor`, `expect_item` | Uses a loc |
 | `use_on` | `item`, `target_kind` (`'npc'`, `'loc'` or `'item'`), `target`, `anchor`, `product` | Uses an item on a thing, and waits for the product |

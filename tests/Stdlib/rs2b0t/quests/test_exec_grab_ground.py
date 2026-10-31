@@ -6,7 +6,7 @@ from rs2004.game import game
 from rs2004.geometry import Tile
 from rs2004.items import inventory
 from rs2004.quests.engine.types import quest_step
-from rs2004.quests.exec.steps import execute_step
+from rs2004.quests.exec.steps import RESPAWN_WAIT_TICKS, execute_step
 from rs2004.traversal import traversal
 
 ANCHOR = Tile(3227, 3300, 0)
@@ -123,12 +123,24 @@ def _fn1():
         expect(S['held']).to_be(1)
     test('Takes after the walk if the egg is there on re-query', _fn4)
 
+    # Departs from rs2b0t, which paused 2 ticks: a single spawn emptied by the last pick parked the quest inside one
+    # respawn, so the step waits for it, a tick at a time, up to RESPAWN_WAIT_TICKS.
     def _fn5():
         grabbed = yield from grab(True)
         expect(grabbed).to_be(False)
         expect(S['walks']).to_be(1)
-        expect(S['waits']).to_be(1)
-    test('waitIfMissing delays when the pen is still empty', _fn5)
+        expect(S['waits']).to_be(RESPAWN_WAIT_TICKS)
+    test('waitIfMissing waits out the respawn when the pen stays empty', _fn5)
+
+    def _fn6():
+        S['item'] = Egg()
+        S['queries'] = -3
+        spy_on(ground_items, 'query', impl=later_egg)
+        grabbed = yield from grab(True)
+        expect(grabbed).to_be(True)
+        expect(S['takes']).to_be(1)
+        expect(S['held']).to_be(1)
+    test('waitIfMissing takes the egg once it respawns', _fn6)
 
 
 describe('grabGround', _fn1)

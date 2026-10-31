@@ -750,11 +750,16 @@ class _Traversal:
         last_tile = None
         click = {'mark': None, 'at': None}
         last_move_tick = _core.tick()
+        # Why: rs2b0t's WalkExecutor pumps Sustain every pass of the route, so a long walk under fire still eats, and a
+        # quest's borrowed hook (Troll Stronghold's missile guard) ticks; pumped only per ladder pass, a whole route
+        # went by without either, and the troll pass killed the account on eight uneaten lobsters.
+        from rs2004.catalogs.tasks import sustain
         while _core.step_time() < deadline:
             if self._force_repath:
                 self._force_repath = False
                 say('repath requested')
                 return 'repath'
+            yield from sustain.run()
             me = local_tile()
             if click['at'] is not None and not _same(me, click['at']):
                 click['mark'] = None
@@ -1108,9 +1113,14 @@ class _Traversal:
                 if not shut.interact(transport['action']):
                     say(f'{transport["loc_name"]} has no {transport["action"]} (it has {shut.actions()})')
                     return False
+                # Why: a door scripted to walk you through and shut again (Tenzing's, `open_and_close_door2`) is never seen
+                # open, so being on the far side is the crossing, as rs2b0t's door crossing polls for passage.
                 yield from execution.delay_until(lambda: find_transport_loc(transport) is None or _can_step(approach, step) or game_messages.saw_since(mark, CANT_REACH) or chat_shows_quest_lock()
-                                                 or lock_message_since(mark),
+                                                 or lock_message_since(mark) or walkgeom.is_on_far_side(local_tile(), approach, step),
                                                  TRANSPORT_WAIT_MS)
+                if walkgeom.is_on_far_side(local_tile(), approach, step):
+                    say(f'through the {transport["loc_name"]} at {transport["loc_x"]},{transport["loc_z"]}')
+                    return True
                 if game_messages.saw_since(mark, CANT_REACH):
                     say(f"the server can't reach the {transport['loc_name']} at {transport['loc_x']},{transport['loc_z']}")
                     return False
