@@ -210,6 +210,29 @@ def parenthesised_targets(path):
     return found
 
 
+def bracketed_adjacent_fields(path):
+    """f'{a}{(b)}': pocketpy reads a field that opens with a bracket straight after another as a call of the first."""
+    found = []
+    with open(path, 'rb') as f:
+        depth = 0
+        last = []
+        for token in tokenize.tokenize(f.readline):
+            if token.type == tokenize.FSTRING_START:
+                depth += 1
+                last = []
+                continue
+            if token.type == tokenize.FSTRING_END:
+                depth -= 1
+                last = []
+                continue
+            if depth == 0 or token.type in (tokenize.NL, tokenize.COMMENT):
+                continue
+            last = (last + [token])[-3:]
+            if len(last) == 3 and [t.string for t in last] == ['}', '{', '('] and all([t.type == tokenize.OP for t in last]):
+                found.append((token.start[0], "f'{a}{(b)}' calls a; drop the brackets or wrap the field in str()"))
+    return found
+
+
 def unicode_escapes(path):
     """\\u, \\U and \\N{...} in a string, which pocketpy rejects as an invalid escape: use chr()."""
     found = []
@@ -523,7 +546,7 @@ def lint(path):
     link_parents(tree)
     finder = Finder(path)
     finder.visit(tree)
-    found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + unicode_escapes(path) + two_level_closures(source, path) + rebound_outer_names(tree) + loop_closures(tree) + shadowed_callees(tree)
+    found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + bracketed_adjacent_fields(path) + unicode_escapes(path) + two_level_closures(source, path) + rebound_outer_names(tree) + loop_closures(tree) + shadowed_callees(tree)
     return sorted(set(found + undefined_names(tree, path) + shadowed_methods(tree)))
 
 
@@ -578,6 +601,76 @@ def keywords_to_required(trees):
     return found
 
 
+def _own_yields(fn):
+    stack = list(fn.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.Yield, ast.YieldFrom)):
+            return True
+        if not isinstance(node, (ast.FunctionDef, ast.Lambda, ast.ClassDef)):
+            stack.extend(ast.iter_child_nodes(node))
+    return False
+
+
+def _hands_back(fn, generators):
+    """A function that returns another's generator without driving it, as `return walk_to(...)` does."""
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Call):
+            callee = node.value.func
+            if isinstance(callee, ast.Name) and callee.id in generators:
+                return True
+            if isinstance(callee, ast.Attribute) and callee.attr == 'walk_resilient':
+                return True
+    return False
+
+
+def _module_name(path, roots):
+    for root in roots:
+        rel = os.path.relpath(path, root)
+        if not rel.startswith('..'):
+            name = rel[:-len('.py')].replace(os.sep, '.')
+            return name[:-len('.__init__')] if name.endswith('.__init__') else name
+    return None
+
+
+def undriven_generators(trees, roots):
+    """A generator function's call tested or dropped instead of driven with yield from: the generator is always
+    truthy and does nothing."""
+    generators = {}
+    for path, tree in trees.items():
+        generators[path] = {n.name for n in tree.body if isinstance(n, ast.FunctionDef) and _own_yields(n)}
+    for _ in range(3):
+        for path, tree in trees.items():
+            for n in tree.body:
+                if isinstance(n, ast.FunctionDef) and _hands_back(n, generators[path]):
+                    generators[path].add(n.name)
+    by_module = {_module_name(path, roots): names for path, names in generators.items()}
+    found = {}
+    for path, tree in trees.items():
+        known = set(generators[path])
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and node.module in by_module:
+                known |= {alias.asname or alias.name for alias in node.names if alias.name in by_module[node.module]}
+        for parent in ast.walk(tree):
+            tested = []
+            if isinstance(parent, (ast.If, ast.While)):
+                tested = [parent.test]
+            elif isinstance(parent, ast.IfExp):
+                tested = [parent.test]
+            elif isinstance(parent, ast.UnaryOp) and isinstance(parent.op, ast.Not):
+                tested = [parent.operand]
+            elif isinstance(parent, ast.BoolOp):
+                tested = parent.values
+            elif isinstance(parent, ast.Compare):
+                tested = [parent.left] + parent.comparators
+            elif isinstance(parent, ast.Expr):
+                tested = [parent.value]
+            for node in tested:
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in known:
+                    found.setdefault(path, []).append((node.lineno, f'{node.func.id}() makes a generator, which does nothing until driven; use yield from'))
+    return found
+
+
 def main(argv):
     if len(argv) < 2:
         print(__doc__)
@@ -598,8 +691,10 @@ def main(argv):
         except SyntaxError:
             pass
     cross = keywords_to_required(trees)
+    undriven = undriven_generators(trees, known)
     for path in paths:
-        for line, message in sorted(set(lint(path) + cross.get(os.path.abspath(path), []))):
+        key = os.path.abspath(path)
+        for line, message in sorted(set(lint(path) + cross.get(key, []) + undriven.get(key, []))):
             print(f'{path}:{line}: {message}')
             total += 1
     print('nothing found' if total == 0 else f'{total} found')
