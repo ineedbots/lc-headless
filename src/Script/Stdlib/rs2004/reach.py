@@ -21,6 +21,8 @@ from rs2004.messages import CANT_REACH, game_messages
 
 __all__ = ['reach', 'is_openable_barrier', 'is_open_barrier_leaf', 'open_op', 'close_op', 'talk_op', 'toward_dest']
 
+# Holy Grail's Fisher King sits behind one such door.
+SHAPE_WALL_DIAGONAL = 9
 REACH_DOOR_ATTEMPTS = 8
 # Within this many tiles, a failed search of the scene means blocked rather than out of range.
 PROBE_RADIUS = 10
@@ -97,8 +99,9 @@ def _door_approachable(door):
 
 
 def _wall_barrier(loc, test):
-    """A door or gate in the wall layer. rs2b0t's name test alone also takes a trapdoor for a door."""
-    return loc.layer == LAYER_WALL and test(loc.name, loc.actions())
+    """A door or gate in the wall layer, or a diagonal one, which isn't. rs2b0t's name test alone also takes a trapdoor
+    for a door."""
+    return (loc.layer == LAYER_WALL or loc.shape == SHAPE_WALL_DIAGONAL) and test(loc.name, loc.actions())
 
 
 def _barrier_at(tile, test):
