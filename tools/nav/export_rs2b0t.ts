@@ -39,6 +39,10 @@ const STAIR_FIXES = [
     // levels; rs2b0t's edges put its ends at (3021,3519) and (3021,3518), where it answers "I can't reach that!".
     { locId: 1750, locX: 3022, locZ: 3518, action: 'Climb-up', from: { x: 3022, z: 3517, level: 0 }, to: { x: 3022, z: 3517, level: 1 } },
     { locId: 1749, locX: 3022, locZ: 3518, action: 'Climb-down', from: { x: 3022, z: 3517, level: 1 }, to: { x: 3022, z: 3517, level: 0 } },
+    // The Champions' Guild staircase is climbed from inside, at (3188,3358). rs2b0t's first edges end at (3187,3355), outside
+    // the west wall, where it answers "I can't reach that!", so Scavvo had no route (phase 17g's live run).
+    { locId: 1722, locX: 3188, locZ: 3355, action: 'Climb-up', from: { x: 3188, z: 3358, level: 0 } },
+    { locId: 1723, locX: 3188, locZ: 3355, action: 'Climb-down', to: { x: 3188, z: 3358, level: 0 } },
 ];
 for (const fix of STAIR_FIXES) {
     const stair = stairs.find((s: any) => s.locId === fix.locId && s.locX === fix.locX && s.locZ === fix.locZ && s.action === fix.action);
