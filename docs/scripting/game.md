@@ -120,6 +120,7 @@ Raw reads, for what no facade covers.
 | `reader.main_modal_button_near_text(label)` | rs2b0t's `mainModalButtonNearText`: the button nearest the main interface's first text containing `label`, or -1 |
 | `reader.side_modal()` | The interface replacing the side tabs, or -1 |
 | `reader.chat_modal()` | The chat box interface, such as a dialogue, or -1 |
+| `reader.chat_modal_texts()` | The open chat box interface's text lines, such as a message box's, or `[]` when none is open |
 | `reader.modals()` | rs2b0t's: all three, as an object with `main`, `side` and `chat` |
 | `reader.interface_open(id)` | Whether that interface is open |
 | `reader.component_text(com)` | A component's text as the player sees it, or `None` |

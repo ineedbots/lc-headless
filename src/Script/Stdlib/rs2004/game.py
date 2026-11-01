@@ -345,6 +345,11 @@ class _Reader:
         main = _core.get_main_modal()
         return _core.get_texts(main) if main != -1 else []
 
+    def chat_modal_texts(self):
+        """The open chat interface's text lines, such as a ~mesbox's, or an empty list when it is shut."""
+        chat = _core.get_chat_modal()
+        return _core.get_texts(chat) if chat != -1 else []
+
     # Why: the server arms a button with if_sethide and drops a press on a hidden one without a message, so a caller
     # waits for hidden to clear; it picks the button by caption, since a root's children aren't numbered in order.
     def modal_buttons(self, root):

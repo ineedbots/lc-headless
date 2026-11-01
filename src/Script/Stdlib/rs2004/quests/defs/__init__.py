@@ -254,8 +254,32 @@ def _biohazard():
     return biohazard
 
 
+def _druidspirit():
+    from rs2004.quests.defs.druidspirit import druidspirit
+    return druidspirit
+
+
+def _mortton():
+    from rs2004.quests.defs.mortton import mortton
+    return mortton
+
+
+def _tbwt():
+    from rs2004.quests.defs.tbwt import tbwt
+    return tbwt
+
+
+def _shilo():
+    from rs2004.quests.defs.shilo import shilo
+    return shilo
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'druidspirit': ('druidspirit', _druidspirit),
+    'mortton': ('mortton', _mortton),
+    'tbwt': ('tbwt', _tbwt),
+    'shilo': ('zombiequeen', _shilo),
     'deathplateau': ('death', _deathplateau),
     'trollstronghold': ('troll', _trollstronghold),
     'eadgar': ('eadgar', _eadgar),

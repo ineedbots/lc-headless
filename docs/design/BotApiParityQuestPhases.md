@@ -175,9 +175,11 @@ All five modules are ported, registered and tested, and all five completed live 
 
 Morytania's first two, then Karamja's jungle after Jungle Potion. rs2b0t's `shilo-gear-lifecycle` engine test, which needs Shilo Village's module, ports here.
 
+All four modules are ported, registered and tested, and all four completed live in one queue. See the design doc's "As built: 17d".
+
 - **Done when:**
-    - [ ] Their tests are ported and pass, and `shilo-gear-lifecycle`'s.
-    - [ ] Live, AIOQuester finishes all four in one queue.
+    - [x] Their tests are ported and pass, and `shilo-gear-lifecycle`'s.
+    - [x] Live, AIOQuester finishes all four in one queue (development restarts installed fixes to Nature Spirit's silver and ghasts and to the walker's way out of Bervirius' tomb).
 
 ---
 

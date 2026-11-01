@@ -204,6 +204,19 @@ Each keeps rs2b0t's package. Plague City and Biohazard walk out of West Ardougne
 
 All five phase-17c quests have completed in one live queue. Eadgar's Ruse departs from rs2b0t in drawing two prayer potions for the Trollheim crossings, and Death Plateau in closing Harold's menu before it reads the IOU.
 
+The phase-17d modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `druidspirit` | `druidspirit` | Needs The Restless Ghost and Priest in Peril. Wears the ghostspeak amulet before the first word, summons Filliman at the grotto door, shows him the mirror and his journal, blooms a fungus with his scroll and feeds the ritual stones, then casts a silver sickle at Al Kharid (bank first, else Dommik's mould, a pickaxe from Bob and a mined bar), has it blessed and kills three ghasts with the pouch, praying back up at Paterdomus |
+| `mortton` | `mortton` | Needs Priest in Peril, and Nature Spirit started for the Mort Myre gate. Burns the Varrock log spawns for ashes, reads Herbi Flax's diary, brews serum 207 from the table's two tarromin, kills five shades for their remains, buys plank, brick and paste at Razmire's counters, rebuilds the Flamtaer temple from its transmitted meters, lights the altar, sanctifies the oil and cremates a shade |
+| `tbwt` | `tbwt` | Needs Jungle Potion. Kits up at Ardougne across the ferry (a bow, arrows, armour, food, a spear and agility potions, bank first; the knife, pestle and tinderbox from Jiminua), then takes the brothers in the only order that closes: Lubufu's bait and apprenticeship, Tiadeche's catch, Tamayu's hunt with four doses and a Karambwan-poisoned spear, Tinsay's rum, sandwich and marinated Jogre bones, and Tiadeche's manual |
+| `shilo` | `zombiequeen` | Needs Jungle Potion. Takes the coins, bones and food off the mainland, buys the tools from Jiminua in one visit, opens the mound into Ah Za Rhoon, reads both scrolls, buries Zadimus for the bone shard, searches the Bervirius dolmen, crafts the Beads of the Dead and the bone key, and fights the three Nazastarool forms in Rashiliyia's tomb before laying her remains in Bervirius' |
+
+Each keeps rs2b0t's package, and each owns its inventory. Tai Bwo Wannai Trio reads its two transmitted varps (`tbwt_main`, `tbwt_tiadeche`) and opens the journal only for the other three brothers. Shades of Mort'ton reads the temple's three transmitted meters the same way. Every pocket the quests strand the bot in (the grotto, Ah Za Rhoon, the Bervirius tomb, Rashiliyia's tomb) is left before a step that acts outside it.
+
+All four phase-17d quests have completed in one live queue. Nature Spirit departs from rs2b0t twice. Its sickle chain waits, with the reason, below the silver's Mining 20 or Smithing 20, which its record doesn't list and the server refuses in a message box. And it draws the melee kit before the ghasts, since a queue may leave a bow on with an empty quiver. Tai Bwo Wannai Trio needs Fishing 65 and Firemaking 30 beyond its record's levels, for the Karambwan and the Jogre bones.
+
 ## Steps: `rs2004.quests.exec.steps`
 
 `execute_step(step, hops, log)` runs one step. A step is a `Record` made by `quest_step(kind, ...)`, whose fields not set read as `None`:

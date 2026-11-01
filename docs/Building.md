@@ -162,11 +162,11 @@ excluded. Counts represent line trace events, which pocketpy can coalesce, rathe
 Script branch coverage is not collected.
 
 Tracing is test-only and opt-in through the runner. Normal application builds do not include the collector.
-Coverage presets allow 300 seconds per test instead of 120 to accommodate tracing overhead. Script fixtures
-also allow five times their normal VM watchdog duration while collecting coverage; VM deadline tests retain
-their original limits. Cache-dependent tests still skip without cache data, and hidden `[Slow]` tests are
-excluded. Test or collection errors fail the
-command; reports from failed test runs are marked partial. Percentages are informational.
+Coverage presets allow 900 seconds per test instead of 120 to accommodate tracing overhead; the case that runs
+every rs2b0t spec file takes over 260 seconds under tracing. Script fixtures also allow five times their normal VM
+watchdog duration while collecting coverage; VM deadline tests retain their original limits. Cache-dependent tests
+still skip without cache data, and hidden `[Slow]` tests are excluded. Test or collection errors fail the command;
+reports from failed test runs are marked partial. Percentages are informational.
 
 CI reuses the native coverage build with `python3 tools/coverage/script.py --preset linux-coverage --no-build`
 and uploads a separate `stdlib-coverage-linux-x64` artifact. Native and script percentages stay separate.
