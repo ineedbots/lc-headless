@@ -18,6 +18,7 @@ The quest list. Only the list's colours, the quest points and the journals reach
 | `quests.status(name)` | `'not_started'`, `'in_progress'` or `'complete'`, from the row's colour (red, yellow or green), or `'unknown'` when there's no such row. Names match whole, without regard to case |
 | `quests.points()` | Your quest points |
 | `quests.journal(name)` | **Wait.** Opens the quest's journal and gives its lines, or `[]` when it didn't open within 5 seconds |
+| `quests.press_journal(name)` | Sends the quest's journal button without waiting for it; Underground Pass times it itself to stall trap timers |
 
 A `Quest` has `name`, `status` (as above) and `com` (the row's button).
 

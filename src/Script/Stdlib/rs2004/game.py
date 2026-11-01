@@ -382,6 +382,15 @@ class _Reader:
     def component_text(self, com):
         return _core.get_component_text(com)
 
+    def button_by_text(self, root, label):
+        """The id of the component in root's interface whose menu label is label, without regard to case, or -1. The
+        label is the stable handle where an interface's packed ids aren't the client's."""
+        want = label.lower()
+        for component in _core.get_interface(root):
+            if (component.button_text or '').lower() == want:
+                return component.id
+        return -1
+
     def count_dialog_open(self):
         return _core.is_count_dialog_open()
 

@@ -135,6 +135,12 @@ class _Quests:
     def points(self):
         return _core.get_varp(QUEST_POINTS_VARP)
 
+    def press_journal(self, name):
+        """Sends the quest's journal button and doesn't wait for it. Underground Pass holds the journal open to stall
+        trap timers, so its timing is the caller's."""
+        quest = self._find(name)
+        return quest is not None and _core.click_component(quest.com)
+
     def journal(self, name):
         """Opens the quest's journal and gives its lines. Use with yield from."""
         quest = self._find(name)

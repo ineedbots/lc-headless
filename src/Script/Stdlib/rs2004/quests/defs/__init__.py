@@ -334,8 +334,20 @@ def _fremenniktrials():
     return fremenniktrials
 
 
+def _upass():
+    from rs2004.quests.defs.upass import upass
+    return upass
+
+
+def _regicide():
+    from rs2004.quests.defs.regicide import regicide
+    return regicide
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'upass': ('upass', _upass),
+    'regicide': ('regicide', _regicide),
     'ikov': ('ikov', _ikov),
     'fremenniktrials': ('viking', _fremenniktrials),
     'heroquest': ('hero', _heroquest),
