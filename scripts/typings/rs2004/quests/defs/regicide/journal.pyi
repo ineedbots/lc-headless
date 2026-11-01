@@ -1,0 +1,10 @@
+from typing import Any, Callable, Optional, Sequence
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+RG_STAGE: Record
+RG_FLAG: Record
+REGICIDE: str
+def parse_regicide_journal(lines: str | Sequence[str]) -> Optional[QuestProgress]: ...
+def read_regicide_progress() -> Wait[Any]: ...

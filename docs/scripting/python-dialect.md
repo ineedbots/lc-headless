@@ -153,6 +153,8 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 | `api/ai/quests/defs/heroquest/` | `rs2004.quests.defs.heroquest` |
 | `api/ai/quests/defs/ikov/` | `rs2004.quests.defs.ikov` |
 | `api/ai/quests/defs/fremenniktrials/` | `rs2004.quests.defs.fremenniktrials` |
+| `api/ai/quests/defs/upass/` | `rs2004.quests.defs.upass` |
+| `api/ai/quests/defs/regicide/` | `rs2004.quests.defs.regicide` |
 | `adapter/ClientAdapter.ts`'s `chatModalTexts` | `reader.chat_modal_texts` |
 
 | TypeScript | Python |

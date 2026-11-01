@@ -320,6 +320,29 @@ Before mining blurite, The Knight's Sword acquires a usable pickaxe even if its 
 
 `rs2004.karamja_recovery.missing_boat_fare(from_, dest, coins, missing)` recognises a stranded traveller whose only missing route item is the 30-coin fare. `recover_boat_fare(dest, missing, log)` collects Luthas's payment, filling the plantation crate first when needed. `traversal.walk_to` calls it after an unfunded route fails, then retries the destination; available routes and teleports are tried first.
 
+The phase-17h modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `upass` | `upass` | Starts with King Lathas, shoots the bridge rope with a fire arrow, crosses the spiked grid and the trapped corridor with the quest journal held open, burns the four orbs, crushes the unicorn, feeds the well three crests and the horn, builds the doll of Iban from its four elements, throws it into the pit, and follows Koftik out. |
+| `regicide` | `regicide` | Takes the King's message and walks the pass again through the Well of Voyage, tracks King Tyras's camp through Isafdar's pockets, gathers the bomb's parts, distils naphtha at the Rimmington still, walks the pass a third time with the bomb, fires the catapult, and carries the letter past Arianwyn to King Lathas. |
+
+Both own their inventories and declare `resume_at` over the pockets a walk can't leave. Underground Pass needs a melee kit banked, since it has no bank past the cave mouth and fights three paladins, three demons and Kalrag. Regicide needs a spade: no shop near Ardougne sells one, so the account must keep the one it took through the pass.
+
+`quests.press_journal(name)` sends a journal's button without waiting, since an open modal suspends the pass's trap timers and the press has to land in its own tick. `reader.button_by_text(root, label)` finds the still's controls by their menu labels, as the packed component ids are the server's and not the client's.
+
+The live run added these departures from rs2b0t:
+
+- **Underground Pass**
+    - A crossing sends its op to the loc cardinal to its stand, as a row of ledges ties by distance and the diagonal one refuses.
+    - A crossing still landing is waited out, and a step back onto the walkable graph asks again whether the rest can be walked, so a tunnel door beside the target isn't taken by accident.
+    - Fights renew a lapsed attack and eat as they go, since a second paladin engaging lapses the first attack.
+    - A drop gets a few ticks to land, and a paladin who left no crest still owes one.
+    - Making room for the robes drops the spade last, because Regicide needs it.
+- **Regicide**
+    - The first wait for the King's messenger logs in again, since his timer only starts at login and a queue that just finished the pass hasn't logged in since.
+    - The walk through the pass settles after the well's teleport before asking which crossing is outstanding.
+
 ## Kit
 
 | Module | Has |

@@ -235,9 +235,11 @@ All three modules are ported, registered and tested. Two partner accounts finish
 
 The longest two after Legends'. Regicide's `seams.ts` and `pockets.ts` are the Isafdar crossings the clue engine's walk across Tirannwn uses; 17i wires them in.
 
+Both modules are ported, registered and tested, and both completed live in one queue, with no restart and no death, on a fresh account on the final build. See the design doc's "As built: 17h".
+
 - **Done when:**
-    - [ ] Those tests are ported and pass.
-    - [ ] Live, AIOQuester finishes Underground Pass and then Regicide in one queue.
+    - [x] Those tests are ported and pass.
+    - [x] Live, AIOQuester finishes Underground Pass and then Regicide in one queue (with skills at 70, as rs2b0t's recipes run; see "As built: 17h").
 
 ---
 

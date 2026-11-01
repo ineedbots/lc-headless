@@ -124,6 +124,7 @@ Raw reads, for what no facade covers.
 | `reader.modals()` | rs2b0t's: all three, as an object with `main`, `side` and `chat` |
 | `reader.interface_open(id)` | Whether that interface is open |
 | `reader.component_text(com)` | A component's text as the player sees it, or `None` |
+| `reader.button_by_text(root, label)` | The id of the component in `root`'s interface whose menu label is `label`, without regard to case, or -1 |
 | `reader.count_dialog_open()` | Whether an "Enter amount" dialog is open |
 | `reader.inventory(com)` | The [`InvItem`](items.md#invitem)s of any inventory the server sent, such as `BANK` |
 | `reader.npc_type(id)` | An [`NpcType`](world.md#npctype--readernpc_typeid), or `None` |
