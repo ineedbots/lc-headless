@@ -297,6 +297,8 @@ function stdlibExports(): Map<string, string> {
         const rel = path.relative(stdlibRoot, file).replace(/\\/g, '/').replace(/\.py$/, '').replace(/\/__init__$/, '');
         if (rel.split('/').some(part => part.startsWith('_') && part !== '__init__')) continue;
         const module = rel.replace(/\//g, '.');
+        // Why: a quest's files import each other by path, and its helpers share names with the engine's: once Fremennik's talk_until was drafted, Hero's Quest imported it over exec.legs's.
+        if (module.startsWith('rs2004.quests.defs.')) continue;
         const text = fs.readFileSync(file, 'utf8');
         const listed = new Set<string>();
         for (const all of text.matchAll(/^__all__\s*\+?=\s*\[([\s\S]*?)\]/gm)) {
@@ -563,6 +565,14 @@ class Translator {
         this.out.push(...emitted);
     }
 
+    private emitBreakUnless(hoisted: string[], condition: string): void {
+        for (const line of hoisted) {
+            this.out.push(line.startsWith('\n') ? line.slice(1) : '    '.repeat(this.depth) + line);
+        }
+        this.emit(`if not (${condition}):`);
+        this.emit('    break');
+    }
+
     private comments(node: Node): void {
         const text = this.sf.getFullText();
         const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
@@ -785,18 +795,33 @@ class Translator {
             case k.ForStatement:
                 this.forStatement(node);
                 return;
-            case k.WhileStatement:
-                this.emit(`while ${this.condition(node.expression)}:`);
-                this.block(node.statement);
+            case k.WhileStatement: {
+                // Why: a condition that awaits hoists its yield from, and hoisted before the loop it runs once.
+                this.prelude.push([]);
+                const condition = this.condition(node.expression);
+                const hoisted = this.prelude.pop()!;
+                if (hoisted.length === 0) {
+                    this.emit(`while ${condition}:`);
+                    this.block(node.statement);
+                    return;
+                }
+                this.emit('while True:');
+                this.depth++;
+                this.emitBreakUnless(hoisted, condition);
+                this.blockStatements(node.statement);
+                this.depth--;
                 return;
-            case k.DoStatement:
+            }
+            case k.DoStatement: {
                 this.emit('while True:');
                 this.depth++;
                 this.blockStatements(node.statement);
-                this.emit(`if not (${this.condition(node.expression)}):`);
-                this.emit('    break');
+                this.prelude.push([]);
+                const condition = this.condition(node.expression);
+                this.emitBreakUnless(this.prelude.pop()!, condition);
                 this.depth--;
                 return;
+            }
             case k.BreakStatement:
                 this.emit(node.label ? this.todo('a labelled break') : 'break');
                 return;
@@ -1976,6 +2001,12 @@ class Translator {
         const index = this.expr(e.argumentExpression);
         const kind = this.collectionKind(e.expression);
         const write = isWriteTarget(e);
+        // Why: x?.[i] on a find's result is undefined when nothing matched, where an unguarded index raises.
+        if (e.questionDotToken) {
+            const held = this.fresh('v');
+            this.pre(`${held} = ${owner}`);
+            return `(${held}[${index}] if ${held} is not None else None)`;
+        }
         if (!write && kind !== 'array' && kind !== 'string' && this.isDictLike(e.expression)) {
             return `${owner}.get(${index})`;
         }
@@ -2053,6 +2084,11 @@ class Translator {
         if (ts.isPropertyAccessExpression(callee) && /^(bool|num|str|list|tile|raw)$/.test(callee.name.text) && /settings$/.test(callee.expression.getText()) && e.arguments.length > 0 && ts.isStringLiteral(e.arguments[0])) {
             const rest = e.arguments.slice(1).map((a: Node) => this.expr(a));
             return `${this.expr(callee.expression)}.${callee.name.text}(${[pyString(snake(e.arguments[0].text)), ...rest].join(', ')})`;
+        }
+        // Why: a?.b() guards the owner, so the member can't be translated alone: that calls the guard's None.
+        if (!optionalCall && ts.isPropertyAccessExpression(callee) && callee.questionDotToken) {
+            const owner = this.expr(callee.expression);
+            return `(${owner}.${this.memberName(callee)}(${this.argList(e, params)}) if ${owner} is not None else None)`;
         }
         const fn = optionalCall && ts.isPropertyAccessExpression(callee) ? this.member(callee) : this.expr(callee);
         if (optionalCall && !/^[\w.]+$/.test(fn)) {
