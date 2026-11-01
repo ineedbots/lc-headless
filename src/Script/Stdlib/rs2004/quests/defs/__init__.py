@@ -274,8 +274,32 @@ def _shilo():
     return shilo
 
 
+def _touristtrap():
+    from rs2004.quests.defs.touristtrap import touristtrap
+    return touristtrap
+
+
+def _watchtower():
+    from rs2004.quests.defs.watchtower import watchtower
+    return watchtower
+
+
+def _chompybird():
+    from rs2004.quests.defs.chompybird import chompybird
+    return chompybird
+
+
+def _grandtree():
+    from rs2004.quests.defs.grandtree import grandtree
+    return grandtree
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'touristtrap': ('desertrescue', _touristtrap),
+    'watchtower': ('itwatchtower', _watchtower),
+    'chompybird': ('chompybird', _chompybird),
+    'grandtree': ('grandtree', _grandtree),
     'druidspirit': ('druidspirit', _druidspirit),
     'mortton': ('mortton', _mortton),
     'tbwt': ('tbwt', _tbwt),

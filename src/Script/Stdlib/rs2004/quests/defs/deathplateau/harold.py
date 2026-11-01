@@ -143,7 +143,7 @@ def dice_open():
 
 # Why: the live harness surfaces a bounded number of log lines per poll, so one line per button would only ever show the last.
 def dice_state():
-    return ', '.join([f"{b.com_id}:{b.label or b.menu}{(' pause' if b.pause else '')}{(' hidden' if b.hidden else '')}" for b in reader.modal_buttons(DEATH_DICE_MAIN)])
+    return ', '.join([f"{b.com_id}:{b.label or b.menu}{str(' pause' if b.pause else '')}{str(' hidden' if b.hidden else '')}" for b in reader.modal_buttons(DEATH_DICE_MAIN)])
 
 
 # Why: `com_28` is `buttontype=normal` and `com_30` is `buttontype=pause`, and both pack ids are the server's own, so match on label and pause flag.

@@ -1630,9 +1630,23 @@ class Translator {
             return undefined;
         }
         if (ts.isIdentifier(callee)) {
+            // A quest's own functions wait as their types say: several quests share a name (walk_to), and the stub
+            // index holds only one of them.
+            if (this.declaredInQuestDefs(callee)) {
+                return undefined;
+            }
             return stubs.functions.get(this.valueName(callee.text));
         }
         return undefined;
+    }
+
+    private declaredInQuestDefs(e: Node): boolean {
+        let symbol = checker.getSymbolAtLocation(e);
+        if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+        const file = symbol?.declarations?.[0]?.getSourceFile()?.fileName;
+        if (!file) return false;
+        const rel = path.relative(botRoot, file).replace(/\\/g, '/');
+        return rel.startsWith(QUEST_DEFS_PREFIX);
     }
 
     private typeName(e: Node): string | null {
@@ -1892,7 +1906,10 @@ class Translator {
         let out = 'f' + quote;
         parts.forEach((p, i) => {
             out += escapeFor(p, quote);
-            if (i < exprs.length) out += `{${exprs[i]}}`;
+            if (i >= exprs.length) return;
+            // pocketpy reads `{a}{(b)}` as a call of a, so a bracketed field straight after another is wrapped.
+            const call = i > 0 && p === '' && exprs[i].startsWith('(');
+            out += call ? `{str(${exprs[i]})}` : `{${exprs[i]}}`;
         });
         return out + quote;
     }
