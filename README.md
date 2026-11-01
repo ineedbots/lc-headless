@@ -52,6 +52,7 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 
 - Remove this section when points are completed
 - Phase 17 and 18 of the rs2b0t parity design (the p2p quests and account leveler)
+- Check and implement newer rs2b0t's commits
 
 ## Credits
 
