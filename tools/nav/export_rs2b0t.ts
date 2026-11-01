@@ -98,6 +98,12 @@ const EDGE_ADDITIONS = [
     // (`oploc1,zqhandholds` teleports a climber to 0_43_46_12_32 and steps them east), so the retreat to a bank and
     // the next quest in the queue had no route out of it (phase 17d's live run).
     { kind: 'dungeon', from: { x: 2764, z: 9376, level: 0 }, to: { x: 2765, z: 2976, level: 0 }, cost: edgeCostForKind('dungeon'), locName: 'Climbing rocks', action: 'Climb', locX: 2765, locZ: 9376, locId: 2236, toTile: { x: 2765, z: 2976 } },
+    // Elemental Workshop: the quest ends down the spiral stairs, which `oploc1,elemental_workshop_spiralstairs` climbs
+    // to 0_42_54_21_41, so the retreat to a bank and the next quest in the queue had no route out (phase 17f's live run).
+    { kind: 'dungeon', from: { x: 2716, z: 9888, level: 0 }, to: { x: 2709, z: 3497, level: 0 }, cost: edgeCostForKind('dungeon'), locName: 'Staircase', action: 'Climb-up', locX: 2714, locZ: 9887, locId: 3416, toTile: { x: 2709, z: 3497 } },
+    // The stairs land in the room behind the odd looking wall, which `open_and_close_double_door2` opens from inside
+    // with a Push; only the way in needs the key.
+    { kind: 'door', from: { x: 2709, z: 3496, level: 0 }, to: { x: 2709, z: 3495, level: 0 }, cost: edgeCostForKind('door'), locName: 'Odd looking wall', action: 'Push', locX: 2709, locZ: 3495, locId: 3391, toTile: { x: 2709, z: 3495 } },
 ];
 edges.push(...EDGE_ADDITIONS);
 

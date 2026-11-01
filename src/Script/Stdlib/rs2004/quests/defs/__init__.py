@@ -294,8 +294,38 @@ def _grandtree():
     return grandtree
 
 
+def _elementalworkshop():
+    from rs2004.quests.defs.elementalworkshop import elementalworkshop
+    return elementalworkshop
+
+
+def _digsite():
+    from rs2004.quests.defs.digsite import digsite
+    return digsite
+
+
+def _holygrail():
+    from rs2004.quests.defs.holygrail import holygrail
+    return holygrail
+
+
+def _familycrest():
+    from rs2004.quests.defs.familycrest import familycrest
+    return familycrest
+
+
+def _horror():
+    from rs2004.quests.defs.horror import horror
+    return horror
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'elementalworkshop': ('elemental_workshop', _elementalworkshop),
+    'digsite': ('itexam', _digsite),
+    'holygrail': ('grail', _holygrail),
+    'familycrest': ('crest', _familycrest),
+    'horror': ('horror', _horror),
     'touristtrap': ('desertrescue', _touristtrap),
     'watchtower': ('itwatchtower', _watchtower),
     'chompybird': ('chompybird', _chompybird),

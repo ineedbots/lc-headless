@@ -54,7 +54,7 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 - Phase 17 and 18 of the rs2b0t parity design (the p2p quests and account leveler)
 - Check and implement newer rs2b0t's commits
 - Do tutorial island, not just skipping it
-- 17ad test coverage
+- 17aef test coverage
 
 ## Credits
 

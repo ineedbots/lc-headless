@@ -12,7 +12,7 @@ from coverage_world import PatchWorld
 class ReachObject:
     def __init__(self, world, name='Chest', op='Search', x=101):
         self.world, self.name, self.op, self.x = world, name, op, x
-        self.id, self.layer = 1, LAYER_WALL
+        self.id, self.layer, self.shape = 1, LAYER_WALL, 0
         self.accept = True
 
     def actions(self):
@@ -157,6 +157,21 @@ def test_reach_closes_swung_leaf_then_opens_blocking_door():
         door.op, door.x = 'Open', 103
         assert world.run(reach._open_blocking_door(Tile(110, 100), world.logs.append))
         assert world.actions[-1] == ('Door', 'Open') and world.walks == [door.tile()]
+
+
+def test_reach_opens_a_diagonal_door_but_not_a_trapdoor():
+    with ReachWorld() as world:
+        world.reachable = False
+        trapdoor = ReachObject(world, 'Door', 'Open')
+        trapdoor.layer, trapdoor.shape = 2, 22
+        world.objects = [trapdoor]
+        assert world.run(reach._open_blocking_door(Tile(110, 100), world.logs.append)) is False
+        assert world.actions == []
+        # Holy Grail's hall door: shape 9 isn't in the wall layer.
+        trapdoor.shape = 9
+        world.reachable = True
+        world.run(reach._open_blocking_door(Tile(110, 100), world.logs.append))
+        assert world.actions == [('Door', 'Open')]
 
 
 def test_reach_unapproachable_door_and_rejected_open_are_failure():
