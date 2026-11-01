@@ -287,6 +287,31 @@ The live run added these departures from rs2b0t:
 
 `reach` also opens diagonal doors now, and the walker can climb out of the Elemental Workshop.
 
+The phase-17g modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `heroquest` | `hero` | Gathers the kit, runs the gang's half of the armband with the partner (see "Hero's Quest and its partner"), fishes and cooks the lava eel, kills the Ice Queen for the ice gloves, takes the fire feather on Entrana, and hands all three in. |
+| `ikov` | `ikov` | Fetches the boots of lightness and makes the bow and ice arrows, crosses the lava with the lever, kills the Fire Warrior, farms limpwurt roots from the hobgoblins for Winelda, then joins the Guardians of Armadyl and banishes Lucien. |
+| `fremenniktrials` | `viking` | Wins the seven votes, from the Revellers' and the Bard's to the seer's riddles and the hunter's Draugen, and passes Thorvald's trial by letting Koschei's fourth form land the last blow. |
+
+Hero's Quest and The Fremennik Trials own their inventories. All three declare `resume_at` over the pockets a walk can't leave. The Fremennik Trials warns below Prayer 70, since Koschei's forms outlast a lower pool under Protect from Melee, and Ikov's Fire Warrior needs about Ranged 70 for its 20 arrows.
+
+The live run added these departures from rs2b0t:
+
+- **Hero's Quest**
+    - A short purse draws the difference from the bank before Scavvo, since the engine's own draw only tops up below a quarter of the price.
+    - With the Ice Queen dead and no gloves on the floor, it waits up to five minutes for her respawn, since partners share her.
+- **Temple of Ikov**
+    - `past_south_gate` needs the temple too, as the half-plane alone holds the surface.
+    - Armour found on at a shut south gate comes off, so the lever can be fetched across the bridge.
+    - The bridge is one click, as a re-click from the far side carries the bot back.
+    - The boots errand fetches its own knife.
+    - A worn weapon stands unless something stocked beats it.
+- **The Fremennik Trials** warns about Prayer as above, and `resume_at` covers its trial rooms.
+
+The walker also has the Champions' Guild's staircase from inside the wall now.
+
 A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool. `rs2004.quests.exec.garlic.take_garlic(log)` climbs to Morgan's cupboard, opens it and searches for a clove; each climb or Open costs a pass, and it returns `True` once Garlic is held. Use it with `yield from`. `rs2004.quests.exec.fund_coins.fund_quest_coins(target, log, label=None)` earns pack coins up to `target` by pickpocketing Men: Varrock's only while the 10-coin Al Kharid toll is still owed, then Al Kharid's, buying and eating a Kebab from the seller beside him when Hitpoints fall below 3. It stops on a pending random event, or after two minutes without a coin, Thieving experience or a change in Hitpoints. `earn_quest_coins_step(target, label)` is a custom step that runs it.
 
 Goblin Diplomacy's `tools` is a function returning the current keep list, including the configured food; the engine evaluates it before banking.
@@ -314,6 +339,10 @@ AIOQuester offers `arrav_gang` (`random`, `phoenix` or `blackarm`), `arrav_partn
 `bots/arrav_supplier.py` is a separate certificate supplier. Start it on an unjoined character with coins banked and a Phoenix member named by `partner` to provide the first store key. It prepares Straven's mission before joining Black Arm, then uses the report on Straven to join Phoenix too. It collects both halves, mints and banks certificates until `cert_target` (default 10, minimum 2). It never redeems: redeeming would stop the supply. Proven mission and memberships are saved under `ArravSupplierState` for restarts.
 
 `rs2004.partner_handoff.run_handoff(spec)` moves one exact item ID between two named characters, waits through both trade screens and checks the pack after the trade closes. Its `Record` fields are `partner`, `rendezvous`, `id`, `name`, `giving`, `label` and `log`. Use it with `yield from`.
+
+## Hero's Quest and its partner
+
+AIOQuester's `hero_partner` names the character running the other gang, since the master thief armband can't be earned alone. There is no gang setting: Grip refuses a Black Arm attacker and Katrine a Phoenix candlestick, so the gang is the one the character joined for Shield of Arrav. Run both accounts at once, each naming the other.
 
 ## The barcrawl
 

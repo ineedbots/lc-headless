@@ -150,6 +150,9 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 | `api/ai/quests/defs/holygrail/` | `rs2004.quests.defs.holygrail` |
 | `api/ai/quests/defs/familycrest/` | `rs2004.quests.defs.familycrest` |
 | `api/ai/quests/defs/horror/` | `rs2004.quests.defs.horror` |
+| `api/ai/quests/defs/heroquest/` | `rs2004.quests.defs.heroquest` |
+| `api/ai/quests/defs/ikov/` | `rs2004.quests.defs.ikov` |
+| `api/ai/quests/defs/fremenniktrials/` | `rs2004.quests.defs.fremenniktrials` |
 | `adapter/ClientAdapter.ts`'s `chatModalTexts` | `reader.chat_modal_texts` |
 
 | TypeScript | Python |

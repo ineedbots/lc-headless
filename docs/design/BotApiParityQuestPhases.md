@@ -218,9 +218,11 @@ All five modules are ported, registered and tested, and all five completed live 
 - **Hero's Quest** needs two accounts, one of each gang, as Shield of Arrav did: `partner.ts` again. AIOQuester gains its partner setting.
 - **Temple of Ikov** brings the walker's `ikovTiles` test.
 
+All three modules are ported, registered and tested. Two partner accounts finished Hero's Quest live, and one queue finished the other two. See the design doc's "As built: 17g".
+
 - **Done when:**
-    - [ ] Their tests are ported and pass, and `ikovTiles`'s.
-    - [ ] Live, two partner accounts finish Hero's Quest, and AIOQuester finishes the other two in one queue.
+    - [x] Their tests are ported and pass, and `ikovTiles`'s.
+    - [x] Live, two partner accounts finish Hero's Quest, and AIOQuester finishes the other two in one queue (development restarts installed the fixes, and the harness raised Prayer and Ranged to 70 and gave the second partner Scavvo's kit; see "As built: 17g").
 
 ---
 
