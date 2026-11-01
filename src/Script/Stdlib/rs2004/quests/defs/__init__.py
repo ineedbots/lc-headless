@@ -319,8 +319,26 @@ def _horror():
     return horror
 
 
+def _heroquest():
+    from rs2004.quests.defs.heroquest import heroquest
+    return heroquest
+
+
+def _ikov():
+    from rs2004.quests.defs.ikov import ikov
+    return ikov
+
+
+def _fremenniktrials():
+    from rs2004.quests.defs.fremenniktrials import fremenniktrials
+    return fremenniktrials
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
+    'ikov': ('ikov', _ikov),
+    'fremenniktrials': ('viking', _fremenniktrials),
+    'heroquest': ('hero', _heroquest),
     'elementalworkshop': ('elemental_workshop', _elementalworkshop),
     'digsite': ('itexam', _digsite),
     'holygrail': ('grail', _holygrail),

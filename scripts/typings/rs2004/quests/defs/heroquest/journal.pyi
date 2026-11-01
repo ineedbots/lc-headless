@@ -1,0 +1,13 @@
+from typing import Any, Callable, Optional, Sequence
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+HERO_STAGE: Record
+def normalize(lines: Any) -> Any: ...
+STAGES: list
+FLAGS: list
+def parse_hero_quest_journal(lines: Any) -> Any: ...
+last_good: Any
+def reset_hero_quest_progress() -> Any: ...
+def read_hero_quest_progress() -> Wait[Any]: ...

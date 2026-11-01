@@ -1,8 +1,9 @@
 """AIOQuester's food choice and queue summary: rs2b0t's AIOQuesterLogic.ts, and queueEntry, blockedEntries, focusRow,
 queueSummary and questClockRestarts from AIOQuesterPaint.ts (MIT, see thirdparty/rs2b0t). Includes Shield of Arrav's
-gang and partner settings; Hero's Quest's partner and Legends' reward settings come with those quests."""
+gang and partner settings and Hero's Quest's partner; Legends' reward setting comes with that quest."""
 
 import math
+from rs2004.quests.defs.heroquest.config import hero_config
 from rs2004.quests.defs.shieldofarrav.config import arrav_config
 from rs2004.catalogs import Record, food_forms, food_heal_amount, should_eat_to_use_food
 
@@ -130,3 +131,10 @@ def apply_arrav_settings(raw):
     arrav_config.partner = raw.partner.strip()
     count = raw.certs
     arrav_config.cert_target = max(1, math.floor(count if math.isfinite(count) else 2))
+
+
+# Why: Grip refuses a Black Arm attacker and Katrine a Phoenix candlestick, so the gang here is the one the character
+# joined for Shield of Arrav, and only the partner is a setting of this quest.
+def apply_hero_settings(raw):
+    """Push the setting onto the Hero's Quest config."""
+    hero_config.partner = raw.partner.strip()
