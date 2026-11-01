@@ -1,0 +1,9 @@
+from typing import Any, Callable, Optional, Sequence
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+cook_state: Record
+def seasoning_step(snap: QuestSnapshot) -> Any: ...
+def ask_kids(log: Any) -> Wait[Any]: ...
+def cook_chompy(log: Any) -> Wait[Any]: ...

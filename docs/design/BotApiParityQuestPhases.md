@@ -189,9 +189,11 @@ All four modules are ported, registered and tested, and all four completed live 
 
 Each is long and keeps to one region. Watch Tower is the quest whose market stage `~cq` left unset in phase 15; an account that does it here needs no `setvar`.
 
+All four modules and `fundCoins` are ported, registered and tested, and all four completed live in one queue. See the design doc's "As built: 17e".
+
 - **Done when:**
-    - [ ] Their tests are ported and pass.
-    - [ ] Live, AIOQuester finishes all four in one queue.
+    - [x] Their tests are ported and pass.
+    - [x] Live, AIOQuester finishes all four in one queue.
 
 ---
 

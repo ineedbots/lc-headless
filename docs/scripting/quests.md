@@ -217,6 +217,33 @@ Each keeps rs2b0t's package, and each owns its inventory. Tai Bwo Wannai Trio re
 
 All four phase-17d quests have completed in one live queue. Nature Spirit departs from rs2b0t twice. Its sickle chain waits, with the reason, below the silver's Mining 20 or Smithing 20, which its record doesn't list and the server refuses in a message box. And it draws the melee kit before the ghasts, since a queue may leave a bow on with an empty quiver. Tai Bwo Wannai Trio needs Fishing 65 and Firemaking 30 beyond its record's levels, for the Karambwan and the Jogre bones.
 
+The phase-17e modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `touristtrap` | `desertrescue` | Funds its 1,000 coins from the bank or by pickpocketing Men (`exec.fund_coins`), buys the desert outfit, waterskins and pass from Shantay, provokes the Mercenary Captain for the camp key, frees the slave for his clothes, trades Al Shabim the prototype dart it forges and fletches for a Tenti pineapple, and gets Ana out by barrel, lift, winch and mine cart. Its own water and food floors keep it alive in the desert, and every capture or jail is escaped before the stage is read |
+| `watchtower` | `itwatchtower` | Draws its banked kit in one trip (the dragon bones, guam, bat bones and gold bar its record demands, plus whatever else the bank holds), helps Og, Toban and Grew for the relic parts, steals a rock cake for the battlement, answers the city guard's riddle with a death rune, learns the skavid words cave by cave, brews and has the ogre potion infused, dissolves the six shamans, takes the last two crystals and pulls the lever |
+| `chompybird` | `chompybird` | Fletches twelve ogre arrows from achey logs, feathers and wolf-bone tips, with the knife and chisel from the bank or Bugs, takes the bellows from the ogre chest or the bank, inflates swamp toads for bait, borrows or buys the bow, shoots and plucks a chompy, carries all six seasonings and roasts it on the spit |
+| `grandtree` | `grandtree` | Carries the bark sample to Hazelmere and the message back, goes through Glough's jail, glides to Karamja for the foreman's lumber order and rides Femi's cart back in, takes the invasion plans from Glough's chest with Anita's key, lays the four twigs on their pillars, kills the Black Demon below the trapdoor, and searches the roots for the Daconia rock |
+
+Each keeps rs2b0t's layout: The Tourist Trap is one module, and the other three are packages. The Tourist Trap, Watch Tower and Big Chompy Bird Hunting own their inventories. Watch Tower's sealed pockets (the wizard floor, Grew's island, Toban's camp, the city-guard pocket, the lower city, the skavid caves and the enclave) are each left before a step that starts elsewhere, and The Grand Tree's legs own the unbaked climbs to Anita's floor and Glough's pillar floor. The Grand Tree reads its journal for the stage and keeps the furthest stage it has read, since a journal read opens a modal mid-fight. Big Chompy Bird Hunting departs from rs2b0t in waiting, with the reason, below Crafting 5, which its record doesn't list and the server refuses the chisel below in a message box.
+
+The live run added more departures from rs2b0t:
+
+- **The Tourist Trap**
+    - It searches the jail window by its exact tile, since the nearest window answers "I can't reach that!".
+    - Its `resume_at` covers the jails, the camp, the mine and the Bedabin tent, so a resumed queue gets out before generic banking.
+    - A make-room deposit keeps the prototype's bar, feathers and hammer and the pass. Kebabs are kept only when no food is configured.
+    - A pack holding only kept items banks food above the entry floor, one at a time, to make room for a quest item.
+    - It makes room before it buys or withdraws the Shantay pass.
+- **Watch Tower**
+    - Its own inventory is left alone by the engine, so while it is still collecting its kit a full pack banks everything except quest items, food and prayer potions.
+    - It fights Gorad, swinging and eating, rather than waiting for his tooth.
+    - It asks Og, Toban and then Grew for replacement relic parts lost in a death. A part the wizard answers "I already have that part" is not offered again.
+    - It buys the riddle's death rune from Aubury when Magic is under the Magic Guild's 66.
+    - It draws no more enclave food than the pack has room for.
+
+
 ## Steps: `rs2004.quests.exec.steps`
 
 `execute_step(step, hops, log)` runs one step. A step is a `Record` made by `quest_step(kind, ...)`, whose fields not set read as `None`:
@@ -238,7 +265,7 @@ All four phase-17d quests have completed in one live queue. Nature Spirit depart
 | `wait` | `reason` | Waits two ticks |
 | `done` | | Nothing |
 
-A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool. `rs2004.quests.exec.garlic.take_garlic(log)` climbs to Morgan's cupboard, opens it and searches for a clove; each climb or Open costs a pass, and it returns `True` once Garlic is held. Use it with `yield from`.
+A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool. `rs2004.quests.exec.garlic.take_garlic(log)` climbs to Morgan's cupboard, opens it and searches for a clove; each climb or Open costs a pass, and it returns `True` once Garlic is held. Use it with `yield from`. `rs2004.quests.exec.fund_coins.fund_quest_coins(target, log, label=None)` earns pack coins up to `target` by pickpocketing Men: Varrock's only while the 10-coin Al Kharid toll is still owed, then Al Kharid's, buying and eating a Kebab from the seller beside him when Hitpoints fall below 3. It stops on a pending random event, or after two minutes without a coin, Thieving experience or a change in Hitpoints. `earn_quest_coins_step(target, label)` is a custom step that runs it.
 
 Goblin Diplomacy's `tools` is a function returning the current keep list, including the configured food; the engine evaluates it before banking.
 

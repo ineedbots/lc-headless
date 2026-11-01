@@ -1,0 +1,9 @@
+from typing import Any, Callable, Optional, Sequence
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+TIPS_CRAFTING: int
+def walk_to(tile: Any, radius: Any, log: Any) -> Wait[Any]: ...
+def feathers_needed(snap: QuestSnapshot) -> Any: ...
+def arrow_step(snap: QuestSnapshot, crafting_level: Any = None) -> Any: ...
