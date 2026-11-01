@@ -145,6 +145,11 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 | `api/ai/quests/defs/watchtower/` | `rs2004.quests.defs.watchtower` |
 | `api/ai/quests/defs/chompybird/` | `rs2004.quests.defs.chompybird` |
 | `api/ai/quests/defs/grandtree/` | `rs2004.quests.defs.grandtree` |
+| `api/ai/quests/defs/elementalworkshop/` | `rs2004.quests.defs.elementalworkshop` |
+| `api/ai/quests/defs/digsite/` | `rs2004.quests.defs.digsite` |
+| `api/ai/quests/defs/holygrail/` | `rs2004.quests.defs.holygrail` |
+| `api/ai/quests/defs/familycrest/` | `rs2004.quests.defs.familycrest` |
+| `api/ai/quests/defs/horror/` | `rs2004.quests.defs.horror` |
 | `adapter/ClientAdapter.ts`'s `chatModalTexts` | `reader.chat_modal_texts` |
 
 | TypeScript | Python |

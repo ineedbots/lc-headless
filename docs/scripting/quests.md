@@ -265,6 +265,28 @@ The live run added more departures from rs2b0t:
 | `wait` | `reason` | Waits two ticks |
 | `done` | | Nothing |
 
+The phase-17f modules are registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `elementalworkshop` | `elemental_workshop` | Finds and reads the battered book, cuts its spine for the key, provisions from the Seers bank, starts the water wheel, stitches the bellows, lights the furnace with lava, kills the rock's Earth elemental for its ore, smelts it and smiths the shield. |
+| `digsite` | `itexam` | Stamps the Examiner's letter, runs the three students' errands, sits the three exams, digs the level 3 site for the talisman, and works both shafts for the chemicals, the blast and the stone tablet. Every NPC, loc and object goes by id, since their names collide. |
+| `holygrail` | `grail` | Talks to King Arthur and Merlin, strips for Entrana, takes the napkin from Galahad and the whistles from Draynor Manor, buys back or withdraws Excalibur, kills the Black Knight Titan, rings the bell to reach the Fisher King, frees Sir Percival and lifts the Grail. |
+| `familycrest` | `crest` | Hands Caleb his fish, finds Avan through the gem trader and Boot, walks the lever chain to the perfect gold, crafts the ring and necklace, cures Johnathon and lands the four blasts on Chronozon from his safespot. |
+| `horror` | `horror` | Builds the bridge, tours the barcrawl for Gunnjorn's key, gathers the tar and glass, repairs the lighthouse's light, loads the strange wall and fights the junior and the mother. |
+
+Each keeps rs2b0t's package. Elemental Workshop, Digsite Quest, Family Crest and Horror from the Deep own their inventories. Holy Grail declares `resume_at` over the Fisher King's realm, which only the whistle leaves.
+
+The live run added these departures from rs2b0t:
+
+- **Family Crest** kills whatever else is hitting the account before it casts at Chronozon, since the lair is single-way and the server refuses the cast otherwise.
+- **Horror from the Deep**
+    - It reads its bridge flag off the open page's raw text, since `quests.journal` gives lines without colour tags.
+    - It draws no more food than the pack has room for, and with a full pack banks what the stage has no use for.
+    - Its dungeon load carries three prayer potions when the bank has them, and its fights drink one at the prayer floor.
+
+`reach` also opens diagonal doors now, and the walker can climb out of the Elemental Workshop.
+
 A bank is the step's `bank`, or the nearest the walker can reach. `rs2004.quests.exec.legs` has the longer legs quests share: `open_container`, `climb`, `walk_and_talk`, `talk_and_close`, `talk_until` and `combine_by_id`; `rs2004.quests.exec.wool` gathers balls of wool. `rs2004.quests.exec.garlic.take_garlic(log)` climbs to Morgan's cupboard, opens it and searches for a clove; each climb or Open costs a pass, and it returns `True` once Garlic is held. Use it with `yield from`. `rs2004.quests.exec.fund_coins.fund_quest_coins(target, log, label=None)` earns pack coins up to `target` by pickpocketing Men: Varrock's only while the 10-coin Al Kharid toll is still owed, then Al Kharid's, buying and eating a Kebab from the seller beside him when Hitpoints fall below 3. It stops on a pending random event, or after two minutes without a coin, Thieving experience or a change in Hitpoints. `earn_quest_coins_step(target, label)` is a custom step that runs it.
 
 Goblin Diplomacy's `tools` is a function returning the current keep list, including the configured food; the engine evaluates it before banking.

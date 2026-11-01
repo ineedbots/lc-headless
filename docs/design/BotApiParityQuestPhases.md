@@ -203,9 +203,11 @@ All four modules and `fundCoins` are ported, registered and tested, and all four
 
 Each has puzzles or machinery of its own, and Holy Grail, Family Crest and Horror from the Deep end in a boss fight.
 
+All five modules are ported, registered and tested, and all five completed live in one queue. See the design doc's "As built: 17f".
+
 - **Done when:**
-    - [ ] Their tests are ported and pass.
-    - [ ] Live, AIOQuester finishes all five in one queue.
+    - [x] Their tests are ported and pass.
+    - [x] Live, AIOQuester finishes all five in one queue (development restarts installed fixes to `reach`, the walker's data, Holy Grail, Family Crest and Horror from the Deep).
 
 ---
 
