@@ -4,12 +4,12 @@ What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone add
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
-**Snapshot:** 66,236 of 77,165 lines (85.84%), with 10,929 missed across 291 of 432 files.
+**Snapshot:** 66,746 of 77,165 lines (86.50%), with 10,419 missed across 284 of 432 files.
 Taken on Windows with no game caches, so the real-cache tests were skipped. Scripts under `scripts/` aren't measured.
 
 | Area | Missed lines |
 |---|---:|
-| Quest legs, `quests/defs/` | 10,384 |
+| Quest legs, `quests/defs/` | 9,874 |
 | Everything else, in [Shared code](#shared-code) | 545 |
 
 Almost all of it is quest legs: `decide()` and the journal parsers are ported with rs2b0t's own tests, while the legs
@@ -49,8 +49,9 @@ Coverage work should report these rather than pin them in a test.
 | `holygrail/legs.py`, `ring_bell` | `RING_STAND` is 2 tiles from `CASTLE_LANDING` and the landing check allows 2, so 6 of the 9 tiles the walk can stop on pass before any teleport. The leg can log that it's inside, and set `inside_castle`, when it isn't. The spec tests from a tile where the check still tells the two apart. |
 | `touristtrap.py`, lines 2448 and 2484 | `leave_camp` here looks unreachable, since `safe_recovery_route` has already answered for both camp areas. |
 
-Some of what remains can't be reached by a test at all. `elementalworkshop/workshop.py` lines 129–130 and 657 are guards
-on states the lines before them rule out, so 100% isn't the goal for every file.
+Some of what remains can't be reached by a test at all. `elementalworkshop/workshop.py` lines 129–130 and 657 and
+`chompybird/hunt.py` lines 109–110 and 160 are guards on states the lines before them rule out, so 100% isn't the goal
+for every file.
 
 ## Quest legs
 
@@ -71,7 +72,6 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [fremenniktrials](#fremenniktrials) | 551 | 61.1% | none |
 | [horror](#horror) | 519 | 56.9% | none |
 | [familycrest](#familycrest) | 514 | 56.5% | `familycrest_chronozon_runtime` |
-| [chompybird](#chompybird) | 513 | 51.2% | none |
 | [witchshouse](#witchshouse) | 163 | 78.2% | `witchshouse_runtime` |
 | [hazeelcult](#hazeelcult) | 148 | 58.9% | none |
 | [druidicritual](#druidicritual) | 96 | 65.2% | `druidicritual_and_monksfriend_runtime` |
@@ -107,7 +107,7 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [impcatcher](#impcatcher) | 11 | 96.0% | none |
 | [mortton](#mortton) | 11 | 99.2% | `mortton_runtime` |
 
-Also missing fewer than 10 lines each: shilo (9), princeali (8), druidspirit (5), priestperil (5), clocktower (4), doric (4), cooksassistant (3), ernest (3), gertrudescat (2), romeojuliet (2), shieldofarrav (2), tbwt (2), tribaltotem (2), blackknight (1), grandtree (1), hetty (1), restlessghost (1), sheepshearer (1).
+Also missing fewer than 10 lines each: shilo (9), princeali (8), druidspirit (5), priestperil (5), clocktower (4), doric (4), chompybird (3), cooksassistant (3), ernest (3), gertrudescat (2), romeojuliet (2), shieldofarrav (2), tbwt (2), tribaltotem (2), blackknight (1), grandtree (1), hetty (1), restlessghost (1), sheepshearer (1).
 
 ### By file
 
@@ -260,17 +260,7 @@ Under 10 each: `areas.py` (2).
 
 #### chompybird
 
-| File | Missed | Covered |
-|---|---:|---:|
-| `hunt.py` | 235 | 12.3% |
-| `dialogue.py` | 75 | 15.7% |
-| `arrows.py` | 58 | 48.2% |
-| `cook.py` | 57 | 40.6% |
-| `__init__.py` | 50 | 75.6% |
-| `supplies.py` | 19 | 82.1% |
-| `journal.py` | 15 | 66.7% |
-
-Under 10 each: `areas.py` (4).
+Under 10 each: `hunt.py` (3), now 99.7% covered. Runtime spec: `chompybird_legs_runtime`.
 
 #### grandtree
 
