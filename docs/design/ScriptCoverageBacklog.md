@@ -4,12 +4,12 @@ What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone add
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
-**Snapshot:** 66,156 of 77,165 lines (85.73%), with 11,009 missed across 293 of 432 files.
+**Snapshot:** 66,212 of 77,165 lines (85.81%), with 10,953 missed across 292 of 432 files.
 Taken on Windows with no game caches, so the real-cache tests were skipped. Scripts under `scripts/` aren't measured.
 
 | Area | Missed lines |
 |---|---:|
-| Quest legs, `quests/defs/` | 10,464 |
+| Quest legs, `quests/defs/` | 10,408 |
 | Everything else, in [Shared code](#shared-code) | 545 |
 
 Almost all of it is quest legs: `decide()` and the journal parsers are ported with rs2b0t's own tests, while the legs
@@ -77,19 +77,19 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [elementalworkshop](#elementalworkshop) | 91 | 90.8% | `elementalworkshop_workshop_runtime` |
 | [monksfriend](#monksfriend) | 87 | 62.7% | `druidicritual_and_monksfriend_runtime` |
 | [fishingcontest](#fishingcontest) | 78 | 81.2% | `fishingcontest_runtime` |
-| [fightarena](#fightarena) | 70 | 89.6% | `fightarena_runtime` |
-| [grandtree](#grandtree) | 68 | 89.2% | `grandtree_legs_runtime` |
 | [seaslug](#seaslug) | 68 | 82.0% | `seaslug_runtime` |
 | [deathplateau](#deathplateau) | 67 | 94.5% | `deathplateau_runtime` |
 | [dragonslayer](#dragonslayer) | 65 | 96.3% | none |
 | [treegnome](#treegnome) | 64 | 90.4% | `treegnome_runtime` |
 | [waterfall](#waterfall) | 61 | 94.7% | `waterfall_runtime` |
+| [fightarena](#fightarena) | 57 | 91.6% | `fightarena_runtime` |
 | [junglepotion](#junglepotion) | 55 | 79.3% | none |
 | [observatory](#observatory) | 39 | 92.8% | `observatory_runtime` |
 | [lostcity](#lostcity) | 30 | 94.0% | `lostcity_runtime` |
 | [murder](#murder) | 26 | 94.2% | `murder_runtime` |
 | [sheepherder](#sheepherder) | 26 | 95.7% | `sheepherder_runtime` |
 | [goblindiplomacy](#goblindiplomacy) | 25 | 95.4% | none |
+| [grandtree](#grandtree) | 25 | 96.0% | `grandtree_legs_runtime`, `grandtree_combat_runtime` |
 | [holygrail](#holygrail) | 24 | 96.4% | `holygrail_legs_runtime` |
 | [scorpcatcher](#scorpcatcher) | 24 | 96.1% | `scorpcatcher_runtime` |
 | [dwarfcannon](#dwarfcannon) | 23 | 93.5% | `dwarfcannon_runtime` |
@@ -274,11 +274,10 @@ Under 10 each: `areas.py` (4).
 
 #### grandtree
 
-Runtime spec `grandtree_legs_runtime` covers all 251 executable lines in `legs.py`.
+Runtime specs `grandtree_legs_runtime` and `grandtree_combat_runtime` cover all executable lines in `legs.py` (251) and `fight.py` (61).
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `fight.py` | 43 | 29.5% |
 | `journal.py` | 19 | 65.5% |
 
 Under 10 each: `__init__.py` (6).
@@ -348,7 +347,7 @@ Under 10 each: `__init__.py` (3).
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `fights.py` | 39 | 72.7% |
+| `fights.py` | 26 | 81.8% |
 | `journal.py` | 19 | 71.6% |
 | `__init__.py` | 11 | 93.1% |
 
