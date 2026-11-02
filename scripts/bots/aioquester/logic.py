@@ -1,9 +1,10 @@
 """AIOQuester's food choice and queue summary: rs2b0t's AIOQuesterLogic.ts, and queueEntry, blockedEntries, focusRow,
 queueSummary and questClockRestarts from AIOQuesterPaint.ts (MIT, see thirdparty/rs2b0t). Includes Shield of Arrav's
-gang and partner settings and Hero's Quest's partner; Legends' reward setting comes with that quest."""
+gang and partner settings, Hero's Quest's partner and Legends Quest's reward."""
 
 import math
 from rs2004.quests.defs.heroquest.config import hero_config
+from rs2004.quests.defs.legends.config import LEGENDS_REWARD_OPTIONS, legends_config
 from rs2004.quests.defs.shieldofarrav.config import arrav_config
 from rs2004.catalogs import Record, food_forms, food_heal_amount, should_eat_to_use_food
 
@@ -138,3 +139,8 @@ def apply_arrav_settings(raw):
 def apply_hero_settings(raw):
     """Push the setting onto the Hero's Quest config."""
     hero_config.partner = raw.partner.strip()
+
+
+def apply_legends_settings(raw):
+    """Push the setting onto the Legends Quest config."""
+    legends_config.reward = raw.reward if raw.reward in LEGENDS_REWARD_OPTIONS else 'Prayer'

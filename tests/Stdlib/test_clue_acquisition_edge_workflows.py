@@ -107,7 +107,7 @@ def test_spade_collection_closes_distance_and_requires_inventory_arrival():
         assert spade.at in w.walks
 
 
-def test_clue_special_travel_routes_are_dispatched_and_unsupported_seams_report_failure():
+def test_clue_special_travel_routes_are_dispatched():
     for name in ['duel', 'tirannwn', 'kharazi']:
         with ClueWorld() as w:
             for module in [executor, solve]:
@@ -122,5 +122,3 @@ def test_clue_special_travel_routes_are_dispatched_and_unsupported_seams_report_
     with ClueWorld() as w:
         w.install(travel)
         assert w.run(travel._walk(w.position, {}))
-        assert not w.run(travel.walk_across_kharazi(Tile(2800, 2900), 1, w.logs.append))
-        assert not w.run(travel.walk_across_tirannwn(Tile(2200, 3200), 1, w.logs.append, {}))

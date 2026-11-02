@@ -343,6 +343,22 @@ The live run added these departures from rs2b0t:
     - The first wait for the King's messenger logs in again, since his timer only starts at login and a queue that just finished the pass hasn't logged in since.
     - The walk through the pass settles after the well's teleport before asking which crossing is outstanding.
 
+The phase-17i module is registered too:
+
+| Module in `rs2004.quests.defs` | Record id | Behaviour |
+|---|---|---|
+| `legends` | `legends` | Stocks the bank from the Magic Guild and Jiminua's before asking Radimus for the quest, cuts into the Kharazi Jungle and maps its three thirds, trades a copy for the bull roarer, befriends Gujuo, forges and blesses the gold bowl, descends the trials for the Book of Binding, kills Nezikchened three times and the three Viyeldi guardians, fetches the sacred water, grows and carves the Yommi tree, and takes the gilded totem and four training sessions from Radimus |
+
+It owns its inventory and declares `resume_at` over the jungle and both cave complexes. rs2b0t's recipe runs it at 70 in every skill. The bank has to hold what nothing sells: a rune axe, a lockpick, unpowered orbs, cosmic runes and the seven cut gems (or a chisel and a pickaxe, for the gem rocks), as well as coins, food, prayer potions and a melee kit. The trials swallow the pack's last slot, so each leg's food float is its own number.
+
+AIOQuester's `legends_reward` names the skill Radimus's sessions train, one of the twelve he offers, and defaults to Prayer. `rs2004.traversal.execute_teleport_hop(transport, log)` casts or rubs one teleport hop of a route.
+
+The live runs added these departures from rs2b0t:
+
+- The wait after swinging the bull roarer counts ticks, eats, and kills what the noise set on the swinger, since a Jungle Savage killed a character standing through rs2b0t's wall-clock wait.
+- A hat, shield or leg slot with nothing to wear no longer parks the quest, as a death can lose a piece nothing on the route sells. Only the body does.
+- Radimus's conversation is driven to its end rather than waited on, since it shut after the first session on every run and the wait sat out its whole budget. The engine's next attempt talks to him again.
+
 ## Kit
 
 | Module | Has |

@@ -145,10 +145,10 @@ A hard dig can spawn a wizard who must die before the dig finds the next clue.
 Legs walk with the walker. `trail_walk_opts(log, radius)` gives the options, which allow teleports beyond 40 tiles while `set_trail_teleports(True)` holds. A few places aren't on the walker's graph:
 
 - **The Duel Arena's pens.** `walk_across_clue_duel(dest, radius, log)` enters the pen the clue wants by an unstaked obstacle duel. The partner is the account the Global `clue_duel_partner` names, which runs DuelArena as the clue helper, or else whoever in the lobby takes one. A wrong pen forfeits and tries once more; leaving forfeits.
-- **The Kharazi Jungle** (`in_kharazi`, `jungle_crossing`, `jungle_kit_missing`): the bank stop packs a machete, the best axe and Radimus's notes for one of `KHARAZI_CLUES`.
-- **Isafdar** (`in_isafdar`, `crosses_tirannwn`).
+- **The Kharazi Jungle** (`in_kharazi`, `jungle_crossing`, `jungle_kit_missing`, `walk_across_kharazi`): the bank stop packs a machete, the best axe and Radimus's notes for one of `KHARAZI_CLUES`, and the walk cuts through the dense band with Legends Quest's `enter_jungle` and `leave_jungle`, then walks the rest. An account past the quest needs no notes.
+- **Isafdar** (`crosses_tirannwn`, `tirannwn_stage`, `walk_across_tirannwn`): either end in one of Regicide's pockets sends the walk over its crossings. A leg leaving the forest teleports out first when the walk's options allow one and the route starts with one, and falls back to the crossings if the cast fails. A walk from the jungle cuts out first, and one into it goes to the jungle's mouth and then cuts in. The clues are gated on Regicide, whose stage opens the dense forests and the palisade.
 
-The walk into the Kharazi Jungle and the walk across Isafdar fail with a log line for now (see [What isn't here yet](#what-isnt-here-yet)).
+Both quests are big, so these import them the first time a walk needs them, not when a bot that carries a clue starts.
 
 `walk_to_bank(tile, log)` is the walk a trail takes to a bank, with those crossings. `open_clue_bank(log)` opens the nearest bank its own way (a banker, a chest or a booth), and `reopen_clue_bank()` opens it again and waits for it to be ready.
 
@@ -178,5 +178,4 @@ Every leg's notes go into a `ClueTrace`. An abandoned trail logs the trace and k
 
 ## What isn't here yet
 
-- **The Kharazi Jungle and Isafdar.** Cutting into the jungle needs Legends' Quest's jungle code, and crossing Isafdar needs Regicide's seams. Both come with phase 17's members' quests. Until then, a trail that needs either abandons the clue and logs why.
 - **The clue scroll paint.** rs2b0t's `cluePaint.ts` draws an overlay, which a headless client has no use for.

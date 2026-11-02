@@ -671,6 +671,7 @@ class SolveClue(Task):
             kit = hard_clue_kit(hard_kit_snapshot(True, ranged), self._hard_food_target())
             if kit != 'ready':
                 self.status = f'hard kit: {kit}'
+                self._log(f'hard kit short of {kit}: keeping the clue until the bank has it')
                 self._block_hard_kit()
                 yield from bank.close()
                 return False
@@ -744,6 +745,7 @@ class SolveClue(Task):
 
             armed = yield from stock_hard_weapon(entrana_strip, remember, self._weapon_name(), self._hard_food_target(), ranged)
             if not armed:
+                self._log('no guardian weapon came out of the bank: keeping the clue until it has one')
                 self._block_hard_kit()
                 return False
         if entrana_strip and (len(equipment.items()) > 0 or names_have_entrana_restricted_gear([i.name or '' for i in inventory.items() + equipment.items()])):
@@ -779,6 +781,7 @@ class SolveClue(Task):
             bankable = self.stripped_gear + (['Sextant', 'Watch', 'Chart'] if puzzle_id is not None else [])
             supplied = yield from stock_hard_supplies((COORD_TOOL_SLOTS if fetching_coord_tools else 0) + puzzle_slots, bankable, self._hard_food_target())
             if not supplied:
+                self._log(f'{inventory.free()} slots free and {inventory.count("Shark")} sharks held, short of the minimum: keeping the clue')
                 self._block_hard_kit()
                 return False
         elif food != '':

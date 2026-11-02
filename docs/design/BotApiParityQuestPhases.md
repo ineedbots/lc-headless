@@ -252,8 +252,10 @@ Both modules are ported, registered and tested, and both completed live in one q
 - `walk_across_tirannwn` uses `travel_tirannwn`, as rs2b0t's `tirannwnTravel.ts` does, and `tirannwnStage` comes off coverage.py's not-ported list;
 - rs2b0t's `tirannwnTravel` test and the walking parts of `kharaziJungle`'s port.
 
+The module, both walks and the reward setting are ported, registered and tested. A fresh account finished the quest live in one queue with no restart and no death, and ClueSolver finished a trail from each region. See the design doc's "As built: 17i".
+
 - **Done when:**
-    - [ ] Legends' tests and the clue walks' are ported and pass.
-    - [ ] Live, AIOQuester finishes Legends' Quest.
-    - [ ] Live, ClueSolver finishes a clue in the Kharazi Jungle and one in Isafdar, on an account with Legends' Quest and Regicide done.
-    - [ ] `coverage.py` reports nothing missing in `api/ai/quests`.
+    - [x] Legends' tests and the clue walks' are ported and pass (less one solver case the live run stands in for; see "As built: 17i").
+    - [x] Live, AIOQuester finishes Legends' Quest (with skills at 70, as rs2b0t's recipe runs).
+    - [x] Live, ClueSolver finishes a clue in the Kharazi Jungle and one in Isafdar, on an account with Legends' Quest and Regicide done (the Isafdar trail across restarts for more sharks and a fix; see "As built: 17i").
+    - [x] `coverage.py` reports nothing missing in `api/ai/quests`.
