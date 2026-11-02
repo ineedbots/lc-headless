@@ -4,13 +4,13 @@ What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone add
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
-**Snapshot:** 65,945 of 77,165 lines (85.46%), with 11,220 missed across 294 of 432 files.
+**Snapshot:** 66,042 of 77,165 lines (85.59%), with 11,123 missed across 294 of 432 files.
 Taken on Windows with no game caches, so the real-cache tests were skipped. Scripts under `scripts/` aren't measured.
 
 | Area | Missed lines |
 |---|---:|
-| Quest legs, `quests/defs/` | 10,676 |
-| Everything else, in [Shared code](#shared-code) | 544 |
+| Quest legs, `quests/defs/` | 10,578 |
+| Everything else, in [Shared code](#shared-code) | 545 |
 
 Almost all of it is quest legs: `decide()` and the journal parsers are ported with rs2b0t's own tests, while the legs
 that act on the game aren't. Each quest's legs need a runtime spec against fake facades.
@@ -71,7 +71,7 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [horror](#horror) | 519 | 56.9% | none |
 | [familycrest](#familycrest) | 514 | 56.5% | `familycrest_chronozon_runtime` |
 | [chompybird](#chompybird) | 513 | 51.2% | none |
-| [grandtree](#grandtree) | 280 | 55.3% | none |
+| [grandtree](#grandtree) | 182 | 71.0% | `grandtree_legs_runtime` |
 | [witchshouse](#witchshouse) | 163 | 78.2% | `witchshouse_runtime` |
 | [hazeelcult](#hazeelcult) | 148 | 58.9% | none |
 | [druidicritual](#druidicritual) | 96 | 65.2% | `druidicritual_and_monksfriend_runtime` |
@@ -276,7 +276,7 @@ Under 10 each: `areas.py` (4).
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `legs.py` | 212 | 15.5% |
+| `legs.py` | 114 | 54.6% |
 | `fight.py` | 43 | 29.5% |
 | `journal.py` | 19 | 65.5% |
 
@@ -541,7 +541,7 @@ and worth less than one in a quest leg. Paths are under `rs2004/`.
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `traversal.py` | 59 | 95.1% |
+| `traversal.py` | 60 | 95.0% |
 | `hunting/supply.py` | 39 | 95.1% |
 | `clues/solve.py` | 37 | 95.1% |
 | `hunting/combat.py` | 33 | 95.3% |
