@@ -37,7 +37,7 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 | Black Knights' Fortress re-listens at the grill after a restart (rs2b0t keeps `listened` in memory) | Harmless; a stage oracle would fix it |
 | A step failing while the character steps between two tiles never parks, as the tile reads as progress (rs2b0t's watchdog) | When a quest hits it |
 | The walker's data needed fixes for this engine at Black Knights' Fortress (`STAIR_FIXES`, `CROSSING_ADDITIONS` in `tools/nav/export_rs2b0t.ts`), Bervirius' tomb and the Elemental Workshop (`EDGE_ADDITIONS`), and the Champions' Guild (`STAIR_FIXES`) | More may turn up with each quest sub-phase |
-| Runtime specs for phases 17f's and 17g's game legs, as 17c and 17d have (17e lacks them too; 17g has them only for legs fixed live) | A coverage follow-up |
+| Runtime specs for phases 17f's and 17g's game legs, as 17c and 17d have (17e lacks them too; 17g has them only for legs fixed live) | A coverage follow-up, listed in [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md) |
 | Scavvo stocks one of each rune piece and doesn't restock, so a second Hero's Quest partner needs the kit banked | When a pair runs it without a harness |
 | A wield swap changes the inventory, so the no-progress watchdog can't see a two-step loop (Ikov's melee picker had one) | A rule in the watchdog, when another quest hits it |
 | Regicide needs the spade it took through the pass, and no shop near Ardougne sells one, so a death carrying the only one parks it with the reason | When a quest needs a spade source |
