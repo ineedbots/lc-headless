@@ -1,6 +1,5 @@
 """rs2b0t's test/api/ai/clues/kharaziJungle.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and
-expect. The band check plans over the real map, so it's in nav/test_clue_kharazi_band.py. tirannwnTravel.test.ts
-isn't ported yet: its cases drive Regicide's seams and Legends' Quest's jungle code, which phase 17 brings."""
+expect. The band check plans over the real map, so it's in nav/test_clue_kharazi_band.py."""
 
 from rs2004.clues.data import CLUE_DB, PACK_UNREACHABLE
 from rs2004.clues.travel import KHARAZI_CLUES, crosses_kharazi, has_jungle_map, in_kharazi, jungle_axe, jungle_crossing, jungle_kit_missing
@@ -27,7 +26,13 @@ def diagnosed():
         expect(PACK_UNREACHABLE.get(id) or '').to_contain('machete')
 
 
+def holding_only_a_casket():
+    # Why: live, a bank stop with a casket in the pack and no scroll asked this of a set, which pocketpy answers by raising.
+    expect(None in KHARAZI_CLUES).to_be(False)
+
+
 describe('the Kharazi clue set', lambda: [
+    test('a pack with no scroll is not a Kharazi clue', holding_only_a_casket),
     test('is exactly the clues whose dig is inside the jungle', exactly_inside),
     test('08 05 South 15 56 East is one of them, and digs at (2950,2902)', chest_dig),
     test('each one still tells the pack audit why it cannot be routed to', diagnosed),
@@ -67,7 +72,7 @@ def crossing():
 
 def empty_kit():
     stub_pack(KARAMJA_MAINLAND)
-    expect(jungle_kit_missing()).to_equal(['Machete', 'an axe', "Radimus notes (Legends' Quest reads started)"])
+    expect(jungle_kit_missing()).to_equal(['Machete', 'an axe', "Radimus notes (Legends Quest reads started)"])
 
 
 def enough():

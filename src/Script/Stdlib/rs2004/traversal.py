@@ -1451,3 +1451,9 @@ def _near_route(tile, ahead):
 
 
 traversal = _Traversal()
+
+
+def execute_teleport_hop(transport, log):
+    """Casts or rubs one teleport hop of a route. True once it lands. rs2b0t's teleportExecute.ts. Use with yield from."""
+    landed = yield from traversal._teleport(transport, log)
+    return landed

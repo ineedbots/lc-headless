@@ -1,0 +1,9 @@
+from typing import Any, Callable, Optional, Sequence
+from __builtins__ import Tile, Wait
+from rs2004.catalogs.record import Record
+from rs2004.quests.engine.types import QuestModule, QuestProgress, QuestSnapshot
+
+def grow_totem_pole(log: Any) -> Wait[Any]: ...
+def replace_evil_totem(log: Any) -> Wait[Any]: ...
+take_gilded_totem: Any
+def ask_for_more_seeds(log: Any) -> Wait[Any]: ...

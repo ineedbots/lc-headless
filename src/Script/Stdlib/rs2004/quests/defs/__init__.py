@@ -344,10 +344,16 @@ def _regicide():
     return regicide
 
 
+def _legends():
+    from rs2004.quests.defs.legends import legends
+    return legends
+
+
 # The ported quests: file, record id, loader.
 _PORTED = {
     'upass': ('upass', _upass),
     'regicide': ('regicide', _regicide),
+    'legends': ('legends', _legends),
     'ikov': ('ikov', _ikov),
     'fremenniktrials': ('viking', _fremenniktrials),
     'heroquest': ('hero', _heroquest),

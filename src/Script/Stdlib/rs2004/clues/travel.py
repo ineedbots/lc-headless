@@ -1,9 +1,9 @@
 """Getting a trail to places the walker's graph doesn't reach: the Duel Arena's pens, the Kharazi Jungle and
 Isafdar. rs2b0t's api/ai/clues/duelTravel.ts, kharaziTravel.ts and tirannwnTravel.ts (MIT, see thirdparty/rs2b0t).
 
-The Kharazi Jungle is cut into tile by tile with a machete, and Isafdar is crossed on Regicide's seams; both are the
-members' quests' code, phase 17's. Until then a leg that has to cross either says so and fails, and the clue is
-abandoned: the Isafdar clues are gated on Regicide anyway (data.CLUE_GATES)."""
+The Kharazi Jungle is cut into tile by tile with Legends Quest's jungle code, and Isafdar is crossed on Regicide's
+seams. Both quests are big, so they're imported the first time a walk needs them, not by every bot that carries a
+clue."""
 
 import time
 
@@ -16,7 +16,8 @@ from rs2004.geometry import Tile
 from rs2004.items import equipment, inventory
 from rs2004.settings import settings_store
 from rs2004.tabs import quests
-from rs2004.traversal import traversal
+from rs2004.navigation import navigator
+from rs2004.traversal import execute_teleport_hop, traversal
 from rs2004.bank import bank
 
 # The trail's walks
@@ -120,11 +121,16 @@ def walk_across_clue_duel(dest, radius, log):
 # The Kharazi Jungle (kharaziTravel.ts)
 
 # The three hard coordinate digs inside the jungle.
-KHARAZI_CLUES = set([3532, 3534, 3536])
+# Why: a list, as a bank stop asks about a pack holding only a casket, whose scroll id is None, and in pocketpy None in a set raises.
+KHARAZI_CLUES = [3532, 3534, 3536]
 MACHETE = 'Machete'
 # Radimus Erkle's notes, the blank copy and the finished one, which share a name.
 RADIMUS_NOTES = 'Radimus notes'
-LEGENDS_QUEST = "Legends' Quest"
+LEGENDS_QUEST = 'Legends Quest'
+KHARAZI_WALK_ATTEMPTS = 4
+KHARAZI_WALK_TIMEOUT_MS = 240000
+# The tile the band is cut south from.
+JUNGLE_MOUTH = Tile(2816, 2940, 0)
 # The z of the last open jungle tile and of the first open mainland tile north of the band.
 JUNGLE_SOUTH = 2936
 JUNGLE_NORTH = 2940
@@ -146,10 +152,20 @@ def crosses_kharazi(dest):
     return jungle_crossing(dest, game.tile()) != 'none'
 
 
-def walk_across_kharazi(dest, radius, log):
-    log(f"the Kharazi Jungle is cut into with Legends' Quest's jungle code, which comes with the members' quests; can't reach ({dest.x},{dest.z}) yet")
-    return False
-    yield
+def walk_across_kharazi(dest, radius, log, options=None):
+    """Cut through the dense band, then walk the rest on the ordinary graph."""
+    from rs2004.quests.defs.legends.jungle import enter_jungle, leave_jungle
+    cut = leave_jungle if jungle_crossing(dest, game.tile()) == 'leave' else enter_jungle
+    through = yield from cut(log)
+    if not through:
+        return False
+    fields = {'radius': radius, 'attempts': KHARAZI_WALK_ATTEMPTS, 'timeout_ms': KHARAZI_WALK_TIMEOUT_MS, 'log': log}
+    if options is not None:
+        for key in ('use_teleport_catalog', 'policy'):
+            if key in options:
+                fields[key] = options[key]
+    arrived = yield from traversal.walk_resilient(Tile(dest.x, dest.z, dest.level), **fields)
+    return arrived
 
 
 def _worn_or_held(name):
@@ -194,17 +210,74 @@ def jungle_keep_names():
 
 # Isafdar (tirannwnTravel.ts)
 
-# Why: rs2b0t finds an Isafdar pocket by Regicide's seam spans; until those come, the forest west of Arandar is a
-# box, which is all crosses_tirannwn needs to send the walk here rather than to a graph that has no edges there.
-def in_isafdar(p):
-    return p is not None and p.level == 0 and 2140 <= p.x <= 2390 and 3140 <= p.z <= 3340
+# Why: 3 callers walk a clue somewhere and only one is the trail itself; the talk step reaches its NPC through reach
+# and the bank stop picks its own booth, so each needs the seam graph or the walker calls Isafdar unreachable.
+def _pocket_at(tile):
+    from rs2004.quests.defs.regicide.pockets import pocket_at
+    return pocket_at(tile)
+
+
+def _teleport_out(dest, log, options):
+    start = game.tile()
+    if not start or _pocket_at(start) is None or _pocket_at(dest) is not None or event_signal.pending():
+        return
+    catalog = options.get('use_teleport_catalog')
+    policy = options.get('policy') or {}
+    if catalog == False or policy.get('use_teleports') == False:
+        return
+    if not (catalog or policy.get('use_teleports') or traversal.teleports_enabled()):
+        return
+    merged = {}
+    for key in policy.keys():
+        merged[key] = policy[key]
+    merged['use_teleports'] = True
+    path = navigator.find_path(start, dest, policy=merged, use_teleport_catalog=True)
+    if event_signal.pending():
+        return
+    waypoints = path.raw.get('waypoints', []) if path.ok else []
+    hop = waypoints[1].get('transport') if len(waypoints) > 1 else None
+    if hop is None or hop.get('kind') != 'teleport':
+        return
+    log(f"leaving Isafdar using {hop['loc_name']}")
+    landed = yield from execute_teleport_hop(hop, log)
+    if not landed:
+        log('Isafdar teleport failed; trying the exit crossings')
+
+
+# Why: the seam graph gates the dense forests on stage 8 and the palisade southbound on 13, so a journal short of
+# complete must not be handed a stage that opens them.
+def tirannwn_stage():
+    from rs2004.quests.defs.regicide.journal import RG_STAGE
+    return RG_STAGE.COMPLETE if quests.status('Regicide') == 'complete' else RG_STAGE.NOT_STARTED
 
 
 def crosses_tirannwn(dest):
-    return in_isafdar(dest) or in_isafdar(game.tile())
+    """Whether either end of the walk sits in a pocket the walker's graph has no edges through."""
+    return (dest is not None and _pocket_at(dest) is not None) or _pocket_at(game.tile()) is not None
 
 
 def walk_across_tirannwn(dest, radius, log, opts=None):
-    log(f"Isafdar is crossed on Regicide's seams, which come with the members' quests; can't reach ({dest.x},{dest.z}) yet")
-    return False
-    yield
+    """Travel to dest using teleports out or the Isafdar crossings."""
+    from rs2004.quests.defs.legends.jungle import leave_jungle
+    from rs2004.quests.defs.regicide.pockets import travel_tirannwn
+    options = opts if opts is not None else {}
+    if in_kharazi(game.tile()):
+        left = yield from leave_jungle(log)
+        if not left:
+            return False
+    jungle = in_kharazi(dest)
+    target = JUNGLE_MOUTH if jungle else Tile(dest.x, dest.z, dest.level)
+    yield from _teleport_out(target, log, options)
+    if event_signal.pending():
+        return False
+    fields = {}
+    for key in ('use_teleport_catalog', 'policy'):
+        if key in options:
+            fields[key] = options[key]
+    arrived = yield from travel_tirannwn(target, 0 if jungle else radius, tirannwn_stage(), log, fields)
+    if not arrived:
+        return False
+    if not jungle:
+        return True
+    crossed = yield from walk_across_kharazi(dest, radius, log, options)
+    return crossed

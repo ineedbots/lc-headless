@@ -2,7 +2,8 @@
 Its applyLegendsSettings cases come with Legends' Quest."""
 
 from rs2004.catalogs.record import Record
-from bots.aioquester.logic import resolve_consume_action, resolve_sustain_policy, select_sustain_consumable
+from bots.aioquester.logic import apply_legends_settings, resolve_consume_action, resolve_sustain_policy, select_sustain_consumable
+from rs2004.quests.defs.legends.config import LEGENDS_REWARD_OPTIONS, legends_config
 
 
 def food(name, ops=None):
@@ -110,3 +111,16 @@ def _fn11():
 
 
 describe('resolveSustainPolicy', _fn11)
+
+
+def _legends_reward():
+    apply_legends_settings(Record({'reward': 'Agility'}))
+    expect(legends_config.reward).to_be('Agility')
+    apply_legends_settings(Record({'reward': 'Runecraft'}))
+    expect(legends_config.reward).to_be('Prayer')
+    expect(len(LEGENDS_REWARD_OPTIONS)).to_be(12)
+    expect('Prayer' in LEGENDS_REWARD_OPTIONS).to_be(True)
+    expect('Runecraft' in LEGENDS_REWARD_OPTIONS).to_be(False)
+
+
+test("a reward Radimus offers is pushed onto the config, and anything else falls back to Prayer", _legends_reward)
