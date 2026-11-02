@@ -1,8 +1,10 @@
-"""Grand Tree's cupboard, tree climbs and Daconia root sweep against Scene facades."""
+"""Grand Tree's dialogue, item handoffs, climbs and root sweep against Scene facades."""
 
+from rs2004 import execution
 from rs2004.geometry import Tile
 from rs2004.quests.defs.grandtree import legs
-from rs2004.quests.defs.grandtree.areas import GT_LOC, GT_OBJ, GT_ROOTS, GT_TILE
+from rs2004.quests.defs.grandtree.areas import ANITA, FOREMAN, GT_LOC, GT_OBJ, GT_PILLARS, GT_ROOTS, GT_TILE
+from rs2004.reach import reach
 
 
 def move(scene, tile):
@@ -200,3 +202,194 @@ def cave_exit():
 
 
 test('Grand Tree leaves the caves only after the ladder reaches the surface', cave_exit)
+
+
+def talking_world(at):
+    scene = Scene(at)
+    scene.entity_ops = []
+
+    def operate(find, op, expect, open_when_unreachable=False, expect_ms=5000, what=None, log=None):
+        target = find()
+        if target is None:
+            return 'missing'
+        scene.entity_ops.append((target.name, op))
+        if not target.interact(op):
+            return 'retry'
+        answered = yield from execution.delay_until(expect, expect_ms)
+        return 'done' if answered else 'retry'
+
+    spy_on(reach, 'entity_op', impl=operate)
+    return scene
+
+
+def chat_effect(scene, pages):
+    def effect(op):
+        expect(op).to_be('Talk-to')
+        scene.chat.pages = list(pages)
+        return True
+    return effect
+
+
+def anita_stairs():
+    scene = talking_world(GT_TILE.anita_stairs)
+    scene.walk_ok = False
+    expect(run_wait(legs.anita_key(scene.log))).to_be(False)
+    scene.walk_ok = True
+    expect(run_wait(legs.anita_key(scene.log))).to_be(False)
+    up = scene.loc('Staircase', ['Climb-up'], effect=lambda op: False)
+    expect(run_wait(legs.anita_key(scene.log))).to_be(False)
+    up._fields['interact'] = lambda op: True
+    before = scene.clock
+    expect(run_wait(legs.anita_key(scene.log))).to_be(False)
+    expect(scene.clock - before >= 8000).to_be(True)
+    up._fields['interact'] = move(scene, GT_TILE.anita_floor)
+    expect(run_wait(legs.anita_key(scene.log))).to_be(False)
+    expect(scene.at).to_equal(ANITA.anchor)
+    scene.loc('Staircase', ['Climb-down'], effect=move(scene, GT_TILE.anita_stairs))
+
+    def receive_key():
+        scene.item(GT_OBJ.KEY, "Glough's key")
+
+    def speak(op):
+        expect(op).to_be('Talk-to')
+        scene.chat.pages = ['continue']
+        scene.later(lambda: None)
+        scene.later(receive_key)
+        return True
+
+    scene.npc(ANITA.npc, ['Talk-to'], effect=speak)
+    scene.at = GT_TILE.anita_stairs
+    expect(run_wait(legs.anita_key(scene.log))).to_be(True)
+    expect(scene.has(GT_OBJ.KEY)).to_be(True)
+    expect(scene.at).to_equal(GT_TILE.anita_stairs)
+    expect(scene.entity_ops).to_equal([(ANITA.npc, 'Talk-to')])
+    walks = len(scene.walks)
+    expect(run_wait(legs.anita_key(scene.log))).to_be(True)
+    expect(len(scene.walks)).to_be(walks)
+
+
+test('Grand Tree climbs to Anita, receives the key and returns to the ground', anita_stairs)
+
+
+def anita_descent():
+    scene = Scene()
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(True)
+    scene.at = GT_TILE.narnode
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(True)
+    scene.at = GT_TILE.glough
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(True)
+    expect(scene.walks).to_equal([])
+    scene.at = GT_TILE.anita_floor
+    scene.walk_ok = False
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(False)
+    scene.walk_ok = True
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(False)
+    down = scene.loc('Staircase', ['Climb-down'], effect=lambda op: False)
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(False)
+    down._fields['interact'] = lambda op: True
+    before = scene.clock
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(False)
+    expect(scene.clock - before).to_be(8000)
+    down._fields['interact'] = move(scene, GT_TILE.anita_stairs)
+    expect(run_wait(legs.descend_anita(scene.log))).to_be(True)
+    expect(scene.at).to_equal(GT_TILE.anita_stairs)
+
+
+test('Grand Tree reports Anita descent failures and leaves other upstairs houses alone', anita_descent)
+
+
+def foreman():
+    scene = talking_world(GT_TILE.karamja_crash)
+    scene.walk_ok = False
+    expect(run_wait(legs.foreman_order(scene.log))).to_be(False)
+    scene.walk_ok = True
+    expect(run_wait(legs.foreman_order(scene.log))).to_be(False)
+    expect(scene.walks[-1]).to_equal(FOREMAN.anchor)
+    npc = scene.npc(FOREMAN.npc, ['Talk-to'], effect=lambda op: False)
+    walks = len(scene.walks)
+    expect(run_wait(legs.foreman_order(scene.log))).to_be(False)
+    expect(len(scene.walks)).to_be(walks)
+    npc._fields['interact'] = chat_effect(scene, ['continue'])
+    before = scene.clock
+    expect(run_wait(legs.foreman_order(scene.log))).to_be(False)
+    expect(scene.clock - before >= 180000).to_be(True)
+    pages = [['Attack him', choice] for choice in FOREMAN.prefer]
+    npc._fields['interact'] = chat_effect(scene, pages)
+
+    def take_order(text):
+        if text == FOREMAN.prefer[-1]:
+            scene.item(GT_OBJ.LUMBER_ORDER, 'Lumber order')
+
+    scene.chat.on_choose = take_order
+    expect(run_wait(legs.foreman_order(scene.log))).to_be(True)
+    expect(scene.chat.chosen).to_equal(FOREMAN.prefer)
+    expect(scene.has(GT_OBJ.LUMBER_ORDER)).to_be(True)
+    calls = len(scene.entity_ops)
+    expect(run_wait(legs.foreman_order(scene.log))).to_be(True)
+    expect(len(scene.entity_ops)).to_be(calls)
+
+
+test('Grand Tree answers all foreman questions and resumes at his current location', foreman)
+
+
+def chest():
+    scene = Scene(GT_TILE.chest_stand)
+    scene.walk_ok = False
+    expect(run_wait(legs.open_chest(scene.log))).to_be(False)
+    scene.walk_ok = True
+    expect(run_wait(legs.open_chest(scene.log))).to_be(False)
+    key = scene.item(GT_OBJ.KEY, "Glough's key", on_use=lambda target: False)
+    scene.loc('Closed chest', id=999, dist=0)
+    expect(run_wait(legs.open_chest(scene.log))).to_be(False)
+    target = scene.loc('Closed chest', id=GT_LOC.CHEST_SHUT)
+    expect(run_wait(legs.open_chest(scene.log))).to_be(False)
+    key._fields['use_on'] = lambda target: True
+    before = scene.clock
+    expect(run_wait(legs.open_chest(scene.log))).to_be(False)
+    expect(scene.clock - before >= 30000).to_be(True)
+
+    def unlock(loc):
+        expect(loc).to_be(target)
+        scene.item(GT_OBJ.INVASION_PLANS, 'Invasion plans')
+        return True
+
+    key._fields['use_on'] = unlock
+    expect(run_wait(legs.open_chest(scene.log))).to_be(True)
+    expect(scene.has(GT_OBJ.INVASION_PLANS)).to_be(True)
+    walks = len(scene.walks)
+    expect(run_wait(legs.open_chest(scene.log))).to_be(True)
+    expect(len(scene.walks)).to_be(walks)
+
+
+test('Grand Tree uses the key on the correct chest and confirms the invasion plans', chest)
+
+
+def twigs():
+    scene = Scene(GT_TILE.climb_tree_stand)
+    scene.walk_ok = False
+    expect(run_wait(legs.place_twig(0)(scene.log))).to_be(False)
+    scene.walk_ok = True
+    scene.at = GT_TILE.pillar_floor
+
+    def lay_effect(scene, pillar, target):
+        def use(loc):
+            expect(loc).to_be(target)
+            scene.take(pillar.obj)
+            return True
+        return use
+
+    for index in range(len(GT_PILLARS)):
+        pillar = GT_PILLARS[index]
+        twig = scene.item(pillar.obj, 'Twigs', on_use=lambda target: False)
+        scene.locs = []
+        scene.loc('Pillar', id=999, dist=0)
+        expect(run_wait(legs.place_twig(index)(scene.log))).to_be(False)
+        target = scene.loc('Pillar', id=pillar.loc)
+        expect(run_wait(legs.place_twig(index)(scene.log))).to_be(False)
+        twig._fields['use_on'] = lay_effect(scene, pillar, target)
+        expect(run_wait(legs.place_twig(index)(scene.log))).to_be(True)
+        expect(scene.has(pillar.obj)).to_be(False)
+        expect(scene.walks[-1]).to_equal(pillar.stand)
+
+
+test('Grand Tree matches each identically named twig to its own pillar id', twigs)
