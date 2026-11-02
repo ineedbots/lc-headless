@@ -206,6 +206,17 @@ class FakeQuery:
     def within(self, radius):
         return FakeQuery([r for r in self.rows if r.distance() <= radius])
 
+    def within_of(self, origin, radius):
+        return FakeQuery([r for r in self.rows if r.tile().distance_to(origin) <= radius])
+
+    def id(self, *ids):
+        return FakeQuery([r for r in self.rows if r.id in ids])
+
+    def inside(self, area):
+        from rs2004.entities import _area_test
+        test = _area_test(area)
+        return FakeQuery([r for r in self.rows if test(r.tile())])
+
     def nearest(self):
         """The row of least distance(), or the first when the rows have no distance."""
         if not self.rows:
@@ -240,6 +251,10 @@ class FakeChat:
         self.pages = list(pages) if pages is not None else []
         self.chosen = []
         self.on_choose = None
+        self.shown = []
+
+    def texts(self):
+        return list(self.shown)
 
     def is_open(self):
         return len(self.pages) > 0
@@ -268,9 +283,267 @@ class FakeChat:
         yield
 
     def install(self, chat_dialog):
-        for name in ['is_open', 'can_continue', 'options', 'continue_', 'choose_option']:
+        for name in ['is_open', 'can_continue', 'options', 'continue_', 'choose_option', 'texts']:
             spy_on(chat_dialog, name, impl=getattr(self, name))
         return self
+
+
+class Scene:
+    """A quest leg's whole world over the facades: where the player stands, the pack and what's worn, the locs, NPCs
+    and ground items about, the game messages said, the chat, and a clock. Everything is put back when the test ends.
+
+    A wait answers at once and costs game time: a tick is 600 ms, and a delay_until whose condition never comes costs
+    its whole timeout, so a leg's own deadline runs out as it would live. after_wait holds what happens once the
+    player next waits, one entry per wait. A thing's effect(op), or use_on's effect(target), says what its click does,
+    and returning False from it refuses the click. A thing stands dist tiles off, or with dist=None as far as its tile
+    is from the player. Walking arrives unless walk_ok is False or the tile is in no_walk; talk_status and
+    loc_op_status are what reach answers, and loc_op_effect(name, op) what its loc_op does."""
+
+    def __init__(self, at=None):
+        import _core
+        from rs2004 import execution
+        from rs2004.catalogs.tasks import sustain
+        from rs2004.dialogue import chat_dialog, modals
+        from rs2004.entities import ground_items, locs, npcs
+        from rs2004.game import game, reader, skills
+        from rs2004.items import equipment, inventory
+        from rs2004.reach import reach
+        from rs2004.tabs import quests
+        from rs2004.traversal import traversal
+        self.at = at
+        self.pack = []
+        self.worn = []
+        self.locs = []
+        self.npcs = []
+        self.ground = []
+        self.said = []
+        self.lines = []
+        self.walks = []
+        self.ticks = 0
+        self.clock = 0
+        self.fighting = False
+        self.walk_ok = True
+        self.no_walk = []
+        self.stats = {}
+        self.status = 'in_progress'
+        self.main_modal = -1
+        self.after_wait = []
+        self.talk_status = 'done'
+        self.talks = []
+        self.loc_op_status = 'done'
+        self.loc_ops = []
+        self.loc_op_effect = None
+        self.main_texts = []
+        self._next_index = 1
+        self.chat = FakeChat([]).install(chat_dialog)
+        spy_on(game, 'tile', impl=lambda: self.at)
+        spy_on(game, 'in_combat', impl=lambda: self.fighting)
+        spy_on(game, 'tick', impl=lambda: self.ticks)
+        spy_on(locs, 'query', impl=querying(lambda: self.locs))
+        spy_on(npcs, 'query', impl=querying(lambda: self.npcs))
+        spy_on(ground_items, 'query', impl=querying(lambda: self.ground))
+        spy_on(inventory, 'items', impl=lambda: list(self.pack))
+        spy_on(inventory, 'count', impl=lambda name: sum([i.count for i in self.pack if (i.name or '').lower() == name.lower()]))
+        spy_on(inventory, 'count_by_id', impl=lambda id: sum([i.count for i in self.pack if i.id == id]))
+        spy_on(inventory, 'contains', impl=self._pack_holds)
+        spy_on(inventory, 'first', impl=self._pack_first)
+        spy_on(inventory, 'free', impl=lambda: 28 - len(self.pack))
+        spy_on(inventory, 'used', impl=lambda: len(self.pack))
+        spy_on(inventory, 'is_full', impl=lambda: len(self.pack) >= 28)
+        spy_on(equipment, 'items', impl=lambda: list(self.worn))
+        spy_on(equipment, 'contains', impl=self._wearing)
+        spy_on(equipment, 'equip', impl=self._equip)
+        spy_on(equipment, 'unequip', impl=self._unequip)
+        spy_on(skills, 'level', impl=lambda name: self.stats.get(name, 99))
+        spy_on(skills, 'effective', impl=lambda name: self.stats.get(name, 99))
+        spy_on(skills, 'xp', impl=lambda name: self.stats.get(name, 99))
+        spy_on(skills, 'hp_fraction', impl=lambda: self.stats.get('hp_fraction', 1))
+        spy_on(traversal, 'walk_resilient', impl=self._walk)
+        spy_on(execution, 'delay_ticks', impl=self._delay_ticks)
+        spy_on(execution, 'delay_until', impl=self._delay_until)
+        spy_on(execution, 'delay_until_ticks', impl=self._delay_until_ticks)
+        spy_on(sustain, 'run', impl=self._idle)
+        spy_on(modals, 'is_open', impl=lambda: self.main_modal != -1)
+        spy_on(modals, 'close', impl=self._close_modal)
+        spy_on(modals, 'close_if_open', impl=self._close_modal)
+        spy_on(reader, 'modals', impl=lambda: Fake(main=self.main_modal, side=-1, chat=-1))
+        spy_on(reader, 'main_modal_texts', impl=lambda: list(self.main_texts))
+        spy_on(reach, 'npc_dialog', impl=self._talk)
+        spy_on(reach, 'loc_op', impl=self._loc_op)
+        spy_on(quests, 'status', impl=lambda name: self.status)
+        spy_on(_core, 'step_time', impl=lambda: self.clock)
+        spy_on(_core, 'close_interfaces', impl=self._close_interfaces)
+        spy_on(_core, 'message_mark', impl=lambda: len(self.said))
+        spy_on(_core, 'game_messages_since', impl=lambda mark: [(n, self.said[n]) for n in range(mark, len(self.said))])
+
+    def log(self, line):
+        self.lines.append(line)
+
+    def logged(self, text):
+        return len([line for line in self.lines if text in line]) > 0
+
+    def say(self, text):
+        self.said.append(text)
+
+    def later(self, effect):
+        """Runs effect at the player's next wait, after any already queued."""
+        self.after_wait.append(effect)
+
+    def item(self, id, name, count=1, actions=None, effect=None, on_use=None):
+        """Puts an item in the pack."""
+        thing = self._item(id, name, count, actions, effect, on_use, self.pack)
+        self.pack.append(thing)
+        return thing
+
+    def wear(self, name, id=0, actions=None):
+        thing = self._item(id, name, 1, actions, None, None, self.worn)
+        self.worn.append(thing)
+        return thing
+
+    def drop_item(self, thing):
+        if thing in self.pack:
+            self.pack.remove(thing)
+
+    def has(self, id):
+        return len([i for i in self.pack if i.id == id]) > 0
+
+    def take(self, id):
+        """Removes every item of that id from the pack."""
+        self.pack = [i for i in self.pack if i.id != id]
+
+    def loc(self, name, actions=None, tile=None, effect=None, id=0, dist=2, on_use=None):
+        thing = self._placed(self.locs, id, name, actions, tile, effect, dist, on_use)
+        self.locs.append(thing)
+        return thing
+
+    def npc(self, name, actions=None, tile=None, effect=None, id=0, dist=2, targets_me=False, others=False):
+        thing = self._placed(self.npcs, id, name, actions, tile, effect, dist, None, targets_me, others)
+        self.npcs.append(thing)
+        return thing
+
+    def on_ground(self, id, name, tile=None, effect=None, dist=2):
+        """A ground item whose Take moves it to the pack, unless its effect says otherwise."""
+        def taken(op):
+            if effect is not None:
+                return effect(op)
+            self.item(id, name)
+            self.ground = [g for g in self.ground if g.id != id]
+            return True
+
+        thing = self._placed(self.ground, id, name, ['Take'], tile, taken, dist, None)
+        self.ground.append(thing)
+        return thing
+
+    def _item(self, id, name, count, actions, effect, on_use, owner):
+        def interact(op):
+            return effect is None or effect(op) is not False
+
+        def use_on(target):
+            return on_use is None or on_use(target) is not False
+
+        return Fake(id=id, name=name, count=count, actions=lambda: actions if actions is not None else ['Use', 'Drop'], interact=interact, use_on=use_on)
+
+    def _placed(self, rows, id, name, actions, tile, effect, dist, on_use, targets_me=False, others=False):
+        index = self._next_index
+        self._next_index += 1
+        where = tile if tile is not None else self.at
+
+        def interact(op):
+            return effect is None or effect(op) is not False
+
+        def is_valid():
+            return index in [r.index for r in self.locs + self.npcs + self.ground]
+
+        def distance():
+            return dist if dist is not None else where.distance_to(self.at)
+
+        return Fake(id=id, index=index, name=name, on_use=on_use, tile=lambda: where, distance=distance, actions=lambda: actions if actions is not None else [], interact=interact, valid=is_valid, in_combat=False, targets_me=lambda: targets_me, targets_another_player=lambda: others)
+
+    def _pack_holds(self, name):
+        return len([i for i in self.pack if (i.name or '').lower() == name.lower()]) > 0
+
+    def _pack_first(self, name):
+        rows = [i for i in self.pack if (i.name or '').lower() == name.lower()]
+        return rows[0] if len(rows) > 0 else None
+
+    def _wearing(self, name):
+        return len([i for i in self.worn if (i.name or '').lower() == name.lower()]) > 0
+
+    def _equip(self, name):
+        rows = [i for i in self.pack if (i.name or '').lower() == name.lower()]
+        if len(rows) == 0:
+            return False
+        self.pack.remove(rows[0])
+        self.worn.append(rows[0])
+        return True
+        yield
+
+    def _unequip(self, name):
+        rows = [i for i in self.worn if (i.name or '').lower() == name.lower()]
+        if len(rows) == 0:
+            return False
+        self.worn.remove(rows[0])
+        self.pack.append(rows[0])
+        return True
+        yield
+
+    def _walk(self, dest, radius=0, attempts=0, timeout_ms=0, log=None):
+        self.walks.append(dest)
+        if not self.walk_ok or dest in self.no_walk:
+            return False
+        self.at = dest
+        return True
+        yield
+
+    def _pump(self):
+        if len(self.after_wait) > 0:
+            self.after_wait.pop(0)()
+
+    def _delay_ticks(self, n=1):
+        self.ticks += n
+        self.clock += 600 * n
+        self._pump()
+        return None
+        yield
+
+    def _delay_until(self, cond, timeout_ms=6000):
+        self._pump()
+        ok = cond()
+        self.clock += 600 if ok else timeout_ms
+        return ok
+        yield
+
+    def _delay_until_ticks(self, cond, ticks=1):
+        self._pump()
+        ok = cond()
+        self.ticks += 1 if ok else ticks
+        self.clock += 600 if ok else 600 * ticks
+        return ok
+        yield
+
+    def _idle(self, *args):
+        return None
+        yield
+
+    def _close_modal(self):
+        self.main_modal = -1
+        return True
+        yield
+
+    def _close_interfaces(self):
+        self.main_modal = -1
+
+    def _talk(self, name, near, open_ms=15000, log=None):
+        self.talks.append(name)
+        return self.talk_status
+        yield
+
+    def _loc_op(self, name, op, near, expect, within=10, id=None, expect_ms=12000, refused=None, log=None):
+        self.loc_ops.append((name, op))
+        if self.loc_op_effect is not None:
+            self.loc_op_effect(name, op)
+        return self.loc_op_status
+        yield
 
 
 def instant_until(cond, timeout_ms=6000):
