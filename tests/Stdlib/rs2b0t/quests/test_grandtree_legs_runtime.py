@@ -3,7 +3,7 @@
 from rs2004 import execution
 from rs2004.geometry import Tile
 from rs2004.quests.defs.grandtree import legs
-from rs2004.quests.defs.grandtree.areas import ANITA, FOREMAN, GT_LOC, GT_OBJ, GT_PILLARS, GT_ROOTS, GT_TILE
+from rs2004.quests.defs.grandtree.areas import ANITA, CHARLIE, FEMI, FOREMAN, GLOUGH, GT_LOC, GT_OBJ, GT_PILLARS, GT_ROOTS, GT_TILE, NARNODE, NARNODE_UNDER, PILOT
 from rs2004.reach import reach
 
 
@@ -393,3 +393,162 @@ def twigs():
 
 
 test('Grand Tree matches each identically named twig to its own pillar id', twigs)
+
+
+def starting_dialogue():
+    scene = talking_world(None)
+    expect(run_wait(legs.start_quest(scene.log))).to_be(False)
+    scene.at = GT_TILE.narnode
+    king = scene.npc(NARNODE.npc, ['Talk-to'], effect=lambda op: False)
+    expect(run_wait(legs.start_quest(scene.log))).to_be(False)
+    king._fields['interact'] = chat_effect(scene, ['continue'])
+    before = scene.clock
+    expect(run_wait(legs.start_quest(scene.log))).to_be(False)
+    expect(scene.clock - before >= legs.TALK_MS).to_be(True)
+
+    for start in [GT_TILE.narnode, GT_TILE.narnode_under]:
+        scene = talking_world(start)
+        choices = NARNODE.prefer[:2]
+        scene.npc(NARNODE.npc, ['Talk-to'], tile=start, effect=chat_effect(scene, [['No thanks', choice] for choice in choices]))
+
+        def accept(text):
+            if text == NARNODE.prefer[1]:
+                scene.item(GT_OBJ.BARK, 'Bark sample')
+                scene.item(GT_OBJ.TRANSLATION_BOOK, 'Translation book')
+
+        scene.chat.on_choose = accept
+        expect(run_wait(legs.start_quest(scene.log))).to_be(True)
+        expect(scene.chat.chosen).to_equal(choices)
+        expect(scene.has(GT_OBJ.BARK)).to_be(True)
+        expect(scene.has(GT_OBJ.TRANSLATION_BOOK)).to_be(True)
+        expect(scene.walks).to_equal([])
+        calls = len(scene.entity_ops)
+        expect(run_wait(legs.start_quest(scene.log))).to_be(True)
+        expect(len(scene.entity_ops)).to_be(calls)
+
+
+test('Grand Tree starts with the surface or underground king and confirms the bark handoff', starting_dialogue)
+
+
+def delayed_dialogue(scene, effect):
+    def speak(op):
+        expect(op).to_be('Talk-to')
+        scene.chat.pages = ['continue']
+        scene.later(lambda: None)
+        scene.later(effect)
+        return True
+    return speak
+
+
+def jail_release():
+    scene = talking_world(None)
+    expect(run_wait(legs.jailed_by_glough(scene.log))).to_be(False)
+    scene.at = GT_TILE.glough
+    glough = scene.npc(GLOUGH.npc, ['Talk-to'], effect=lambda op: False)
+    expect(run_wait(legs.jailed_by_glough(scene.log))).to_be(False)
+    glough._fields['interact'] = chat_effect(scene, ['continue'])
+    before = scene.clock
+    expect(run_wait(legs.jailed_by_glough(scene.log))).to_be(False)
+    expect(scene.clock - before >= legs.TALK_MS).to_be(True)
+    released = Tile(GT_TILE.jail.x + 1, GT_TILE.jail.z, 3)
+
+    for start, stop in [(GT_TILE.glough, GLOUGH), (GT_TILE.jail, CHARLIE), (released, GLOUGH)]:
+        scene = talking_world(start)
+
+        def release():
+            scene.at = released
+
+        scene.npc(stop.npc, ['Talk-to'], effect=delayed_dialogue(scene, release))
+        expect(run_wait(legs.jailed_by_glough(scene.log))).to_be(True)
+        expect(scene.at).to_equal(released)
+        expect(scene.chat.is_open()).to_be(False)
+        expect(scene.entity_ops).to_equal([(stop.npc, 'Talk-to')])
+
+
+test('Grand Tree resumes jail dialogue with Charlie and replays Glough after an interrupted release', jail_release)
+
+
+def glider_flight():
+    scene = talking_world(None)
+    expect(run_wait(legs.fly_to_karamja(scene.log))).to_be(False)
+    scene.at = GT_TILE.glider_pad
+    pilot = scene.npc(PILOT.npc, ['Talk-to'], effect=lambda op: False)
+    expect(run_wait(legs.fly_to_karamja(scene.log))).to_be(False)
+    pilot._fields['interact'] = chat_effect(scene, ['continue'])
+    before = scene.clock
+    expect(run_wait(legs.fly_to_karamja(scene.log))).to_be(False)
+    expect(scene.clock - before >= 60000).to_be(True)
+
+    def land(text):
+        scene.at = GT_TILE.karamja_crash
+
+    scene.chat.on_choose = land
+    pilot._fields['interact'] = chat_effect(scene, [['Stay here', PILOT.prefer[0]]])
+    expect(run_wait(legs.fly_to_karamja(scene.log))).to_be(True)
+    expect(scene.chat.chosen).to_equal(PILOT.prefer)
+    expect(scene.at).to_equal(GT_TILE.karamja_crash)
+    calls = len(scene.entity_ops)
+    expect(run_wait(legs.fly_to_karamja(scene.log))).to_be(True)
+    expect(len(scene.entity_ops)).to_be(calls)
+    scene.at = Tile(GT_TILE.karamja_crash.x, GT_TILE.karamja_crash.z, 1)
+    scene.npcs = []
+    expect(run_wait(legs.fly_to_karamja(scene.log))).to_be(False)
+
+
+test('Grand Tree takes the Karamja glider and requires a ground-level crash landing', glider_flight)
+
+
+def femi_return():
+    scene = talking_world(GT_TILE.karamja_crash)
+    scene.walk_ok = False
+    expect(run_wait(legs.femi_cart(scene.log))).to_be(False)
+    scene.walk_ok = True
+    expect(run_wait(legs.femi_cart(scene.log))).to_be(False)
+    expect(scene.walks[-1]).to_equal(GT_TILE.femi)
+    femi = scene.npc(FEMI.npc, ['Talk-to'], effect=lambda op: False)
+    expect(run_wait(legs.femi_cart(scene.log))).to_be(False)
+    femi._fields['interact'] = chat_effect(scene, ['continue'])
+    before = scene.clock
+    expect(run_wait(legs.femi_cart(scene.log))).to_be(False)
+    expect(scene.clock - before >= 60000).to_be(True)
+
+    def ride(text):
+        scene.at = GT_TILE.femi_landing
+
+    scene.chat.on_choose = ride
+    femi._fields['interact'] = chat_effect(scene, [['No thanks', FEMI.prefer[0]]])
+    expect(run_wait(legs.femi_cart(scene.log))).to_be(True)
+    expect(scene.chat.chosen).to_equal([FEMI.prefer[0]])
+    expect(scene.at).to_equal(GT_TILE.femi_landing)
+    walks = len(scene.walks)
+    expect(run_wait(legs.femi_cart(scene.log))).to_be(True)
+    expect(len(scene.walks)).to_be(walks)
+
+
+test('Grand Tree returns through Femi and waits until the cart enters the stronghold', femi_return)
+
+
+def rock_handoff():
+    scene = talking_world(GT_TILE.narnode_under)
+    expect(run_wait(legs.give_rock(scene.log))).to_be(True)
+    expect(scene.entity_ops).to_equal([])
+    scene.item(GT_OBJ.DACONIA, 'Daconia rock')
+    expect(run_wait(legs.give_rock(scene.log))).to_be(False)
+    king = scene.npc(NARNODE_UNDER.npc, ['Talk-to'], effect=lambda op: False)
+    expect(run_wait(legs.give_rock(scene.log))).to_be(False)
+    king._fields['interact'] = chat_effect(scene, ['continue'])
+    before = scene.clock
+    expect(run_wait(legs.give_rock(scene.log))).to_be(False)
+    expect(scene.clock - before >= 60000).to_be(True)
+    expect(scene.has(GT_OBJ.DACONIA)).to_be(True)
+
+    def hand_over():
+        scene.take(GT_OBJ.DACONIA)
+
+    king._fields['interact'] = delayed_dialogue(scene, hand_over)
+    expect(run_wait(legs.give_rock(scene.log))).to_be(True)
+    expect(scene.has(GT_OBJ.DACONIA)).to_be(False)
+    expect(scene.entity_ops[-1]).to_equal((NARNODE_UNDER.npc, 'Talk-to'))
+
+
+test('Grand Tree gives Daconia to the underground king and confirms it leaves the pack', rock_handoff)

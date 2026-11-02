@@ -4,12 +4,12 @@ What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone add
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
-**Snapshot:** 66,115 of 77,165 lines (85.68%), with 11,050 missed across 294 of 432 files.
+**Snapshot:** 66,156 of 77,165 lines (85.73%), with 11,009 missed across 293 of 432 files.
 Taken on Windows with no game caches, so the real-cache tests were skipped. Scripts under `scripts/` aren't measured.
 
 | Area | Missed lines |
 |---|---:|
-| Quest legs, `quests/defs/` | 10,505 |
+| Quest legs, `quests/defs/` | 10,464 |
 | Everything else, in [Shared code](#shared-code) | 545 |
 
 Almost all of it is quest legs: `decide()` and the journal parsers are ported with rs2b0t's own tests, while the legs
@@ -73,12 +73,12 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [chompybird](#chompybird) | 513 | 51.2% | none |
 | [witchshouse](#witchshouse) | 163 | 78.2% | `witchshouse_runtime` |
 | [hazeelcult](#hazeelcult) | 148 | 58.9% | none |
-| [grandtree](#grandtree) | 109 | 82.6% | `grandtree_legs_runtime` |
 | [druidicritual](#druidicritual) | 96 | 65.2% | `druidicritual_and_monksfriend_runtime` |
 | [elementalworkshop](#elementalworkshop) | 91 | 90.8% | `elementalworkshop_workshop_runtime` |
 | [monksfriend](#monksfriend) | 87 | 62.7% | `druidicritual_and_monksfriend_runtime` |
 | [fishingcontest](#fishingcontest) | 78 | 81.2% | `fishingcontest_runtime` |
 | [fightarena](#fightarena) | 70 | 89.6% | `fightarena_runtime` |
+| [grandtree](#grandtree) | 68 | 89.2% | `grandtree_legs_runtime` |
 | [seaslug](#seaslug) | 68 | 82.0% | `seaslug_runtime` |
 | [deathplateau](#deathplateau) | 67 | 94.5% | `deathplateau_runtime` |
 | [dragonslayer](#dragonslayer) | 65 | 96.3% | none |
@@ -274,9 +274,10 @@ Under 10 each: `areas.py` (4).
 
 #### grandtree
 
+Runtime spec `grandtree_legs_runtime` covers all 251 executable lines in `legs.py`.
+
 | File | Missed | Covered |
 |---|---:|---:|
-| `legs.py` | 41 | 83.7% |
 | `fight.py` | 43 | 29.5% |
 | `journal.py` | 19 | 65.5% |
 
