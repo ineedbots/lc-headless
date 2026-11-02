@@ -4,13 +4,13 @@ What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone add
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
-**Snapshot:** 65,945 of 77,165 lines (85.46%), with 11,220 missed across 294 of 432 files.
+**Snapshot:** 66,236 of 77,165 lines (85.84%), with 10,929 missed across 291 of 432 files.
 Taken on Windows with no game caches, so the real-cache tests were skipped. Scripts under `scripts/` aren't measured.
 
 | Area | Missed lines |
 |---|---:|
-| Quest legs, `quests/defs/` | 10,676 |
-| Everything else, in [Shared code](#shared-code) | 544 |
+| Quest legs, `quests/defs/` | 10,384 |
+| Everything else, in [Shared code](#shared-code) | 545 |
 
 Almost all of it is quest legs: `decide()` and the journal parsers are ported with rs2b0t's own tests, while the legs
 that act on the game aren't. Each quest's legs need a runtime spec against fake facades.
@@ -45,6 +45,7 @@ Coverage work should report these rather than pin them in a test.
 
 | Where | Finding |
 |---|---|
+| `grandtree/journal.py`, `read_grand_tree_stage` | A recognized older page returns its parsed stage even when `last_stage` holds a newer one. The cache stays ahead, but the returned stage can temporarily regress; an unreadable page then returns the newer cached stage again. |
 | `holygrail/legs.py`, `ring_bell` | `RING_STAND` is 2 tiles from `CASTLE_LANDING` and the landing check allows 2, so 6 of the 9 tiles the walk can stop on pass before any teleport. The leg can log that it's inside, and set `inside_castle`, when it isn't. The spec tests from a tile where the check still tells the two apart. |
 | `touristtrap.py`, lines 2448 and 2484 | `leave_camp` here looks unreachable, since `safe_recovery_route` has already answered for both camp areas. |
 
@@ -71,19 +72,18 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [horror](#horror) | 519 | 56.9% | none |
 | [familycrest](#familycrest) | 514 | 56.5% | `familycrest_chronozon_runtime` |
 | [chompybird](#chompybird) | 513 | 51.2% | none |
-| [grandtree](#grandtree) | 280 | 55.3% | none |
 | [witchshouse](#witchshouse) | 163 | 78.2% | `witchshouse_runtime` |
 | [hazeelcult](#hazeelcult) | 148 | 58.9% | none |
 | [druidicritual](#druidicritual) | 96 | 65.2% | `druidicritual_and_monksfriend_runtime` |
 | [elementalworkshop](#elementalworkshop) | 91 | 90.8% | `elementalworkshop_workshop_runtime` |
 | [monksfriend](#monksfriend) | 87 | 62.7% | `druidicritual_and_monksfriend_runtime` |
 | [fishingcontest](#fishingcontest) | 78 | 81.2% | `fishingcontest_runtime` |
-| [fightarena](#fightarena) | 70 | 89.6% | `fightarena_runtime` |
 | [seaslug](#seaslug) | 68 | 82.0% | `seaslug_runtime` |
 | [deathplateau](#deathplateau) | 67 | 94.5% | `deathplateau_runtime` |
 | [dragonslayer](#dragonslayer) | 65 | 96.3% | none |
 | [treegnome](#treegnome) | 64 | 90.4% | `treegnome_runtime` |
 | [waterfall](#waterfall) | 61 | 94.7% | `waterfall_runtime` |
+| [fightarena](#fightarena) | 57 | 91.6% | `fightarena_runtime` |
 | [junglepotion](#junglepotion) | 55 | 79.3% | none |
 | [observatory](#observatory) | 39 | 92.8% | `observatory_runtime` |
 | [lostcity](#lostcity) | 30 | 94.0% | `lostcity_runtime` |
@@ -107,7 +107,7 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [impcatcher](#impcatcher) | 11 | 96.0% | none |
 | [mortton](#mortton) | 11 | 99.2% | `mortton_runtime` |
 
-Also missing fewer than 10 lines each: shilo (9), princeali (8), druidspirit (5), priestperil (5), clocktower (4), doric (4), cooksassistant (3), ernest (3), gertrudescat (2), romeojuliet (2), shieldofarrav (2), tbwt (2), tribaltotem (2), blackknight (1), hetty (1), restlessghost (1), sheepshearer (1).
+Also missing fewer than 10 lines each: shilo (9), princeali (8), druidspirit (5), priestperil (5), clocktower (4), doric (4), cooksassistant (3), ernest (3), gertrudescat (2), romeojuliet (2), shieldofarrav (2), tbwt (2), tribaltotem (2), blackknight (1), grandtree (1), hetty (1), restlessghost (1), sheepshearer (1).
 
 ### By file
 
@@ -274,13 +274,10 @@ Under 10 each: `areas.py` (4).
 
 #### grandtree
 
-| File | Missed | Covered |
-|---|---:|---:|
-| `legs.py` | 212 | 15.5% |
-| `fight.py` | 43 | 29.5% |
-| `journal.py` | 19 | 65.5% |
+Runtime specs `grandtree_legs_runtime` and `grandtree_combat_runtime` cover all executable lines in `legs.py` (251) and `fight.py` (61).
+Runtime spec `grandtree_state_runtime` covers all 55 executable lines in `journal.py`; the quest is 99.8% covered overall.
 
-Under 10 each: `__init__.py` (6).
+Under 10 each: `__init__.py` (1).
 
 #### clocktower
 
@@ -347,7 +344,7 @@ Under 10 each: `__init__.py` (3).
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `fights.py` | 39 | 72.7% |
+| `fights.py` | 26 | 81.8% |
 | `journal.py` | 19 | 71.6% |
 | `__init__.py` | 11 | 93.1% |
 
@@ -541,7 +538,7 @@ and worth less than one in a quest leg. Paths are under `rs2004/`.
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `traversal.py` | 59 | 95.1% |
+| `traversal.py` | 60 | 95.0% |
 | `hunting/supply.py` | 39 | 95.1% |
 | `clues/solve.py` | 37 | 95.1% |
 | `hunting/combat.py` | 33 | 95.3% |
