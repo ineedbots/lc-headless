@@ -4,13 +4,13 @@ What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone add
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
-**Snapshot:** 65,509 of 77,165 lines (84.89%), with 11,656 missed across 294 of 432 files.
+**Snapshot:** 65,945 of 77,165 lines (85.46%), with 11,220 missed across 294 of 432 files.
 Taken on Windows with no game caches, so the real-cache tests were skipped. Scripts under `scripts/` aren't measured.
 
 | Area | Missed lines |
 |---|---:|
-| Quest legs, `quests/defs/` | 11,111 |
-| Everything else, in [Shared code](#shared-code) | 545 |
+| Quest legs, `quests/defs/` | 10,676 |
+| Everything else, in [Shared code](#shared-code) | 544 |
 
 Almost all of it is quest legs: `decide()` and the journal parsers are ported with rs2b0t's own tests, while the legs
 that act on the game aren't. Each quest's legs need a runtime spec against fake facades.
@@ -72,11 +72,8 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [familycrest](#familycrest) | 514 | 56.5% | `familycrest_chronozon_runtime` |
 | [chompybird](#chompybird) | 513 | 51.2% | none |
 | [grandtree](#grandtree) | 280 | 55.3% | none |
-| [clocktower](#clocktower) | 175 | 53.0% | none |
 | [witchshouse](#witchshouse) | 163 | 78.2% | `witchshouse_runtime` |
-| [gertrudescat](#gertrudescat) | 151 | 58.2% | none |
 | [hazeelcult](#hazeelcult) | 148 | 58.9% | none |
-| [tribaltotem](#tribaltotem) | 117 | 58.2% | none |
 | [druidicritual](#druidicritual) | 96 | 65.2% | `druidicritual_and_monksfriend_runtime` |
 | [elementalworkshop](#elementalworkshop) | 91 | 90.8% | `elementalworkshop_workshop_runtime` |
 | [monksfriend](#monksfriend) | 87 | 62.7% | `druidicritual_and_monksfriend_runtime` |
@@ -110,7 +107,7 @@ of those cover a single fix or a part of the quest. Files missing fewer than 10 
 | [impcatcher](#impcatcher) | 11 | 96.0% | none |
 | [mortton](#mortton) | 11 | 99.2% | `mortton_runtime` |
 
-Also missing fewer than 10 lines each: shilo (9), princeali (8), druidspirit (5), priestperil (5), doric (4), cooksassistant (3), ernest (3), romeojuliet (2), shieldofarrav (2), tbwt (2), blackknight (1), hetty (1), restlessghost (1), sheepshearer (1).
+Also missing fewer than 10 lines each: shilo (9), princeali (8), druidspirit (5), priestperil (5), clocktower (4), doric (4), cooksassistant (3), ernest (3), gertrudescat (2), romeojuliet (2), shieldofarrav (2), tbwt (2), tribaltotem (2), blackknight (1), hetty (1), restlessghost (1), sheepshearer (1).
 
 ### By file
 
@@ -287,9 +284,7 @@ Under 10 each: `__init__.py` (6).
 
 #### clocktower
 
-| File | Missed | Covered |
-|---|---:|---:|
-| `clocktower.py` | 175 | 53.0% |
+Under 10 each: `clocktower.py` (4), now 98.9% covered. Runtime spec: `clocktower_legs_runtime`.
 
 #### witchshouse
 
@@ -304,9 +299,7 @@ Under 10 each: `__init__.py` (6).
 
 #### gertrudescat
 
-| File | Missed | Covered |
-|---|---:|---:|
-| `gertrudescat.py` | 151 | 58.2% |
+Under 10 each: `gertrudescat.py` (2), now 99.4% covered. Runtime spec: `gertrudescat_legs_runtime`.
 
 #### hazeelcult
 
@@ -316,9 +309,7 @@ Under 10 each: `__init__.py` (6).
 
 #### tribaltotem
 
-| File | Missed | Covered |
-|---|---:|---:|
-| `tribaltotem.py` | 117 | 58.2% |
+Under 10 each: `tribaltotem.py` (2), now 99.3% covered. Runtime spec: `tribaltotem_legs_runtime`.
 
 #### druidicritual
 
@@ -550,7 +541,7 @@ and worth less than one in a quest leg. Paths are under `rs2004/`.
 
 | File | Missed | Covered |
 |---|---:|---:|
-| `traversal.py` | 60 | 95.0% |
+| `traversal.py` | 59 | 95.1% |
 | `hunting/supply.py` | 39 | 95.1% |
 | `clues/solve.py` | 37 | 95.1% |
 | `hunting/combat.py` | 33 | 95.3% |
