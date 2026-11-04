@@ -1,7 +1,9 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/elementalworkshop/supplies.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
+from rs2004.catalogs.tools import PICKAXES as MINING_PICKS
 from rs2004.game import skills
+from rs2004.geometry import Tile
 from rs2004.quests.defs.elementalworkshop.areas import EW_ITEM, PICKAXES, SEERS_BANK
 from rs2004.quests.weapons import MELEE_WEAPONS, best_banked, best_held, pack_weapon, wielded_weapon
 
@@ -161,10 +163,40 @@ def bank_count_by_name(snap, name):
     return (_v6 if _v6 is not None else 0)
 
 
+def gather_coal(snap, mining_level=None):
+    short = COAL_NEED - held(snap, EW_ITEM.COAL.id)
+    in_bank = banked(snap, EW_ITEM.COAL.id)
+    if short <= in_bank:
+        return None
+    mining = mining_level if mining_level is not None else skills.level('mining')
+    picks = [pick for pick in PICKAXES if any([tool.name == pick.name and mining >= tool.level for tool in MINING_PICKS])]
+    pick = ([pick for pick in picks if held(snap, pick.id) > 0 or _worn_id(snap, pick.id)] or [None])[0]
+    free = snap.free_slots if snap.free_slots is not None else 28
+    if free < short + (0 if pick else 1):
+        keep = [EW_ITEM.BATTERED_BOOK, EW_ITEM.BATTERED_KEY, EW_ITEM.ELEMENTAL_ORE,
+                EW_ITEM.ELEMENTAL_METAL, EW_ITEM.ELEMENTAL_SHIELD, EW_ITEM.COAL] + ([pick] if pick else [])
+        return Record({'kind': 'deposit', 'keep': [item.name for item in keep], 'keep_ids': [item.id for item in keep],
+                       'bank': SEERS_BANK, 'exact_keep': True})
+    if in_bank > 0:
+        return withdraw([{'name': EW_ITEM.COAL.name, 'id': EW_ITEM.COAL.id, 'qty': min(short, in_bank)}])
+    if mining < 30:
+        return Record({'kind': 'wait', 'reason': f'need Mining 30 to mine Coal, or {short} Coal in the bank'})
+    if pick is None:
+        bank_pick = ([pick for pick in picks if banked(snap, pick.id) > 0] or [None])[0]
+        if bank_pick:
+            return withdraw([{'name': bank_pick.name, 'id': bank_pick.id, 'qty': 1}])
+        return Record({'kind': 'grab_ground', 'item': 'Bronze pickaxe', 'anchor': Tile(2963, 3216, 0), 'wait_if_missing': True})
+    return Record({'kind': 'mine_rock', 'rock': 'Coal', 'item': EW_ITEM.COAL.name, 'qty': short, 'anchor': Tile(2581, 3480, 0)})
+
+
 def surface_loadout(snap, need_bellows_fix, need_smelt):
     """Tools and materials needed before committing to the spiral stairs. Bank first: scan, deposit junk, withdraw the missing kit (food and weapon included)."""
     if not snap.bank_known:
         return scan_bank()
+    if need_smelt:
+        coal = gather_coal(snap)
+        if coal:
+            return coal
     # Drop junk before packing so a full pack of misc loot cannot block withdraws.
     # Entry kit can need ~12 free slots (tools + coal + food).
     keep = keep_names_for_entry()
@@ -252,11 +284,6 @@ def surface_loadout(snap, need_bellows_fix, need_smelt):
         return Record({'kind': 'wait', 'reason': 'need a pickaxe in the bank for Elemental ore'})
     if held(snap, EW_ITEM.HAMMER.id) == 0 and banked(snap, EW_ITEM.HAMMER.id) == 0:
         return Record({'kind': 'wait', 'reason': 'need a Hammer in the bank to smith the Elemental shield'})
-    if need_smelt and held(snap, EW_ITEM.COAL.id) < COAL_NEED and banked(snap, EW_ITEM.COAL.id) == 0:
-        return Record({
-            'kind': 'wait',
-            'reason': f'need {COAL_NEED - held(snap, EW_ITEM.COAL.id)} Coal in the bank to smelt Elemental ore',
-        })
     if need_bellows_fix and held(snap, EW_ITEM.THREAD.id) < THREAD_NEED and banked(snap, EW_ITEM.THREAD.id) == 0:
         return Record({'kind': 'wait', 'reason': 'need Thread in the bank to fix the bellows'})
     if need_smelt and not has_weapon(snap) and not best_bank_weapon(snap):

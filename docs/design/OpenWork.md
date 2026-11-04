@@ -9,7 +9,7 @@ Everything found open in this repository on 2026-11-01, for deciding what to do 
 | Item | State | Source |
 |---|---|---|
 | Phase 18: the account leveler | Not started. It's the last parity phase, and its checklist also requires `coverage.py` over all of rs2b0t to report only the "Not ported" table | [BotApiParityDesign.md §12](BotApiParityDesign.md#12-phase-18-the-account-leveler) |
-| Newer rs2b0t commits | Ported from `4417d0b7`. Upstream `main` has 14 commits that it lacks, up to `fc4db259` (2026-11-01). Several bear on ported code: quest recovery (#905, #907, #908), AccountLeveler (#898, #907), random events (#902), multilocs (#899) and FireGiant (#892) | README |
+| Newer rs2b0t commits | Reviewed 17 commits from `32d52004` through `8b7db422` (2026-11-04); selected script, quest, navigation and content fixes applied. Remaining quest recovery, multilocs, Cosmic runecrafting, three-tick fishing, MuleDepot and leveler work are recorded in [the review](Rs2b0tUpstreamReview.md) | README, upstream review |
 | Play Tutorial Island rather than skipping it | Not started. `rs2004/tutorial.py` only asks the guide to skip | README |
 | Stdlib test coverage, including phases 17a and 17e–17i | 84.89% with PR #17; 11,656 lines left | README, [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md) |
 
@@ -17,7 +17,6 @@ Everything found open in this repository on 2026-11-01, for deciding what to do 
 
 | Item | State | Source |
 |---|---|---|
-| Holy Grail's `ring_bell` can report being inside the castle before any teleport | Likely bug, not live-tested: 6 of the 9 tiles the walk can stop on pass the landing check | [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md#known-findings) |
 | JiveKQ stopped once on a third restock with "Could not buy a Shantay pass" | Cause unknown; log the shop's state when it recurs | Status page |
 | A step failing while the character steps between two tiles never parks, as the tile reads as progress | Waiting for a quest to hit it | Status page |
 | A wield swap changes the inventory, so the watchdog can't see a two-step loop (Ikov's melee picker had one) | Needs a watchdog rule when another quest hits it | Status page |

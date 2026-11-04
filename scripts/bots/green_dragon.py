@@ -49,6 +49,7 @@ SETTINGS = {
     'use_potions': SettingDef('boolean', True, 'Drink super attack / strength', group='Combat', show_if=SHOW_MELEE,
                               help="sips a dose mid-fight once the boost decays to within a tenth of the base level; the loadout's carry list sets the dose form and how many flasks per trip, otherwise one Super attack(3) and one Super strength(3)"),
     'loadout': LOADOUT_SETTING,
+    'food': SettingDef('string', '', 'Food', group='Food & healing', help='Blank uses the selected loadout or the site default.'),
     'food_withdraw': SettingDef('number', 20, 'Food to withdraw per bank run', 1, 27, group='Food & healing'),
     'panic_hp': SettingDef('number', 30, 'Escape below HP%', 1, 98, group='Food & healing', help='when out of food and this low, escape to the bank'),
     'food_reserve': SettingDef('number', 4, 'Food kept back from slot-freeing', 0, 27, group='Food & healing',
@@ -526,7 +527,7 @@ class GreenDragon(TaskBot):
         self.use_special = s.bool('use_special', True)
         self.started_at = time.time()
         self.xp_at_start = sum([skills.xp(skill) for skill in GRIND_SKILLS])
-        self.food_name = script_food(s, 'Lobster')
+        self.food_name = s.str('food', '').strip() or script_food(s, 'Lobster')
         self.panic_hp = s.num('panic_hp', 30) / 100
         self.runes_withdraw = s.num('runes_withdraw', 150)
         self.food_withdraw = s.num('food_withdraw', 20)

@@ -1,0 +1,44 @@
+# rs2b0t upstream review
+
+Reviewed on 2026-11-04, from [`32d52004`](https://github.com/rs2b2t/rs2b0t/commit/32d52004724da540f71e0b038331eb97ef455e54), inclusive, through upstream `main` at [`8b7db422`](https://github.com/rs2b2t/rs2b0t/commit/8b7db422). This is a selective port into the existing headless client, not a new claim of complete upstream parity. The original parity baseline remains `4417d0b7`.
+
+The source checkout was read at a pinned detached worktree. Changes were translated into the existing Python API and generator waits; the TypeScript commits cannot be cherry-picked into this C++/pocketpy application. Upstream code and data are MIT licensed; see [the retained license](../../thirdparty/rs2b0t/LICENSE).
+
+## Commit decisions
+
+| Commit | Upstream change | Decision |
+|---|---|---|
+| `32d52004` (#892) | FireGiant full-pack bank loop | Applied. Count inventory slots holding loot the bank would deposit, excluding food, entry kit, escape runes, required spell runes and bones selected for burial. Fullness alone banks only above one such slot; food and combat-supply triggers remain active. |
+| `9bafd4df` (#898) | AccountLeveler dragon progression and rune supplies | Applied the independent GreenDragon/JiveDragons food override, preserving loadout/site fallback when blank. AccountLeveler itself is still phase 18; its adapters, dragon planning and Paladin supplies are deferred with it. The Dragon Slayer Wilderness-plank switch is also deferred with the leveler's policy settings. |
+| `bfa997a8` (#894) | Browser multibox roster modal | Not applicable to the terminal client. Account files and console account management remain its roster interface. |
+| `d721cfa4` (#900) | Browser e2e drift-check success reporting | Not applicable: this repository has no corresponding browser e2e runner/report format. |
+| `5d506832` (#901) | Smithing and FireGiant banking regressions | Added FireGiant bank-trigger and supply/loot overlap regressions. The smithing test describes the existing banked-bar path; retained our existing smithing and quest nail tests. |
+| `682a84cd` (#902) | Random-event dialogue NPC ownership | Applied at dialogue selection as well as detection, with tests for a nearer NPC owned by another player and a scene containing only another player's event. |
+| `169ee2d2` (#903) | NatureCrafter renamed JiveRC; Cosmic route | Deferred as a feature port. Cosmic needs matching altar identity, inside meeting coordinates, a dialogue banker and Dramen-staff retention together. Adding only a route to our NatureCrafter would mistake Zanaris's underground bank for an altar. Browser roster/settings migration is not applicable. |
+| `54aeed35` (#904) | Revision 289 content lookups | Applied the cooking-surface, drop-table, item-name collision and untradeable-list updates through our exporter, replacing only those tables. Existing unrelated catalog and quest records were preserved. |
+| `1c563f41` (#899) | Varbit-selected multilocs | Deferred as a native feature. Our `LocTypeDecoder` currently skips opcode 77; there is no retained multiloc selector, child list or varbit catalog. The upstream resolver also separates base interaction identity from visible child identity. That model must be added to cache decoding, live state, entity snapshots and collision together, with revision 225/274 coverage; copying the rendering-client resolver alone cannot fix it here. |
+| `1a718285` (#868) | MuleCrafter trade completion and task refactor | Applied the independent stable-closure fix on both trade roles, and retain the crafter's partner name before the trade header disappears. Tests simulate an inactive-screen gap followed by an active screen and then sustained closure. The larger inside-altar meeting/banking/task redesign remains a feature port. |
+| `ae56ccc9` (#905) | Quest inventory preparation and recovery | Applied banked Ghostspeak-amulet recovery and Lost City's corrected Entrana bounds/food shortfall. Nature Spirit's silver-smelting skill gate and Demon Slayer's completed-bones hand-in condition already exist here. Retained local sealed-area and inventory fixes. The remaining resume-inventory planner, combat staff preparation and quest-specific acquisition changes are follow-ups below. |
+| `b17e837b` (#907) | More quest recovery, navigation and leveler work | Applied Demon Slayer's banked bones, Gertrude's Cat's server-position/line-of-sight brother check, Holy Grail's exact bell landing and owned-Excalibur handling, Ikov's worn-equipment stock count, and Scorpion Catcher's banked barcrawl card. Refreshed navigation data for fortress ladders/dialogue, Mining Guild gates, Melzar's Maze and Elemental Workshop exits. Our equipment-aware provisioning and sealed-area resume ordering already cover part of the engine change. Remaining quest/engine work is below; leveler/UI changes stay with their respective subsystems. |
+| `4c4d03e1` (#908) | Source quest coal and dragon bones | Applied Elemental Workshop coal acquisition: banked stock first, enough free slots, Mining 30 gate, usable banked/carried/worn pickaxe, bronze ground-spawn fallback and coal-rock mining. Watchtower's blue-dragon hunt is deferred: it introduces a quest-owned combat host and bank-refresh lifecycle and must be ported with its exit/restart tests. |
+| `fc4db259` (#912) | Three-tick fly fishing | Deferred as a feature port. It depends on animation-start tick tracking in the native player snapshot plus the full knife/log provisioning and timing state machine. Existing tick-manipulation profiles remain unchanged. |
+| `d4640686` (#910) | Bot UI management, wool spinning, amulet stringing | Applied exact raw-fibre matching in inventory and bank, and JiveCrafting's amulet-stringing mode. The mode uses exact unstrung/strung ids, unnoted pairs, partial bank loads and the nearest bank. Existing crafting settings default to jewellery as before. Browser management changes do not apply. |
+| `8de83411` (#878) | MuleDepot shared bank bot | Deferred as a new bot port: its persistent shared-stock ledger, dump/supply protocol and bank/trade/movement tasks have no existing MuleDepot here. It is not a replacement for MuleCrafter or NatureCrafter. |
+| `8b7db422` (#875) | WildyAgility lap timing | Applied removal of the post-success settle delay and its unused random-delay helper. Retained our timeout setting and existing retry/food/pit behavior. Upstream's repeated per-tick obstacle clicking and retry redesign need a separate live timing check on this client's scheduler. No upstream lap-time claim is made for the headless client. |
+
+## Remaining quest work
+
+The two broad quest-recovery commits contain additional useful changes. They are deliberately recorded here rather than marking those commits wholly ported:
+
+- Engine: resumed-inventory preparation and item caps, refusing to move to another quest when a sealed-area owner is not selected, completed-area recovery, and stricter handling of failed preparation/retreat. Keep our existing death recovery, watchdog and local quest exits when adapting these changes.
+- Shared combat: staff provisioning and the updated strike/combat setup, plus deposit-step refinements. Their food, staff and inventory changes affect several quests together.
+- Quest acquisition: Family Crest fish/ruby sourcing, Goblin Diplomacy combat/redberries, Rune Mysteries junk handling, Knight's Sword inventory preparation, Waterfall food, and Watchtower's dragon-bone hunt. Preserve existing live-tested alternatives rather than replacing whole modules with translated upstream files.
+- Quest execution: Black Knights' Fortress progress, Merlin's Crystal routes/crate/Excalibur/crystal, Fight Arena release/combat recovery, Horror from the Deep exits, Sheep Herder herding, Shilo scroll/key/completion recovery, and the remaining Dragon Slayer/Ikov changes.
+
+These are follow-ups, along with the new features identified in the table; this review does not close phase 18 or all newer-upstream work.
+
+## Validation
+
+Regression tests live in `tests/Stdlib/rs2b0t/test_upstream_script_regressions.py`, `quests/test_upstream_quest_recovery.py` and the existing random-event/quest workflow suites. The same embedded pocketpy VM runs them as account scripts. Navigation data was generated with our existing stair fixes and crossing additions, preserving the local engine adjustments. The changed catalog tables were regenerated separately so unrelated catalog differences could not overwrite local work.
+
+Validation passed: Windows x64 Release build; all 800 registered Release CTest cases (26 cache-dependent cases skipped); a separate real-cache run with revisions 225, 274 and 289 (26 cases, 482 assertions); the changed-file port linter; and the traced Debug suite. Stdlib line coverage is 97.88% (75,621 / 77,256), with all 432 files meeting the 95% minimum. No new live-server or lap-timing run is claimed; CI supplies Linux and Windows x86 builds.

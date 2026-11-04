@@ -98,6 +98,7 @@ SETTINGS = {
     'pray_melee': SettingDef('boolean', True, 'Pray Protect from Melee on the metal dragons', group='Combat', show_if=SHOW_MELEE,
                              help='the metal dragons stop at ten tiles and breathe, so melee walks to one and fights beside it, where it headbutts for up to 22; the overhead makes that 0 and the shield with a dose takes the close breath. Needs 43 Prayer'),
     'loadout': LOADOUT_SETTING,
+    'food': SettingDef('string', '', 'Food', group='Food & healing', help='Blank uses the selected loadout or the site default.'),
     'food_withdraw': SettingDef('number', 20, 'Food to withdraw per bank run', 1, 27, group='Food & healing'),
     'panic_hp': SettingDef('number', 30, 'Panic-to-bank below HP%', 1, 98, group='Food & healing', help='out of food and this low, the run leaves the lair for the bank'),
     'retreat_hp': SettingDef('number', 50, 'Retreat to a safespot below HP%', 0, 99, group='Food & healing',
@@ -769,7 +770,7 @@ class JiveDragons(TaskBot):
         self.weapon_picked = self.combat_style == 'melee' and self.weapon == BEST_WEAPON
         if self.weapon_picked:
             self.weapon = melee_weapon_held() or ''
-        self.food = script_food(s, site.food or 'Lobster')
+        self.food = s.str('food', '').strip() or script_food(s, site.food or 'Lobster')
         self.leave_walk = s.str('leave_via', 'teleport') == 'walk'
         escape = 'walk out' if self.leave_walk else escape_runes_for(site.escape_teleport_id).label
         self.bury = s.bool('bury_bones', False) and site.bones != 'Ashes'

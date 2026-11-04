@@ -312,7 +312,7 @@ class BankRun(Task):
             return True
         if not bot.has_food() and not bot.bank_empty:
             return True
-        return inventory.is_full()
+        return inventory.is_full() and bot.bankable_loot_slots() > 1
 
     def execute(self):
         bot = self.bot
@@ -924,6 +924,18 @@ class FireGiant(TaskBot):
         """What the deposit holds back. The spell and escape runes aren't kept, since the withdrawals put back the
         set amount and a trip leaves with a known quantity."""
         return combat_keep_names(self.food_name, self.style, ammo=self.ammo, weapon=self.weapon, extra=[AMULET, ROPE])
+
+    def bankable_loot_slots(self):
+        kit = set([name.lower() for name in self.keep_names()])
+        for rune, count in self.tele.runes:
+            kit.add(rune.lower())
+        if self.style == 'mage':
+            for entry in rune_withdraw_list(self.spell, self.wielded_names(), 1):
+                kit.add(entry['rune'].lower())
+        return len([item for item in inventory.items()
+                    if item.name and item.name.lower() not in kit
+                    and not (self.bury_bones and item.name.lower() == 'big bones')
+                    and (item.name.lower() in self.loot_set or (self.bank_common and matches_common_bank_loot(item.name)))])
 
     def has_escape_runes(self):
         if self.use_barrel:

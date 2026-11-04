@@ -70,7 +70,7 @@ def workshop_loadout():
     snap.inv = {'odd sword': 1}
     expect(workshop.has_held_slash_tool(snap)).to_be(True)
     snap.inv = {}
-    for fn, reason in [[lambda: workshop.surface_loadout(snap, True, True), 'pickaxe'],
+    for fn, reason in [[lambda: workshop.surface_loadout(snap, True, True), 'Mining 30'],
                        [lambda: workshop.surface_loadout(snap, False, False), 'Hammer']]:
         expect(fn().reason).to_contain(reason)
     snap.inv_ids[workshop.PICKAXES[0].id] = 1

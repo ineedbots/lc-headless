@@ -7,12 +7,14 @@ from rs2004.geometry import Tile
 from rs2004.items import inventory
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.runemysteries import WIZARD_HOPS
-from rs2004.quests.engine.types import QuestModule, quest_step
+from rs2004.quests.engine.types import QuestModule, banked_id, quest_step
 from rs2004.quests.exec.primitives import NpcStop, talk_through, walk_with_hops
 
 __all__ = ['AMULET', 'SKULL', 'AERECK', 'URHNEY', 'decide', 'restlessghost']
 
 AMULET = 'Ghostspeak amulet'
+AMULET_ID = 552
+DRAYNOR_BANK = Tile(3093, 3243, 0)
 SKULL = 'Skull'
 
 AERECK = NpcStop('Father Aereck', Tile(3244, 3206, 0), 6, ["I'm looking for a quest!"])
@@ -96,6 +98,10 @@ def decide(snap):
         return quest_step('custom', name='return skull', run=return_skull)
     amulet = AMULET.lower()
     if amulet not in snap.inv and amulet not in snap.worn:
+        if not snap.bank_known:
+            return quest_step('scan_bank', bank=DRAYNOR_BANK)
+        if banked_id(snap, AMULET_ID) > 0:
+            return quest_step('withdraw', items=[{'name': AMULET, 'id': AMULET_ID, 'qty': 1}], bank=DRAYNOR_BANK)
         return quest_step('talk', stop=URHNEY)
     if amulet not in snap.worn:
         return quest_step('equip', item=AMULET)
@@ -104,7 +110,7 @@ def decide(snap):
 
 restlessghost = QuestModule(
     record=quest_record('priest'),
-    bank=Tile(3093, 3243, 0),
+    bank=DRAYNOR_BANK,
     tools=['ghostspeak amulet', 'skull'],
     hops=WIZARD_HOPS,
     decide=decide,

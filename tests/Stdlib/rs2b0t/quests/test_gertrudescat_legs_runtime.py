@@ -297,6 +297,7 @@ test('Gertrude searches all six crates, follows corner waypoints and skips a blo
 
 def brothers_world():
     scene = world(cat.MARKET)
+    spy_on(cat._core, 'line_of_sight', returns=True)
     scene.npc('Shilop', ['Talk-to'], tile=cat.MARKET)
     scene.npc('Wilough', ['Talk-to'], tile=cat.MARKET)
     scene.coins = scene.item(995, 'Coins', count=1000)
@@ -343,6 +344,7 @@ def paying_brothers():
     expect(scene.clock >= cat.PAY_ATTEMPTS * 60000).to_be(True)
     scene = brothers_world()
     scene.npcs[1]._fields['tile'] = lambda: cat.YARD_HUB
+    scene.npcs[1]._fields['network_tile'] = lambda: cat.YARD_HUB
     expect(run_wait(cat.pay_brothers(scene.log))).to_be(False)
     expect(scene.logged('never wandered within earshot')).to_be(True)
     expect(scene.opened).to_be(0)
@@ -350,6 +352,19 @@ def paying_brothers():
     scene.walk_ok = False
     expect(run_wait(cat.pay_brothers(scene.log))).to_be(False)
     expect(scene.opened).to_be(0)
+
+
+def brothers_within_server_range():
+    scene = brothers_world()
+    scene.npcs[1]._fields['network_tile'] = lambda: Tile(cat.MARKET.x + 3, cat.MARKET.z, 0)
+    expect(run_wait(cat.pay_brothers(scene.log))).to_be(True)
+    scene = brothers_world()
+    spy_on(cat._core, 'line_of_sight', returns=False)
+    expect(run_wait(cat.pay_brothers(scene.log))).to_be(False)
+    expect(scene.opened).to_be(0)
+
+
+test('the brothers can be three tiles apart with line of sight but cannot hear through a wall', brothers_within_server_range)
 
 
 test('Gertrude pays only paired brothers and verifies the coin debit, with bounded retries', paying_brothers)

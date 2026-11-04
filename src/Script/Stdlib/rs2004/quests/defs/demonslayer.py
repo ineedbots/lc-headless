@@ -356,6 +356,15 @@ def decide(snap):
     draw = [{'name': 'Key', 'id': id, 'qty': 1} for id in keys if banked.get(id, 0) > 0 and carried.get(id, 0) == 0]
     if draw:
         return Record({'kind': 'withdraw', 'items': draw})
+    if carried.get(ROVIN_KEY_ID, 0) > 0 and carried.get(TRAIBORN_KEY_ID, 0) == 0:
+        missing = BONES_NEEDED - carried.get(BONES_ID, snap.inv.get('bones', 0))
+        room = snap.free_slots if snap.free_slots is not None else 28
+        if missing > 0 and room > 0:
+            if not snap.bank_known:
+                return Record({'kind': 'scan_bank'})
+            qty = min(missing, banked.get(BONES_ID, (snap.bank or {}).get('bones', 0)), room)
+            if qty > 0:
+                return Record({'kind': 'withdraw', 'items': [{'name': 'Bones', 'id': BONES_ID, 'qty': qty}]})
     return Record({'kind': 'custom', 'name': 'key hunt', 'run': key_hunt})
 
 

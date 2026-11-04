@@ -2,6 +2,8 @@
 
 Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's "As built" section there has the detail; this page is the summary and the list of what's still open.
 
+The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective port of newer commits from `32d52004` through `8b7db422`, including the remaining feature and quest work. It does not replace the original parity baseline or close phase 18.
+
 ## Phases
 
 | Phase | What | State |
