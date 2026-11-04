@@ -70,8 +70,7 @@ def stone_toward(dest, spent, log):
 
     def _fn4():
         return pick.loc.interact(pick.op)
-        if False:
-            yield
+        yield
     return Record({
         'send': _fn4,
         'arrived': lambda: near(at, 1),
@@ -109,8 +108,7 @@ def take_trapped_orb(log):
         trigger = find_trigger()
         op = ((trigger.actions() if trigger is not None else None) or [None])[0]
         return trigger is not None and op is not None and trigger.interact(op)
-        if False:
-            yield
+        yield
     arrived = yield from corridor_hop(UP_TILE.LOGTRAP, 'the hanging-log trigger', lambda: find_trigger() is not None, _fn6, lambda: near(UP_TILE.LOGTRAP, 1), log)
     if not arrived:
         # Why: the trigger is deleted for 50 ticks once its orb is taken, so absent while standing on it means burned; absent from across the corridor only means out of the build area.
@@ -158,8 +156,7 @@ def take_ground_orb(orb, tile, log):
     def _fn8():
         drop = find_drop()
         return drop is not None and drop.interact('Take')
-        if False:
-            yield
+        yield
     took = yield from corridor_hop(tile, f'the Orb of light at ({tile.x},{tile.z})', lambda: find_drop() is not None, _fn8, lambda: held_id(orb.id) > 0, log)
     if took:
         return True
@@ -192,8 +189,7 @@ def burn_orbs(log):
                 furnace = find_furnace()
                 item = ([inv for inv in inventory.items() if inv.id == orb.id] or [None])[0]
                 return furnace is not None and item is not None and item.use_on(furnace)
-                if False:
-                    yield
+                yield
             gone = yield from corridor_hop(UP_TILE.FURNACE, f'the {orb.name} on the furnace', lambda: find_furnace() is not None, _fn9, lambda: held_id(orb.id) == 0, log)
             if not gone:
                 log(f'the furnace would not take orb {orb.id} on pass {pass_ + 1}')
@@ -246,8 +242,7 @@ def enter_well(log):
         well = find_well()
         op = ((well.actions() if well is not None else None) or [None])[0]
         return well is not None and op is not None and well.interact(op)
-        if False:
-            yield
+        yield
     climbed = yield from corridor_hop(UP_TILE.WELL, 'the well', lambda: find_well() is not None, _fn17, down, log)
     # Why: `cave_well` runs 3 zero-tick delays before the teleport, so the descent can land a tick after the journey has given up.
     _c18 = climbed

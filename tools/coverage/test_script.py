@@ -83,6 +83,22 @@ class ScriptReportTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "no executed stdlib lines"):
             script.merge(self.manifest, self.raw)
 
+    @patch("builtins.print")
+    def test_coverage_gate_accepts_exactly_95_percent_and_empty_modules(self, output):
+        counts = {"boundary.py": dict.fromkeys(range(19), 1) | {19: 0}, "empty.py": {}}
+        self.assertTrue(script.coverage_passes(counts))
+
+    @patch("builtins.print")
+    def test_coverage_gate_does_not_round_up_or_hide_a_file_in_the_total(self, output):
+        counts = {"large.py": dict.fromkeys(range(100000), 1),
+                  "short.py": {1: 1, 2: 0},
+                  "rounded.py": dict.fromkeys(range(18999), 1) | dict.fromkeys(range(18999, 20000), 0)}
+        self.assertFalse(script.coverage_passes(counts))
+        message = output.call_args.args[0]
+        self.assertIn("short.py: 1/2", message)
+        self.assertIn("rounded.py: 18999/20000 (95.00%)", message)
+        self.assertNotIn("large.py:", message)
+
 
 if __name__ == "__main__":
     unittest.main()
