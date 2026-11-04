@@ -487,7 +487,7 @@ class Scene:
         return True
         yield
 
-    def _walk(self, dest, radius=0, attempts=0, timeout_ms=0, log=None):
+    def _walk(self, dest, radius=0, attempts=0, timeout_ms=0, log=None, avoid_zones=None):
         self.walks.append(dest)
         if not self.walk_ok or dest in self.no_walk:
             return False

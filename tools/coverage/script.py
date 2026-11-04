@@ -15,6 +15,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 STDLIB = ROOT / "src" / "Script" / "Stdlib"
+MINIMUM_FILE_COVERAGE = 95
 STYLE = """body{font:15px system-ui;margin:2rem;color:#202124}a{color:#1558a6}
 table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:.25rem .6rem;border-bottom:1px solid #ddd}
 pre{margin:0;white-space:pre-wrap}tr.hit{background:#e6f4ea}tr.miss{background:#fce8e6}
@@ -69,6 +70,21 @@ def merge(manifest_path, raw):
 
 def percent(covered, total):
     return 100 * covered / total if total else 100.0
+
+
+def coverage_passes(counts):
+    failures = []
+    for name, lines in sorted(counts.items()):
+        covered = sum(value > 0 for value in lines.values())
+        total = len(lines)
+        # Compare the counts, since rounding 94.995% for display must not pass the gate.
+        if covered * 100 < total * MINIMUM_FILE_COVERAGE:
+            failures.append(f"{name}: {covered}/{total} ({percent(covered, total):.2f}%)")
+    if failures:
+        print(f"Script coverage below {MINIMUM_FILE_COVERAGE}% per file:\n" + "\n".join(failures), flush=True)
+        return False
+    print(f"All {len(counts)} stdlib files meet {MINIMUM_FILE_COVERAGE}% line coverage.", flush=True)
+    return True
 
 
 def page(title, body, stylesheet="style.css"):
@@ -155,7 +171,8 @@ def collect(binary, output, parallel, preset):
     counts = merge(output / "manifest.json", raw)
     report(counts, output, partial=result.returncode != 0)
     print(f"HTML report: {output / 'html' / 'index.html'}", flush=True)
-    return result.returncode
+    passed = coverage_passes(counts)
+    return result.returncode or (0 if passed else 1)
 
 
 def main():
