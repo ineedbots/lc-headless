@@ -33,6 +33,31 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client, std::move(net)}
     , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger}
 {
+    const auto& experience = m_config->scripting;
+    if (!experience.experienceDirectory.empty() && experience.experienceIntervalMinutes > std::chrono::minutes::zero())
+    {
+        m_experience.emplace(std::filesystem::path{experience.experienceDirectory}, m_account.name, experience.experienceIntervalMinutes, m_logger);
+    }
+
+    if (!m_config->scripting.bankLogDirectory.empty())
+    {
+        // The bank is the cache's, so this needs no script and works for every bot.
+        m_bankLog.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.bankLogDirectory});
+    }
+
+    if (!m_config->scripting.inventoryDirectory.empty())
+    {
+        m_inventory.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.inventoryDirectory},
+                            ItemLog::Kind_e::Backpack, m_config->scripting.inventoryIntervalSeconds);
+    }
+
+    if (!m_config->scripting.equipmentDirectory.empty())
+    {
+        // Worn equipment changes rarely, so every change is worth a line.
+        m_equipment.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.equipmentDirectory},
+                            ItemLog::Kind_e::Equipment, 0s);
+    }
+
     if (m_account.script)
     {
         const auto& scripting = m_config->scripting;
@@ -152,12 +177,23 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
     try
     {
-        if (StepRelog(Clock::now()))
+        const auto now = Clock::now();
+        const auto status = m_client.GetStatus();
+
+        // Before the early returns below: a logout, a disconnect and a relog are states worth recording too.
+        // Settled, not merely in game: the stats arrive a tick after the player is placed.
+        if (m_experience)
+        {
+            const auto& state = m_client.GetState();
+            m_experience->Step(now, state, status, state.IsSettled());
+        }
+
+        if (StepRelog(now))
         {
             return;
         }
 
-        const auto ended = m_client.GetStatus() == ClientStatus_e::LoggedOut || m_client.GetStatus() == ClientStatus_e::Disconnected;
+        const auto ended = status == ClientStatus_e::LoggedOut || status == ClientStatus_e::Disconnected;
         if (ended && !IsStopping())
         {
             if (m_options.client.connectAttempts == 0)
@@ -173,13 +209,11 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
         UpdateFinished();
 
-        const auto status = m_client.GetStatus();
         if (m_finished || status == ClientStatus_e::LoggingOut)
         {
             return;
         }
 
-        const auto now = Clock::now();
         if (m_script)
         {
             StepScript(now);
@@ -187,6 +221,24 @@ void Account::Step(std::chrono::milliseconds maxWait)
         else if (status == ClientStatus_e::InGame)
         {
             StepIdle(now);
+        }
+
+        if (status == ClientStatus_e::InGame)
+        {
+            if (m_bankLog)
+            {
+                m_bankLog->Step(m_client.GetState());
+            }
+
+            if (m_inventory)
+            {
+                m_inventory->Step(now, m_client.GetState());
+            }
+
+            if (m_equipment)
+            {
+                m_equipment->Step(now, m_client.GetState());
+            }
         }
 
         if (!m_finished && m_killDeadline && now >= *m_killDeadline)

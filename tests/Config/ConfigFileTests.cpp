@@ -70,7 +70,13 @@ namespace
         "minRetryDelaySeconds": 3,
         "maxRetryDelaySeconds": 45,
         "reloginDelaySeconds": 120,
-        "progressDirectory": "reports"
+        "progressDirectory": "reports",
+        "experienceDirectory": "xp",
+        "experienceIntervalMinutes": 15,
+        "bankLogDirectory": "banks",
+        "inventoryDirectory": "bags",
+        "inventoryIntervalSeconds": 0,
+        "equipmentDirectory": "worn"
     }
 }
 )json"sv;
@@ -112,7 +118,13 @@ namespace
         "minRetryDelaySeconds": 2,
         "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
-        "progressDirectory": "progress"
+        "progressDirectory": "progress",
+        "experienceDirectory": "experience",
+        "experienceIntervalMinutes": 1,
+        "bankLogDirectory": "bank",
+        "inventoryDirectory": "inventory",
+        "inventoryIntervalSeconds": 5,
+        "equipmentDirectory": "equipment"
     }
 }
 )json"sv;
@@ -187,6 +199,7 @@ namespace
         {"scripting", "maxRetryDelaySeconds"},
         {"scripting", "reloginDelaySeconds"},
         {"scripting", "progressDirectory"},
+        {"scripting", "experienceDirectory"},
     };
 
     nlohmann::json ParseJsonWithComments(std::string_view text)

@@ -220,7 +220,7 @@ scripts/                      bot scripts: bots/, examples/, and typings/ for ed
 accounts/                     account files (ignored by git) and the sample file
 ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0
 docs/                         user guides, scripting reference, and design/ for designs and protocol references
-tools/                        data exporters for rs2b0t's walker and catalogs, and docker/ for the Linux build check
+tools/                        data exporters for rs2b0t's walker and catalogs, docker/ for the Linux build check, and fleet/ for the local fleet view
 thirdparty/                   licenses of the projects code was ported from
 ```
 
