@@ -157,9 +157,10 @@ TEST_CASE("rs2b0t's ported Python tests pass at full size", "[.][Slow]")
 
     for (const auto& file : files)
     {
-        CAPTURE(file.filename().string());
-
-        auto fixture = StdlibFixture{SCRIPTS_FOLDER, 1h};
-        Rs2b0tSpecs::Run(fixture.vm, file);
+        DYNAMIC_SECTION(file.filename().string())
+        {
+            auto fixture = StdlibFixture{SCRIPTS_FOLDER, 1h};
+            Rs2b0tSpecs::Run(fixture.vm, file);
+        }
     }
 }

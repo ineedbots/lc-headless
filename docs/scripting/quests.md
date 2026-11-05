@@ -386,3 +386,11 @@ AIOQuester's `hero_partner` names the character running the other gang, since th
 ## The barcrawl
 
 `bots/barcrawl.py` banks for coins, obtains Alfred Grimhand's card, visits all ten bars nearest first and hands the signed card to the Barbarian Outpost guard. It has no settings. `rs2004.quests.barcrawl.run_barcrawl.ensure_barcrawl(log, on_progress=None)` is the same tour for another bot or quest; `on_progress(signed, total)` reports the card's progress. The caller supplies coins (`BARCRAWL_GP` in `barcrawl_logic` includes travel money). `read_card(log=None)` returns a record with `remaining` bars and `done`, or `None` when unreadable. Both functions are generators. A completed card's refusal to Read because the character is too drunk counts as fully signed.
+
+
+AIOQuester's `gather_wilderness_planks` boolean defaults to `true`. Set it to `false` to
+prevent Dragon Slayer's supply gatherer from collecting Wilderness planks, including a
+partial ship repair or later replacement. The delegated bot restores the previous gather
+policy on stop. AccountLeveler forwards its Wilderness setting to this option.
+Witch's House checks for a usable fire staff before buying Fire Strike runes, and preserves
+fire staves while preparing inventory.

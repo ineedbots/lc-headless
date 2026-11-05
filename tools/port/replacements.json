@@ -1,0 +1,537 @@
+[
+    {
+        "module": "event/webwalk/PathFinder.ts",
+        "exports": [
+            "PathFinder"
+        ],
+        "implementation": "src/Game/Nav/WorldPathFinder.cpp",
+        "anchor": "WorldPathFinder::"
+    },
+    {
+        "module": "event/webwalk/activateStateAware.ts",
+        "exports": [
+            "activateTransportRows"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/data/dangerZones.ts",
+        "exports": [
+            "knownDangerZone",
+            "knownDangerZoneIds"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/walkgeom.py",
+        "anchor": "def known_danger_zones("
+    },
+    {
+        "module": "event/webwalk/data/specialCrossings.ts",
+        "exports": [
+            "SPECIAL_CROSSINGS",
+            "specialCrossingAt",
+            "meetsRequirement",
+            "meetsSkill",
+            "matchesUseItem"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/routeplan.py",
+        "anchor": "def special_crossing_for_transport("
+    },
+    {
+        "module": "event/webwalk/desertMiningCampDoors.ts",
+        "exports": [
+            "DESERT_MINING_CAMP_REPLACED_DOOR_IDS"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/edgeId.ts",
+        "exports": [
+            "transportEdgeId",
+            "ensureEdgeId"
+        ],
+        "implementation": "src/Game/Nav/NavGraph.cpp",
+        "anchor": "NavGraph::"
+    },
+    {
+        "module": "event/webwalk/essenceExit.ts",
+        "exports": [
+            "essenceReturnStateIndex",
+            "essenceReturnIdFromStateIndex",
+            "ESSENCE_EXIT_PORTALS",
+            "essenceReturnIdFromPacked",
+            "essenceExitEdges"
+        ],
+        "implementation": "src/Game/Nav/NavRequires_s.cpp",
+        "anchor": "NavRequires_s::"
+    },
+    {
+        "module": "event/webwalk/exec/doorCrossing.ts",
+        "exports": [
+            "DOOR_AVOID_STRIKES",
+            "noteFailedDoor",
+            "pickNearbyDoorTile",
+            "questLockDoorTileNearPlayer",
+            "barrierLooksOpen",
+            "crossingTiming",
+            "crossMultiTileDoor"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _handle_transport("
+    },
+    {
+        "module": "event/webwalk/exec/specialCrossing.ts",
+        "exports": [
+            "shouldSceneStepToTile",
+            "arrivalDialogueResolved",
+            "hasEntranaRestrictedGear",
+            "handleSpecialCrossing"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _handle_transport("
+    },
+    {
+        "module": "event/webwalk/exec/transportLoc.ts",
+        "exports": [
+            "matchesTransportLoc",
+            "transportLocValid",
+            "matchesTransportLanding",
+            "multiLandingNeedsRepath",
+            "awaitTransportLoc",
+            "openShutTrapdoor"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _handle_transport("
+    },
+    {
+        "module": "event/webwalk/fromV1.ts",
+        "exports": [
+            "doorToTransportEdges",
+            "v1TransportToEdge",
+            "compileV1Graph",
+            "activeEdges"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/geometry/edgeCosts.ts",
+        "exports": [
+            "RUN_TILES_PER_TICK",
+            "WALK_TILES_PER_TICK",
+            "TILE_STEP_COST",
+            "TILE_STEP_COST_WALK",
+            "ticksToCost",
+            "RUN_ENERGY_MAX",
+            "runEnergyRecoverPerTick",
+            "runEnergyDrainPerRunTick",
+            "approxRunTilesBeforeEmpty",
+            "SPELL_TELEPORT_COST",
+            "JEWELLERY_TELEPORT_COST",
+            "BANK_WITHDRAW_COST",
+            "DEFAULT_EDGE_COST",
+            "edgeCostForKind",
+            "teleportEdgeCost"
+        ],
+        "implementation": "src/Game/Nav/WorldPathFinder.cpp",
+        "anchor": "WorldPathFinder::"
+    },
+    {
+        "module": "event/webwalk/geometry/lcCoord.ts",
+        "exports": [
+            "parseLcCoord",
+            "lcCoord",
+            "packCoord",
+            "unpackCoord",
+            "packNavPoint"
+        ],
+        "implementation": "src/Game/Nav/NavGraph.cpp",
+        "anchor": "NavGraph::"
+    },
+    {
+        "module": "event/webwalk/geometry/lineOfSight.ts",
+        "exports": [
+            "hasLineOfSightLocal"
+        ],
+        "implementation": "src/Game/Query/ReachQuery.cpp",
+        "anchor": "ReachQuery::"
+    },
+    {
+        "module": "event/webwalk/geometry/localReach.ts",
+        "exports": [
+            "canStepLocal",
+            "canReachLocal"
+        ],
+        "implementation": "src/Game/Query/ReachQuery.cpp",
+        "anchor": "ReachQuery::"
+    },
+    {
+        "module": "event/webwalk/geometry/pathExpand.ts",
+        "exports": [
+            "expandChebyshevSegment",
+            "localBfsPath",
+            "expandSegment",
+            "remainingPathFromPlayer"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/walkgeom.py",
+        "anchor": "def expand_waypoints("
+    },
+    {
+        "module": "event/webwalk/hops.ts",
+        "exports": [
+            "hopsFromWaypoints",
+            "formatHops"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/walkgeom.py",
+        "anchor": "def expand_waypoints("
+    },
+    {
+        "module": "event/webwalk/iceQueenRockslide.ts",
+        "exports": [
+            "ICE_QUEEN_ROCKSLIDE_ID",
+            "iceQueenRockslideEdges"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/loadTransportGraph.ts",
+        "exports": [
+            "allDoorRows",
+            "allTransportRows",
+            "loadDefaultNavEdges"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/locRef.ts",
+        "exports": [
+            "locPlacementKey",
+            "locRefFromTransport",
+            "locRefFromDoor",
+            "matchesLocRef",
+            "probeLocRef",
+            "locRefValid",
+            "locRefStale"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _handle_transport("
+    },
+    {
+        "module": "event/webwalk/plannedEdge.ts",
+        "exports": [
+            "plannedEdge",
+            "isAdjacentSameLevel"
+        ],
+        "implementation": "src/Game/Nav/WorldPathFinder.cpp",
+        "anchor": "WorldPathFinder::"
+    },
+    {
+        "module": "event/webwalk/policy.ts",
+        "exports": [
+            "DEFAULT_DISTANCE_BEFORE_TELEPORT",
+            "kindAllowedByPolicy",
+            "teleportAllowedByPolicy",
+            "routeSpanChebyshev"
+        ],
+        "implementation": "src/Game/Nav/WorldPathFinder.cpp",
+        "anchor": "WorldPathFinder::"
+    },
+    {
+        "module": "event/webwalk/requires.ts",
+        "exports": [
+            "hasGatingRequires",
+            "isEdgeAllowed"
+        ],
+        "implementation": "src/Game/Nav/NavRequires_s.cpp",
+        "anchor": "NavRequires_s::"
+    },
+    {
+        "module": "event/webwalk/routeState.ts",
+        "exports": [
+            "RouteState"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _handle_transport("
+    },
+    {
+        "module": "event/webwalk/rsmod/CollisionEngine.ts",
+        "exports": [
+            "CollisionEngine"
+        ],
+        "implementation": "src/Game/Map/WorldMap.cpp",
+        "anchor": "WorldMap::"
+    },
+    {
+        "module": "event/webwalk/rsmod/CollisionStrategy.ts",
+        "exports": [
+            "canMove"
+        ],
+        "implementation": "src/Game/Map/WorldMap.cpp",
+        "anchor": "WorldMap::"
+    },
+    {
+        "module": "event/webwalk/rsmod/StepValidator.ts",
+        "exports": [
+            "canTravel"
+        ],
+        "implementation": "src/Game/Map/WorldMap.cpp",
+        "anchor": "WorldMap::"
+    },
+    {
+        "module": "event/webwalk/rsmod/collision.ts",
+        "exports": [
+            "changeLandCollision",
+            "changeLocCollision",
+            "changeRoofCollision"
+        ],
+        "implementation": "src/Game/Map/WorldMap.cpp",
+        "anchor": "WorldMap::"
+    },
+    {
+        "module": "event/webwalk/rsmod/flags.ts",
+        "exports": [
+            "DirectionFlag",
+            "CollisionType",
+            "LocAngle",
+            "LocLayer",
+            "LocShape",
+            "locShapeLayer"
+        ],
+        "implementation": "src/Game/Map/WorldMap.cpp",
+        "anchor": "WorldMap::"
+    },
+    {
+        "module": "event/webwalk/slashTool.ts",
+        "exports": [
+            "WEB_SLASHED_NAME",
+            "WEB_SLASH_SUCCESS",
+            "WEB_SLASH_FAIL",
+            "WEB_SLASH_NO_BLADE",
+            "classifyWebSlashChat"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/routeplan.py",
+        "anchor": "def special_crossing_for_transport("
+    },
+    {
+        "module": "event/webwalk/specialRequires.ts",
+        "exports": [
+            "specialRequiresAt"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/stateAwareRequires.ts",
+        "exports": [
+            "STATE_AWARE_ACTIVATIONS",
+            "activationForEdge",
+            "isStateDeferredReason"
+        ],
+        "implementation": "src/Game/Nav/NavRequires_s.cpp",
+        "anchor": "NavRequires_s::"
+    },
+    {
+        "module": "event/webwalk/teleportCatalog.ts",
+        "exports": [
+            "SPELL_TELEPORTS",
+            "JEWELLERY_TELEPORTS",
+            "LEVER_TELEPORTS",
+            "ALL_TELEPORT_DESTINATIONS",
+            "teleportDestinationsToEdges",
+            "inventoryNameMatchesJewellery",
+            "teleportAllowedFromOrigin"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/transportQuestReqs.ts",
+        "exports": [
+            "TRANSPORT_QUEST_SEEDS",
+            "canonicalQuestName",
+            "richTransportQuestMap",
+            "transportQuestSetvarCommands",
+            "transportQuestJournalNames"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/travelCatalog.ts",
+        "exports": [
+            "SPIRIT_TREE",
+            "ENTRANA_LAND",
+            "CART_BRIMHAVEN",
+            "CART_SHILO",
+            "ESSENCE_RETURN",
+            "ESSENCE_MINE_PAD",
+            "WILDY_LEVER",
+            "TRAVEL_STANDS",
+            "spiritTreeEdges",
+            "gliderEdges",
+            "entranaFerryEdges",
+            "shiloCartEdges",
+            "shiloGateEdges",
+            "essenceEntryEdges",
+            "wildyLeverEdges",
+            "mageArenaBarrierEdges",
+            "handelmortDoorEdges",
+            "agilityShortcutEdges",
+            "elkoyMazeEdges",
+            "desertMiningCampEdges",
+            "curatedTravelEdges",
+            "TRAVEL_FAMILIES"
+        ],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "activateTransportRows"
+    },
+    {
+        "module": "event/webwalk/types.ts",
+        "exports": [
+            "isTeleportKind"
+        ],
+        "implementation": "src/Game/Nav/WorldPathFinder.cpp",
+        "anchor": "WorldPathFinder::"
+    },
+    {
+        "module": "event/webwalk/walkLadder.ts",
+        "exports": [
+            "initialLadderState"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _handle_transport("
+    },
+    {
+        "module": "event/webwalk/worldStateData.ts",
+        "exports": [
+            "worldStateFromData",
+            "emptyWorldStateData"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def world_state("
+    },
+    {
+        "module": "event/webwalk/worldStateLive.ts",
+        "exports": [
+            "snapshotWorldStateData",
+            "snapshotWorldState"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def world_state("
+    },
+    {
+        "module": "runtime/ScriptRunner.ts",
+        "exports": [
+            "loopReadyOrDetached",
+            "stopReasonOf"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/_runtime.py",
+        "anchor": "def step("
+    },
+    {
+        "module": "runtime/randomevents/RandomEvents.ts",
+        "exports": [
+            "pickEventNear",
+            "eventNpcTargetsAnotherPlayer",
+            "isHostileEventNpc"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_events.py",
+        "anchor": "def _pick("
+    },
+    {
+        "module": "runtime/randomevents/maze/mazeGraph.ts",
+        "exports": [
+            "MAZE_SPAWNS",
+            "parseJm2Locs",
+            "solveRoute"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_solvers.py",
+        "anchor": "def build_maze("
+    },
+    {
+        "module": "runtime/randomevents/maze/mazeLayout.ts",
+        "exports": [
+            "MAZE_LAYOUT_STRIDE",
+            "MAZE_LAYOUT"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_solvers.py",
+        "anchor": "def build_maze("
+    },
+    {
+        "module": "runtime/randomevents/maze/mazeWalk.ts",
+        "exports": [
+            "walkTowards"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_solvers.py",
+        "anchor": "def build_maze("
+    },
+    {
+        "module": "runtime/randomevents/maze/selectRoute.ts",
+        "exports": [
+            "selectRoute"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_solvers.py",
+        "anchor": "def build_maze("
+    },
+    {
+        "module": "runtime/randomevents/solvers/Mime.ts",
+        "exports": [
+            "MIME_IF",
+            "MIME_EMOTE_BY_SEQ",
+            "performMimeStage"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_solvers.py",
+        "anchor": "def perform_mime("
+    },
+    {
+        "module": "runtime/randomevents/solvers/StrangeBox.ts",
+        "exports": [
+            "closeBankAndShop"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/random_solvers.py",
+        "anchor": "def _close_bank_and_shop("
+    },
+    {
+        "module": "data/cookLocations.ts",
+        "exports": [
+            "buildCookLocations",
+            "findCookLocation"
+        ],
+        "implementation": "tools/catalogs/export_rs2b0t.ts",
+        "anchor": "COOK_LOCATIONS"
+    },
+    {
+        "module": "data/cookingRanges.ts",
+        "exports": [
+            "listFishCampRangePathCases"
+        ],
+        "implementation": "tools/catalogs/export_rs2b0t.ts",
+        "anchor": "COOK_LOCATIONS"
+    },
+    {
+        "module": "data/fishingLocations.ts",
+        "exports": [
+            "resolveLocation"
+        ],
+        "implementation": "tools/catalogs/export_rs2b0t.ts",
+        "anchor": "COOK_LOCATIONS"
+    },
+    {
+        "module": "runtime/defineBot.ts",
+        "exports": [
+            "isBotManifest"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/_runtime.py",
+        "anchor": "isinstance(manifest, BotManifest)"
+    },
+    {
+        "module": "client/config/worlds.ts",
+        "exports": [
+            "resolveWorldNumber"
+        ],
+        "implementation": "src/Script/Stdlib/rs2004/game.py",
+        "anchor": "def world("
+    }
+]

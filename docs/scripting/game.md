@@ -8,6 +8,7 @@ Your own state, and actions on yourself.
 
 | Method | Gives |
 |---|---|
+| `game.world()` | Configured `server.world`, or 0 when unknown; independent of login state |
 | `game.ingame()` | Logged in and placed in the world, so the map is built and actions are taken |
 | `game.scene_ready()`, `game.scene_state()` | rs2b0t's: `ingame()`, and 2 once placed or 0 before |
 | `game.tile()` | Your [`Tile`](geometry.md#tile), or `None` before you're placed |

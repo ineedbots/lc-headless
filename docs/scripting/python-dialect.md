@@ -234,3 +234,14 @@ Coordinates differ between RSC and 2004, so every tile in a script changes. An `
 | `is_appearance_screen()`, `send_appearance_update(...)` | `game.appearance_screen_open()`, `game.set_appearance(female, kits, colours)` |
 
 Fatigue, sleeping, the sleepword and raw packets don't exist.
+
+
+Phase 18 maps `scripts/AccountLeveler/*.ts` to `scripts/bots/account_leveler/*.py`,
+with `AccountLeveler.ts` in `bot.py` and a `bots/leveler.py` entry. Imports resolve selected
+child manifests instead of the browser's `ScriptRegistry`; planner memory uses
+`settings_store` instead of desktop storage. Its local mutable `Record` also supports
+item/skill indexing, unlike the immutable catalog records.
+`runtime/optionSelection.ts` maps to `rs2004.settings.selected_options` and
+`signed_options`. Empty selection enables all options; signed tokens use last-token wins,
+case-insensitive matching and the catalog's order. An explicit negative-only selection can
+select nothing. These helpers are also available in script builtins.

@@ -13,6 +13,7 @@ from rs2004 import tutorial as _tutorial
 from rs2004 import upkeep as _upkeep
 from rs2004.bot import AbstractBot, BotManifest, LoopingBot, is_generator, resolve_loop_cadence
 from rs2004.execution import Ticks, Update, event_signal
+from rs2004.game import game
 from rs2004.settings import GLOBAL, GLOBAL_SETTINGS, SettingsBag, apply_schema, bot_settings_path, schema_defaults
 from rs2004.settings import select_bot_settings, settings_store
 from rs2004.random_events import random_events
@@ -278,11 +279,12 @@ def command(name, text, args):
         raise TypeError(f"the {name} command's handler can't wait; set a flag and do the work in loop()")
 
 
-def configure(random_events_on, stall_minutes, run_auto, run_energy_min):
+def configure(random_events_on, stall_minutes, run_auto, run_energy_min, world=0):
     """The account file's choices for upkeep: randomEvents, stallMinutes, runAuto and runEnergyMin."""
     global _random_events_on, _stall_minutes
     _random_events_on = random_events_on
     _stall_minutes = stall_minutes
+    game._world = world
     _upkeep.run_manager.configure(run_auto, run_energy_min)
     _upkeep.stall_guard.configure(stall_minutes)
     _upkeep.stall_guard.reset(_core.step_time())

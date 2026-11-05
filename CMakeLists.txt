@@ -117,7 +117,8 @@ target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     Catch2::Catch2WithMain)
 
 include(Catch)
-set(TEST_TIMEOUT 120)
+# The combined ported specs include the account-leveler adapter and camp matrices.
+set(TEST_TIMEOUT 300)
 # Why: every rs2b0t spec file runs in one case, which takes over 260 seconds under tracing.
 if(RS2004_ENABLE_SCRIPT_COVERAGE)
     set(TEST_TIMEOUT 900)

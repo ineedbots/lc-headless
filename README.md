@@ -51,7 +51,6 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 ## TODO
 
 - Remove this section when points are completed
-- Phase 18 of the rs2b0t parity design (account leveler)
 - Check and implement newer rs2b0t's commits
 - Do tutorial island, not just skipping it
 

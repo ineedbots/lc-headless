@@ -8,8 +8,7 @@ Everything found open in this repository on 2026-11-01, for deciding what to do 
 
 | Item | State | Source |
 |---|---|---|
-| Phase 18: the account leveler | Not started. It's the last parity phase, and its checklist also requires `coverage.py` over all of rs2b0t to report only the "Not ported" table | [BotApiParityDesign.md §12](BotApiParityDesign.md#12-phase-18-the-account-leveler) |
-| Newer rs2b0t commits | Reviewed 17 commits from `32d52004` through `8b7db422` (2026-11-04); selected script, quest, navigation and content fixes applied. The quest recovery follow-up is implemented. Remaining multilocs, Cosmic runecrafting, three-tick fishing, MuleDepot and leveler work are recorded in [the review](Rs2b0tUpstreamReview.md) | README, upstream review |
+| Newer rs2b0t commits | Reviewed 17 commits from `32d52004` through `8b7db422` (2026-11-04); selected script, quest, navigation and content fixes applied. The quest recovery follow-up is implemented. Remaining multilocs, Cosmic runecrafting, three-tick fishing and MuleDepot work are recorded in [the review](Rs2b0tUpstreamReview.md) | README, upstream review |
 | Play Tutorial Island rather than skipping it | Not started. `rs2004/tutorial.py` only asks the guide to skip | README |
 | Stdlib test coverage, including phases 17a and 17e–17i | 84.89% with PR #17; 11,656 lines left | README, [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md) |
 

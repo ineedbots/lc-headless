@@ -227,3 +227,26 @@ def _fn36():
 
 
 describe('witchshouse module wiring', _fn36)
+
+
+def fire_staff_preparation():
+    from rs2004.quests.defs.witchshouse import fire_staff, KEEP
+    s = snap()
+    s.magic = 13
+    s.attack = 1
+    s.inv['coins'] = 2000
+    expect(fire_staff(s).kind).to_be('buy')
+    s.inv_ids[1387] = 1
+    expect(fire_staff(s).kind).to_be('equip')
+    s.inv_ids[1387] = 0
+    s.bank_ids[1387] = 1
+    expect(fire_staff(s).kind).to_be('withdraw')
+    s.bank_ids[1387] = 0
+    s.worn_ids.add(1387)
+    expect(fire_staff(s)).to_be_null()
+    s.worn_ids.clear()
+    s.inv['fire rune'] = 450
+    expect(fire_staff(s)).to_be_null()
+    expect('staff of fire' in KEEP).to_be(True)
+
+test('Witch House prepares and preserves a usable fire staff', fire_staff_preparation)

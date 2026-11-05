@@ -342,7 +342,8 @@ void ScriptHost::LoadBot()
     py_newint(py_r1(), m_options.stallMinutes.count());
     py_newbool(py_r2(), m_options.runAuto);
     py_newint(py_r3(), m_options.runEnergyMin);
-    static_cast<void>(m_vm->CallBuiltin(CONFIGURE, std::array{py_r0(), py_r1(), py_r2(), py_r3()}));
+    py_newint(py_r4(), m_options.world);
+    static_cast<void>(m_vm->CallBuiltin(CONFIGURE, std::array{py_r0(), py_r1(), py_r2(), py_r3(), py_r4()}));
 }
 
 void ScriptHost::Unload()

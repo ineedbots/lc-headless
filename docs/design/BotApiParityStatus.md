@@ -2,7 +2,7 @@
 
 Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's "As built" section there has the detail; this page is the summary and the list of what's still open.
 
-The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective port of newer commits from `32d52004` through `8b7db422`, including the remaining feature and quest work. It does not replace the original parity baseline or close phase 18.
+The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective port of newer commits from `32d52004` through `8b7db422`, including the remaining feature and quest work. It does not replace the original parity baseline; phase 18 is implemented and validated separately below.
 
 ## Phases
 
@@ -16,7 +16,7 @@ The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective 
 | 15 | The clue engine and ClueSolver, wired into the seven bots that carry clues | Done, with the open items below |
 | 16 | The quest engine and the free-to-play quests, in sub-phases 16a–16c ([BotApiParityQuestPhases.md](BotApiParityQuestPhases.md)) | 16a done (the engine, seven quests, AIOQuester), with the open items below; 16b done (nine more quests, garlic and Karamja fare recovery); 16c done (paired Arrav, Dragon Slayer, supplier, barcrawl and the fresh-account eighteen-quest queue) |
 | 17 | The members' quests, in sub-phases 17a–17i | 17a done: all twelve quests completed in one live queue, and both gatherers banked full loads; 17b done: all nine quests completed in one live queue; 17c done: all five quests completed in one live queue, and ClimbingBoots ran live; 17d done: all four quests completed in one live queue; 17e done: all four quests completed in one live queue; 17f done: all five quests completed in one live queue; 17g done: two partners finished Hero's Quest and one queue finished the other two; 17h done: Underground Pass and Regicide completed in one live queue; 17i done: Legends Quest completed in one live queue, and ClueSolver finished a trail from the Kharazi Jungle and one from Isafdar |
-| 18 | The account leveler | Not started |
+| 18 | The account leveler | Done: tests and full export audit pass; two active hours on one fresh account across multiple child methods, in three measured sessions (see design for limits) |
 
 ## What's in place
 

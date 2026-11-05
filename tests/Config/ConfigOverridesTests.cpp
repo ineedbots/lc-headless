@@ -23,10 +23,11 @@ TEST_CASE("ConfigOverrides puts an account's server in place of client.jsonc's",
     auto shared = Config_s{};
     shared.server.host = "shared";
     shared.scripting.scriptsDirectory = "shared-scripts";
+    shared.server.world = 10;
     const auto config = std::make_shared<const Config_s>(shared);
 
     auto account = AccountConfig_s{};
-    account.server = ServerSettings_s{.transport = Transport_e::Wss, .host = "own", .port = 443, .origin = "https://own"};
+    account.server = ServerSettings_s{.transport = Transport_e::Wss, .host = "own", .port = 443, .world = 1, .origin = "https://own"};
 
     const auto own = ConfigOverrides::ForAccount(config, account);
 
@@ -34,9 +35,11 @@ TEST_CASE("ConfigOverrides puts an account's server in place of client.jsonc's",
     CHECK(own->server.transport == Transport_e::Wss);
     CHECK(own->server.host == "own");
     CHECK(own->server.port == 443);
+    CHECK(own->server.world == 1);
     CHECK(own->server.origin == "https://own");
     CHECK(own->scripting.scriptsDirectory == "shared-scripts");
     CHECK(config->server.host == "shared");
+    CHECK(config->server.world == 10);
 }
 
 TEST_CASE("ConfigOverrides puts an account's proxy in place of client.jsonc's", "[ConfigOverrides]")
