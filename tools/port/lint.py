@@ -547,7 +547,69 @@ def lint(path):
     finder = Finder(path)
     finder.visit(tree)
     found = finder.found + nested_ternaries(tree, source) + implicit_concatenation(path) + parenthesised_targets(path) + bracketed_adjacent_fields(path) + unicode_escapes(path) + two_level_closures(source, path) + rebound_outer_names(tree) + loop_closures(tree) + shadowed_callees(tree)
-    return sorted(set(found + undefined_names(tree, path) + shadowed_methods(tree)))
+    return sorted(set(found + undefined_names(tree, path) + shadowed_methods(tree) + none_set_membership(tree)))
+
+
+def none_set_membership(tree):
+    """Reject statically known None/set combinations without rejecting None in lists or dictionaries."""
+    bindings = {}
+
+    def scope_of(node):
+        while not isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            node = node.parent
+        return node
+
+    def bind(scope, name, value):
+        bindings.setdefault((scope, name), []).append(value)
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    bind(scope_of(node), target.id, node.value)
+        elif isinstance(node, ast.arg):
+            bind(scope_of(node), node.arg, None)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bind(scope_of(node), alias.asname or alias.name.split('.')[0], None)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            bind(scope_of(node.parent), node.name, None)
+
+    def lookup(scope, name):
+        while True:
+            key = (scope, name)
+            if key in bindings:
+                return key
+            if isinstance(scope, ast.Module):
+                return None
+            scope = scope_of(scope.parent)
+
+    def is_set(node, scope, seen):
+        if isinstance(node, (ast.Set, ast.SetComp)):
+            return True
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'set':
+            return lookup(scope, 'set') is None
+        if not isinstance(node, ast.Name):
+            return False
+        key = lookup(scope, node.id)
+        if key is None or key in seen:
+            return False
+        values = bindings[key]
+        return all(value is not None and is_set(value, key[0], seen | {key}) for value in values)
+
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Set) and any(isinstance(value, ast.Constant) and value.value is None for value in node.elts):
+            found.append((node.lineno, 'None is unhashable in pocketpy sets; use a list or exclude None'))
+        if not isinstance(node, ast.Compare):
+            continue
+        left = node.left
+        for op, right in zip(node.ops, node.comparators):
+            if isinstance(op, (ast.In, ast.NotIn)) and isinstance(left, ast.Constant) and left.value is None and is_set(right, scope_of(node), set()):
+                found.append((node.lineno, 'None is unhashable in pocketpy sets; guard against None before membership'))
+            left = right
+    return found
 
 
 def files(paths):
@@ -614,9 +676,22 @@ def _own_yields(fn):
 
 def _hands_back(fn, generators):
     """A function that returns another's generator without driving it, as `return walk_to(...)` does."""
-    for node in ast.walk(fn):
-        if isinstance(node, ast.Return) and isinstance(node.value, ast.Call):
-            callee = node.value.func
+    stack = list(fn.body)
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            stack.extend(ast.iter_child_nodes(node))
+        if not isinstance(node, ast.Return):
+            continue
+        values = [node.value]
+        while values:
+            value = values.pop()
+            if isinstance(value, ast.IfExp):
+                values.extend([value.body, value.orelse])
+                continue
+            if not isinstance(value, ast.Call):
+                continue
+            callee = value.func
             if isinstance(callee, ast.Name) and callee.id in generators:
                 return True
             if isinstance(callee, ast.Attribute) and callee.attr == 'walk_resilient':
@@ -639,11 +714,20 @@ def undriven_generators(trees, roots):
     generators = {}
     for path, tree in trees.items():
         generators[path] = {n.name for n in tree.body if isinstance(n, ast.FunctionDef) and _own_yields(n)}
-    for _ in range(3):
+    while True:
+        changed = False
+        by_module = {_module_name(path, roots): names for path, names in generators.items()}
         for path, tree in trees.items():
+            known = set(generators[path])
+            for node in tree.body:
+                if isinstance(node, ast.ImportFrom) and node.module in by_module:
+                    known |= {alias.asname or alias.name for alias in node.names if alias.name in by_module[node.module]}
             for n in tree.body:
-                if isinstance(n, ast.FunctionDef) and _hands_back(n, generators[path]):
+                if isinstance(n, ast.FunctionDef) and n.name not in generators[path] and _hands_back(n, known):
                     generators[path].add(n.name)
+                    changed = True
+        if not changed:
+            break
     by_module = {_module_name(path, roots): names for path, names in generators.items()}
     found = {}
     for path, tree in trees.items():
@@ -665,6 +749,14 @@ def undriven_generators(trees, roots):
                 tested = [parent.left] + parent.comparators
             elif isinstance(parent, ast.Expr):
                 tested = [parent.value]
+            elif isinstance(parent, ast.Return) and isinstance(parent.value, ast.IfExp):
+                values = [parent.value]
+                while values:
+                    value = values.pop()
+                    if isinstance(value, ast.IfExp):
+                        values.extend([value.body, value.orelse])
+                    else:
+                        tested.append(value)
             for node in tested:
                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in known:
                     found.setdefault(path, []).append((node.lineno, f'{node.func.id}() makes a generator, which does nothing until driven; use yield from'))
