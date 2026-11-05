@@ -19,8 +19,8 @@ def _fn1():
         step = bread_plan(snap(100), 40, 0)
         expect(step.kind).to_be('buy')
         expect((step).item).to_be('Bread')
-        expect((step).shop.npc).to_be('Wydin')
-    test('buys Bread from Wydin when funded', _fn2)
+        expect((step).shop.npc).to_be('Baker')
+    test('buys Bread from the Baker when funded', _fn2)
 
     def _fn3():
         step = bread_plan(snap(0), 1, 0)
@@ -28,4 +28,4 @@ def _fn1():
     test('parks when broke (buyOrWait), never loops a bare buy', _fn3)
 
 
-describe('breadPlan: Wydin buy (baker stall has no bread in rev 274)', _fn1)
+describe('breadPlan: Baker bread supply', _fn1)

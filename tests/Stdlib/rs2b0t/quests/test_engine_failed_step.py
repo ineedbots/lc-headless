@@ -171,7 +171,7 @@ def fixture():
     spy_on(execution, 'delay_ticks', impl=instant_ticks)
     spy_on(execution, 'delay_until', impl=answer_true)
     stub(sheepshearer, read_stage=lambda: 0, decide=lambda snap: quest_step('custom', name='next quest', run=next_quest_run))
-    stub(runemysteries, decide=fixture_decide)
+    stub(runemysteries, read_stage=None, decide=fixture_decide)
     engine = QuestEngine(host)
     for id in ['runemysteries', 'sheep']:
         engine._provisioned.add(id)
@@ -512,6 +512,8 @@ test('a worn mustHave item counts as held', _worn_supplies)
 
 
 def _goblin_progress():
+    from rs2004.navigation import reachability
+    spy_on(reachability, 'can_reach', returns=True)
     from rs2004.entities import npcs, ground_items
     from rs2004.catalogs.tasks import sustain
     from rs2004.quests.defs.goblindiplomacy import _farm_goblin_mail_tick

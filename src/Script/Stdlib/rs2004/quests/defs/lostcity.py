@@ -109,7 +109,7 @@ def lost_city_area(tile):
         return 'zanaris'
     if tile.x >= 2790 and tile.x <= 2900 and tile.z >= 9650 and tile.z <= 9850:
         return 'dungeon'
-    if tile.x >= 2790 and tile.x <= 2880 and tile.z >= 3290 and tile.z <= 3440:
+    if tile.x >= 2790 and tile.x <= 2880 and tile.z >= 3290 and tile.z <= 3391:
         return ('entranaShip' if tile.level > 0 else 'entrana')
     return 'mainland'
 
@@ -241,7 +241,7 @@ def source_combat_food(snap):
     if in_bank < missing:
         return Record({
             'kind': 'wait',
-            'reason': f'need {missing} more {food} in the bank ({LOST_CITY_FOOD_TARGET} combat food total)',
+            'reason': f'need {missing - in_bank} more {food} in the bank ({LOST_CITY_FOOD_TARGET} combat food total)',
         })
     space = make_acquisition_space(snap, missing)
     if space:
@@ -441,7 +441,7 @@ def sail_to_entrana(log):
 
     def _fn32():
         tile = game.tile()
-        return tile is not None and tile.x >= 2790 and tile.x <= 2880 and tile.z >= 3290 and tile.z <= 3440
+        return lost_city_area(tile) in ['entrana', 'entranaShip']
     _result31 = yield from execution.delay_until(_fn32, 30000)
     return _result31
 

@@ -278,9 +278,9 @@ def reads_the_scrolls():
     scroll = island.hold(SV_ITEM.TATTERED_SCROLL, interact=lambda op: False)
     expect(run_wait(read(island.log))).to_be(False)
     scroll._fields['interact'] = lambda op: True
-    spy_on(ahzarhoon, 'drive_choice', impl=lambda prefer, log: result(False))
+    spy_on(ahzarhoon, 'drive_until', impl=lambda *args: result(False))
     expect(run_wait(read(island.log))).to_be(False)
-    spy_on(ahzarhoon, 'drive_choice', impl=lambda prefer, log: result(True))
+    spy_on(ahzarhoon, 'drive_until', impl=lambda *args: result(True))
     modal = [355]
     spy_on(reader, 'modals', impl=lambda: Fake(main=modal[0]))
     closed = []
@@ -292,7 +292,7 @@ def reads_the_scrolls():
     spy_on(_core, 'close_interfaces', impl=close)
     expect(run_wait(read(island.log))).to_be(True)
     expect(closed).to_equal([1])
-    expect(run_wait(read(island.log))).to_be(True)
+    expect(run_wait(read(island.log))).to_be(False)
     expect(closed).to_equal([1])
 
 

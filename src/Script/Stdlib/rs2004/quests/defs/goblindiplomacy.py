@@ -3,6 +3,9 @@
 import _core
 from rs2004 import execution
 from rs2004.catalogs.record import Record
+from rs2004.catalogs.tables import item_db
+from rs2004.quests.weapons import wieldable, quest_done
+from rs2004.quests.defs.goblindiplomacy_redberries import acquire_redberries
 from rs2004.catalogs.tasks import sustain
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import ground_items, npcs
@@ -340,7 +343,7 @@ def earn_goblin_diplomacy_coins(log):
 def food_acquisition_space(snap, slots):
     if snap.free_slots is None or snap.free_slots >= slots:
         return None
-    mail = ['goblin mail', 'orange goblin mail', 'blue goblin mail']
+    mail = ['goblin mail', 'orange goblin mail', 'blue goblin mail', 'blue dye', 'orange dye', 'red dye', 'yellow dye', 'woad leaf', 'redberries', 'onion']
     with_food = ['coins'] + list(mail) + list([name.lower() for name in combat_food_names()])
     has_spillover = any([not (name.lower() in with_food) for name in list(list(snap.inv.keys()))])
     return Record({
@@ -356,6 +359,28 @@ def goblin_mail_gather_step(snap, need=1):
     held_coins = qty(snap, 'coins')
     if not in_goblin_mail_field(snap.tile):
         reset_goblin_mail_combat()
+    if not snap.bank_known:
+        return Record({'kind': 'scan_bank', 'bank': DRAYNOR_BANK})
+    banked_mail = (snap.bank or {}).get('goblin mail', 0)
+    if banked_mail > 0:
+        space = food_acquisition_space(snap, min(need, banked_mail))
+        return space or Record({'kind': 'withdraw', 'items': [{'name': 'Goblin mail', 'qty': min(need, banked_mail)}], 'bank': DRAYNOR_BANK})
+    if held_coins >= GOBLIN_DIPLOMACY_QUEST_COIN_RESERVE:
+        for weapon in wieldable(snap.attack if snap.attack is not None else skills.level('attack'), quest_done, True):
+            worn = weapon.id in (snap.worn_ids or set()) or weapon.name.lower() in snap.worn
+            carried = (snap.inv_ids or {}).get(weapon.id, snap.inv.get(weapon.name.lower(), 0))
+            banked = (snap.bank_ids or {}).get(weapon.id, (snap.bank or {}).get(weapon.name.lower(), 0))
+            if not worn and not carried and not banked:
+                continue
+            if worn:
+                break
+            if carried:
+                record = ([item for item in item_db() if item.id == weapon.id] or [None])[0]
+                displaced = set([item.slot for item in item_db() if item.slot in ['righthand', 'lefthand'] and (item.id in (snap.worn_ids or set()) or item.name.lower() in snap.worn)])
+                if record is not None and record.two_handed and len(displaced) > (snap.free_slots if snap.free_slots is not None else 28) + 1:
+                    return food_acquisition_space(snap, len(displaced) - 1)
+                return Record({'kind': 'equip', 'item': weapon.name})
+            return food_acquisition_space(snap, max(need + 2, 3)) or Record({'kind': 'withdraw', 'items': [{'name': weapon.name, 'id': weapon.id, 'qty': 1}], 'bank': DRAYNOR_BANK})
     make_mail_space = food_acquisition_space(snap, max(1, need) + ((0 if held_coins > 0 else 1)))
     if make_mail_space:
         return make_mail_space
@@ -373,15 +398,36 @@ def goblin_mail_gather_step(snap, need=1):
 
 
 def farm_goblin_mail(log):
-    # A disengage grace period or a kill without a mail drop is still part of the same gathering attempt.
-    # Returning every tick let the quest watchdog park it before the five-second combat grace expired.
+    global goblin_mail_rejected_target_index, goblin_mail_rejected_until
     before = inventory.count('Goblin mail')
     deadline = _core.step_time() + 90000
+    last_target = None
+    last_health = None
+    last_xp = sum([skills.xp(skill) for skill in ['attack', 'strength', 'defence', 'ranged', 'magic', 'hitpoints']])
+    last_offense = _core.step_time()
     while _core.step_time() < deadline:
         if execution.event_signal.pending():
             return False
         if inventory.count('Goblin mail') > before:
             return True
+        target = ([npc for npc in npcs.all() if npc.index == goblin_mail_target_index] or [None])[0]
+        xp = sum([skills.xp(skill) for skill in ['attack', 'strength', 'defence', 'ranged', 'magic', 'hitpoints']])
+        if target is None or target.index != last_target or xp > last_xp or (last_health is not None and target.health < last_health):
+            last_offense = _core.step_time()
+        if target is not None and target.health == 0 and target.max_health > 0:
+            execution.note_progress()
+            release_goblin_mail_target()
+            yield from execution.delay_ticks(2)
+            return True
+        if target is not None and _core.step_time() - last_offense >= 30000:
+            log(f'no damage or XP against Goblin {target.index} for 30s — choosing another target')
+            goblin_mail_rejected_target_index = target.index
+            goblin_mail_rejected_until = _core.step_time() + GOBLIN_REJECT_MS
+            release_goblin_mail_target()
+            return False
+        last_target = target.index if target is not None else None
+        last_health = target.health if target is not None else None
+        last_xp = xp
         yield from _farm_goblin_mail_tick(log)
         yield from sustain.run()
         yield from execution.delay_ticks(1)
@@ -431,7 +477,7 @@ def _farm_goblin_mail_tick(log):
         yield from execution.delay_ticks(2)
         release_goblin_mail_target()
         return False
-    attacker = npcs.query().name('Goblin').action('Attack').within(15).where(lambda npc: npc.targets_me() and npc.tile().distance_to(GOBLIN_FARM) <= 18).nearest()
+    attacker = npcs.query().name('Goblin').action('Attack').within(15).where(lambda npc: npc.targets_me() and npc.tile().distance_to(GOBLIN_FARM) <= 18 and not (npc.index == goblin_mail_rejected_target_index and _core.step_time() < goblin_mail_rejected_until) and reachability.can_reach(npc.tile(), adjacent_ok=True)).nearest()
     if attacker and (attacker.index != goblin_mail_target_index or goblin is None):
         goblin_mail_target_index = attacker.index
         goblin_mail_target_engaged = False
@@ -542,12 +588,8 @@ def make_orange_dye(log):
         return True
     if not inventory.contains('Red dye'):
         if inventory.count('Redberries') < 3:
-            before = inventory.count('Redberries')
-            _result29 = yield from execute_step(Record({'kind': 'buy', 'item': 'Redberries', 'qty': 3 - before, 'shop': PORT_SARIM_SHOP, 'est_gp': 60}), [], log)
-            # Wydin stocks one berry. An empty shelf must wait for restocking before retrying the quest step.
-            if inventory.count('Redberries') == before:
-                yield from execution.delay_ticks(20)
-            return _result29
+            result = yield from acquire_redberries(log)
+            return result
         if inventory.count('Coins') < 5:
             log('need ~5 coins for red dye')
             return False

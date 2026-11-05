@@ -2,7 +2,7 @@
 
 from rs2004.catalogs.record import Record
 from rs2004.geometry import Tile
-from rs2004.quests.defs.watchtower.areas import WT_ITEM, WT_TILE
+from rs2004.quests.defs.watchtower.areas import RELIC_PARTS, WT_ITEM, WT_TILE
 from rs2004.quests.food import quest_food
 
 __all__ = ['ARDOUGNE_ADVENTURER', 'MAGIC_GUILD', 'VARROCK_RUNES', 'OGRE_HERBLORE', 'held', 'banked', 'owned', 'withdraw_from', 'scan_bank', 'source', 'bank_only', 'source_coins', 'source_rope', 'source_death_rune', 'source_vial', 'source_pestle', 'source_pickaxe', 'source_light_source', 'carried_food', 'source_food', 'make_room', 'quest_kit']
@@ -38,7 +38,7 @@ def owned(snap, id):
     return held(snap, id) + banked(snap, id)
 
 
-KIT_ITEMS = [
+KIT_ITEMS = list(RELIC_PARTS) + [
     WT_ITEM.ROPE,
     WT_ITEM.LIT_CANDLE,
     WT_ITEM.VIAL_WATER,

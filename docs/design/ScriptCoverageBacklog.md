@@ -44,8 +44,9 @@ Coverage work should report these rather than pin them in a test.
 | Where | Finding |
 |---|---|
 | `grandtree/journal.py`, `read_grand_tree_stage` | A recognized older page returns its parsed stage even when `last_stage` holds a newer one. The cache stays ahead, but the returned stage can temporarily regress; an unreadable page then returns the newer cached stage again. |
-| `holygrail/legs.py`, `ring_bell` | `RING_STAND` is 2 tiles from `CASTLE_LANDING` and the landing check allows 2, so 6 of the 9 tiles the walk can stop on pass before any teleport. The leg can log that it's inside, and set `inside_castle`, when it isn't. The spec tests from a tile where the check still tells the two apart. |
 | `touristtrap.py`, lines 2448 and 2484 | `leave_camp` here looks unreachable, since `safe_recovery_route` has already answered for both camp areas. |
+
+Holy Grail's premature bell-landing check was fixed in the [2026-11-04 upstream port](Rs2b0tUpstreamReview.md): it now drives the bell dialogue and requires the exact castle landing tile. Regression tests cover both a real landing and remaining outside after ringing.
 
 Some of what remains can't be reached by a test at all. `elementalworkshop/workshop.py` lines 129–130 and 657 and
 `chompybird/hunt.py` lines 109–110 and 160 are guards on states the lines before them rule out, so 100% isn't the goal

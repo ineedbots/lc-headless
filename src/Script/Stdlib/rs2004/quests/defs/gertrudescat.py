@@ -65,9 +65,8 @@ CRATES = [
 ]
 FOUND_NOTHING = 'you find nothing'
 CRATE_SEARCH_MS = 30000
-# Why: `npc_find` measures the brothers against each other, and both wander 2 tiles from their own spawn.
-# Why: the check runs 4 chat lines in, so the gap has to start inside the script's limit of 3; at 2 the pair drifted out of range 2 attempts in 3.
-BROTHER_GAP = 1
+# Talking freezes both boys beside the player; they can remain two tiles apart until the player moves.
+BROTHER_GAP = 3
 PAY_ATTEMPTS = 6
 SEASON_ATTEMPTS = 3
 OFFER_ATTEMPTS = 3
@@ -329,7 +328,9 @@ def pay_brothers(log):
         wilough = npcs.query().name('Wilough').nearest()
         if not shilop or not wilough:
             return None
-        return (shilop if shilop.tile().distance_to(wilough.tile()) <= BROTHER_GAP else None)
+        start = shilop.network_tile()
+        end = wilough.network_tile()
+        return shilop if start.distance_to(end) <= BROTHER_GAP and _core.line_of_sight(start.x, start.z, end.x, end.z) else None
 
     for attempt in range(PAY_ATTEMPTS):
         _w20 = yield from traversal.walk_resilient(MARKET, radius=3, attempts=3, timeout_ms=180000, log=log)
@@ -348,7 +349,7 @@ def pay_brothers(log):
         _w23 = yield from execution.delay_until(lambda: inventory.count('Coins') <= before - BOY_PAYMENT, 5000)
         if _w23:
             return True
-        log('gertrudescat: the dialogue ended without paying — the brothers had drifted apart')
+        log('gertrudescat: the dialogue ended without paying')
     return False
 
 

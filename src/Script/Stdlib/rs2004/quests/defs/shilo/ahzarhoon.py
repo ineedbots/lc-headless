@@ -3,6 +3,7 @@
 import _core
 
 from rs2004 import execution
+from rs2004.dialogue import chat_dialog
 from rs2004.catalogs.record import Record
 from rs2004.game import game, reader
 from rs2004.items import inventory
@@ -173,26 +174,28 @@ def take_zadimus_corpse(log):
 
 # Why: reading sets the bits that gate the Bervirius tomb and the necklace craft, and the journal stops rendering them once the dolmen is searched, so read on sight.
 def read_scroll(item_id):
-    """Read a scroll, setting the tomb and necklace bits."""
-
-    def _fn17(log):
+    def run(log):
         scroll = ([item for item in inventory.items() if item.id == item_id] or [None])[0]
-        if not scroll:
+        if scroll is None:
             log(f'no scroll {item_id} in the pack to read')
             return False
-        if not (scroll.interact('Read')):
+        yield from execution.delay_ticks(1)
+        opened = False
+        for attempt in range(3):
+            if not scroll.interact('Read'):
+                return False
+            opened = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue() or reader.modals().main != -1, 2500)
+            if opened:
+                break
+        if not opened:
             return False
-        yield from execution.delay_ticks(2)
-        _w18 = yield from drive_choice(YES_READ, log)
-        if not (_w18):
+        shown = yield from drive_until(lambda: reader.modals().main != -1, YES_READ, log, 10000)
+        if not shown:
             return False
-        # Why: the scroll body is a main modal built with if_settext, so driveChoice can't see it, and every journal read comes back empty while it's up.
-        yield from execution.delay_until(lambda: reader.modals().main != -1, 6000)
-        if reader.modals().main != -1:
-            _core.close_interfaces()
-            yield from execution.delay_ticks(1)
+        _core.close_interfaces()
+        yield from execution.delay_ticks(1)
         return True
-    return _fn17
+    return run
 
 
 def leave_ah_za_rhoon(log):

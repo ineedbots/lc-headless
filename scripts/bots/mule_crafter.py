@@ -5,6 +5,7 @@
 import time
 
 from rs2004.catalogs import DEFAULT_RUNE, RUNES, RUNE_OPTIONS, ContinueDialog, Record
+from rs2004.catalogs.partner import stable_closed_poll
 
 # MuleCrafterLogic.ts
 
@@ -427,16 +428,16 @@ class CrafterTradeAtRuins(Task):
         if trade.on_confirm_screen():
             self._bot.set_status('confirming trade')
             before_ess = ess_count()
+            who = trade.partner()
             accepted = trade.accept()
             self._bot.log(f'CrafterTradeAtRuins: confirm-screen accept returned {accepted}')
-            done = yield from execution.delay_until(lambda: not trade.active(), 3000)
+            done = yield from execution.delay_until(stable_closed_poll(), 5000)
             if done:
                 got = ess_count() - before_ess
                 self._bot.log(f'CrafterTradeAtRuins: trade closed, essCount went {before_ess} -> {ess_count()} (delta {got})')
                 if got > 0:
                     self._bot.count_trade()
                     self._bot.log(f'received {got} essence')
-                    who = trade.partner()
                     if who:
                         self._bot.mark_mule_traded(who)
                         self._bot.log(f'marked {who} as traded (confirm complete)')
@@ -672,7 +673,7 @@ class MuleTradeExecute(Task):
             self._bot.log(f'MuleTradeExecute: confirm screen, beforeEss={self._before_ess}')
             accepted = trade.accept()
             self._bot.log(f'MuleTradeExecute: confirm-screen accept returned {accepted}')
-            done = yield from execution.delay_until(lambda: not trade.active(), 2500)
+            done = yield from execution.delay_until(stable_closed_poll(), 5000)
             if done and self._before_ess > 0:
                 delivered = self._before_ess - ess_count()
                 self._bot.log(f'MuleTradeExecute: trade closed, delivered {delivered} essence (beforeEss={self._before_ess}, ess now={ess_count()})')

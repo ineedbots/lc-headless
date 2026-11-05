@@ -3,6 +3,7 @@
 import math
 from rs2004 import execution
 from rs2004.catalogs.record import Record
+from rs2004.quests.defs.familycrest.fish import CALEB_KEEP, source_caleb_fish
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import npcs
 from rs2004.items import inventory
@@ -212,7 +213,7 @@ def decide(snap):
         if stage == FC_STAGE.SPOKEN_CALEB:
             short = missing_fish(snap)
             if len(short) > 0:
-                tidy = tidy_for(snap, len(short) + 2, [f.name.lower() for f in CALEB_FISH], LEG_BANK.caleb)
+                tidy = deposit(CALEB_KEEP, LEG_BANK.caleb) if (snap.free_slots if snap.free_slots is not None else 28) < len(short) + 2 else None
                 if tidy:
                     return tidy
                 for fish in short:
@@ -265,6 +266,8 @@ def decide(snap):
             return custom('climb down into the perfect-gold mine', enter_gold_mine)
         # Why: moulds, rubies, furnace and Avan are all in Al Kharid, so moulds and rubies are sourced before the smelt to keep it one trip.
         # Why: coins first, since a `buy` step withdraws its own `estGp` and buying the ring mould leaves the pack under it for the next purchase.
+        if (snap.free_slots if snap.free_slots is not None else 28) < 5:
+            return deposit(['coins', "'perfect' gold ore", "'perfect' gold bar", "'perfect' ring", "'perfect' necklace", 'ring mould', 'necklace mould', 'ruby', 'uncut ruby', 'chisel', 'law rune', 'air rune', 'fire rune', 'earth rune', 'water rune'], LEG_BANK.gold)
         leg_coins = coin_top_up(snap, 50000, LEG_BANK.gold)
         if leg_coins:
             return leg_coins
@@ -284,6 +287,15 @@ def decide(snap):
             banked = from_bank(snap, Record({'id': FC_ID.RUBY, 'name': FC_ITEM.RUBY}), outstanding, LEG_BANK.gold)
             if banked:
                 return banked
+            uncut = Record({'id': 1619, 'name': 'Uncut ruby'})
+            rough = from_bank(snap, uncut, ruby_short, LEG_BANK.gold)
+            if rough:
+                return rough
+            if held(snap, uncut.id) > 0:
+                chisel = source(snap, Record({'id': 1755, 'name': 'Chisel'}), 1, LEG_BANK.gold, SHOP.DOMMIK, MOULD_GP)
+                if chisel:
+                    return chisel
+                return Record({'kind': 'use_on', 'item': 'Chisel', 'target_kind': 'item', 'target': uncut.name, 'anchor': LEG_BANK.gold, 'product': FC_ITEM.RUBY})
             if snap.no_progress >= 2:
                 return Record({
                     'kind': 'wait',

@@ -1,7 +1,8 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/ikov/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
-from rs2004.game import game
+from rs2004.game import game, skills
+from rs2004.items import equipment
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.ikov.areas import ARROWS_WANTED, IKOV_FOODS, IKOV_NAME, IKOV_OBJ, IKOV_TILE, LUCIEN_START, ROOTS_WANTED, WINELDA_STOP, in_dark_room, in_guardian_temple, in_temple, in_trap_pit, on_winelda_ledge, west_of_bridge
 from rs2004.quests.defs.ikov.dungeon import arrows_secured, boots_step, escape_pocket, pull_trap_lever, south_gate_open, stock_ice_arrows, temple_walk, unlock_south_gate, wear_fear_pendant, wearing_boots
@@ -28,13 +29,25 @@ def held(snap, id):
     return (_v1 if _v1 is not None else 0)
 
 
+def remove_bridge_equipment(log):
+    for item in equipment.items():
+        if item.name and item.name.lower() not in ['boots of lightness', 'pendant of lucien']:
+            removed = yield from equipment.unequip(item.name)
+            if not removed:
+                return False
+    return True
+
+
 def bridge_trim_step(snap):
-    """Bank whatever the crossing cannot afford to carry, before the bot is underground with no booth."""
-    return trim_step(snap, BRIDGE_KEEP)
+    trim = trim_step(snap, BRIDGE_KEEP)
+    if trim:
+        return trim
+    if any([name not in ['boots of lightness', 'pendant of lucien'] for name in snap.worn]):
+        return Record({'kind': 'custom', 'name': 'remove equipment for the lava bridge', 'run': remove_bridge_equipment})
+    return None
 
 
 ROOTS_KEEP = ['coins', 'pendant', 'limpwurt root'] + list(IKOV_FOODS)
-# Why: keeping the farm's food leaves 19 slots for a 20-root withdraw, which retries until the watchdog fires.
 FERRY_KEEP = ['coins', 'pendant', 'limpwurt root']
 
 
@@ -126,7 +139,7 @@ def in_sealed_temple(t):
     return t is not None and in_temple(t) and (in_dark_room(t) or in_trap_pit(t) or west_of_bridge(t) or on_winelda_ledge(t) or in_guardian_temple(t))
 
 
-def decide(snap):
+def decide(snap, fletching_level=None):
     if snap.journal == 'complete':
         return Record({'kind': 'done'})
     if snap.journal == 'unknown':
@@ -154,7 +167,7 @@ def decide(snap):
         return pendant
     if stage >= IKOV_STAGE.SPOKEN_WINELDA:
         if held_or_banked(snap, IKOV_OBJ.LIMPWURT_ROOT) < ROOTS_WANTED:
-            roots = supplies_step(snap, False, False, True)
+            roots = supplies_step(snap, False, False, True, fletching_level)
             if roots:
                 return roots
         # Why: 20 unstackable roots plus coins and food fill the pack, so anything else has to go before the withdraw can land.
@@ -170,7 +183,7 @@ def decide(snap):
         return Record({'kind': 'custom', 'name': 'ask Winelda for the ferry across the lava', 'run': talk_to_winelda})
     # Why: the candle only lights the stairs down to the boots, so it leaves the kit once the boots are had.
     need_boots = not wearing_boots() and held_or_banked(snap, IKOV_OBJ.BOOTS) == 0
-    supplies = supplies_step(snap, need_boots, True, False)
+    supplies = supplies_step(snap, need_boots, True, False, fletching_level)
     if supplies:
         return supplies
     if not arrows_secured(snap) or need_boots:
@@ -226,5 +239,5 @@ ikov = QuestModule(**{
     'resume_at': in_sealed_temple,
     'warn_readiness': sourcing_shortfall,
     'observe': _fn9,
-    'decide': decide,
+    'decide': lambda snap: decide(snap, skills.effective('fletching')),
 })

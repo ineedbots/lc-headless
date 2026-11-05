@@ -10,7 +10,7 @@ DEFAULT_WHEEL_TILE = Tile(2711, 3471, 1)
 BOOTH_OP = 'Use-quickly'
 
 SETTINGS = {
-    'product': SettingDef('string', 'Flax', 'Fibre to spin', options=['Flax', 'Wool'], help='matched against the "What would you like to spin?" menu'),
+    'product': SettingDef('string', 'Flax', 'Fibre to spin', options=['Flax', 'Wool'], help='Flax makes bow strings; Wool makes balls of wool. Withdraws raw fibre from the bank.'),
     'bank_stand': SettingDef('tile', DEFAULT_BANK_STAND, 'Bank stand tile (x,z)'),
     'ladder_tile': SettingDef('tile', DEFAULT_LADDER_TILE, 'Ladder stand tile (x,z) — inside the house', help='walkable tile INSIDE the wheel house beside the ladder (not the ladder tile itself — see route note); the house door is opened on the way'),
     'wheel_tile': SettingDef('tile', DEFAULT_WHEEL_TILE, 'Spinning wheel tile (x,z,level)', help='upstairs — search centre for the wheel'),
@@ -64,8 +64,8 @@ class BankTrip(Task):
         bot.trips += 1
 
         wanted = bot.product.lower()
-        banked = [i for i in bank.items() if i.name is not None and wanted in i.name.lower()]
-        if len(banked) == 0 or bank.count(banked[0].name) == 0:
+        banked = [i for i in bank.items() if i.name is not None and wanted == i.name.lower() and i.count > 0]
+        if len(banked) == 0:
             bot.status = f'out of {bot.product}; stopped'
             bot.request_finish(f"out of '{bot.product}' in the bank")
             return
@@ -190,8 +190,7 @@ class FlaxSpinner(TaskBot):
         return here is not None and here.level == level
 
     def fibre_count(self):
-        pattern = self.product.lower()
-        return sum([max(1, i.count) for i in inventory.items() if i.name is not None and pattern in i.name.lower()])
+        return inventory.count(self.product)
 
     def on_progress_report(self):
         here = game.tile()

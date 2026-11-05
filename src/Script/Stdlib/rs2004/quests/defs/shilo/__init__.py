@@ -1,6 +1,7 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/shilo/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
+from rs2004.tabs import quests
 from rs2004.quests.data import quest_record
 from rs2004.quests.engine.types import QuestModule
 from rs2004.quests.defs.shilo.ahzarhoon import bury_zadimus, cross_cave_in, dig_mound, enter_fissure, leave_ah_za_rhoon, light_fissure, read_scroll, rope_fissure, take_crumpled_scroll, take_tattered_scroll, take_zadimus_corpse
@@ -135,10 +136,17 @@ def stage_middle(snap, area):
                 return in_the_open(area, step("bury Zadimus on Tai Bwo Wannai's sacred ground", bury_zadimus))
             return step('take the corpse from the ancient gallows', take_zadimus_corpse)
         return in_the_open_or_in(area, 'berviriusTomb', step("search the dolmen in Bervirius' tomb", search_bervirius_dolmen))
-    if in_caves:
-        return step('climb out of Ah Za Rhoon', leave_ah_za_rhoon)
     if not has_flag(snap.progress, 'found-door'):
         return in_the_open(area, step('search the carved doors for their lock', search_carved_doors))
+    if held(snap, SV_ITEM.BONE_SHARD.id) == 0 and held(snap, SV_ITEM.BONE_KEY.id) == 0:
+        banked = recover_from_bank(snap, SV_ITEM.BONE_KEY) or recover_from_bank(snap, SV_ITEM.BONE_SHARD)
+        if banked:
+            return in_the_open(area, banked)
+        if held(snap, SV_ITEM.ZADIMUS_CORPSE.id) > 0:
+            return in_the_open(area, step("bury Zadimus on Tai Bwo Wannai's sacred ground", bury_zadimus))
+        return step('take the corpse from the ancient gallows', take_zadimus_corpse)
+    if in_caves:
+        return step('climb out of Ah Za Rhoon', leave_ah_za_rhoon)
     craft = craft_chain(snap, area, True)
     if craft:
         return craft
@@ -285,6 +293,9 @@ def decide(snap):
 shilo = QuestModule(**{
     'record': quest_record('zombiequeen'),
     'on_start': reset_combat_gear,
+    'exit': leave_bervirius_tomb,
+    'recover': lambda tile: escape_pocket(shilo_area(tile)) if tile.level == 0 and quests.status('Shilo Village') == 'complete' else None,
+    'resume_at': lambda tile: tile is not None and tile.level == 0 and shilo_area(tile) in ['ahZaRhoonNorth', 'ahZaRhoonSouth', 'berviriusTomb', 'rashEntry', 'rashLedge', 'rashInner'],
     'bank': SV_TILE.ARDOUGNE_BANK,
     'owns_inventory': True,
     'read_progress': read_shilo_progress,

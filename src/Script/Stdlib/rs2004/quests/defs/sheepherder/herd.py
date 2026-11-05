@@ -1,5 +1,6 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/sheepherder/herd.ts (MIT, see thirdparty/rs2b0t)."""
 
+import _core
 from rs2004 import execution
 from rs2004.catalogs.record import Record
 from rs2004.dialogue import chat_dialog, modals
@@ -15,6 +16,7 @@ __all__ = ['SceneGrid', 'sheep_in_pen', 'clear_refusal', 'herd_to_pen']
 
 # Why: the shortest route is 31 pushes and the longest 58, and drift near a sheep's spawn roughly triples that (90 pushes on the 31-tile leg live).
 PROD_BUDGET = 260
+PROD_ANIM = 799
 PROGRESS_EVERY = 25
 STUCK_LIMIT = 8
 APPROACH_RADIUS = 6
@@ -64,19 +66,23 @@ def copies(n):
 
 
 # Why: 3 copies of every sheep share one quest bit and name and the herded one stays within a tile or two of where it was last seen, so lock on its last tile; client slots churn on scene rebuilds.
-def near_last(n, last):
-    """The copy still standing where the herd left it."""
+def near_last(n, last, index):
+    nearby = copies(n)
+    tracked = ([npc for npc in nearby if npc.index == index] or [None])[0]
+    if tracked:
+        return tracked
     best = None
-    for npc in copies(n):
-        t = npc.tile()
+    for npc in nearby:
+        t = npc.network_tile()
         d = max(abs(t.x - last.x), abs(t.z - last.z))
         if d <= LOCK_RADIUS and (best is None or d < best.d):
             best = Record({'npc': npc, 'd': d})
-    return best.npc if best is not None else None
+    _v1 = (best.npc if best is not None else None)
+    return (_v1 if _v1 is not None else None)
 
 
 def route_cost(npc):
-    t = npc.tile()
+    t = npc.network_tile()
     return herd_cost(herd_plan(SCENE_GRID, t, GATE_ZONE), t.x, t.z)
 
 
@@ -97,7 +103,8 @@ def pick_sheep(n):
 
 
 def sheep_in_pen(n):
-    return ([npc for npc in copies(n) if in_box(PEN, npc.tile())] or [None])[0]
+    _v3 = ([npc for npc in copies(n) if in_box(PEN, npc.network_tile())] or [None])[0]
+    return (_v3 if _v3 is not None else None)
 
 
 # Why: an npc only enters the client's list within about 15 tiles, so "not in the scene" says where you're standing.
@@ -162,7 +169,8 @@ def stand_opposite(sheep, dir, log):
         return True
     here = game.tile()
     if here and here.level == 0 and max(abs(here.x - stand.x), abs(here.z - stand.z)) <= FOLLOW_RADIUS:
-        yield from direct_navigator.walk_to(stand, 0, 8000)
+        direct_navigator.walk(stand)
+        yield from execution.delay_until(on, 8000)
     else:
         yield from traversal.walk_resilient(stand, radius=0, attempts=1, timeout_ms=20000, log=log)
     if on():
@@ -185,46 +193,60 @@ def stand_cost(tile, dir, me):
 
 
 def push_once(n, npc, dir, log):
-    before = npc.tile()
+    before = npc.network_tile()
+    if _core.get_local_player().animation == PROD_ANIM:
+        _w5 = yield from execution.delay_until(lambda: _core.get_local_player().animation != PROD_ANIM, 2000)
+        if not (_w5):
+            return 'refused'
+        current = (near_last(n, before, npc.index).network_tile() if near_last(n, before, npc.index) is not None else None)
+        if not current or current.x != before.x or current.z != before.z:
+            return 'elsewhere'
     if not (npc.interact('Prod')):
         log(f'sheepherder: no Prod op on {sheep_name(n)}')
         return 'refused'
+    prodded = yield from execution.delay_until(lambda: _core.get_local_player().animation == PROD_ANIM or modals.is_open() or chat_dialog.is_open(), 6000)
+    _w6 = yield from clear_refusal()
+    if _w6 or not prodded:
+        return 'refused'
 
-    def _fn5():
-        now = near_last(n, before)
-        return now is None or now.tile().x != before.x or now.tile().z != before.z
-    moved = yield from execution.delay_until(_fn5, 6000)
+    def _fn7():
+        now = near_last(n, before, npc.index)
+        return now is None or now.network_tile().x != before.x or now.network_tile().z != before.z
+    moved = yield from execution.delay_until(_fn7, 6000)
     yield from clear_refusal()
     if not moved:
         return 'refused'
-    landed = near_last(n, before)
-    after = landed.tile() if landed is not None else None
+    after = (near_last(n, before, npc.index).network_tile() if near_last(n, before, npc.index) is not None else None)
     wanted = after is not None and after.x == before.x + dir.dx and after.z == before.z + dir.dz
     return ('wanted' if wanted else 'elsewhere')
 
 
 def herd_to_pen(n, log):
-    """Push one sheep out to the tiles west of the gate and then over it. Why: the route is re-derived from the sheep's tile on every push, since its ai_timer returns it to wander mode and it drifts back toward spawn."""
     SCENE_GRID.reset()
+    """Push one sheep out to the tiles west of the gate and then over it. Why: the route is re-derived from the sheep's tile on every push, since its ai_timer returns it to wander mode and it drifts back toward spawn."""
     first = yield from find_sheep(n, log)
     if not first:
         return False
-    _w6 = yield from traversal.walk_resilient(first.tile(), radius=APPROACH_RADIUS, attempts=3, timeout_ms=180000, log=log)
-    if not (_w6):
+    _w8 = yield from traversal.walk_resilient(first.network_tile(), radius=APPROACH_RADIUS, attempts=3, timeout_ms=180000, log=log)
+    if not (_w8):
         return False
-    _v7 = yield from pick_sheep(n)
-    last = ((_v7 if _v7 is not None else first)).tile()
+    _v9 = yield from pick_sheep(n)
+    selected = (_v9 if _v9 is not None else first)
+    last = selected.network_tile()
+    index = selected.index
     stuck = 0
     pinned = 0
     strayed = 0
     for push in range(PROD_BUDGET):
-        sheep = near_last(n, last)
-        if sheep is None:
-            sheep = yield from pick_sheep(n)
+        _v10 = near_last(n, last, index)
+        if _v10 is None:
+            _v10 = yield from pick_sheep(n)
+        sheep = _v10
         if not sheep:
             log(f'sheepherder: lost {sheep_name(n)} mid-herd')
             return False
-        tile = sheep.tile()
+        tile = sheep.network_tile()
+        index = sheep.index
         last = tile
         if in_box(PEN, tile):
             log(f'sheepherder: {sheep_name(n)} is in the enclosure after {push} push(es)')
@@ -248,18 +270,28 @@ def herd_to_pen(n, log):
         # Why: a refused push falls through to the next-best direction.
         dir = dirs[min(stuck, len(dirs) - 1)]
         ready = strayed < STRAY_LIMIT and behind_sheep(game.tile(), tile, dir)
-        _c9 = not ready
-        if _c9:
-            _w10 = yield from stand_opposite(tile, dir, log)
-            _c9 = not (_w10)
-        if _c9:
+        _c11 = not ready
+        if _c11:
+            _w12 = yield from stand_opposite(tile, dir, log)
+            _c11 = not (_w12)
+        if _c11:
             stuck += 1
             continue
-        now = near_last(n, tile)
-        if not now or now.tile().x != tile.x or now.tile().z != tile.z:
-            # Why: the sheep wandered while the walk landed, so the stand behind it is the wrong tile now.
-            yield from execution.delay_ticks(1)
+        now = near_last(n, tile, index)
+        if not now:
             continue
+        current = now.network_tile()
+        if current.x != tile.x or current.z != tile.z:
+            me = game.tile()
+            if not me or me.level != 0:
+                continue
+            catch_dir = Record({'dx': current.x - me.x, 'dz': current.z - me.z})
+            if abs(catch_dir.dx) + abs(catch_dir.dz) != 1:
+                continue
+            legal = (any_stand(current) if in_box(GATE_ZONE, current) else herd_directions(SCENE_GRID, current, GATE_ZONE))
+            if not any([d.dx == catch_dir.dx and d.dz == catch_dir.dz for d in legal]):
+                continue
+            dir = catch_dir
         outcome = yield from push_once(n, now, dir, log)
         # Why: an off-axis landing is usually the sheep's own wander step, so the count is a streak: 6 in a row means the server is picking its own approach side, and 1 good push clears it.
         # Why: it resets since walking every stand doubles the cycle and the sheep's walk home, which strays it again; one unlucky run spent 20 minutes on one sheep.

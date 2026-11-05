@@ -29,6 +29,7 @@ def no_walk():
 def bank_opens():
     # open_bank_leg uses banking.open (Shantay chest and booths), not bank.open_nearest.
     spy_on(banking, 'open', impl=answers(True))
+    spy_on(bank, 'backpack_ready', impl=answers(True))
 
 
 def _fn4():

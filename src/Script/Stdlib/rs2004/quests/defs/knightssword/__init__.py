@@ -2,6 +2,8 @@
 
 from rs2004.catalogs.record import Record
 from rs2004.game import skills
+from rs2004.quests.food import FOOD_FLOAT, quest_food
+from rs2004.quests.exec.primitives import is_underground
 from rs2004.quests.data import QUESTS
 from rs2004.quests.defs.knightssword.areas import KS_ID, KS_NAME, KS_STAGE, RELDO, SQUIRE, THURGO
 from rs2004.quests.defs.knightssword.dungeon import mine_blurite
@@ -66,7 +68,13 @@ def decide_at(snap, mining_level, smithing_level):
     stage = (_v3 if _v3 is not None else snap.stage)
     if stage is None:
         return Record({'kind': 'wait', 'reason': 'quest stage not readable'})
-    float_ = kit(snap)
+    food = quest_food.name
+    held_food = snap.inv.get(food.lower(), 0) if food else 0
+    banked_food = (snap.bank or {}).get(food.lower(), 0) if food else 0
+    keep = list(knightssword.tools or []) + ([food] if food and held_food <= FOOD_FLOAT else [])
+    if (snap.free_slots if snap.free_slots is not None else 28) < 8 and not (snap.tile is not None and is_underground(snap.tile)) and any([not any([item.lower() in name.lower() for item in keep]) for name in snap.inv]):
+        return Record({'kind': 'deposit', 'keep': keep})
+    float_ = kit(snap, Record({'name': food, 'held': held_food, 'target': min(FOOD_FLOAT, held_food + banked_food), 'low': 4}) if food and banked_food > 0 else None)
     if float_:
         return float_
     if stage == KS_STAGE.NOT_STARTED:
@@ -108,7 +116,7 @@ knightssword = QuestModule(**{
     'pastry dough',
     'pie shell',
     'uncooked berry pie',
-    'redberry pie',
+    'redberry pie', 'burnt pie',
     'iron ore',
     'iron bar',
     'blurite ore',

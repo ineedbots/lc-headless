@@ -1,12 +1,15 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/merlinscrystal.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004 import execution
+from rs2004.tabs import quests
+from rs2004.quests.journal_text import normalize_journal
+from rs2004.quests.exec.primitives import open_dialogue
 from rs2004.catalogs.record import Record
 from rs2004.catalogs.tasks import sustain
-from rs2004.dialogue import chat_dialog
+from rs2004.dialogue import chat_dialog, modals
 from rs2004.entities import ground_items, locs, npcs
 from rs2004.execution import event_signal
-from rs2004.game import game
+from rs2004.game import game, reader
 from rs2004.geometry import Tile
 from rs2004.items import equipment, inventory
 from rs2004.quests.engine.provisioning import gp_short
@@ -43,6 +46,11 @@ CAM_STAIR_L0 = Tile(2750, 3510, 0)
 LADY_LAKE = NpcStop('The Lady of the Lake', Tile(2924, 3405, 0), 6, ['I seek the sword Excalibur.'])
 CANDLE_MAKER = NpcStop('Candle maker', Tile(2800, 3439, 0), 6, ['Have you got any black candles?'])
 CATHERBY_CRATE_STAND = Tile(2801, 3443, 0)
+CRATE_INTERIOR = Tile(2778, 9839, 0)
+ALTAR_AVOID_ZONES = [{'min_x': 2944, 'max_x': 3455, 'min_z': 3648, 'max_z': 4095, 'level': 0}]
+
+def inside_crate(tile):
+    return tile.level == 0 and CRATE_INTERIOR.distance_to(tile) <= 2
 
 
 def inside_keep(t):
@@ -64,7 +72,7 @@ JEWELLER_DOOR_STAND = Tile(3016, 3247, 0)
 BEEHIVE_STAND = Tile(2758, 3444, 0)
 REPELLENT_SPAWN = Tile(2807, 3450, 0)
 BAT_ANCHOR = Tile(2589, 3478, 0)
-WYDIN_SHOP = Record({'npc': 'Wydin', 'anchor': Tile(3014, 3204, 0)})
+WYDIN_SHOP = Record({'npc': 'Baker', 'anchor': Tile(2669, 3310, 0)})
 RIMMINGTON_SHOP = Record({'npc': 'Shop keeper', 'anchor': Tile(2947, 3216, 0)})
 
 
@@ -98,11 +106,16 @@ def bread_plan(snap, _thieving_level=0, _passes_used=0):
 
 
 def drive_dialogue(prefer, log, max_pages=60):
+    matched = False
     for i in range(max_pages):
-        if not ((chat_dialog.is_open() or chat_dialog.can_continue())):
-            break
         if event_signal.pending():
-            return
+            return False
+        _c2 = not chat_dialog.is_open() and not chat_dialog.can_continue()
+        if _c2:
+            _w3 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 1500)
+            _c2 = not (_w3)
+        if _c2:
+            return matched
         if chat_dialog.can_continue():
             yield from chat_dialog.continue_()
             yield from execution.delay_ticks(1)
@@ -110,28 +123,30 @@ def drive_dialogue(prefer, log, max_pages=60):
         opts = chat_dialog.options()
         if len(opts) > 0:
             pick = pick_preferred(opts, prefer)
+            matched = matched or pick is not None
             if not pick:
                 log(f"  driveDialogue: no preferred option in [{' | '.join(opts)}] — taking the last")
             yield from chat_dialog.choose_option((pick if pick is not None else opts[len(opts) - 1]))
             yield from execution.delay_ticks(1)
             continue
         yield from execution.delay_ticks(1)
+    return matched
 
 
 def climb_at(stand, op, log):
-    _w2 = yield from traversal.walk_resilient(stand, radius=1, attempts=3, timeout_ms=60000, log=log)
-    if not (_w2):
+    _w4 = yield from traversal.walk_to(stand, radius=1, timeout_ms=600000, avoid_zones=ALTAR_AVOID_ZONES, log=log)
+    if not (_w4):
         return False
     stair = locs.query().action(op).within(4).nearest()
     if not stair:
         log(f'climbAt: no \'{op}\' near ({stand.x},{stand.z}) — LIVE-VERIFY the stair')
         return False
-    _v3 = (game.tile().level if game.tile() is not None else None)
-    before = (_v3 if _v3 is not None else stand.level)
+    _v5 = (game.tile().level if game.tile() is not None else None)
+    before = (_v5 if _v5 is not None else stand.level)
     if not (stair.interact(op)):
         return False
-    _w4 = yield from execution.delay_until(lambda: (((game.tile().level if game.tile() is not None else None) if (game.tile().level if game.tile() is not None else None) is not None else before)) != before, 6000)
-    if not (_w4):
+    _w6 = yield from execution.delay_until(lambda: (((game.tile().level if game.tile() is not None else None) if (game.tile().level if game.tile() is not None else None) is not None else before)) != before, 6000)
+    if not (_w6):
         return False
     yield from execution.delay_ticks(2)
     return True
@@ -247,13 +262,16 @@ def fortress(log):
     t = game.tile()
     if not t:
         return False
+    if inside_crate(t):
+        _result19 = yield from recover_crate(log)
+        return _result19
     # After Morgan's brief the keep is done, never re-board the Catherby crate.
     if mordred_briefed and not inside_keep(t):
         log('fortress: Morgan brief already done and outside the keep')
         return True
     if not inside_keep(t):
-        _w17 = yield from traversal.walk_resilient(CATHERBY_CRATE_STAND, radius=2, attempts=3, timeout_ms=90000, log=log)
-        if not (_w17):
+        _w20 = yield from traversal.walk_resilient(CATHERBY_CRATE_STAND, radius=2, attempts=3, timeout_ms=90000, log=log)
+        if not (_w20):
             return False
         crate = locs.query().name('Crate').action('Hide-in').within(6).nearest()
         if not crate:
@@ -264,10 +282,10 @@ def fortress(log):
         yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 6000)
         yield from drive_dialogue(['Yes.'], log, 40)
 
-        def _fn18():
+        def _fn21():
             g = game.tile()
             return g is not None and inside_keep(g)
-        boarded = yield from execution.delay_until(_fn18, 12000)
+        boarded = yield from execution.delay_until(_fn21, 12000)
         log(f'fortress: crate Hide-in -> insideKeep={boarded} (needs stage>=spoken_lancelot to teleport)')
         return False
     # Why: the dialogue and the Morgan brief outrank Attack, as Mordred stays attackable after the fight ends and re-Attack loops without latching "briefed" (#353).
@@ -292,16 +310,16 @@ def fortress(log):
         log('fortress: already briefed by Morgan — leaving keep')
         yield from leave_keep(log)
         return False
-    _v19 = (game.tile().level if game.tile() is not None else None)
-    lvl = (_v19 if _v19 is not None else 0)
+    _v22 = (game.tile().level if game.tile() is not None else None)
+    lvl = (_v22 if _v22 is not None else 0)
     if lvl < 2:
         if lvl < 1:
             yield from climb_at(KEEP_STAIR_L0, 'Climb-up', log)
         else:
             yield from climb_at(KEEP_STAIR_L1_UP, 'Climb-up', log)
         return False
-    _w20 = yield from traversal.walk_resilient(MORDRED_TILE, radius=5, attempts=3, timeout_ms=60000, log=log)
-    if not (_w20):
+    _w23 = yield from traversal.walk_resilient(MORDRED_TILE, radius=5, attempts=3, timeout_ms=60000, log=log)
+    if not (_w23):
         return False
     # Dialog may have opened while walking up.
     if chat_dialog.is_open() or chat_dialog.can_continue():
@@ -341,20 +359,23 @@ def fortress(log):
 
 def leave_keep(log):
     here = game.tile()
-    if here and not inside_keep(here):
+    if here and inside_crate(here):
+        _result24 = yield from recover_crate(log)
+        return _result24
+    if here and not inside_keep(here) and not inside_crate(here):
         return True
     # Mordred is L2; the exit crate is ground-floor (keep_crate_coord). Descend fully first.
     for guard in range(4):
         if not ((((game.tile().level if game.tile() is not None else None) if (game.tile().level if game.tile() is not None else None) is not None else 0)) > 0):
             break
-        _v21 = (game.tile().level if game.tile() is not None else None)
-        level = (_v21 if _v21 is not None else 0)
+        _v25 = (game.tile().level if game.tile() is not None else None)
+        level = (_v25 if _v25 is not None else 0)
         down = locs.query().name('Staircase').action('Climb-down').within(8).nearest()
         if down:
             if not (down.interact('Climb-down')):
                 return False
-            _w22 = yield from execution.delay_until(lambda: (((game.tile().level if game.tile() is not None else None) if (game.tile().level if game.tile() is not None else None) is not None else level)) < level, 8000)
-            if not (_w22):
+            _w26 = yield from execution.delay_until(lambda: (((game.tile().level if game.tile() is not None else None) if (game.tile().level if game.tile() is not None else None) is not None else level)) < level, 8000)
+            if not (_w26):
                 return False
             yield from execution.delay_ticks(2)
             continue
@@ -374,30 +395,22 @@ def leave_keep(log):
     if crate:
         crate.interact('Hide-in')
         yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 6000)
-        for i in range(40):
-            if not ((chat_dialog.is_open() or chat_dialog.can_continue())):
-                break
-            if event_signal.pending():
-                break
-            if chat_dialog.can_continue():
-                yield from chat_dialog.continue_()
-                yield from execution.delay_ticks(1)
-                continue
-            opts = chat_dialog.options()
-            if len(opts) > 0:
-                yes = ([o for o in opts if answer_is(o, 'yes')] or [opts[0]])[0]
-                yield from chat_dialog.choose_option(yes)
-                yield from execution.delay_ticks(2)
-                continue
-            yield from execution.delay_ticks(1)
+        yield from drive_dialogue(['Yes.'], log)
+        riding = game.tile()
+        _c27 = riding and inside_crate(riding)
+        if _c27:
+            _w28 = yield from recover_crate(log)
+            _c27 = not (_w28)
+        if _c27:
+            return False
 
         # Crate ride is a multi-mesbox teleport sequence, give it time.
-        def _fn24():
+        def _fn29():
             g = game.tile()
-            return g is not None and not inside_keep(g)
-        yield from execution.delay_until(_fn24, 25000)
+            return g is not None and not inside_keep(g) and not inside_crate(g)
+        yield from execution.delay_until(_fn29, 25000)
         here = game.tile()
-        if here and not inside_keep(here):
+        if here and not inside_keep(here) and not inside_crate(here):
             log('leaveKeep: crate ride out of the keep')
             return True
         log('leaveKeep: crate Hide-in did not leave the keep')
@@ -406,7 +419,7 @@ def leave_keep(log):
     KEEP_WEST_EXIT = Tile(2758, 3401, 0)
     for attempt in range(8):
         here = game.tile()
-        if here and not inside_keep(here):
+        if here and not inside_keep(here) and not inside_crate(here):
             return True
         door = locs.query().name('Large door').action('Open').within(6).nearest()
         if door:
@@ -414,7 +427,7 @@ def leave_keep(log):
             yield from execution.delay_ticks(2)
         yield from traversal.walk_resilient(KEEP_WEST_EXIT, radius=1, attempts=2, timeout_ms=30000, log=log)
     here = game.tile()
-    return here is not None and not inside_keep(here)
+    return here is not None and not inside_keep(here) and not inside_crate(here)
 
 
 def opening_leg(log):
@@ -512,17 +525,29 @@ def light_candle(log):
 def get_excalibur(log):
     if inventory.contains(EXCALIBUR):
         return True
-    _w37 = yield from goto_npc(LADY_LAKE, [], log)
-    if _w37:
-        yield from talk_through('The Lady of the Lake', LADY_LAKE.prefer, log)
+    _w38 = yield from goto_npc(LADY_LAKE, [], log)
+    if not (_w38):
+        return False
+    _w39 = yield from open_dialogue('The Lady of the Lake', log)
+    if not (_w39):
+        return False
+    _w40 = yield from drive_dialogue(LADY_LAKE.prefer, log)
+    if not (_w40):
+        log('getExcalibur: Lady did not offer her sword test')
+        return False
+    if inventory.contains(EXCALIBUR):
+        return True
     if not inventory.contains(BREAD):
         log('getExcalibur: no Bread for the Beggar (should be provisioned)')
         return False
-    _w38 = yield from traversal.walk_resilient(JEWELLER_DOOR_STAND, radius=2, attempts=3, timeout_ms=120000, log=log)
-    if not (_w38):
+    _w41 = yield from traversal.walk_resilient(JEWELLER_DOOR_STAND, radius=2, attempts=3, timeout_ms=120000, log=log)
+    if not (_w41):
         return False
-    beggar = npcs.query().name('Beggar').action('Talk-to').within(6).nearest()
-    if beggar:
+
+    def beggar():
+        return npcs.query().name('Beggar').action('Talk-to').within(6).nearest()
+
+    if beggar():
         yield from talk_through('Beggar', ['Yes, here you go.', 'Yes certainly.'], log)
     else:
         door = locs.query().name('Door').action('Open').within(6).nearest()
@@ -531,11 +556,14 @@ def get_excalibur(log):
             return False
         if not (door.interact('Open')):
             return False
-        _w39 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 8000)
-        if not (_w39):
-            log('getExcalibur: jeweller door opened but the Beggar dialogue never appeared — retry')
+        _w42 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue() or beggar() is not None, 8000)
+        if not (_w42):
+            log('getExcalibur: jeweller door produced no Beggar or dialogue')
             return False
-        yield from drive_dialogue(['Yes certainly.', 'Yes, here you go.'], log)
+        if chat_dialog.is_open() or chat_dialog.can_continue():
+            yield from drive_dialogue(['Yes certainly.', 'Yes, here you go.'], log)
+        else:
+            yield from talk_through('Beggar', ['Yes, here you go.', 'Yes certainly.'], log)
     return inventory.contains(EXCALIBUR)
 
 
@@ -555,22 +583,22 @@ def summon_and_break(log):
 
 
 def try_break_crystal(log):
-    _v42 = (game.tile().level if game.tile() is not None else None)
-    _c41 = ((_v42 if _v42 is not None else 0)) < 1
-    if _c41:
-        _w43 = yield from climb_at(TOWER_LADDER_0, 'Climb-up', log)
-        _c41 = not (_w43)
-    if _c41:
-        return 'fail'
     _v45 = (game.tile().level if game.tile() is not None else None)
-    _c44 = ((_v45 if _v45 is not None else 0)) < 2
+    _c44 = ((_v45 if _v45 is not None else 0)) < 1
     if _c44:
-        _w46 = yield from climb_at(TOWER_LADDER_1, 'Climb-up', log)
+        _w46 = yield from climb_at(TOWER_LADDER_0, 'Climb-up', log)
         _c44 = not (_w46)
     if _c44:
         return 'fail'
-    _w47 = yield from traversal.walk_resilient(CRYSTAL_STAND, radius=2, attempts=3, timeout_ms=60000, log=log)
-    if not (_w47):
+    _v48 = (game.tile().level if game.tile() is not None else None)
+    _c47 = ((_v48 if _v48 is not None else 0)) < 2
+    if _c47:
+        _w49 = yield from climb_at(TOWER_LADDER_1, 'Climb-up', log)
+        _c47 = not (_w49)
+    if _c47:
+        return 'fail'
+    _w50 = yield from traversal.walk_resilient(CRYSTAL_STAND, radius=2, attempts=3, timeout_ms=60000, log=log)
+    if not (_w50):
         return 'fail'
 
     def crystal_q():
@@ -586,32 +614,42 @@ def try_break_crystal(log):
             log('tryBreakCrystal: scene not synced on L2 — retrying')
             return 'fail'
         return 'broke'
+    _c51 = not inventory.contains(EXCALIBUR) and equipment.contains(EXCALIBUR)
+    if _c51:
+        _w52 = yield from equipment.unequip(EXCALIBUR)
+        _c51 = not (_w52)
+    if _c51:
+        return 'fail'
     excal = inventory.first(EXCALIBUR)
     if not excal:
         log('tryBreakCrystal: no Excalibur to break the crystal')
         return 'fail'
-    excal.use_on(crystal)
-    yield from execution.delay_ticks(3)
-    gone = locs.query().name('Giant crystal').within(8).nearest() is None or npcs.query().name('Merlin').within(8).nearest() is not None
-    return ('broke' if gone else 'need-summon')
+    if not (excal.use_on(crystal)):
+        return 'fail'
+    freed = yield from execution.delay_until(lambda: crystal_q() is None or npcs.query().name('Merlin').within(8).nearest() is not None or any([('already freed merlin' in text.lower() or 'set merlin free' in text.lower()) for text in chat_dialog.texts()]), 8000)
+    if event_signal.pending():
+        return 'fail'
+    if freed:
+        yield from drive_dialogue([], log)
+    return ('broke' if freed else 'need-summon')
 
 
 def summon_thrantax(log):
-    _w48 = yield from traversal.walk_resilient(CHAOS_ALTAR_STAND, radius=2, attempts=4, timeout_ms=180000, log=log)
-    if not (_w48):
+    _w53 = yield from traversal.walk_to(CHAOS_ALTAR_STAND, radius=2, timeout_ms=600000, avoid_zones=ALTAR_AVOID_ZONES, log=log)
+    if not (_w53):
         return False
     altar = locs.query().name('Chaos altar').action('Check').within(8).nearest()
     if altar:
         altar.interact('Check')
         yield from execution.delay_ticks(2)
-    _w49 = yield from traversal.walk_resilient(MAGIC_SYMBOL, radius=1, attempts=3, timeout_ms=120000, log=log)
-    if not (_w49):
+    _w54 = yield from traversal.walk_to(MAGIC_SYMBOL, radius=1, timeout_ms=600000, avoid_zones=ALTAR_AVOID_ZONES, log=log)
+    if not (_w54):
         return False
-    _c50 = not inventory.contains(LIT_CANDLE)
-    if _c50:
-        _w51 = yield from light_candle(log)
-        _c50 = not (_w51)
-    if _c50:
+    _c55 = not inventory.contains(LIT_CANDLE)
+    if _c55:
+        _w56 = yield from light_candle(log)
+        _c55 = not (_w56)
+    if _c55:
         return False
     bones = inventory.first(BAT_BONES)
     if not bones:
@@ -619,8 +657,8 @@ def summon_thrantax(log):
         return False
     if not (bones.interact('Drop')):
         return False
-    _w52 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue() or npcs.query().name(THRANTAX).within(6).nearest() is not None, 6000)
-    if not (_w52):
+    _w57 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue() or npcs.query().name('Thrantax').within(6).nearest() is not None, 6000)
+    if not (_w57):
         log('summonThrantax: Thrantax did not appear (words not learned, or off the symbol?)')
         return False
     yield from drive_dialogue(['Snarthon Candtrick Termanto'], log)
@@ -652,14 +690,31 @@ def decide(snap):
     if snap.journal == 'not_started':
         mordred_briefed = False
         return Record({'kind': 'talk', 'stop': KING_ARTHUR})
-    has_excalibur = has(snap, EXCALIBUR)
+    if snap.stage is None:
+        return Record({'kind': 'wait', 'reason': 'Merlin journal stage unavailable'})
+    mordred_briefed = snap.stage >= 4
+    if snap.stage < 3:
+        return Record({'kind': 'custom', 'name': 'opening (knights + fortress)', 'run': opening_leg})
+    if snap.stage == 3:
+        return Record({'kind': 'custom', 'name': 'fortress (Mordred + Morgan)', 'run': fortress})
+    here = (snap.tile if snap.tile is not None else game.tile())
+    if here and inside_keep(here):
+        return Record({'kind': 'custom', 'name': 'leave Mordred fortress', 'run': leave_keep})
+    if snap.stage >= 6:
+        return Record({'kind': 'talk', 'stop': KING_ARTHUR})
+    has_excalibur = has(snap, EXCALIBUR) or ('excalibur' in snap.worn)
+    if not has_excalibur:
+        if not snap.bank_known:
+            return Record({'kind': 'scan_bank'})
+        _v60 = (snap.bank.get('excalibur') if snap.bank is not None else None)
+        if ((_v60 if _v60 is not None else 0)) > 0:
+            return Record({'kind': 'withdraw', 'items': [Record({'name': EXCALIBUR, 'qty': 1})]})
+    if snap.stage == 5:
+        return (Record({'kind': 'custom', 'name': 'summon Thrantax + break the crystal', 'run': summon_and_break}) if has_excalibur else Record({'kind': 'custom', 'name': 'get Excalibur (Lady of the Lake + Beggar)', 'run': get_excalibur}))
     has_unlit = has(snap, UNLIT_CANDLE)
     has_lit = has(snap, LIT_CANDLE)
     has_bones = has(snap, BAT_BONES)
     has_wax = has(snap, WAX)
-    any_product = has_excalibur or has_unlit or has_lit or has_bones or has_wax
-    if not any_product:
-        return Record({'kind': 'custom', 'name': 'opening (knights + fortress)', 'run': opening_leg})
     if not has_bones:
         return Record({'kind': 'custom', 'name': 'kill a Giant bat for bones', 'run': kill_giant_bat})
     if not has_unlit and not has_lit and not has_wax:
@@ -672,6 +727,61 @@ def decide(snap):
         return Record({'kind': 'custom', 'name': 'get Excalibur (Lady of the Lake + Beggar)', 'run': get_excalibur})
     return Record({'kind': 'custom', 'name': 'summon Thrantax + break the crystal', 'run': summon_and_break})
 
+
+def recover_crate(log):
+    def outside():
+        tile = game.tile()
+        return tile is not None and not inside_crate(tile)
+
+    if outside():
+        return True
+    yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 1500)
+    if chat_dialog.is_open() or chat_dialog.can_continue():
+        yield from drive_dialogue(['Yes.'], log)
+        if outside():
+            return True
+    if event_signal.pending():
+        return False
+    wall = locs.query().name('Crate wall').action('Climb-out').within(3).where(lambda loc: loc.tile().x == CRATE_INTERIOR.x or loc.tile().z == CRATE_INTERIOR.z).nearest()
+    if not wall or not (wall.interact('Climb-out')):
+        return False
+    _w17 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 6000)
+    if not (_w17):
+        return False
+    yield from drive_dialogue(['Yes.'], log)
+    _result18 = yield from execution.delay_until(outside, 6000)
+    return _result18
+
+def read_merlin_stage():
+    status = quests.status("Merlin's Crystal")
+    if status == 'complete':
+        return 7
+    if status == 'not_started':
+        return 0
+    if status != 'in_progress':
+        return None
+    _w59 = yield from quests.journal("Merlin's Crystal")
+    text = normalize_journal(_w59)
+    if reader.modals().main != -1:
+        yield from modals.close()
+        yield from execution.delay_ticks(1)
+    if ('quest complete!' in text):
+        return 7
+    if ('i freed merlin by shattering' in text):
+        return 6
+    if ('i summoned the spirit thrantax' in text):
+        return 5
+    if ('in return for sparing her son' in text):
+        return 4
+    if ('delivery by sea' in text):
+        return 3
+    if ('impenetrable fortress' in text):
+        return 2
+    if ('i should ask the' in text):
+        return 1
+    if ('i can start this quest' in text):
+        return 0
+    return None
 
 merlinscrystal = QuestModule(**{
     'record': quest_record('arthur'),
@@ -697,5 +807,7 @@ merlinscrystal = QuestModule(**{
     'coins',
     'rune mace',
 ],
+    'read_stage': read_merlin_stage,
+    'recover': lambda tile: Record({'kind': 'custom', 'name': 'climb out of Merlin crate', 'run': recover_crate}) if inside_crate(tile) else None,
     'decide': decide,
 })

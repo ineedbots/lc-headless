@@ -129,12 +129,64 @@ def open_wall_and_descend(log):
 
 # Why: completing teleports you into the post-quest cavern, a level-1 pocket of mapsquare 39_156 whose only exit is its iron ladder to the lighthouse ground floor.
 # Why: retaliation stays off so the level-100 dagannoths below don't start a fight on the way home.
+def in_postquest_cavern(tile):
+    return tile is not None and tile.level == 1 and tile.x >= 2496 and tile.x <= 2559 and tile.z >= 9984 and tile.z <= 10047
+
+def in_lighthouse(tile):
+    if not tile or tile.level < 0 or tile.level > 2 or tile.z < 3636 or tile.z > 3644:
+        return False
+    if tile.z == 3636:
+        return tile.x == 2509
+    inset = (2 if tile.z == 3637 or tile.z == 3644 else (1 if tile.z == 3638 or tile.z == 3643 else 0))
+    return tile.x >= 2505 + inset and tile.x <= 2512 - inset
+
+def leave_lighthouse(log):
+    yield from settle_scene()
+    for i in range(2):
+        here = game.tile()
+        if not here:
+            return False
+        if here.level == 0:
+            break
+        stairs = locs.query().name(HD_LOC.STAIRS).action('Climb-down').within(12).where(lambda loc: loc.tile().level == here.level).nearest()
+        if not stairs or not (stairs.interact('Climb-down')):
+            return False
+
+        def _fn1():
+            tile = game.tile()
+            return tile is not None and tile.level < here.level
+        _w2 = yield from execution.delay_until(_fn1, 8000)
+        if not (_w2):
+            return False
+        yield from settle_scene()
+    doorway = HD_TILE.REAL_LIGHTHOUSE_L0.translate(0, -1)
+    _w3 = yield from traversal.walk_resilient(doorway, radius=0, attempts=3, timeout_ms=30000, log=log)
+    if not (_w3):
+        return False
+    yield from settle_scene()
+    door = locs.query().name(HD_LOC.DOORWAY).action('Walk-through').where(lambda loc: loc.tile().equals(doorway)).nearest()
+    if not door or not (door.interact('Walk-through')):
+        return False
+
+    def _fn4():
+        tile = game.tile()
+        return tile is not None and HD_TILE.LIGHTHOUSE_DOOR.equals(tile)
+    _w5 = yield from execution.delay_until(_fn4, 8000)
+    if not (_w5):
+        return False
+    yield from settle_scene()
+    _result6 = yield from traversal.walk_resilient(HD_TILE.CAUSEWAY_SOUTH, radius=1, attempts=3, timeout_ms=180000, log=log)
+    return _result6
+
 def exit_after_quest(log):
     """Walk out of the finished quest's cavern."""
     here = game.tile()
     if not here:
         return False
-    if here.z < 9984:
+    if not in_postquest_cavern(here):
+        if in_lighthouse(here):
+            result = yield from leave_lighthouse(log)
+            return result
         return True
     game.set_auto_retaliate(False)
     try:
@@ -156,5 +208,9 @@ def _climb_out(log):
     if not ladder or not (ladder.interact('Climb')):
         log('no iron ladder out of the post-quest cavern')
         return False
-    result = yield from execution.delay_until(lambda: _z() < 9984, 10000)
+    landed = yield from execution.delay_until(lambda: in_lighthouse(game.tile()), 10000)
+    if not landed:
+        return False
+    yield from settle_scene()
+    result = yield from leave_lighthouse(log)
     return result

@@ -35,7 +35,7 @@ def stocked(snap, name):
     key = name.lower()
     _v2 = snap.inv.get(key)
     _v3 = (snap.bank.get(key) if snap.bank is not None else None)
-    return ((_v2 if _v2 is not None else 0)) + ((_v3 if _v3 is not None else 0))
+    return ((_v2 if _v2 is not None else 0)) + ((_v3 if _v3 is not None else 0)) + int(key in snap.worn)
 
 
 def dressed(snap, slot):

@@ -330,9 +330,11 @@ def root_step(snap):
     return Record({'kind': 'custom', 'name': f'farm limpwurt roots ({banked + held}/{ROOTS_WANTED})', 'run': farm_roots})
 
 
-def supplies_step(snap, candle, bow, roots):
+def supplies_step(snap, candle, bow, roots, fletching_level=None):
     """The next surface acquisition for the wanted parts of the kit, or null when they are all in hand."""
     need_bow = bow and held_or_banked(snap, IKOV_OBJ.YEW_SHORTBOW) == 0
+    if need_bow and fletching_level is not None and fletching_level < 65:
+        return Record({'kind': 'wait', 'reason': 'need Fletching 65 to make a Yew shortbow, or a banked Yew shortbow'})
     # Why: Aemad's is in East Ardougne and the rest of the kit is a Catherby-Seers loop, so the axe is bought on the way out.
     if need_bow and axe_outstanding(snap):
         return Record({

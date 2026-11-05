@@ -263,7 +263,9 @@ def fight_with_release(fight, release_npc_id, log):
     beast_id = fight.npc_id
 
     def loose():
-        return beast_loose(beast_id)
+        npc_id = beast_id
+        cover = fight.cover
+        return npcs.query().where(lambda npc: npc.id == npc_id and not npc.targets_another_player() and (cover is not None or pocket_of(npc.network_tile()) == 'arena')).action('Attack').within(20).exists()
 
     # Why: a caged beast still renders and offers Attack, so the first pass may only learn it's caged by swinging; either way the Servil lets it out.
     if loose():
@@ -282,6 +284,7 @@ def fight_with_release(fight, release_npc_id, log):
     if not (_w28):
         log(f'{fight.what} did not come out after the dialogue')
         return False
+    yield from execution.delay_ticks(2)
     _w29 = yield from run_fight(fight, log)
     return (_w29) == 'won'
 

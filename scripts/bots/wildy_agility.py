@@ -1,7 +1,6 @@
 # Runs the Wilderness Agility Course, eating as it goes, and after a death banks for food and comes back:
 # rs2b0t's WildyAgility (MIT, see thirdparty/rs2b0t). It needs Agility 52 for the ridge, and carried food.
 
-import random
 import time
 
 from rs2004.catalogs import FOOD_OPTIONS, LOADOUT_SETTING, ContinueDialog, DeathRecovery, food_heal_amount, is_food_item, script_food, should_eat_to_use_food
@@ -148,14 +147,6 @@ def near_tile(here, dest, radius):
 def at_ridge_approach(here, radius=2):
     """Ready to click the ridge: by its south stand, not already north of the Door."""
     return near_tile(here, RIDGE_APPROACH, radius) and south_of_ridge(here)
-
-
-def reaction_ms():
-    """A human pause after clearing an obstacle; the character settles a tick before the next click, or the first
-    try is wasted."""
-    if random.random() < 0.1:
-        return 1200 + random.random() * 1800
-    return 600 + random.random() * 900
 
 
 def now_ms():
@@ -534,8 +525,6 @@ class RunLap(Task):
                 bot.obstacle_times.pop(0)
             bot.last_cleared_tick = game.tick()
             bot.advance()
-            # A short human pause only: waiting on the animation hung the next lap when combat kept it animating.
-            yield from execution.delay(int(reaction_ms()))
             return
         # Low HP gives way to EatFood without spending a retry: combat damage isn't the obstacle failing.
         if reason == 'low_hp':

@@ -456,7 +456,7 @@ def _loc_with_action(name, op):
 class _Banking:
     """Opening a bank for a trip, and the whole trip, walking to one across the map when none is near."""
 
-    def open(self, stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14, log=None):
+    def open(self, stand=None, booth_name='Bank booth', booth_op='Use-quickly', obstacles=None, destination=None, prefer_nearby=True, nearby_radius=14, log=None, avoid_zones=None):
         """Opens a bank, the way resolve_bank_open_route picks: a booth within nearby_radius; else a known bank
         that near, when the preset stand isn't; else the booth at stand, walked to through the obstacles named
         ('door', 'gate') when there are some; else destination, or the nearest bank a route reaches. A bank the
@@ -485,7 +485,7 @@ class _Banking:
 
         if route == 'local-bank' and nearest is not None:
             say(f"bank: local {nearest['name']} bank; using it instead of the distant preset")
-            arrived = yield from traversal.walk_resilient(_tile_of(nearest), 4, None, 120000, log=log)
+            arrived = yield from traversal.walk_resilient(_tile_of(nearest), 4, None, 120000, log=log, avoid_zones=avoid_zones)
             if not arrived:
                 return False
             opened = yield from open_bank_access(nearest, fallback, log)
@@ -500,7 +500,7 @@ class _Banking:
             if wanted:
                 yield from walk_opening(stand, 2, wanted, log)
             else:
-                arrived = yield from traversal.walk_resilient(stand, 2, None, 120000, log=log)
+                arrived = yield from traversal.walk_resilient(stand, 2, None, 120000, log=log, avoid_zones=avoid_zones)
                 if not arrived:
                     return False
             # Shantay, the Duel Arena and Gundai: the known bank's access beats a booth by name.
@@ -524,7 +524,7 @@ class _Banking:
                 dest = nearest
             if dest is not None:
                 say(f"no booth in scene; walking to the {dest['name']} bank")
-                arrived = yield from traversal.walk_resilient(_tile_of(dest), 4, None, 120000, log=log)
+                arrived = yield from traversal.walk_resilient(_tile_of(dest), 4, None, 120000, log=log, avoid_zones=avoid_zones)
                 if not arrived:
                     say(f"bank: could not reach {dest['name']}")
                     return False

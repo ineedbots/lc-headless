@@ -94,7 +94,8 @@ def fight_rounds(fight, log):
     missing = 0
     lures = 0
     open_field = False
-    for i in range(fight.guard):
+    started = game.tick()
+    while game.tick() - started < fight.guard:
         if event_signal.pending():
             log(f'{fight.what}: yielding to a random event')
             return 'stuck'
@@ -125,6 +126,8 @@ def fight_rounds(fight, log):
             yield from execution.delay_ticks(1)
             continue
         missing = 0
+        if not fight.cover and pocket_of(npc.network_tile()) != 'arena':
+            return 'unengaged'
         if now - reported >= 40:
             reported = now
             log(f"{fight.what}: hp={skills.effective('hitpoints')}/{skills.level('hitpoints')}" + f' prayer={prayer.points()} attacks={swings} at ({npc.tile().x},{npc.tile().z})')

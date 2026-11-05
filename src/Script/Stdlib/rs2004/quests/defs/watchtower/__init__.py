@@ -1,6 +1,8 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/watchtower/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
+from rs2004.quests.defs.watchtower.bones import dragon_bank_pending, hunt_dragon_bones, in_dragon_lair, leave_dragon_lair, refresh_dragon_bank
+from rs2004.quests.food import quest_food
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.watchtower.areas import CRYSTALS, RELIC_PARTS, WT_ITEM, WT_TILE, watchtower_area
 from rs2004.quests.defs.watchtower.caves import answer_mad_skavid, learn_from_scared_skavid, learn_word, leave_cave, next_skavid_cave, take_nightshade
@@ -67,6 +69,10 @@ def stage_tribes(snap, area):
         if held(snap, WT_ITEM.DRAGON_BONES.id) > 0 or not has_flag(progress, 'spoken-toban'):
             return at(area, 'tobanCamp', Record({'kind': 'custom', 'name': 'talk to Toban', 'run': talk_to_toban}))
         bones = bank_only(snap, WT_ITEM.DRAGON_BONES)
+        if bones is not None and bones.kind == 'wait':
+            foods = [quest_food.name or 'Lobster', 'Lobster', 'Swordfish', 'Tuna']
+            food = ([name for name in foods if snap.inv.get(name.lower(), 0) + (snap.bank or {}).get(name.lower(), 0) >= 12] or [quest_food.name or 'Lobster'])[0]
+            bones = Record({'kind': 'custom', 'name': 'kill a blue dragon for Dragon bones', 'run': lambda log: hunt_dragon_bones(food, log)})
         return (at(area, 'yanille', bones) if bones else at(area, 'tobanCamp', Record({'kind': 'custom', 'name': 'talk to Toban', 'run': talk_to_toban})))
     if not has_flag(progress, 'helped-grew'):
         if held(snap, WT_ITEM.OGRE_TOOTH.id) > 0 or not has_flag(progress, 'spoken-grew'):
@@ -298,6 +304,10 @@ def recover_crystals(snap):
 
 
 def decide(snap):
+    if in_dragon_lair(snap.tile):
+        return Record({'kind': 'custom', 'name': 'leave the dragon lair', 'run': leave_dragon_lair})
+    if dragon_bank_pending():
+        return Record({'kind': 'custom', 'name': 'refresh the bank after the dragon hunt', 'run': refresh_dragon_bank})
     if snap.journal == 'complete' or ((snap.stage if snap.stage is not None else -1)) >= WATCHTOWER_STAGE.COMPLETE:
         if held(snap, WT_ITEM.WATCHTOWER_SPELL.id) > 0:
             return Record({'kind': 'custom', 'name': 'read the Watchtower spell scroll', 'run': read_spell_scroll})
@@ -365,6 +375,7 @@ watchtower = QuestModule(**{
     'record': quest_record('itwatchtower'),
     'bank': WT_TILE.YANILLE_BANK,
     'owns_inventory': True,
+    'resume_at': in_dragon_lair,
     'read_progress': read_watchtower_progress,
     'sustain': Record({'foods': ['Lobster', 'Swordfish', 'Tuna'], 'eat_below_hp': 0.6}),
     'decide': decide,

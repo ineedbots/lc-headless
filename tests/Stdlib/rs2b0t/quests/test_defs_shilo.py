@@ -936,8 +936,16 @@ def _fn106():
 test('Shilo scans an unknown bank when combat slots still need gear', _fn106)
 
 
+def ready_answer(value):
+    return value
+    yield
+
+
 def _fn107():
     deposited = []
+    from rs2004.items import inventory
+    spy_on(bank, 'backpack_ready', impl=lambda *args, **kwargs: ready_answer(True))
+    spy_on(inventory, 'items', returns=[])
     s = snapshot(({
         'inv': {_k: _v for _k, _v in [['rune warhammer', 1], ['hammer', 1], ['tattered scroll', 1], ['lobster', 25]]},
         'bank': {_k: _v for _k, _v in [['steel scimitar', 1]]},
