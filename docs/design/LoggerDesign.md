@@ -66,7 +66,7 @@ rs2004-headless/
         └── LogCapture.cpp
 ```
 
-- `LogLevel_e`, `LogEntry_s` and `LogFormat_s` each have a header of their own, since the sinks, the formatter and the config use them without the logger. `LogFormatter` formats an entry as a line, `ConsoleOutput` writes it to stdout or stderr, and `Terminal` holds the platform calls that decide whether the console shows colors ([RefactorDesign.md](RefactorDesign.md) §5).
+- `LogLevel_e`, `LogEntry_s` and `LogFormat_s` each have a header of their own, since the sinks, the formatter and the config use them without the logger. `LogFormatter` formats an entry as a line, `ConsoleOutput` writes it to stdout or stderr, and `Terminal` holds the platform calls that decide whether the console shows colors.
 - `Logger` lives in `Console/`, with everything else that writes to the console. A class that logs includes `../Console/Logger.hpp` in its header, because `Logger` appears in its constructor's prototype and its members, and again in its `.cpp` (CONVENTIONS §5).
 - `pch.hpp` gains `<atomic>` and `<mutex>` for the logger's members, `<source_location>` and `<type_traits>` for `LogFormat_s`, and `<thread>` for the threading tests.
 - `main.cpp` creates the logger, makes it the default, and passes it to `Application`, which passes it on (see Usage).

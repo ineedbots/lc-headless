@@ -604,11 +604,11 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 
 | Kind | rs2b0t | Here |
 |---|---|---|
-| Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, tick manipulation (off until rs2b0t ships it), the Fisher's mule hand-offs (gatherer, mule, cooker, supplier) and the Fishing Guild feather and Shilo supply runs |
+| Gathering | Miner, Woodcutter, Fisher (GatheringBot) | `miner.py`, `woodcutter.py`, `fisher.py`, on the `bots/gathering/` package: cooking, chop-then-burn, tool buying and repair, the Desert Mining Camp, opt-in three-tick fly fishing, the Fisher's mule hand-offs (gatherer, mule, cooker, supplier) and the Fishing Guild feather and Shilo supply runs |
 | Gathering | CoalTrucks, EssMiner, FlaxPicker, FlaxAIO, GnomeMagicChopper | `coal_trucks.py`, `ess_miner.py`, `flax_picker.py`, `flax_aio.py`, `gnome_magic_chopper.py` |
 | Skilling | BankFletcher, CookBot, DartFletcher, Firemaker, FlaxSpinner, GemCutter, HerbCleaner, HerbloreSecondaries, PotionMaker, LeatherCrafter, SmelterBot, SmithingBot, Superheater, TannerBot, VialFiller, BoneBurier, ClimbingBoots | `bank_fletcher.py` and the rest, each named as rs2b0t names it in snake_case |
 | Jewellery and caskets | JiveBalls, JiveCaskets, JiveCrafting, JiveEnchanter | `jive_balls.py`, `jive_caskets.py`, `jive_crafting.py`, `jive_enchanter.py`. JiveCrafting can craft jewellery or string amulets with banked balls of wool at the nearest bank |
-| Runecrafting | RuneCrafter, NatureCrafter | `rune_crafter.py`, `nature_crafter.py`. NatureCrafter's paint button is the `gobank` console command |
+| Runecrafting | RuneCrafter, NatureCrafter, JiveRC | `rune_crafter.py`, `nature_crafter.py`, `jive_rc.py`. NatureCrafter's paint button is the `gobank` console command |
 | Agility | AgilityBot, WildyAgility, EdgevilleMonkeyBars, BrimhavenAgility | `gnome_course.py`, `wildy_agility.py`, `edgeville_monkey_bars.py`, `brimhaven_agility.py` |
 | Thieving | ThievingBot, ArdyCakes, ArdyThiever, ArdyFighter | `thiever.py`, `ardy_cakes.py`, `ardy_thiever.py`, `ardy_fighter.py`. The three Ardougne bots solve the clues they pick up |
 | Treasure Trails | ClueSolver | `clue_solver.py`: solves the clue or opens the casket in the pack, then banks the reward |
@@ -624,9 +624,61 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Two-account | FlaxRunner, MuleCrafter | `flax_runner.py` (a runner picks, a spinner spins), `mule_crafter.py` (a crafter and its mules) |
 | Four-account | JiveKQ | `jive_kq.py`, its parts in `bots/jivekq/`: four accounts in one client kill the Kalphite Queen together, talking over `send_bot_message` |
 | Account progression | AccountLeveler | [`bots/leveler.py`](account-leveler.md), with its planner, supply adapters and controller in `bots/account_leveler/` |
+| Bank coordination | MuleDepot | `mule_depot.py`: dump and supply roles with per-client delivery accounting |
 | Utility | BankSorter | `bank_sorter.py` |
 | Gathering | FlourCollector | `flour_collector.py`: fills banked empty pots at Sinclair Mansion and banks the flour at Seers; requires Murder Mystery started |
 | Herblore | RoguesPurse | `rogues_purse.py`, with `bots/roguespurse/logic.py`: searches, identifies and drops herbs by default; `mode=bank` banks full loads. Requires Herblore 3 and Jungle Potion at the Rogues purse stage |
 | Event looting | WanderLooter | `wander_looter.py`, its logic and tasks in `bots/wanderlooter/`: wanders and picks up drops by exact name (Pumpkin by default), without fighting, and leaves alone drops where it took damage |
 
 `scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
+
+## Bot feature settings
+
+### JiveRC and Cosmic runes
+
+`bots/jive_rc.py` exposes the upstream JiveRC name alongside the supported `bots/nature_crafter.py`
+entry and saved settings. Select `Cosmic runes` and start in Zanaris or the Cosmic altar. Inside meetings
+require the matching talisman; the Dramen staff is retained during cleanup and deposits. Cosmic uses
+the exact altar map square and the Zanaris dialogue banker. `gobank` remains the console bank command.
+
+### Three-tick fly fishing
+
+Fisher's opt-in `three_tick_fly` requires fly fishing, with cooking and mule modes Off. It batches drops,
+knife/log, Make-1 and Lure; the next-tick landing arms the cycle and a missed landing falls back safely.
+Catches are dropped even when banking is enabled. Bank trips replenish rod, feathers, knife and carrier
+log. Missing kit falls back to the knife/axe ground spawns and chopping a log, including with `bank=false`.
+Other unshipped tick-manipulation profiles remain Off. Live throughput remains unmeasured.
+
+### MuleCrafter meeting and banking
+
+`meeting_point` defaults to `Altar (inside)` and each mule needs its talisman. Select `Ruins (outside)`
+for the previous location. The crafter remains at the altar between deliveries and exits for a due bank
+visit; active trade handling takes precedence over banking and movement.
+
+`bank_fill` allows all crafter bank visits, including startup cleanup. If false, start with the talisman
+and configure partners. If true, `trades_per_bank=0` selects solo crafting and banking on empty; a
+positive count enables mule trades and banks after that many confirmed deliveries. Paired configurations
+should set a positive count. The local default remains `bank_fill=true`.
+
+### MuleDepot
+
+`bots/mule_depot.py` supports Dump/Mule, Dump/Supermule, Supply/Supplier and Supply/Client. Participants
+choose the same bank. Dump transfers the exact configured item list; Supply sends client loadouts over
+as many batches as needed. Names/IDs resolve and merge before planning; oversized requests, partner
+allow-lists and rotating requests are supported. Transfers require sustained trade closure and an
+inventory change. Three empty stock reads stop dumping or mark shortages, which are reported per client.
+The delivery ledger is in memory for the current run, not persistent shared stock; restarting Supply
+starts a fresh delivery run. Coordinated live acceptance is tracked in
+[#32](https://github.com/ineedbots/lc-headless/issues/32).
+
+### WildyAgility
+
+`food_withdraw` defaults to 28; explicit saved values such as 20 remain valid. The local
+`obstacle_timeout_ticks` setting remains available (default 24, range 5–60), with a wall-clock bound
+for endless movement/animation. Waiting obstacles are re-clicked each server tick after checking XP,
+falls/refusals and interruptions. Failed initial clicks and timeouts share retry-in-place, return-to-start
+and bounded-skip escalation. Food yields after three ticks without spending a retry.
+
+A 600 ms scratch-account comparison measured six laps at 59.70 seconds mean before and 57.40 after,
+with equal XP/clears but five versus two falls. Successful clear-time means were higher after the change;
+this supports workflow completion, not proof of a speedup or upstream-equivalent throughput.

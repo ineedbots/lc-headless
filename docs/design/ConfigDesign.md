@@ -84,7 +84,7 @@ rs2004-headless/
         └── AccountFileTests.cpp
 ```
 
-The single `ConfigFile` this section first described was split by job ([RefactorDesign.md](RefactorDesign.md) §6); the rules and messages below are unchanged.
+The single `ConfigFile` this section first described was split by job (see the current ownership below); the rules and messages below are unchanged.
 
 - `Config_s` and its section structs live in `Config_s.hpp`, the account's structs in `AccountConfig_s.hpp`, and `ServerSettings_s`, which both use, in a header of its own.
 - `Config_s.hpp` includes `../Utils/BigUInt.hpp`, because `BigUInt` is a member of `LoginSettings_s`, and `../Console/LogLevel_e.hpp`, because `LogLevel_e` is a member of `ClientSettings_s`. `ConfigFile.hpp` includes `../Console/Logger.hpp`, because `Logger` appears in `Load`'s and `Parse`'s prototypes.
@@ -277,7 +277,7 @@ Each account has its own file in `scripting.accountsDirectory`, read by `Account
 
 ## 4. ConfigFile
 
-This section shows `ConfigFile` as it was first written, as one class. [RefactorDesign.md](RefactorDesign.md) §6 split it by job without changing what it does: the parsing and conversions below are in `ConfigJson`, `Validate` and the TLS warning in `ConfigValidator`, the account functions in `AccountFile` (`LoadAccount` became `AccountFile::Load`, `ParseAccount` `AccountFile::Parse`, and `ACCOUNT_EXTENSION` `AccountFile::EXTENSION`), and `ConfigFile` keeps `Load`, `Parse` and `Serialize` for `client.jsonc`.
+This section shows `ConfigFile` as it was first written, as one class. The current implementation splits it by job: the parsing and conversions below are in `ConfigJson`, `Validate` and the TLS warning in `ConfigValidator`, the account functions in `AccountFile` (`LoadAccount` became `AccountFile::Load`, `ParseAccount` `AccountFile::Parse`, and `ACCOUNT_EXTENSION` `AccountFile::EXTENSION`), and `ConfigFile` keeps `Load`, `Parse` and `Serialize` for `client.jsonc`.
 
 ### Interface
 
@@ -856,3 +856,18 @@ This comes after `BigUInt` ([PacketDesign.md](PacketDesign.md) §8 step 3) and t
     - Update [LoggerDesign.md](LoggerDesign.md):
         - The `log_level` TODOs in §3 and §5: the key is now `client.logLevel`, with no `warn` alias.
         - The "unknown config key" example of a `Warning` in §4: nothing warns about one now.
+
+## 8. Current configuration ownership
+
+`ConfigFile` loads/parses/serializes `client.jsonc`; `AccountFile` owns account parsing and script-setting
+writes; `AccountDirectory` discovers enabled accounts and rejects duplicate usernames. `ConfigJson`
+converts JSON values, `ConfigValidator` applies rules/warnings, `ConfigOverrides::ForAccount` merges
+overrides, and `JsoncScanner`/`JsoncEditor` preserve comments while editing settings. The application
+keeps command-line-specific account-directory diagnostics. Opening/reading failures report
+`Failed to read config file <path>` or `Failed to read account file <path>` as appropriate.
+
+`settings_store.save` queues a change on `ScriptControl`. After stepping or finishing, the host updates
+its settings copy and invokes `onSettingSave`; `AccountFile::SetScriptSetting` persists the change with
+`JsoncEditor::Set`. Reloaded scripts therefore see the saved value. Shared bot settings belong under
+`script.settings["Global"]`, not new top-level account keys; see the
+[settings reference](../scripting/settings.md#global-settings) for the schema.

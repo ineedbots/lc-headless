@@ -2,9 +2,9 @@
 
 Plan for a script API with the abilities of rs2b0t's bot API, written the way Python is: rs2b0t's facades, query builder, bot classes, world walker, random-event guardian and catalogs, with snake_case names, and generators where rs2b0t awaits. The client hasn't been released, so this replaces today's flat API ([scripting/README.md](../scripting/README.md)) outright; nothing keeps the old names. plutonium-rsc's abilities are a subset of rs2b0t's, and its scripts port through a table in scripting/README.md. rs2b0t's quest and clue engines are left for a later project. The work comes in nine phases after a docs fix (§14). Code style follows [CONVENTIONS.md](CONVENTIONS.md). It extends the interface decoding in [CacheDesign.md](CacheDesign.md) §6, the paths in CacheDesign §10–11, and the runtime, events and API in [ScriptingDesign.md](ScriptingDesign.md) §3–6, whose naming rule it replaces.
 
-> All nine phases are done. [BotApiParityDesign.md](BotApiParityDesign.md) plans the rest of rs2b0t from phase 10, including what §1 leaves out for now: the quest and clue engines, and the market.
+> All original phases and the subsequent parity implementation are complete, including the quest and clue engines, market and AccountLeveler. The numbered phase descriptions below retain their original scope; [implemented scope and porting](#15-implemented-scope-and-porting) records the current additions and exclusions. Remaining work is tracked in [GitHub issues](https://github.com/ineedbots/lc-headless/issues).
 
-> The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
+> The change records below name classes as they were at the time. The current implementation splits those responsibilities: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
 
 Reference sources:
 
@@ -592,3 +592,77 @@ Each phase's "Done when" is in its section. The end-to-end check translates thre
 - `BankFletcher`: make menus and Make X.
 
 The scripting/README.md porting tables then map every rs2b0t export this design covers, and every name in plutonium's `script.go`, to its Python name, or mark it not ported, with the reason.
+
+## 15. Implemented scope and porting
+
+The embedded stdlib includes the shared bot modules, world travel and banking, market, combat hunting,
+duels, clues, all 63 quest definitions and AccountLeveler. Shared engines live in `rs2004.clues` and
+`rs2004.quests`; quest definitions are modules or packages under `quests/defs/` and load on demand.
+Bots live in `scripts/bots/`, with shared bot-specific logic in packages. Reusable API behavior belongs
+in the embedded stdlib rather than `scripts/lib`. The [bot catalog](../scripting/catalogs.md#ported-bots),
+[quest reference](../scripting/quests.md) and [AccountLeveler reference](../scripting/account-leveler.md)
+describe the public behavior.
+
+The original parity baseline was upstream `4417d0b7`. A later selective review covered `32d52004`
+through `8b7db422`, including quest recovery, Cosmic/JiveRC, multilocs, three-tick fly fishing,
+MuleCrafter meeting/banking modes, MuleDepot and WildyAgility retry timing. This is a pinned scope,
+not a claim about upstream's current tip. Upstream code/data are MIT licensed; retain provenance and
+the notice in `thirdparty/rs2b0t/LICENSE` when porting. Later upstream review is [#29](https://github.com/ineedbots/lc-headless/issues/29).
+
+### Porting tools
+
+`tools/port/ts2py.ts` uses the upstream checkout's TypeScript compiler to produce a first draft:
+
+```sh
+bun tools/port/ts2py.ts ../rs2b0t <file.ts> --stdlib
+python -I tools/port/lint.py src/Script/Stdlib scripts tests/Stdlib
+python -I tools/port/coverage.py ../rs2b0t --all
+python -B -m unittest discover -s tools/port
+```
+
+Finish drafts by hand, follow the [Python dialect](../scripting/python-dialect.md), and port outcome-based
+tests alongside each change. The translator converts names and waits; it does not replace review or
+behavioral validation, and must not overwrite finished hand ports. The export audit checks snake_case
+surface presence in the stdlib/stubs against its explicit `NOT_PORTED` allow-list; it cannot establish
+behavioral parity. Catalog and navigation exporters live in `tools/catalogs/` and `tools/nav/`;
+preserve local engine adjustments when regenerating data.
+
+The linter rejects silent pocketpy pitfalls, including literal `None` membership in statically known
+sets, and undriven generator calls through conditional returns/imported wrappers. Unknown values,
+imported collections and shadowed `set` names are conservatively left alone; this is not a type checker.
+
+### Deliberate headless exclusions
+
+| Upstream feature | Headless replacement or reason |
+|---|---|
+| Paint, panels, map pickers/overlays, multibox UI, desktop and camera controls | Terminal progress reports, account configuration and native navigation; no screen or camera |
+| Mouse/keyboard `Input` helpers | Facade actions such as `direct_navigator.walk` and `InvItem.interact` |
+| Browser diagnostics, render gates, worker clocks and event producers | Native host timing, event dispatch and diagnostics |
+| AutoRelogin, LoginBackoff, LoginCoordination, Credentials and WorldSwitch | Account connection/retry/login-spacing settings |
+| WelcomeScreen | No webclient welcome-screen interaction |
+| ScriptRegistry, registerScript, apiVersion and paint controls | Account files select Python scripts; no browser registry/version gate |
+| Bank snapshot-generation APIs | Deposit/withdraw generators wait for acknowledged inventory changes |
+| Tile.toString and AcquireTask constructor spelling | Python `repr` and `__init__` |
+| Nav worker packing, navTargets and panel/loadout/price schemas | Native navigator, generated graph and headless configuration |
+
+### Recorded validation and limits
+
+The 2026-11-05 checkpoint passed 810 registered tests in default Windows Debug and cache-backed Release
+using revisions 225, 274 and 289; default Debug skipped 27 cache-dependent cases. The traced Debug run
+covered 76,822 / 78,503 executable stdlib lines (97.86%), all 436 files at or above 95%. Later dragon/KQ
+scenario additions passed focused Debug and Release runs; bots under `scripts/` are outside that trace.
+The full export audit at `8b7db422`, dialect lint and 11 port-tool unit tests passed. These are saved
+results, not a substitute for rerunning checks on changed code.
+
+Live acceptance covered the implemented bots, all quest queues and clue trails, with limitations now
+tracked in issues. AccountLeveler's two active hours used low-level methods at 100 ms across restarts;
+phases 17h/17i also used 100 ms rather than 600 ms. Real-speed and newer feature checks remain in
+[#32](https://github.com/ineedbots/lc-headless/issues/32), [#34](https://github.com/ineedbots/lc-headless/issues/34)
+and [#35](https://github.com/ineedbots/lc-headless/issues/35). The incomplete dragon/KQ scenario audit is
+[#30](https://github.com/ineedbots/lc-headless/issues/30); the cache-backed Debug navigation timeout is
+[#31](https://github.com/ineedbots/lc-headless/issues/31).
+
+Detailed superseded phase plans, per-quest harness notes, commit decisions and acceptance logs remain
+available in the [documentation snapshot before consolidation](https://github.com/ineedbots/lc-headless/tree/3e1b92d/docs/design).
+Outstanding tasks, optional improvements and observations awaiting recurrence are maintained solely in
+[GitHub issues](https://github.com/ineedbots/lc-headless/issues).

@@ -394,3 +394,23 @@ partial ship repair or later replacement. The delegated bot restores the previou
 policy on stop. AccountLeveler forwards its Wilderness setting to this option.
 Witch's House checks for a usable fire staff before buying Fire Strike runes, and preserves
 fire staves while preparing inventory.
+
+## Recovery and preparation invariants
+
+All 63 quest definitions are implemented. `decide(snap)` chooses a leg from current state; resumable
+progress and interrupt recovery must not depend solely on a suspended generator's locals. Quest-list
+state and journals establish stage floors; unreadable/stale pages must not regress recognized progress,
+while an authoritative not-started result may reset it. Runtime specs cover journal boundaries and
+restart behavior.
+
+Inventory preparation is bank-first and equipment-aware, with quest-specific item caps and bounded
+preparation/retreat failure. An unselected sealed-area owner must not be abandoned; recover/exit the
+current pocket before normal banking or quest selection. Deposits require backpack acknowledgement.
+Combat preparation counts owned worn/carried/banked gear and provisions required spell runes and damage
+budgets. Watchtower's quest-owned dragon hunt confirms its exit, cleans up on failure and refreshes bank
+state before selection resumes. These rules also apply when resuming a partially completed quest.
+
+The [stdlib runtime-spec guide](../Building.md#writing-stdlib-runtime-specs) explains the test fixture
+and pocketpy constraints. Real-speed acceptance gaps and recurrence-based observations are maintained
+in [GitHub issues](https://github.com/ineedbots/lc-headless/issues), including
+[#34](https://github.com/ineedbots/lc-headless/issues/34) for phases 17h/17i.
