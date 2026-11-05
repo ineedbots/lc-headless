@@ -260,7 +260,7 @@ class ThievingBot(TaskBot):
         s = self.settings
         self.target = s.str('target', 'Man')
         self.action = s.str('action', 'Pickpocket')
-        self.food = script_food(s, '').lower()
+        self.food = (s.str('food', '').strip() or script_food(s, '')).lower()
         self.auto_bank = auto_food_banking(s.str('banking', 'None'))
         self.food_withdraw = s.num('food_withdraw', 22)
         self.bank_at_food = min(s.num('bank_at_food', 0), self.food_withdraw - 1)

@@ -177,3 +177,23 @@ def resolved_wait(value):
     if False:
         yield
     return value
+
+
+
+def delegated_thiever_food():
+    activity = ScriptActivity(lambda message: None)
+    spy_on(game, 'tile').mock_return_value(Tile(3221, 3219))
+    try:
+        yield from activity.start(manifest_for('Thiever'), {'food': ' Shrimps ', 'loadout': '', 'banking': 'Auto', 'food_withdraw': 12})
+        expect(activity.outcome).to_be_null()
+        expect(activity.child.food).to_be('shrimps')
+        expect(activity.child.auto_bank).to_be(True)
+        expect(activity.child.food_withdraw).to_be(12)
+    except Exception:
+        activity.stop()
+        restore_all()
+        raise
+    activity.stop()
+    restore_all()
+
+test('delegated Thiever uses explicit food without a loadout', delegated_thiever_food)
