@@ -39,7 +39,7 @@ namespace
         return {.x = Fixtures::HOME + dx, .z = Fixtures::HOME + dz, .level = 0};
     }
 
-    std::shared_ptr<const GameCache_s> MakeCache(Revision_e revision, bool withInterfaces)
+    std::shared_ptr<const GameCache_s> MakeCache(Revision_e revision, bool withInterfaces, bool multiloc = false)
     {
         auto cache = GameCache_s{};
         cache.revision = revision;
@@ -51,18 +51,24 @@ namespace
         TestCache::AddLoc(cache, 1530, "Door", {"Open"});
         TestCache::AddLoc(cache, 1276, "Tree", {"Chop down"});
 
+        if (multiloc)
+        {
+            TestCache::AddLoc(cache, 1531, "Visible door", {"Search"});
+            cache.locs[1530].multivarbit = 0;
+            cache.locs[1530].multiloc = {1531, -1};
+            cache.varbits.push_back({.baseVar = 7, .startBit = 0, .endBit = 0});
+        }
+
         if (withInterfaces)
         {
             TestCache::SetChatInterfaces(cache);
             TestCache::SetTradeScreen(cache);
             TestCache::AddComponents(cache, {
-                {.id = 700, .root = 700, .type = ComponentType_e::Layer, .width = 480, .height = 300,
-                    .children = {{.id = 701, .x = 20, .y = 20}, {.id = 702, .x = 62, .y = 20}, {.id = 703, .x = 200, .y = 100}}},
-                {.id = 701, .root = 700, .type = ComponentType_e::Inv, .width = 4, .height = 1, .marginX = 10,
-                    .options = {"Make", "Make 5", "Make 10"}},
-                {.id = 702, .root = 700, .type = ComponentType_e::Model, .width = 32, .height = 32},
-                {.id = 703, .root = 700, .type = ComponentType_e::InvText, .width = 1, .height = 1},
-            });
+                                                {.id = 700, .root = 700, .type = ComponentType_e::Layer, .width = 480, .height = 300, .children = {{.id = 701, .x = 20, .y = 20}, {.id = 702, .x = 62, .y = 20}, {.id = 703, .x = 200, .y = 100}}},
+                                                {.id = 701, .root = 700, .type = ComponentType_e::Inv, .width = 4, .height = 1, .marginX = 10, .options = {"Make", "Make 5", "Make 10"}},
+                                                {.id = 702, .root = 700, .type = ComponentType_e::Model, .width = 32, .height = 32},
+                                                {.id = 703, .root = 700, .type = ComponentType_e::InvText, .width = 1, .height = 1},
+                                            });
         }
 
         const auto locs = std::to_array<TestLoc_s>({{.id = 1276, .tile = Offset(-2, 3), .shape = 10}});
@@ -81,8 +87,8 @@ namespace
     class BindingFixture
     {
     public:
-        explicit BindingFixture(Revision_e revision = Revision_e::Rev289, bool withInterfaces = false, std::shared_ptr<const Config_s> config = {})
-            : cache{MakeCache(revision, withInterfaces)}
+        explicit BindingFixture(Revision_e revision = Revision_e::Rev289, bool withInterfaces = false, std::shared_ptr<const Config_s> config = {}, bool multiloc = false)
+            : cache{MakeCache(revision, withInterfaces, multiloc)}
             , map{cache}
             , client{config ? std::move(config) : MakeConfig(revision), cache, FakeGameServer::MakeAccount(), capture.GetLogger()}
             , actions{client}
@@ -573,17 +579,19 @@ TEST_CASE("Native named NPC actions return false after the target disappears", "
 
 TEST_CASE("Native scenery bindings accept object and coordinate call forms", "[ScriptBindings][ActionBindingCoverage]")
 {
+    const auto multiloc = GENERATE(false, true);
     auto server = FakeGameServer{TestWorld::Send};
-    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig())};
+    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig()), multiloc};
     fixture.Login();
+    fixture.Run(multiloc ? "op = 'Search'" : "op = 'Open'");
     REQUIRE_NOTHROW(fixture.Run(R"python(
 import _core
 door = locs.at(game.tile().translate(1, 0))
-assert _core.interact_loc(door, 'open') is True
-assert _core.interact_loc(door, op='Open') is True
+assert _core.interact_loc(door, op) is True
+assert _core.interact_loc(door, op=op) is True
 assert _core.interact_loc(door, 1) is True
-assert _core.interact_loc(1530, 3201, 3200, 'Open') is True
-assert _core.interact_loc_via([(3200,3200),(3200,3201)], 1530, 3201, 3200, 'Open') is True
+assert _core.interact_loc(1530, 3201, 3200, op) is True
+assert _core.interact_loc_via([(3200,3200),(3200,3201)], 1530, 3201, 3200, op) is True
 )python"));
     fixture.client.Flush();
     REQUIRE(server.WaitForPacket(ClientProt_e::OpLoc1, 5));
@@ -690,8 +698,8 @@ TEST_CASE("Native social bindings surface offline errors and leave queries usabl
     auto fixture = BindingFixture{};
     fixture.Run("import _core\n");
     const auto source = GENERATE("_core.say('Hello')", "_core.send_pm('Zezima', 'Hello')",
-        "_core.command('test')", "_core.add_friend('Zezima')", "_core.remove_friend('Zezima')",
-        "_core.add_ignore('Spammer')", "_core.remove_ignore('Spammer')");
+                                 "_core.command('test')", "_core.add_friend('Zezima')", "_core.remove_friend('Zezima')",
+                                 "_core.add_ignore('Spammer')", "_core.remove_ignore('Spammer')");
     CAPTURE(source);
     CHECK_THROWS_WITH(fixture.Run(source), ContainsSubstring("RuntimeError") && ContainsSubstring("not in game"));
     REQUIRE_NOTHROW(fixture.Run("assert _core.get_friends() == [('Zezima', 2)]\nassert _core.get_ignores() == ['Spammer']\n"));
@@ -1053,4 +1061,31 @@ assert game_messages.saw_since(7, CANT_REACH) and not game_messages.saw_since(9,
 assert game_messages.first_since(0, lambda text: text.startswith('Welcome')).seq == 7
 assert [m.text for m in game_messages.recent(1)] == ["I can't reach that!"]
 )python");
+}
+
+TEST_CASE("Script scenery snapshots use child options and keep base interaction ids", "[ScriptBindings][Multiloc]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, false, {}, true};
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+loc = locs.query().name('Visible door').nearest()
+assert loc is not None and loc.id == 1530 and loc.type_id == 1531
+assert loc.actions() == ['Search'] and loc.valid()
+assert locs.query().id(1530).nearest().name == 'Visible door'
+)python"));
+    fixture.state.varps[7] = 1;
+    fixture.map.Update(fixture.state);
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+assert not loc.valid()
+assert locs.query().name('Visible door').nearest() is None
+assert locs.at(loc.tile(), loc.layer) is None
+)python"));
+}
+
+TEST_CASE("Player snapshots retain animation start ticks when the sequence repeats", "[ScriptBindings]")
+{
+    auto fixture = BindingFixture{};
+    fixture.state.localPlayer.animation = {.id = 623, .tick = 49};
+    REQUIRE_NOTHROW(fixture.Run("p = players.local(); assert p.animation_id == 623 and p.animation_tick == 49"));
+    fixture.state.localPlayer.animation.tick = 50;
+    REQUIRE_NOTHROW(fixture.Run("p = players.local(); assert p.animation_id == 623 and p.animation_tick == 50"));
 }

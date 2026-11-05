@@ -5,6 +5,8 @@ struct LocType_s
     static constexpr std::size_t OP_COUNT = 5;
 
     u16 id = 0;
+    u16 multivarbit = 65535;
+    std::vector<s32> multiloc;
     u8 width = 1;
     u8 length = 1;
     bool blockWalk = true;

@@ -135,7 +135,7 @@ class Loc(_Located):
 
     def valid(self):
         current = _core.get_loc_at(self._x, self._z, self.layer)
-        return current is not None and current.id == self.id
+        return current is not None and current.id == self.id and current.type_id == self.type_id
 
     def __repr__(self):
         return f'Loc(id={self.id}, name={self.name}, tile=({self._x}, {self._z}, {self._plane}), layer={self.layer})'

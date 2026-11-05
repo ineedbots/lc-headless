@@ -17,6 +17,8 @@ struct SceneLoc_s
     u8 shape = 0;
     u8 angle = 0;
     bool changed = false;
+    // The selected child supplies appearance and options; id remains the interaction identity.
+    s32 visibleId = -2;
 };
 
 // Update rebuilds it whenever the state's build area or loc changes have moved on, so it always agrees with
@@ -44,6 +46,7 @@ public:
 
 private:
     void Rebuild(const GameState_s& state);
+    [[nodiscard]] std::optional<SceneLoc_s> ResolveLoc(SceneLoc_s loc) const;
     void BlockMissingSquares();
     void AddCollision(s32 level, s32 x, s32 z, s32 id, u8 shape, u8 angle);
     [[nodiscard]] const LocChange_s* FindChange(const Tile_s& tile, LocLayer_e layer) const;
@@ -58,4 +61,5 @@ private:
     std::optional<u64> m_builtAt;
     std::array<CollisionMap, MapSquare::LEVELS> m_collision;
     std::vector<LocChange_s> m_changes;
+    std::unordered_map<u16, s32> m_varps;
 };

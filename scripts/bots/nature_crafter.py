@@ -47,7 +47,7 @@ SPIDER_SAFE = Tile(2790, 3094, 0)
 
 
 class RuneRoute:
-    def __init__(self, talisman, rune, level, ruins, runner_bank, master_bank, unnote_npc=None, unnote_tile=None):
+    def __init__(self, talisman, rune, level, ruins, runner_bank, master_bank, unnote_npc=None, unnote_tile=None, temple_map_x=37, inside_meet=None, bank_npc=None, keep_items=None):
         self.talisman = talisman
         self.rune = rune
         self.level = level
@@ -57,18 +57,23 @@ class RuneRoute:
         # The store that un-notes essence, on routes that carry it noted.
         self.unnote_npc = unnote_npc
         self.unnote_tile = unnote_tile
+        self.temple_map_x = temple_map_x
+        self.inside_meet = inside_meet
+        self.bank_npc = bank_npc
+        self.keep_items = keep_items or []
 
 
 RUNES = {
     'Nature runes': RuneRoute('Nature talisman', 'Nature rune', 44, Tile(2865, 3022, 0), Tile(2655, 3283, 0), Tile(2852, 2954, 0), 'Jiminua', Tile(2767, 3122, 0)),
-    'Air runes': RuneRoute('Air talisman', 'Air rune', 1, Tile(2983, 3288, 0), Tile(3013, 3355, 0), Tile(3013, 3355, 0)),
+    'Air runes': RuneRoute('Air talisman', 'Air rune', 1, Tile(2983, 3288, 0), Tile(3013, 3355, 0), Tile(3013, 3355, 0), temple_map_x=44),
+    'Cosmic runes': RuneRoute('Cosmic talisman', 'Cosmic rune', 27, Tile(3173, 9501, 0), Tile(3152, 9575, 0), Tile(3152, 9575, 0), temple_map_x=33, inside_meet=Tile(2142, 4830, 0), bank_npc={'name': 'Banker', 'op': 'Bank', 'choose': "I'd like to access my bank account"}, keep_items=['Dramen staff']),
 }
 RUNE_OPTIONS = list(RUNES)
 DEFAULT_RUNE = 'Nature runes'
 
 SETTINGS = {
     'rune': SettingDef('string', DEFAULT_RUNE, 'Rune', options=RUNE_OPTIONS,
-                       help='which rune the pair crafts. Nature = Ardougne bank + ship + Jiminua un-noting; Air = Falador East bank, straight there and back'),
+                       help='which rune the pair crafts. Nature uses Ardougne and Jiminua; Air uses Falador East; Cosmic uses Zanaris bank (start in Zanaris or the Cosmic altar)'),
     'mode': SettingDef('string', 'Master', 'Mode', options=['Master', 'Runner'],
                        help='Master crafts at the altar and takes essence from runners; Runner ferries essence to the master'),
     'partner': SettingDef('string', '', 'Partner name(s)', help='Master: runner name(s) to accept essence from, comma-separated. Runner: the master to deliver to.'),
@@ -107,9 +112,9 @@ def offer_count(unnoted):
     return max(0, min(TRADE_CAP, unnoted))
 
 
-def keep_names(talisman, product_rune):
+def keep_names(talisman, product_rune, items=None):
     """Coins, essence and the talisman; the master keeps the rune it crafts too. A nameless slot is litter."""
-    keep = [ESSENCE_NAME, COINS_NAME, talisman.lower()]
+    keep = [ESSENCE_NAME, COINS_NAME, talisman.lower()] + [name.lower() for name in (items or [])]
     if product_rune:
         keep.append(product_rune.lower())
     return keep
@@ -210,9 +215,29 @@ def now_ms():
     return time.time() * 1000
 
 
-def in_temple():
-    t = game.tile()
-    return t is not None and t.z > TEMPLE_Z
+def in_rune_temple(tile, route):
+    return tile is not None and tile.level == 0 and tile.x // 64 == route.temple_map_x and tile.z // 64 == 75
+
+
+def in_zanaris(tile):
+    return tile is not None and tile.level == 0 and 3136 <= tile.x < 3264 and 9472 <= tile.z < 9600
+
+
+def in_temple(route=None):
+    tile = game.tile()
+    if route is not None:
+        return in_rune_temple(tile, route)
+    return any([in_rune_temple(tile, r) for r in RUNES.values()])
+
+
+def open_route_bank(route, stand):
+    if route.bank_npc is not None:
+        opened = yield from bank.open_npc_access(route.bank_npc)
+        return opened
+    opened = yield from bank.open_booth(stand, BOOTH_NAME, BOOTH_OP)
+    if not opened:
+        opened = yield from bank.open_nearest(BOOTH_NAME, BOOTH_OP)
+    return opened
 
 
 def ess_count():
@@ -248,9 +273,11 @@ def enter_altar(bot):
     if not talisman.use_on(ruins):
         yield from execution.delay_ticks(2)
         return False
-    entered = yield from execution.delay_until(in_temple, 10000)
+    entered = yield from execution.delay_until(lambda: in_temple(bot.conf), 10000)
     if entered:
         bot.log('entered the altar')
+        if bot.conf.inside_meet is not None:
+            yield from bot.walk_to(bot.conf.inside_meet, 1)
     return entered
 
 
@@ -260,7 +287,7 @@ def portal_out(bot):
     bot.status = 'taking the portal out'
     bot.log('taking the portal back to the ruins')
     for _ in range(15):
-        if not in_temple():
+        if not in_temple(bot.conf):
             break
         if chat_dialog.can_continue():
             yield from chat_dialog.continue_()
@@ -269,7 +296,7 @@ def portal_out(bot):
         if portal is not None:
             portal.interact(PORTAL_OP)
         yield from execution.delay_ticks(1)
-    if not in_temple():
+    if not in_temple(bot.conf):
         bot.log('back at the mysterious ruins')
 
 
@@ -365,7 +392,7 @@ class HandleOpenTrade(Task):
             yield from execution.delay_ticks(1)
             return False
         offered = trade.my_offer()
-        precious = [n.lower() for n in [bot.conf.talisman, bot.conf.rune, ESSENCE]]
+        precious = [n.lower() for n in [bot.conf.talisman, bot.conf.rune, ESSENCE] + bot.conf.keep_items]
         if len([o for o in offered if (o.name or '').lower() in precious]) > 0:
             bot.say(f"decline safety mine=[{','.join([o.name or '?' for o in offered])}] {trade_snap()}")
             yield from trade.decline()
@@ -385,7 +412,7 @@ class CraftNatures(Task):
         self.bot = bot
 
     def validate(self):
-        return in_temple() and ess_count() > 0
+        return in_temple(self.bot.conf) and ess_count() > 0
 
     def execute(self):
         bot = self.bot
@@ -414,7 +441,7 @@ class ExitTemple(Task):
 
     def validate(self):
         bot = self.bot
-        return master_should_exit_temple(in_temple(), ess_count(), bot.stay_in_altar, bot.bank_trip_due())
+        return master_should_exit_temple(in_temple(bot.conf), ess_count(), bot.stay_in_altar, bot.bank_trip_due())
 
     def execute(self):
         if self.bot.bank_trip_due():
@@ -430,7 +457,7 @@ class EnterAltar(Task):
 
     def validate(self):
         bot = self.bot
-        return master_should_enter_altar(in_temple(), ess_count(), bot.stay_in_altar, bot.bank_trip_due())
+        return master_should_enter_altar(in_temple(bot.conf), ess_count(), bot.stay_in_altar, bot.bank_trip_due())
 
     def execute(self):
         bot = self.bot
@@ -453,7 +480,7 @@ class BankEverything(Task):
         self.backoff_until = 0
 
     def validate(self):
-        return self.bot.bank_trip_due() and not in_temple() and ess_count() == 0 and not trade.active() and now_ms() >= self.backoff_until
+        return self.bot.bank_trip_due() and not in_temple(self.bot.conf) and ess_count() == 0 and not trade.active() and now_ms() >= self.backoff_until
 
     def execute(self):
         bot = self.bot
@@ -465,9 +492,7 @@ class BankEverything(Task):
         reached = yield from traversal.walk_resilient(conf.master_bank, radius=3, attempts=2, timeout_ms=30000, log=lambda m: bot.log(f'  {m}'))
         opened = False
         if reached:
-            opened = yield from bank.open_booth(conf.master_bank, BOOTH_NAME, BOOTH_OP)
-            if not opened:
-                opened = yield from bank.open_nearest(BOOTH_NAME, BOOTH_OP)
+            opened = yield from open_route_bank(conf, conf.master_bank)
         if not opened:
             bot.log('NatureCrafter: bank unreachable (Shilo Village quest?) — holding runes (they stack) and continuing to serve runners')
             self.backoff_until = now_ms() + BANK_BACKOFF_MS
@@ -475,7 +500,7 @@ class BankEverything(Task):
             return
         made = inventory.count(conf.rune)
         before = inventory.used()
-        yield from bank.deposit_all_matching(deposit_all_except([conf.talisman]))
+        yield from bank.deposit_all_matching(deposit_all_except([conf.talisman] + conf.keep_items))
         yield from execution.delay_ticks(1)
         bot.log(f'banked {made} {conf.rune}s, cleared {before - inventory.used()} slot(s); back to the altar')
         yield from bot.walk_to(conf.ruins, 1)
@@ -490,7 +515,7 @@ class AcceptRunner(Task):
     def validate(self):
         bot = self.bot
         return (ess_count() == 0 and not trade.active() and now_ms() >= self.next_click_at and bot.trade_target() is not None
-                and (bot.stay_in_altar or not in_temple()))
+                and (bot.stay_in_altar or not in_temple(bot.conf)))
 
     def execute(self):
         bot = self.bot
@@ -519,7 +544,7 @@ class WaitForRunner(Task):
         self.bot = bot
 
     def validate(self):
-        return ess_count() == 0 and (self.bot.stay_in_altar or not in_temple())
+        return ess_count() == 0 and (self.bot.stay_in_altar or not in_temple(self.bot.conf))
 
     def execute(self):
         bot = self.bot
@@ -527,7 +552,7 @@ class WaitForRunner(Task):
             bot.status = 'runner in sight — standing for the trade'
             yield from execution.delay_ticks(1)
             return
-        if bot.stay_in_altar and in_temple():
+        if bot.stay_in_altar and in_temple(bot.conf):
             bot.status = 'waiting for a runner in the altar'
             yield from execution.delay_ticks(1)
             return
@@ -704,7 +729,7 @@ class PickupRunnerSupplies(Task):
         self.blocked_until = 0
 
     def validate(self):
-        return not in_temple() and unnoted_essence() == 0 and not trade.active() and now_ms() >= self.blocked_until and ground_runner_supplies() is not None
+        return not in_temple(self.bot.conf) and unnoted_essence() == 0 and not trade.active() and now_ms() >= self.blocked_until and ground_runner_supplies() is not None
 
     def execute(self):
         bot = self.bot
@@ -752,7 +777,7 @@ class DeliverEssence(Task):
     def execute(self):
         bot = self.bot
         master_name = bot.partners[0] if len(bot.partners) > 0 else None
-        if bot.stay_in_altar and not in_temple():
+        if bot.stay_in_altar and not in_temple(bot.conf):
             bot.status = 'entering the altar to deliver'
             entered = yield from enter_altar(bot)
             if not entered:
@@ -761,7 +786,7 @@ class DeliverEssence(Task):
         master = bot.nearest_partner()
         if master is not None:
             self.meeting = True
-        if runner_should_walk_to_meet(master is not None, self.meeting, in_temple(), bot.stay_in_altar):
+        if runner_should_walk_to_meet(master is not None, self.meeting, in_temple(self.bot.conf), bot.stay_in_altar):
             bot.status = f'walking to {master_name}'
             yield from bot.walk_to(bot.conf.ruins, 2)
             return
@@ -791,7 +816,7 @@ class ExitAltarForRestock(Task):
         self.bot = bot
 
     def validate(self):
-        return self.bot.stay_in_altar and in_temple() and runner_may_leave_altar(trade.active(), unnoted_essence())
+        return self.bot.stay_in_altar and in_temple(self.bot.conf) and runner_may_leave_altar(trade.active(), unnoted_essence())
 
     def execute(self):
         self.bot.say(f'leaving altar after delivery {trade_snap()}')
@@ -813,7 +838,7 @@ class UnNoteEssence(Task):
         self.last_shake_at = 0
 
     def validate(self):
-        return (self.bot.conf.unnote_npc is not None and not in_temple() and not trade.active() and noted_essence() > 0 and unnoted_essence() == 0
+        return (self.bot.conf.unnote_npc is not None and not in_temple(self.bot.conf) and not trade.active() and noted_essence() > 0 and unnoted_essence() == 0
                 and inventory.count(COINS) >= LOW_COINS)
 
     def execute(self):
@@ -864,7 +889,7 @@ class BankRestock(Task):
         conf = bot.conf
         bot.status = 'restocking at the bank'
         yield from bot.walk_to(conf.runner_bank, 3)
-        opened = yield from bank.open_booth(conf.runner_bank, BOOTH_NAME, BOOTH_OP)
+        opened = yield from open_route_bank(conf, conf.runner_bank)
         if not opened:
             opened = yield from bank.open_nearest(BOOTH_NAME, BOOTH_OP)
         if not opened:
@@ -872,7 +897,7 @@ class BankRestock(Task):
             return
         yield from bank.set_note_mode(False)
         # Random events hand out items that take the slots essence needs, so anything unrelated goes.
-        keep = [ESSENCE]
+        keep = [ESSENCE] + conf.keep_items
         if conf.unnote_npc:
             keep.append(COINS)
         if bot.stay_in_altar:
@@ -946,6 +971,8 @@ class NatureCrafter(TaskBot):
             self.log(f'NatureCrafter: no partner names set — {who}. Stopping.')
             raise RuntimeError('NatureCrafter: no partner configured')
         conf = self.conf
+        if conf.rune == 'Cosmic rune' and not in_zanaris(game.tile()) and not in_temple(conf):
+            raise RuntimeError('JiveRC: start Cosmic crafting in Zanaris or the cosmic altar')
         if self.mode == 'Runner':
             if self.stay_in_altar:
                 yield from execution.delay_until(lambda: inventory.first(conf.talisman) is not None, 3000)
@@ -995,7 +1022,7 @@ class NatureCrafter(TaskBot):
         self.loop_cadence = {'kind': 'frame'} if on else None
 
     def keep_list(self, keep_product_rune):
-        return keep_names(self.conf.talisman, self.conf.rune if keep_product_rune else None)
+        return keep_names(self.conf.talisman, self.conf.rune if keep_product_rune else None, self.conf.keep_items)
 
     def count_trade(self, essence):
         self.trades += 1
