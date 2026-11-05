@@ -108,7 +108,7 @@ class Falls:
         yield
 
     def hold(self, item, count=1, use_on=None, interact=None):
-        thing = Fake(id=item.id, name=item.name, count=count,
+        thing = Fake(id=item.id, name=item.name, count=count, noted=False,
                      use_on=use_on if use_on is not None else (lambda other: True),
                      interact=interact if interact is not None else (lambda op: True))
         self.pack.append(thing)
@@ -307,7 +307,7 @@ def stalls():
         yield
     spy_on(wf, 'pickpocket_funding_man', impl=nothing)
     expect(run_wait(wf.farm_waterfall_coins(wf.VARROCK_MAN, 100, False, world.log))).to_be(False)
-    expect(world.logged('for 120s at the verified Man')).to_be(True)
+    expect(world.logged('at the verified Man')).to_be(True)
 
 
 test('two minutes without coins, XP or health change stops the farm', stalls)
@@ -554,7 +554,7 @@ def loots_tomb():
     world.locs = [world.loc(1757, ['Climb-up'], interact=world.moves(MAINLAND))]
     world.hp = 4
     expect(run_wait(wf.tomb_leg(world.log))).to_be(True)
-    expect(world.logged('Glarial tomb exit: cannot reach full health')).to_be(True)
+    expect(world.logged('Glarial tomb exit: healing stopped')).to_be(True)
 
 
 test("the tomb gives the amulet from the chest and the urn from the coffin, then is left by its ladder", loots_tomb)
@@ -568,13 +568,13 @@ def heals():
 
     def eat():
         world.hp += 2
-    world.on_sustain = eat
+    world.hold(wf.FOODS[0], interact=lambda op: eat() or True)
     expect(run_wait(wf.heal_to_full(world.log, 'test'))).to_be(True)
     expect(world.hp).to_be(10)
     world.hp = 6
-    world.on_sustain = None
+    world.pack.clear()
     expect(run_wait(wf.heal_to_full(world.log, 'test'))).to_be(False)
-    expect(world.logged('test: cannot reach full health')).to_be(True)
+    expect(world.logged('test: healing stopped')).to_be(True)
 
 
 test('healing to full stops when the food stops healing', heals)
@@ -921,3 +921,33 @@ def reads_book_with_log():
 
 
 test("reading the book takes the log a custom step's run is handed", reads_book_with_log)
+
+
+def cake_fallback(mode):
+    def run():
+        behavior = mode
+        world = Falls()
+        fighting = [mode == 'combat']
+        spy_on(wf.game, 'in_combat', impl=lambda: fighting[0])
+        spy_on(wf.event_signal, 'pending', returns=mode == 'event')
+        spy_on(wf.skills, 'level', returns=1 if mode in ['training', 'training-failed'] else 10)
+        spy_on(wf, 'farm_waterfall_coins', impl=lambda *args: result(behavior != 'training-failed'))
+        def cakes(**kwargs):
+            world.hold(wf.FOODS[0], count=8)
+            return 'stocked'
+            yield
+        spy_on(wf, 'steal_cakes', impl=cakes)
+        if mode == 'remote':
+            world.at = TOMB
+        if mode in ['walk-failed', 'flee-failed']:
+            world.walk_ok = False
+        if mode == 'flee-failed':
+            fighting[0] = True
+        if mode == 'combat':
+            world.on_tick = lambda: fighting.__setitem__(0, False)
+        expect(run_wait(wf.steal_waterfall_cakes(world.log))).to_be(mode in ['stocked', 'training', 'combat'])
+    return run
+
+
+for mode in ['stocked', 'training', 'training-failed', 'walk-failed', 'event', 'remote', 'combat', 'flee-failed']:
+    test('Waterfall cake fallback handles ' + mode, cake_fallback(mode))

@@ -53,12 +53,12 @@ def _item_named(name, one_handed=False):
     return None
 
 
-def _build():
+def _build(include_two_handed=False):
     out = []
     for tier, attack in TIERS:
-        for kind in TYPES:
+        for kind in TYPES + (['2h sword'] if include_two_handed else []):
             name = f'{tier} {kind}'
-            row = _item_named(name, True)
+            row = _item_named(name, not include_two_handed)
             if row is not None:
                 out.append(MeleeWeapon(row.id, name, tier, attack, QUEST_GATE.get(name)))
     return out
@@ -66,6 +66,7 @@ def _build():
 
 # Every one-handed melee weapon the item db knows, best tier first.
 MELEE_WEAPONS = _build()
+ALL_MELEE_WEAPONS = _build(True)
 
 
 def _build_pickaxes():
@@ -91,9 +92,9 @@ def banked_pickaxe(banked, attack):
     return None
 
 
-def wieldable(attack, quest_done):
+def wieldable(attack, quest_done, include_two_handed=False):
     """Weapons this account may wield right now, best first."""
-    return [w for w in MELEE_WEAPONS if attack >= w.attack and (w.quest is None or quest_done(w.quest))]
+    return [w for w in (ALL_MELEE_WEAPONS if include_two_handed else MELEE_WEAPONS) if attack >= w.attack and (w.quest is None or quest_done(w.quest))]
 
 
 def held_weapon(held, worn, attack, quest_done):

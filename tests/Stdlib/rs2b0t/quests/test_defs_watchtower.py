@@ -247,8 +247,8 @@ def _fn22():
 
     def _fn29():
         expect(sorted([i.name for i in watchtower.record.items])).to_equal(['Bat bones', 'Dragon bones', 'Gold bar', 'Guam leaf'])
-        expect(all([i.kind == 'mustHave' for i in watchtower.record.items])).to_be(True)
-    test('the record demands exactly the four bank-supplied items', _fn29)
+        expect(all([i.kind == ('acquirable' if i.name == 'Dragon bones' else 'mustHave') for i in watchtower.record.items])).to_be(True)
+    test('the record allows dragon-bone acquisition and retains the other required items', _fn29)
 
 
 describe('watchtower decide — terminal cases', _fn22)
@@ -318,9 +318,9 @@ def _fn35():
 
     def _fn41():
         step = decide(snapshot(Fake(**{'progress': P(2, 'helped-og', 'spoken-toban')})))
-        expect(step.kind).to_be('wait')
-        expect(mentions(step.kind == 'wait' and step.reason, 'dragon bones')).to_be(True)
-    test('with no dragon bones anywhere it parks naming the item', _fn41)
+        expect(step.kind).to_be('custom')
+        expect(mentions(step.name, 'dragon bones')).to_be(True)
+    test('with no dragon bones anywhere it hunts a blue dragon', _fn41)
 
     def _fn42():
         step = decide(snapshot(Fake(**{'progress': P(2, 'helped-og', 'helped-toban'), 'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.ROPE.id, 1]]}})))

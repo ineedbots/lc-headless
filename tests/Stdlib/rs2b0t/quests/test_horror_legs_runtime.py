@@ -191,7 +191,8 @@ def postquest_exit():
     scene.walk_ok = True
     expect(run_wait(dungeon.exit_after_quest(scene.log))).to_be(False)
     scene.loc(HD_LOC.LADDER, ['Climb'], tile=HD_TILE.POSTQUEST_LADDER,
-              effect=lambda op: setattr(scene, 'at', HD_TILE.LIGHTHOUSE_DOOR))
+              effect=lambda op: setattr(scene, 'at', HD_TILE.REAL_LIGHTHOUSE_L0))
+    scene.loc(HD_LOC.DOORWAY, ['Walk-through'], tile=HD_TILE.REAL_LIGHTHOUSE_L0.translate(0, -1), effect=lambda op: setattr(scene, 'at', HD_TILE.LIGHTHOUSE_DOOR))
     expect(run_wait(dungeon.exit_after_quest(scene.log))).to_be(True)
     expect(auto.calls[-1]).to_equal((True,))
 
@@ -297,3 +298,30 @@ def combat_rounds():
 
 
 test('dagannoth combat handles absent targets, refused spells, melee forms and prayer handover', combat_rounds)
+
+
+def lighthouse_escape_recovery():
+    scene = Scene(Tile(2509, 3640, 2))
+    spy_on(dungeon, 'settle_scene', impl=instant_ticks)
+    for level in [2, 1]:
+        current_level = level
+        scene.loc(HD_LOC.STAIRS, actions=['Climb-down'], tile=Tile(2509, 3640, level), effect=lambda op: setattr(scene, 'at', Tile(2509, 3640, scene.at.level - 1)))
+    doorway = HD_TILE.REAL_LIGHTHOUSE_L0.translate(0, -1)
+    scene.loc(HD_LOC.DOORWAY, actions=['Walk-through'], tile=doorway, effect=lambda op: setattr(scene, 'at', HD_TILE.LIGHTHOUSE_DOOR))
+    expect(run_wait(dungeon.exit_after_quest(scene.log))).to_be(True)
+    expect(scene.at).to_be(HD_TILE.CAUSEWAY_SOUTH)
+    expect(dungeon.in_lighthouse(Tile(2509, 3636, 0))).to_be(True)
+    expect(dungeon.in_lighthouse(Tile(2508, 3636, 0))).to_be(False)
+    scene.at = None
+    expect(run_wait(dungeon.leave_lighthouse(scene.log))).to_be(False)
+    scene.at = Tile(2509, 3640, 2)
+    scene.locs.clear()
+    expect(run_wait(dungeon.leave_lighthouse(scene.log))).to_be(False)
+    scene.at = Tile(2509, 3640, 0)
+    scene.walk_ok = False
+    expect(run_wait(dungeon.leave_lighthouse(scene.log))).to_be(False)
+    scene.walk_ok = True
+    expect(run_wait(dungeon.leave_lighthouse(scene.log))).to_be(False)
+
+
+test('a restart upstairs in the lighthouse descends, leaves the doorway and reaches the causeway', lighthouse_escape_recovery)

@@ -1,10 +1,13 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/waterfall.ts (MIT, see thirdparty/rs2b0t)."""
 
 import _core
+import math
 from rs2004 import execution
 from rs2004.catalogs._items import ITEM_DB
 from rs2004.catalogs.record import Record
 from rs2004.catalogs.tasks import sustain
+from rs2004.catalogs.thieving import steal_cakes, STAND, FLEE_TILE
+from rs2004.execution import event_signal
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import locs, npcs
 from rs2004.game import game, reader, skills
@@ -49,7 +52,9 @@ ITEM = Record({
     'ROPE': Record({'id': 954, 'name': 'Rope'}),
 })
 RUNES = [ITEM.AIR_RUNE, ITEM.EARTH_RUNE, ITEM.WATER_RUNE]
+ARDOUGNE_MAN = Tile(2654, 3311, 0)
 FOOD_TARGET = 8
+FOODS = [Record({'id': id, 'name': name}) for id, name in [(1891, 'Cake'), (1893, '2/3 cake'), (1895, 'Slice of cake'), (2309, 'Bread'), (1901, 'Chocolate slice')]]
 # Why: refilling on any shortfall walked back to Ardougne for 1 fish mid-route.
 FOOD_LOW = 3
 RUNE_TARGET = 6
@@ -385,13 +390,15 @@ def restore_funding_health(kebabs_available, log):
     return True
 
 
-def farm_waterfall_coins(anchor, target, kebabs_available, log):
+def farm_waterfall_coins(anchor, target, kebabs_available, log, thieving_target=1):
     _w13 = yield from reach_funding_man(anchor, log)
     if not (_w13):
         return False
     reported_hundreds = (live_coins() // 100)
     last_evidence_at = _core.step_time()
-    while live_coins() < target:
+    while live_coins() < target or skills.level('thieving') < thieving_target:
+        if event_signal.pending():
+            return False
         coins_before = live_coins()
         xp_before = skills.xp('thieving')
         hp_before = skills.effective('hitpoints')
@@ -404,7 +411,7 @@ def farm_waterfall_coins(anchor, target, kebabs_available, log):
         if live_coins() != coins_before or skills.xp('thieving') != xp_before or skills.effective('hitpoints') != hp_before:
             last_evidence_at = _core.step_time()
         elif _core.step_time() - last_evidence_at >= FUNDING_STALL_MS:
-            log(f'no cash, Thieving XP, or Hitpoints change for {FUNDING_STALL_MS // 1000}s at the verified Man')
+            log(f'no cash, Thieving XP, or Hitpoints change for {FUNDING_STALL_MS / 1000}s at the verified Man')
             return False
         hundreds = (live_coins() // 100)
         if hundreds > reported_hundreds:
@@ -491,29 +498,31 @@ def food_item():
 
 
 def with_food(ids):
-    """Keep ids plus whatever the player eats, so a normalize pass never banks the food."""
     food = food_item()
-    return (list(ids) + [food.id] if food else ids)
+    return list(ids) + [item.id for item in FOODS] + ([food.id] if food else [])
 
 
 def source_food(snap, bank=None):
     if bank is None:
         bank = ARDOUGNE_BANK
-    food = food_item()
-    if not food:
-        return Record({'kind': 'wait', 'reason': 'no food selected for the Waterfall dungeon'})
-    held = held_count(snap, food)
-    if held > FOOD_LOW:
+    if not needs_food(snap):
         return None
-    missing = FOOD_TARGET - held
     if not snap.bank_known:
         return scan_bank(bank)
-    in_bank = banked(snap, food)
-    if in_bank <= 0:
-        return Record({'kind': 'wait', 'reason': f'no {food.name} in the bank for the Waterfall dungeon'})
+    missing = FOOD_TARGET - food_count(snap)
     if snap.free_slots is not None and snap.free_slots < missing:
-        return Record({'kind': 'wait', 'reason': f'need {missing} free slots for {food.name}'})
-    return withdraw_exact(food, min(missing, in_bank), bank)
+        return Record({'kind': 'wait', 'reason': f'need {missing} free slots for Waterfall food'})
+    selected = food_item()
+    foods = ([selected] if selected else []) + [item for item in FOODS if selected is None or item.id != selected.id]
+    items = []
+    for food in foods:
+        qty = min(missing, banked(snap, food))
+        if qty > 0:
+            items.append({'name': food.name, 'id': food.id, 'qty': qty})
+            missing -= qty
+    if items:
+        return withdraw(items, bank)
+    return Record({'kind': 'custom', 'name': 'steal Waterfall cakes', 'run': steal_waterfall_cakes})
 
 
 def near_betty(snap):
@@ -558,7 +567,10 @@ def source_puzzle_runes(snap):
 def inventory_has_outside_ids(snap, keep_ids):
     if snap.inv_ids:
         return any([not (id in keep_ids) for id in list(list(snap.inv_ids.keys()))])
-    keep_names = set([ITEM.get(key).name.lower() for key in ITEM.keys() if ITEM.get(key).id in keep_ids])
+    keep_names = set([item.name.lower() for item in [ITEM.get(key) for key in ITEM.keys()] + list(FOODS) if item.id in keep_ids])
+    selected = food_item()
+    if selected is not None and selected.id in keep_ids:
+        keep_names.add(selected.name.lower())
     return any([not (name in keep_names) for name in list(list(snap.inv.keys()))])
 
 
@@ -579,10 +591,12 @@ MAX_LOADOUT_COUNT = {_k: _v for _k, _v in [
 
 def max_loadout_count(id):
     food = food_item()
-    return (FOOD_TARGET if food and id == food.id else MAX_LOADOUT_COUNT.get(id))
+    return FOOD_TARGET if any([item.id == id for item in FOODS]) or (food is not None and id == food.id) else MAX_LOADOUT_COUNT.get(id)
 
 
 def inventory_has_excess_kept_ids(snap, keep_ids):
+    if food_count(snap) > FOOD_TARGET:
+        return True
     if not snap.inv_ids:
         return False
 
@@ -878,13 +892,8 @@ def exit_waterfall_dungeon(log):
 
 
 def heal_to_full(log, context):
-    while skills.effective('hitpoints') < skills.level('hitpoints'):
-        before = skills.effective('hitpoints')
-        yield from sustain.run()
-        if skills.effective('hitpoints') <= before:
-            log(f'{context}: cannot reach full health without usable food')
-            return False
-    return True
+    result = yield from heal_to_hp(log, context, skills.level('hitpoints'), 24)
+    return result
 
 
 def prepare_dungeon_sprint(log):
@@ -1003,7 +1012,7 @@ def find_baxtorian_key(log):
     _w83 = yield from traversal.walk_resilient(BAXTORIAN_CRATE_STAND, radius=0, attempts=3, timeout_ms=90000, log=log)
     if not (_w83):
         return False
-    _w84 = yield from heal_to_full(log, 'Baxtorian crate')
+    _w84 = yield from heal_at_crate(log)
     if not (_w84):
         yield from exit_waterfall_dungeon(log)
         return False
@@ -1117,8 +1126,7 @@ def prepare_dungeon(snap, final_trip):
     if relic_recovery:
         return relic_recovery
     # Why: refilling food first narrows the pack to travel supplies, so a restart with leftover relics or runes can't fill it before the food and Rope are in.
-    food0 = food_item()
-    replenishing_food = food0 is not None and held_count(snap, food0) <= FOOD_LOW
+    replenishing_food = needs_food(snap)
     travel_normalize = normalize_loadout(snap, with_food((START_KEEP if replenishing_food else ((FINAL_KEEP if final_trip else DUNGEON_KEEP)))), ('prepare a safe final Waterfall trip' if final_trip else 'prepare a safe Waterfall dungeon trip'), bank)
     if travel_normalize:
         return travel_normalize
@@ -1335,6 +1343,88 @@ def decide(snap):
         return Record({'kind': 'wait', 'reason': 'unrecognized Waterfall Quest stage ' + str(snap.stage)})
 
 
+def food_count(snap):
+    selected = food_item()
+    foods = list(FOODS) + ([selected] if selected is not None and not any([food.id == selected.id for food in FOODS]) else [])
+    return sum([held_count(snap, food) for food in foods])
+
+def needs_food(snap):
+    tile = snap.tile
+    resupplying = (tile.level if tile is not None else None) == 0 and max(abs(tile.x - ARDOUGNE_BANK.x), abs(tile.z - ARDOUGNE_BANK.z)) <= 64
+    return food_count(snap) < ((FOOD_TARGET if resupplying else FOOD_LOW + 1))
+
+def steal_waterfall_cakes(log):
+    if waterfall_area(game.tile()) != 'mainland' or event_signal.pending():
+        return False
+    yield from sustain.run()
+    if not game.in_combat() and skills.level('thieving') < 5:
+        log('pickpocketing the Ardougne Man to level 5 Thieving for cakes')
+        _w20 = yield from farm_waterfall_coins(ARDOUGNE_MAN, 0, False, log, 5)
+        if not (_w20):
+            return False
+    _c21 = not game.in_combat()
+    if _c21:
+        _w22 = yield from traversal.walk_resilient(STAND, radius=0, attempts=3, timeout_ms=120000, log=log)
+        _c21 = not (_w22)
+    if _c21:
+        return False
+    # ts2py: this await was inside a condition, and now always runs first (line 532)
+    if game.in_combat():
+        result = 'combat'
+    else:
+        result = yield from steal_cakes(abort=lambda: event_signal.pending() or waterfall_area(game.tile()) != 'mainland', set_status=log, log=log, fill_to=FOOD_TARGET)
+    if result == 'combat':
+        _w25 = yield from traversal.walk_resilient(FLEE_TILE, radius=2, attempts=3, timeout_ms=30000, log=log)
+        if not (_w25):
+            return False
+        yield from execution.delay_until(lambda: not game.in_combat(), 15000)
+        yield from sustain.run()
+        return not game.in_combat()
+    return result == 'stocked' and sum([live_count(food) for food in FOODS]) > FOOD_LOW
+
+def live_food_bites():
+    selected = food_item()
+    ids = set([food.id for food in FOODS] + ([selected.id] if selected else []))
+    total = 0
+    for item in inventory.items():
+        if item.noted or item.id not in ids:
+            continue
+        total += item.count * (3 if item.id == 1891 else (2 if item.id == 1893 else 1))
+    return total
+
+
+def heal_to_hp(log, context, target, limit):
+    consumed = 0
+    stalled = 0
+    attempt = 0
+    while attempt < limit + 3 and consumed < limit and stalled < 3:
+        if event_signal.pending():
+            return False
+        if skills.effective('hitpoints') >= target:
+            return True
+        food = ([item for item in inventory.items() if not item.noted and (any([food.id == item.id for food in FOODS]) or (food_item() is not None and food_item().id == item.id))] or [None])[0]
+        if not food:
+            break
+        hp = skills.effective('hitpoints')
+        before = live_food_bites()
+        food.interact('Eat')
+        yield from execution.delay_ticks(3)
+        bites = max(0, before - live_food_bites())
+        consumed += bites
+        stalled = (0 if bites > 0 or skills.effective('hitpoints') > hp else stalled + 1)
+        if bites > 0:
+            log(f"{context}: ate {bites} bite(s), {skills.effective('hitpoints')}/{target} HP")
+        attempt += 1
+    hp = skills.effective('hitpoints')
+    if hp >= target:
+        return True
+    log(f'{context}: healing stopped at {hp}/{target} HP after {consumed} bites ({live_food_bites()} bites left)')
+    return False
+
+def heal_at_crate(log):
+    max_hp = skills.level('hitpoints')
+    return heal_to_hp(log, 'Baxtorian crate', min(max_hp, max(20, math.ceil(max_hp * 0.8))), 6)
+
 waterfall = QuestModule(**{
     'record': quest_record('waterfall'),
     'bank': ARDOUGNE_BANK,
@@ -1342,6 +1432,6 @@ waterfall = QuestModule(**{
     'tools': ['glarial', 'a key', 'rope', 'book on baxtorian', 'air rune', 'earth rune', 'water rune', 'coins'],
     'owns_inventory': True,
     'read_stage': read_waterfall_stage,
-    'sustain': Record({'foods': [], 'eat_below_hp': 1}),
+    'sustain': Record({'foods': ['Cake', 'Bread', 'Chocolate slice'], 'eat_below_hp': 1}),
     'decide': decide,
 })

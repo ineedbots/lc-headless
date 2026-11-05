@@ -150,6 +150,7 @@ class QuestEngine(Task):
         self._provisioned = set()
         self._retreated = set()
         self._retreat_tries = {}
+        self._recovery_tries = {}
         self._deposited = set()
         self._freshened = set()
         self._freshen_tries = {}
@@ -217,17 +218,27 @@ class QuestEngine(Task):
         if skip and self.running_id is not None:
             self._apply_user_skip(self.running_id, elig)
 
+        recovered_area = yield from self._recover_area(picked, elig)
+        if recovered_area:
+            return
         if self.running_id is None:
             selectable = set([id for id in picked if id not in self._blocked])
-            resume = []
+            owner = None
+            tile = game.tile()
             for candidate in QUEST_DEFS:
-                if (candidate.record.id not in selectable or elig[candidate.record.id].status != 'READY'
-                        or quests.status(candidate.record.name) != 'in_progress'):
+                if quests.status(candidate.record.name) != 'in_progress':
                     continue
-                inside = getattr(candidate.module(), 'resume_at', None)
-                if inside is not None and inside(game.tile()):
-                    resume.append(candidate.record.id)
-            self.running_id = next_quest(resume or self._order, selectable, elig, self._parked)
+                inside = candidate.module().resume_at
+                if tile is not None and inside is not None and inside(tile):
+                    owner = candidate.record.id
+                    break
+            if owner is not None:
+                if owner not in selectable or elig[owner].status != 'READY':
+                    self.host.finish(f'{owner}: cannot switch quests from this area; owning quest is not selected or ready')
+                    return
+                self.running_id = owner
+            else:
+                self.running_id = next_quest(self._order, selectable, elig, self._parked)
         rows = self._apply_blocked(queue_rows(self._order, picked, elig, self._parked, self.running_id))
 
         if self.running_id is None:
@@ -282,6 +293,11 @@ class QuestEngine(Task):
         if freshened:
             return
 
+        if not inside_resume:
+            prepared = yield from self._prepare_resume(module, id, snap, rows)
+            if prepared:
+                return
+
         if module.owns_inventory:
             # Some quests have one-way, bankless areas, so their stage oracle runs before any generic spillover banking
             # or provisioning on the mainland.
@@ -323,6 +339,12 @@ class QuestEngine(Task):
                 banked = yield from execute_step(quest_step('deposit', keep=keep, bank=bank_for(module), leave_open=True), module.hops or [], self._log)
                 if banked:
                     self._deposited.add(id)
+                else:
+                    tries = self._freshen_tries.get(id, 0) + 1
+                    self._freshen_tries[id] = tries
+                    if tries >= FRESH_GIVE_UP:
+                        self._block(id, ['could not prepare inventory: bank unreachable or deposit refused'])
+                        self.running_id = None
                 yield from execution.delay_until(lambda: bank.loaded(), 3000)
                 self._refresh_bank_counts(True)
                 yield from modals.close_if_open()
@@ -334,6 +356,10 @@ class QuestEngine(Task):
         else:
             step = module.decide(snap)
 
+        if not inside_resume:
+            prepared = yield from self._prepare_resume(module, id, snap, rows, step)
+            if prepared:
+                return
         step_desc = describe_step(step)
         self.host.note_state(rows, id, step_desc, self._no_progress_count, len(self._parked))
 
@@ -499,7 +525,7 @@ class QuestEngine(Task):
         food_short = (food_ready and food_item and module.food and id not in self._food_drawn
                       and snap.inv.get(food_item.lower(), 0) < module.food)
         potions_short = potions and id not in self._potions_drawn and snap.inv.get(PRAYER_POTION.lower(), 0) < potions
-        needs_bank_snapshot = len(plan.blocked) > 0 or not coin_plan['drawn'] or food_short or potions_short
+        needs_bank_snapshot = len(plan.blocked) > 0 or len(plan.gather) > 0 or not coin_plan['drawn'] or food_short or potions_short
         if not self._bank_known and needs_bank_snapshot:
             return quest_step('scan_bank', bank=bank_for(module))
         if len(plan.blocked) > 0 and len(plan.withdraw) == 0:
@@ -563,6 +589,99 @@ class QuestEngine(Task):
         self._wait_key = ''
         self._wait_count = 0
 
+    def _recover_area(self, picked, elig):
+        tile = game.tile()
+        if tile is None:
+            return False
+        for definition in QUEST_DEFS:
+            module = definition.module()
+            step = module.recover(tile) if module.recover is not None else None
+            if step is None:
+                continue
+            id = module.record.id
+            rows = self._apply_blocked(queue_rows(self._order, picked, elig, self._parked, self.running_id))
+            description = describe_step(step)
+            self.host.note_state(rows, id, description, self._no_progress_count, len(self._parked))
+            self.host.log(f'{module.record.name}: recovering: {description}')
+            ok = yield from execute_step(step, module.hops or [], self._log)
+            if ok:
+                self._recovery_tries.pop(id, None)
+                self._reset_watchdog()
+            else:
+                tries = self._recovery_tries.get(id, 0) + 1
+                self._recovery_tries[id] = tries
+                if tries >= RETREAT_GIVE_UP:
+                    self.host.finish(f'could not recover from {module.record.name}: {description} after {tries} attempts')
+            return True
+        self._recovery_tries.clear()
+        return False
+
+    def _prepare_resume(self, module, id, snap, rows, step=None):
+        from rs2004.quests.engine.resume_preparation import resume_preparation
+        from rs2004.bank import NEARBY_BANK_RADIUS
+        from rs2004.navigation import navigator
+        from rs2004.traversal import NAV_PURE_WALK, bank_cost_for_navigator, nearest_bank, nearest_walkable_bank, traversal
+
+        if id in self._freshened or snap.journal != 'in_progress' or inventory.count_by_id(431) > 0:
+            return False
+        plan = resume_preparation(module, snap, inventory.items(), self.host.food_item())
+        if plan is None:
+            self._freshened.add(id)
+            return False
+        if snap.tile is None or game.in_combat() or (step is not None and step.kind == 'deposit'):
+            return False
+        nearby = nearest_bank(snap.tile)
+        stand = nearby['tile'] if nearby is not None else None
+        at_bank = stand is not None and stand['level'] == snap.tile.level and Tile(stand['x'], stand['z'], stand['level']).distance_to(snap.tile) <= NEARBY_BANK_RADIUS
+        bank_step = step is not None and step.kind in ['scan_bank', 'withdraw']
+        mainland = snap.tile.level == 0 and 2944 <= snap.tile.x < 3392 and 3200 <= snap.tile.z < 3520
+        detour = not at_bank and not bank_step and mainland and nearby is not None
+        if not at_bank and not bank_step and not detour:
+            return False
+        destination = step.bank if bank_step else None
+        if detour:
+            reachable = nearest_walkable_bank(snap.tile, bank_cost_for_navigator(navigator, max_expansions=500000))
+            stand = reachable['tile'] if reachable is not None else None
+        if at_bank or detour:
+            destination = Tile(stand['x'], stand['z'], stand['level']) if stand is not None else None
+        tries = self._freshen_tries.get(id, 0) + 1
+        self._freshen_tries[id] = tries
+        self.host.note_state(rows, id, 'preparing inventory for resumed quest', self._no_progress_count, len(self._parked))
+        arrived = True
+        if detour:
+            arrived = False
+            if destination is not None:
+                arrived = yield from traversal.walk_resilient(destination, radius=3, attempts=2, timeout_ms=90000, log=self._log, **NAV_PURE_WALK)
+        prepared = False
+        if arrived:
+            prepared = yield from execute_step(quest_step('deposit', keep=[], keep_ids=plan.keep_ids, bank=destination, leave_open=True), module.hops or [], self._log)
+        if prepared:
+            for cap in plan.caps:
+                while inventory.count_by_id(cap.id) > cap.qty:
+                    ready = yield from bank.backpack_ready(log=self._log)
+                    if not ready:
+                        prepared = False
+                        break
+                    item = ([item for item in inventory.items() if item.id == cap.id] or [None])[0]
+                    ops = [op for op in item.actions() if op.lower().replace('-', ' ') == 'deposit 1'] if item is not None else []
+                    before = inventory.count_by_id(cap.id)
+                    if not ops or not item.interact(ops[0]):
+                        prepared = False
+                        break
+                    prepared = yield from execution.delay_until(lambda: inventory.count_by_id(cap.id) < before, 3000)
+                    if not prepared:
+                        break
+                if not prepared:
+                    break
+        self._refresh_bank_counts(True)
+        yield from modals.close_if_open()
+        if prepared:
+            self._freshened.add(id)
+        elif tries >= FRESH_GIVE_UP:
+            self._block(id, ['could not prepare inventory: bank unreachable or deposit refused'])
+            self.running_id = None
+        return True
+
     def _freshen_pack(self, module, id, snap, rows):
         """Banks the pack to nothing before a quest opens; True when the pass should yield after the trip. Use with
         yield from."""
@@ -576,10 +695,11 @@ class QuestEngine(Task):
         self.host.note_state(rows, id, 'banking the pack to nothing', self._no_progress_count, len(self._parked))
         self.host.log(f'{module.record.name} not started, banking {carried} carried slot(s) so it provisions from empty ({tries}/{FRESH_GIVE_UP})')
         emptied = yield from execute_step(quest_step('deposit', keep=[], bank=bank_for(module), leave_open=True), module.hops or [], self._log)
-        if emptied or tries >= FRESH_GIVE_UP:
+        if emptied:
             self._freshened.add(id)
-        if not emptied and tries >= FRESH_GIVE_UP:
-            self.host.log(f'{module.record.name}: no bank reachable after {FRESH_GIVE_UP} tries — starting on the pack as it stands')
+        elif tries >= FRESH_GIVE_UP:
+            self._block(id, ['could not prepare inventory: bank unreachable or deposit refused'])
+            self.running_id = None
         yield from execution.delay_until(lambda: bank.loaded(), 3000)
         self._refresh_bank_counts(True)
         yield from modals.close_if_open()
@@ -593,9 +713,8 @@ class QuestEngine(Task):
         tries = self._retreat_tries.get(id, 0) + 1
         self._retreat_tries[id] = tries
         if tries > RETREAT_GIVE_UP:
-            self.host.log(f'{module.record.name}: no way back to a bank after {RETREAT_GIVE_UP} tries — leaving the character where it finished')
-            self._retreated.add(id)
-            return True
+            self.host.finish(f'could not leave {module.record.name} after {RETREAT_GIVE_UP} attempts')
+            return False
         self.host.note_state(rows, id, 'walking back to a bank', self._no_progress_count, len(self._parked))
         self.host.log(f'{module.record.name} finished — walking back to a bank ({tries}/{RETREAT_GIVE_UP})')
         if module.exit is not None:
@@ -650,7 +769,14 @@ class QuestEngine(Task):
         self._blocked[id] = reasons
         self._reset_watchdog()
 
-    def _park_or_give_up(self, id, name):
+    def _park_or_give_up(self, id, name, reasons=None):
+        reasons = list(reasons or [])
+        if not reasons and self._last_step_logged:
+            reasons = [f'no progress on {self._last_step_logged}']
+        if reasons:
+            self._parked_reasons[id] = reasons
+        else:
+            self._parked_reasons.pop(id, None)
         count = self._park_counts.get(id, 0) + 1
         self._park_counts[id] = count
         if count >= PARK_GIVE_UP:

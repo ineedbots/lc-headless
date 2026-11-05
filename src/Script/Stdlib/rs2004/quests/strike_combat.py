@@ -79,7 +79,7 @@ def ready_strikes(log):
         if not removed:
             log(f'need room to remove {item.name} before casting')
             return False
-    return strike_spell(skills.effective('magic'), lambda rune: inventory.count(rune)) is not None
+    return strike_spell(skills.effective('magic'), lambda rune: inventory.count(rune), [item.name for item in equipment.items() if item.name]) is not None
 
 
 def take_strike_cover(spot, log, lure_target=None):
@@ -97,7 +97,7 @@ def take_strike_cover(spot, log, lure_target=None):
             return False
         if tile == ARENA_LURE[0] and lure_target is not None:
             target = lure_target()
-            if target is not None and not target.targets_me() and cast_from_cover(tile, target):
+            if target is not None and cast_from_cover(tile, target):
                 cast = yield from cast_strike(tile, target, log)
                 if not cast:
                     return False
@@ -143,7 +143,7 @@ def cast_strike(spot, target, log, lane=True):
     up and steps back onto its own tile, so the cast isn't walked into. Use with yield from."""
     if event_signal.pending() or game.auto_retaliate_on() or not at_cover(spot) or not cast_from_cover(spot, target, lane):
         return False
-    spell = strike_spell(skills.effective('magic'), lambda rune: inventory.count(rune))
+    spell = strike_spell(skills.effective('magic'), lambda rune: inventory.count(rune), [item.name for item in equipment.items() if item.name])
     if spell is None:
         log('out of Strike runes; holding cover')
         return False

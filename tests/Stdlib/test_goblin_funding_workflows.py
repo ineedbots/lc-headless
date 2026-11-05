@@ -18,6 +18,8 @@ class FundingWorld(QuestWorld):
     def __enter__(self):
         QuestWorld.__enter__(self)
         self.install(gd)
+        import rs2004.quests.defs.goblindiplomacy_redberries as redberries
+        self.install(redberries)
         self.patch(gd, '_core', self)
         self.patch(gd, 'skills', FakeModule(effective=lambda n: self.hp, xp=lambda n: self.xp))
         return self
@@ -133,6 +135,8 @@ def test_goblin_dyes_source_each_ingredient_and_reject_missing_cash_or_arrival()
                     yield from w.reply()
                     return True
                 w.patch(gd, 'execute_step', execute)
+                import rs2004.quests.defs.goblindiplomacy_redberries as redberries
+                w.patch(redberries, 'execute_step', execute)
                 w.coins.count = 0 if mode in ['no_cash', 'yellow_no_cash'] else 100
                 if mode == 'held':
                     w.pack.append(QuestObject(w, color + ' dye'))
@@ -149,7 +153,7 @@ def test_goblin_dyes_source_each_ingredient_and_reject_missing_cash_or_arrival()
                     onion.count = 2
                     w.pack.append(onion)
                 result = w.run((gd.make_blue_dye if color == 'Blue' else gd.make_orange_dye)(w.logs.append))
-                expected = mode in ['held', 'ingredients'] if color == 'Blue' else mode in ['held', 'no_cash', 'leaves', 'combine', 'red']
+                expected = mode in ['held', 'ingredients'] if color == 'Blue' else mode in ['held', 'combine', 'red']
                 assert result == expected, (color, mode, w.logs)
                 if color == 'Orange' and mode == 'combine':
                     assert steps[-1].product == 'Orange dye'

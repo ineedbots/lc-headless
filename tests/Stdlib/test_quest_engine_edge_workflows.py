@@ -109,7 +109,7 @@ def test_engine_finished_quest_retreats_before_clearing_its_latches():
         w.bot._retreated.clear()
         for i in range(engine.RETREAT_GIVE_UP):
             w.run(w.bot._retreat_to_bank(w.module, 'test', []))
-        assert w.run(w.bot._retreat_to_bank(w.module, 'test', []))
+        assert not w.run(w.bot._retreat_to_bank(w.module, 'test', []))
 
 
 def test_engine_freshens_new_quest_pack_and_bounded_failed_bank_trips():
@@ -121,7 +121,8 @@ def test_engine_freshens_new_quest_pack_and_bounded_failed_bank_trips():
             snap = QuestSnapshot(journal='not_started')
             for i in range(1 if success else engine.FRESH_GIVE_UP):
                 assert w.run(w.bot._freshen_pack(w.module, 'test', snap, []))
-            assert 'test' in w.bot._freshened
+            assert ('test' in w.bot._freshened) == success
+            assert ('test' in w.bot._blocked) == (not success)
             assert w.steps[-1].keep == [] and w.steps[-1].leave_open
 
 

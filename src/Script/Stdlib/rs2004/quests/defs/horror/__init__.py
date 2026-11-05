@@ -1,13 +1,14 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/horror/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004 import execution
+from rs2004.tabs import quests
 from rs2004.catalogs.record import Record
 from rs2004.items import inventory
 from rs2004.quests.barcrawl.run_barcrawl import ensure_barcrawl
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.horror.areas import GUNNJORN, HD_ID, HD_ITEM, HD_STAGE, HD_TILE, LARRISSA
 from rs2004.quests.defs.horror.barcrawl import barcrawl_funds
-from rs2004.quests.defs.horror.dungeon import exit_after_quest, in_cavern, open_wall_and_descend
+from rs2004.quests.defs.horror.dungeon import exit_after_quest, in_cavern, in_lighthouse, in_postquest_cavern, open_wall_and_descend
 from rs2004.quests.defs.horror.fight import fight_junior, fight_mother
 from rs2004.quests.defs.horror.journal import HD_FLAG, read_horror_progress
 from rs2004.quests.defs.horror.lighthouse import climb_to_light, descend_to_basement, enter_lighthouse, in_basement, in_quest_lighthouse, repair_bridge, repair_light
@@ -175,6 +176,7 @@ horror = QuestModule(**{
     'sustain': Record({'foods': ['Shark', 'Swordfish', 'Lobster', 'Tuna'], 'eat_below_hp': 0.6}),
     'warn_readiness': warn_horror_readiness,
     'read_progress': read_horror_progress,
+    'recover': lambda tile: custom('leave the lighthouse for the mainland', exit_after_quest) if in_postquest_cavern(tile) or (in_lighthouse(tile) and quests.status('Horror from the Deep') == 'complete') else None,
     'exit': exit_after_quest,
     'decide': decide,
 })

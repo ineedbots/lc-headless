@@ -10,42 +10,37 @@ from helpers import FakeModule
 from quest_world import QuestWorld, QuestObject
 
 
-def test_fortress_listens_once_then_uses_cabbage_on_upper_floor_hole():
+def test_fortress_listens_then_sabotages_only_after_dialogue_confirms_success():
     with QuestWorld() as w:
         w.install(bk)
-        w.patch(bk, 'bkf_state', bk._BkfState())
+        w.patch(bk, 'game', FakeModule(tile=lambda: w.position, set_auto_retaliate=lambda on: True))
         assert w.run(bk.infiltrate(w.logs.append))
-        cabbage = QuestObject(w, 'Cabbage', effect=lambda: setattr(w, 'pack', []))
+        cabbage = QuestObject(w, 'Cabbage', id=1965, effect=lambda: setattr(w, 'pack', []))
         w.pack = [cabbage]
         assert w.run(bk.pick_cabbage(w.logs.append))
         for status in ['unreachable', 'failed', 'done']:
             w.patch(bk, 'reach', FakeModule(loc_op=lambda *a, **kw: w.reply(status)))
-            if status == 'done':
-                w.pages = [('continue', ['A sinister plot'])]
-            assert w.run(bk.infiltrate(w.logs.append)) is False
-            assert bk.bkf_state.listened == (status == 'done')
+            w.patch(bk, 'drive_dialog', lambda *args: w.reply(True))
+            assert w.run(bk.infiltrate(w.logs.append, True)) == (status == 'done')
         w.scene = [QuestObject(w, 'Hole', at=bk.HOLE)]
-        assert w.run(bk.infiltrate(w.logs.append)) is False
+        w.patch(bk, 'chat_dialog', FakeModule(texts=lambda: ['You successfully sabotaged the potion']))
+        assert w.run(bk.infiltrate(w.logs.append, False))
         assert not w.pack and w.walks[-1] == bk.HOLE
-        w.position = bk.GRILL
-        assert bk._grill_answered()
-        w.position = None
-        assert not bk._near_tile(bk.GRILL, 1)
 
 
-def test_fortress_cabbage_gatherer_drives_reach_and_returns_a_custom_step():
+def test_fortress_cabbage_gatherer_requires_an_ordinary_cabbage():
     with QuestWorld() as w:
         w.install(bk)
         calls = []
         def pick(name, op, tile, expect, **kw):
             calls.append((name, op))
-            yield from w.reply()
-            w.pack = [QuestObject(w, 'Cabbage')]
+            w.pack = [QuestObject(w, 'Cabbage', id=1965)]
             assert expect()
             return 'done'
+            yield
         w.patch(bk, 'reach', FakeModule(loc_op=pick))
         step = bk._gather_cabbage(QuestSnapshot())
-        assert not w.run(step.run(w.logs.append))
+        assert w.run(step.run(w.logs.append))
         assert calls == [('Cabbage', 'Pick')]
 
 

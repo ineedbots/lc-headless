@@ -6,7 +6,7 @@ from rs2004.quests.defs.fightarena.fights import FA_FIGHT
 from rs2004.quests.defs.fightarena.journal import FA_STAGE, read_fight_arena_stage
 from rs2004.quests.defs.fightarena.legs import enter_arena_by_door2, enter_arena_by_guard, enter_building, fight_with_release, flee_arena, leave_building, search_chest, talk_and_land, talk_by_id, unlock_jeremy, unwearable, wear_khazard
 from rs2004.quests.exec.primitives import NpcStop, talk_strict
-from rs2004.quests.strike import STRIKE_RUNES, prepare_strikes
+from rs2004.quests.strike import STRIKE_RUNES, STRIKE_STAVES, prepare_strike_staff, prepare_strikes
 from rs2004.traversal import traversal
 from rs2004.quests.engine.types import QuestModule
 from rs2004.quests.data import quest_record
@@ -122,7 +122,10 @@ def outside_step(snap, stage):
     if stage <= FA_STAGE.NOT_STARTED or stage >= FA_STAGE.FREED_SERVILS:
         return Record({'kind': 'talk', 'stop': LADY_SERVIL})
     if stage < FA_STAGE.DEFEATED_BOUNCER:
-        runes = prepare_strikes(snap, ['khazard helmet', 'khazard armour', 'khazard cell keys', 'khali brew'])
+        staff = prepare_strike_staff(snap, ['khazard helmet', 'khazard armour', 'khazard cell keys', 'khali brew'] + STRIKE_STAVES)
+        if staff:
+            return staff
+        runes = prepare_strikes(snap, ['khazard helmet', 'khazard armour', 'khazard cell keys', 'khali brew'] + STRIKE_STAVES)
         if runes:
             return runes
     if stage >= FA_STAGE.SENT_JAIL:
@@ -199,8 +202,8 @@ fightarena = QuestModule(**{
     'bank': FA_TILE.YANILLE_BANK,
     'food': FOOD,
     'grind': ['Khazard Ogre', 'Khazard Scorpion', 'Bouncer'],
-    'tools': ['khazard helmet', 'khazard armour', 'khazard cell keys', 'khali brew', 'coins'] + list(STRIKE_RUNES) + list(KIT_KEEP),
-    'food_ready': lambda snap: ((snap.stage if snap.stage is not None else 0)) >= FA_STAGE.DEFEATED_BOUNCER or prepare_strikes(snap) is None,
+    'tools': ['khazard helmet', 'khazard armour', 'khazard cell keys', 'khali brew', 'coins'] + list(STRIKE_RUNES) + list(STRIKE_STAVES) + list(KIT_KEEP),
+    'food_ready': lambda snap: ((snap.stage if snap.stage is not None else 0)) >= FA_STAGE.DEFEATED_BOUNCER or (prepare_strike_staff(snap) is None and prepare_strikes(snap) is None),
     'read_stage': read_fight_arena_stage,
     'sustain': Record({'foods': ['Lobster', 'Swordfish', 'Shark', 'Tuna'], 'eat_below_hp': 0.6}),
     'warn_readiness': lambda: 'Fight Arena ends on Bouncer — level 137, 116 hitpoints, 120 attack and defence',

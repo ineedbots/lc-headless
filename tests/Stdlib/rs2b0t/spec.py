@@ -359,6 +359,7 @@ class Scene:
         spy_on(skills, 'xp', impl=lambda name: self.stats.get(name, 99))
         spy_on(skills, 'hp_fraction', impl=lambda: self.stats.get('hp_fraction', 1))
         spy_on(traversal, 'walk_resilient', impl=self._walk)
+        spy_on(traversal, 'walk_to', impl=self._walk)
         spy_on(execution, 'delay_ticks', impl=self._delay_ticks)
         spy_on(execution, 'delay_until', impl=self._delay_until)
         spy_on(execution, 'delay_until_ticks', impl=self._delay_until_ticks)

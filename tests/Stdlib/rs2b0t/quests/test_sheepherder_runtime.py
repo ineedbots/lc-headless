@@ -37,6 +37,8 @@ test('the scene grid asks the client once per tile and direction until reset', a
 
 # The herd, the gate, the prod, the poison and the furnace.
 
+real_route_cost = herd.route_cost
+
 EAST = Record({'dx': 1, 'dz': 0})
 FIELD = Tile(2585, 3361, 0)
 OUTSIDE_PEN = Tile(2590, 3370, 0)
@@ -54,6 +56,7 @@ class Sheep:
 
     def __init__(self, farm, n, at, moves=True):
         self.farm = farm
+        self.index = len(farm.sheep)
         self.name = sheep_name(n)
         self.at = at
         self.moves = moves
@@ -61,6 +64,9 @@ class Sheep:
         self.on_prod = None
 
     def tile(self):
+        return self.at
+
+    def network_tile(self):
         return self.at
 
     def actions(self):
@@ -71,6 +77,7 @@ class Sheep:
 
     def interact(self, op):
         self.prods += 1
+        self.farm.animation = herd.PROD_ANIM
         if self.on_prod is not None:
             return self.on_prod(op)
         if self.moves:
@@ -87,6 +94,8 @@ class Farm:
 
     def __init__(self, at=None):
         self.at = at if at is not None else FIELD
+        self.animation = -1
+        spy_on(herd._core, 'get_local_player', impl=self.player)
         self.pack = []
         self.sheep = []
         self.locs = []
@@ -107,6 +116,7 @@ class Farm:
         spy_on(equipment, 'equip', impl=lambda name: result(True))
         spy_on(traversal, 'walk_resilient', impl=self.walk)
         spy_on(direct_navigator, 'walk_to', impl=self.step_to)
+        spy_on(direct_navigator, 'walk', impl=self.step)
         spy_on(reachability, 'walkable', returns=True)
         spy_on(reachability, 'can_step', returns=True)
         spy_on(modals, 'is_open', impl=lambda: self.modal)
@@ -118,6 +128,16 @@ class Farm:
         spy_on(pen, 'settle_scene', impl=instant_ticks)
         patch(execution, 'delay_until', instant_until)
         patch(execution, 'delay_ticks', instant_ticks)
+
+    def player(self):
+        animation = self.animation
+        self.animation = -1
+        return Fake(animation=animation)
+
+    def step(self, tile):
+        if self.walk_ok:
+            self.at = tile
+        return self.walk_ok
 
     def log(self, text):
         self.lines.append(text)
@@ -231,7 +251,7 @@ def refused():
     expect(farm.logged('refused 8 pushes near (2589,3361)')).to_be(True)
     farm = Farm()
     farm.sheep = [Sheep(farm, 1, Tile(2589, 3361, 0))]
-    spy_on(direct_navigator, 'walk_to', impl=lambda tile, radius, ms: result(False))
+    spy_on(direct_navigator, 'walk', returns=False)
     expect(run_wait(herd.herd_to_pen(1, farm.log))).to_be(False)
     expect(farm.logged('could not stand at (2588,3361)')).to_be(True)
 
@@ -435,3 +455,47 @@ def burns():
 
 
 test('the remains are burnt in the furnace until the server says they are dust', burns)
+
+
+def tracks_server_slot_changes():
+    farm = Farm()
+    a = Sheep(farm, 1, Tile(2589, 3361, 0))
+    b = Sheep(farm, 1, Tile(2590, 3361, 0))
+    a.index = 10
+    b.index = 20
+    farm.sheep = [a, b]
+    expect(herd.near_last(1, a.at, 10)).to_be(a)
+    expect(herd.near_last(1, a.at, 99)).to_be(a)
+    a.at = Tile(2500, 3300, 0)
+    expect(herd.near_last(1, Tile(2589, 3361, 0), 99)).to_be(b)
+    spy_on(herd, 'herd_plan', returns=[])
+    spy_on(herd, 'herd_cost', returns=8)
+    expect(real_route_cost(b)).to_be(8)
+    expect(herd.stand_cost(b.at, EAST, None)).to_be(0)
+    spy_on(herd._core, 'get_local_player', returns=Fake(animation=herd.PROD_ANIM))
+    expect(run_wait(herd.push_once(1, b, EAST, farm.log))).to_be('refused')
+    ticks = [0]
+    def player():
+        ticks[0] += 1
+        if ticks[0] > 1:
+            b.at = Tile(2591, 3361, 0)
+        return Fake(animation=herd.PROD_ANIM if ticks[0] == 1 else -1)
+    spy_on(herd._core, 'get_local_player', impl=player)
+    expect(run_wait(herd.push_once(1, b, EAST, farm.log))).to_be('elsewhere')
+
+
+test('herding follows a nearby server position after NPC slots change and waits for an active prod', tracks_server_slot_changes)
+
+
+def remote_stand_and_ack():
+    farm = Farm(Tile(2500, 3300, 1))
+    sheep = Sheep(farm, 1, FIELD)
+    farm.sheep = [sheep]
+    expect(herd.behind_sheep(farm.at, sheep.at, EAST)).to_be(False)
+    expect(run_wait(herd.stand_opposite(sheep.at, EAST, farm.log))).to_be(True)
+    sheep.on_prod = lambda op: True
+    spy_on(herd._core, 'get_local_player', returns=Fake(animation=-1))
+    expect(run_wait(herd.push_once(1, sheep, EAST, farm.log))).to_be('refused')
+
+
+test('the herder walks from a remote floor and refuses to push again without animation acknowledgement', remote_stand_and_ack)
