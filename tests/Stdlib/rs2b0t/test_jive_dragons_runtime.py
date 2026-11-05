@@ -69,6 +69,7 @@ class DragonDrop:
         world.events.append((op, self.id, self.position))
         if world.reject_take:
             return False
+        world.tile = self.position
         stack = [item for item in world.pack if item.id == self.id]
         if stack and self.id in [892, 995]:
             stack[0].count += self.count
@@ -548,3 +549,267 @@ def shield_blocks_attack():
 
 
 test('a required missing shield prevents attacks even after target selection', shield_blocks_attack)
+
+
+
+def moving_target(site):
+    world = DragonWorld(site)
+    world.dragon.in_combat = False
+    world.dragon.position = Tile(world.tile.x + 7, world.tile.z)
+    spy_on(event_signal, 'pending', impl=lambda: world.attacks > 0)
+    world.run()
+    world.dragon.position = Tile(world.dragon.position.x, world.dragon.position.z + 1)
+    world.run()
+    expect(world.attacks).to_be(1)
+    expect(any([event[0] == 'Walk' for event in world.events])).to_be(False)
+
+
+test_each(['taverley-blue', 'taverley-black'])('%s attacks a moving unclaimed dragon within two opportunities', moving_target)
+
+
+def ineligible_target(condition):
+    world = DragonWorld()
+    world.dragon.in_combat = condition == 'combat-face-gap'
+    if condition == 'occluded':
+        spy_on(reachability, 'line_of_sight', returns=False)
+    elif condition == 'claimed':
+        world.dragon.foreign = True
+    elif condition == 'skipped':
+        world.bot.fight.skip[17] = world.clock + 5000
+    elif condition == 'out-of-range':
+        world.dragon.position = Tile(world.tile.x + 20, world.tile.z)
+    world.run()
+    world.dragon.position = Tile(world.dragon.position.x, world.dragon.position.z + 1)
+    world.run()
+    expect(world.attacks).to_be(0)
+    expect(any([event[0] == 'Walk' for event in world.events])).to_be(False)
+
+
+test_each(['occluded', 'claimed', 'combat-face-gap', 'skipped', 'out-of-range'])(
+    'unsettled targeting rejects %s candidates', ineligible_target)
+
+
+def network_body_not_visual():
+    world = DragonWorld()
+    world.dragon.in_combat = False
+    world.dragon.position = Tile(world.tile.x + 20, world.tile.z)
+    world.dragon.visual = Tile(world.tile.x + 3, world.tile.z)
+    world.run(2)
+    expect(world.attacks).to_be(0)
+
+
+test('a near interpolated tile cannot make a distant network body attackable', network_body_not_visual)
+
+
+def adaptive_hold(condition):
+    world = DragonWorld()
+    world.dragon.in_combat = False
+    if condition in ['owned', 'pending']:
+        world.bot.fight._set_target(17)
+    if condition == 'pending':
+        world.bot.fight._clear_target()
+    if condition == 'friendly':
+        world.dragon.foreign = True
+    if condition == 'skipped':
+        world.bot.fight.skip[17] = world.clock + 10000
+    spy_on(reachability, 'line_of_sight', impl=lambda from_, to, size: condition == 'ready' or from_.x == 2834)
+    run_wait(world.bot.fight._ladder())
+    expect(any([event[0] == 'Walk' for event in world.events])).to_be(False)
+
+
+test_each(['ready', 'owned', 'pending', 'friendly', 'skipped'])('adaptive stand holds for %s', adaptive_hold)
+
+
+def adaptive_stand(x, z):
+    world = DragonWorld()
+    world.tile = Tile(2836, 9817)
+    world.dragon.in_combat = False
+    world.dragon.size = 4
+    world.dragon.position = Tile(2839, z + 2)
+    spy_on(reachability, 'line_of_sight', impl=lambda from_, to, size: from_.x <= x)
+    spy_on(event_signal, 'pending', impl=lambda: world.attacks > 0 or world.clock > 12000)
+    world.run()
+    walks = [event[2] for event in world.events if event[0] == 'Walk']
+    expect(len(walks)).to_be(1)
+    expect(walks[0].equals(Tile(x, 9817))).to_be(True)
+    expect(world.attacks).to_be(1)
+    expect(world.bot.fight.blocks_loot()).to_be(True)
+
+
+test_each([[2834, 9822], [2835, 9823]])('network body chooses the nearest existing visible stand %s,%s', adaptive_stand)
+
+
+def melee_nearby(site, x, z):
+    world = DragonWorld(site, 'melee', {'rotate_spawns': False})
+    world.tile = Tile(x, z)
+    world.dragon.in_combat = False
+    world.dragon.position = Tile(x + 3, z)
+    spy_on(event_signal, 'pending', impl=lambda: world.attacks > 0 or world.clock > 15000)
+    world.run()
+    expect(world.attacks).to_be(1)
+    expect(world.bot.target_idx).to_be(17)
+    expect(any([event[0] == 'Walk' for event in world.events])).to_be(False)
+
+
+test_each([['taverley-blue', 2898, 9788], ['heroes-blue', 2925, 9908],
+           ['gutanoth-blue', 2588, 9440], ['brimhaven-iron', 2728, 9440]])(
+    '%s melee attacks nearby prey without returning to the anchor', melee_nearby)
+
+
+
+def last_food_return():
+    world = loot_world(1)
+    world.drop(536)
+    world.run(3)
+    expect(len(world.bot.loot_run.food)).to_be(1)
+    return world
+
+
+def retry_food_recovery(failure):
+    world = last_food_return()
+    world.walk_ok = failure != 'walk'
+    world.reject_take = failure == 'take'
+    world.run()
+    expect(len(world.bot.loot_run.food)).to_be(1)
+    expect(world.task('BankRun').validate()).to_be(False)
+    world.walk_ok = True
+    world.reject_take = False
+    world.run(2)
+    expect(inventory.count('Shark')).to_be(1)
+    expect(any([event[0] == 'Bank' for event in world.events])).to_be(False)
+    expect(world.bot.loot_run).to_be_null()
+
+
+test_each(['walk', 'take'])('last-food recovery survives a refused %s and resumes before banking', retry_food_recovery)
+
+
+def bounded_food_recovery(failure):
+    world = last_food_return()
+    world.walk_ok = failure != 'walk'
+    world.reject_take = failure == 'take'
+    world.run(4)
+    expect(len(world.bot.loot_run.food)).to_be(1)
+    world.run()
+    expect(world.bot.loot_run).to_be_null()
+    expect(world.task('BankRun').validate()).to_be(True)
+
+
+test_each(['walk', 'take'])('last-food recovery abandons only after five failed %s attempts', bounded_food_recovery)
+
+
+def interrupted_food_recovery():
+    world = last_food_return()
+
+    def walk(tile, **opts):
+        world.tile = tile
+        world.pending = True
+        return True
+        yield
+
+    spy_on(traversal, 'walk_resilient', impl=walk)
+    world.run()
+    expect(len(world.bot.loot_run.food)).to_be(1)
+    expect(inventory.count('Shark')).to_be(0)
+    world.pending = False
+    world.run(2)
+    expect(inventory.count('Shark')).to_be(1)
+    expect(any([event[0] == 'Bank' for event in world.events])).to_be(False)
+
+
+test('an interrupted loot return retains its food ledger until the event ends', interrupted_food_recovery)
+
+
+def burial_exhaustion(reclaim):
+    world = loot_world(1)
+    anchor = world.tile
+    world.reject_bury = True
+    world.drop(536)
+    world.run(7)
+    expect(len([event for event in world.events if event[0] == 'Bury'])).to_be(5)
+    expect(world.task('BuryBones').validate()).to_be(False)
+    if reclaim:
+        world.pack.pop()
+    world.run(2 if reclaim else 1)
+    expect(world.tile.equals(anchor)).to_be(True)
+    expect(world.bot.loot_run).to_be_null()
+    if reclaim:
+        expect(inventory.count('Shark')).to_be(1)
+        expect(any([event[0] == 'Bank' for event in world.events])).to_be(False)
+    else:
+        expect(world.task('BankRun').validate()).to_be(True)
+        world.run()
+        expect(len([event for event in world.events if event[0] == 'Bank'])).to_be(1)
+
+
+test_each([False, True])('burial exhaustion returns safely and reclaims food only if room appears: %s', burial_exhaustion)
+
+
+
+def full_pack_shield(failure):
+    from rs2004.hunting import supply
+    world = DragonWorld('brimhaven-iron', 'melee')
+    world.worn = [item for item in world.worn if item.id != 1540]
+    world.pack = [DragonItem(world, 385)] + [DragonItem(world, 995, n + 10) for n in range(27)]
+    valuables = list(world.pack[1:])
+    world.bank = [Held(1540, 'Dragonfire shield', 1, 5)]
+    world.open = True
+    rejected = [failure != 'none']
+    spy_on(bank, 'loaded', impl=lambda: world.open)
+
+    def deposit(name, op):
+        expect(name).to_be('Shark')
+        expect(op).to_be('Deposit-1')
+        if rejected[0] and failure == 'refused':
+            return False
+        if rejected[0] and failure == 'unconfirmed':
+            return True
+        if rejected[0] and failure == 'closed':
+            world.open = False
+            return True
+        item = [item for item in world.pack if item.id == 385][0]
+        world.pack.remove(item)
+        world.bank.append(item)
+        return True
+
+    original_take = world.take
+
+    def withdraw(name, op):
+        return False if rejected[0] and failure == 'withdrawal' else original_take(name, op)
+
+    deposited = spy_on(bank, 'deposit', impl=deposit)
+    spy_on(bank, 'withdraw', impl=withdraw)
+    ready = run_wait(supply.withdraw_gear(world.bot, world.site))
+    expect(ready).to_be(failure == 'none')
+    if failure != 'none':
+        expect(world.bot.parked).to_be(False)
+        expect(equipment.contains('Dragonfire shield')).to_be(False)
+        expect(any([item.id == 1540 for item in world.bank])).to_be(True)
+        rejected[0] = False
+        world.open = True
+        expect(run_wait(supply.withdraw_gear(world.bot, world.site))).to_be(True)
+    run_wait(supply.equip_gear(world.bot, world.site))
+    expect(equipment.contains('Dragonfire shield')).to_be(True)
+    expect([item for item in world.pack if item.id == 995]).to_equal(valuables)
+    expect(world.bot.parked).to_be(False)
+    before = len(deposited.calls)
+    world.open = True
+    expect(run_wait(supply.withdraw_gear(world.bot, world.site))).to_be(True)
+    expect(len(deposited.calls)).to_be(before)
+
+
+test_each(['none', 'refused', 'unconfirmed', 'closed', 'withdrawal'])(
+    'bank-only shield preparation preserves a full kept pack and retries %s', full_pack_shield)
+
+
+def missing_shield_bank(state):
+    from rs2004.hunting import supply
+    world = DragonWorld('brimhaven-iron', 'melee')
+    world.worn = []
+    world.open = state != 'closed'
+    world.bank = []
+    spy_on(bank, 'loaded', returns=state != 'unloaded')
+    expect(run_wait(supply.withdraw_gear(world.bot, world.site))).to_be(False)
+    expect(world.bot.parked).to_be(state == 'missing')
+
+
+test_each(['missing', 'unloaded', 'closed'])('shield shortages park only with a confirmed ready bank: %s', missing_shield_bank)

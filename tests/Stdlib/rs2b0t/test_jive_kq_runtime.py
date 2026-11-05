@@ -1080,3 +1080,211 @@ def formation_before_optional_prayers():
 
 
 test('approaching a visible queen spreads into formation before optional offensive prayers', formation_before_optional_prayers)
+
+
+
+def blocked_queen(engaged=False):
+    world = QueenWorld()
+    world.hp = 70
+    world.at = Tile(3480, 9498)
+    centre = Tile(3477, 9509)
+    world.queen._fields.update({'id': 1160, 'network_tile': lambda: centre, 'tile': lambda: centre,
+                                'targets_me': lambda: engaged, 'target': ('player', 1) if engaged else None})
+    spy_on(reachability, 'walkable', impl=lambda p: not (p.x > 3477 and p.z == 9509))
+    spy_on(reachability, 'can_reach', returns=True)
+    spy_on(reachability, 'can_step', returns=True)
+    world.heartbeat()
+    world.bot.observe_queen()
+    return world
+
+
+def blocked_approach():
+    world = blocked_queen()
+    run_wait(world.bot.fight())
+    expect(world.bot.stage).to_be('fight')
+    expect(world.bot.blocked).to_be(True)
+    target = [event[1] for event in world.events if event[0] == 'walk'][-1]
+    expect(max(abs(target.x - 3477), abs(target.z - 9509))).to_be(6)
+
+
+test('a blocked cross approaches the unengaged queen before searching elsewhere', blocked_approach)
+
+
+def body_wide_pull():
+    world = blocked_queen(True)
+    stepped = spy_on(reachability, 'can_step', returns=True)
+    run_wait(world.bot.fight())
+    expect(world.bot.sighting.engaged).to_be(True)
+    target = [event[1] for event in world.events if event[0] == 'walk'][-1]
+    expect(target.equals(Tile(3477, 9495))).to_be(True)
+    expect(any([call[0].equals(Tile(3479, 9511)) and call[1].equals(Tile(3479, 9510)) for call in stepped.calls])).to_be(True)
+
+
+test('an engaged queen pull checks steps for the whole five-wide body', body_wide_pull)
+
+
+def stationary_reacquisition():
+    world = blocked_queen(True)
+    run_wait(world.bot.fight())
+    queen = world.queen
+    world.npcs = []
+    world.clock += 9000
+    world.heartbeat()
+    world.bot.observe_queen()
+    run_wait(world.bot.fight())
+    world.heartbeat()
+    run_wait(world.bot.fight())
+    expect(world.bot.lure_at).to_be(0)
+    world.npcs = [queen]
+    world.heartbeat()
+    world.bot.observe_queen()
+    run_wait(world.bot.fight())
+    expect(world.bot.lure_at).to_be(world.now())
+    world.clock += 16000
+    world.heartbeat()
+    world.bot.observe_queen()
+    run_wait(world.bot.fight())
+    expect(world.bot.lure_attempt).to_be(1)
+    expect(world.bot.stage).to_be('fight')
+
+
+test('reacquiring a stationary queen restarts the pull retry timer', stationary_reacquisition)
+
+
+def sighting_persists():
+    world = blocked_queen()
+    world.npcs = []
+    world.bot.observe_queen()
+    expect(world.bot.blocked).to_be(True)
+    expect(world.bot.sighting.tile.equals(Tile(3477, 9509))).to_be(True)
+
+
+test('a blocked queen leaving view retains her last observed position', sighting_persists)
+
+
+def peer_sighting():
+    world = QueenWorld()
+    world.hp = 70
+    world.npcs = []
+    world.at = Tile(3508, 9493)
+    world.peer_overrides['two'] = {'blocked': True, 'queen': {'id': 1160, 'tile': {'x': 3478, 'z': 9510, 'level': 0},
+        'at': world.now(), 'engaged': False}}
+    spy_on(reachability, 'can_reach', returns=True)
+    world.heartbeat()
+    run_wait(world.bot.fight())
+    expect(world.bot.status).to_be('searching the last reported queen position')
+    target = [event[1] for event in world.events if event[0] == 'walk'][-1]
+    expect(max(abs(target.x - 3478), abs(target.z - 9510))).to_be(6)
+    expect(world.bot.party.unsafe(1, world.now())).to_be(False)
+
+
+test('an unseen queen can be approached from a peer sighting without group abort', peer_sighting)
+
+
+def remote_aggression():
+    world = blocked_queen()
+    world.queen._fields['target'] = ('player', 2)
+    world.peer_overrides['two'] = {'player_slot': 2}
+    spy_on(reader, 'players', returns=[])
+    world.heartbeat()
+    world.bot.observe_queen()
+    expect(world.bot.sighting.engaged).to_be(True)
+
+
+test('queen aggression recognizes party slots beyond local player visibility', remote_aggression)
+
+
+def empty_search():
+    world = QueenWorld()
+    world.hp = 70
+    world.npcs = []
+    world.at = Tile(3488, 9496)
+    spy_on(reachability, 'can_reach', returns=True)
+    world.heartbeat()
+    run_wait(world.bot.fight())
+    target = [event[1] for event in world.events if event[0] == 'walk'][-1]
+    expect(target.equals(world.at)).to_be(False)
+    expect(world.bot.status).to_be('searching the queen chamber')
+    expect(world.bot.stage).to_be('fight')
+
+
+test('an empty central waypoint advances the chamber search', empty_search)
+
+
+
+def recovery_world():
+    world = QueenWorld()
+    world.hp = 70
+    death = DeathReport(world.now(), world.at, [RecoveryItem(BOW, 1)], [])
+    world.peer_overrides['two'] = {'stage': 'retreat', 'ready': False, 'restocking': True, 'death': death.to_message()}
+    world.peer_overrides['three'] = {'recovery_space': 4}
+    world.peer_overrides['four'] = {'recovery_space': 4}
+    world.heartbeat()
+    return world
+
+
+def recovery_election():
+    world = recovery_world()
+    original = world.bot.party
+    world.bot.party = Party(original.roster, 'three', 'three')
+    spot = {'x': world.at.x, 'z': world.at.z, 'level': 0}
+    for name in original.roster:
+        message = {'name': name, 'session': name, 'trip': 1, 'stage': 'fight', 'ready': True, 'tile': spot, 'recovery_space': 4}
+        message.update(world.peer_overrides.get(name, {}))
+        world.bot.party.receive(message, world.now())
+    expect(run_wait(world.bot.recover_loot())).to_be(False)
+    expect(world.events).to_equal([])
+    world.bot.party.receive({'name': 'one', 'session': 'one', 'trip': 1, 'stage': 'retreat', 'ready': False,
+                             'restocking': True, 'tile': spot, 'recovery_space': 0}, world.now())
+    expect(run_wait(world.bot.recover_loot())).to_be(True)
+    expect(world.bot.status).to_contain('recovering two')
+
+
+test('only the first survivor with recovery space leaves formation for teammate gear', recovery_election)
+
+
+def confirmed_gear_recovery(acknowledged):
+    world = recovery_world()
+    world.active_prayers.clear()
+    drop = world.drop(BOW, 'Magic shortbow', world.at)
+
+    def take(op):
+        world.events.append(('take', BOW))
+        if acknowledged:
+            world.carried[BOW] = 1
+            world.ground = []
+        return True
+
+    drop._fields['interact'] = take
+    drop._fields['count'] = 1
+    expect(run_wait(world.bot.recover_loot())).to_be(True)
+    expect(any([event[0] == 'take' for event in world.events])).to_be(False)
+    expect(run_wait(world.bot.recover_loot())).to_be(True)
+    expect(len(world.bot.recovered_items)).to_be(1 if acknowledged else 0)
+    if acknowledged:
+        expect(world.bot.loot_counts.get('Recovered for two: Magic shortbow')).to_be(1)
+        expect(world.bot.recovered_items[0].owner).to_be('two')
+        world.ticks += 13
+        run_wait(world.bot.recover_loot())
+        run_wait(world.bot.recover_loot())
+        expect(world.bot.stage).to_be('retreat')
+        expect(world.bot.restocking).to_be(True)
+    else:
+        expect(world.bot.loot_counts.get('Recovered for two: Magic shortbow')).to_be_null()
+
+
+test_each([True, False])('teammate gear recovery waits for protection and inventory acknowledgement: %s', confirmed_gear_recovery)
+
+
+def recovery_preserves_supplies():
+    world = recovery_world()
+    world.drop(BOW, 'Magic shortbow', world.at)
+    world.pack = [Fake(id=FOOD, name='Shark', count=1) for n in range(28)]
+    run_wait(world.bot.recover_loot())
+    run_wait(world.bot.recover_loot())
+    expect(all([event[0] == 'walk' for event in world.events])).to_be(True)
+    expect(world.bot.stage).to_be('retreat')
+    expect(len(world.pack)).to_be(28)
+
+
+test('full recovery inventories preserve food and escape supplies', recovery_preserves_supplies)
