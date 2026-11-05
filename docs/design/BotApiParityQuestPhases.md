@@ -1,5 +1,12 @@
 # Bot API Parity: the quest phases
 
+**Complete, reviewed 2026-11-05:** all sub-phases 16a–16c and 17a–17i are implemented, tested and have
+the live acceptance evidence recorded below and in the design's "As built" sections. This is the completed
+implementation plan. Later runtime specs also brought every embedded stdlib file above the 95% coverage
+floor; remaining findings are in [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md).
+Real-speed checks for 17h/17i and other retained limits are in
+[BotApiParityStatus.md](BotApiParityStatus.md#open-items).
+
 [BotApiParityDesign.md](BotApiParityDesign.md) §10 and §11 plan phases 16 and 17: the quest engine and all 63 of rs2b0t's quests. Together they're about 75,000 lines of rs2b0t, against phase 15's 3,900. This file splits them into sub-phases, each small enough to port, test and run live before the next one starts. The design doc's decisions still hold: `rs2004.quests` is a stdlib package, each quest is `rs2004/quests/defs/<id>.py` or a package of that name, and `decide(snap)` stays a pure function of the snapshot.
 
 Sizes were measured at rs2b0t `4417d0b7` (2026-10-23), in lines of TypeScript. As with every phase, each sub-phase starts by measuring again at rs2b0t's tip.

@@ -4,6 +4,22 @@ Reviewed on 2026-11-04, from [`32d52004`](https://github.com/rs2b2t/rs2b0t/commi
 
 The source checkout was read at a pinned detached worktree. Changes were translated into the existing Python API and generator waits; the TypeScript commits cannot be cherry-picked into this C++/pocketpy application. Upstream code and data are MIT licensed; see [the retained license](../../thirdparty/rs2b0t/LICENSE).
 
+## Remaining work
+
+Reviewed again on 2026-11-05 against the local implementation and recorded validation:
+
+- Run live checks for Cosmic/JiveRC, coordinated MuleDepot transfers, MuleCrafter's inside/outside meetings
+  and bank-visit settings, and three-tick fishing at real speed. Existing specs validate workflows; they do
+  not measure real-speed throughput or coordinated live-server behavior.
+- Validate multilocs against real revision-289 content when available. The local 289 cache has varbit
+  definitions but no multiloc loc definitions, so child transitions/collision currently use synthetic fixtures.
+- Review commits after `8b7db422` in a future upstream pass. This review and the passing export audit are
+  limited to that pinned snapshot; upstream's current tip was not fetched for this documentation cleanup.
+
+The quest recovery, account leveler and non-quest feature ports described below are implemented. No other
+feature port from this review remains deferred. Broader parity follow-ups are in
+[BotApiParityStatus.md](BotApiParityStatus.md#open-items).
+
 ## Commit decisions
 
 | Commit | Upstream change | Decision |
@@ -24,7 +40,7 @@ The source checkout was read at a pinned detached worktree. Changes were transla
 | `fc4db259` (#912) | Three-tick fly fishing | Applied as Fisher's opt-in `three_tick_fly`. Native snapshots expose raw animation ids and start ticks, including repeated sequences. The controller batches drops, knife/log, Make-1 and Lure, arms from the next-tick landing, and falls back after a missed landing. Bank-first knife/log/axe restocking and ground-spawn/log-chopping fallback are included. Other tick-manipulation profiles remain unchanged. |
 | `d4640686` (#910) | Bot UI management, wool spinning, amulet stringing | Applied exact raw-fibre matching in inventory and bank, and JiveCrafting's amulet-stringing mode. The mode uses exact unstrung/strung ids, unnoted pairs, partial bank loads and the nearest bank. Existing crafting settings default to jewellery as before. Browser management changes do not apply. |
 | `8de83411` (#878) | MuleDepot shared bank bot | Applied as `bots/mule_depot.py`, with Dump/Mule, Dump/Supermule, Supply/Supplier and Supply/Client roles. Includes normalized partner allow-lists, bank cleanup and noted withdrawals, oversized delivery batches, rotating requests, stable trade closure and per-client delivered/shortfall accounting. Upstream uses an in-memory delivery ledger, not persistent shared stock; the previous review description was incorrect. The other runecrafting bots remain available. |
-| `8b7db422` (#875) | WildyAgility lap timing | Applied removal of the post-success settle delay and its unused random-delay helper. Retained our timeout setting and existing retry/food/pit behavior. Upstream's repeated per-tick obstacle clicking and retry redesign need a separate live timing check on this client's scheduler. No upstream lap-time claim is made for the headless client. |
+| `8b7db422` (#875) | WildyAgility lap timing | Applied removal of the post-success settle delay and its unused random-delay helper, per-tick re-clicks and shared failed-click/timeout escalation. Food withdrawal now defaults to 28. Retained the local timeout setting and pit/food recovery. See the WildyAgility follow-up below for headless validation. |
 
 ## Completed quest follow-up
 
@@ -35,7 +51,8 @@ The remaining quest work from the review is implemented in the existing Python m
 - Quest acquisition: Family Crest fish/ruby sourcing, Goblin Diplomacy combat/redberries, Rune Mysteries junk handling, Knight's Sword inventory preparation, Waterfall food, and Watchtower's dragon-bone hunt. Existing local alternatives are retained. The Watchtower hunt cleans up on failure and refreshes bank state before quest selection resumes.
 - Quest execution: Black Knights' Fortress progress, Merlin's Crystal routes/crate/Excalibur/crystal, Fight Arena release/combat recovery, Horror from the Deep exits, Sheep Herder herding, Shilo scroll/key/completion recovery, and the remaining Dragon Slayer/Ikov changes.
 
-The non-quest feature ports identified in the table are implemented in the feature follow-up below. WildyAgility's repeated-click timing and retry redesign remain deferred as described in its row; no live timing claim is made here. Phase 18 is tracked separately.
+The non-quest feature ports identified in the table are implemented in the feature follow-ups below,
+including WildyAgility's repeated-click timing and retry redesign. Phase 18 is tracked separately.
 
 ## Validation
 
@@ -60,3 +77,53 @@ The new default `meeting_point` is `Altar (inside)`. Each mule must start with i
 `bank_fill` now means **allow crafter bank visits**, including startup cleanup. When false, the crafter must start with its talisman and cannot run without partners. When true, `trades_per_bank` controls banking: 0 selects solo crafting and banks on empty; a positive value enables mule trades and banks after that many confirmed deliveries. Existing paired configurations should set a positive trade count. The existing `bank_fill=true` default is retained locally.
 
 Validation passed: Windows x64 Release and Debug builds; all 809 registered CTest cases in each configuration (27 cache-dependent cases skipped); those 27 cases separately against revisions 225, 274 and 289 (493 assertions); the complete traced Debug suite before the last native edge-case addition (808 cases); and focused final feature regressions in both configurations. Traced stdlib coverage is 97.85% (76,809 / 78,499), with all 436 files above the 95% minimum. The port linter and `git diff --check` pass. The final feature specs cover twenty workflows, including same-named item ids, all four depot startups, bankless crafter startup, raw Make-1 batching and Cosmic travel-gear trade refusal. Live-server Cosmic, coordinated depot transfers and real-speed three-tick throughput have not been measured. The local 289 cache supplies varbit definitions but currently contains no multiloc loc definitions; synthetic decoded fixtures exercise child transitions and collisions.
+
+## WildyAgility follow-up (2026-11-05)
+
+`RunLap` now clicks again on each waiting server tick, beginning after the first wait. It checks XP, pit
+position, refusal/fall messages, death, dialogue and random events before re-clicking; food yields after
+three ticks without spending a retry. Only the first re-click is logged, and timeout diagnostics include
+the re-click count. XP still takes priority when a redundant click produces a refusal as traversal finishes.
+
+Failed initial clicks, vanished actions and timeouts share one escalation ladder: retry in place, walk
+back to the starting side, then skip after the retry limit. A skip wrapping the lap walks to the pipe's
+starting side. The existing unreachable-approach, pit, food and death recovery paths remain in place.
+
+`food_withdraw` defaults to 28, including the startup fallback. Explicit saved values such as 20 remain
+valid. Unlike upstream, this client retains the `obstacle_timeout_ticks` setting (default 24, range 5–60)
+and the wall-clock bound for endless movement/animation.
+
+`tests/Stdlib/rs2b0t/test_wildy_agility_runtime.py` covers twenty scenarios through the actual task and
+startup generators: dropped/failed clicks, disappearing actions, escalation and lap wrapping, unreachable
+starts, idle/wall-clock timeouts, successful clears, late refusals, interruptions, falls, food priority and
+existing settings. The final focused specs pass in both Debug and Release.
+
+The live check used two fresh scratch accounts on the local revision-289 members engine at 600 ms ticks,
+Agility 52, Hitpoints/Defence 99 and 28 lobsters. Both ran the same harness and Release executable, starting
+inside the course. Timing begins after the first completed lap and covers the next six; Tutorial Island,
+setup and the warm-up lap are excluded. The baseline uses the pre-change script.
+
+| Six-lap window | Baseline | Per-tick clicks |
+|---|---:|---:|
+| Elapsed | 358,174 ms (597 ticks) | 344,391 ms (574 ticks) |
+| Mean lap time | 59.70 s | 57.40 s |
+| Agility XP | 3,428 | 3,428 |
+| Obstacle clears | 30 | 30 |
+| Course falls | 5 | 2 |
+| Bot failures / skipped obstacles / deaths / script errors | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
+
+Successful clear-time means in ticks, in course order (pipe, swing, stones, log, rocks), were
+`19.00, 7.33, 16.00, 16.67, 11.00` before and `19.83, 8.50, 16.33, 20.50, 12.33` after. The total
+time was lower, but falls differed and clear-time means were higher, so this is workflow/timing evidence,
+not proof of a speedup or upstream-equivalent throughput. Late refusal messages occurred alongside XP;
+they did not cause a retry or skip. Deliberate dropped/failed clicks are covered by runtime specs rather
+than this live run. Logs, harnesses and `timing-results.json` remain under `build/wildy-agility-live`.
+
+Validation: Windows x64 Debug and Release builds; all 809 Release CTest cases with revisions 225, 274
+and 289 configured; all 809 default Debug cases (27 cache-dependent cases skipped); the twenty final
+focused scenarios in both configurations; porting lint over stdlib/scripts/specs and the final changed
+files; the pinned full export audit; and `git diff --check`.
+
+The cache-backed Debug walker-data aggregate exceeded CTest's 300-second limit without an assertion
+failure being reported. This remains a test-budget follow-up in [OpenWork.md](OpenWork.md), separate
+from the passing default Debug suite and cache-backed Release suite above.
