@@ -6,19 +6,11 @@ The source checkout was read at a pinned detached worktree. Changes were transla
 
 ## Remaining work
 
-Reviewed again on 2026-11-05 against the local implementation and recorded validation:
-
-- Run live checks for Cosmic/JiveRC, coordinated MuleDepot transfers, MuleCrafter's inside/outside meetings
-  and bank-visit settings, and three-tick fishing at real speed. Existing specs validate workflows; they do
-  not measure real-speed throughput or coordinated live-server behavior.
-- Validate multilocs against real revision-289 content when available. The local 289 cache has varbit
-  definitions but no multiloc loc definitions, so child transitions/collision currently use synthetic fixtures.
-- Review commits after `8b7db422` in a future upstream pass. This review and the passing export audit are
-  limited to that pinned snapshot; upstream's current tip was not fetched for this documentation cleanup.
-
-The quest recovery, account leveler and non-quest feature ports described below are implemented. No other
-feature port from this review remains deferred. Broader parity follow-ups are in
-[BotApiParityStatus.md](BotApiParityStatus.md#open-items).
+Follow-ups now live in GitHub: [later upstream commits (#29)](https://github.com/ineedbots/lc-headless/issues/29),
+[live feature validation (#32)](https://github.com/ineedbots/lc-headless/issues/32) and
+[real-content multiloc validation (#33)](https://github.com/ineedbots/lc-headless/issues/33).
+The [issue index](OpenWork.md) covers the broader parity follow-ups. The ports and validation
+below are historical evidence; this review remains limited to pinned upstream `8b7db422`.
 
 ## Commit decisions
 
@@ -125,5 +117,5 @@ focused scenarios in both configurations; porting lint over stdlib/scripts/specs
 files; the pinned full export audit; and `git diff --check`.
 
 The cache-backed Debug walker-data aggregate exceeded CTest's 300-second limit without an assertion
-failure being reported. This remains a test-budget follow-up in [OpenWork.md](OpenWork.md), separate
+failure being reported. This is tracked in [#31](https://github.com/ineedbots/lc-headless/issues/31), separate
 from the passing default Debug suite and cache-backed Release suite above.

@@ -3,7 +3,7 @@
 **Complete, reviewed 2026-11-05:** all sub-phases 16a–16c and 17a–17i are implemented, tested and have
 the live acceptance evidence recorded below and in the design's "As built" sections. This is the completed
 implementation plan. Later runtime specs also brought every embedded stdlib file above the 95% coverage
-floor; remaining findings are in [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md).
+floor; optional coverage is tracked in [#62](https://github.com/ineedbots/lc-headless/issues/62).
 Real-speed checks for 17h/17i and other retained limits are in
 [BotApiParityStatus.md](BotApiParityStatus.md#open-items).
 

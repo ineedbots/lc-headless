@@ -1,6 +1,6 @@
 # Bot API Parity: Status
 
-Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's "As built" section there has the detail; this page is the summary and the list of what's still open.
+Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's "As built" section there has the detail; this page retains the implementation summary and validation history.
 
 **Reviewed 2026-11-05:** all phases are implemented. The export audit against pinned upstream `8b7db422`
 reports nothing missing. Remaining work is the follow-ups below, rather than an unfinished parity phase.
@@ -31,28 +31,10 @@ The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective 
 
 ## Open items
 
-| Item | Where it goes |
-|---|---|
-| Remaining facade scenarios | Finish the one-for-one scenario audit for JiveDragons and JiveKQ; remaining targeting/route and upkeep/loot edge cases are not claimed complete. See the follow-up below for the suites already ported |
-| A refused crossing with another way past, to show the walker routing round it live (the Champions' Guild has none) | When one is found |
-| JiveKQ: one account stopped on a third restock with "Could not buy a Shantay pass" after buying one each earlier trip; the log doesn't say why | When it recurs, with the shop's state logged |
-| JiveKBD's default Fire Strike kills nothing in 30 minutes; the bot runs and banks | A settings matter, as rs2b0t's |
-| `trail complete` logged twice at a trail's end | Cosmetic |
-| GnomeMagicChopper's "Chopped" count stays 0, as rs2b0t counts it | Cosmetic; left as rs2b0t's |
-| Live runs were 12 minutes, not the plan's 15 | — |
-| Black Knights' Fortress re-listens at the grill after a restart (rs2b0t keeps `listened` in memory) | Harmless; a stage oracle would fix it |
-| A step failing while the character steps between two tiles never parks, as the tile reads as progress (rs2b0t's watchdog) | When a quest hits it |
-| The walker's data needed fixes for this engine at Black Knights' Fortress (`STAIR_FIXES`, `CROSSING_ADDITIONS` in `tools/nav/export_rs2b0t.ts`), Bervirius' tomb and the Elemental Workshop (`EDGE_ADDITIONS`), and the Champions' Guild (`STAIR_FIXES`) | More may turn up with each quest sub-phase |
-| Scavvo stocks one of each rune piece and doesn't restock, so a second Hero's Quest partner needs the kit banked | When a pair runs it without a harness |
-| A wield swap changes the inventory, so the no-progress watchdog can't see a two-step loop (Ikov's melee picker had one) | A rule in the watchdog, when another quest hits it |
-| Regicide needs the spade it took through the pass, and no shop near Ardougne sells one, so a death carrying the only one parks it with the reason | When a quest needs a spade source |
-| Phase 17h's live runs were all at 100 ms ticks; its timing races (the throw, the wield, the crest) haven't been seen on a 600 ms world | When a run at real speed is due |
-| Phase 17i's live runs were at 100 ms ticks too, and Radimus's conversation shuts after the first session for a reason not found; the engine's next attempt carries on | When a run at real speed is due |
-| The gilded totem's hand-in lost a minute on one run, in the shape the training had, and recovered on its next attempt | When it costs more |
-| A failing teleport cast is offered again for 5 repaths (an account with a spell's quest set by varp shows it) | When a real account hits it |
-| A hard Kharazi trail's pack only just fits its kit and 15 sharks, so an extra scroll or gift blocks it, though now with a log line; ClueSolver doesn't dress an account for the Saradomin Wizard | When an account hits it |
-| New feature live checks: Cosmic travel/trading, coordinated MuleDepot transfers, three-tick fishing throughput and MuleCrafter meeting/banking modes | Implementations and regression specs pass; live behavior remains to be measured |
-| AccountLeveler at real speed, high-level dragon progression and optional player-market trading | The completed acceptance run used 100 ms ticks and low-level methods; higher-level paths have specs/cache checks |
+Remaining work is tracked in [GitHub issues](OpenWork.md), including live acceptance gaps,
+trigger-based observations and optional improvements. That index links each migrated task;
+issue bodies include scope, acceptance criteria and commit-pinned historical context.
+The facade scenario audit is tracked in [#30](https://github.com/ineedbots/lc-headless/issues/30).
 
 ## Working on it
 
@@ -83,7 +65,8 @@ loot order/capacity, food reclaim/retry budgets, bounded pickup failure, network
 ports cover food/equipment/prayer acknowledgement, same-tick combat inputs, valuable and arrow loot, entry gates,
 upkeep, route interactions, search/pull, teammate gear recovery and death restocking. KQ sends special-attack toggles without delaying the next attack,
 and a pending combat eat reserves its future loot slot before another food or vial is discarded. The remaining
-scenario families above stay open; these additions do not claim a complete one-for-one port of both bot suites.
+scenario audit is tracked in [#30](https://github.com/ineedbots/lc-headless/issues/30); these additions
+do not claim a complete one-for-one port of both bot suites.
 
 Validation: Windows Debug and cache-backed Release each pass all 810 registered tests. The default Debug run
 skips 27 cache-dependent tests; Release uses the 225, 274 and 289 caches. The full traced Debug run also passes

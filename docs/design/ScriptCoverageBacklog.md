@@ -1,6 +1,8 @@
-# Script coverage backlog
+# Script coverage reference
 
-What's left to test in the embedded stdlib, `src/Script/Stdlib/`, for anyone adding coverage. Script tests live in
+Optional behavioral coverage is tracked in [#62](https://github.com/ineedbots/lc-headless/issues/62),
+which retains the migrated candidate-file table. This page preserves the saved snapshot and runtime-spec
+instructions for the embedded stdlib, `src/Script/Stdlib/`. Script tests live in
 `tests/Stdlib/`, and [Building.md](../Building.md#stdlib-script-coverage) describes the report these figures come from.
 The figures are a snapshot: rerun the report rather than trusting them once tests have moved on.
 
@@ -57,29 +59,9 @@ Some of what remains can't be reached by a test at all. `elementalworkshop/works
 `chompybird/hunt.py` lines 109–110 and 160 are guards on states the lines before them rule out, so 100% isn't the goal
 for every file.
 
-## Files nearest the coverage floor
+## Further coverage
 
-These are follow-up opportunities beyond the enforced 95% floor. The generated HTML report lists every missed line.
-
-| File | Covered / executable | Coverage |
-|---|---:|---:|
-| `rs2004/quests/defs/hazeelcult.py` | 342 / 360 | 95.00% |
-| `rs2004/quests/defs/witchshouse/house.py` | 171 / 180 | 95.00% |
-| `rs2004/quests/defs/watchtower/caves.py` | 134 / 141 | 95.04% |
-| `rs2004/traversal.py` | 1150 / 1210 | 95.04% |
-| `rs2004/quests/defs/legends/shaman.py` | 307 / 323 | 95.05% |
-| `rs2004/quests/defs/horror/journal.py` | 96 / 101 | 95.05% |
-| `rs2004/random_events.py` | 462 / 486 | 95.06% |
-| `rs2004/quests/defs/upass/doll.py` | 289 / 304 | 95.07% |
-| `rs2004/quests/defs/dragonslayer/__init__.py` | 734 / 772 | 95.08% |
-| `rs2004/quests/defs/blackknight.py` | 116 / 122 | 95.08% |
-| `rs2004/quests/defs/piratestreasure/journal.py` | 58 / 61 | 95.08% |
-| `rs2004/hunting/supply.py` | 758 / 797 | 95.11% |
-| `rs2004/quests/defs/upass/pass_.py` | 564 / 593 | 95.11% |
-| `rs2004/quests/defs/deathplateau/__init__.py` | 584 / 614 | 95.11% |
-| `rs2004/clues/solve.py` | 721 / 758 | 95.12% |
-| `rs2004/quests/defs/piratestreasure/supplies.py` | 39 / 41 | 95.12% |
-| `rs2004/quests/defs/sheepherder/herd.py` | 234 / 246 | 95.12% |
-| `rs2004/quests/defs/witchshouse/patrol.py` | 137 / 144 | 95.14% |
-| `rs2004/quests/defs/digsite/__init__.py` | 236 / 248 | 95.16% |
-| `rs2004/quests/defs/fremenniktrials/hunter.py` | 138 / 145 | 95.17% |
+Use [#62](https://github.com/ineedbots/lc-headless/issues/62) for optional coverage work and regenerate
+the report before choosing missed behavior. The 95% floor is already met in every file; further
+coverage is not an outstanding phase requirement. The separate upstream bot scenario audit is
+tracked in [#30](https://github.com/ineedbots/lc-headless/issues/30).

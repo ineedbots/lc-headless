@@ -207,7 +207,7 @@ The bots phases 1–9 ported are brought up to rs2b0t's current versions as well
     - [x] `coverage.py` reports the modules above whole, less `karamjaRecovery.ts` and bank sorting (see "As built").
     - [x] rs2b0t's tests for them are ported and pass, including `test/api/bank`'s (less bank sorting), the firemaking lane finder's, `test/scripts/GatheringBot`'s and the thieving rules', less those that stub the facades (see "As built").
     - [x] Real-cache tests: `line_of_sight` against rs2b0t's cases. `hint_arrow` is read from a `FakeGameServer` packet.
-    - [ ] Against the local engine, every bot above runs 15 minutes without a script error. Each banks at least once where it banks, and Firemaker burns a full backpack in a lane it found.
+    - Against the local engine, every bot above runs 15 minutes without a script error. Each banks at least once where it banks, and Firemaker burns a full backpack in a lane it found. The remaining duration evidence is tracked in [#36](https://github.com/ineedbots/lc-headless/issues/36).
 
 ### As built
 
@@ -571,10 +571,7 @@ The other 45, in nine sub-phases, 17a to 17i, listed in [BotApiParityQuestPhases
 
 FlourCollector comes with Murder Mystery, and RoguesPurse with Jungle Potion, since each imports its quest's constants.
 
-- **Done when:** for each sub-phase,
-    - [ ] its quests' tests are ported and pass;
-    - [ ] against the local engine, AIOQuester completes every quest in it, on an account with the prerequisites done and skills set by debugproc;
-    - [ ] whatever else that file lists for it.
+- **Original acceptance template:** for each sub-phase, its quest tests pass, AIOQuester completes its quests against the local engine with prerequisites and required skills set, and the sub-phase's additional criteria are checked. Completion evidence is recorded in the "As built" sections below; real-speed follow-up is tracked in [#34](https://github.com/ineedbots/lc-headless/issues/34).
 
 ### As built: 17a
 

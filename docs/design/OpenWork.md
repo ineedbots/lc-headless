@@ -1,75 +1,63 @@
 # Open work
 
-Reviewed against local code, tests and saved validation reports on 2026-11-05. Linked documents retain
-implementation details and historical acceptance evidence. GitHub issues, pull requests and upstream's
-current tip were not queried during this review.
+GitHub issues are the source of truth for remaining work. The reviewed 2026-11-05 backlog has been
+migrated below, including optional work and observations awaiting a recurrence. Those observations
+are not confirmed failures or release blockers. Follow issue state rather than treating this index
+as a second checklist.
 
-All original Bot API parity phases (10–18), including all 63 quests and AccountLeveler, are implemented.
-The export audit against pinned rs2b0t `8b7db422` reports nothing missing. The newer quest recovery,
-multiloc, Cosmic/JiveRC, three-tick fishing, MuleCrafter and MuleDepot ports are also implemented.
-Every embedded stdlib file meets the 95% coverage floor; additional coverage is optional follow-up.
+All original parity phases (10–18) are implemented. Historical plans, acceptance evidence and limits
+remain in [BotApiParityDesign.md](BotApiParityDesign.md), [BotApiParityQuestPhases.md](BotApiParityQuestPhases.md),
+[BotApiParityStatus.md](BotApiParityStatus.md) and [Rs2b0tUpstreamReview.md](Rs2b0tUpstreamReview.md).
+Issue bodies retain the original context through commit-pinned links.
 
 ## Implementation and tooling
 
-| Item | Remaining work | Source |
-|---|---|---|
-| Play Tutorial Island | Implement the tutorial sequence; `rs2004/tutorial.py` currently designs the character and asks the guide to skip | README |
-| Later upstream commits | Review changes after pinned `8b7db422`; this cleanup makes no claim about upstream's current tip | [Upstream review](Rs2b0tUpstreamReview.md) |
-| Remaining upstream facade tests | Finish the JiveDragons and JiveKQ scenario audit: dragon targeting, route/egress, supply safety and recovery cases, plus the remaining KQ upkeep and loot edge cases. Banking, open-window `StableClosedPoll`, JiveMarketDumper, MarketMaker, Shilo supply trips and native WordPack chat echo now have runtime ports; dragon ownership/targeting/loot/ammo/supply and KQ combat/loot/search/recovery/gate cases are also ported | [Parity status](BotApiParityStatus.md#parity-findings-follow-up-2026-11-05) |
-| Cache-backed Debug navigation test budget | The aggregate walker-data suite exceeded CTest's 300-second limit during the WildyAgility follow-up; split its registration or review the budget. The full cache-backed Release suite and default Debug suite pass | [Validation](Rs2b0tUpstreamReview.md#wildyagility-follow-up-2026-11-05) |
+- [#28: Implement the playable Tutorial Island sequence](https://github.com/ineedbots/lc-headless/issues/28)
+- [#29: Review upstream rs2b0t changes after 8b7db422](https://github.com/ineedbots/lc-headless/issues/29)
+- [#30: Finish the JiveDragons and JiveKQ upstream scenario audit](https://github.com/ineedbots/lc-headless/issues/30)
+- [#31: Resolve the cache-backed Debug navigation test timeout](https://github.com/ineedbots/lc-headless/issues/31)
 
 ## Live validation
 
-| Item | Evidence still needed | Source |
-|---|---|---|
-| New feature workflows | Cosmic travel/trading, coordinated MuleDepot transfers, MuleCrafter meeting/banking modes and real-speed three-tick fishing throughput | [Upstream review](Rs2b0tUpstreamReview.md#remaining-work) |
-| Multilocs with real content | Local 289 cache has varbits but no multiloc loc definitions; transitions/collision currently use synthetic fixtures | Upstream review |
-| Phases 17h/17i at real speed | Repeat timing-sensitive quest/clue runs at 600 ms; recorded acceptance used 100 ms ticks | [Parity status](BotApiParityStatus.md#open-items) |
-| AccountLeveler beyond its acceptance run | Real-speed behavior, high-level dragon progression and optional player-market trading. The completed two-hour run used low-level methods at 100 ms across restarts | [Design, phase 18](BotApiParityDesign.md#as-built-18) |
-| Phase 11 duration | Most bots ran 12 minutes; the plan's 15-minute acceptance checkbox remains open | [Design, phase 11](BotApiParityDesign.md#5-phase-11-the-modules-bots-share) |
-| Refused crossing with an alternative | Demonstrate the walker routing around one live; the Champions' Guild crossing has no alternative | Parity status |
-| Revision 225/274 live evidence | Confirm/document planned checks. The old audit found a 274 live-run record without CHAT `rights`/`MESSAGE_PRIVATE` evidence and no 225 live-run record; these remain unverified | [RevisionDesign.md](RevisionDesign.md), [Revision274Design.md](Revision274Design.md) |
+- [#32: Record live acceptance for Cosmic, MuleDepot, MuleCrafter and three-tick fishing](https://github.com/ineedbots/lc-headless/issues/32)
+- [#33: Validate multiloc transitions against real revision-289 content](https://github.com/ineedbots/lc-headless/issues/33)
+- [#34: Repeat phases 17h and 17i acceptance at 600 ms ticks](https://github.com/ineedbots/lc-headless/issues/34)
+- [#35: Extend AccountLeveler live validation beyond low-level accelerated methods](https://github.com/ineedbots/lc-headless/issues/35)
+- [#36: Complete the phase-11 fifteen-minute live acceptance runs](https://github.com/ineedbots/lc-headless/issues/36)
+- [#37: Demonstrate live rerouting after a refused crossing with an alternative](https://github.com/ineedbots/lc-headless/issues/37)
+- [#38: Complete revision-225 and revision-274 live protocol evidence](https://github.com/ineedbots/lc-headless/issues/38)
 
 ## Bugs and limitations awaiting a trigger
 
-These are retained observations, not newly reproduced failures.
-
-| Item | Next step or trigger | Source |
-|---|---|---|
-| JiveKQ Shantay-pass purchase stopped on a third restock | Capture the shop state if it recurs | [Parity status](BotApiParityStatus.md#open-items) |
-| Tile oscillation counts as watchdog progress | Add a rule when another failing quest reproduces it | Parity status |
-| Wield swaps hide two-step loops from the watchdog | Add a rule when another quest reproduces it; Ikov's specific picker loop is fixed | Parity status |
-| Failed teleport offered for five repaths | Revisit when a real account hits it; observed with quest progress seeded by varp | Parity status |
-| Radimus conversation closes after its first session | Investigate if retry recovery stops being sufficient | Parity status |
-| Gilded totem hand-in lost a minute once | Investigate if it recurs or recovery fails | Parity status |
-| Regicide death can lose its only spade | Add a source when needed; currently parks with a reason | Parity status |
-| Scavvo's rune kit does not restock | Bank a second kit for paired Hero's Quest runs without a harness | Parity status |
-| Hard Kharazi pack capacity and Saradomin Wizard kit | Extra items can block a 15-shark load; ClueSolver logs shortages but does not dress its account | Parity status |
-| Unexplained clue bank stall | One historical account stalled before kit logging existed; investigate if it recurs | [Design, phase 17i](BotApiParityDesign.md#as-built-17i) |
+- [#39: Investigate recurring JiveKQ Shantay-pass restock failure](https://github.com/ineedbots/lc-headless/issues/39)
+- [#40: Detect quest watchdog loops caused by tile oscillation](https://github.com/ineedbots/lc-headless/issues/40)
+- [#41: Detect quest watchdog loops hidden by repeated wield swaps](https://github.com/ineedbots/lc-headless/issues/41)
+- [#42: Bound repeated offers of a failing teleport during repaths](https://github.com/ineedbots/lc-headless/issues/42)
+- [#43: Investigate Radimus dialogue closure if retry recovery fails](https://github.com/ineedbots/lc-headless/issues/43)
+- [#44: Investigate delayed gilded-totem hand-in if it recurs](https://github.com/ineedbots/lc-headless/issues/44)
+- [#45: Source a replacement spade after Regicide death when needed](https://github.com/ineedbots/lc-headless/issues/45)
+- [#46: Support paired Heros Quest rune-kit provisioning without a harness](https://github.com/ineedbots/lc-headless/issues/46)
+- [#47: Handle hard-clue Kharazi pack pressure and Saradomin Wizard loadout](https://github.com/ineedbots/lc-headless/issues/47)
+- [#48: Investigate a recurring unexplained clue bank stall](https://github.com/ineedbots/lc-headless/issues/48)
 
 ## Revisions and deferred maintenance
 
-| Item | Remaining work or trigger | Source |
-|---|---|---|
-| Content ids on 225/274 | Audit revision-specific content: catalogs/nav are generated from 289, and catalog-name checks target 289 | [RevisionDesign.md §15](RevisionDesign.md#15-out-of-scope-and-risks), [Revision274Design.md §12](Revision274Design.md#12-out-of-scope-and-risks) |
-| Download 225 maps over the wire | Optional phase 6; `DATA_*` payloads are consumed/dropped and stale squares only warn | [RevisionDesign.md](RevisionDesign.md) |
-| A revision per account | Requires a cache per revision in `Application` | RevisionDesign §15 |
-| `std::byteswap` | When moving from C++20 to C++23 | `src/Utils/Endian.hpp` |
-| IPv6 literal server host | When a server needs one | [TransportDesign.md](TransportDesign.md) |
-| Send queue limit | When a stalled server makes it necessary | TransportDesign |
-| Config JSON Schema | When configuration growth warrants it | [ConfigDesign.md](ConfigDesign.md) |
-| Walker data adjustments | When a new quest route exposes an engine-specific mismatch | Parity status |
-| Obsolete protocol implementation notes | `tcp-protocol-289.md` still points to an absent `headless-client` and describes `OBJ_ADD` as missing; this client already decodes it | [Protocol notes](tcp-protocol-289.md#headless-client-implementation-notes) |
+- [#49: Audit revision-specific content IDs and navigation on 225 and 274](https://github.com/ineedbots/lc-headless/issues/49)
+- [#50: Implement optional revision-225 map downloads over the wire](https://github.com/ineedbots/lc-headless/issues/50)
+- [#51: Allow accounts to use different revisions and caches](https://github.com/ineedbots/lc-headless/issues/51)
+- [#52: Replace custom byte swapping when adopting C++23](https://github.com/ineedbots/lc-headless/issues/52)
+- [#53: Support literal IPv6 server hosts when required](https://github.com/ineedbots/lc-headless/issues/53)
+- [#54: Bound the transport send queue under stalled-server backpressure](https://github.com/ineedbots/lc-headless/issues/54)
+- [#55: Add a configuration JSON Schema when configuration growth warrants it](https://github.com/ineedbots/lc-headless/issues/55)
+- [#56: Correct engine-specific walker data when new routes expose mismatches](https://github.com/ineedbots/lc-headless/issues/56)
+- [#57: Refresh obsolete revision-289 protocol implementation notes](https://github.com/ineedbots/lc-headless/issues/57)
 
 ## Cosmetic and optional coverage
 
-- Duplicate `trail complete` logging and GnomeMagicChopper's zero "Chopped" counter remain cosmetic.
-- JiveKBD's default Fire Strike yielded no kills in its recorded 30-minute run; adjust settings as needed.
-- Black Knights' Fortress re-listens at the grill after a restart because `listened` is process-local.
-- Further coverage opportunities are in [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md). Its latest saved
-  report is 97.86%, with every file meeting 95%; phase 17 runtime specs are no longer an outstanding floor requirement.
+- [#58: Remove duplicate trail-complete logging](https://github.com/ineedbots/lc-headless/issues/58)
+- [#59: Correct GnomeMagicChopper chopped-count reporting](https://github.com/ineedbots/lc-headless/issues/59)
+- [#60: Evaluate useful JiveKBD default combat settings](https://github.com/ineedbots/lc-headless/issues/60)
+- [#61: Avoid redundant Black Knights Fortress grill listening after restart](https://github.com/ineedbots/lc-headless/issues/61)
+- [#62: Add optional behavioral coverage beyond the stdlib 95-percent floor](https://github.com/ineedbots/lc-headless/issues/62)
 
-Completed items have been removed from this index, including phase 18, the old coverage-floor work,
-empty-ground-spawn waiting and the log file sink (`src/Console/LogFile.cpp`, configured by `client.logFile`).
-Historical phase checklists and test counts remain in the design documents as evidence. Template checkboxes,
-unsupported stage-number fallbacks and deliberately excluded browser features are not pending tasks.
+[All open repository issues](https://github.com/ineedbots/lc-headless/issues?q=is%3Aissue%20state%3Aopen).
