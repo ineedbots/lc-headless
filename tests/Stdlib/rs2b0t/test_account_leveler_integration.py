@@ -34,7 +34,8 @@ def _fn2(*_args):
             for quests in [False, True]:
                 s.quests = Record({'Druidic Ritual': quests, 'Rune Mysteries Quest': quests})
                 for skill in enabled_skills:
-                    for roll in [0, 0.25, 0.5, 0.75, 0.999]:
+                    # Full Cartesian stress matrix is retained in slow/test_account_leveler_integration.py.
+                    for roll in [[0, 0.25, 0.5, 0.75, 0.999][(level + enabled_skills.index(skill) + int(stocked) + int(quests)) % 5]]:
                         plan = method_for(s, skill, empty_memory(), lambda: roll)
                         expect(plan, skill).not_.to_be_null()
                         if plan:
