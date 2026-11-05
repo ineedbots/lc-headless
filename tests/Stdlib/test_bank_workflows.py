@@ -741,12 +741,12 @@ def test_missing_or_refused_closed_chest_does_not_use_another_object():
     for missing in [True, False]:
         with OpeningWorld() as world:
             closed = AccessTarget(world, 'Closed chest', ['Open'])
-            closed.refusals = 1
+            closed.refusals = 3
             world.objects = [] if missing else [closed]
             access = {'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': 'Closed chest', 'op': 'Open'}}
             assert not world.run(world.bank.open_nearest_access(access))
-            assert world.waits == []
             assert not world.open
+            assert world.interactions == ([] if missing else [('Closed chest', 'Open')] * 3)
 
 
 def test_opening_a_chest_can_open_the_bank_directly():
@@ -762,8 +762,8 @@ def test_chest_that_never_opens_times_out_without_bank_success():
         world.objects = [AccessTarget(world, 'Closed chest', ['Open'], response=None)]
         access = {'name': 'Bank chest', 'op': 'Use', 'open_first': {'name': 'Closed chest', 'op': 'Open'}}
         assert not world.run(world.bank.open_nearest_access(access))
-        assert world.now == vault.OPEN_TIMEOUT_MS
-        assert world.interactions == [('Closed chest', 'Open')]
+        assert world.now == 3 * vault.OPEN_TIMEOUT_MS
+        assert world.interactions == [('Closed chest', 'Open')] * 3
 
 
 def test_banker_access_uses_the_requested_npc_action():

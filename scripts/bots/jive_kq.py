@@ -6,6 +6,7 @@
 
 import random
 import time
+import _core
 
 from rs2004.catalogs import Record, sustain
 from bots.jivekq.loadout import ARROWS, BOW, FOOD, MACE, RECOIL
@@ -81,6 +82,7 @@ class JiveKQ(LoopingBot):
         self.prayer_requests = {}
         self.protection_failures = 0
         self.weapon_request = None
+        self.special_retry_tick = 0
         self.queen_dead = False
         self.blocked = False
         self.lure = None
@@ -429,6 +431,15 @@ class JiveKQ(LoopingBot):
         self.last_attack = -10
         return True
 
+    def arm_special(self):
+        if special.armed() or game.tick() < self.special_retry_tick:
+            return
+        bar = special.bar_component()
+        if bar < 0:
+            return
+        sent = _core.click_component(bar)
+        self.special_retry_tick = game.tick() + (10 if sent else 1)
+
     def observe_food(self):
         if not game.scene_ready() or self.pending_food is None or inventory.count_by_id(FOOD) >= self.pending_food[1]:
             return
@@ -618,6 +629,9 @@ class JiveKQ(LoopingBot):
     # The fight
 
     def fight(self):
+        # Combat sends inputs without waiting, but step() still drives this as a Wait.
+        if False:
+            yield
         peers = [m for m in self.party.members(now_ms()) if not m.restocking]
         if any([m.stage != 'fight' or not in_lair(m.tile) for m in peers]):
             self.status = 'waiting for the team to finish descending'
@@ -686,7 +700,7 @@ class JiveKQ(LoopingBot):
         self.request_prayer(ULTIMATE_STRENGTH, melee)
         self.request_prayer(INCREDIBLE_REFLEXES, melee)
         if special.ready('Dragon mace' if melee else 'Magic shortbow'):
-            yield from special.arm()
+            self.arm_special()
         if game.tick() - self.last_attack >= 4 or game.facing() != ('npc', queen.index):
             if queen.interact('Attack'):
                 self.last_attack = game.tick()
@@ -889,7 +903,7 @@ class JiveKQ(LoopingBot):
         def ready():
             return self.clear_prayers() if waiting else prayer.points() > 0 and self.protect()
 
-        result = self.collector.step(party, self.trip, [c.death.tile for c in party.deaths(self.trip)], ready, self.queue_combat_food, waiting)
+        result = self.collector.step(party, self.trip, [c.death.tile for c in party.deaths(self.trip)], ready, self.queue_combat_food, waiting, self.pending_food is not None)
         if self.stage == 'retreat':
             return True
         if result.collected is not None:
