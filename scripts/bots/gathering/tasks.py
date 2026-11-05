@@ -11,6 +11,7 @@ from rs2004.catalogs import should_cooldown_gather_tile, should_soft_home_from_g
 from rs2004.catalogs import DEFAULT_TRADE_RANGE, count_offer_matching, drive_active_partner_trade, trade_screen_state
 from rs2004.random_events import step_off_candidates
 
+from bots.gathering import three_tick
 from bots.gathering.camp import gather_hunt_radius, gather_spot_range_origin, resource_within_camp, spot_within_gather_range
 from bots.gathering.fish_cook import bank_pace_ticks, cook_filter_label, cook_pace_ticks, is_burnt_fish_name, is_cooked_fish_name, should_cook_then_bank
 from bots.gathering.logic import ent_abort_action, feather_coins_to_draw, fishing_session_broken, hostile_attacker_nearby, loc_gather_should_yield
@@ -1094,6 +1095,16 @@ class RestockFishingGear(Task):
         yield from execution.delay_until_ticks(bank.loaded, 5)
         yield from execution.delay_ticks(1)
         plan = fishing_restock_plan(method, inventory.count, bank.count)
+        if bot.tick_manip.method == 'three-tick-fly':
+            for name, qty in plan:
+                yield from withdraw_step(bot, name, qty, 50)
+            yield from three_tick.restock_axe(bot)
+            yield from bot.close_script_bank(log, False)
+            acquired = yield from three_tick.acquire_kit(bot)
+            if acquired and bot.has_gear():
+                yield from bot.walk_home_if_needed(log)
+                return
+            plan = []
         if len(plan) == 0:
             still = bot.missing_gear_names()
             if len(still) == 0:
@@ -1606,6 +1617,9 @@ class Gather(Task):
             if target is None:
                 self.active_fish_index = None
                 return
+        if bot.tick_manip.method == 'three-tick-fly':
+            yield from three_tick.fish(bot, target)
+            return
         yield from self.fish_at(target)
 
     def fish_ended(self, index, start_tile):

@@ -4,6 +4,7 @@
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Config/Revision_e.hpp"
 #include "../../Game/Menu/MenuOp.hpp"
+#include "../../Game/Map/WorldMap.hpp"
 #include "../../Game/Menu/Menus.hpp"
 #include "../../Game/Protocol/ClientPackets.hpp"
 #include "../../Game/State/GameState_s.hpp"
@@ -20,6 +21,21 @@
 
 namespace
 {
+    u8 FindSceneLocOp(const ScriptContext& context, u16 id, s32 x, s32 z, std::string_view text)
+    {
+        const auto tile = Tile_s{.x = x, .z = z, .level = context.GetPosition().level};
+        for (const auto layer : WorldMap::LOC_LAYERS)
+        {
+            const auto loc = context.GetMap().GetLoc(tile, layer);
+            if (loc && loc->id == id)
+            {
+                return Menus::FindLocOp(context.GetCache(), static_cast<u16>(loc->visibleId), text);
+            }
+        }
+
+        return Menus::FindLocOp(context.GetCache(), id, text);
+    }
+
     bool ClickComponent(int, py_StackRef argv) noexcept
     {
         return BindingSupport::Guard([argv]
@@ -126,7 +142,7 @@ namespace
 
             const auto op = BindingSupport::ResolveOp(opArgument, [&context, &loc](std::string_view text)
             {
-                return Menus::FindLocOp(context.GetCache(), loc.id, text);
+                return FindSceneLocOp(context, loc.id, loc.x, loc.z, text);
             });
 
             context.GetActions().InteractLoc(loc.id, loc.x, loc.z, op);
@@ -141,9 +157,9 @@ namespace
             auto& context = BindingSupport::GetContext();
             const auto points = PyArgs::ToPoints(py_arg(0), context.GetPosition().level, "points");
             const auto id = PyValue::ToU16(py_arg(1), "id");
-            const auto op = BindingSupport::ResolveOp(py_arg(4), [&context, id](std::string_view text)
+            const auto op = BindingSupport::ResolveOp(py_arg(4), [&context, id, argv](std::string_view text)
             {
-                return Menus::FindLocOp(context.GetCache(), id, text);
+                return FindSceneLocOp(context, id, PyArgs::ToCoord(py_arg(2), "x"), PyArgs::ToCoord(py_arg(3), "z"), text);
             });
 
             context.GetActions().InteractLocVia(points, id, PyArgs::ToCoord(py_arg(2), "x"), PyArgs::ToCoord(py_arg(3), "z"), op);

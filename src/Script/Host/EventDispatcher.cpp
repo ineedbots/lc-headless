@@ -2,6 +2,7 @@
 #include "EventDispatcher.hpp"
 
 #include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/LocTypeResolver.hpp"
 #include "../../Cache/ObjType_s.hpp"
 #include "../../Console/Logger.hpp"
 #include "../../Game/GameTick.hpp"
@@ -218,7 +219,7 @@ void EventDispatcher::DispatchEvent(const GameEvent_s& event, const GameState_s&
     else if (const auto* loc = std::get_if<LocChanged_s>(&data); loc && hooks.Has("loc_changed"))
     {
         const auto& change = loc->change;
-        const auto scene = SceneLoc_s{.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true};
+        const auto scene = SceneLoc_s{.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true, .visibleId = LocTypeResolver::ResolveId(cache, state.varps, change.id)};
         PyObjects::FromLoc(py_r0(), scene, cache);
         hooks.Call("loc_changed", one);
     }

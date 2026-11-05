@@ -118,12 +118,16 @@ namespace
         }
     }
 
-    void SkipMultiloc(Packet& packet)
+    void ReadMultiloc(Packet& packet, LocType_s& type)
     {
-        static_cast<void>(packet.G2());
+        type.multivarbit = packet.G2();
 
-        const auto count = std::size_t{packet.G1()};
-        TypeDecoder::Skip(packet, (count + 1) * sizeof(u16));
+        const auto count = std::size_t{packet.G1()} + 1;
+        for (auto i = std::size_t{0}; i < count; ++i)
+        {
+            const auto id = packet.G2();
+            type.multiloc.push_back(id == 65535 ? -1 : id);
+        }
     }
 
     void DecodeLoc(Packet& packet, LocType_s& type, TextPool& text, Revision_e revision)
@@ -199,7 +203,7 @@ namespace
                 breaksRouteFinding = true;
                 break;
             case MULTILOC:
-                SkipMultiloc(packet);
+                ReadMultiloc(packet, type);
                 break;
             default:
                 TypeDecoder::ThrowUnknown(opcode);

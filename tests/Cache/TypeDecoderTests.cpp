@@ -3,6 +3,8 @@
 
 #include "Cache/Error/CacheError.hpp"
 #include "Cache/LocTypeDecoder.hpp"
+#include "Cache/LocTypeResolver.hpp"
+#include "Cache/GameCache_s.hpp"
 #include "Cache/LocType_s.hpp"
 #include "Cache/NpcTypeDecoder.hpp"
 #include "Cache/NpcType_s.hpp"
@@ -13,6 +15,7 @@
 #include "Cache/TypeDecoder.hpp"
 #include "Cache/VarpTypeDecoder.hpp"
 #include "Cache/VarpType_s.hpp"
+#include "Cache/VarbitTypeDecoder.hpp"
 #include "Config/Revision_e.hpp"
 #include "Io/Packet.hpp"
 
@@ -426,9 +429,12 @@ TEST_CASE("Every type decoder rejects incomplete framing before reading definiti
     const auto decode = [kind](const TypeFiles_s& files)
     {
         auto text = TextPool{};
-        if (kind == "loc") return LocTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
-        if (kind == "npc") return NpcTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
-        if (kind == "obj") return ObjTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        if (kind == "loc")
+            return LocTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        if (kind == "npc")
+            return NpcTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        if (kind == "obj")
+            return ObjTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
         return VarpTypeDecoder::Decode(files.dat, files.idx, Revision_e::Rev289).size();
     };
     const auto complete = CacheWriter::MakeTypeFiles({std::vector<u8>{0}});
@@ -663,4 +669,45 @@ TEST_CASE("TypeDecoder works out whether a 225 loc is active from its shaped mod
     CHECK_FALSE(IsActive({1, 1, 0, 7, 22}, Revision_e::Rev225));
     CHECK_FALSE(IsActive({1, 0}, Revision_e::Rev225));
     CHECK(IsActive({30, 'O', 'p', 'e', 'n', '\n'}, Revision_e::Rev225));
+}
+
+TEST_CASE("Varbit definitions retain inclusive selectors and reject malformed data", "[Cache][TypeDecoder]")
+{
+    const auto dat = std::to_array<u8>({0, 1, 1, 0, 7, 2, 4, 10, 'x', 10, 0});
+    const auto types = VarbitTypeDecoder::Decode(dat);
+    REQUIRE(types.size() == 1);
+    CHECK(types[0].baseVar == 7);
+    CHECK(types[0].startBit == 2);
+    CHECK(types[0].endBit == 4);
+    CHECK_THROWS_AS(VarbitTypeDecoder::Decode(std::to_array<u8>({0, 1, 1, 0})), CacheError);
+    CHECK_THROWS_AS(VarbitTypeDecoder::Decode(std::to_array<u8>({0, 1, 1, 0, 7, 4, 2, 0})), CacheError);
+    CHECK_THROWS_AS(VarbitTypeDecoder::Decode(std::to_array<u8>({0, 1, 1, 0, 7, 0, 32, 0})), CacheError);
+    CHECK_THROWS_AS(VarbitTypeDecoder::Decode(std::to_array<u8>({0, 0, 0})), CacheError);
+    CHECK_THROWS_AS(VarbitTypeDecoder::Decode(std::to_array<u8>({0, 1, 99})), CacheError);
+}
+
+TEST_CASE("Loc decoder retains multiloc selector and absent children", "[Cache][TypeDecoder]")
+{
+    auto text = TextPool{};
+    const auto types = DecodeLocs({MakeEveryLocOpcode()}, text);
+    REQUIRE(types.size() == 1);
+    CHECK(types[0].multivarbit == 300);
+    CHECK(types[0].multiloc == std::vector<s32>{1, 2, -1});
+}
+
+TEST_CASE("Multiloc resolution handles absent selectors and full-width signed varps", "[Cache][TypeDecoder][Multiloc]")
+{
+    auto cache = GameCache_s{};
+    cache.locs.resize(4);
+    cache.locs[1].multivarbit = 0;
+    cache.locs[1].multiloc = {2, 3, -1};
+    CHECK(LocTypeResolver::ResolveId(cache, {}, 1) == -1);
+    CHECK(LocTypeResolver::ResolveId(cache, {}, 99) == 99);
+    cache.varbits.push_back({.baseVar = 7, .startBit = 31, .endBit = 31});
+    CHECK(LocTypeResolver::ResolveId(cache, {}, 1) == 2);
+    CHECK(LocTypeResolver::ResolveId(cache, {{7, INT32_MIN}}, 1) == 3);
+    cache.varbits[0] = {.baseVar = 7, .startBit = 0, .endBit = 31};
+    CHECK(LocTypeResolver::ResolveId(cache, {{7, 1}}, 1) == 3);
+    CHECK(LocTypeResolver::ResolveId(cache, {{7, 2}}, 1) == -1);
+    CHECK(LocTypeResolver::ResolveId(cache, {{7, -1}}, 1) == -1);
 }

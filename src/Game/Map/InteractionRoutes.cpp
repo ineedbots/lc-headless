@@ -85,7 +85,7 @@ std::optional<RouteTarget_s> InteractionRoutes::FindLocTarget(const WorldMap& ma
         const auto scene = map.GetLoc(tile, layer);
         if (scene && scene->id == loc)
         {
-            return MakeLocTarget(*scene, map.GetCache().FindLoc(loc));
+            return MakeLocTarget(*scene, map.GetCache().FindLoc(scene->visibleId));
         }
     }
 

@@ -60,6 +60,8 @@ class Npc(_Located):
     health: int
     max_health: int
     animation: int
+    animation_id: int
+    animation_tick: int
     moving: bool
     target: Optional[tuple[str, int]]
     def interact(self, action: Action) -> bool: ...
@@ -76,6 +78,8 @@ class Player(_Located):
     health: int
     max_health: int
     animation: int
+    animation_id: int
+    animation_tick: int
     moving: bool
     target: Optional[tuple[str, int]]
     def interact(self, action: Action) -> bool: ...
@@ -84,6 +88,7 @@ class Player(_Located):
 
 class Loc(_Located):
     id: int
+    type_id: int
     name: Optional[str]
     shape: int
     angle: int

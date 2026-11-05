@@ -187,7 +187,7 @@ std::vector<SceneLoc_s> EntityQuery::GetLocs(const SearchFilter_s& filter, std::
     auto locs = m_map.GetLocs(here.level);
     std::erase_if(locs, [&cache, &here, &filter, &layer](const SceneLoc_s& loc)
     {
-        return (layer && loc.layer != *layer) || !filter.Matches(here, loc.tile, loc.id, cache.FindLocName(loc.id));
+        return (layer && loc.layer != *layer) || !filter.Matches(here, loc.tile, loc.id, cache.FindLocName(loc.visibleId));
     });
 
     SortByDistance(locs, here, [](const SceneLoc_s& loc)

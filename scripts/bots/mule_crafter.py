@@ -62,7 +62,9 @@ SETTINGS = {
     'rune': SettingDef('string', DEFAULT_RUNE, 'Rune', options=RUNE_OPTIONS, help='which rune the pair crafts. Air = Falador East bank; Mind = Edgeville bank.'),
     'mode': SettingDef('string', 'Crafter', 'Mode', options=['Crafter', 'Mule'], help='Crafter has the talisman, crafts at the altar, trades runes at ruins. Mule carries essence to the ruins and runes back to the bank.'),
     'partner': SettingDef('string', '', 'Partner name(s) (Optional for Crafter)', help='Crafter: optional mule name(s) to trade with, comma-separated (blank = solo mode). Mule: required crafter to trade with.'),
-    'bank_fill': SettingDef('boolean', True, 'Fill essence at bank', help='When enabled, crafter withdraws essence from bank. When disabled, mules bring all essence (blank rune mode). Only applies to Crafter mode.'),
+    'bank_fill': SettingDef('boolean', True, 'Allow crafter bank visits', help='When disabled, the crafter never banks and must start with its talisman. Mules bring all essence.'),
+    'meeting_point': SettingDef('string', 'Altar (inside)', 'Meet at', options=['Altar (inside)', 'Ruins (outside)'], help='Inside requires each mule to carry the matching talisman.'),
+    'trades_per_bank': SettingDef('number', 0, 'Bank after trades', 0, help='0 banks on empty and runs solo when bank visits are enabled. Ignored when bank visits are disabled.'),
 }
 
 
@@ -76,7 +78,7 @@ def item_id_named(items, name):
 
 def in_temple():
     t = game.tile()
-    return t is not None and t.z > TEMPLE_Z
+    return t is not None and t.level == 0 and t.z // 64 == 75
 
 
 def ess_count():
@@ -101,8 +103,15 @@ class MuleCrafter(TaskBot):
         _v1 = RUNES.get(self._rune)
         self._conf = (_v1 if _v1 is not None else RUNES.get(DEFAULT_RUNE))
         self._bank_tile = bank_tile(self._conf.bank)
-        self._partners = [_x for _x in [s.strip() for s in self.settings.str('partner', '').split(',')] if _x]
+        self._partners = [_clean_name(p) for p in self.settings.str('partner', '').split(',') if p.strip()]
         self._bank_fill = self.settings.bool('bank_fill', True)
+        self._meeting = self.settings.str('meeting_point', 'Altar (inside)')
+        self._trade_limit = max(0, int(self.settings.num('trades_per_bank', 0)))
+        self._trades_since_bank = 0
+        self._last_request_at = None
+        self._requested_partner = None
+        self._requested_at = 0
+        self.on('chat_message', self.heard_trade_request)
         self._started_at = time.time()
         self._xp_at_start = skills.xp('runecraft')
         self._traded_mules = set()
@@ -112,16 +121,21 @@ class MuleCrafter(TaskBot):
                 raise RuntimeError('MuleCrafter: no partner configured for mule mode')
             self.log(f"MuleCrafter mule starting — ferrying essence for {self._rune} to [{', '.join(self._partners)}]")
             yield from self._clean_mule_inventory()
-            self.add(ContinueDialog(), MuleWalkToRuins(self), MuleTradeWithCrafter(self), MuleTradeExecute(self), MuleGoBank(self))
+            self.add(MuleTradeExecute(self), ContinueDialog(), MuleExitAltar(self), MuleGoBank(self), MuleWalkToRuins(self), EnterAltar(self), ApproachMeeting(self), MuleTradeWithCrafter(self))
             return
         # Crafter mode.
         if len(self._partners) == 0:
+            if not self._bank_fill:
+                raise RuntimeError('MuleCrafter: no partners and crafter bank visits disabled')
             self._bank_fill = True
             self.log('MuleCrafter: No partners configured. Running in Solo Crafter mode.')
         else:
             self.log(f"MuleCrafter crafter starting — {self._rune}, accepting essence from [{', '.join(self._partners)}]{(', banking for essence' if self._bank_fill else ', mules bring all essence')}")
-        yield from self._clean_crafter_inventory()
-        self.add(ContinueDialog(), CrafterAtBank(self), CrafterWalkToRuins(self), EnterAltar(self), CraftRunes(self), ExitAltar(self), CrafterRequestTrade(self), CrafterWaitAtRuins(self), CrafterTradeAtRuins(self), CrafterGoBank(self))
+        if self._bank_fill:
+            yield from self._clean_crafter_inventory()
+        elif not inventory.contains(self._conf.talisman):
+            raise RuntimeError('MuleCrafter: bank visits disabled; start with the talisman')
+        self.add(CrafterTradeAtRuins(self), ContinueDialog(), CraftRunes(self), ExitAltar(self), CrafterGoBank(self), CrafterAtBank(self), CrafterWalkToRuins(self), EnterAltar(self), ApproachMeeting(self), CrafterRequestTrade(self), CrafterWaitAtRuins(self))
 
     def _clean_crafter_inventory(self):
         has_extra_items = len([i for i in inventory.items() if i.name and i.id != ESSENCE_ID and i.name.lower() != self._conf.talisman.lower()]) > 0
@@ -152,7 +166,9 @@ class MuleCrafter(TaskBot):
                     raise RuntimeError(f'MuleCrafter: {self._conf.talisman} not found')
 
     def _clean_mule_inventory(self):
-        has_extra_items = len([i for i in inventory.items() if i.name and i.id != ESSENCE_ID]) > 0
+        if self.inside_meeting() and not inventory.contains(self._conf.talisman):
+            raise RuntimeError('MuleCrafter: inside meeting needs a carried talisman')
+        has_extra_items = len([i for i in inventory.items() if i.name and i.id != ESSENCE_ID and (not self.inside_meeting() or i.name != self._conf.talisman)]) > 0
         if has_extra_items:
             self.log('Mule inventory contains unauthorized items. Opening bank to clean inventory...')
             yield from self.walk_to(self._bank_tile, 3)
@@ -164,7 +180,7 @@ class MuleCrafter(TaskBot):
             rune_id = item_id_named(inventory.items(), self._conf.rune)
             if rune_id == -1:
                 rune_id = item_id_named(bank.items(), self._conf.rune)
-            mule_keep = set([id for id in [ESSENCE_ID, rune_id] if id != -1])
+            mule_keep = set([id for id in [ESSENCE_ID, rune_id, item_id_named(inventory.items(), self._conf.talisman) if self.inside_meeting() else -1] if id != -1])
             yield from bank.deposit_all_matching(lambda name, id: len(name) > 0 and not (id in mule_keep))
             yield from execution.delay_ticks(1)
 
@@ -182,6 +198,25 @@ class MuleCrafter(TaskBot):
     def get_bank_tile(self):
         return self._bank_tile
 
+    def inside_meeting(self):
+        return getattr(self, '_meeting', 'Ruins (outside)') == 'Altar (inside)'
+
+    def at_meeting(self):
+        return in_temple() if self.inside_meeting() else not in_temple() and is_at_tile(self.cfg().ruins, 4)
+
+    def trading_active(self):
+        return self.get_mode() == 'Crafter' and self.has_partners() and (not self.fill_bank() or getattr(self, '_trade_limit', 0) > 0)
+
+    def bank_due(self):
+        if not self.fill_bank():
+            return False
+        if not self.trading_active():
+            return ess_count() == 0
+        return getattr(self, '_trades_since_bank', 0) >= self._trade_limit
+
+    def trade_request_due(self):
+        return self._last_request_at is None or now_ms() - self._last_request_at >= 3000
+
     def fill_bank(self):
         return self._bank_fill
 
@@ -193,6 +228,7 @@ class MuleCrafter(TaskBot):
 
     def count_trade(self):
         self._trades += 1
+        self._trades_since_bank = getattr(self, '_trades_since_bank', 0) + 1
 
     def has_partners(self):
         return len(self._partners) > 0
@@ -203,9 +239,19 @@ class MuleCrafter(TaskBot):
     def partner_names(self):
         return self._partners
 
+    def heard_trade_request(self, event):
+        if event.type == 'trade_request' and self.is_partner(event.username):
+            self._requested_partner = event.username
+            self._requested_at = now_ms()
+
     def nearest_partner(self):
         if not self.has_partners():
             return None
+        requested = getattr(self, '_requested_partner', None)
+        if requested is not None and now_ms() - self._requested_at < 15000:
+            partner = players.query().name(requested).nearest()
+            if partner is not None:
+                return partner
         return players.query().name(*self._partners).nearest()
 
     def mark_mule_traded(self, name):
@@ -219,6 +265,7 @@ class MuleCrafter(TaskBot):
 
     def reset_traded_mules(self):
         self._traded_mules.clear()
+        self._trades_since_bank = 0
 
     def walk_to(self, dest, radius=2):
         here = game.tile()
@@ -238,7 +285,7 @@ class CrafterAtBank(Task):
         self._empty_reads = 0
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and not in_temple() and not trade.active() and is_at_tile(self._bot.get_bank_tile(), 6) and (not inventory.contains(self._bot.cfg().talisman) or ess_count() == 0)
+        return self._bot.get_mode() == 'Crafter' and self._bot.fill_bank() and not in_temple() and not trade.active() and is_at_tile(self._bot.get_bank_tile(), 6) and (not inventory.contains(self._bot.cfg().talisman) or ess_count() == 0)
 
     def execute(self):
         self._bot.set_status('at bank - preparing')
@@ -265,6 +312,7 @@ class CrafterAtBank(Task):
                 return
             self._empty_reads = 0
             max_take = min(inventory.free(), essence_per_trade(28, True), banked)
+            yield from bank.set_note_mode(False)
             yield from bank.withdraw_x(ESSENCE, max_take)
             yield from execution.delay_until(lambda: ess_count() > 0, 4000)
             self._bot.log(f'withdrew {ess_count()} essence from the bank')
@@ -277,7 +325,7 @@ class CrafterWalkToRuins(Task):
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and not in_temple() and not trade.active() and not is_at_tile(self._bot.cfg().ruins, 3)
+        return self._bot.get_mode() == 'Crafter' and not self._bot.bank_due() and not in_temple() and not trade.active() and not is_at_tile(self._bot.cfg().ruins, 3)
 
     def execute(self):
         self._bot.set_status('walking to the ruins')
@@ -292,7 +340,7 @@ class EnterAltar(Task):
         self._fails = 0
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and not in_temple() and ess_count() > 0 and not trade.active()
+        return not in_temple() and not trade.active() and (ess_count() > 0 or (self._bot.get_mode() == 'Crafter' and self._bot.trading_active() and self._bot.inside_meeting() and not self._bot.bank_due())) and (self._bot.get_mode() == 'Crafter' or self._bot.inside_meeting())
 
     def execute(self):
         self._bot.set_status('entering the altar')
@@ -351,7 +399,7 @@ class ExitAltar(Task):
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and in_temple() and ess_count() == 0
+        return self._bot.get_mode() == 'Crafter' and in_temple() and ess_count() == 0 and not trade.active() and (not self._bot.inside_meeting() or self._bot.bank_due())
 
     def execute(self):
         self._bot.set_status('taking the portal out')
@@ -377,7 +425,7 @@ class CrafterWaitAtRuins(Task):
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and not in_temple() and not trade.active() and is_at_tile(self._bot.cfg().ruins, 4) and inventory.count(self._bot.cfg().rune) > 0 and not self._bot.has_all_mules_traded()
+        return self._bot.trading_active() and self._bot.at_meeting() and ess_count() == 0 and not trade.active() and not self._bot.bank_due()
 
     def execute(self):
         remaining = self._bot.remaining_mules()
@@ -393,19 +441,20 @@ class CrafterRequestTrade(Task):
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and not in_temple() and not trade.active() and is_at_tile(self._bot.cfg().ruins, 4) and inventory.count(self._bot.cfg().rune) > 0 and not self._bot.has_all_mules_traded()
+        return self._bot.trading_active() and self._bot.at_meeting() and ess_count() == 0 and not trade.active() and not self._bot.bank_due()
 
     def execute(self):
-        remaining = self._bot.remaining_mules()
-        if len(remaining) == 0:
+        if not self._bot.trade_request_due():
+            yield from execution.delay_ticks(1)
             return
-        mule_name = remaining[0]
-        mule = players.query().name(mule_name).nearest()
+        mule = self._bot.nearest_partner()
+        mule_name = mule.name if mule else ''
         if not mule or not mule.name:
             self._bot.set_status(f'waiting for {mule_name} at ruins')
             yield from execution.delay_ticks(2)
             return
         self._bot.set_status(f'requesting trade with {mule_name}')
+        self._bot._last_request_at = now_ms()
         requested = trade.request(mule_name)
         self._bot.log(f'CrafterRequestTrade: Trade.request({mule_name}) returned {requested}')
         done = yield from execution.delay_until(lambda: trade.active(), 4000)
@@ -464,7 +513,7 @@ class CrafterTradeAtRuins(Task):
         self._bot.log(f'CrafterTradeAtRuins: offer screen with {who}, their offer state={state}, my runes={inventory.count(self._bot.cfg().rune)}, my ess={ess_count()}')
         if state == 'has-essence':
             talisman_name = self._bot.cfg().talisman
-            to_offer = [i for i in inventory.items() if i.name and i.name.lower() != talisman_name.lower()]
+            to_offer = [i for i in inventory.items() if i.name and i.name.lower() == self._bot.cfg().rune.lower()]
             unique_names = list(set([i.name for i in to_offer]))
             if len(unique_names) > 0:
                 self._bot.set_status(f'offering {len(unique_names)} item type(s) to {who}')
@@ -490,7 +539,7 @@ class CrafterGoBank(Task):
         self._empty_reads = 0
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and not in_temple() and not trade.active() and (is_at_tile(self._bot.get_bank_tile(), 6) or (inventory.count(self._bot.cfg().rune) > 0 and not is_at_tile(self._bot.cfg().ruins, 4) and self._bot.has_partners()) or (ess_count() == 0 and not self._bot.has_partners()) or (self._bot.has_partners() and self._bot.has_all_mules_traded() and is_at_tile(self._bot.cfg().ruins, 4)))
+        return self._bot.get_mode() == 'Crafter' and not in_temple() and not trade.active() and self._bot.bank_due() and ess_count() == 0
 
     def execute(self):
         if not self._bot.fill_bank():
@@ -535,6 +584,7 @@ class CrafterGoBank(Task):
                 return
             self._empty_reads = 0
             max_take = min(inventory.free(), essence_per_trade(28, True), banked)
+            yield from bank.set_note_mode(False)
             yield from bank.withdraw_x(ESSENCE, max_take)
             yield from execution.delay_until(lambda: ess_count() > 0, 4000)
             self._bot.log(f'withdrew {ess_count()} essence from the bank')
@@ -549,7 +599,7 @@ class MuleGoBank(Task):
         self._empty_reads = 0
 
     def validate(self):
-        return self._bot.get_mode() == 'Mule' and not trade.active() and (inventory.count(self._bot.cfg().rune) > 0 or (ess_count() == 0 and not is_at_tile(self._bot.cfg().ruins, 5)) or (is_at_tile(self._bot.get_bank_tile(), 6) and (inventory.count(self._bot.cfg().rune) > 0 or ess_count() == 0)))
+        return self._bot.get_mode() == 'Mule' and not in_temple() and not trade.active() and (inventory.count(self._bot.cfg().rune) > 0 or (ess_count() == 0 and not is_at_tile(self._bot.cfg().ruins, 5)) or (is_at_tile(self._bot.get_bank_tile(), 6) and (inventory.count(self._bot.cfg().rune) > 0 or ess_count() == 0)))
 
     def execute(self):
         if not is_at_tile(self._bot.get_bank_tile(), 6):
@@ -569,6 +619,10 @@ class MuleGoBank(Task):
             self._bot.log(f'deposited {runes_held} {self._bot.cfg().rune}s')
             self._bot.count_trade()
         mule_keep = set([ESSENCE_ID])
+        if self._bot.inside_meeting():
+            tid = item_id_named(inventory.items(), self._bot.cfg().talisman)
+            if tid >= 0:
+                mule_keep.add(tid)
         before = inventory.used()
         yield from bank.deposit_all_matching(lambda name, id: len(name) > 0 and not (id in mule_keep))
         if inventory.used() < before:
@@ -584,6 +638,7 @@ class MuleGoBank(Task):
         if ess_count() > 0:
             return
         max_take = min(inventory.free(), essence_per_trade(28, False), banked)
+        yield from bank.set_note_mode(False)
         yield from bank.withdraw_x(ESSENCE, max_take)
         yield from execution.delay_until(lambda: ess_count() > 0, 4000)
         self._bot.log(f'withdrew {ess_count()} essence from the bank')
@@ -596,7 +651,7 @@ class MuleWalkToRuins(Task):
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Mule' and not trade.active() and not is_at_tile(self._bot.cfg().ruins, 3) and ess_count() > 0
+        return self._bot.get_mode() == 'Mule' and not in_temple() and not trade.active() and not is_at_tile(self._bot.cfg().ruins, 3) and ess_count() > 0
 
     def execute(self):
         self._bot.set_status('walking to the ruins')
@@ -610,7 +665,7 @@ class MuleTradeWithCrafter(Task):
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Mule' and not trade.active() and is_at_tile(self._bot.cfg().ruins, 4) and ess_count() > 0
+        return self._bot.get_mode() == 'Mule' and not trade.active() and self._bot.at_meeting() and ess_count() > 0
 
     def execute(self):
         crafter = self._bot.nearest_partner()
@@ -683,6 +738,38 @@ class MuleTradeExecute(Task):
                 self._before_ess = 0
             else:
                 self._bot.log('MuleTradeExecute: trade still active or beforeEss was 0 after confirm accept')
+
+
+class MuleExitAltar(ExitAltar):
+    def validate(self):
+        return self._bot.get_mode() == 'Mule' and in_temple() and not trade.active() and ess_count() == 0
+
+
+class ApproachMeeting(Task):
+    def __init__(self, bot):
+        Task.__init__(self)
+        self._bot = bot
+
+    def validate(self):
+        if not self._bot.inside_meeting() or not in_temple() or trade.active() or self._bot.bank_due():
+            return False
+        partner = self._bot.nearest_partner()
+        altar = locs.query().name(ALTAR.name).nearest()
+        return (partner is not None and partner.distance() > 2) or (partner is None and altar is not None and altar.distance() > 3)
+
+    def execute(self):
+        altar = locs.query().name(ALTAR.name).nearest()
+        partner = self._bot.nearest_partner()
+        dest = None
+        if partner is not None and partner.distance() > 2:
+            dest = partner.tile()
+        elif partner is None and altar is not None and altar.distance() > 3:
+            dest = altar.tile()
+        if dest is not None:
+            yield from self._bot.walk_to(dest, 2)
+        else:
+            # A movement task must yield to the trade tasks when already in position.
+            return
 
 
 BOT = define_bot(

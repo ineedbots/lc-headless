@@ -19,6 +19,7 @@
 #include "NpcTypeDecoder.hpp"
 #include "ObjTypeDecoder.hpp"
 #include "VarpTypeDecoder.hpp"
+#include "VarbitTypeDecoder.hpp"
 #include "VarpType_s.hpp"
 
 namespace
@@ -145,6 +146,15 @@ namespace
             const auto locDat = ReadEntry(config, "loc.dat");
             const auto locIdx = ReadEntry(config, "loc.idx");
             cache.locs = LocTypeDecoder::Decode(locDat, locIdx, cache.text, cache.revision);
+
+            if (cache.revision == Revision_e::Rev289)
+            {
+                const auto varbits = config.Read("varbit.dat");
+                if (varbits)
+                {
+                    cache.varbits = VarbitTypeDecoder::Decode(*varbits);
+                }
+            }
 
             const auto npcDat = ReadEntry(config, "npc.dat");
             const auto npcIdx = ReadEntry(config, "npc.idx");

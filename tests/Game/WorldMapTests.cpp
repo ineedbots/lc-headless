@@ -9,6 +9,8 @@
 #include "Game/Decode/ServerPacketDecoder.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"
+#include "Game/Map/InteractionRoutes.hpp"
+#include "Game/Map/PathFinder.hpp"
 #include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/State/GameState_s.hpp"
@@ -229,4 +231,49 @@ TEST_CASE("WorldMap blocks the squares a loaded cache has no map for, as the ser
     CHECK(flagsAt(true, home) == CollisionFlag::OPEN);
     // A cache built by hand holds only the squares given it, so the rest stay open.
     CHECK(flagsAt(false, other) == CollisionFlag::OPEN);
+}
+
+TEST_CASE("WorldMap resolves multilocs and updates collision on varp changes", "[WorldMap]")
+{
+    auto cache = GameCache_s{};
+    TestCache::AddLoc(cache, 1, "Base", {"Open"});
+    TestCache::AddLoc(cache, 2, "Visible", {"Search"}).width = 2;
+    TestCache::AddLoc(cache, 3, "Open").blockWalk = false;
+    cache.locs[1].multivarbit = 0;
+    cache.locs[1].multiloc = {2, 3, -1};
+    cache.varbits.push_back({.baseVar = 7, .startBit = 2, .endBit = 3});
+    const auto tile = Local(40, 40);
+    const auto placed = std::to_array<TestLoc_s>({{.id = 1, .tile = tile, .shape = CENTREPIECE}});
+    TestCache::SetMap(cache, placed, {});
+    auto map = WorldMap{std::make_shared<const GameCache_s>(std::move(cache))};
+    auto state = Fixtures::PlacedState();
+    map.Update(state);
+    REQUIRE(map.GetLoc(tile, LocLayer_e::Ground));
+    CHECK(map.GetLoc(tile, LocLayer_e::Ground)->id == 1);
+    CHECK(map.GetLoc(tile, LocLayer_e::Ground)->visibleId == 2);
+    const auto target = InteractionRoutes::FindLocTarget(map, tile, 1);
+    REQUIRE(target);
+    CHECK(target->width == 2);
+    CHECK(map.GetCollision(0).GetFlags(40, 40) != 0);
+    CHECK(map.GetCollision(0).GetFlags(41, 40) != 0);
+    state.varps[7] = 4;
+    map.Update(state);
+    CHECK(map.GetLoc(tile, LocLayer_e::Ground)->visibleId == 3);
+    CHECK(map.GetCollision(0).GetFlags(40, 40) == 0);
+    state.varps[7] = 8;
+    map.Update(state);
+    CHECK_FALSE(map.GetLoc(tile, LocLayer_e::Ground));
+    CHECK(map.GetLocs(0).empty());
+    state.varps[7] = 12;
+    map.Update(state);
+    CHECK_FALSE(map.GetLoc(tile, LocLayer_e::Ground));
+    state.varps.clear();
+    state.locChanges = {{.tile = tile, .layer = LocLayer_e::Ground, .id = 1, .shape = CENTREPIECE}};
+    ++state.sceneChangeCount;
+    map.Update(state);
+    REQUIRE(map.GetLoc(tile, LocLayer_e::Ground));
+    CHECK(map.GetLoc(tile, LocLayer_e::Ground)->changed);
+    CHECK(map.GetLoc(tile, LocLayer_e::Ground)->visibleId == 2);
+    map.Clear();
+    CHECK_FALSE(map.IsLoaded());
 }

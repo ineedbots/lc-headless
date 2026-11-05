@@ -2,7 +2,7 @@
 
 Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's "As built" section there has the detail; this page is the summary and the list of what's still open.
 
-The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective port of newer commits from `32d52004` through `8b7db422`, including the remaining feature and quest work. It does not replace the original parity baseline; phase 18 is implemented and validated separately below.
+The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective port of newer commits from `32d52004` through `8b7db422`, including the completed quest and 2026-11-05 non-quest feature follow-ups, settings migrations and remaining live timing checks. It does not replace the original parity baseline; phase 18 is implemented and validated separately below.
 
 ## Phases
 
