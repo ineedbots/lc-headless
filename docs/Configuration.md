@@ -33,6 +33,7 @@ Omitted settings use the defaults below. A missing process config is an error. A
 | `server.transport` | `ws` | `ws`, `wss` or `tcp`. |
 | `server.host` | empty; must be set | Hostname or IPv4 address, 1–253 letters, digits, hyphens or dots. No URL scheme, port, path or IPv6 literal. |
 | `server.port` | `0`; must be set | Integer from 1 to 65535. |
+| `server.world` | `0` | Nonnegative world identifier exposed by `game.world()`. Zero means unknown. Account server overrides take precedence; no hostname inference. |
 | `server.origin` | empty | WebSocket `Origin` header; empty sends no header. Must be printable ASCII when set. |
 | `server.tlsCaFile` | `SYSTEM` | `SYSTEM`, `NONE` or a PEM CA bundle path; used for `wss`. Must not be empty. |
 | `login.revision` | `289` | `289`, `274` or `225`, shared by all accounts. |

@@ -59,6 +59,7 @@ struct ScriptHostOptions_s
     std::chrono::minutes stallMinutes{0};
     bool runAuto = false;
     s32 runEnergyMin = 20;
+    s32 world = 0;
 };
 
 // The script is loaded on construction, so a broken script fails before login.

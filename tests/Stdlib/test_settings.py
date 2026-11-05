@@ -116,3 +116,12 @@ def test_schema_defaults_are_as_an_account_file_holds_them():
         'power': False,
     }
     assert schema_defaults(None) == {}
+
+
+def test_signed_option_selection_is_ordered_and_last_token_wins():
+    from rs2004.settings import selected_options, signed_options
+    options = ['Dragon', 'Zanaris', 'Druidic']
+    assert selected_options([], options) == options
+    assert selected_options(['+dragon', '-DRAGON', ' ZANARIS '], options) == ['Zanaris']
+    assert selected_options(['-unknown'], options) == []
+    assert signed_options(['+dragon'], options) == ['+Dragon', '-Zanaris', '-Druidic']

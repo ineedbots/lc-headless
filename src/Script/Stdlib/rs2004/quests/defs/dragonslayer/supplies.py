@@ -16,7 +16,9 @@ from rs2004.items import inventory
 from rs2004.trade import shop
 from rs2004.traversal import traversal
 
-__all__ = ['SUPPLY', 'SUPPLY_TOOLS', 'ensure_coins', 'smith_nails', 'in_plank_graveyard', 'SUPPLY_GATHERS']
+__all__ = ['SUPPLY', 'SUPPLY_TOOLS', 'ensure_coins', 'smith_nails', 'in_plank_graveyard', 'SUPPLY_GATHERS', 'DragonSupplies']
+
+DragonSupplies = Record({'wilderness_planks': True})
 
 # Why: 4 of the 7 shopping items are bought; planks only lie on the ground (nearest pile outside Crandor is the Graveyard of Shadows), nails are 2 to a steel bar, and an unfired bowl is clay, water and a potter's wheel.
 SUPPLY = Record({
@@ -434,6 +436,11 @@ plank_tried = set()
 # Why: `need` is the shortfall the engine still wants; compared against the pack, "2 held, 1 short" reads as satisfied and the third plank never gets fetched.
 def grab_planks(need, log):
     """Walk the Graveyard of Shadows picking up the plank spawns."""
+    if not DragonSupplies.wilderness_planks:
+        log('Wilderness plank gathering is disabled; bank the remaining Planks to continue Dragon Slayer')
+        if False:
+            yield
+        return False
     if need <= 0:
         plank_tried.clear()
         return True
@@ -497,6 +504,13 @@ def make_room(snap, slots=1):
     }))
 
 
+def plank_supply(snap, need):
+    if not DragonSupplies.wilderness_planks:
+        return Record({'kind': 'wait', 'reason': 'Wilderness plank gathering is disabled; bank the remaining Planks to continue Dragon Slayer'})
+    room = make_room(snap, need)
+    return room if room is not None else custom(f"fetch {need} plank{('' if need == 1 else 's')}", lambda log: grab_planks(need, log))
+
+
 SUPPLY_GATHERS = Record({
     'hammer': lambda snap, need: (make_room(snap) if make_room(snap) is not None else buy('Hammer', 1, SUPPLY.GENERAL_STORE, 100)),
     'silk': lambda snap, need: (make_room(snap) if make_room(snap) is not None else buy('Silk', 1, SUPPLY.THESSALIA, 200)),
@@ -506,5 +520,5 @@ SUPPLY_GATHERS = Record({
     'kind': 'wait',
     'reason': 'Crafting 8 is required to make an unfired bowl; train Crafting or obtain and bank an Unfired bowl',
 }) if skills.effective('crafting') < 8 else (make_room(snap) if make_room(snap) is not None else custom('make an unfired bowl', make_unfired_bowl))),
-    'plank': lambda snap, need: (make_room(snap, need) if make_room(snap, need) is not None else custom(f"fetch {need} plank{('' if need == 1 else 's')}", lambda log: grab_planks(need, log))),
+    'plank': plank_supply,
 })

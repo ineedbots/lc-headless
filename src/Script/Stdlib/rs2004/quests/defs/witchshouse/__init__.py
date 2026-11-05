@@ -1,9 +1,10 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/witchshouse/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
-from rs2004.quests.strike import prepare_strikes, STRIKE_RUNES
+from rs2004.quests.strike import prepare_strikes, STRIKE_RUNES, STRIKE_CASTS, STAFF_GP
 from rs2004.quests.data import QUESTS
-from rs2004.quests.engine.types import held_id
+from rs2004.quests.engine.types import held_id, banked_id
+from rs2004.quests.defs.witchshouse.areas import FIRE_STAVES, ZAFF
 from rs2004.quests.defs.witchshouse.areas import FALADOR_WEST_BANK, BOY, EXPERIMENT_NAMES, SHOP_GP, THESSALIA, WH_NAME, WH_OBJ, WYDIN, in_garden, in_shed
 from rs2004.quests.defs.witchshouse.garden import fountain_key, kill_experiment, take_ball, leave_garden
 from rs2004.quests.defs.witchshouse.house import diary_wanted, drop_stale_magnet, fetch_diary, fetch_magnet, read_diary, take_door_key, unlock_back_door
@@ -17,10 +18,34 @@ from rs2004.quests.data import quest_record
 __all__ = ['decide', 'witchshouse']
 
 WH_FOOD = 12
+KEEP = ['door key', 'key', 'magnet', 'cheese', 'ball', 'diary', 'leather gloves', 'coins'] + list(STRIKE_RUNES) + [staff.name.lower() for staff in FIRE_STAVES]
 
 
 def custom(name, run):
     return (Record({'kind': 'custom', 'name': name, 'run': run}))
+
+
+def fire_staff(snap):
+    if (snap.magic or 1) < 13 or any([staff.id in (snap.worn_ids or set()) or staff.name.lower() in snap.worn for staff in FIRE_STAVES]):
+        return None
+    usable = [staff for staff in FIRE_STAVES if staff.level <= (snap.magic or 1) and staff.level <= (snap.attack or 1)]
+    for staff in usable:
+        if held_id(snap, staff.id) > 0:
+            return Record({'kind': 'equip', 'item': staff.name})
+    if in_garden(snap.tile) or in_shed(snap.tile):
+        return None
+    for staff in usable:
+        if banked_id(snap, staff.id) > 0:
+            return Record({'kind': 'withdraw', 'items': [{'name': staff.name, 'id': staff.id, 'qty': 1}], 'bank': FALADOR_WEST_BANK})
+    fire_runes = snap.inv.get('fire rune', 0) + (snap.bank.get('fire rune', 0) if snap.bank_known and snap.bank else 0)
+    if fire_runes >= 3 * STRIKE_CASTS:
+        return None
+    if not snap.bank_known:
+        return Record({'kind': 'scan_bank', 'bank': FALADOR_WEST_BANK})
+    short = STAFF_GP - snap.inv.get('coins', 0)
+    if short > 0:
+        return Record({'kind': 'withdraw', 'items': [{'name': 'Coins', 'qty': short}], 'bank': FALADOR_WEST_BANK}) if snap.bank_coins >= short else None
+    return Record({'kind': 'buy', 'item': 'Staff of fire', 'qty': 1, 'shop': ZAFF, 'est_gp': STAFF_GP})
 
 
 def decide(snap):
@@ -32,8 +57,11 @@ def decide(snap):
         return Record({'kind': 'done'})
     if stage is None:
         return Record({'kind': 'wait', 'reason': "Witch's House journal stage unavailable"})
+    staff = fire_staff(snap) if stage < WH_STAGE.DEFEATED else None
+    if staff is not None:
+        return staff
     if stage < WH_STAGE.DEFEATED and not in_garden(snap.tile) and not in_shed(snap.tile):
-        runes = prepare_strikes(snap, ['door key', 'key', 'magnet', 'cheese', 'ball', 'diary', 'leather gloves'])
+        runes = prepare_strikes(snap, KEEP, list(snap.worn))
         if runes:
             return runes
     if stage == WH_STAGE.NOT_STARTED:
@@ -89,7 +117,7 @@ witchshouse = QuestModule(**{
     'food': WH_FOOD,
     'food_ready': lambda snap: ((((snap.progress.stage if snap.progress is not None else None) if (snap.progress.stage if snap.progress is not None else None) is not None else snap.stage) if ((snap.progress.stage if snap.progress is not None else None) if (snap.progress.stage if snap.progress is not None else None) is not None else snap.stage) is not None else 0)) >= WH_STAGE.DEFEATED or prepare_strikes(snap) is None,
     'grind': list(EXPERIMENT_NAMES),
-    'tools': ['door key', 'key', 'magnet', 'cheese', 'ball', 'diary', 'leather gloves', 'coins'] + list(STRIKE_RUNES),
+    'tools': KEEP,
     'read_progress': read_witchs_house_progress,
     'sustain': Record({'foods': ['Lobster', 'Swordfish', 'Trout'], 'eat_below_hp': 0.6}),
     'gather': Record({

@@ -61,6 +61,12 @@ def facing_player(face_entity):
 class _Game:
     """Your position, energy, combat and pacing."""
 
+    _world = 0
+
+    def world(self):
+        """The configured server.world; zero means the world number is unknown."""
+        return self._world
+
     def ingame(self):
         """Logged in and placed in the world, so the map is built and actions are taken."""
         return _core.is_placed()

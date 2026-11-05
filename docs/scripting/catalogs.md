@@ -623,6 +623,7 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Shops and trading | ShopBuyout, ShopRunner, MarketMaker, JiveMarketDumper, MuleTrader | `shop_buyout.py`, `shop_runner.py`, `market_maker.py` (its logic in `bots/marketmaker/`), `jive_market_dumper.py`, `mule_trader.py` |
 | Two-account | FlaxRunner, MuleCrafter | `flax_runner.py` (a runner picks, a spinner spins), `mule_crafter.py` (a crafter and its mules) |
 | Four-account | JiveKQ | `jive_kq.py`, its parts in `bots/jivekq/`: four accounts in one client kill the Kalphite Queen together, talking over `send_bot_message` |
+| Account progression | AccountLeveler | [`bots/leveler.py`](account-leveler.md), with its planner, supply adapters and controller in `bots/account_leveler/` |
 | Utility | BankSorter | `bank_sorter.py` |
 | Gathering | FlourCollector | `flour_collector.py`: fills banked empty pots at Sinclair Mansion and banks the flour at Seers; requires Murder Mystery started |
 | Herblore | RoguesPurse | `rogues_purse.py`, with `bots/roguespurse/logic.py`: searches, identifies and drops herbs by default; `mode=bank` banks full loads. Requires Herblore 3 and Jungle Potion at the Rogues purse stage |

@@ -5,7 +5,16 @@ from rs2004.geometry import Tile
 from rs2004.quests.engine.types import QuestModule, QuestProgress
 from rs2004.quests.data import quest_record
 
-__all__ = ['WITCHS_HOUSE_QUEST', 'WH_OBJ', 'WH_NAME', 'WH_LOC', 'WH_NPC', 'EXPERIMENT_IDS', 'EXPERIMENT_NAMES', 'WH_TILE', 'BOY', 'WYDIN', 'THESSALIA', 'SHOP_GP', 'FALADOR_WEST_BANK', 'in_garden', 'in_shed', 'in_porch']
+FIRE_STAVES = [
+    Record({'id': 1387, 'name': 'Staff of fire', 'level': 1}),
+    Record({'id': 1393, 'name': 'Fire battlestaff', 'level': 30}),
+    Record({'id': 3053, 'name': 'Lava battlestaff', 'level': 30}),
+    Record({'id': 1401, 'name': 'Mystic fire staff', 'level': 40}),
+    Record({'id': 3054, 'name': 'Mystic lava staff', 'level': 40}),
+]
+ZAFF = {'npc': 'Zaff', 'anchor': Tile(3203, 3433)}
+
+__all__ = ['FIRE_STAVES', 'ZAFF', 'WITCHS_HOUSE_QUEST', 'WH_OBJ', 'WH_NAME', 'WH_LOC', 'WH_NPC', 'EXPERIMENT_IDS', 'EXPERIMENT_NAMES', 'WH_TILE', 'BOY', 'WYDIN', 'THESSALIA', 'SHOP_GP', 'FALADOR_WEST_BANK', 'in_garden', 'in_shed', 'in_porch']
 
 WITCHS_HOUSE_QUEST = "Witch's House"
 WH_OBJ = Record({

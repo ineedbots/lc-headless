@@ -55,6 +55,8 @@ Of the public API, the names missing are few and small (§4). Most of the gap is
 | `ScriptRegistry`, `registerScript`, `apiVersion`, `ScriptRunner.paintControls` | An account file names its script. Nothing is listed, bundled or version-checked |
 | Bank snapshot generations: `Bank.snapshotGeneration`, `snapshotReady`, `waitSnapshotAfter`, `reader.bankSnapshotGeneration` | As BotApiDesign §7 decided: the deposit and withdraw generators wait for the update, so a port drops these calls |
 | `Tile.toString`, `AcquireTask`'s constructor | Python's `repr` and `__init__` |
+| `webwalk/coverageLogic`, `navTargets`, `navPack`, map/loadout/price-panel settings and labels | Browser diagnostics, worker packing and UI schemas. The native navigator, generated graph and headless configuration replace their runtime roles |
+| Newer three-tick fly gear helpers, JiveRC Cosmic route, MuleDepot | Separate feature ports explicitly deferred in [Rs2b0tUpstreamReview.md](Rs2b0tUpstreamReview.md); not part of the original parity baseline |
 
 ---
 
@@ -796,7 +798,7 @@ FlourCollector comes with Murder Mystery, and RoguesPurse with Jungle Potion, si
 
 ## 12. Phase 18: the account leveler
 
-AccountLeveler is the last bot because it uses nearly everything above. Its 21 files become `scripts/bots/account_leveler/`. It plans training by method and combat progression, shops and stocks for each, and runs each method as a child bot (phase 10's `ScriptActivity`). It reads the market (phase 13) for what to buy and sell.
+AccountLeveler is the last bot because it uses nearly everything above. Its original 21 files (27 at upstream `8b7db422`) become `scripts/bots/account_leveler/`. It plans training by method and combat progression, shops and stocks for each, and runs each method as a child bot (phase 10's `ScriptActivity`). It reads the market (phase 13) for what to buy and sell.
 
 Three of its reads change here:
 - It finds each method's bot through `ScriptRegistry`; here it imports the bot's `BOT` (§2).
@@ -804,9 +806,20 @@ Three of its reads change here:
 - It reads the world number from the webclient's URL, since Seers' player market is on world 1. Here it reads a `world` key in the account's `server` section, through `game.world()`.
 
 - **Done when:**
-    - [ ] Its tests are ported and pass.
+    - [x] Its tests are ported and pass.
     - [ ] Against the local engine, a fresh account levels for two hours across at least three methods, buying its tools and supplies, without a script error.
-    - [ ] `coverage.py` over all of rs2b0t reports nothing but the "Not ported" table.
+    - [x] `coverage.py` over all of rs2b0t reports nothing but the "Not ported" table.
+
+
+### As built: 18
+
+- **Scope.** AccountLeveler is ported through rs2b0t `8b7db422`, including the six newer dragon/rune/travel files. The package retains its upstream divisions; `bot.py` holds the controller, `manifests.py` lazily resolves child `BOT`s, and `scripts/bots/leveler.py` is the entry. Browser paint is represented by action history and progress reports. This does not apply the unrelated newer features deferred in the upstream review.
+- **Planning and execution.** Method dependencies, balanced melee progression, camp rotation and cooldowns, partial consumable batches, shopping budgets and stock deltas are retained. The parent observes XP and bank changes while a child waits. Preparation has bounded retries; death and failed travel interrupt/replan. Dragon progression checks combat/food/quest prerequisites, prepares Lost City and Dragon Slayer, sources chaos runes through Paladins and buys dragon weapons through Zanaris with an exit reserve. AIOQuester exposes and restores the Wilderness-plank policy. The final audit also applies the upstream signed-option selector and Witch's House fire-staff preparation/retention.
+- **Python adaptations.** The local mutable `Record` supports indexed skill/item maps as well as optional attributes. Exception subclasses encode unavailable items in their message because pocketpy exceptions cannot hold instance fields. Generator wrappers replace awaited expressions and finally blocks; inventory interactions and trade accepts remain synchronous. The supply adapter selects a reachable bank explicitly: default nearby-bank probing could repeatedly click a distant visible bank from fresh Lumbridge. Native navigation remains the route implementation.
+- **Persistence and world.** `AccountLevelerState.progress` stores objective, recent camps, death count, attempt ordering, cooldown durations and diagnostics through `settings_store`. Restoring filters malformed values and rebases durations to the new monotonic clock. `server.world` defaults to unknown (0), accepts account overrides, and reaches `game.world()` through `ScriptHost`; only an explicit 1 enables the optional Seers purchase. Its tests check quotes, exact quantities, partner identity on both trade screens and receipt.
+- **Tests.** The `test_account_leveler_*` specs port upstream planner, progression, camps, equipment, stock, shopping, supplies, market, controller, dragon, Lost City, rune, Zanaris and travel coverage. Controller regressions exercise a pending child, tick observation, death, retry and completion. Integration specs instantiate every selected child with its declared schema. Random stress loops sample the source's ranges deterministically to fit the VM watchdog. `nav/test_account_leveler_cache.py` checks camp NPC identities and attack operations, all 76 camp routes from three starting banks, vendors and Zanaris crossings against the real cache. The upstream repository's raw-server wandering/threat checks are represented by cache/route checks here; these do not prove live NPC movement behavior.
+- **Whole-surface audit.** `coverage.py --all` now checks public declarations, API/event/runtime/data exports and each bot's external imports. Previously `--all` was silently treated as a nonexistent module path; missing paths now fail. Token indexing replaces repeated scans. `replacements.json` records exact exports implemented in native navigation, generated data or differently shaped Python helpers, each with a checked implementation path and anchor. New exports in those modules still fail the audit. The audit reports names/surface presence, not semantic equivalence or every newer bot's implementation; explicit deferred features remain in the Not ported table. CPython regressions cover dispatch, missing paths, anchors and a new export beside a native replacement.
+- **Validation.** Windows Release builds. With the 289, 274 and 225 caches configured, all 802 CTest cases pass, including the ported Python specs and real-cache routes. Porting lint reports nothing found, the four audit-tool regressions pass, `coverage.py build/rs2b0t-upstream --all` reports nothing missing, and `git diff --check` is clean. The two-hour fresh-account acceptance run is in progress; its result will be recorded before this phase is marked complete.
 
 ---
 
