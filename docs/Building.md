@@ -240,3 +240,34 @@ Everything in `src/` except `main.cpp` builds into a static library. The client 
 | Release fails on a warning | Fix the warning; non-Debug configurations enable warnings as errors. |
 | Cache tests skip | Set the corresponding `RS2004_CACHE_DIR*` variable to a matching cache layout before invoking CTest. |
 | Built client cannot find data | Launch from the repository root or extracted package directory; relative paths use the working directory. |
+
+## Writing stdlib runtime specs
+
+1. Put it in `tests/Stdlib/rs2b0t/quests/test_<quest>_<area>_runtime.py`. New files are picked up without a rebuild.
+2. Build the world from `Scene` in `tests/Stdlib/rs2b0t/spec.py`, which fakes the pack, worn items, locs, NPCs, ground
+   items, messages, chat, walking and the clock. A failed `delay_until` costs its whole timeout, so a leg's own deadlines
+   expire as they do live.
+3. Take each leg through its success and each of its failures, asserting on the outcome rather than only running the
+   lines. `test_touristtrap_legs_runtime.py` and `test_legends_trials_runtime.py` are the models to follow.
+4. Run the spec alone, then lint it:
+
+   ```sh
+   build/windows-script-coverage/Debug/Rs2004HeadlessTests.exe "rs2b0t's ported Python tests pass" -c test_<name>.py
+   python -I tools/port/lint.py tests/Stdlib/rs2b0t/quests/test_<name>.py
+   ```
+
+To see one spec's coverage without a full run, set `RS2004_SCRIPT_COVERAGE_DIR` to an empty folder for that command, and
+compare the JSON profiles it writes with `build/windows-script-coverage/script-coverage/manifest.json`.
+
+Two pocketpy traps catch these specs:
+
+- A closure captures an enclosing local when it's defined. A sibling function defined later is a `NameError`, and
+  rebinding a local afterwards isn't seen, so define callees first and build effects in a helper for each object.
+- Default arguments must be literals, so `stage=STAGE.STARTED` won't load.
+
+Optional behavioral coverage is tracked in [#62](https://github.com/ineedbots/lc-headless/issues/62).
+The enforced 95% floor is already met; prioritize meaningful missing outcomes rather than unreachable
+guards or a blanket 100% target. Bot scripts under `scripts/` are outside the embedded stdlib trace.
+For live acceptance, use a scratch client configuration and accounts folder against the local engine,
+never the user's accounts. Record engine/client SHAs, tick duration, seeded prerequisites and logs;
+accelerated runs do not demonstrate 600 ms throughput.

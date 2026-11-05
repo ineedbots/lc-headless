@@ -10,12 +10,15 @@
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"
+#include "Game/Protocol/WordPack.hpp"
 #include "Game/State/GameState_s.hpp"
 #include "Script/Bindings/ScriptBindings.hpp"
+#include "Script/Convert/PyValue.hpp"
 #include "Script/Error/ScriptError.hpp"
 #include "Script/ScriptContext.hpp"
 #include "Script/ScriptVm.hpp"
 #include "Script/Stdlib.hpp"
+#include "Utils/StringUtils.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -146,6 +149,29 @@ TEST_CASE("rs2b0t's ported Python tests pass", "[Stdlib]")
             Rs2b0tSpecs::Run(fixture.vm, file);
         }
     }
+}
+
+TEST_CASE("Market replies survive the native chat wire without becoming commands", "[Stdlib][WordPack]")
+{
+    auto fixture = StdlibFixture{SCRIPTS_FOLDER, 60s};
+    Rs2b0tSpecs::Run(fixture.vm, Rs2b0tSpecs::GetFolder() / "test_market_chat_echo.py");
+    fixture.vm.RunSource("def replies():\n    return EVERY_REPLY\n", "chat_replies.py");
+    const auto replies = fixture.vm.Call("replies");
+    REQUIRE(py_list_len(replies) > 0);
+
+    for (auto index = 0; index < py_list_len(replies); ++index)
+    {
+        const auto line = PyValue::ToString(py_list_getitem(replies, index), "reply");
+        CAPTURE(line);
+        CHECK(line.size() <= WordPack::MAX_PACK_LENGTH);
+        const auto decoded = StringUtils::ToLower(WordPack::Unpack(WordPack::Pack(line)));
+        CHECK(StringUtils::Trim(decoded) == StringUtils::ToLower(StringUtils::Trim(line)));
+    }
+
+    CHECK(StringUtils::Trim(WordPack::Unpack(WordPack::Pack("18/22"))) == "18 22");
+    CHECK(WordPack::Unpack(WordPack::Pack("18-22")) == "18-22");
+    const auto numberedReply = WordPack::Unpack(WordPack::Pack("2 matches: 'maple longbow' #851. which?"));
+    CHECK(StringUtils::ToLower(StringUtils::Trim(numberedReply)) == "2 matches: 'maple longbow' #851. which?");
 }
 
 // Why: some of rs2b0t's tests run at a size pocketpy takes minutes over, such as 10,000 puzzle boxes, so the suite

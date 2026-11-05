@@ -1,6 +1,5 @@
-"""rs2b0t's test/api/market/chatEcho.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and expect.
-Its half that packs each line with the webclient's WordPack and back is left out: the Python side has no
-WordPack."""
+"""rs2b0t's test/api/market/chatEcho.test.ts (MIT, see thirdparty/rs2b0t). StdlibTests.cpp also round-trips
+EVERY_REPLY through the native WordPack codec, alongside these command-echo checks."""
 
 from rs2004.catalogs import Record
 from rs2004.market import HELP_LINES, appraise, build_catalog, describe_appraisal, format_ambiguous, format_gp, format_price_list, parse_command

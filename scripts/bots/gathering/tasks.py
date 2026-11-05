@@ -1415,6 +1415,8 @@ class Gather(Task):
         # Combat stops only AFK gathering; the retaliating tick methods go on.
         if inventory.is_full() or event_signal.pending() or combat_breaks_gather(game.in_combat(), bot.allow_combat_gather()):
             return False
+        if bot.fishing and bot.shilo_supply_trip.active:
+            return False
         # After a flee, it doesn't walk back onto the spiders while the hold lasts.
         if bot.should_suppress_camp_reentry():
             return False

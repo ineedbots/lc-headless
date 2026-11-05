@@ -1,6 +1,6 @@
 """rs2b0t's test/scripts/JiveMarketDumper/settings.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test
-and expect. Here because the banks are the walker's data. Its runtime.test.ts stubs the bank and game facades,
-which pocketpy can't, so it isn't ported."""
+and expect. Here because the banks are the walker's data. Runtime bank access is covered separately by
+test_jive_market_dumper_runtime.py."""
 
 from bots.jive_market_dumper import BOT, NEAREST_BANK, SETTINGS, bank_choice
 

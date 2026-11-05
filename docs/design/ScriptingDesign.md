@@ -2,7 +2,7 @@
 
 Plan for running Python scripts that drive the headless client, modelled on plutonium-rsc's scripting. A script defines `loop()`, which returns how many milliseconds to wait before it is called again, plus optional `on_*` hooks for things that happen in game. It reads the game through a flat set of global functions and acts through them too. One process runs several accounts, each with its own client and its own isolated interpreter. Code style follows [CONVENTIONS.md](CONVENTIONS.md).
 
-> The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
+> The change records below name classes as they were at the time. The current implementation splits those responsibilities: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
 
 Reference sources:
 
@@ -573,3 +573,31 @@ Scripts in one process can send each other messages, as plutonium's can.
 5. **Extras** (§12).
     - Work: progress reports to `progress/<account>.txt`; `send_bot_message` and `on_bot_message` between the accounts in the process; `--watch`, which reloads a script when its files change; `--debugger`, which attaches pocketpy's VS Code debugger to one account.
     - Done when: each has tests, except the debugger (§12). Messages between accounts are tested through `AccountRunner` over real connections, since the server plays no part in them. Against the local engine, a `--watch` run writes a progress report and reloads an edited script without logging out, including after a syntax error, and a `--debugger` run stops at a breakpoint in `loop()` for a DAP client that attaches as VS Code's extension does, then logs out cleanly on Ctrl+C.
+
+## 14. Current native ownership
+
+The native runtime separates binding conversion from game knowledge. `ScriptHost` owns `ScriptContext`,
+which owns `ScriptActions` and `ScriptControl`; actions validate targets and send input, control retains stop/relog,
+timing and progress requests, and context connects state/cache/navigation/messaging to lightweight views.
+`Game/Query` holds entity, inventory, player and reach queries; `Game/Menu/Menus` constructs and selects
+menu operations. `Game/Map/InteractionRoutes` supplies route geometry to both actions and reach checks.
+`Game/Interface/DialogueTracker` remembers one continue/count answer per modal change.
+
+Bindings are grouped by area under `Script/Bindings`; they convert arguments/results and delegate game
+rules to these classes. `PyValue` converts plain values, `PyObjects` builds game snapshots, and `PyArgs`
+validates script arguments. `ScriptHooks` handles hook calls; `EventDispatcher` tracks event/message and
+backpack delivery. The host retains loading/reloading, login synchronization, upkeep, ticks and loops.
+`ScriptContext` constructs query views on demand rather than maintaining a forwarding `ScriptApi` facade.
+
+`Accounts/ProgressReporter` owns report scheduling, formatting and file output. `Account::StepScript`
+requests a due report after the complete `ScriptHost::Step` and before network flush, so it includes that
+loop's counters and its packets leave in the same pass. A zero interval disables reporting. The first
+report is due one interval after script start; a due report waits until the script is active/in game,
+then schedules the next interval from that time. `ScriptHost` only invokes `on_progress_report` and
+returns the report. Its hook validation remains part of the script layer.
+
+`Application/CommandLine` parses startup options and `InterruptSignal` owns Ctrl+C state. `Config/`
+owns account discovery/parsing/validation/overrides; `Console/` owns commands, terminal I/O and logging;
+`Utils/` contains shared string/file/endian utilities. Tests mirror subsystem ownership and reuse
+`tests/Support/Game/QueryWorld` and `tests/Support/Script/HostFixture` where appropriate. There is no
+shared `Core/` bucket. Follow [CONVENTIONS.md](CONVENTIONS.md) for class/file boundaries and includes.

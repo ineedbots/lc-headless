@@ -2,7 +2,7 @@
 
 Plan for loading the revision-289 game cache once per process and sharing it, read-only, with every account. The client computes the nine login CRCs from the cache, so `login.crcs` leaves `client.jsonc`. The cache also lifts the packet-only limits in [ScriptingDesign.md](ScriptingDesign.md) §10: scripts get names and options for NPCs, items and scenery, they see scenery the server never changed, and walks route around walls. The work ships in four phases, plus an optional fifth that lets several processes share one copy (§16, §17). Revision 225's cache, a folder of loose files, came later and is in §18; revision 274's, which is 289's store with fewer definition opcodes, is in §19. Code style follows [CONVENTIONS.md](CONVENTIONS.md). It reads bytes and computes CRCs with `Packet` ([PacketDesign.md](PacketDesign.md) §3), adds a key to `ConfigFile` ([ConfigDesign.md](ConfigDesign.md)), and extends the script API ([ScriptingDesign.md](ScriptingDesign.md) §6).
 
-> The change records below name classes as they were at the time. [RefactorDesign.md](RefactorDesign.md) has since split some of them: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
+> The change records below name classes as they were at the time. The current implementation splits those responsibilities: `ScriptApi` into `ScriptContext`, `ScriptActions`, `ScriptControl` and the `Game/Query` and `Game/Menu` classes; `PyConvert` into `PyValue`, `PyArgs` and `PyObjects`; `ScriptBindings` into one class per area; and `ConfigFile` into the `Config/` classes.
 
 Reference sources, in `289server/` beside this repository:
 
@@ -1402,3 +1402,23 @@ Every component and the run varp are found as in §6, except the bank. 225 has n
 The two store revisions can't be told apart by their files. A 289 cache read as 274 fails on the two objs that use opcode `115`: `{dir}: read as revision 274: store 0 file 2 (config): obj 4041: unknown opcode 115`. A 274 cache read as 289 decodes, since 274's opcodes are a subset of 289's, and the login then fails with status 6.
 
 `RealCache::Require(Revision_e::Rev274)` reads the folder in `RS2004_CACHE_DIR_274`, such as `../274server/engine/data/pack`, and skips when it isn't set. `RealCacheTests` checks its CRCs against the CRC32 of each file in the 274 engine's store 0, and its components and type counts against its `content/pack` files. On the real 274 cache every component id matches 289's.
+
+## 20. Revision-289 multilocs
+
+Revision-289 loc opcode 77 retains its varbit selector and child definitions. The varbit catalog decodes
+inclusive bit ranges. Scene queries, snapshots, menus, interaction geometry and collision resolve the
+currently visible child; packets retain the base loc identity. A varp update refreshes the scene.
+`Loc.id` is the scene/packet identity, while `Loc.type_id` is the resolved child whose name/actions are
+shown. A hidden child disappears from queries; a retained snapshot becomes invalid after a child change.
+Older revision decoders retain their own formats and reject unsupported opcode 77.
+
+Current tests use synthetic decoded fixtures: the local 289 cache used for acceptance has varbit
+definitions but no multiloc loc definitions. Real-content validation remains in
+[#33](https://github.com/ineedbots/lc-headless/issues/33). The Python player/NPC snapshots also expose
+raw `animation_id` and `animation_tick`, including repeated sequence starts; the existing `animation`
+property retains its expiry behavior. Fisher uses the raw fields for tick timing.
+
+Definition decoding is split into `LocTypeDecoder`, `NpcTypeDecoder`, `ObjTypeDecoder` and
+`VarpTypeDecoder`, with shared framing/readers in `TypeDecoder` and dropped-opcode reporting in
+`DroppedOpcodes_s`. `GameCache_s` owns shared name/ID lookups so query and binding code use the same
+matching rules. `tests/Cache/TypeDecoderTests.cpp` shares definition builders across decoder tests.

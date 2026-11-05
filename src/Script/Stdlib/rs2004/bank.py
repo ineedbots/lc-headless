@@ -383,10 +383,18 @@ class _Bank:
             return opened
         first = access.get('open_first')
         if first is not None and _loc_with_action(access['name'], access['op']) is None:
-            closed = _loc_with_action(first['name'], first['op'])
-            if closed is None or not closed.interact(first['op']):
+            for attempt in range(3):
+                if self.is_open():
+                    break
+                closed = _loc_with_action(first['name'], first['op'])
+                if closed is None or not closed.interact(first['op']):
+                    yield from execution.delay_ticks(1)
+                    continue
+                usable = yield from execution.delay_until(lambda: self.is_open() or _loc_with_action(access['name'], access['op']) is not None, OPEN_TIMEOUT_MS)
+                if usable:
+                    break
+            if not self.is_open() and _loc_with_action(access['name'], access['op']) is None:
                 return False
-            yield from execution.delay_until(lambda: self.is_open() or _loc_with_action(access['name'], access['op']) is not None, OPEN_TIMEOUT_MS)
         if self.is_open():
             opened = yield from self._opened()
             return opened

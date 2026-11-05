@@ -100,16 +100,16 @@ class LootCollector:
         self.target = None
         return LootResult(False)
 
-    def step(self, party, trip, excluded, ready, eat_for_space=None, recover_arrows=False):
+    def step(self, party, trip, excluded, ready, eat_for_space=None, recover_arrows=False, food_pending=False):
         """Advances the claim one tick. ready() says whether the fight lets a click go now; eat_for_space() sends an
         Eat click for room and returns whether it went."""
         tick = game.tick()
         try:
-            return self._advance(party, trip, excluded, ready, tick, eat_for_space, recover_arrows)
+            return self._advance(party, trip, excluded, ready, tick, eat_for_space, recover_arrows, food_pending)
         except Exception:
             return self._release(tick)
 
-    def _advance(self, party, trip, excluded, ready, tick, eat_for_space, recover_arrows):
+    def _advance(self, party, trip, excluded, ready, tick, eat_for_space, recover_arrows, food_pending):
         here = game.tile()
         if here is None or not in_lair(here):
             self.clear()
@@ -178,6 +178,8 @@ class LootCollector:
                 return self._release(tick) if tick - target.room[2] >= 6 else LootResult(True)
             target.room = None
         if inventory.is_full() and not _stacks(drop.id):
+            if food_pending:
+                return LootResult(True)
             vial = inventory.first('Vial')
             if vial is not None:
                 target.room = (vial.id, inventory.count_by_id(vial.id), tick)

@@ -1,5 +1,6 @@
 """rs2b0t's describe, test and expect, for its tests as ts2py drafts them. StdlibTests.cpp runs this before each
-test_*.py here, then run_specs(), which runs every test and raises with each failure."""
+test_*.py here, then run_specs(), which runs every test and raises with each failure. A spec starting with
+`# fixture: name` also loads fixtures/name.py into the same isolated VM before the test source."""
 
 _SPECS = []
 _PREFIX = []
