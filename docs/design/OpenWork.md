@@ -15,11 +15,7 @@ Every embedded stdlib file meets the 95% coverage floor; additional coverage is 
 |---|---|---|
 | Play Tutorial Island | Implement the tutorial sequence; `rs2004/tutorial.py` currently designs the character and asks the guide to skip | README |
 | Later upstream commits | Review changes after pinned `8b7db422`; this cleanup makes no claim about upstream's current tip | [Upstream review](Rs2b0tUpstreamReview.md) |
-| Pocketpy lint: set membership | Detect unsafe `None in some_set`, or audit relevant sets; the specific clue casket crash is fixed | [Parity status](BotApiParityStatus.md#open-items) |
-| Pocketpy lint: returned generators | Detect conditional generator returns such as `return (a(log) if c else b(log))`; the specific Digsite/Ikov call sites are fixed | Parity status |
-| Remaining upstream facade tests | Port bank-chest/id/transfer, open-window `StableClosedPoll`, JiveMarketDumper runtime, MarketMaker tasks, Shilo supply-trip fixtures, WordPack chat echo, and remaining JiveDragons/JiveKQ suites. Class/module `spy_on` and fakes are available; instance method replacement remains unsupported | Parity status |
-| Grand Tree journal | Investigate returning an older parsed stage despite a newer cached stage | [Coverage findings](ScriptCoverageBacklog.md#known-findings) |
-| Tourist Trap recovery | Confirm/remove the two suspected unreachable `leave_camp` branches following `safe_recovery_route` | Coverage findings |
+| Remaining upstream facade tests | Finish the JiveDragons and JiveKQ scenario audit: dragon targeting, route/egress, supply safety and recovery cases, plus the remaining KQ upkeep and loot edge cases. Banking, open-window `StableClosedPoll`, JiveMarketDumper, MarketMaker, Shilo supply trips and native WordPack chat echo now have runtime ports; dragon ownership/targeting/loot/ammo/supply and KQ combat/loot/search/recovery/gate cases are also ported | [Parity status](BotApiParityStatus.md#parity-findings-follow-up-2026-11-05) |
 | Cache-backed Debug navigation test budget | The aggregate walker-data suite exceeded CTest's 300-second limit during the WildyAgility follow-up; split its registration or review the budget. The full cache-backed Release suite and default Debug suite pass | [Validation](Rs2b0tUpstreamReview.md#wildyagility-follow-up-2026-11-05) |
 
 ## Live validation
@@ -71,7 +67,7 @@ These are retained observations, not newly reproduced failures.
 - JiveKBD's default Fire Strike yielded no kills in its recorded 30-minute run; adjust settings as needed.
 - Black Knights' Fortress re-listens at the grill after a restart because `listened` is process-local.
 - Further coverage opportunities are in [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md). Its latest saved
-  report is 97.85%, with every file meeting 95%; phase 17 runtime specs are no longer an outstanding floor requirement.
+  report is 97.86%, with every file meeting 95%; phase 17 runtime specs are no longer an outstanding floor requirement.
 
 Completed items have been removed from this index, including phase 18, the old coverage-floor work,
 empty-ground-spawn waiting and the log file sink (`src/Console/LogFile.cpp`, configured by `client.logFile`).

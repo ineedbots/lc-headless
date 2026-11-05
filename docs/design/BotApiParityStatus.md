@@ -4,7 +4,7 @@ Where [BotApiParityDesign.md](BotApiParityDesign.md)'s plan stands. Each phase's
 
 **Reviewed 2026-11-05:** all phases are implemented. The export audit against pinned upstream `8b7db422`
 reports nothing missing. Remaining work is the follow-ups below, rather than an unfinished parity phase.
-The latest saved coverage report has 76,809 / 78,499 executable lines covered (97.85%), with all 436 files
+The latest saved coverage report has 76,822 / 78,503 executable lines covered (97.86%), with all 436 files
 meeting the 95% floor; see [ScriptCoverageBacklog.md](ScriptCoverageBacklog.md) for scope and findings.
 
 The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective port of newer commits from `32d52004` through `8b7db422`, including the completed quest and 2026-11-05 non-quest feature follow-ups, settings migrations and remaining live timing checks. It does not replace the original parity baseline; phase 18 is implemented and validated separately below.
@@ -33,11 +33,10 @@ The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective 
 
 | Item | Where it goes |
 |---|---|
+| Remaining facade scenarios | Finish the one-for-one scenario audit for JiveDragons and JiveKQ; remaining targeting/route and upkeep/loot edge cases are not claimed complete. See the follow-up below for the suites already ported |
 | A refused crossing with another way past, to show the walker routing round it live (the Champions' Guild has none) | When one is found |
-| Remaining upstream facade tests: bank-chest, bank-id, bank-transfer, `StableClosedPoll` with a window open, JiveMarketDumper runtime, MarketMaker tasks, the Shilo supply-trip fixtures and WordPack's `chatEcho` cases | Port with `spec.py`'s class/module `spy_on` and fakes; instance method replacement still does not work. New trade feature regressions do not replace a full port of these suites |
 | JiveKQ: one account stopped on a third restock with "Could not buy a Shantay pass" after buying one each earlier trip; the log doesn't say why | When it recurs, with the shop's state logged |
 | JiveKBD's default Fire Strike kills nothing in 30 minutes; the bot runs and banks | A settings matter, as rs2b0t's |
-| The rest of JiveDragons' and JiveKQ's tests stub the client with `spyOn` | `spec.py`'s `spy_on` and fakes (phase 15) make them portable; JiveDragons' clue tests are ported |
 | `trail complete` logged twice at a trail's end | Cosmetic |
 | GnomeMagicChopper's "Chopped" count stays 0, as rs2b0t counts it | Cosmetic; left as rs2b0t's |
 | Live runs were 12 minutes, not the plan's 15 | — |
@@ -52,9 +51,6 @@ The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective 
 | The gilded totem's hand-in lost a minute on one run, in the shape the training had, and recovered on its next attempt | When it costs more |
 | A failing teleport cast is offered again for 5 repaths (an account with a spell's quest set by varp shows it) | When a real account hits it |
 | A hard Kharazi trail's pack only just fits its kit and 15 sharks, so an extra scroll or gift blocks it, though now with a log line; ClueSolver doesn't dress an account for the Saradomin Wizard | When an account hits it |
-| `None in some_set` raises in pocketpy (phase 17i's casket crash); `lint.py` has no rule for it | A rule, or a check of the stdlib's sets |
-| A generator returned from a conditional, `return (a(log) if c else b(log))`, isn't flagged by `ts2py.ts` or `lint.py` (Digsite's `talk_to_npc_id` and Ikov's `fetch_ikov_lever` had it) | A rule alongside the generator-call one |
-| Grand Tree's stage reader can return an older parsed journal stage despite a newer cached stage; Tourist Trap has two suspected unreachable recovery branches | Investigate the [coverage findings](ScriptCoverageBacklog.md#known-findings) |
 | New feature live checks: Cosmic travel/trading, coordinated MuleDepot transfers, three-tick fishing throughput and MuleCrafter meeting/banking modes | Implementations and regression specs pass; live behavior remains to be measured |
 | AccountLeveler at real speed, high-level dragon progression and optional player-market trading | The completed acceptance run used 100 ms ticks and low-level methods; higher-level paths have specs/cache checks |
 
@@ -63,3 +59,34 @@ The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective 
 - **Porting a module:** draft with `bun tools/port/ts2py.ts ../rs2b0t <file.ts> --stdlib`, finish by hand, then `python -I tools/port/lint.py src/Script/Stdlib scripts tests/Stdlib` and `python -I tools/port/coverage.py ../rs2b0t <module>`.
 - **pocketpy's limits** are in [scripting/README.md](../scripting/python-dialect.md#the-python-dialect); `lint.py` checks the ones that bite silently. The worst: a parameter without a default can't be passed by keyword, and a method set on an instance does nothing.
 - **Live tests** run against `289server/engine` (`npx tsx src/app.ts`) from a scratch client config and accounts folder, never the user's `accounts/`. A harness bot sets stats and stock with the engine's cheats, then runs the bot under test as a `ScriptActivity`.
+
+
+## Parity findings follow-up (2026-11-05)
+
+The linter now rejects literal `None` membership in statically known sets (including local aliases and
+set comprehensions), and follows conditional generator returns and imported wrapper chains. It conservatively
+leaves unknown values, imported collections and shadowed `set` names alone; it is not an optional-value type
+checker. Its regression tests run in CI alongside the port export collector tests.
+
+Grand Tree journal reads retain the newest cached stage when an older page is recognized. A quest-list
+`not_started` result still resets that floor. Tourist Trap's two unreachable `leave_camp` branches were removed;
+recovery tests exercise both camp floors at both affected stages through `safe_recovery_route`.
+
+Runtime facade ports now cover bank-chest/id/transfer, open-window and reopened `StableClosedPoll`,
+JiveMarketDumper access selection, MarketMaker task outcomes, Shilo supply-trip interruption/retry and native
+WordPack round trips of market replies. The bank scenarios exposed unsafe delegation after a chest failed to
+open: access now retries three times and returns failure without using an unavailable bank action. Active Shilo
+supply trips now keep gathering suspended while banking is retried.
+
+The new JiveDragons runtime fixture covers ownership and kill settlement, scene rebuilds, movement rechecks,
+loot order/capacity, food reclaim/retry budgets, bounded pickup failure, network targeting, adaptive stands, ammo acknowledgement and bank-only shield preparation. KQ runtime
+ports cover food/equipment/prayer acknowledgement, same-tick combat inputs, valuable and arrow loot, entry gates,
+upkeep, route interactions, search/pull, teammate gear recovery and death restocking. KQ sends special-attack toggles without delaying the next attack,
+and a pending combat eat reserves its future loot slot before another food or vial is discarded. The remaining
+scenario families above stay open; these additions do not claim a complete one-for-one port of both bot suites.
+
+Validation: Windows Debug and cache-backed Release each pass all 810 registered tests. The default Debug run
+skips 27 cache-dependent tests; Release uses the 225, 274 and 289 caches. The full traced Debug run also passes
+(76,822 / 78,503 lines, 97.86%; all 436 files above 95%). Later dragon/KQ scenario additions pass focused Debug
+and Release runs. Full dialect lint is clean, the 11 port-tool unit tests pass, C++ formatting passes, and the
+export audit against pinned `8b7db422` reports nothing missing. Live behavior was not remeasured in this follow-up.
