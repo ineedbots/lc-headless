@@ -150,7 +150,8 @@ test('seeded sessions rotate stronger members and free-world camps with the prod
 def _fn13(*_args):
     selected = set()
     for region in range(0, 100, 10):
-        for camp in range(len(COMBAT_CAMPS)):
+        # Full region/camp cross-product is retained in the Slow suite.
+        for camp in range(0, len(COMBAT_CAMPS), max(1, len(COMBAT_CAMPS) // 10)):
             calls = [0]
             def select():
                 calls[0] += 1
