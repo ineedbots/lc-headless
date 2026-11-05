@@ -55,7 +55,6 @@ The [2026-11-04 upstream review](Rs2b0tUpstreamReview.md) records the selective 
 | `None in some_set` raises in pocketpy (phase 17i's casket crash); `lint.py` has no rule for it | A rule, or a check of the stdlib's sets |
 | A generator returned from a conditional, `return (a(log) if c else b(log))`, isn't flagged by `ts2py.ts` or `lint.py` (Digsite's `talk_to_npc_id` and Ikov's `fetch_ikov_lever` had it) | A rule alongside the generator-call one |
 | Grand Tree's stage reader can return an older parsed journal stage despite a newer cached stage; Tourist Trap has two suspected unreachable recovery branches | Investigate the [coverage findings](ScriptCoverageBacklog.md#known-findings) |
-| WildyAgility's repeated per-tick clicks and retry redesign | Separate scheduler/timing port and live check; see the [upstream review](Rs2b0tUpstreamReview.md#remaining-work) |
 | New feature live checks: Cosmic travel/trading, coordinated MuleDepot transfers, three-tick fishing throughput and MuleCrafter meeting/banking modes | Implementations and regression specs pass; live behavior remains to be measured |
 | AccountLeveler at real speed, high-level dragon progression and optional player-market trading | The completed acceptance run used 100 ms ticks and low-level methods; higher-level paths have specs/cache checks |
 

@@ -14,13 +14,13 @@ Every embedded stdlib file meets the 95% coverage floor; additional coverage is 
 | Item | Remaining work | Source |
 |---|---|---|
 | Play Tutorial Island | Implement the tutorial sequence; `rs2004/tutorial.py` currently designs the character and asks the guide to skip | README |
-| WildyAgility timing/retries | Port repeated per-tick obstacle clicks and the retry redesign, then measure them on this scheduler. Post-success delay removal is already applied | [Upstream review](Rs2b0tUpstreamReview.md#remaining-work) |
 | Later upstream commits | Review changes after pinned `8b7db422`; this cleanup makes no claim about upstream's current tip | [Upstream review](Rs2b0tUpstreamReview.md) |
 | Pocketpy lint: set membership | Detect unsafe `None in some_set`, or audit relevant sets; the specific clue casket crash is fixed | [Parity status](BotApiParityStatus.md#open-items) |
 | Pocketpy lint: returned generators | Detect conditional generator returns such as `return (a(log) if c else b(log))`; the specific Digsite/Ikov call sites are fixed | Parity status |
 | Remaining upstream facade tests | Port bank-chest/id/transfer, open-window `StableClosedPoll`, JiveMarketDumper runtime, MarketMaker tasks, Shilo supply-trip fixtures, WordPack chat echo, and remaining JiveDragons/JiveKQ suites. Class/module `spy_on` and fakes are available; instance method replacement remains unsupported | Parity status |
 | Grand Tree journal | Investigate returning an older parsed stage despite a newer cached stage | [Coverage findings](ScriptCoverageBacklog.md#known-findings) |
 | Tourist Trap recovery | Confirm/remove the two suspected unreachable `leave_camp` branches following `safe_recovery_route` | Coverage findings |
+| Cache-backed Debug navigation test budget | The aggregate walker-data suite exceeded CTest's 300-second limit during the WildyAgility follow-up; split its registration or review the budget. The full cache-backed Release suite and default Debug suite pass | [Validation](Rs2b0tUpstreamReview.md#wildyagility-follow-up-2026-11-05) |
 
 ## Live validation
 

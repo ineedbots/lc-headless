@@ -65,7 +65,7 @@ Of the public API, the names missing are few and small (§4). Most of the gap is
 
 Three-tick fly fishing and its gear acquisition, JiveRC's Cosmic route, multilocs and MuleDepot were added
 after the original baseline in the [2026-11-05 feature follow-up](Rs2b0tUpstreamReview.md#feature-follow-up-2026-11-05).
-WildyAgility's repeated-click/retry redesign remains deferred there.
+WildyAgility's repeated-click/retry follow-up is also implemented; see the review's timing evidence.
 
 ---
 
