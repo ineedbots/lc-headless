@@ -4,6 +4,24 @@ Reviewed on 2026-11-04, from [`32d52004`](https://github.com/rs2b2t/rs2b0t/commi
 
 The source checkout was read at a pinned detached worktree. Changes were translated into the existing Python API and generator waits; the TypeScript commits cannot be cherry-picked into this C++/pocketpy application. Upstream code and data are MIT licensed; see [the retained license](../../thirdparty/rs2b0t/LICENSE).
 
+## Remaining work
+
+Reviewed again on 2026-11-05 against the local implementation and recorded validation:
+
+- Port WildyAgility's repeated per-tick obstacle clicks and retry redesign, then measure them against this
+  client's scheduler. Only the post-success delay removal is applied so far.
+- Run live checks for Cosmic/JiveRC, coordinated MuleDepot transfers, MuleCrafter's inside/outside meetings
+  and bank-visit settings, and three-tick fishing at real speed. Existing specs validate workflows; they do
+  not measure real-speed throughput or coordinated live-server behavior.
+- Validate multilocs against real revision-289 content when available. The local 289 cache has varbit
+  definitions but no multiloc loc definitions, so child transitions/collision currently use synthetic fixtures.
+- Review commits after `8b7db422` in a future upstream pass. This review and the passing export audit are
+  limited to that pinned snapshot; upstream's current tip was not fetched for this documentation cleanup.
+
+The quest recovery, account leveler and non-quest feature ports described below are implemented. No other
+feature port from this review remains deferred. Broader parity follow-ups are in
+[BotApiParityStatus.md](BotApiParityStatus.md#open-items).
+
 ## Commit decisions
 
 | Commit | Upstream change | Decision |
