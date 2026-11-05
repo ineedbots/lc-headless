@@ -6,6 +6,7 @@ from rs2004.messages import game_messages
 from rs2004.quests.defs.touristtrap import TOURIST_TRAP_STAGE, decide, forge_bar_wasted_since, observe_tourist_trap, parse_tourist_trap_journal, run_surface_rescue_checkpoint, strict_tourist_trap_choice, tourist_trap_area, waterskin_doses
 from rs2004.quests.engine.types import QuestSnapshot
 from rs2004.quests.food import quest_food
+from rs2004.quests.defs.touristtrap import ITEM, leave_camp
 
 def tile(x, z, level=0):
     return (Record({'x': x, 'z': z, 'level': level}))
@@ -78,6 +79,21 @@ after_each(_fn5)
 
 def custom_name(step):
     return (step.name if step.kind == 'custom' else None)
+
+
+def camp_recovery(stage, upstairs):
+    snapshot = snap(Record({'stage': stage, 'tile': CAMP_UPPER if upstairs else CAMP_SURFACE,
+                            'inv': [[ITEM.METAL_KEY, 1], [ITEM.PLANS, 1], [ITEM.BAR, 1], [ITEM.FEATHER, 10], [ITEM.HAMMER, 1]],
+                            'worn': SLAVE_WORN}))
+    step = decide(snapshot)
+    expect(step.kind).to_be('custom')
+    expect(step.name).to_be('climb down before item recovery' if upstairs else 'leave the camp safely for item recovery')
+    if not upstairs:
+        expect(step.run).to_be(leave_camp)
+
+
+test_each([[10, False], [10, True], [12, False], [12, True]])(
+    'pineapple/plans stage %s uses the shared safe camp recovery, upstairs=%s', camp_recovery)
 
 
 def classifies(world_tile, expected):
