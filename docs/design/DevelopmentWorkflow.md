@@ -4,6 +4,31 @@ Feature work flows through `develop`. Published releases come from tagged commit
 This document defines the repository policy; branch protection and automated enforcement must be configured
 separately in the repository settings and workflows.
 
+Follow [CONVENTIONS.md](CONVENTIONS.md) for C++ code style, project structure and implementation rules.
+
+## GitHub issues
+
+Track bugs, feature requests and remaining work in [GitHub Issues](https://github.com/ineedbots/lc-headless/issues).
+Issues are the current backlog; design documents provide implementation context and historical decisions.
+
+1. Search existing open and closed issues before creating one. Add evidence to an existing issue when it
+   covers the same work; link related issues and dependencies instead of duplicating their scope.
+2. Give each issue a specific title, context and clear acceptance criteria. For bugs, include reproduction
+   steps, expected and actual behavior, the affected commit or version, server revision and relevant logs.
+   For features, describe the intended behavior and scope. Link relevant code, designs and test evidence.
+3. Before starting work, record the intended scope in the issue and identify any blockers. Keep progress,
+   findings and changes to acceptance criteria in the issue so another contributor can pick it up.
+   Keep deferred or trigger-based observations identified as such until their stated trigger is met;
+   they are not automatically confirmed bugs or release blockers.
+4. Implement the work on a feature branch from `develop` and link the issue in the pull request into
+   `develop`. Use `Refs: #123` for partial or related work and `Resolves: #123` when the change completes
+   the issue, following the [issue reference convention](#bodies-and-issue-references) below.
+5. Close an issue when its acceptance criteria are met, relevant checks pass and the change is merged.
+   Record the resolving pull request or commit, validation results and any remaining limitations in the
+   issue. Verify closure after a merge into `develop`; close it manually if it remains open. For work
+   completed without a code change, record the evidence and reason for closure. Link follow-up issues
+   for remaining work, and explain duplicate, declined or superseded closures with a reference or reason.
+
 ## Branches
 
 | Branch | Purpose | How it changes |
