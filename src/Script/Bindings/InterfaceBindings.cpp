@@ -311,9 +311,9 @@ namespace
         return BindingSupport::Guard([&]
         {
             const auto tab = PyValue::ToInt(py_arg(0), "tab");
-            if (tab < 0 || tab >= 15)
+            if (tab < 0 || tab >= static_cast<s64>(Interfaces_s::TAB_COUNT))
             {
-                throw std::invalid_argument("tab must be between 0 and 14");
+                throw std::invalid_argument(std::format("tab must be between 0 and {}", Interfaces_s::TAB_COUNT - 1));
             }
 
             return BindingSupport::ReturnBool(BindingSupport::GetContext().GetActions().OpenSideTab(static_cast<u8>(tab)));
