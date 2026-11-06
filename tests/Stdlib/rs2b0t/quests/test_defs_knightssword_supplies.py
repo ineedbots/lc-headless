@@ -233,7 +233,13 @@ describe('iron bar chain', _fn34)
 def _fn45():
 
     def _fn46():
-        expect(iron_bars_at(snap([[KS_ID.IRON_ORE, ORE_PER_TRIP]]), 86, 1)).to_match_object(Fake(**{'kind': 'wait', 'reason': 'Smithing 15 is required to smelt iron bars; train Smithing or obtain and bank two Iron bars'}))
+        step = iron_bars_at(snap([[KS_ID.IRON_ORE, ORE_PER_TRIP]]), 86, 1)
+        expect(step.kind).to_be('grab_ground')
+        expect(step.item).to_be('Iron bar')
+        expect(step.anchor.x).to_be(3111)
+        expect(step.anchor.z).to_be(3657)
+        expect(step.anchor.level).to_be(0)
+        expect(step.wait_if_missing).to_be(True)
     test('does not try smelting an iron batch at Smithing 1', _fn46)
 
     def _fn47():
@@ -241,10 +247,20 @@ def _fn45():
     test('withdraws banked bars at the quest Mining floor and Smithing 1', _fn47)
 
     def _fn48():
-        expect(iron_bars_at(snap([[BRONZE_PICKAXE, 1]]), 10, 15)).to_match_object(Fake(**{'kind': 'wait', 'reason': 'Mining 15 is required to mine iron ore; train Mining or obtain and bank two Iron bars'}))
+        expect(iron_bars_at(snap([[BRONZE_PICKAXE, 1]]), 10, 15)).to_match_object(Fake(**{'kind': 'grab_ground', 'item': 'Iron bar', 'wait_if_missing': True}))
     test('does not mine iron below Mining 15', _fn48)
 
     def _fn49():
         expect(iron_bars_at(snap([[KS_ID.IRON_ORE, ORE_PER_TRIP]]), 10, 15)).to_match_object(Fake(**{'kind': 'custom', 'name': 'smelt iron bars'}))
     test('smelts carried ore below Mining 15 when Smithing permits it', _fn49)
 describe('iron bar skill requirements', _fn45)
+
+
+def wilderness_second_bar():
+    step = iron_bars_at(snap([[KS_ID.IRON_BAR, 1]]), 10, 1)
+    expect(step.kind).to_be('grab_ground')
+    expect(step.wait_if_missing).to_be(True)
+    expect(iron_bars_at(snap([[KS_ID.IRON_BAR, 2]]), 10, 1).kind).to_be('wait')
+
+
+test('collects a second Wilderness bar and stops once two are held', wilderness_second_bar)

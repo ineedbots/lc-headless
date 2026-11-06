@@ -198,7 +198,7 @@ def smelt_iron(log):
 
 
 def iron_bars_at(snap, mining_level, smithing_level):
-    """Nothing sells iron bars, Drogo's Mining Emporium stocks zero and the only ground spawn is deep in the Wilderness, so smelt them."""
+    """Use banked bars first, then smelt or collect the level 18 Wilderness spawn."""
     held = held_id(snap, KS_ID.IRON_BAR)
     if held >= 2:
         return Record({'kind': 'wait', 'reason': 'two iron bars already held'})
@@ -208,19 +208,15 @@ def iron_bars_at(snap, mining_level, smithing_level):
     if banked > 0:
         return withdraw([{'name': KS_NAME.IRON_BAR, 'qty': min(2 - held, banked), 'id': KS_ID.IRON_BAR}])
     if smithing_level < 15:
-        return Record({
-            'kind': 'wait',
-            'reason': 'Smithing 15 is required to smelt iron bars; train Smithing or obtain and bank two Iron bars',
-        })
+        return Record({'kind': 'grab_ground', 'item': KS_NAME.IRON_BAR,
+                       'anchor': KS_TILE.IRON_BAR_SPAWN, 'wait_if_missing': True})
     # Why: `mineRock` ignores its qty and mines one ore per invocation, so the batch is counted here.
     # Why: smelting on the first ore would walk the 130 tiles between Rimmington and the furnace 8 times.
     if held_id(snap, KS_ID.IRON_ORE) >= ORE_PER_TRIP:
         return Record({'kind': 'custom', 'name': 'smelt iron bars', 'run': smelt_iron})
     if mining_level < 15:
-        return Record({
-            'kind': 'wait',
-            'reason': 'Mining 15 is required to mine iron ore; train Mining or obtain and bank two Iron bars',
-        })
+        return Record({'kind': 'grab_ground', 'item': KS_NAME.IRON_BAR,
+                       'anchor': KS_TILE.IRON_BAR_SPAWN, 'wait_if_missing': True})
     _v11 = pickaxe_at(snap, mining_level)
     return (_v11 if _v11 is not None else Record({
         'kind': 'mine_rock',
