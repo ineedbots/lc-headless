@@ -59,7 +59,7 @@ Use `@<account>` to target applicable built-in commands too: `@mule status`, `@m
 | `status` | One line per account: logging in, in game and where, reconnecting or finished, and its script's state |
 | `quit`, `exit` | As Ctrl+C: each script gets `on_kill_signal`; typing it again logs every account out at once |
 | `loglevel [verbose\|info\|warning\|error]` | Shows or sets the log level of every account |
-| `say <text>` | Says the text in public chat from every account in game, cut to 80 characters |
+| `say <text>` | Says the text in public chat from every account in game, cut to 80 characters. `say ::<command>` sends a server command instead (up to 80 characters after `::`). |
 | `pause` | Every script has it: stops stepping the bot, dropping its step in progress, and calls `on_pause`. Upkeep goes on, so a paused account still answers random events and keeps its run on, and the stall guard waits. `@<account> pause` pauses one |
 | `resume` | Calls `on_resume`, and `loop()` starts afresh |
 

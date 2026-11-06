@@ -437,6 +437,10 @@ TEST_CASE("AccountRunner says console text in public chat", "[AccountRunner]")
         {
             console.Push("say Hello there");
             console.Push("@bot2 say Just me");
+            console.Push("say ::tele 3200 3200");
+            console.Push("@bot2 say ::" + std::string(80, 'a'));
+            console.Push("say ::");
+            console.Push("say ::" + std::string(81, 'a'));
             console.Push("say");
             console.Push("quit");
             sent = true;
@@ -466,6 +470,18 @@ TEST_CASE("AccountRunner says console text in public chat", "[AccountRunner]")
 
     CHECK(said(fixture.first) == std::vector<std::string>{"Hello there "});
     CHECK(said(fixture.second) == std::vector<std::string>{"Hello there ", "Just me "});
+
+    const auto commands = [](const FakeGameServer& server)
+    {
+        auto texts = std::vector<std::string>{};
+        for (const auto& packet : server.GetPackets(ClientProt_e::ClientCheat))
+        {
+            texts.emplace_back(packet.payload.begin(), packet.payload.end());
+        }
+        return texts;
+    };
+    CHECK(commands(fixture.first) == std::vector<std::string>{"tele 3200 3200\n"});
+    CHECK(commands(fixture.second) == std::vector<std::string>{"tele 3200 3200\n", std::string(80, 'a') + "\n"});
 }
 
 TEST_CASE("AccountRunner quits one account from the console", "[AccountRunner]")
