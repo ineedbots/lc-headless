@@ -54,6 +54,7 @@ public:
     bool ContinueDialogue();
     bool AnswerCountDialog(s32 value);
     void CloseInterfaces();
+    bool OpenSideTab(u8 tab);
     void SetRun(bool run);
     void Say(std::string_view text);
     void SendPrivateMessage(std::string_view name, std::string_view text);

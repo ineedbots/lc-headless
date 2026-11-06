@@ -88,6 +88,17 @@ TEST_CASE("InterfaceView lists the open interfaces once each", "[InterfaceView]"
     CHECK_FALSE(view.IsOpen(TestCache::TRADE_ACCEPT));
 }
 
+TEST_CASE("InterfaceView exposes the sticky tutorial instructions as visible text", "[InterfaceView]")
+{
+    const auto cache = MakeCache();
+    auto interfaces = Interfaces_s{};
+    interfaces.tutorialComponent = OPTIONS;
+    const auto view = InterfaceView{cache, interfaces};
+    CHECK(view.IsOpen(OPTIONS));
+    CHECK(view.IsVisible(*view.Find(TITLE)));
+    CHECK(Ids(view.FindText("Select an Option")) == std::vector<u16>{TITLE});
+}
+
 TEST_CASE("InterfaceView prefers what the server set to what the cache has", "[InterfaceView]")
 {
     const auto cache = MakeCache();

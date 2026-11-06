@@ -233,7 +233,7 @@ Define these as methods on a bot, or as module-level functions. Unlike [events](
 
 | Hook | Called |
 |---|---|
-| `on_start()` | Once, one server tick after the player is first placed in the world, when stats and inventories have arrived. May be a generator; it runs before the first `loop()`. On Tutorial Island, after the [tutorial skip](upkeep.md#tutorial-island) |
+| `on_start()` | Once, one server tick after the player is first placed in the world, when stats and inventories have arrived. May be a generator; it runs before the first `loop()`. On Tutorial Island, after [completing the tutorial](upkeep.md#tutorial-island) |
 | `on_stop(reason)` | Once, when the script stops: after `stop_script()`, `stop_account()`, `request_finish(reason)`, an error, a stall-guard restart, or a logout the client starts, such as Ctrl+C. `reason` is a string. Can't wait |
 | `on_pause()`, `on_resume()` | When the console's [`pause` and `resume`](console-and-messages.md#built-in-commands) stop and start the bot. Can't wait |
 | `on_progress_report()` | When a [progress report](console-and-messages.md#progress-reports) is due. Returns a `dict` |

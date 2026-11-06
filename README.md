@@ -48,12 +48,6 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 | [Development workflow](docs/design/DevelopmentWorkflow.md) | Branch policy, release promotion and commit messages |
 | [Design documents](docs/design/) | Implementation plans, code conventions and protocol references |
 
-## TODO
-
-- Remove this section when points are completed
-- Check and implement newer rs2b0t's commits
-- Do tutorial island, not just skipping it
-
 ## Credits
 
 - LostCity - https://github.com/LostCityRS
