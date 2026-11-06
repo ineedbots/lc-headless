@@ -353,6 +353,46 @@ def test_tutorial_unfamiliar_option_is_not_guessed():
         assert world.clicks == []
 
 
+def test_startup_accepts_an_initial_skip_and_waits_for_mainland():
+    with ActionWorld() as world:
+        tutorial._perform_stage = world.completion_saved[0]
+        world.pages = [('options', ['Yes please.', 'No, thank you.'])]
+        assert world.run(tutorial.complete(world.logs.append))
+        assert world.clicks == [110]
+        assert not tutorial.on_tutorial_island()
+        assert world.now >= tutorial.DESIGN_WAIT_MS + 1500
+
+
+def test_initial_dialogue_without_a_skip_continues_into_playable_tasks():
+    with ActionWorld() as world:
+        world.pages = [('continue', ['Welcome! Go through the door.'])]
+        assert world.stage(1)
+        assert world.clicks == ['continue'] and tutorial.on_tutorial_island()
+        world.instruction = 'Interacting with scenery'
+        world.loc(3014, 'Door')
+        assert world.stage(tutorial.progress())
+        assert world.uses == [('Door', 'Open')]
+        assert world.talks == 0
+
+
+def test_skip_preference_does_not_apply_after_the_start():
+    with ActionWorld() as world:
+        world.instruction = 'Moving around'
+        world.leaves = False
+        world.pages = [('options', ['Yes please.', 'No, thank you.'])]
+        assert world.stage(10)
+        assert world.clicks == [111] and tutorial.on_tutorial_island()
+
+
+def test_initial_skip_requires_actual_arrival_and_times_out_safely():
+    with ActionWorld() as world:
+        world.leaves = False
+        world.pages = [('options', ['Yes please.', 'No, thank you.'])]
+        assert world.stage(1) is False
+        assert world.clicks == [110] and tutorial.on_tutorial_island()
+        assert world.now >= tutorial.LEAVE_MS
+
+
 def test_stale_instruction_packets_do_not_repeat_completed_tasks():
     with CompletionWorld() as world:
         world.instruction = 'These are your stats'

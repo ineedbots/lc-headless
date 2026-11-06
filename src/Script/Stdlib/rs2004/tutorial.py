@@ -1,5 +1,5 @@
 """Playable Tutorial Island, resumed from the server's instruction panel before on_start.
-complete() follows every instructor; skip() remains an explicit alternative for test tools.
+complete() accepts an initial skip offer, otherwise follows every instructor.
 """
 
 import _core
@@ -178,7 +178,7 @@ def progress():
     return _last_stage
 
 
-def _drain_dialogue():
+def _drain_dialogue(prefer_skip=False):
     """Only answer known progression options; never guess at an unfamiliar choice."""
     for step in range(80):
         if not chat_dialog.is_open():
@@ -187,6 +187,10 @@ def _drain_dialogue():
                 return True
         options = chat_dialog.options()
         if options:
+            if prefer_skip and progress() <= 1 and offers_skip(options):
+                yield from chat_dialog.choose_option(SKIP_OPTION)
+                left = yield from execution.delay_until(lambda: _core.is_placed() and not on_tutorial_island(), LEAVE_MS)
+                return left
             wanted = ['No, thank you', 'No thanks', "I'm ready to move on"]
             if progress() == 500 or progress() >= 660:
                 wanted = ['Yes.']
@@ -221,7 +225,7 @@ def _instructor(name, tile):
                                        open_when_unreachable=True, expect_ms=TALK_OPEN_MS)
     if status != 'done':
         return False
-    result = yield from _drain_dialogue()
+    result = yield from _drain_dialogue(prefer_skip=name == GUIDE and progress() <= 1)
     return result
 
 
@@ -285,7 +289,7 @@ def _fight(ranged):
 
 def _perform_stage(stage):
     if chat_dialog.is_open():
-        result = yield from _drain_dialogue()
+        result = yield from _drain_dialogue(prefer_skip=stage <= 1)
         return result
     if stage in TABS:
         result = yield from game.open_side_tab(TABS[stage])
@@ -368,8 +372,8 @@ def _perform_stage(stage):
 
 
 def complete(say):
-    """Complete all tasks through ordinary player actions. False leaves startup stopped on the island."""
-    say('tutorial: completing Tutorial Island')
+    """Take an initial skip offer, otherwise complete all tasks. False stops startup on the island."""
+    say('tutorial: leaving Tutorial Island; skipping if the initial guide offers it')
     yield from _finish_design(say)
     stage = -1
     deadline = _core.step_time() + STAGE_TIMEOUT_MS
