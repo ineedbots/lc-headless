@@ -36,6 +36,18 @@ void Rs2b0tSpecs::Run(ScriptVm& vm, const std::filesystem::path& file)
     REQUIRE(source.has_value());
 
     REQUIRE_NOTHROW(vm.RunSource(*spec, "spec.py"));
+    constexpr auto FIXTURE_PREFIX = "# fixture: "sv;
+    if (source->starts_with(FIXTURE_PREFIX))
+    {
+        const auto end = source->find('\n');
+        const auto name = source->substr(FIXTURE_PREFIX.size(), end - FIXTURE_PREFIX.size());
+        REQUIRE_FALSE(name.empty());
+        REQUIRE(name.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_") == std::string::npos);
+        const auto fixturePath = GetFolder() / "fixtures" / (name + ".py");
+        const auto fixture = FileUtils::ReadText(fixturePath);
+        REQUIRE(fixture.has_value());
+        REQUIRE_NOTHROW(vm.RunSource(*fixture, fixturePath.filename().string()));
+    }
     auto loaded = false;
     CHECK_NOTHROW((vm.RunSource(*source, file.filename().string()), loaded = true));
     if (loaded)

@@ -8,7 +8,7 @@ def snap(over=None):
     if over is None:
         over = Record({})
     _merged1 = {}
-    for _k, _v in {'journal': 'in_progress', 'inv': {}, 'worn': set(), 'no_progress': 0, 'bank_coins': 0}.items():
+    for _k, _v in {'journal': 'in_progress', 'stage': 1, 'bank_known': True, 'inv': {}, 'worn': set(), 'no_progress': 0, 'bank_coins': 0}.items():
         _merged1[_k] = _v
     for _k, _v in (over._fields if isinstance(over, Record) else over).items():
         _merged1[_k] = _v
@@ -43,11 +43,11 @@ def _fn2():
     def _fn6():
         s = decide(snap(Record({'worn': wearing('iron chainbody', 'bronze med helm'), 'inv': held('Cabbage')})))
         expect(s.kind).to_be('custom')
-        expect(s.kind == 'custom' and s.name).to_be('infiltrate')
+        expect(s.kind == 'custom' and s.name).to_be('listen at the grill')
     test('in progress, disguise worn, cabbage held → infiltrate', _fn6)
 
     def _fn7():
-        s = decide(snap(Record({'worn': wearing('iron chainbody', 'bronze med helm'), 'inv': {}})))
+        s = decide(snap(Record({'worn': wearing('iron chainbody', 'bronze med helm'), 'inv': {}, 'stage': 3})))
         expect(s.kind).to_be('talk')
         expect(s.kind == 'talk' and s.stop.npc).to_be('Sir Amik Varze')
     test('in progress, disguise worn, cabbage GONE (sabotaged) → talk Sir Amik', _fn7)

@@ -161,7 +161,7 @@ class QuestModule:
     # on its instance.
     def __init__(self, record=None, decide=None, on_start=None, hops=None, bank=None, grind=None, food=None, gather=None,
                  tools=None, exit=None, owns_inventory=False, food_ready=None, read_stage=None, read_progress=None,
-                 sustain=None, pray=None, coin_float=None, warn_readiness=None, observe=None, resume_at=None):
+                 sustain=None, pray=None, coin_float=None, warn_readiness=None, observe=None, resume_at=None, recover=None):
         self.record = record
         self.decide = decide
         self.on_start = on_start
@@ -183,3 +183,4 @@ class QuestModule:
         self.observe = observe
         # A one-way quest area must be left through its own quest before another queue entry can bank.
         self.resume_at = resume_at
+        self.recover = recover

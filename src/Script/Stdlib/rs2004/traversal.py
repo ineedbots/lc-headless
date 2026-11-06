@@ -25,7 +25,7 @@ from rs2004.interfaces import interfaces
 from rs2004.items import equipment, inventory
 from rs2004.messages import CANT_REACH, game_messages
 from rs2004.reach import close_op, is_open_barrier_leaf, is_openable_barrier, open_op
-from rs2004.routeplan import WEB_SLASH_KNIFE_NAME, crossings, essence_session, explain_unreachable, gate_item_candidates, is_quest_lock_dialogue, is_quest_lock_text
+from rs2004.routeplan import WEB_SLASH_KNIFE_NAME, WITHDRAW_COST, crossings, essence_session, explain_unreachable, gate_item_candidates, is_quest_lock_dialogue, is_quest_lock_text
 from rs2004.routeplan import missing_items_for_path, path_has_teleport, pick_choice, plan_bank_leg, post_quest_talk_for, records_have_slash_tool
 from rs2004.routeplan import resolve_path_follow_config, special_crossing_for_transport, teleport_by_id, virtualize_with_items
 from rs2004.settings import settings_store
@@ -686,6 +686,10 @@ class _Traversal:
         # fleet.
         state = world_state()
         direct_missing = missing_items_for_path(direct_waypoints, state) if direct is not None else self.last_missing_gate_items
+        direct_cost = None if direct is None or len(direct_missing) > 0 else direct['cost']
+        # No bank detour can beat a funded walk cheaper than withdrawing alone.
+        if direct_cost is not None and direct_cost <= WITHDRAW_COST:
+            return False
         if direct is not None and len(direct_missing) == 0 and path_has_teleport(direct_waypoints):
             return False
         stand_bank = nearest_bank(me, quest_statuses=state.get('quests'))
@@ -695,11 +699,14 @@ class _Traversal:
         to_bank = self._request(me, stand, max_expansions, policy, use_teleports, zones, state=state)
         if not to_bank['ok'] or len(missing_items_for_path(_waypoints(to_bank), state)) > 0:
             return False
+        # Prune before the expensive bank-to-destination search. All remaining
+        # route costs are nonnegative, so this detour already cannot win.
+        if direct_cost is not None and to_bank['cost'] + WITHDRAW_COST >= direct_cost:
+            return False
         bank_to_dest = self._request(stand, dest, max_expansions, policy, use_teleports, zones, virtualize_with_items(state, bank_items))
         if not bank_to_dest['ok']:
             return False
         bank_waypoints = _waypoints(bank_to_dest)
-        direct_cost = None if direct is None or len(direct_missing) > 0 else direct['cost']
         plan = plan_bank_leg(direct_cost, False, to_bank['cost'], bank_to_dest['cost'], missing_items_for_path(bank_waypoints, state))
         if plan.action != 'bank':
             return False

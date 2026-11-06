@@ -578,3 +578,23 @@ def _fn73():
 
 
 describe('Family Crest module wiring', _fn73)
+
+
+def ruby_recovery():
+    kit = [[FC_ID.PERFECT_GOLD_ORE, 2], [FC_ID.RING_MOULD, 1], [FC_ID.NECKLACE_MOULD, 1]]
+    state = snap(Record({'stage': FC_STAGE.SPOKEN_BOOT, 'inv_ids': kit, 'inv': [['Coins', 50000]]}))
+    state.bank_ids = {1619: 2}
+    expect(decide(state).items[0]['id']).to_be(1619)
+    state.bank_ids = {}
+    state.inv_ids[1619] = 2
+    expect(decide(state).item).to_be('Chisel')
+    state.inv_ids[1755] = 1
+    expect(decide(state).kind).to_be('use_on')
+    state.inv_ids.pop(1619)
+    state.no_progress = 2
+    expect(decide(state).kind).to_be('wait')
+    state.free_slots = 1
+    expect(decide(state).kind).to_be('deposit')
+
+
+test('Family Crest cuts banked or carried uncut rubies before retrying the limited shop', ruby_recovery)

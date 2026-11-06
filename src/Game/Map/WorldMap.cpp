@@ -3,6 +3,7 @@
 
 #include "../../Cache/GameCache_s.hpp"
 #include "../../Cache/LocType_s.hpp"
+#include "../../Cache/LocTypeResolver.hpp"
 #include "../../Cache/MapSquare.hpp"
 #include "../State/GameState_s.hpp"
 #include "../State/Zone_s.hpp"
@@ -38,7 +39,7 @@ WorldMap::WorldMap(std::shared_ptr<const GameCache_s> cache)
 
 void WorldMap::Update(const GameState_s& state)
 {
-    if (!state.buildArea.loaded || m_builtAt == state.sceneChangeCount)
+    if (!state.buildArea.loaded || (m_builtAt == state.sceneChangeCount && m_varps == state.varps))
     {
         return;
     }
@@ -51,6 +52,7 @@ void WorldMap::Clear()
     m_area = BuildArea_s{};
     m_builtAt.reset();
     m_changes.clear();
+    m_varps.clear();
 }
 
 const GameCache_s& WorldMap::GetCache() const
@@ -97,7 +99,11 @@ void WorldMap::VisitCachedLocs(TVisit visit) const
                 continue;
             }
 
-            visit(SceneLoc_s{.tile = tile, .layer = layer, .id = loc.id, .shape = loc.GetShape(), .angle = loc.GetAngle()}, localX, localZ);
+            const auto resolved = ResolveLoc({.tile = tile, .layer = layer, .id = loc.id, .shape = loc.GetShape(), .angle = loc.GetAngle()});
+            if (resolved)
+            {
+                visit(*resolved, localX, localZ);
+            }
         }
     }
 }
@@ -111,7 +117,7 @@ std::optional<SceneLoc_s> WorldMap::GetLoc(const Tile_s& tile, LocLayer_e layer)
 
     if (const auto* const change = FindChange(tile, layer))
     {
-        return SceneLoc_s{.tile = tile, .layer = layer, .id = change->id, .shape = change->shape, .angle = change->angle, .changed = true};
+        return ResolveLoc({.tile = tile, .layer = layer, .id = change->id, .shape = change->shape, .angle = change->angle, .changed = true});
     }
 
     if (!IsInScene(tile.x - m_area.baseX, tile.z - m_area.baseZ))
@@ -129,7 +135,7 @@ std::optional<SceneLoc_s> WorldMap::GetLoc(const Tile_s& tile, LocLayer_e layer)
     {
         if (LocShape::GetLayer(loc.GetShape()) == layer)
         {
-            return SceneLoc_s{.tile = tile, .layer = layer, .id = loc.id, .shape = loc.GetShape(), .angle = loc.GetAngle()};
+            return ResolveLoc({.tile = tile, .layer = layer, .id = loc.id, .shape = loc.GetShape(), .angle = loc.GetAngle()});
         }
     }
 
@@ -159,7 +165,11 @@ std::vector<SceneLoc_s> WorldMap::GetLocs(s32 level) const
             continue;
         }
 
-        locs.push_back({.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true});
+        const auto resolved = ResolveLoc({.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true});
+        if (resolved)
+        {
+            locs.push_back(*resolved);
+        }
     }
 
     return locs;
@@ -171,6 +181,7 @@ void WorldMap::Rebuild(const GameState_s& state)
 {
     m_area = state.buildArea;
     m_changes = state.locChanges;
+    m_varps = state.varps;
 
     for (auto& collision : m_collision)
     {
@@ -200,7 +211,7 @@ void WorldMap::Rebuild(const GameState_s& state)
 
     VisitCachedLocs([this](const SceneLoc_s& loc, s32 localX, s32 localZ)
     {
-        AddCollision(loc.tile.level, localX, localZ, loc.id, loc.shape, loc.angle);
+        AddCollision(loc.tile.level, localX, localZ, loc.visibleId, loc.shape, loc.angle);
     });
 
     for (const auto& change : m_changes)
@@ -212,7 +223,11 @@ void WorldMap::Rebuild(const GameState_s& state)
             continue;
         }
 
-        AddCollision(change.tile.level, localX, localZ, change.id, change.shape, change.angle);
+        const auto resolved = ResolveLoc({.tile = change.tile, .layer = change.layer, .id = change.id, .shape = change.shape, .angle = change.angle, .changed = true});
+        if (resolved)
+        {
+            AddCollision(change.tile.level, localX, localZ, resolved->visibleId, change.shape, change.angle);
+        }
     }
 
     m_builtAt = state.sceneChangeCount;
@@ -291,4 +306,15 @@ std::vector<const MapSquare*> WorldMap::GetSquares() const
     }
 
     return squares;
+}
+
+std::optional<SceneLoc_s> WorldMap::ResolveLoc(SceneLoc_s loc) const
+{
+    loc.visibleId = LocTypeResolver::ResolveId(*m_cache, m_varps, loc.id);
+    if (loc.id >= 0 && loc.visibleId < 0)
+    {
+        return std::nullopt;
+    }
+
+    return loc;
 }

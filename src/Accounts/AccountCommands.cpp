@@ -6,6 +6,7 @@
 #include "../Console/LogLevelNames.hpp"
 #include "../Console/LogLevel_e.hpp"
 #include "../Console/Logger.hpp"
+#include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/Protocol/WordPack.hpp"
 #include "../Script/ScriptCommand_s.hpp"
 #include "../Utils/StringUtils.hpp"
@@ -136,7 +137,14 @@ void AccountCommands::Say(Account* target, std::string_view text) const
         return;
     }
 
-    if (text.size() > WordPack::MAX_PACK_LENGTH)
+    const auto isCommand = text.starts_with("::");
+    if (isCommand && (text.size() == 2 || text.size() - 2 > ClientPackets::MAX_CHEAT_LENGTH || text.find('\n') != std::string_view::npos))
+    {
+        m_logger.Warning("A :: command needs 1 to {} characters on one line", ClientPackets::MAX_CHEAT_LENGTH);
+        return;
+    }
+
+    if (!isCommand && text.size() > WordPack::MAX_PACK_LENGTH)
     {
         m_logger.Warning("Public chat holds {} characters; the rest is cut off", WordPack::MAX_PACK_LENGTH);
         text = text.substr(0, WordPack::MAX_PACK_LENGTH);

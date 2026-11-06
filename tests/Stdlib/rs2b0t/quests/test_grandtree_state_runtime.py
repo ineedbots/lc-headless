@@ -65,6 +65,26 @@ def cached_journal():
 test('Grand Tree closes its journal, advances the cached stage and survives unreadable pages', cached_journal)
 
 
+def stale_journal_never_regresses():
+    scene = journal_world()
+    scene.journal_lines = ['King Narnode has seen the light.']
+    expect(run_wait(journal.read_grand_tree_stage())).to_be(GT_STAGE.SEARCHING_DACONIA)
+    scene.journal_lines = ['He has asked me to take a sample.']
+    scene.main_modal = 123
+    expect(run_wait(journal.read_grand_tree_stage())).to_be(GT_STAGE.SEARCHING_DACONIA)
+    expect(scene.main_modal).to_be(-1)
+    scene.journal_lines = ['Loading...']
+    expect(run_wait(journal.read_grand_tree_stage())).to_be(GT_STAGE.SEARCHING_DACONIA)
+    scene.status = 'not_started'
+    expect(run_wait(journal.read_grand_tree_stage())).to_be(GT_STAGE.NOT_STARTED)
+    scene.status = 'in_progress'
+    scene.journal_lines = ['He has asked me to take a sample.']
+    expect(run_wait(journal.read_grand_tree_stage())).to_be(GT_STAGE.STARTED)
+
+
+test('a stale journal page cannot return an earlier stage, while a new quest-list start resets the floor', stale_journal_never_regresses)
+
+
 def diagnostics():
     snap = QuestSnapshot()
     lines = tree.grandtree.observe(snap, Fake(kind='wait'))

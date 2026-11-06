@@ -32,6 +32,11 @@ def profile(skill, overrides=None):
     return Record(fields)
 
 
+def three_tick_fly_profile():
+    return profile('fish', {'method': 'three-tick-fly', 'label': '3-tick fly', 'use_knife_delay': True,
+                            'timed_reclick': True, 'native_cycle_ticks': 3})
+
+
 def off_profile(skill):
     return profile(skill)
 

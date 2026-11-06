@@ -90,6 +90,7 @@ namespace
     {
         Check(IsHost(server.host), "server.host", std::format("must be a host name or IPv4 address of 1 to {} letters, digits, '-' and '.'", MAX_HOST_LENGTH));
         Check(server.port >= 1 && server.port <= MAX_PORT, "server.port", std::format("must be from 1 to {}", MAX_PORT));
+        Check(server.world >= 0, "server.world", "must be zero (unknown) or a positive world number");
         Check(server.origin.empty() || StringUtils::IsPrintableAscii(server.origin), "server.origin", "must be empty or printable ASCII");
         Check(!server.tlsCaFile.empty(), "server.tlsCaFile", "must be a PEM file path, SYSTEM or NONE");
     }

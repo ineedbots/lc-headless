@@ -108,7 +108,7 @@ class Falls:
         yield
 
     def hold(self, item, count=1, use_on=None, interact=None):
-        thing = Fake(id=item.id, name=item.name, count=count,
+        thing = Fake(id=item.id, name=item.name, count=count, noted=False,
                      use_on=use_on if use_on is not None else (lambda other: True),
                      interact=interact if interact is not None else (lambda op: True))
         self.pack.append(thing)
@@ -307,7 +307,7 @@ def stalls():
         yield
     spy_on(wf, 'pickpocket_funding_man', impl=nothing)
     expect(run_wait(wf.farm_waterfall_coins(wf.VARROCK_MAN, 100, False, world.log))).to_be(False)
-    expect(world.logged('for 120s at the verified Man')).to_be(True)
+    expect(world.logged('at the verified Man')).to_be(True)
 
 
 test('two minutes without coins, XP or health change stops the farm', stalls)
@@ -554,7 +554,7 @@ def loots_tomb():
     world.locs = [world.loc(1757, ['Climb-up'], interact=world.moves(MAINLAND))]
     world.hp = 4
     expect(run_wait(wf.tomb_leg(world.log))).to_be(True)
-    expect(world.logged('Glarial tomb exit: cannot reach full health')).to_be(True)
+    expect(world.logged('Glarial tomb exit: healing stopped')).to_be(True)
 
 
 test("the tomb gives the amulet from the chest and the urn from the coffin, then is left by its ladder", loots_tomb)
@@ -568,13 +568,13 @@ def heals():
 
     def eat():
         world.hp += 2
-    world.on_sustain = eat
+    world.hold(wf.FOODS[0], interact=lambda op: eat() or True)
     expect(run_wait(wf.heal_to_full(world.log, 'test'))).to_be(True)
     expect(world.hp).to_be(10)
     world.hp = 6
-    world.on_sustain = None
+    world.pack.clear()
     expect(run_wait(wf.heal_to_full(world.log, 'test'))).to_be(False)
-    expect(world.logged('test: cannot reach full health')).to_be(True)
+    expect(world.logged('test: healing stopped')).to_be(True)
 
 
 test('healing to full stops when the food stops healing', heals)
@@ -667,6 +667,7 @@ def spend(world, thing):
     def use(target):
         thing._fields['count'] = thing.count - 1
         world.messages.append('You place the rune on the stand.'.lower())
+        world.messages.append('The rune stone disappears in a puff of smoke.'.lower())
         return True
     return use
 
@@ -709,6 +710,37 @@ def unplaced():
 
 
 test('a rune the server does not take stops the pillars', unplaced)
+
+
+def waits_for_rune_smoke():
+    world = Falls(PUZZLE)
+    pillar_room(world, placed=False)
+    thing = world.pack[0]
+
+    def start(target):
+        thing._fields['count'] = thing.count - 1
+        world.messages.append('you place the rune on the stand.')
+        return True
+
+    thing._fields['use_on'] = start
+    # Use the real wait: the first packet has consumed the rune, but the server
+    # is still delayed. No next interaction may start until the smoke arrives.
+    patch(execution, 'delay_until', _rune_delay_until)
+    placing = wf.place_rune(wf.RUNES[0], world.locs[0], world.log)
+    expect(isinstance(next(placing), execution.Update)).to_be(True)
+    world.messages.append('the rune stone disappears in a puff of smoke.')
+    expect(run_wait(placing)).to_be(True)
+
+    def duplicate(target):
+        world.messages.append('you remember putting that type of rune there.')
+        return True
+
+    thing._fields['use_on'] = duplicate
+    expect(run_wait(wf.place_rune(wf.RUNES[0], world.locs[0], world.log))).to_be(True)
+
+
+_rune_delay_until = execution.delay_until
+test('rune consumption waits for smoke while duplicate placements finish immediately', waits_for_rune_smoke)
 
 
 def key():
@@ -921,3 +953,53 @@ def reads_book_with_log():
 
 
 test("reading the book takes the log a custom step's run is handed", reads_book_with_log)
+
+
+def cake_fallback(mode):
+    def run():
+        behavior = mode
+        world = Falls()
+        fighting = [mode == 'combat']
+        spy_on(wf.game, 'in_combat', impl=lambda: fighting[0])
+        spy_on(wf.event_signal, 'pending', returns=mode == 'event')
+        spy_on(wf.skills, 'level', returns=1 if mode in ['training', 'training-failed'] else 10)
+        def train(anchor, target, kebabs_available, log, thieving_target):
+            expect(anchor).to_equal(Tile(2567, 3384, 0))
+            expect(thieving_target).to_be(5)
+            return result(behavior != 'training-failed')
+        spy_on(wf, 'farm_waterfall_coins', impl=train)
+        def cakes(abort, set_status, log, fill_to=None):
+            expect(abort()).to_be(False)
+            expect(fill_to).to_be(wf.FOOD_TARGET)
+            world.hold(wf.FOODS[0], count=8)
+            return 'stocked'
+            yield
+        spy_on(wf, 'steal_cakes', impl=cakes)
+        if mode == 'remote':
+            world.at = TOMB
+        if mode in ['walk-failed', 'flee-failed']:
+            world.walk_ok = False
+        if mode == 'flee-failed':
+            fighting[0] = True
+        if mode == 'combat':
+            world.on_tick = lambda: fighting.__setitem__(0, False)
+        expect(run_wait(wf.steal_waterfall_cakes(world.log))).to_be(mode in ['stocked', 'training', 'combat'])
+    return run
+
+
+for mode in ['stocked', 'training', 'training-failed', 'walk-failed', 'event', 'remote', 'combat', 'flee-failed']:
+    test('Waterfall cake fallback handles ' + mode, cake_fallback(mode))
+
+
+def cake_helper_runtime():
+    import rs2004.catalogs.thieving as thieving
+    world = Falls()
+    world.hold(wf.FOODS[0], count=wf.FOOD_TARGET)
+    spy_on(wf.game, 'in_combat', returns=False)
+    spy_on(wf.event_signal, 'pending', returns=False)
+    spy_on(thieving, '_listen', returns=None)
+    expect(run_wait(wf.steal_waterfall_cakes(world.log))).to_be(True)
+    expect(world.logged('stocked 8 stall food')).to_be(True)
+
+
+test('Waterfall invokes the real cake helper in the embedded runtime', cake_helper_runtime)

@@ -28,6 +28,7 @@ QUEST_OPTION_IDS = sorted([d.record.id for d in QUEST_DEFS], key=lambda id: QUES
 FALLBACK_FOOD = 'Lobster'
 
 AIO_SETTINGS = {
+    'gather_wilderness_planks': SettingDef('boolean', True, 'Gather Wilderness planks', help='Dragon Slayer gathers missing planks in the Wilderness; disable to require banked planks'),
     'arrav_gang': SettingDef('string', 'random', 'Shield of Arrav gang', options=ARRAV_GANG_OPTIONS),
     'arrav_partner': SettingDef('string', '', 'Shield of Arrav partner', help='character name of the partner in the other gang'),
     'arrav_certs': SettingDef('number', 2, 'Arrav certificates', min=1, help='certificates to mint before splitting with the partner'),
@@ -68,6 +69,9 @@ class AIOQuester(TaskBot):
     loop_delay = 600
 
     def on_start(self):
+        from rs2004.quests.defs.dragonslayer.supplies import DragonSupplies
+        self.previous_wilderness_planks = DragonSupplies.wilderness_planks
+        DragonSupplies.wilderness_planks = self.settings.bool('gather_wilderness_planks', True)
         self.status = 'starting'
         self.rows = []
         self.running_id = None
@@ -88,8 +92,7 @@ class AIOQuester(TaskBot):
         self.quest_since = self.started_at
 
         every = [d.record.id for d in QUEST_DEFS]
-        chosen = [id for id in self.settings.list('quests', []) if id in every]
-        self.picked = set(chosen if len(chosen) > 0 else every)
+        self.picked = set(selected_options(self.settings.list('quests', []), every))
 
         self.on('chat_message', self.heard)
         self.command('skip', self.request_skip, help='give up the running quest for this session and go on with the queue')
@@ -113,6 +116,8 @@ class AIOQuester(TaskBot):
         self.add(ContinueDialog(), EatFood(self), self.engine)
 
     def on_stop(self, reason):
+        from rs2004.quests.defs.dragonslayer.supplies import DragonSupplies
+        DragonSupplies.wilderness_planks = getattr(self, 'previous_wilderness_planks', True)
         event_signal.set_interrupt(None)
         sustain.set(None)
         set_quest_prayer(None, None)

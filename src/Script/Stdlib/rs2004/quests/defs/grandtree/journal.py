@@ -70,4 +70,4 @@ def read_grand_tree_stage():
         yield from execution.delay_ticks(1)
     if parsed is not None and (last_stage is None or parsed > last_stage):
         last_stage = parsed
-    return (parsed if parsed is not None else last_stage)
+    return last_stage

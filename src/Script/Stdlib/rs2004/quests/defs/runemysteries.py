@@ -2,6 +2,9 @@
 Sedridor under the Wizards' Tower, his package to Aubury, and Aubury's notes back."""
 
 from rs2004.geometry import Tile
+from rs2004.tabs import quests
+from rs2004.dialogue import modals
+from rs2004.quests.journal_text import normalize_journal
 from rs2004.quests.data import quest_record
 from rs2004.quests.engine.types import QuestModule, quest_step
 from rs2004.quests.exec.primitives import LadderHop, NpcStop
@@ -32,14 +35,44 @@ def decide(snap):
         return quest_step('wait', reason='quest journal not loaded')
     if snap.journal == 'not_started':
         return _talk(DUKE)
-    # Why: Sedridor takes one talisman and leaves any extras; the package is the delivery to Aubury.
-    if 'notes' in snap.inv:
+    stage = snap.progress.stage if snap.progress is not None else snap.stage
+    if stage == 2:
         return _talk(SEDRIDOR)
-    if 'research package' in snap.inv:
+    if stage == 4:
         return _talk(AUBURY)
-    if 'air talisman' in snap.inv:
-        return _talk(SEDRIDOR)
+    for name, stop in [('Notes', SEDRIDOR), ('Research package', AUBURY), ('Air talisman', SEDRIDOR)]:
+        if snap.inv.get(name.lower(), 0) > 0:
+            return _talk(stop)
+        if (snap.bank or {}).get(name.lower(), 0) > 0:
+            return quest_step('withdraw', items=[{'name': name, 'qty': 1}])
+    if not snap.bank_known:
+        return quest_step('scan_bank')
     return _talk(RECOVER_PROBES[snap.no_progress % len(RECOVER_PROBES)])
+
+
+def parse_rune_mysteries_journal(lines):
+    text = normalize_journal(lines)
+    needles = ['i can start this quest by speaking to', 'i need to find the head wizard',
+               'i should talk to the head wizard again', 'i should take this research package',
+               'i should speak to aubury again', 'i should take the notes to sedridor', 'quest complete!']
+    for stage, needle in enumerate(needles):
+        if needle in text:
+            return stage
+    return None
+
+
+def read_stage():
+    status = quests.status(runemysteries.record.name)
+    if status == 'complete':
+        return 6
+    if status == 'not_started':
+        return 0
+    if status != 'in_progress':
+        return None
+    lines = yield from quests.journal(runemysteries.record.name)
+    stage = parse_rune_mysteries_journal(lines)
+    yield from modals.close_if_open()
+    return stage
 
 
 runemysteries = QuestModule(
@@ -47,5 +80,6 @@ runemysteries = QuestModule(
     bank=Tile(3093, 3243, 0),
     tools=['air talisman', 'research package', 'notes'],
     hops=WIZARD_HOPS,
+    read_stage=read_stage,
     decide=decide,
 )

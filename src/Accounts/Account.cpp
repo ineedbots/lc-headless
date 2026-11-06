@@ -87,6 +87,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .stallMinutes = m_account.stallMinutes,
                 .runAuto = m_account.runAuto,
                 .runEnergyMin = m_account.runEnergyMin,
+                .world = m_config->server.world,
             },
             m_logger);
         // clang-format on
@@ -430,7 +431,7 @@ bool Account::Say(std::string_view text)
         return false;
     }
 
-    m_client.Send(m_client.GetPackets().MessagePublic(text));
+    m_client.Send(text.starts_with("::") ? m_client.GetPackets().ClientCheat(text.substr(2)) : m_client.GetPackets().MessagePublic(text));
     return true;
 }
 

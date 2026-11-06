@@ -4,6 +4,7 @@
 
 #include "Cache/CacheLoader.hpp"
 #include "Cache/GameCache_s.hpp"
+#include "Cache/LocType_s.hpp"
 #include "Cache/MapSquare.hpp"
 #include "Config/Revision_e.hpp"
 #include "Game/Interface/ChatDialog.hpp"
@@ -524,4 +525,34 @@ TEST_CASE("Real cache animation lengths expire entity animations on the correct 
     CHECK(EntityStatus::GetAnimation(entity, 107, length) == -1);
     CHECK_FALSE(cache.FindSeqLength(-1).has_value());
     CHECK_FALSE(cache.FindSeqLength(static_cast<s32>(cache.seqLengths.size())).has_value());
+}
+
+TEST_CASE("Real caches validate varbit and multiloc references by revision", "[RealCache]")
+{
+    const auto revision = GENERATE(Revision_e::Rev225, Revision_e::Rev274, Revision_e::Rev289);
+    const auto& cache = RealCache::Require(revision);
+    if (revision != Revision_e::Rev289)
+    {
+        CHECK(cache.varbits.empty());
+        CHECK(std::ranges::none_of(cache.locs, [](const LocType_s& loc)
+        {
+            return !loc.multiloc.empty();
+        }));
+        return;
+    }
+
+    REQUIRE_FALSE(cache.varbits.empty());
+    for (const auto& loc : cache.locs)
+    {
+        if (loc.multiloc.empty())
+        {
+            continue;
+        }
+
+        REQUIRE(loc.multivarbit < cache.varbits.size());
+        for (const auto id : loc.multiloc)
+        {
+            CHECK((id == -1 || cache.FindLoc(id) != nullptr));
+        }
+    }
 }

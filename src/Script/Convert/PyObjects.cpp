@@ -78,14 +78,16 @@ void PyObjects::FromLoc(py_OutRef out, const SceneLoc_s& loc, const GameCache_s&
     const auto object = NewInstance(out, LOC_CLASS);
     SetInt(object, "id", loc.id);
 
-    const auto* const type = cache.FindLoc(loc.id);
+    const auto visibleId = loc.visibleId == -2 ? loc.id : loc.visibleId;
+    SetInt(object, "type_id", visibleId);
+    const auto* const type = cache.FindLoc(visibleId);
     SetOptionalString(object, "name", type == nullptr ? std::string_view{} : type->name);
     SetBool(object, "changed", loc.changed);
     SetTile(object, loc.tile);
     SetInt(object, "shape", loc.shape);
     SetInt(object, "angle", loc.angle);
     SetInt(object, "layer", static_cast<s64>(loc.layer));
-    SetMenu(object, Menus::GetLocMenu(cache, loc.id));
+    SetMenu(object, Menus::GetLocMenu(cache, visibleId));
 }
 
 void PyObjects::FromProjectile(py_OutRef out, const Projectile_s& projectile)
@@ -426,6 +428,8 @@ void PyObjects::SetEntity(py_Ref object, const Entity_s& entity, u64 tick, const
     SetInt(object, "index", entity.index);
     SetTile(object, entity.tile);
     SetInt(object, "animation", EntityStatus::GetAnimation(entity, tick, cache.FindSeqLength(entity.animation.id)));
+    SetInt(object, "animation_id", entity.animation.id);
+    SetInt(object, "animation_tick", static_cast<s64>(entity.animation.tick));
     SetBool(object, "moving", EntityStatus::IsMoving(entity, tick));
     SetBool(object, "in_combat", EntityStatus::InCombat(entity, tick));
 

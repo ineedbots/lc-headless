@@ -747,6 +747,17 @@ def stock(snap, wants):
     return short[0].source(snap, short[0].need)
 
 
+def hire_ned(snap):
+    if aboard(snap.tile):
+        return custom('go ashore', leave_ship)
+    if held_id(snap, DS_ID.MAP) == 0:
+        if not snap.bank_known:
+            return Record({'kind': 'scan_bank'})
+        if banked_id(snap, DS_ID.MAP) > 0:
+            return Record({'kind': 'withdraw', 'items': [{'name': DS_ITEM.MAP, 'id': DS_ID.MAP, 'qty': 1}]})
+    return Record({'kind': 'talk', 'stop': NED_HIRE})
+
+
 def hull_errand(snap):
     """The next thing the hull needs that the pack lacks, or null once hammer, nails and planks are all aboard."""
     # Why: a hole takes one plank and four nails together, as lady_lumbridge.rs2 inv_dels both, so what is owed is four nails per plank still to be placed and never the twelve the hull costs.
@@ -787,7 +798,7 @@ def hull_errand(snap):
     planks_to_fetch = (SHIP_REPAIR.planks if in_plank_graveyard(snap.tile) else planks_wanted)
     # Why: smithing belongs to the boat leg rather than the shopping, as it is eighteen slots of ore and wants the pack the map pieces and the Oracle's four charms were using.
     # Why: the hammer comes before it, as the anvil answers nothing without one, and the planks after, as three slots the ore leg would only bank and draw again.
-    return stock(snap, [bought(DS_ID.HAMMER, DS_ITEM.HAMMER), nails, bought(DS_ID.PLANK, DS_ITEM.PLANK, planks_to_fetch)])
+    return stock(snap, [bought(DS_ID.HAMMER, DS_ITEM.HAMMER), nails]) or stock(snap, [bought(DS_ID.PLANK, DS_ITEM.PLANK, planks_to_fetch)])
 
 
 def decide(snap):
@@ -883,19 +894,14 @@ def decide(snap):
             return for_ship
         return Record({'kind': 'talk', 'stop': KLARENSE})
     if stage == DRAGON_STAGE.BOUGHT_SHIP:
+        if has_flag(snap.progress, 'ship-repaired'):
+            return hire_ned(snap)
         errand = hull_errand(snap)
         if errand:
-            return (custom('go ashore', leave_ship) if aboard(snap.tile) else errand)
-        # Why: hiring Ned leaves no journal trace, so the repair, which the journal can confirm, gates it.
-        if not has_flag(snap.progress, 'ship-repaired'):
-            return custom('patch the Lady Lumbridge', repair_ship)
-        return Record({'kind': 'talk', 'stop': NED_HIRE})
+            return custom('go ashore', leave_ship) if aboard(snap.tile) else errand
+        return custom('patch the Lady Lumbridge', repair_ship)
     if stage == DRAGON_STAGE.REPAIRED_SHIP:
-        # The patch leaves the bot a deck below where it boarded, off the nav graph.
-        if aboard(snap.tile):
-            return custom('go ashore', leave_ship)
-        # Hire and hand-over are two dialogues: the first visit gets his promise, the second takes the map.
-        return Record({'kind': 'talk', 'stop': NED_HIRE})
+        return hire_ned(snap)
     if stage == DRAGON_STAGE.NED_GIVEN_MAP:
         here = snap.tile
         if here and here.level >= 3:

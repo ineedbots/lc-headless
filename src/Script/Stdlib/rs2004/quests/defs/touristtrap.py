@@ -2444,8 +2444,6 @@ def decide(snap):
         route = safe_recovery_route(area)
         if route:
             return route
-        if area == 'campSurface' or area == 'campUpper':
-            return custom('leave camp to visit Al Shabim', leave_camp)
         item_space = make_critical_item_space(snap)
         if item_space:
             return item_space
@@ -2480,8 +2478,6 @@ def decide(snap):
         route = safe_recovery_route(area)
         if route:
             return route
-        if area == 'campSurface' or area == 'campUpper':
-            return custom('leave camp with the technical plans', leave_camp)
         south = route_south(snap)
         return (south if south is not None else custom('show the technical plans to Al Shabim', show_plans_to_al))
     if stage == TOURIST_TRAP_STAGE.SHOWN_PLANS:

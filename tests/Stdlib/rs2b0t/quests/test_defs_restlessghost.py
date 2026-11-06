@@ -15,6 +15,7 @@ def snap(journal, inv=None, worn=None):
         'worn': set(worn),
         'no_progress': 0,
         'bank_coins': 0,
+        'bank_known': True,
     }))
 
 

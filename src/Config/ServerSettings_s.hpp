@@ -8,6 +8,7 @@ struct ServerSettings_s
     std::string host;
     // An s32, not a u16, so 70000 fails validation instead of wrapping to a valid port.
     s32 port = 0;
+    s32 world = 0;
     std::string origin;
     std::string tlsCaFile = "SYSTEM";
 };

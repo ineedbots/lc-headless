@@ -3,6 +3,17 @@
 # three. rs2b0t's JiveCrafting (MIT, see thirdparty/rs2b0t).
 
 from rs2004.catalogs import ContinueDialog
+from rs2004.bank import banking
+
+BALL_OF_WOOL = 1759
+AMULETS = [
+    ('Gold amulet', 1673, 1692),
+    ('Sapphire amulet', 1675, 1694),
+    ('Emerald amulet', 1677, 1696),
+    ('Ruby amulet', 1679, 1698),
+    ('Diamond amulet', 1681, 1700),
+    ('Dragonstone amulet', 1683, 1702),
+]
 
 GOLD_BAR = 'Gold bar'
 PACK = 28
@@ -59,7 +70,12 @@ JEWELLERY = [
 PRODUCT_OPTIONS = [j.label for j in JEWELLERY]
 
 SETTINGS = {
-    'product': SettingDef('string', 'Sapphire ring', 'Product', options=PRODUCT_OPTIONS, help='which gold jewel to make this session'),
+    'mode': SettingDef('string', 'Craft jewellery', 'Mode', options=['Craft jewellery', 'String amulets']),
+    'product': SettingDef('string', 'Sapphire ring', 'Product', options=PRODUCT_OPTIONS, help='which gold jewel to make this session',
+                          show_if={'key': 'mode', 'any_of': ['Craft jewellery']}),
+    'amulet': SettingDef('string', 'Gold amulet', 'Amulet to string', options=[amulet[0] for amulet in AMULETS],
+                         help='Uses banked unstrung amulets and balls of wool at the nearest bank.',
+                         show_if={'key': 'mode', 'any_of': ['String amulets']}),
 }
 
 
@@ -262,6 +278,70 @@ class Craft(Task):
         bot.made += max(0, before - inventory.count(GOLD_BAR))
 
 
+class StringAmulets(Task):
+    def __init__(self, bot, amulet):
+        Task.__init__(self, label='string amulets')
+        self.bot = bot
+        self.amulet = amulet
+
+    def validate(self):
+        return not chat_dialog.can_continue()
+
+    def execute(self):
+        if event_signal.pending():
+            return
+        bot = self.bot
+        label, raw_id, strung_id = self.amulet
+        if inventory.count_by_id(raw_id) > 0 and inventory.count_by_id(BALL_OF_WOOL) > 0:
+            if bank.is_open():
+                closed = yield from bank.close()
+                if not closed:
+                    return
+            wool = ([item for item in inventory.items() if item.id == BALL_OF_WOOL] or [None])[0]
+            raw = ([item for item in inventory.items() if item.id == raw_id] or [None])[0]
+            if wool is None or raw is None:
+                return
+            bot.status = f'stringing {label}'
+            before = inventory.count_by_id(strung_id)
+            if not wool.use_on(raw):
+                return
+            yield from execution.delay_until(lambda: inventory.count_by_id(strung_id) > before or chat_dialog.can_continue() or event_signal.pending(), 4000)
+            bot.made += max(0, inventory.count_by_id(strung_id) - before)
+            return
+        bot.status = 'banking amulets'
+        opened = yield from banking.open(log=bot.log)
+        if not opened:
+            return
+        products = inventory.count_by_id(strung_id)
+        yield from bank.deposit_inventory()
+        emptied = yield from execution.delay_until(lambda: bank.is_open() and inventory.used() == 0, 4000)
+        if not emptied:
+            return
+        ready = yield from bank.wait_ready()
+        if not ready:
+            return
+        bot.trips += 1
+        bot.banked += products
+        raw_count = bank.count_by_id(raw_id)
+        wool_count = bank.count_by_id(BALL_OF_WOOL)
+        if raw_count < 1 or wool_count < 1:
+            yield from bank.close()
+            bot.status = 'stopped'
+            missing = f'unstrung {label}' if raw_count < 1 else 'Ball of wool'
+            bot.request_finish(f'[crafting] the bank has no {missing}')
+            return
+        pairs = min(14, raw_count, wool_count)
+        bot.status = f'withdrawing {pairs} amulets and balls of wool'
+        yield from bank.set_note_mode(False)
+        drawn = yield from bank.withdraw_x_by_id(raw_id, pairs)
+        if not drawn:
+            return
+        drawn = yield from bank.withdraw_x_by_id(BALL_OF_WOOL, pairs)
+        if not drawn:
+            return
+        yield from bank.close()
+
+
 class JiveCrafting(TaskBot):
     loop_delay = 600
 
@@ -271,6 +351,15 @@ class JiveCrafting(TaskBot):
         self.trips = 0
         self.banked = 0
         self.xp_start = skills.xp('crafting')
+        self.amulet = None
+        if self.settings.str('mode', 'Craft jewellery') == 'String amulets':
+            pick = self.settings.str('amulet', 'Gold amulet').strip().lower()
+            self.amulet = ([amulet for amulet in AMULETS if amulet[0].lower() == pick] or [None])[0]
+            if self.amulet is None:
+                self.request_finish(f"[crafting] unknown amulet '{pick}'")
+                return
+            self.add(ContinueDialog(), StringAmulets(self, self.amulet))
+            return
         pick = self.settings.str('product', 'Sapphire ring')
         jewel = jewel_by_name(pick)
         self.jewel = jewel if jewel is not None else JEWELLERY[1]
@@ -286,7 +375,7 @@ class JiveCrafting(TaskBot):
         self.add(ContinueDialog(), BankTrip(self), Craft(self))
 
     def recovery_anchor(self):
-        return BANK_STAND
+        return None if self.amulet else BANK_STAND
 
     def pack(self):
         return PackState(inventory.contains(self.jewel.mould), inventory.count(GOLD_BAR), inventory.count(self.jewel.gem) if self.jewel.gem else 0)
@@ -295,6 +384,11 @@ class JiveCrafting(TaskBot):
         return decide(self.pack(), self.jewel)
 
     def on_progress_report(self):
+        if self.amulet:
+            label, raw_id, strung_id = self.amulet
+            return {'Status': self.status, 'Product': label, 'Made': self.made, 'Trips': self.trips, 'Banked': self.banked,
+                    'Crafting xp': skills.xp('crafting') - self.xp_start, 'Unstrung': inventory.count_by_id(raw_id),
+                    'Balls of wool': inventory.count_by_id(BALL_OF_WOOL), 'Strung': inventory.count_by_id(strung_id)}
         pack = self.pack()
         return {'Status': self.status, 'Product': self.jewel.label, 'Made': self.made, 'Trips': self.trips, 'Banked': self.banked,
                 'Crafting xp': skills.xp('crafting') - self.xp_start, 'Bars': pack.bars, 'Can make': craftable(pack, self.jewel)}
@@ -303,7 +397,7 @@ class JiveCrafting(TaskBot):
 BOT = define_bot(
     name='JiveCrafting',
     create=JiveCrafting,
-    description='Makes one gold jewel picked from the dropdown at the Al Kharid furnace: banks for the mould, the gold bars and the gems, uses a bar on the furnace, clicks the biggest Make button that fits the load and walks back with it. Stops honestly when the bank runs out of any of the three.',
+    description='Crafts gold jewellery at the Al Kharid furnace, or strings banked amulets with balls of wool at the nearest bank. Stops when the required bank supplies run out.',
     category='Crafting',
     tags=['crafting', 'jewellery', 'al kharid', 'banking', 'afk'],
     settings_schema=SETTINGS,

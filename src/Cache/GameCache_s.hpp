@@ -7,6 +7,7 @@
 #include "NpcType_s.hpp"
 #include "ObjType_s.hpp"
 #include "TextPool.hpp"
+#include "VarbitType_s.hpp"
 
 // The CRCs of a 225 map square's files as the cache holds them, to compare with the ones REBUILD_NORMAL
 // sends. Nullopt for a file the cache doesn't have.
@@ -39,6 +40,7 @@ struct GameCache_s
     TextPool text;
     // Index i holds the type whose id is i.
     std::vector<LocType_s> locs;
+    std::vector<VarbitType_s> varbits;
     std::vector<NpcType_s> npcs;
     std::vector<ObjType_s> objs;
     // Keyed by MapSquare::GetId.

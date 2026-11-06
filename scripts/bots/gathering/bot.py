@@ -42,7 +42,9 @@ from bots.gathering.tasks import MaintainWildernessMinerStance, MinerEatFood, Re
 from bots.gathering.tasks import TannerfishSustain, TrimKnifeDelayLogs, UpgradeGatherTool, WaitStickyCombat
 from bots.gathering.tick_manip import FLETCHABLE_LOG_NAMES, KNIFE_DELAY_MAKE_MATCH, SHORTBOW_NAMES, TICK_MANIP_KNIFE, extra_delay_logs_to_drop
 from bots.gathering.tick_manip import is_fletchable_log_name, is_shortbow_name, mining_rate_for_pickaxe, profile_for_setting
-from bots.gathering import tool_acquire_exec
+from bots.gathering import tool_acquire_exec, three_tick
+from bots.gathering.tick_manip import three_tick_fly_profile
+from rs2004.catalogs.fishing import FishingMethod, FishingGearPiece
 
 LOCAL_BURN_HALF = 8
 INVENTORY_TAB = 3
@@ -430,6 +432,16 @@ class GatheringBot(TaskBot):
         skill = 'fish' if self.fishing else ('mine' if self.mining() else ('wc' if self.woodcutting() else None))
         label = self.settings.str('tick_manip', 'Off') if skill is not None and 'tick_manip' in raw else 'Off'
         self.tick_manip = profile_for_setting(skill or 'mine', label)
+        if self.fishing and self.settings.bool('three_tick_fly', False):
+            if self.fish_method.op != 'Lure':
+                raise RuntimeError('3-tick fly requires Fly fishing — trout/salmon')
+            if self.mule_mode != 'off' or self.cook_mode != 'off':
+                raise RuntimeError('3-tick fly requires mule and cooking modes Off')
+            self.tick_manip = three_tick_fly_profile()
+            self.fish_method = FishingMethod(self.fish_method.name, self.fish_method.op, self.fish_method.pair,
+                                             list(self.fish_method.gear) + [FishingGearPiece('Knife'), FishingGearPiece('Logs')])
+            self.log('3-tick fly: drops catches in each batch; bank trips restock gear and feathers')
+            return
         if self.tick_manip.method == 'off':
             return
         if self.power_mode:

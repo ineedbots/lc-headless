@@ -8,7 +8,23 @@ file's script.settings["<namespace>"]. The Global namespace holds rs2b0t's accou
 import _core
 from rs2004.geometry import Tile
 
-__all__ = ['SettingDef', 'SettingsBag', 'settings_store', 'GLOBAL_SETTINGS']
+__all__ = ['SettingDef', 'SettingsBag', 'settings_store', 'GLOBAL_SETTINGS', 'selected_options', 'signed_options']
+
+
+def selected_options(values, options):
+    if not values:
+        return list(options)
+    choices = {}
+    for value in values:
+        token = value.strip().lower()
+        id = token[1:] if token.startswith('+') or token.startswith('-') else token
+        choices[id] = not token.startswith('-')
+    return [option for option in options if choices.get(option.lower()) is True]
+
+
+def signed_options(values, options):
+    selected = selected_options(values, options)
+    return [('+' if option in selected else '-') + option for option in options]
 
 TYPES = ('boolean', 'number', 'string', 'string[]', 'tile')
 

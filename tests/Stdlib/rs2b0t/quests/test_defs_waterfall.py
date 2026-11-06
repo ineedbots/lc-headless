@@ -288,7 +288,7 @@ def _fn28():
     # Why: refilling on any shortfall walked the run back to Ardougne for a single fish, and the walker
     # was still following the route to the falls when the next decision turned it round.
     def pack(held):
-        return snapshot(stage=WATERFALL_STAGE.ENTERED_WATERFALL, inv=[[ITEM.FOOD, held]], bank=[[ITEM.FOOD, 100]])
+        return snapshot(stage=WATERFALL_STAGE.ENTERED_WATERFALL, inv=[[ITEM.FOOD, held]], bank=[[ITEM.FOOD, 100]], tile=[2510, 3464, 0])
 
     def _fn29():
         for held in [8, 7, 6, 5, 4]:
@@ -302,8 +302,8 @@ def _fn28():
 
     def _fn31():
         dry = snapshot(stage=WATERFALL_STAGE.ENTERED_WATERFALL, inv=[[ITEM.FOOD, 1]], bank=[])
-        expect((source_food(dry).kind if source_food(dry) is not None else None)).to_be('wait')
-    test('an empty bank parks rather than walking there for nothing', _fn31)
+        expect((source_food(dry).kind if source_food(dry) is not None else None)).to_be('custom')
+    test('an empty bank falls back to gathering cakes', _fn31)
 
 
 describe('food is refilled at a low mark, not on every bite', _fn28)
@@ -608,8 +608,8 @@ def _fn92():
     test('owns its exact loadout and stage oracle', _fn93)
 
     def _fn94():
-        expect(waterfall.sustain).to_equal(Record({'foods': [], 'eat_below_hp': 1}))
-    test('names no food of its own, so the configured one is what gets eaten', _fn94)
+        expect(waterfall.sustain).to_equal(Record({'foods': ['Cake', 'Bread', 'Chocolate slice'], 'eat_below_hp': 1}))
+    test('sustains on cakes and the configured food', _fn94)
 
 
 describe('Waterfall module wiring', _fn92)

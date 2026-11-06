@@ -1,15 +1,17 @@
 """Lists what of rs2b0t (MIT, see thirdparty/rs2b0t) the standard library doesn't have yet, by the snake_case
 names of rs2b0t's exports. A name counts as ported when it appears in the stdlib or the stubs; NOT_PORTED
-lists what's left out on purpose (docs/design/BotApiParityDesign.md §1). Run with CPython:
+lists what's left out on purpose (docs/design/BotApiDesign.md §15). Run with CPython:
 
     python -I tools/port/coverage.py ../rs2b0t                  # the public API, index.d.ts
     python -I tools/port/coverage.py ../rs2b0t api/thieving     # each module under src/bot/api/thieving
     python -I tools/port/coverage.py ../rs2b0t --bots           # each bot's imports from outside its folder
+    python -I tools/port/coverage.py ../rs2b0t --all            # public API, modules, runtime, data and bot imports
 
 It exits with 1 when something is missing, so a phase's "Done when" can run it.
 """
 
 import os
+import json
 import re
 import sys
 
@@ -26,6 +28,7 @@ NOT_PORTED_FILES = (
     'runtime/desktopStorage.ts', 'runtime/BotClient.ts', 'event/webwalk/cameraFollow.ts', 'event/webwalk/pathOverlay.ts',
     'event/webwalk/pathPaintTheme.ts', 'event/webwalk/pathScenePaint.ts', 'event/webwalk/pathPublish.ts',
     'event/webwalk/NavWorker.ts', 'api/ai/clues/cluePaint.ts',
+    'event/webwalk/coverageLogic.ts', 'event/webwalk/data/navTargets.ts', 'event/webwalk/navPack.ts',
 )
 # Left out on purpose: single names, by the module that exports them.
 NOT_PORTED_NAMES = {
@@ -37,6 +40,9 @@ NOT_PORTED_NAMES = {
     'runtime/BotHost.ts': {'BotHost'},
     'runtime/Scheduler.ts': {'Scheduler'},
     'runtime/ScriptContext.ts': {'ScriptAborted', 'ScriptContext'},
+    'runtime/defineBot.ts': {'registerScript'},
+    'data/fishingMethods.ts': {'THREE_TICK_FLY_GEAR', 'withThreeTickFlyGear'},
+    'runtime/Settings.ts': {'settingOptionLabel', 'MAP_PICKER_SETTINGS_NS', 'MAP_PICKER_SETTINGS', 'LOADOUT_SETTINGS_NS', 'LOADOUT_SETTINGS', 'PRICE_BOOK_SETTINGS'},
     # The navigator here plans at once, so nearest_walkable_bank and bank_cost_for_navigator serve both.
     'api/bank/BankLocations.ts': {'nearestWalkableBankAsync', 'bankCostForFinder'},
     # rs2b0t's 289 component ids for the staff spell chooser; spell_button_com finds the buttons by shape.
@@ -44,6 +50,36 @@ NOT_PORTED_NAMES = {
     # rs2b0t's 289 modal ids for the duel screens; rs2004.duel finds each screen by its text.
     'api/duel/Duel.ts': {'DUEL_SELECT_MODAL', 'DUEL_CONFIRM_MODAL', 'DUEL_WIN_MODAL'},
 }
+
+
+def replacements():
+    """Audited exports folded into the native core, generated data or a differently shaped Python facade.
+
+    Each entry names exact upstream exports, a local implementation and an anchor in that file. New upstream
+    exports still fail the check; a missing implementation or anchor fails too. This is a name/surface audit,
+    like present(), not a proof that two implementations behave identically.
+    """
+    with open(os.path.join(HERE, 'replacements.json'), encoding='utf-8') as f:
+        rows = json.load(f)
+    result = {}
+    for row in rows:
+        with open(os.path.join(ROOT, row['implementation']), encoding='utf-8') as f:
+            source = f.read()
+        if row['anchor'] not in source:
+            raise ValueError(f"missing port anchor {row['implementation']}: {row['anchor']}")
+        for name in row['exports']:
+            key = (row['module'], name)
+            if key in result:
+                raise ValueError(f'duplicate replacement: {key}')
+            result[key] = row['implementation']
+    return result
+
+
+REPLACEMENTS = replacements()
+
+
+def implemented(hay, module, name):
+    return present(hay, name) or (module, name) in REPLACEMENTS
 
 EXPORT = re.compile(r'^export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:abstract\s+)?(function\*?|const|let|class|type|interface|enum)\s+([A-Za-z_0-9]+)', re.M)
 IMPORT = re.compile(r"import\s+(type\s+)?\{([^}]*)\}\s+from\s+'((?:\.\./)+)([^']+)'", re.S)
@@ -73,10 +109,12 @@ def haystack():
                 if file.endswith(('.py', '.pyi')):
                     with open(os.path.join(folder, file), encoding='utf-8') as f:
                         texts.append(f.read())
-    return '\n'.join(texts)
+    return set(re.findall(r'\b[A-Za-z_][A-Za-z_0-9]*\b', '\n'.join(texts)))
 
 
 def present(hay, name):
+    if isinstance(hay, set):
+        return any(c in hay for c in candidates(name))
     return any(re.search(r'\b' + re.escape(c) + r'\b', hay) for c in candidates(name))
 
 
@@ -110,6 +148,8 @@ def check_modules(rs2b0t, hay, paths):
     total = 0
     for path in paths:
         start = os.path.join(bot, path)
+        if not os.path.exists(start):
+            raise ValueError(f'upstream module path does not exist: {path}')
         files = [start] if os.path.isfile(start) else [os.path.join(d, f) for d, _, fs in os.walk(start) for f in fs]
         for file in sorted(files):
             module = os.path.relpath(file, bot).replace('\\', '/')
@@ -117,7 +157,7 @@ def check_modules(rs2b0t, hay, paths):
                 continue
             with open(file, encoding='utf-8') as f:
                 exports = [name for kind, name in EXPORT.findall(f.read()) if kind not in ('type', 'interface')]
-            missing = [name for name in exports if not left_out(module, name) and not present(hay, name)]
+            missing = [name for name in exports if not left_out(module, name) and not implemented(hay, module, name)]
             if missing:
                 print(f'{module}: missing {" ".join(missing)} ({len(exports) - len(missing)} of {len(exports)} here)')
                 total += len(missing)
@@ -148,7 +188,7 @@ def check_bots(rs2b0t, hay):
                         imported = imported.strip().split(' as ')[0].strip()
                         if not imported or imported.startswith('type ') or left_out(module, imported):
                             continue
-                        if not present(hay, imported):
+                        if not implemented(hay, module, imported):
                             missing.add(f'{module.replace(".ts", "")}:{imported}')
         if missing:
             print(f'{name}: missing {" ".join(sorted(missing))}')
@@ -161,9 +201,15 @@ def main(argv):
         print(__doc__)
         return 2
     rs2b0t = argv[1]
+    if not os.path.isfile(os.path.join(rs2b0t, 'packages/rs2b0t-api/index.d.ts')):
+        raise ValueError('expected an rs2b0t checkout containing packages/rs2b0t-api/index.d.ts')
     hay = haystack()
     rest = argv[2:]
-    if rest == ['--bots']:
+    if rest == ['--all']:
+        missing = check_dts(rs2b0t, hay)
+        missing += check_modules(rs2b0t, hay, ['api', 'event', 'runtime', 'data'])
+        missing += check_bots(rs2b0t, hay)
+    elif rest == ['--bots']:
         missing = check_bots(rs2b0t, hay)
     elif rest:
         missing = check_modules(rs2b0t, hay, rest)

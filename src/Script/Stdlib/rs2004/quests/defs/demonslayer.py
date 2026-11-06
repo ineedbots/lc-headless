@@ -116,6 +116,22 @@ def fill_bucket(snap, need=1):
 
 
 def grind_goblins(log):
+    # A respawn or rejected click is not a whole failed gathering step. Give the
+    # world time to update before spending the engine's no-progress budget.
+    before = inventory.count('Bones')
+    deadline = _core.step_time() + 30000
+    while _core.step_time() < deadline:
+        if inventory.count('Bones') >= BONES_NEEDED or inventory.count('Bones') > before:
+            return True
+        yield from _grind_goblins_once(log)
+        if inventory.count('Bones') >= BONES_NEEDED or inventory.count('Bones') > before:
+            return True
+        yield from execution.delay_ticks(2)
+    log('demon: no bones collected during gathering window; retrying')
+    return False
+
+
+def _grind_goblins_once(log):
     if inventory.count('Bones') >= BONES_NEEDED:
         return True
     if game.in_combat():
@@ -356,6 +372,15 @@ def decide(snap):
     draw = [{'name': 'Key', 'id': id, 'qty': 1} for id in keys if banked.get(id, 0) > 0 and carried.get(id, 0) == 0]
     if draw:
         return Record({'kind': 'withdraw', 'items': draw})
+    if carried.get(ROVIN_KEY_ID, 0) > 0 and carried.get(TRAIBORN_KEY_ID, 0) == 0:
+        missing = BONES_NEEDED - carried.get(BONES_ID, snap.inv.get('bones', 0))
+        room = snap.free_slots if snap.free_slots is not None else 28
+        if missing > 0 and room > 0:
+            if not snap.bank_known:
+                return Record({'kind': 'scan_bank'})
+            qty = min(missing, banked.get(BONES_ID, (snap.bank or {}).get('bones', 0)), room)
+            if qty > 0:
+                return Record({'kind': 'withdraw', 'items': [{'name': 'Bones', 'id': BONES_ID, 'qty': qty}]})
     return Record({'kind': 'custom', 'name': 'key hunt', 'run': key_hunt})
 
 

@@ -185,6 +185,11 @@ void GameActions::CloseInterfaces()
     m_client.Send(m_client.GetPackets().CloseModal());
 }
 
+void GameActions::ClickTutorialTab(u8 tab)
+{
+    m_client.Send(m_client.GetPackets().TutClickSide(tab));
+}
+
 void GameActions::SaveDesign(const IdkDesign_s& design)
 {
     m_client.Send(m_client.GetPackets().IdkSaveDesign(design));

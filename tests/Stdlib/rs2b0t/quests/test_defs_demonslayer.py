@@ -5,7 +5,7 @@ from rs2004.game import game
 from rs2004.items import inventory
 from rs2004.traversal import traversal
 from rs2004.quests.defs.demonslayer import demonslayer
-from rs2004.quests.engine.types import QuestSnapshot
+from rs2004.quests.defs.demonslayer import _grind_goblins_once
 
 S = {}
 
@@ -40,9 +40,9 @@ def drop(id, distance):
     return Fake(id=id, name='Bones', distance=lambda: distance, actions=lambda: ['Take'], interact=take)
 
 def gather():
-    step = demonslayer.gather.get('bones')(QuestSnapshot(), 25)
-    expect(step.kind).to_be('custom')
-    return run_wait(step.run(lambda m: None))
+    # These cases cover one decision; the timed retry window is covered by
+    # test_demon_execution_workflows.py with an advancing game clock.
+    return run_wait(_grind_goblins_once(lambda m: None))
 
 def empty_field():
     gather()

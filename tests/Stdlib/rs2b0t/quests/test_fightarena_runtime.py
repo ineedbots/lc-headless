@@ -438,7 +438,7 @@ test('a talk by id walks near first, needs the dialogue to open and may end in a
 
 
 def ogre():
-    return Fake(id=FA_NPC.OGRE, name='Khazard Ogre', actions=lambda: ['Attack'], distance=lambda: 5)
+    return Fake(id=FA_NPC.OGRE, name='Khazard Ogre', actions=lambda: ['Attack'], distance=lambda: 5, targets_another_player=lambda: False, network_tile=lambda: ARENA)
 
 
 def releases():

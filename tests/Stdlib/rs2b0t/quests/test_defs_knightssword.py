@@ -216,7 +216,7 @@ def banked_food_for_blurite():
     state.bank = {'lobster':10}
     step = decide_at(state,10,1)
     expect(step.kind).to_be('withdraw')
-    expect(step.items).to_equal([{'name':'Lobster','qty':5}])
+    expect(step.items).to_equal([{'name':'Lobster','qty':8}])
 test('takes optional banked food before the ice dungeon', banked_food_for_blurite)
 
 def no_food_restock_inside_blurite():

@@ -39,6 +39,7 @@ class EventNpc:
         self.name = name
         self.id = id
         self.dist = distance
+        self.target = None
 
     def distance(self):
         return self.dist
@@ -49,12 +50,16 @@ class EventNpc:
     def interact(self, op):
         assert op == 'Talk-to'
         self.world.talks += 1
+        self.world.talked_npcs.append(self)
         if self.world.talk_opens:
             self.world.pending_talk = True
         return self.world.talk_opens
 
 
 class RecoveryWorld(DialogueWorld):
+    def get_pid(self):
+        return 1
+
     def __init__(self):
         DialogueWorld.__init__(self)
         self.guardian = events._RandomEvents()
@@ -83,6 +88,7 @@ class RecoveryWorld(DialogueWorld):
         self.reach_results = []
         self.reach_checks = []
         self.talks = 0
+        self.talked_npcs = []
 
     def __enter__(self):
         DialogueWorld.__enter__(self)
@@ -399,6 +405,27 @@ def test_random_ent_no_reachable_neighbor_still_tries_furthest_step():
 
 def test_random_dialogue_missing_npc_is_failure():
     with RecoveryWorld() as world:
+        assert world.run(world.guardian._dialog('genie', world.logs.append)) is False
+        assert world.talks == 0 and world.waits == []
+
+
+def test_random_dialogue_preserves_ownership_when_selecting_nearest():
+    with RecoveryWorld() as world:
+        other = EventNpc(world, distance=1)
+        other.target = ('player', 2)
+        ours = EventNpc(world, distance=3)
+        ours.target = ('player', 1)
+        world.scene = [other, ours]
+        assert world.run(world.guardian._dialog('genie', world.logs.append))
+        assert world.talks == 1
+        assert world.talked_npcs == [ours]
+
+
+def test_random_dialogue_does_not_talk_to_another_players_event():
+    with RecoveryWorld() as world:
+        other = EventNpc(world)
+        other.target = ('player', 2)
+        world.scene = [other]
         assert world.run(world.guardian._dialog('genie', world.logs.append)) is False
         assert world.talks == 0 and world.waits == []
 

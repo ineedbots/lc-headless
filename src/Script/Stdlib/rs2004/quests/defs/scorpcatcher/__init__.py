@@ -49,6 +49,11 @@ def decide(snap):
     next_ = ([key for key in EVERY_SCORPION if not (key in caught)] or [None])[0]
     if next_ is None:
         return Record({'kind': 'talk', 'stop': THORMAC})
+    if next_ == 'b' and snap.inv.get(BARCRAWL_CARD.lower(), 0) == 0:
+        if not snap.bank_known:
+            return Record({'kind': 'scan_bank'})
+        if (snap.bank or {}).get(BARCRAWL_CARD.lower(), 0) > 0:
+            return Record({'kind': 'withdraw', 'items': [{'name': BARCRAWL_CARD, 'qty': 1}]})
     return Record({'kind': 'custom', 'name': f'catch the {SCORPION_LABEL[next_]} scorpion', 'run': CATCH_LEG[next_]})
 
 

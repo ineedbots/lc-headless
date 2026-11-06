@@ -34,6 +34,9 @@ jobs:
       - name: Verify coverage collection
         run: python3 -B -m unittest discover -s tools/coverage
 
+      - name: Verify porting tools
+        run: python3 -B -m unittest discover -s tools/port
+
       - name: Build, test and report native coverage
         run: python3 tools/coverage/native.py
 

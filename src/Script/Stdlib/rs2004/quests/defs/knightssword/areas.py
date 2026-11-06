@@ -63,6 +63,8 @@ KS_TILE = Record({
     'RANGE': Tile(3019, 3237, 0),
     'IRON_ROCKS': Tile(2972, 3239, 0),
     'PICKAXE_SPAWN': Tile(2963, 3216, 0),
+    # 289 server m48_57 OBJ: 0 39 9: 2351 1 (level 18 Wilderness).
+    'IRON_BAR_SPAWN': Tile(3111, 3657, 0),
     'LADDER_BOTTOM': Tile(3008, 9551, 0),
 })
 # Why: the cupboard spans (2984,3336)-(2985,3336) and only its south side is legal, so these 2 tiles are the approach.

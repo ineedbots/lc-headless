@@ -144,7 +144,7 @@ cooksassistant = QuestModule(record=quest_record('cook'), bank=Tile(3093, 3243, 
 
 `decide(snap)` is a pure function of the snapshot, so a quest resumes from wherever it stopped, by a random event, a death or a client that ended. The snapshot has the journal status (`'not_started'`, `'in_progress'`, `'complete'` or `'unknown'`), the pack by lower-case name (`inv`) and by id (`inv_ids`), what's worn, the last bank read, the stage when the module reads one (`read_stage`, or `read_progress` for flags too), the tile, prayer, levels and free slots. `snap.with_fields({...})` copies it with fields changed.
 
-A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe`, `on_start` and `resume_at(tile)`. The optional resume predicate gives a started quest priority when a restarted queue is inside its one-way area, such as Dragon Slayer's maze or Crandor, or the witch's garden and shed. Generic banking waits until the quest leaves that area. See its docstring.
+A `QuestModule`'s other fields say what the engine should do for it: `bank`, `hops`, `grind`, `food`, `gather`, `tools`, `exit`, `owns_inventory`, `food_ready`, `sustain`, `pray`, `coin_float`, `warn_readiness`, `observe`, `on_start` and `resume_at(tile)`. The optional `recover(tile)` returns an exit step for a completed or interrupted quest area; the engine runs it before choosing another quest. Repeated failed recovery stops the queue. The optional resume predicate gives a started quest priority when a restarted queue is inside its one-way area, such as Dragon Slayer's maze or Crandor, or the witch's garden and shed. Generic banking waits until the quest leaves that area. See its docstring.
 
 Ported so far: Cook's Assistant (`cooksassistant`), Sheep Shearer (`sheepshearer`), Rune Mysteries (`runemysteries`), The Restless Ghost (`restlessghost`), Witch's Potion (`hetty`), Black Knights' Fortress (`blackknight`) and Romeo & Juliet (`romeojuliet`), plus Demon Slayer (`demonslayer`), Doric's Quest (`doric`), Imp Catcher (`impcatcher`), Goblin Diplomacy (`goblindiplomacy`), Vampire Slayer (`vampireslayer`), The Knight's Sword (`knightssword`), Ernest the Chicken (`ernest`), Pirate's Treasure (`piratestreasure`), Prince Ali Rescue (`princeali`), Shield of Arrav (`shieldofarrav`) and Dragon Slayer (`dragonslayer`): all eighteen free-to-play quests.
 
@@ -386,3 +386,31 @@ AIOQuester's `hero_partner` names the character running the other gang, since th
 ## The barcrawl
 
 `bots/barcrawl.py` banks for coins, obtains Alfred Grimhand's card, visits all ten bars nearest first and hands the signed card to the Barbarian Outpost guard. It has no settings. `rs2004.quests.barcrawl.run_barcrawl.ensure_barcrawl(log, on_progress=None)` is the same tour for another bot or quest; `on_progress(signed, total)` reports the card's progress. The caller supplies coins (`BARCRAWL_GP` in `barcrawl_logic` includes travel money). `read_card(log=None)` returns a record with `remaining` bars and `done`, or `None` when unreadable. Both functions are generators. A completed card's refusal to Read because the character is too drunk counts as fully signed.
+
+
+AIOQuester's `gather_wilderness_planks` boolean defaults to `true`. Set it to `false` to
+prevent Dragon Slayer's supply gatherer from collecting Wilderness planks, including a
+partial ship repair or later replacement. The delegated bot restores the previous gather
+policy on stop. AccountLeveler forwards its Wilderness setting to this option.
+Witch's House checks for a usable fire staff before buying Fire Strike runes, and preserves
+fire staves while preparing inventory.
+
+## Recovery and preparation invariants
+
+All 63 quest definitions are implemented. `decide(snap)` chooses a leg from current state; resumable
+progress and interrupt recovery must not depend solely on a suspended generator's locals. Quest-list
+state and journals establish stage floors; unreadable/stale pages must not regress recognized progress,
+while an authoritative not-started result may reset it. Runtime specs cover journal boundaries and
+restart behavior.
+
+Inventory preparation is bank-first and equipment-aware, with quest-specific item caps and bounded
+preparation/retreat failure. An unselected sealed-area owner must not be abandoned; recover/exit the
+current pocket before normal banking or quest selection. Deposits require backpack acknowledgement.
+Combat preparation counts owned worn/carried/banked gear and provisions required spell runes and damage
+budgets. Watchtower's quest-owned dragon hunt confirms its exit, cleans up on failure and refreshes bank
+state before selection resumes. These rules also apply when resuming a partially completed quest.
+
+The [stdlib runtime-spec guide](../Building.md#writing-stdlib-runtime-specs) explains the test fixture
+and pocketpy constraints. Real-speed acceptance gaps and recurrence-based observations are maintained
+in [GitHub issues](https://github.com/ineedbots/lc-headless/issues), including
+[#34](https://github.com/ineedbots/lc-headless/issues/34) for phases 17h/17i.

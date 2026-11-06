@@ -367,7 +367,8 @@ class _RandomEvents:
 
     def _dialog(self, name, say):
         say(f'random event: {name}, talking it through')
-        npc = self._named(name)
+        pid = _core.get_pid()
+        npc = npcs.query().where(lambda n: (n.name or '').lower() == name and not targets_another_player(n, pid)).nearest()
         if npc is None:
             return False
         npc.interact('Talk-to')

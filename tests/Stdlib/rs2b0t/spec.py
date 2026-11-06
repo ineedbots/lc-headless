@@ -1,5 +1,6 @@
 """rs2b0t's describe, test and expect, for its tests as ts2py drafts them. StdlibTests.cpp runs this before each
-test_*.py here, then run_specs(), which runs every test and raises with each failure."""
+test_*.py here, then run_specs(), which runs every test and raises with each failure. A spec starting with
+`# fixture: name` also loads fixtures/name.py into the same isolated VM before the test source."""
 
 _SPECS = []
 _PREFIX = []
@@ -359,6 +360,7 @@ class Scene:
         spy_on(skills, 'xp', impl=lambda name: self.stats.get(name, 99))
         spy_on(skills, 'hp_fraction', impl=lambda: self.stats.get('hp_fraction', 1))
         spy_on(traversal, 'walk_resilient', impl=self._walk)
+        spy_on(traversal, 'walk_to', impl=self._walk)
         spy_on(execution, 'delay_ticks', impl=self._delay_ticks)
         spy_on(execution, 'delay_until', impl=self._delay_until)
         spy_on(execution, 'delay_until_ticks', impl=self._delay_until_ticks)
@@ -418,6 +420,7 @@ class Scene:
 
     def npc(self, name, actions=None, tile=None, effect=None, id=0, dist=2, targets_me=False, others=False):
         thing = self._placed(self.npcs, id, name, actions, tile, effect, dist, None, targets_me, others)
+        thing._fields['network_tile'] = thing.tile
         self.npcs.append(thing)
         return thing
 
@@ -487,7 +490,7 @@ class Scene:
         return True
         yield
 
-    def _walk(self, dest, radius=0, attempts=0, timeout_ms=0, log=None):
+    def _walk(self, dest, radius=0, attempts=0, timeout_ms=0, log=None, avoid_zones=None):
         self.walks.append(dest)
         if not self.walk_ok or dest in self.no_walk:
             return False

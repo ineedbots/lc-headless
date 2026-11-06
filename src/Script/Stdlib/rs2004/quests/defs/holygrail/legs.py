@@ -312,11 +312,14 @@ def ring_bell(log):
         if not (bell.interact('Ring')):
             return False
 
-        def _fn19():
+        def inside():
             now = game.tile()
-            return now is not None and GRAIL_TILE.CASTLE_LANDING.distance_to(now) <= 2 and now.level == 0
-        landed = yield from execution.delay_until(_fn19, 8000)
-        yield from drain()
+            return now is not None and GRAIL_TILE.CASTLE_LANDING.equals(now)
+        responded = yield from execution.delay_until(lambda: inside() or chat_dialog.is_open() or chat_dialog.can_continue(), 8000)
+        if not responded:
+            continue
+        yield from drive_dialog([], log)
+        landed = yield from execution.delay_until(inside, 8000)
         if landed:
             log('bell: inside the Grail castle')
             inside_castle = True

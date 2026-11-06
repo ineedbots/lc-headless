@@ -13,6 +13,7 @@ def test_game_scene_energy_appearance_and_combat_reads():
     with PatchWorld() as world:
         world.patch(api, '_core', FakeModule(is_placed=lambda: True, get_run_energy=lambda: 65,
             set_run=lambda enabled: calls.append(enabled) or True, get_weight=lambda: 7,
+            open_side_tab=lambda tab: tab == 3,
             is_appearance_screen_open=lambda: True, set_appearance=lambda *args: calls.append(args) or True,
             get_local_player=lambda: me, get_varp=lambda id: 0, in_combat=lambda: True,
             click_component=lambda id: calls.append(id) or True))

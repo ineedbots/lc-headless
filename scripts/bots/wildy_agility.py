@@ -1,7 +1,6 @@
 # Runs the Wilderness Agility Course, eating as it goes, and after a death banks for food and comes back:
 # rs2b0t's WildyAgility (MIT, see thirdparty/rs2b0t). It needs Agility 52 for the ridge, and carried food.
 
-import random
 import time
 
 from rs2004.catalogs import FOOD_OPTIONS, LOADOUT_SETTING, ContinueDialog, DeathRecovery, food_heal_amount, is_food_item, script_food, should_eat_to_use_food
@@ -39,7 +38,7 @@ SETTINGS = {
     'loadout': LOADOUT_SETTING,
     'food': SettingDef('string', '', 'Food (overrides loadout)', options=FOOD_OPTIONS,
                        help="exact food to eat and withdraw; blank uses the loadout's food, or 'Lobster' if the loadout names none"),
-    'food_withdraw': SettingDef('number', 20, 'Food to withdraw', 1, 28, help='how many to withdraw at startup restock and after death'),
+    'food_withdraw': SettingDef('number', 28, 'Food to withdraw', 1, 28, help='how many to withdraw at startup restock and after death'),
     'min_food': SettingDef('number', 1, 'Bank below food count', 0, 28,
                            help='at script start (and after death), bank if carrying fewer than this many; 0 = skip the startup food check'),
     'acquire_food_at_start': SettingDef('boolean', True, 'Acquire food at start',
@@ -148,14 +147,6 @@ def near_tile(here, dest, radius):
 def at_ridge_approach(here, radius=2):
     """Ready to click the ridge: by its south stand, not already north of the Door."""
     return near_tile(here, RIDGE_APPROACH, radius) and south_of_ridge(here)
-
-
-def reaction_ms():
-    """A human pause after clearing an obstacle; the character settles a tick before the next click, or the first
-    try is wasted."""
-    if random.random() < 0.1:
-        return 1200 + random.random() * 1800
-    return 600 + random.random() * 900
 
 
 def now_ms():
@@ -464,8 +455,7 @@ class RunLap(Task):
         actions = obstacle.actions()
         op = actions[0] if len(actions) > 0 else None
         if not op:
-            bot.log(f"'{obstacle.name}' has no actions — retrying")
-            yield from execution.delay_ticks(2)
+            yield from self.escalate(f"'{obstacle.name}' has no actions")
             return
         # Only a note: the click never waits for a gap after a recovery walk.
         gap_ticks = game.tick() - bot.last_cleared_tick
@@ -477,8 +467,7 @@ class RunLap(Task):
         bot.status = f'{op} {obstacle.name} at {ot.x},{ot.z}'
         bot.log(f"{op} '{bot.current_name()}' @ {ot.x},{ot.z}")
         if not obstacle.interact(op):
-            bot.log(f"interact('{op}') on '{bot.current_name()}' failed — retrying")
-            yield from execution.delay_ticks(2)
+            yield from self.escalate(f"could not click '{op}'")
             return
         # Why: the timeout starts at the click. A hard wall-clock bound is needed too, since counting idle ticks
         # alone stalls forever while combat or pathing jitter keeps the player animating or moving.
@@ -486,19 +475,27 @@ class RunLap(Task):
         wait_deadline = now_ms() + bot.obstacle_timeout_ticks * 600 + 3000
         idle_ticks = 0
         waited_ticks = 0
+        reclicks = 0
         low_hp = False
         last_tile = game.tile()
         while idle_ticks < bot.obstacle_timeout_ticks and now_ms() < wait_deadline:
             t = game.tile()
             if (skills.xp('agility') > before or (t is not None and in_pit(t)) or game_messages.saw_since(mark, CANT_REACH)
                     or game_messages.saw_since(mark, course_wrong_side) or game_messages.saw_since(mark, pit_fall)
-                    or event_signal.pending() or chat_dialog.can_continue()):
+                    or bot.died or event_signal.pending() or chat_dialog.can_continue()):
                 break
             # Why: this gives way to EatFood while the skeletons by the rocks hit it, after a few ticks so stray damage
             # doesn't abort the click, and never with no food, since aborting mid-obstacle strands it on the log or pipe.
             if waited_ticks >= 3 and need_eat(bot):
                 low_hp = True
                 break
+            # A dropped click otherwise costs the full timeout. Wait a tick before re-clicking, and stop on
+            # any outcome above so a late click cannot cancel recovery or the next obstacle.
+            if waited_ticks > 0:
+                reclicks += 1
+                if reclicks == 1:
+                    bot.log(f"no xp after {waited_ticks} ticks — clicking '{op}' again every tick")
+                obstacle.interact(op)
             yield from execution.delay_ticks(1)
             waited_ticks += 1
             # Idle time counts toward the timeout; the wall clock covers endless animating or moving.
@@ -511,7 +508,7 @@ class RunLap(Task):
         here_after = game.tile()
         reason = classify_obstacle(skills.xp('agility') > before, here_after is not None and in_pit(here_after), game_messages.saw_since(mark, CANT_REACH),
                                    game_messages.saw_since(mark, course_wrong_side), game_messages.saw_since(mark, pit_fall),
-                                   event_signal.pending() or chat_dialog.can_continue(), low_hp)
+                                   bot.died or event_signal.pending() or chat_dialog.can_continue(), low_hp)
         if reason == 'interrupted':
             bot.status = 'random event — handling'
             return
@@ -523,7 +520,7 @@ class RunLap(Task):
             return
         if reason == 'timeout':
             bot.status = f'timeout waiting for {obstacle.name} ({idle_ticks} idle / {waited_ticks} total ticks)'
-            bot.log(f"'{bot.current_name()}' timed out after {waited_ticks} ticks ({idle_ticks} idle) — no xp/chat")
+            bot.log(f"'{bot.current_name()}' timed out after {waited_ticks} ticks ({idle_ticks} idle, {reclicks} re-clicks) — no xp/chat")
         if reason == 'xp':
             self.stuck = 0
             bot.cleared += 1
@@ -534,8 +531,6 @@ class RunLap(Task):
                 bot.obstacle_times.pop(0)
             bot.last_cleared_tick = game.tick()
             bot.advance()
-            # A short human pause only: waiting on the animation hung the next lap when combat kept it animating.
-            yield from execution.delay(int(reaction_ms()))
             return
         # Low HP gives way to EatFood without spending a retry: combat damage isn't the obstacle failing.
         if reason == 'low_hp':
@@ -554,30 +549,34 @@ class RunLap(Task):
         if reason == 'cant_reach':
             bot.status = f'out of range for {obstacle.name} — retrying'
             bot.log(f"'{bot.current_name()}' can't reach — retrying")
-        # The first time it retries in place, the second it walks back to the start, and past the limit it skips.
+        yield from self.escalate("isn't completing from here", (obstacle.name or bot.current_name()).lower())
+
+    def escalate(self, reason, obstacle_name=None):
+        bot = self.bot
+        name = bot.current_name()
         self.stuck += 1
         if self.stuck > LAP_RETRY_LIMIT:
-            skipped = bot.current_name()
-            bot.log(f"'{skipped}' isn't completing from here after {self.stuck} tries — moving on to the next obstacle")
+            bot.log(f"'{name}' {reason} after {self.stuck} tries — moving on to the next obstacle")
             self.stuck = 0
             bot.advance()
             # A skip that wrapped onto the same or the first obstacle walks to the first start, breaking a loop in
             # the wrong place, such as at the rocks.
             first = COURSE_OBSTACLES[0]
-            if bot.current_name() == skipped or bot.current_name() == first:
+            if bot.current_name() == name or bot.current_name() == first:
                 bot.log(f"obstacle skip wrapped lap — walking to '{first}' starting side")
                 yield from self.walk_to_start_tile(first)
-        elif self.stuck >= 2:
-            bot.log(f"'{bot.current_name()}' no progress — walking back to starting side ({self.stuck}/{LAP_RETRY_LIMIT})")
-            walked = yield from self.walk_to_start_tile((obstacle.name or bot.current_name()).lower())
+            return
+        if self.stuck >= 2:
+            bot.log(f"'{name}' {reason} — walking back to starting side ({self.stuck}/{LAP_RETRY_LIMIT})")
+            walked = yield from self.walk_to_start_tile(obstacle_name or name)
             if not walked:
-                bot.log(f"'{bot.current_name()}' starting side unreachable — advancing to next obstacle")
+                bot.log(f"'{name}' starting side unreachable — advancing to next obstacle")
                 self.stuck = 0
                 bot.advance()
-        else:
-            bot.status = f'retrying {obstacle.name}'
-            bot.log(f"'{bot.current_name()}' no progress — retrying ({self.stuck}/{LAP_RETRY_LIMIT})")
-            yield from execution.delay_ticks(2)
+            return
+        bot.status = f'retrying {name}'
+        bot.log(f"'{name}' {reason} — retrying ({self.stuck}/{LAP_RETRY_LIMIT})")
+        yield from execution.delay_ticks(2)
 
 
 class WildyAgility(TaskBot):
@@ -596,7 +595,7 @@ class WildyAgility(TaskBot):
         yield from execution.delay_until(lambda: game.ingame() and game.tile() is not None, 0)
         s = self.settings
         self.food = (s.str('food', '').strip() or script_food(s, 'Lobster')).lower()
-        self.food_withdraw = s.num('food_withdraw', 20)
+        self.food_withdraw = s.num('food_withdraw', 28)
         self.min_food = s.num('min_food', 1)
         acquire_at_start = s.bool('acquire_food_at_start', True)
         self.obstacle_timeout_ticks = s.num('obstacle_timeout_ticks', 24)

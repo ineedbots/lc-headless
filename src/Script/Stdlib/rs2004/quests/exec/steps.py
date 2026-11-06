@@ -242,10 +242,16 @@ def _deposit(step, log):
                 return False
         return True
 
-    yield from bank.deposit_all_matching(unkept)
+    ok = yield from bank.backpack_ready(log=log)
+    if ok:
+        yield from bank.deposit_all_matching(unkept)
+        ok = yield from bank.backpack_ready(log=log)
+        ok = ok and not any([unkept(item.name or '', item.id) for item in inventory.items()])
+    if not ok:
+        log('deposit: backpack contents did not confirm the deposit')
     if not step.leave_open:
         yield from modals.close()
-    return True
+    return ok
 
 
 def _buy(step, log):

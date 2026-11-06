@@ -295,3 +295,21 @@ def test_a_route_being_followed_pumps_sustain_every_pass_as_rs2b0ts_walk_executo
             raise e
         sustain.set(None)
         assert len(eaten) >= 3
+
+
+def test_walk_ignores_reachability_messages_before_its_click_or_after_moving():
+    for message_before_click in [True, False]:
+        with WalkWorld() as world:
+            if message_before_click:
+                world.messages.append(walker.CANT_REACH)
+            else:
+                def moved_despite_message():
+                    world.messages.append(walker.CANT_REACH)
+                    world.on_wait = None
+                world.on_wait = moved_despite_message
+            walk = walker._Traversal()
+            assert world.run(walk.walk_to(Tile(3210, 3200), radius=0, timeout_ms=15000,
+                                          log=world.logs.append))
+            assert walk.last_outcome == 'arrived'
+            assert len(world.requests) == 1 and len(world.clicks) == 1
+            assert not any(["the server can't reach" in line for line in world.logs])

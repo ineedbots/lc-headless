@@ -35,6 +35,10 @@ def custom(name, run):
 
 def excalibur_plan(snap, _need=None):
     """Merlin's Crystal doesn't consume Excalibur, so the bank almost always has it."""
+    if held(snap, ITEM.EXCALIBUR) > 0 or worn(snap, ITEM.EXCALIBUR):
+        return Record({'kind': 'equip', 'item': ITEM.EXCALIBUR})
+    if not snap.bank_known:
+        return Record({'kind': 'scan_bank'})
     if banked(snap, ITEM.EXCALIBUR) > 0:
         return Record({'kind': 'withdraw', 'items': [{'name': ITEM.EXCALIBUR, 'qty': 1}]})
     if held(snap, ITEM.COINS) >= EXCALIBUR_PRICE:

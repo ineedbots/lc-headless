@@ -41,6 +41,7 @@ class Merlin:
         spy_on(mc.npcs, 'query', impl=querying(lambda: self.npcs))
         spy_on(mc.ground_items, 'query', impl=querying(lambda: self.ground))
         spy_on(mc.traversal, 'walk_resilient', impl=self.walk)
+        spy_on(mc.traversal, 'walk_to', impl=self.walk)
         spy_on(mc.inventory, 'contains', impl=lambda name: self.item(name) is not None)
         spy_on(mc.inventory, 'first', impl=self.item)
         spy_on(mc.equipment, 'contains', impl=lambda name: name in self.worn)
@@ -56,7 +57,7 @@ class Merlin:
     def logged(self, part):
         return any([part in line for line in self.lines])
 
-    def walk(self, tile, radius=None, attempts=None, timeout_ms=None, log=None):
+    def walk(self, tile, radius=None, attempts=None, timeout_ms=None, log=None, avoid_zones=None):
         self.walks.append(tile)
         if self.walk_ok:
             self.at = tile
@@ -363,7 +364,7 @@ class Mordred(Keep):
         self.locs = [self.stairs, self.crate]
         self.npcs = [self.thing('Sir Mordred', ['Attack'], at=Tile(2772, 3403, 2), interact=self.attack)]
 
-    def walk(self, tile, radius=None, attempts=None, timeout_ms=None, log=None):
+    def walk(self, tile, radius=None, attempts=None, timeout_ms=None, log=None, avoid_zones=None):
         self.walks.append(tile)
         if tile != mc.MORDRED_TILE and self.walk_ok:
             self.at = tile
@@ -501,8 +502,20 @@ def candle():
 test('the black candle is lit with the tinderbox', candle)
 
 
+def lady_agrees(world):
+    original = mc.drive_dialogue
+    def drive(prefer, log, max_pages=60):
+        if prefer == mc.LADY_LAKE.prefer:
+            return True
+        result = yield from original(prefer, log, max_pages)
+        return result
+    spy_on(mc, 'open_dialogue', impl=lambda *args: result(True))
+    spy_on(mc, 'drive_dialogue', impl=drive)
+
+
 def excalibur():
     world = Merlin()
+    lady_agrees(world)
     world.hold(mc.EXCALIBUR)
     expect(run_wait(mc.get_excalibur(world.log))).to_be(True)
     world.pack = []
@@ -521,7 +534,7 @@ def excalibur():
     world.hold(mc.BREAD)
     world.npcs = [world.thing('Beggar', ['Talk-to'])]
     expect(run_wait(mc.get_excalibur(world.log))).to_be(True)
-    expect(talked).to_equal(['The Lady of the Lake', 'The Lady of the Lake', 'Beggar'])
+    expect(talked).to_equal(['Beggar'])
 
 
 test('Excalibur comes from the Beggar after the Lady of the Lake', excalibur)
@@ -529,15 +542,18 @@ test('Excalibur comes from the Beggar after the Lady of the Lake', excalibur)
 
 def jeweller_door():
     world = Merlin()
+    lady_agrees(world)
     world.hold(mc.BREAD)
     spy_on(mc, 'goto_npc', impl=lambda stop, hops, log: result(False))
+    expect(run_wait(mc.get_excalibur(world.log))).to_be(False)
+    spy_on(mc, 'goto_npc', impl=lambda *args: result(True))
     expect(run_wait(mc.get_excalibur(world.log))).to_be(False)
     expect(world.logged('no jeweller Door')).to_be(True)
     world.locs = [world.thing('Door', ['Open'], interact=lambda op: False)]
     expect(run_wait(mc.get_excalibur(world.log))).to_be(False)
     world.locs = [world.thing('Door', ['Open'])]
     expect(run_wait(mc.get_excalibur(world.log))).to_be(False)
-    expect(world.logged('never appeared')).to_be(True)
+    expect(world.logged('produced no Beggar or dialogue')).to_be(True)
 
     def opened(op):
         world.chat.pages = ['continue', ['Yes certainly.', 'No']]
@@ -659,15 +675,17 @@ def snap(journal, held=None):
     inv = {}
     for name in held if held is not None else []:
         inv[name.lower()] = 1
-    return Fake(journal=journal, inv=inv)
+    return Fake(journal=journal, inv=inv, worn=set(), bank_known=True, bank={}, stage=4, tile=CAMELOT)
 
 
 def decides():
     expect(mc.decide(snap('complete')).kind).to_be('done')
     expect(mc.decide(snap('unknown')).kind).to_be('wait')
     expect(mc.decide(snap('not_started')).stop.npc).to_be('King Arthur')
+    empty = snap('in_progress')
+    empty.stage = 2
+    expect(mc.decide(empty).run).to_be(mc.opening_leg)
     rows = [
-        ([], mc.opening_leg),
         ([mc.WAX], mc.kill_giant_bat),
         ([mc.BAT_BONES], mc.get_wax),
         ([mc.BAT_BONES, mc.UNLIT_CANDLE], mc.light_candle),
@@ -680,3 +698,33 @@ def decides():
 
 
 test('decide walks the products from the opening to the crystal', decides)
+
+
+def restart_in_crate():
+    world = Merlin()
+    expect(run_wait(mc.recover_crate(world.log))).to_be(True)
+    world.at = mc.CRATE_INTERIOR
+    expect(run_wait(mc.recover_crate(world.log))).to_be(False)
+    world.pending = True
+    expect(run_wait(mc.recover_crate(world.log))).to_be(False)
+    world.pending = False
+    def climb(op):
+        world.chat.pages = ['continue']
+        return True
+    world.locs = [world.thing('Crate wall', ['Climb-out'], at=mc.CRATE_INTERIOR, interact=climb)]
+    def answer(prefer, log):
+        world.at = KEEP_L0
+        return True
+        yield
+    spy_on(mc, 'drive_dialogue', impl=answer)
+    expect(run_wait(mc.recover_crate(world.log))).to_be(True)
+    world.at = mc.CRATE_INTERIOR
+    world.chat.pages = ['continue']
+    expect(run_wait(mc.recover_crate(world.log))).to_be(True)
+    world.at = mc.CRATE_INTERIOR
+    world.chat.pages = []
+    world.locs = [world.thing('Crate wall', ['Climb-out'], at=mc.CRATE_INTERIOR, interact=lambda op: True)]
+    expect(run_wait(mc.recover_crate(world.log))).to_be(False)
+
+
+test('a restarted crate passenger can confirm the prompt or climb out of the crate wall', restart_in_crate)

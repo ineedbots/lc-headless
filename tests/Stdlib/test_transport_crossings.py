@@ -293,6 +293,28 @@ def door():
     return {'kind': 'door', 'loc_name': 'Door', 'action': 'Open', 'loc_x': 3200, 'loc_z': 3200}
 
 
+def test_broken_fence_accepts_the_289_landing_without_climbing_back_out():
+    for start_z, end_z, waypoint_z in [(3491, 3493, 3494), (3494, 3492, 3492)]:
+        with TransportWorld() as world:
+            world.here = Tile(3306, start_z)
+            fence = Entity(world, 'Broken fence', ['Climb-over'], Tile(3305, 3493), id=2618)
+            world.loc_items = [fence]
+
+            def cross(action):
+                world.events.append(('land', Tile(3305, end_z)))
+                return True
+
+            fence.on_interact = cross
+            transport = {'kind': 'shortcut', 'loc_name': 'Broken fence', 'action': 'Climb-over',
+                         'loc_x': 3305, 'loc_z': 3493, 'loc_id': 2618, 'to_tile': [3305, end_z]}
+            hop = PathTile(3305, waypoint_z, 0, transport)
+            walk = walker._Traversal()
+            assert world.run(walk._take_hop(Tile(3305, start_z), hop, world.logs.append)) == 'crossed'
+            assert world.here == Tile(3305, end_z)
+            assert world.interactions == [('Broken fence', 'Climb-over')]
+            assert walk._avoid_doors == []
+
+
 def ladder():
     return {'kind': 'loc', 'loc_name': 'Ladder', 'action': 'Climb-down', 'loc_id': 1759,
             'loc_x': 3200, 'loc_z': 3200, 'to_level': 1}

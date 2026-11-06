@@ -176,8 +176,8 @@ QUESTS = [
         "quest_points": 3,
         "requirements": {"min_quest_points": 12},
         "items": [
-            {"name": "Iron chainbody", "qty": 1, "kind": "mustHave"},
-            {"name": "Bronze med helm", "qty": 1, "kind": "mustHave"},
+            {"name": "Iron chainbody", "qty": 1, "kind": "acquirable"},
+            {"name": "Bronze med helm", "qty": 1, "kind": "acquirable"},
             {"name": "Cabbage", "qty": 1, "kind": "acquirable"},
         ],
     },
@@ -195,7 +195,7 @@ QUESTS = [
             ],
         },
         "items": [
-            {"name": "Dragon bones", "qty": 1, "kind": "mustHave"},
+            {"name": "Dragon bones", "qty": 1, "kind": "acquirable"},
             {"name": "Guam leaf", "qty": 1, "kind": "mustHave"},
             {"name": "Bat bones", "qty": 1, "kind": "mustHave"},
             {"name": "Gold bar", "qty": 1, "kind": "mustHave"},

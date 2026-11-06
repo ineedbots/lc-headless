@@ -49,14 +49,6 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 | [Development workflow](docs/design/DevelopmentWorkflow.md) | Branch policy, release promotion and commit messages |
 | [Design documents](docs/design/) | Implementation plans, code conventions and protocol references |
 
-## TODO
-
-- Remove this section when points are completed
-- Phase 17 and 18 of the rs2b0t parity design (the p2p quests and account leveler)
-- Check and implement newer rs2b0t's commits
-- Do tutorial island, not just skipping it
-- 17aefghi test coverage
-
 ## Credits
 
 - LostCity - https://github.com/LostCityRS

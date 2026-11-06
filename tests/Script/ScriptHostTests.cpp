@@ -33,6 +33,14 @@
 
 using Catch::Matchers::ContainsSubstring;
 
+TEST_CASE("ScriptHost exposes the configured server world to scripts", "[ScriptHost]")
+{
+    const auto world = GENERATE(0, 1, 317);
+    auto fixture = HostFixture{"def loop():\n    log('>', game.world())\n    return 1000\n", ScriptHostOptions_s{.world = world}};
+    fixture.Step();
+    CHECK(fixture.GetScriptLines() == std::vector<std::string>{std::to_string(world)});
+}
+
 TEST_CASE("ScriptHost contains upkeep failures and finishes the script once", "[ScriptHost][HostResilienceCoverage]")
 {
     auto fixture = HostFixture{R"python(

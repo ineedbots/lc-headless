@@ -8,6 +8,7 @@
 #include "Config/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
 #include "Config/Revision_e.hpp"
+#include "Config/ServerSettings_s.hpp"
 #include "Config/Transport_e.hpp"
 #include "Console/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
@@ -86,6 +87,7 @@ namespace
         "transport": "ws",
         "host": "",
         "port": 0,
+        "world": 0,
         "origin": "",
         "tlsCaFile": "SYSTEM"
     },
@@ -1082,4 +1084,18 @@ TEST_CASE("ConfigFile::Load", "[ConfigFile]")
     }
 
     CHECK(capture.GetEntries().empty());
+}
+
+TEST_CASE("Server world numbers round trip and reject negative values", "[ConfigFile]")
+{
+    auto json = ParseJsonWithComments(EXAMPLE);
+    CHECK(ConfigFile::Parse(json.dump()).server.world == 0);
+
+    json["server"]["world"] = 1;
+    const auto config = ConfigFile::Parse(json.dump());
+    CHECK(config.server.world == 1);
+    CHECK(ConfigFile::Parse(ConfigFile::Serialize(config)).server.world == 1);
+
+    json["server"]["world"] = -1;
+    CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("server.world"));
 }

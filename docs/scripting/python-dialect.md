@@ -178,7 +178,7 @@ The API is rs2b0t's, in Python's style, so a bot translates mostly line by line.
 - A setting that doesn't fit its schema is an error before login rather than quietly the default.
 - `chooseOption(match)` is `choose_option(text)`, and `make(match)` is `make(name)`.
 
-The ported API includes bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, `RecoveryHints`, `EventSignal`, `SettingsStore` with the `Global` settings, `ScriptActivity`, the catalogs and behaviours (`rs2004.catalogs`), the clue engine (`rs2004.clues`), and the quest engine with its first quests (`rs2004.quests`). [BotApiParityDesign.md](../design/BotApiParityDesign.md) plans the rest, phase by phase. See the [ported bot table](catalogs.md#ported-bots) for script filenames.
+The ported API includes bots, `Execution`, settings, events, `Tile` and `Area`, the entity facades and their query, `Inventory`, `Equipment`, `InvItem`, `Skills`, `Game`, `DirectNavigator`, the web walker (`Traversal`, `WalkExecutor` and their crossings), `Reach`, `GameMessages`, `reader`, `ChatDialog`, `Modals`, `Bank`, `Banking` and its deposit rules, `PeriodicBank`, `Shop`, `Trade`, `Quests`, `Prayer`, `Special`, the combat styles, `Autocast`, the `RandomEventGuardian` with its solvers, the `RunManager`, the `StallGuard` with the supervisor's watchdog, `RecoveryHints`, `EventSignal`, `SettingsStore` with the `Global` settings, `ScriptActivity`, the catalogs and behaviours (`rs2004.catalogs`), the clue engine (`rs2004.clues`), and all 63 quests (`rs2004.quests`) and AccountLeveler. [BotApiDesign.md](../design/BotApiDesign.md#15-implemented-scope-and-porting) describes the implemented scope, porting tools and deliberate headless exclusions. See the [ported bot table](catalogs.md#ported-bots) for script filenames.
 
 ## Porting from plutonium
 
@@ -234,3 +234,14 @@ Coordinates differ between RSC and 2004, so every tile in a script changes. An `
 | `is_appearance_screen()`, `send_appearance_update(...)` | `game.appearance_screen_open()`, `game.set_appearance(female, kits, colours)` |
 
 Fatigue, sleeping, the sleepword and raw packets don't exist.
+
+
+Phase 18 maps `scripts/AccountLeveler/*.ts` to `scripts/bots/account_leveler/*.py`,
+with `AccountLeveler.ts` in `bot.py` and a `bots/leveler.py` entry. Imports resolve selected
+child manifests instead of the browser's `ScriptRegistry`; planner memory uses
+`settings_store` instead of desktop storage. Its local mutable `Record` also supports
+item/skill indexing, unlike the immutable catalog records.
+`runtime/optionSelection.ts` maps to `rs2004.settings.selected_options` and
+`signed_options`. Empty selection enables all options; signed tokens use last-token wins,
+case-insensitive matching and the catalog's order. An explicit negative-only selection can
+select nothing. These helpers are also available in script builtins.

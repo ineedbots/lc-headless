@@ -1,6 +1,6 @@
 """rs2b0t's test/scripts/EssMiner/essminer-logic.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and expect.
 Here resolve_pick gives (kind, item) or ('stop', reason), and withdraw_op(ops, '1') is withdrawOneOp. EssMinerChat's
-tests stub the chat facade, which pocketpy can't (see BotApiParityDesign.md §5, "As built")."""
+tests stub the chat facade, which pocketpy can't (see docs/scripting/python-dialect.md)."""
 
 from rs2004.catalogs import in_ess_mine
 
