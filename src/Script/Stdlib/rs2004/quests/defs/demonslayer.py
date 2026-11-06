@@ -116,6 +116,22 @@ def fill_bucket(snap, need=1):
 
 
 def grind_goblins(log):
+    # A respawn or rejected click is not a whole failed gathering step. Give the
+    # world time to update before spending the engine's no-progress budget.
+    before = inventory.count('Bones')
+    deadline = _core.step_time() + 30000
+    while _core.step_time() < deadline:
+        if inventory.count('Bones') >= BONES_NEEDED or inventory.count('Bones') > before:
+            return True
+        yield from _grind_goblins_once(log)
+        if inventory.count('Bones') >= BONES_NEEDED or inventory.count('Bones') > before:
+            return True
+        yield from execution.delay_ticks(2)
+    log('demon: no bones collected during gathering window; retrying')
+    return False
+
+
+def _grind_goblins_once(log):
     if inventory.count('Bones') >= BONES_NEEDED:
         return True
     if game.in_combat():
