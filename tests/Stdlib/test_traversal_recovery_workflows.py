@@ -88,6 +88,31 @@ class MainTraversal(walker._Traversal):
         return self.result
 
 
+def test_funded_routes_prune_bank_searches_that_cannot_be_cheaper():
+    for direct_cost in [routes.WITHDRAW_COST, 100, 101]:
+        check_bank_search_pruning(direct_cost)
+
+
+def check_bank_search_pruning(direct_cost):
+    with RouteWorld() as world:
+        world.patch(walker, 'world_state', lambda: {'items': {}, 'worn': {}, 'quests': {}})
+        world.patch(walker, 'nearest_bank', lambda *args, **kwargs: {'tile': {'x': 3201, 'z': 3200, 'level': 0}})
+        world.patch(walker, 'gate_item_candidates', lambda: {'Coins': 30})
+        requests = []
+
+        def request(self, me, dest, *args, **kwargs):
+            requests.append(dest)
+            return {'ok': True, 'cost': 100 - routes.WITHDRAW_COST, 'waypoints': []}
+
+        walk = walker._Traversal()
+        world.patch(walker._Traversal, '_request', request)
+        assert world.run(walk._maybe_bank_for_route(world.here, Tile(3300, 3200),
+                        {'cost': direct_cost}, [], 1000, {}, False, [], world.logs.append)) is False
+        # Short walks skip both searches, an equal-cost detour skips the
+        # second, and a potentially cheaper detour still gets evaluated.
+        assert len(requests) == (0 if direct_cost == routes.WITHDRAW_COST else (1 if direct_cost == 100 else 2)), (direct_cost, len(requests))
+
+
 def test_resilient_walk_escalates_to_scene_unstick_and_dead_or_repeated_probe():
     for fresh in [True, False]:
         with RouteWorld() as world:
