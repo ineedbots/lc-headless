@@ -803,6 +803,22 @@ assert _core.get_chat_options() == []
     REQUIRE_NOTHROW(fixture.Run("assert _core.find_continue() is None\nassert _core.get_chat_options() == []\nassert _core.get_chat_texts() == []\n"));
 }
 
+TEST_CASE("Native tutorial bindings expose sticky instructions and validate side tabs", "[ScriptBindings][InterfaceBindingCoverage]")
+{
+    auto fixture = BindingFixture{Revision_e::Rev289, true};
+    REQUIRE_NOTHROW(fixture.Run("import _core\nassert _core.get_tutorial_modal() == -1\n"));
+    fixture.state.interfaces.tutorialComponent = TestCache::DIALOGUE;
+    fixture.state.interfaces.tabs[3] = TestCache::INVENTORY;
+    REQUIRE_NOTHROW(fixture.Run(R"python(
+assert _core.get_tutorial_modal() == 310
+assert _core.get_texts(310)
+assert _core.open_side_tab(3)
+assert not _core.open_side_tab(4)
+)python"));
+    const auto invalid = GENERATE(-1, 15, 256);
+    CHECK_THROWS_WITH(fixture.Run(std::format("_core.open_side_tab({})", invalid)), ContainsSubstring("ValueError") && ContainsSubstring("tab must be between 0 and 14"));
+}
+
 TEST_CASE("Native make bindings preserve product names and quantity button mappings", "[ScriptBindings][InterfaceBindingCoverage]")
 {
     auto fixture = BindingFixture{Revision_e::Rev289, true};

@@ -115,6 +115,6 @@ A hint the new bot's `on_start` doesn't take is dropped once it finishes. `recov
 
 ## Tutorial Island
 
-An account that starts on Tutorial Island leaves it before `on_start` runs. If the character design screen is open, the client saves a plain design. Then it talks to the RuneScape Guide and answers "Yes please." when he offers to skip the tutorial, which sends the player to Lumbridge. Hooks and subscribers don't hear the game events that arrive meanwhile.
+An account that starts on Tutorial Island completes the tutorial before `on_start` runs. The client saves a plain character design, declines the guide's skip offer, and performs the instructor tasks: survival, cooking, quests, mining and smithing, melee and ranged combat, banking, prayer, friends and magic. The final instructor sends the player to Lumbridge. Hooks and subscribers don't hear the game events that arrive meanwhile.
 
-The guide only offers this on a server that isn't live, and only before the player has gone further into the tutorial. If he doesn't, the client logs that the player is still on the island, and the script starts anyway.
+Progress is reconstructed from the server's instruction panel when reconnecting or reloading; the tutorial varp is server-only. Each stage has a three-minute deadline. An unsupported instruction or a stage that cannot advance stops the script before `on_start`, with the stage in the log. Restart after resolving the obstruction to resume. `rs2004.tutorial.skip(say)` remains available as an explicit generator for test tools on servers that offer skipping.

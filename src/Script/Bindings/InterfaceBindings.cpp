@@ -10,6 +10,7 @@
 #include "../../Game/Query/InventoryItem_s.hpp"
 #include "../../Game/Query/PlayerQuery.hpp"
 #include "../../Game/State/GameState_s.hpp"
+#include "../../Game/State/Interfaces_s.hpp"
 #include "../../Utils/StringUtils.hpp"
 #include "../Convert/PyObjects.hpp"
 #include "../Convert/PyValue.hpp"
@@ -80,6 +81,14 @@ namespace
                 PyValue::FromString(out, text);
             });
             return true;
+        });
+    }
+
+    bool GetTutorialModal(int, py_StackRef) noexcept
+    {
+        return BindingSupport::Guard([]
+        {
+            return BindingSupport::ReturnInt(BindingSupport::GetContext().GetState().interfaces.tutorialComponent);
         });
     }
 
@@ -297,6 +306,20 @@ namespace
         });
     }
 
+    bool OpenSideTab(int, py_StackRef argv) noexcept
+    {
+        return BindingSupport::Guard([&]
+        {
+            const auto tab = PyValue::ToInt(py_arg(0), "tab");
+            if (tab < 0 || tab >= 15)
+            {
+                throw std::invalid_argument("tab must be between 0 and 14");
+            }
+
+            return BindingSupport::ReturnBool(BindingSupport::GetContext().GetActions().OpenSideTab(static_cast<u8>(tab)));
+        });
+    }
+
     bool IsAppearanceScreenOpen(int, py_StackRef) noexcept
     {
         return BindingSupport::Guard([]
@@ -310,6 +333,7 @@ void InterfaceBindings::Add(std::vector<BoundFunction_s>& functions)
 {
     functions.insert(functions.end(), {
                                           {"can_set_run()", CanSetRun},
+                                          {"open_side_tab(tab)", OpenSideTab},
                                           {"is_appearance_screen_open()", IsAppearanceScreenOpen},
                                           {"get_main_modal()", GetMainModal},
                                           {"get_side_modal()", GetSideModal},
@@ -324,6 +348,7 @@ void InterfaceBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"get_open_interfaces()", GetOpenInterfaces},
                                           {"get_tab_interface(tab)", GetTabInterface},
                                           {"get_texts(root)", GetTexts},
+                                          {"get_tutorial_modal()", GetTutorialModal},
                                           {"modal_changes()", GetModalChanges},
                                           {"find_continue()", FindContinue},
                                           {"get_chat_options()", GetChatOptions},

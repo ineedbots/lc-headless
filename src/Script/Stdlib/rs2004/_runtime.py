@@ -23,11 +23,11 @@ _hooks_from = None
 _generator = None
 # Set while the step in progress is on_start, not loop().
 _starting = False
-# Set while the tutorial skip runs before on_start; the bot's hooks wait for on_start.
-_skipping_tutorial = False
+# Set while the tutorial runs before on_start; the bot's hooks wait for on_start.
+_completing_tutorial = False
 _finish_reason = None
 _finished = False
-# The random event guardian's solver, the stall guard's recovery, or the tutorial skip before on_start, while
+# The random event guardian's solver, the stall guard's recovery, or the tutorial completion before on_start, while
 # it has taken over from the bot.
 _guardian = None
 # What load() was given, so the stall guard can make the bot afresh.
@@ -86,13 +86,13 @@ def load(main, settings):
     """Makes the bot from the script's module, checks its settings, and finds its hooks. Returns warnings.
     A BOT's settings are the object under its name in the account file's settings; a script without one
     reads the whole object."""
-    global bot, _generator, _starting, _skipping_tutorial, _finish_reason, _finished, _guardian, _main, _settings
+    global bot, _generator, _starting, _completing_tutorial, _finish_reason, _finished, _guardian, _main, _settings
     global _setting_defaults, _paused
     bot = None
     _generator = None
     _guardian = None
     _starting = False
-    _skipping_tutorial = False
+    _completing_tutorial = False
     _finish_reason = None
     _finished = False
     _paused = False
@@ -216,24 +216,27 @@ def _hook(name):
 
 def start():
     """Runs on_start once the player is first placed. One that's a generator runs as the first step, and
-    loop() follows on the next pass once it finishes. On Tutorial Island, the guardian first asks the guide to
-    skip the tutorial, and on_start follows."""
-    global _guardian, _skipping_tutorial
+    loop() follows on the next pass once it finishes. On Tutorial Island, the guardian first completes
+    the tutorial, and on_start follows."""
+    global _guardian, _completing_tutorial
     if _tutorial.on_tutorial_island():
-        _guardian = _skip_tutorial()
-        _skipping_tutorial = True
+        _guardian = _complete_tutorial()
+        _completing_tutorial = True
         return
     _start_bot()
 
 
-def _skip_tutorial():
-    yield from _tutorial.skip(lambda message: log(message))
+def _complete_tutorial():
+    completed = yield from _tutorial.complete(lambda message: log(message))
+    if not completed:
+        request_finish('Tutorial Island could not be completed')
+        return
     _start_bot()
 
 
 def _start_bot():
-    global _generator, _starting, _skipping_tutorial
-    _skipping_tutorial = False
+    global _generator, _starting, _completing_tutorial
+    _completing_tutorial = False
     hook = _hook('start')
     if hook is None:
         _started()
@@ -254,8 +257,8 @@ def _started():
 
 def dispatch(name, *args):
     """Calls the event's hook, then its subscribers, and returns what the hook returned. Game events that
-    come while the tutorial skip runs are dropped, as on_start hasn't run yet."""
-    if _skipping_tutorial and name != 'script_finish':
+    come while the tutorial completion runs are dropped, as on_start hasn't run yet."""
+    if _completing_tutorial and name != 'script_finish':
         return None
     call_args = _events.make_args(name, args)
     result = None
@@ -383,11 +386,11 @@ def step():
 
 def reset():
     """Drops the step in progress, so the next step calls loop() afresh."""
-    global _generator, _starting, _guardian, _skipping_tutorial
+    global _generator, _starting, _guardian, _completing_tutorial
     _generator = None
     _starting = False
-    _guardian = None
-    _skipping_tutorial = False
+    _guardian = _complete_tutorial() if _completing_tutorial and _tutorial.on_tutorial_island() else None
+    _completing_tutorial = _guardian is not None
     random_events.handling = False
 
 

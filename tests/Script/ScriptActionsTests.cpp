@@ -361,3 +361,20 @@ TEST_CASE("ScriptActions use the cache run buttons and check whether their inter
     f.actions.SetRun(false);
     f.ExpectWords(ClientProt_e::IfButton, {TestCache::RUN_OFF_BUTTON});
 }
+
+TEST_CASE("ScriptActions acknowledge only an available flashing tutorial tab", "[ScriptActions]")
+{
+    auto f = ActionSession{};
+    f.state.interfaces.flashingTab = 3;
+    CHECK_FALSE(f.actions.OpenSideTab(3));
+    CHECK_FALSE(f.actions.OpenSideTab(15));
+    f.state.interfaces.tabs[3] = PANEL;
+    REQUIRE(f.actions.OpenSideTab(3));
+    f.client.Flush();
+    REQUIRE(f.server.WaitForPacket(ClientProt_e::TutClickSide));
+    CHECK(f.server.GetPackets(ClientProt_e::TutClickSide)[0].payload == std::vector<u8>{3});
+    f.state.interfaces.flashingTab = 1;
+    CHECK(f.actions.OpenSideTab(3));
+    f.client.Flush();
+    CHECK(f.server.GetPackets(ClientProt_e::TutClickSide).size() == 1);
+}

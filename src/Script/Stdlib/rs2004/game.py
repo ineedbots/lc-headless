@@ -80,11 +80,11 @@ class _Game:
         return 2 if _core.is_placed() else 0
 
     def open_side_tab(self, tab):
-        """rs2b0t's: opens a side tab. Every tab's interface is readable here without opening it, so this is
-        True at once. Use with yield from."""
+        """Opens an available side tab, acknowledging a flashing tutorial tab to the server.
+        Use with yield from."""
         if False:
             yield
-        return True
+        return _core.open_side_tab(tab)
 
     def tile(self):
         """Your tile, or None before you're placed."""

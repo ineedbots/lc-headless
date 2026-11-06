@@ -52,7 +52,6 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 
 - Remove this section when points are completed
 - Check and implement newer rs2b0t's commits
-- Do tutorial island, not just skipping it
 
 ## Credits
 

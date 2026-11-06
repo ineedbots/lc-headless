@@ -89,5 +89,5 @@ Hooks only: `start`, `stop`, `progress_report`.
 ## Notes
 
 - Events report only what the server said. When the map rebuilds, or an area falls out of view, things vanish from the state without a despawn event. Query what's in view rather than keeping your own copy.
-- Events that arrive while the client skips Tutorial Island, before `on_start`, aren't delivered.
+- Events that arrive while the client completes Tutorial Island, before `on_start`, aren't delivered.
 - `in_combat` and chat `type` names differ from rs2b0t's webclient: see [Porting](python-dialect.md#porting-from-rs2b0t).

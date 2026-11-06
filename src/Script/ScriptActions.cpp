@@ -13,6 +13,7 @@
 #include "../Game/Query/InventoryItem_s.hpp"
 #include "../Game/Query/InventoryQuery.hpp"
 #include "../Game/State/GameState_s.hpp"
+#include "../Game/State/Interfaces_s.hpp"
 #include "../Game/Tile_s.hpp"
 
 ScriptActions::ScriptActions(const GameState_s& state, const WorldMap& map, GameActions& actions)
@@ -296,6 +297,21 @@ void ScriptActions::SetRun(bool run)
 {
     const auto& cache = GetCache();
     m_actions.ClickButton(run ? cache.runOnButton : cache.runOffButton);
+}
+
+bool ScriptActions::OpenSideTab(u8 tab)
+{
+    if (tab >= m_state.interfaces.tabs.size() || m_state.interfaces.tabs[tab] < 0)
+    {
+        return false;
+    }
+
+    if (m_state.interfaces.flashingTab == tab)
+    {
+        m_actions.ClickTutorialTab(tab);
+    }
+
+    return true;
 }
 
 void ScriptActions::Say(std::string_view text)
