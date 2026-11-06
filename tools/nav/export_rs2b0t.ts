@@ -90,7 +90,11 @@ for (const edge of activateTransportRows([...allTransportRows(), ...stairs])) {
         locId: edge.locId,
         openLocId: edge.openLocId,
         toLevel: edge.to.level !== edge.from.level ? edge.to.level : undefined,
-        toTile: LANDING_KINDS.has(edge.kind) ? { x: edge.to.x, z: edge.to.z } : undefined,
+        // 289's gertrudefence exact move ends on the loc tile when entering, one tile
+        // south of the graph's walkable waypoint. Waiting for 3494 retries the fence and exits.
+        toTile: edge.locName === 'Broken fence' && edge.to.x === 3305 && edge.to.z === 3494
+            ? { x: 3305, z: 3493 }
+            : LANDING_KINDS.has(edge.kind) ? { x: edge.to.x, z: edge.to.z } : undefined,
         acceptAnyLanding: edge.kind === 'portal' || edge.kind === 'teleport' ? true : undefined,
         requires
     });

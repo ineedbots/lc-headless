@@ -58,7 +58,7 @@ Type commands into the running client:
 | `quit` or `exit` | Request shutdown as with Ctrl+C. Repeating it advances the shutdown stages. |
 | `loglevel` | Show the current process log level. |
 | `loglevel verbose` | Set all accounts' log level; accepts `verbose`, `info`, `warning`, `error`. |
-| `say <text>` | Send public chat from accounts in game, limited to 80 characters. |
+| `say <text>` | Send public chat from accounts in game, limited to 80 characters. Use `say ::<command>` to send a server command (up to 80 characters after `::`). |
 | `pause` | Pause scripts while upkeep continues, including random events and run energy management. |
 | `resume` | Resume scripts, starting their loop afresh. |
 

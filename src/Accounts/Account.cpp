@@ -379,7 +379,7 @@ bool Account::Say(std::string_view text)
         return false;
     }
 
-    m_client.Send(m_client.GetPackets().MessagePublic(text));
+    m_client.Send(text.starts_with("::") ? m_client.GetPackets().ClientCheat(text.substr(2)) : m_client.GetPackets().MessagePublic(text));
     return true;
 }
 

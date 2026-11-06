@@ -52,7 +52,9 @@ ITEM = Record({
     'ROPE': Record({'id': 954, 'name': 'Rope'}),
 })
 RUNES = [ITEM.AIR_RUNE, ITEM.EARTH_RUNE, ITEM.WATER_RUNE]
-ARDOUGNE_MAN = Tile(2654, 3311, 0)
+# The level-1 Man spawns north of the castle (289 map m40_52, local 7,56).
+# The market has higher-level pickpocket targets, but no Man.
+ARDOUGNE_MAN = Tile(2567, 3384, 0)
 FOOD_TARGET = 8
 FOODS = [Record({'id': id, 'name': name}) for id, name in [(1891, 'Cake'), (1893, '2/3 cake'), (1895, 'Slice of cake'), (2309, 'Bread'), (1901, 'Chocolate slice')]]
 # Why: refilling on any shortfall walked back to Ardougne for 1 fish mid-route.
@@ -967,11 +969,13 @@ def place_rune(rune, pillar, log):
     item = live_item(rune)
     if not item:
         return True
-    before = live_count(rune)
     message_mark = game_messages.mark()
     if not (item.use_on(pillar)):
         return False
-    processed = yield from execution.delay_until(lambda: live_count(rune) < before or game_messages.saw_since(message_mark, 'you place the rune on the stand') or game_messages.saw_since(message_mark, 'you remember putting that type of rune there'), 8000)
+    # The server consumes the rune and announces placement before p_delay(0). Its
+    # smoke message and puzzle bit come a tick later; another use during that
+    # delay can be lost. Wait for completion, even if the inventory updated first.
+    processed = yield from execution.delay_until(lambda: game_messages.saw_since(message_mark, 'the rune stone disappears in a puff of smoke') or game_messages.saw_since(message_mark, 'you remember putting that type of rune there'), 8000)
     if not processed:
         tile = pillar.tile()
         log(rune.name + ' placement on (' + str(tile.x) + ',' + str(tile.z) + ') was not acknowledged')
@@ -1372,7 +1376,7 @@ def steal_waterfall_cakes(log):
     if game.in_combat():
         result = 'combat'
     else:
-        result = yield from steal_cakes(abort=lambda: event_signal.pending() or waterfall_area(game.tile()) != 'mainland', set_status=log, log=log, fill_to=FOOD_TARGET)
+        result = yield from steal_cakes(lambda: event_signal.pending() or waterfall_area(game.tile()) != 'mainland', log, log, fill_to=FOOD_TARGET)
     if result == 'combat':
         _w25 = yield from traversal.walk_resilient(FLEE_TILE, radius=2, attempts=3, timeout_ms=30000, log=log)
         if not (_w25):

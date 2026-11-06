@@ -24,11 +24,41 @@ def test_demon_bones_pickup_and_goblin_kill_are_incremental():
                 npc.accept = mode != 'attack_refused'
                 npc.effect = lambda: setattr(npc, 'alive', False)
                 w.scene = [npc]
-            assert w.run(demon.grind_goblins(w.logs.append)) == (mode == 'held')
+            assert w.run(demon._grind_goblins_once(w.logs.append)) == (mode == 'held')
             if mode == 'drop':
                 assert w.count('Bones') == 1
             if mode == 'kill':
                 assert not npc.valid()
+
+
+def test_bone_gathering_waits_through_rejected_clicks_and_reports_incremental_progress():
+    with QuestWorld() as w:
+        w.install(demon)
+        w.patch(demon, '_core', w)
+        w.position = demon.GOBLIN_ANCHOR
+        w.hold('Bones', 18)
+        drop = QuestObject(w, 'Bones', demon.BONES_ID, effect=lambda: w.hold('Bones'))
+        drop.accept = False
+        w.scene = [drop]
+        started = w.now
+        w.on_update = lambda: setattr(drop, 'accept', w.now - started >= 12000)
+        assert w.run(demon.grind_goblins(w.logs.append))
+        assert w.count('Bones') == 19
+        assert w.now - started >= 12000
+
+
+def test_bone_gathering_still_fails_after_a_bounded_window_without_progress():
+    with QuestWorld() as w:
+        w.install(demon)
+        w.patch(demon, '_core', w)
+        w.position = demon.GOBLIN_ANCHOR
+        drop = QuestObject(w, 'Bones', demon.BONES_ID)
+        drop.accept = False
+        w.scene = [drop]
+        started = w.now
+        assert not w.run(demon.grind_goblins(w.logs.append))
+        assert w.now - started >= 30000
+        assert w.now - started < 40000
 
 
 def test_drain_surface_fills_bucket_pours_water_and_opens_manhole():
@@ -114,6 +144,7 @@ def test_traiborn_key_hunt_climbs_tower_and_drives_ritual_boxes():
     for mode in ['climb_down', 'grind', 'climb_up', 'unreachable', 'key', 'ritual_stalled']:
         with QuestWorld() as w:
             w.install(demon)
+            w.patch(demon, '_core', w)
             w.hold('Key', id=demon.ROVIN_KEY_ID)
             w.position = Tile(3112, 3162, 1 if mode in ['climb_down', 'unreachable', 'key', 'ritual_stalled'] else 0)
             if mode not in ['climb_down', 'grind']:
