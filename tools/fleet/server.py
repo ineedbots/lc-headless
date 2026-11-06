@@ -80,7 +80,9 @@ def _read_jsonl_tail(path, count):
 
 def _read_jsonl(path, limit=None):
     """Every complete line of a JSONL file, newest last. A line being written is skipped."""
-    if limit is not None and limit <= 100:
+    if limit is not None:
+        # Why: the tail read is what keeps a page refresh cheap once a journal reaches megabytes, and the
+        # experience view asks for 200 records, so the old 100-record cutoff sent it through the whole file.
         tail = _read_jsonl_tail(path, limit)
         if tail:
             return tail
