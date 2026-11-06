@@ -21,6 +21,35 @@ class RouteWorld(TransportWorld):
         return False
 
 
+class ScriptedDoorWorld(RouteWorld):
+    def can_step(self, x, z, to_x, to_z):
+        return False
+
+
+def test_followed_route_crosses_a_scripted_door_once_then_continues_walking():
+    with ScriptedDoorWorld() as world:
+        world.passable = True
+        door = Entity(world, 'Door', ['Open'], Tile(3201, 3200))
+        def cross(op):
+            world.events.append(('land', Tile(3202, 3200)))
+            return True
+        door.on_interact = cross
+        world.loc_items = [door]
+        world.route = [
+            {'x': 3200, 'z': 3200, 'level': 0},
+            {'x': 3202, 'z': 3200, 'level': 0, 'transport': {
+                'kind': 'door', 'loc_name': 'Door', 'action': 'Open',
+                'loc_x': 3201, 'loc_z': 3200}},
+            {'x': 3210, 'z': 3200, 'level': 0},
+        ]
+        walk = walker._Traversal()
+        assert world.run(walk.walk_to(Tile(3210, 3200), radius=0, timeout_ms=15000,
+                                      use_teleport_catalog=False, log=world.logs.append))
+        assert walk.last_outcome == 'arrived' and world.here == Tile(3210, 3200)
+        assert world.interactions == [('Door', 'Open')], world.interactions
+        assert len(world.requests) == 1
+
+
 class ScriptedTraversal(walker._Traversal):
     def __init__(self, world):
         walker._Traversal.__init__(self)
