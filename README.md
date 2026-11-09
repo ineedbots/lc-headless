@@ -38,6 +38,9 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 
 ## Documentation
 
+The current release target is **v1.0.0**. See the [changelog](CHANGELOG.md) for
+release highlights.
+
 | Guide | Contents |
 |---|---|
 | [Requirements](docs/Requirements.md) | Supported platforms, runtime dependencies and server files |
