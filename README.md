@@ -45,6 +45,7 @@ See the [feature guide](docs/Features.md) for capabilities, revision differences
 | [Running](docs/Running.md) | Command-line options, console commands, reconnects, shutdown and script profiling |
 | [Scripting](docs/scripting/README.md) | Quick start, examples and the full Python API reference |
 | [Building](docs/Building.md) | Toolchains, build presets, tests, coverage, packaging and project layout |
+| [Fleet tracking](docs/FleetTracking.md) | Per-account experience, bank, backpack and equipment logs, and the local fleet page |
 | [Development workflow](docs/design/DevelopmentWorkflow.md) | Branch policy, release promotion and commit messages |
 | [Design documents](docs/design/) | Implementation plans, code conventions and protocol references |
 

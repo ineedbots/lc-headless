@@ -43,6 +43,18 @@ struct ScriptingSettings_s
     std::chrono::seconds maxRetryDelaySeconds = 30s;
     std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
+    // Where each account's skill experience is logged: experience/<account>.jsonl, one sample per line.
+    // Empty, or an interval of 0, turns it off.
+    std::string experienceDirectory = "experience";
+    std::chrono::minutes experienceIntervalMinutes = 1min;
+    // Where a bank's contents are written when one opens: bank/<account>.jsonl and .json. Empty turns it off.
+    std::string bankLogDirectory = "bank";
+    // Where an account's backpack is written when it changes: inventory/<account>.jsonl. Empty turns it off.
+    std::string inventoryDirectory = "inventory";
+    // The least time between two lines; 0 records every change.
+    std::chrono::seconds inventoryIntervalSeconds = 5s;
+    // Where an account's worn equipment is written when it changes: equipment/<account>.jsonl. Empty turns it off.
+    std::string equipmentDirectory = "equipment";
 };
 
 // client.jsonc.
