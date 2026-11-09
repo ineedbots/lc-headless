@@ -1,8 +1,8 @@
 # Publishes a GitHub release when a version tag is pushed:
 #
-#     git tag v0.1.0 && git push origin v0.1.0
+#     git tag v1.0.0 && git push origin v1.0.0
 #
-# The tag has to match the project VERSION in CMakeLists.txt, with an optional pre-release suffix such as v0.1.0-rc1,
+# The tag has to match the project VERSION in CMakeLists.txt, with an optional pre-release suffix such as v1.0.0-rc1,
 # which marks the release as a pre-release. Windows (x64 and x86) and Linux (x64 and arm64) are built and tested in
 # Release, then each is packaged with the files the client loads from its working directory, and the release's notes
 # are generated from the commits since the previous tag.
