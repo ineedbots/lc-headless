@@ -28,13 +28,13 @@ def should_fetch_key(state=None):
 
 
 # Why: `open_and_close_door` teleports the actor and re-shuts in 3 ticks, so the door opens for nobody else: the tradeable spare key goes over and the untradeable keyring comes off the floor.
-def decide_hero_handoff(gang, stage, has_key, candlesticks, partner_configured, ready):
+def decide_hero_handoff(gang, stage, has_key, candlesticks, partner_configured, ready, partner_stage=None, partner_has_key=None):
     """Who owes whom, from the snapshot alone."""
     if not partner_configured:
         return None
     if gang == 'blackarm':
         # Why: Grip re-issues the spare whenever `~obj_gettotal` reads 0, so giving it away costs nothing.
-        if stage >= HERO_STAGE.BLACKARM_PAPERS_GIVEN and stage < HERO_STAGE.BLACKARM_ARMBAND and has_key:
+        if stage >= HERO_STAGE.BLACKARM_PAPERS_GIVEN and stage < HERO_STAGE.BLACKARM_ARMBAND and has_key and partner_has_key != True and (partner_stage is None or partner_stage < HERO_STAGE.PHOENIX_KILLED_GRIP):
             return 'give-key'
         # Why: The chest gives two candlesticks and refuses while one is held or banked; one is reserved for the partner.
         if stage >= HERO_STAGE.BLACKARM_LOOTED and stage < HERO_STAGE.BLACKARM_ARMBAND and candlesticks >= 2:
@@ -83,6 +83,7 @@ def run_hero_handoff(handoff, log):
 def hero_handoff_step(handoff):
     return Record({
         'kind': 'custom',
+        'cooperative': True,
         'name': f'{handoff} with {hero_config.partner}',
         'run': lambda log: run_hero_handoff(handoff, log),
     })

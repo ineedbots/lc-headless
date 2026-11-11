@@ -1,5 +1,23 @@
 [
     {
+        "module": "event/webwalk/dungeonTravel.ts",
+        "exports": ["dungeonTravelEdges", "withDungeonTools"],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "allTransportRows()"
+    },
+    {
+        "module": "event/webwalk/lighthouseTravel.ts",
+        "exports": ["lighthouseTravelEdges"],
+        "implementation": "tools/nav/export_rs2b0t.ts",
+        "anchor": "allTransportRows()"
+    },
+    {
+        "module": "event/webwalk/exec/dungeonEntry.ts",
+        "exports": ["handleDungeonEntry"],
+        "implementation": "src/Script/Stdlib/rs2004/traversal.py",
+        "anchor": "def _dungeon_entry("
+    },
+    {
         "module": "event/webwalk/PathFinder.ts",
         "exports": [
             "PathFinder"
@@ -533,5 +551,11 @@
         ],
         "implementation": "src/Script/Stdlib/rs2004/game.py",
         "anchor": "def world("
+    },
+    {
+        "module": "client/config/worlds.ts",
+        "exports": ["resolveNodeId"],
+        "implementation": "scripts/bots/aio_quester.py",
+        "anchor": "'world': str(game.world())"
     }
 ]

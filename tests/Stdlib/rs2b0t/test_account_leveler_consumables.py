@@ -33,9 +33,9 @@ def _fn3(arrows, *_args):
 test_each([1, 8, 299, 300, 1000])('ranged starts with %i banked arrows instead of requiring a refill', _fn3)
 
 def _fn4(*_args):
-    plan = method(snapshot(Record({'coins': 100000, '#843': 1})), 'ranged')
+    plan = method(snapshot(Record({'coins': 100000, '#843': 1}), Record({'ranged': 39})), 'ranged')
     expect(([need for need in plan.needs if need.item == 'Bronze arrow'] or [None])[0]).to_match_object(Record({'count': 300, 'carry': 300, 'minimum': 1}))
-test('empty ranged supplies request a useful refill with a one-arrow minimum', _fn4)
+test('empty ranged supplies below guild level request a useful refill with a one-arrow minimum', _fn4)
 
 def _fn5(*_args):
     s = snapshot(Record({'coins': 500000, 'staff of air': 1, 'mind rune': 40}), Record({'magic': 35}))

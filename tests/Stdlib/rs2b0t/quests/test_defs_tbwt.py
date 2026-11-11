@@ -1,6 +1,7 @@
 """rs2b0t's test/api/ai/quests/defs/tbwt.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and expect."""
 
 from rs2004.catalogs.record import Record
+from rs2004.game import skills
 from rs2004.quests.engine.types import QuestProgress, QuestSnapshot
 from rs2004.quests.defs import QUEST_DEFS
 from rs2004.quests.defs.tbwt import decide, tbwt
@@ -289,6 +290,7 @@ def _fn1():
 
         # Why: the shoal is 160 tiles from the bait, and three Karambwan in ten burn on the fire.
         def _fn45():
+            spy_on(skills, 'level', returns=65)
             _merged46 = {}
             for _k, _v in (PAST_TAMAYU._fields if isinstance(PAST_TAMAYU, Record) else PAST_TAMAYU).items():
                 _merged46[_k] = _v

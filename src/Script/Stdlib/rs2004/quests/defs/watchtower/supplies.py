@@ -4,6 +4,8 @@ from rs2004.catalogs.record import Record
 from rs2004.geometry import Tile
 from rs2004.quests.defs.watchtower.areas import RELIC_PARTS, WT_ITEM, WT_TILE
 from rs2004.quests.food import quest_food
+from rs2004.quests.defs.watchtower.loadout import clear_space, fit_supplies, food_count, food_names, phase_items
+from rs2004.quests.defs.watchtower.areas import watchtower_area
 
 __all__ = ['ARDOUGNE_ADVENTURER', 'MAGIC_GUILD', 'VARROCK_RUNES', 'OGRE_HERBLORE', 'held', 'banked', 'owned', 'withdraw_from', 'scan_bank', 'source', 'bank_only', 'source_coins', 'source_rope', 'source_death_rune', 'source_vial', 'source_pestle', 'source_pickaxe', 'source_light_source', 'carried_food', 'source_food', 'make_room', 'quest_kit']
 
@@ -95,7 +97,7 @@ def source_coins(snap, want):
     available = banked(snap, WT_ITEM.COINS.id)
     if available <= 0:
         return Record({'kind': 'wait', 'reason': f'need {want} gp for Gu\'Tanoth tolls and shops'})
-    return withdraw_from([{'name': WT_ITEM.COINS.name, 'id': WT_ITEM.COINS.id, 'qty': min(want, available)}])
+    return withdraw_from([{'name': WT_ITEM.COINS.name, 'id': WT_ITEM.COINS.id, 'qty': min(want - held(snap, WT_ITEM.COINS.id), available)}])
 
 
 def source_rope(snap):
@@ -146,36 +148,25 @@ def quest_foods():
 
 
 def carried_food(snap):
-    return sum([((snap.inv.get(food.lower()) if snap.inv.get(food.lower()) is not None else 0)) for food in quest_foods()])
+    return food_count(snap)
 
 
-# Why: the shamans are 99 in every combat stat and respawn about every 100 ticks, so an enclave trip without food is a death.
-# Why: ownsInventory means the engine's own food provisioning never runs for this quest.
 def source_food(snap, want):
-    """Source `want` food, or null when the pack has it."""
     carried = carried_food(snap)
     if carried >= want:
         return None
     if not snap.bank_known:
         return scan_bank()
-    for food in quest_foods():
-        _v3 = (snap.bank.get(food.lower()) if snap.bank is not None else None)
-        in_bank = (_v3 if _v3 is not None else 0)
-        if in_bank > 0:
-            # Why: a withdrawal past the free slots draws what fits and asks again for the rest into a full pack forever.
-            room = (snap.free_slots if snap.free_slots is not None else want)
-            if room <= 0:
-                return (None if carried > 0 else Record({'kind': 'wait', 'reason': 'no room in the pack for the shaman enclave food'}))
-            return Record({
-                'kind': 'withdraw',
-                'items': [{'name': food, 'qty': min(want - carried, in_bank, room)}],
-                'bank': WT_TILE.YANILLE_BANK,
-            })
+    room = (snap.free_slots if snap.free_slots is not None else 28) - 2
+    if room <= 0:
+        return clear_space(snap, 3)
+    for food in food_names():
+        stocked = snap.bank.get(food.lower(), 0) if snap.bank is not None else 0
+        if stocked > 0:
+            return Record({'kind': 'withdraw', 'items': [{'name': food, 'qty': min(want - carried, stocked, room)}], 'bank': WT_TILE.YANILLE_BANK})
     return Record({'kind': 'wait', 'reason': 'no food in the bank for the shaman enclave'})
 
 
-# Why: ownsInventory skips the engine's bank-to-nothing, so a quest resumed after another one starts on that quest's
-# leftovers, and a full pack refuses every shop buy and withdrawal (live: Aemad's rope, 0 free after The Grand Tree).
 QUEST_ITEMS = [getattr(WT_ITEM, key) for key in WT_ITEM.keys()]
 KEEP_NAMES = ['prayer']
 
@@ -203,10 +194,10 @@ def make_room(snap):
 def quest_kit(snap, food_want):
     """Everything the kit still needs that the bank can supply, in one withdrawal."""
     # Why: an unread bank is left to the first stage that needs a scan, so a quest wanting nothing more from the bank never takes a trip to prove it.
-    if not snap.bank_known:
+    if not snap.bank_known or watchtower_area(snap.tile) != 'yanille':
         return None
     items = []
-    for item in KIT_ITEMS:
+    for item in phase_items(snap):
         missing = 1 - held(snap, item.id)
         if missing > 0 and banked(snap, item.id) > 0:
             items.append({'name': item.name, 'id': item.id, 'qty': missing})
@@ -218,12 +209,15 @@ def quest_kit(snap, food_want):
     banked_coins = banked(snap, WT_ITEM.COINS.id)
     if coins_short > 0 and banked_coins > 0:
         items.append({'name': WT_ITEM.COINS.name, 'id': WT_ITEM.COINS.id, 'qty': min(coins_short, banked_coins)})
-    food_short = food_want - carried_food(snap)
+    supply_slots = sum([0 if item.get('id') == WT_ITEM.COINS.id and held(snap, WT_ITEM.COINS.id) else (1 if item.get('id') == WT_ITEM.COINS.id else item['qty']) for item in items])
+    if supply_slots + 2 > (snap.free_slots if snap.free_slots is not None else 28):
+        return clear_space(snap, supply_slots + 2)
+    food_short = min(food_want - carried_food(snap), (snap.free_slots if snap.free_slots is not None else 28) - supply_slots - 2)
     if food_short > 0:
-        for food in quest_foods():
+        for food in food_names():
             _v4 = (snap.bank.get(food.lower()) if snap.bank is not None else None)
             in_bank = (_v4 if _v4 is not None else 0)
             if in_bank > 0:
                 items.append({'name': food, 'qty': min(food_short, in_bank)})
                 break
-    return (withdraw_from(items) if len(items) > 0 else None)
+    return fit_supplies(snap, withdraw_from(items)) if items else None

@@ -44,6 +44,7 @@ HERBS = [
     HerbDef('torstol', 'Torstol', 269, 111),
 ]
 SECONDARIES = [
+    SecondaryDef('toads legs', "Toad's legs", 2152),
     SecondaryDef('eye of newt', 'Eye of newt', 221),
     SecondaryDef('red spiders eggs', "Red spiders' eggs", 223),
     SecondaryDef('limpwurt root', 'Limpwurt root', 225),
@@ -58,6 +59,8 @@ HERB_OPTIONS = [h.name for h in HERBS]
 SECONDARY_OPTIONS = [s.name for s in SECONDARIES]
 
 SETTINGS = {
+    'output_id': SettingDef('number', 0, min=0),
+    'output_count': SettingDef('number', 0, min=0),
     'herb': SettingDef('string', CUSTOM, 'Herb', options=HERB_OPTIONS + [CUSTOM], help='Which herb to turn into unfinished potions. Choose Custom to reveal a free-text field.'),
     'herb_custom': SettingDef('string', 'Guam leaf', 'Custom herb', show_if={'key': 'herb', 'any_of': [CUSTOM]}, help='Shown when Herb is Custom — a clean herb name like "guam leaf" or "ranarr".'),
     'secondary': SettingDef('string', CUSTOM, 'Secondary', options=SECONDARY_OPTIONS + [CUSTOM], help='Which secondary to finish the potions with. Choose Custom to reveal a free-text field.'),
@@ -147,6 +150,18 @@ class RestockIngredients(Task):
             return
         if not bank.ready():
             return
+        batch = bot.batch_size()
+        if batch == 0:
+            bot.request_finish('Potion target reached')
+            return
+        if bot.secondary is not None and bank.count_by_id(herb.unf_id) > 0:
+            taken = yield from bank.withdraw_x_by_id(herb.unf_id, batch)
+            if not taken:
+                self.failed('unfinished potions')
+                return
+            self.failed_withdraws = 0
+            yield from bank.close()
+            return
         vials = bank.count_by_id(VIAL_OF_WATER_ID)
         herbs = bank.count_by_id(herb.id)
         if vials == 0 or herbs == 0:
@@ -154,11 +169,11 @@ class RestockIngredients(Task):
             bot.log(f'no {missing} in the bank; stopping')
             bot.request_finish(f'no {missing} in the bank')
             return
-        taken = yield from bank.withdraw_x_by_id(VIAL_OF_WATER_ID, BATCH)
+        taken = yield from bank.withdraw_x_by_id(VIAL_OF_WATER_ID, batch)
         if not taken:
             self.failed('vials of water')
             return
-        taken = yield from bank.withdraw_x_by_id(herb.id, BATCH)
+        taken = yield from bank.withdraw_x_by_id(herb.id, batch)
         if not taken:
             self.failed(herb.name)
             return
@@ -297,6 +312,11 @@ class PotionMaker(TaskBot):
             return
         self.log(f'PotionMaker; {self.herb.name} + {self.secondary.name} at the nearest bank')
         self.add(RestockIngredients(self), MakeUnfinished(self), FinishPotions(self))
+
+    def batch_size(self):
+        id = self.settings.num('output_id', 0)
+        target = self.settings.num('output_count', 0)
+        return max(0, min(BATCH, target - bank.count_by_id(id) - inventory.count_by_id(id))) if id > 0 and target > 0 else BATCH
 
     def wait_for_deposit(self):
         if self.pending_bank_generation is None:

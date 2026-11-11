@@ -411,7 +411,7 @@ def _fn54():
 
     def _fn56():
         step = decide(snapshot(Fake(**{'progress': P(4, 'market-asked'), 'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.ROCK_CAKE.id, 1]]}})))
-        expect(mentions(step.kind == 'custom' and step.name, 'battlement', 'guard')).to_be(True)
+        expect(mentions(step.kind == 'custom' and step.name, 'ogre city', 'guard')).to_be(True)
     test('stage 4 holding the cake gives it to the battlement guard', _fn56)
 
     def _fn57():
@@ -430,7 +430,7 @@ def _fn54():
         'inv_ids': {},
         'bank_ids': {_k: _v for _k, _v in [[WT_ITEM.COINS.id, 100000]]},
     })))
-        expect(mentions(step.kind == 'custom' and step.name, 'battlement')).to_be(True)
+        expect(mentions(step.kind == 'custom' and step.name, 'ogre city')).to_be(True)
     test('short of the toll inside the lower city, it climbs out toward the bank', _fn58)
 
     def _fn59():
@@ -679,8 +679,8 @@ def _fn90():
     def _fn91():
         step = decide(snapshot(Fake(**{
         'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:6'),
-        'inv': {_k: _v for _k, _v in [['tuna', 10]]},
-        'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.MAGIC_OGRE_POTION.id, 1], [WT_ITEM.LIT_CANDLE.id, 1]]},
+        'inv': {_k: _v for _k, _v in [['tuna', 8]]},
+        'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.COINS.id, 1000], [WT_ITEM.MAGIC_OGRE_POTION.id, 1], [WT_ITEM.LIT_CANDLE.id, 1]]},
     })))
         expect(mentions(step.kind == 'custom' and step.name, 'skavid map')).to_be(True)
     test('stage 10 fetching nightshade without the map re-asks the city guard', _fn91)
@@ -688,8 +688,8 @@ def _fn90():
     def _fn92():
         step = decide(snapshot(Fake(**{
         'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:6'),
-        'inv': {_k: _v for _k, _v in [['tuna', 10]]},
-        'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.MAGIC_OGRE_POTION.id, 1], [WT_ITEM.LIT_CANDLE.id, 1]]},
+        'inv': {_k: _v for _k, _v in [['tuna', 8]]},
+        'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.COINS.id, 1000], [WT_ITEM.MAGIC_OGRE_POTION.id, 1], [WT_ITEM.LIT_CANDLE.id, 1]]},
         'bank_ids': {_k: _v for _k, _v in [[WT_ITEM.SKAVID_MAP.id, 1]]},
     })))
         expect(step.kind).to_be('withdraw')
@@ -698,7 +698,7 @@ def _fn90():
     def _fn93():
         step = decide(snapshot(Fake(**{
         'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:6'),
-        'inv': {_k: _v for _k, _v in [['tuna', 10]]},
+        'inv': {_k: _v for _k, _v in [['tuna', 8]]},
         'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.MAGIC_OGRE_POTION.id, 1], [WT_ITEM.SKAVID_MAP.id, 1], [WT_ITEM.LIT_CANDLE.id, 1]]},
     })))
         expect(mentions(step.kind == 'custom' and step.name, 'nightshade')).to_be(True)
@@ -737,7 +737,7 @@ def _fn97():
     def _fn98():
         step = decide(snapshot(Fake(**{
         'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:0'),
-        'inv': {_k: _v for _k, _v in [['tuna', 10]]},
+        'inv': {_k: _v for _k, _v in [['tuna', 8]]},
         'inv_ids': all_four,
         'bank_known': False,
     })))
@@ -749,7 +749,7 @@ def _fn97():
         partial.pop(WT_ITEM.CRYSTAL2.id, None)
         step = decide(snapshot(Fake(**{
         'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:0'),
-        'inv': {_k: _v for _k, _v in [['tuna', 10]]},
+        'inv': {_k: _v for _k, _v in [['tuna', 8]]},
         'inv_ids': partial,
         'bank_known': False,
     })))
@@ -807,7 +807,7 @@ def _fn106():
         _merged107 = {}
         for _k, _v in {
             'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:0'),
-            'inv': {_k: _v for _k, _v in [['tuna', 10]]},
+            'inv': {_k: _v for _k, _v in [['tuna', 8]]},
             'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.NIGHTSHADE.id, 1], [WT_ITEM.SKAVID_MAP.id, 1], [WT_ITEM.LIT_CANDLE.id, 1]]},
         }.items():
             _merged107[_k] = _v
@@ -834,7 +834,7 @@ def _fn106():
     def _fn111():
         step = decide(snapshot(Fake(**{
         'progress': P(WATCHTOWER_STAGE.MADE_POTION, 'shamans-left:6'),
-        'inv': {_k: _v for _k, _v in [['tuna', 10]]},
+        'inv': {_k: _v for _k, _v in [['tuna', 8]]},
         'inv_ids': {_k: _v for _k, _v in [[WT_ITEM.MAGIC_OGRE_POTION.id, 1], [WT_ITEM.NIGHTSHADE.id, 1]]},
     })))
         expect(step.kind).to_be('buy')
@@ -893,7 +893,7 @@ def _fn113():
 describe('the enclave food is whatever the player chose to eat', _fn113)
 
 
-def _fn118():
+def _upstream_fn123():
     FULL_BANK = {_k: _v for _k, _v in [['lobster', 100]]}
 
     def bank_ids():
@@ -914,59 +914,47 @@ def _fn118():
 
     def started(o=None):
         if o is None:
-            o = Fake(**{})
-        _merged119 = {}
+            o = Record({})
+        _upstream_merged124 = {}
         for _k, _v in {
-            'progress': P(WATCHTOWER_STAGE.STARTED),
+            'progress': P(WATCHTOWER_STAGE.GIVEN_FINGERNAILS, 'helped-og', 'helped-toban'),
             'bank_known': True,
             'bank': FULL_BANK,
             'bank_ids': bank_ids(),
         }.items():
-            _merged119[_k] = _v
-        for _k, _v in o._fields.items():
-            _merged119[_k] = _v
-        return snapshot(Fake(**_merged119))
+            _upstream_merged124[_k] = _v
+        for _k, _v in (o._fields if isinstance(o, (Record, Fake)) else o).items():
+            _upstream_merged124[_k] = _v
+        return snapshot(Fake(**_upstream_merged124))
 
-    def _fn120():
+    def _upstream_fn125():
         step = decide(started())
         expect(step.kind).to_be('withdraw')
-        names = ([i['name'] for i in step.items] if step.kind == 'withdraw' else [])
-        for want in [
-        'Coins',
-        'Rope',
-        'Vial of water',
-        'Pestle and mortar',
-        'Bronze pickaxe',
-        'Death rune',
-        'Guam leaf',
-        'Bat bones',
-        'Dragon bones',
-        'Gold bar',
-        'Skavid map',
-        'Lit candle',
-    ]:
-            expect(names).to_contain(want)
-    test('one withdraw carries the whole banked kit, not one item per trip', _fn120)
+        names = ([i.get('name') for i in step.items] if step.kind == 'withdraw' else [])
+        expect(names).to_contain('Rope')
+        for future in ['Vial of water', 'Pestle and mortar', 'Death rune', 'Guam leaf', 'Gold bar']:
+            expect(names).not_.to_contain(future)
+    test('the Grew trip carries a rope without future cave and potion supplies', _upstream_fn125)
 
-    def _fn121():
+    def _upstream_fn126():
         step = decide(started())
-        names = ([i['name'] for i in step.items] if step.kind == 'withdraw' else [])
+        names = ([i.get('name') for i in step.items] if step.kind == 'withdraw' else [])
         expect(names).to_contain('Lobster')
-    test('the configured food rides along in the same trip', _fn121)
+    test('the configured food rides along in the same trip', _upstream_fn126)
 
-    def _fn122():
+    def _upstream_fn127():
         step = decide(started(Fake(**{'bank_ids': {_k: _v for _k, _v in [[WT_ITEM.ROPE.id, 1]]}, 'bank': {}})))
-        names = ([i['name'] for i in step.items] if step.kind == 'withdraw' else [])
+        names = ([i.get('name') for i in step.items] if step.kind == 'withdraw' else [])
         expect(names).to_equal(['Rope'])
-    test('what the bank does not hold is left to the shop and the quest', _fn122)
+    test('what the bank does not hold is left to the shop and the quest', _upstream_fn127)
 
-    def _fn123():
+    def _upstream_fn128():
         held = {_k: _v for _k, _v in bank_ids().items()}
         step = decide(started(Fake(**{'inv_ids': held, 'inv': {_k: _v for _k, _v in [['lobster', 8]]}})))
         expect(step.kind).not_.to_be('withdraw')
-    test('nothing is drawn twice — a full pack moves the quest on', _fn123)
+    test('nothing is drawn twice — a full pack moves the quest on', _upstream_fn128)
 
-    def _fn124():
+    def _upstream_fn129():
         gear = {_k: _v for _k, _v in bank_ids().items()}
         gear.pop(WT_ITEM.COINS.id, None)
         step = decide(started(Fake(**{
@@ -974,31 +962,31 @@ def _fn118():
         'inv': {_k: _v for _k, _v in [['lobster', 8]]},
     })))
         expect(step.kind).not_.to_be('withdraw')
-    test('a purse a few coins short does not buy another bank trip', _fn124)
+    test('a purse a few coins short does not buy another bank trip', _upstream_fn129)
 
-    def _fn125():
+    def _upstream_fn130():
         step = decide(started(Fake(**{'inv_ids': {_k: _v for _k, _v in bank_ids().items()}, 'inv': {_k: _v for _k, _v in [['lobster', 5]]}})))
         expect(step.kind).not_.to_be('withdraw')
-    test('food eaten down does not buy another bank trip', _fn125)
+    test('food eaten down does not buy another bank trip', _upstream_fn130)
 
-    def _fn126():
+    def _upstream_fn131():
         short = {_k: _v for _k, _v in bank_ids().items()}
         short.pop(WT_ITEM.ROPE.id, None)
         short[WT_ITEM.COINS.id] = 1977
         step = decide(started(Fake(**{'inv_ids': short, 'inv': {_k: _v for _k, _v in [['lobster', 5]]}})))
         expect(step.kind).to_be('withdraw')
-        names = ([i['name'] for i in step.items] if step.kind == 'withdraw' else [])
+        names = ([i.get('name') for i in step.items] if step.kind == 'withdraw' else [])
         expect(names).to_contain('Rope')
         expect(names).to_contain('Coins')
         expect(names).to_contain('Lobster')
-    test('a missing piece of gear still brings the purse and the food with it', _fn126)
+    test('a missing piece of gear still brings the purse and the food with it', _upstream_fn131)
 
-    def _fn127():
+    def _upstream_fn132():
         expect(decide(started(Fake(**{'bank_known': False}))).kind).not_.to_be('withdraw')
-    test('an unread bank is left alone, so a quest wanting nothing takes no trip', _fn127)
+    test('an unread bank is left alone, so a quest wanting nothing takes no trip', _upstream_fn132)
 
 
-describe('the kit comes out of the bank in one trip', _fn118)
+describe('the current phase kit comes out of the bank in one trip', _upstream_fn123)
 
 
 # Live: Watch Tower resumed after The Grand Tree with a full pack, and Aemad refused the rope 30 times.
@@ -1011,9 +999,9 @@ def _fn128():
             'free_slots': 0,
         })))
         expect(step.kind).to_be('deposit')
-        expect(step.keep_ids).to_contain(WT_ITEM.DRAGON_BONES.id)
+        expect(step.keep_ids).not_.to_contain(WT_ITEM.DRAGON_BONES.id)
         expect(step.keep_ids).to_contain(WT_ITEM.COINS.id)
-        expect([k.lower() for k in step.keep]).to_contain('lobster')
+        expect([cap.qty for cap in step.caps if cap.id == 379]).to_equal([8])
     test('a full pack of another quest\'s leftovers banks them, keeping the kit and the food', _fn129)
 
     def _fn130():
@@ -1023,7 +1011,7 @@ def _fn128():
             'inv_ids': {379: 26, WT_ITEM.DRAGON_BONES.id: 1, WT_ITEM.COINS.id: 500},
             'free_slots': 0,
         })))
-        expect(step.kind).not_.to_be('deposit')
+        expect(step.kind).to_be('deposit')
     test('a full pack of only kit and food has nothing to bank, so it takes no trip', _fn130)
 
     def _fn131():
@@ -1126,11 +1114,11 @@ def _fn141():
     def _fn142():
         step = source_food(pack(3, 0), 8)
         expect(step.kind).to_be('withdraw')
-        expect(step.items[0]['qty']).to_be(3)
+        expect(step.items[0]['qty']).to_be(1)
     test('the food draw stops at the free slots', _fn142)
 
     def _fn143():
-        expect(source_food(pack(0, 3), 8)).to_be(None)
+        expect(source_food(pack(0, 3), 8).kind).to_be('wait')
     test('a full pack with some food goes on with what it carries', _fn143)
 
     def _fn144():

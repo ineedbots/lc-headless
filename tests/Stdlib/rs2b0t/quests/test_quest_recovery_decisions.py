@@ -67,7 +67,7 @@ def tower_caves_and_potion():
     expect(run_wait(tower.stage_caves(snap, 'yanille').run(scene.log))).to_be(True)
     expect(word.calls[0][0]).to_be(2)
     cave.mock_return_value(6)
-    expect(tower.stage_caves(snap, 'yanille').kind).to_be('wait')
+    expect(tower.stage_caves(snap, 'yanille').run).to_be(tower.answer_mad_skavid)
     snap.inv_ids[tower.WT_ITEM.GOLD_BAR.id] = 1
     expect(tower.stage_caves(snap, 'yanille').run).to_be(tower.answer_mad_skavid)
     expect(tower.stage_enclave_entry(snap, 'enclave').run).to_be(tower.leave_enclave)
@@ -125,16 +125,17 @@ def tower_shamans():
     snap.inv_ids[tower.WT_ITEM.CRYSTAL4.id] = 1
     snap.inv_ids[tower.WT_ITEM.CRYSTAL3.id] = 1
     expect(tower.stage_shamans(snap, 'enclave').run).to_be(tower.leave_enclave)
+    snap.inv_ids[tower.WT_ITEM.ROPE.id] = 1
     expect(tower.stage_shamans(snap, 'yanille').run).to_be(tower.talk_to_grew)
     for crystal in tower.CRYSTALS:
         snap.inv_ids[crystal.id] = 1
     expect(tower.stage_shamans(snap, 'yanille').run).to_be(tower.show_crystals_to_wizard)
     snap.inv_ids = {}
     snap.bank_known = False
-    expect(tower.recover_crystals(snap).kind).to_be('scan_bank')
+    expect(tower.recover_crystals(snap, 'yanille').kind).to_be('scan_bank')
     snap.bank_known = True
     snap.bank_ids[tower.CRYSTALS[0].id] = 1
-    expect(tower.recover_crystals(snap).kind).to_be('withdraw')
+    expect(tower.recover_crystals(snap, 'yanille').kind).to_be('withdraw')
 
 
 test('Watchtower shamans retain food for return visits and recover crystals before requesting duplicates', tower_shamans)

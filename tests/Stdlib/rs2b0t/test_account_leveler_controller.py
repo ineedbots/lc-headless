@@ -293,7 +293,7 @@ def saved_progress():
     bot = Controller()
     spy_on(settings_store, 'saved', returns={
         'objective': 'attack', 'recent': ['one', 3, 'two'], 'deaths': 2,
-        'cooldowns': {'fish-shrimps': 1000, 'quest-dragon': 1000, 'prayer-blue-dragons': 1000},
+        'cooldowns': {'fish-shrimps': 1000, 'quest-dragon': 1000, 'prayer-blue-dragons': 1000, 'ranging-guild': 1000},
         'attempted': {'attack': 3, 'strength': 'bad'},
         'diagnostics': {'failure': {'reason': 'original failure'}, 'history': [{'at': 0, 'message': 'saved'}]},
     })
@@ -303,9 +303,28 @@ def saved_progress():
     assert bot._session.memory.deaths == 2
     assert 'fish-shrimps' not in bot._session.memory.cooldowns
     assert bot._session.memory.cooldowns['quest-dragon'] == _core.step_time() + 1000
+    assert bot._session.memory.cooldowns['ranging-guild'] == _core.step_time() + 1000
     for i in range(100):
         bot._actions.note(str(i))
     assert bot._last_failure['reason'] == 'original failure'
 
 
 test('saved gathering cooldowns are removed while the original failure survives diagnostic history rotation', saved_progress)
+
+
+def guild_failure():
+    setup()
+    bot = Controller()
+    plan = Record({'id': 'ranging-guild', 'objective': 'ranged', 'label': 'Ranging Guild',
+                   'script': 'RangingGuild', 'needs': [{'item': 'Coins', 'count': 1000, 'carry': 1000}], 'settings': {}})
+    bot.snap.stock['coins'] = 600
+    for attempt in range(2):
+        bot.train(plan)
+        bot._waiting_until = 0
+        bot._activity.outcome = Record({'kind': 'failed', 'reason': 'RangingGuild: gave up after 3 recoveries'})
+        run_wait(bot.loop())
+    assert bot._session.memory.cooldowns['ranging-guild'] > _core.step_time()
+    assert bot._retry is None
+
+
+test('failed guild rounds enter cooldown even after some entry coins were spent', guild_failure)

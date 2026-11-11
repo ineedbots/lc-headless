@@ -4,7 +4,7 @@ from rs2004.catalogs.record import Record
 from rs2004.game import skills
 from rs2004.quests.data import quest_record
 from rs2004.quests.engine.types import QuestModule
-from rs2004.quests.defs.tbwt.areas import KARAMBWANJI_WANTED, KARAMBWAN_BAIT, SPEAR_HUNT_KILLS, TBWT_QUEST, TB_ID, TB_LUBUFU, TB_MAIN, TB_NPC, TB_POTIONS, TB_SPEAR_DROPS, TB_TAMAYU, TB_TIADECHE, TB_TILE, TB_TINSAY, in_cutscene
+from rs2004.quests.defs.tbwt.areas import FOOD_TARGET, KARAMBWANJI_WANTED, KARAMBWAN_BAIT, SPEAR_HUNT_KILLS, TBWT_QUEST, TB_ID, TB_LUBUFU, TB_MAIN, TB_NPC, TB_POTIONS, TB_SPEAR_DROPS, TB_TAMAYU, TB_TIADECHE, TB_TILE, TB_TINSAY, in_cutscene
 from rs2004.quests.defs.tbwt.brothers import become_apprentice, claim_reward, give_karambwanji, give_manual, give_tamayu, give_tinsay, hunt_shaikahan, meet_lubufu, meet_tamayu, meet_tiadeche, meet_tinsay, spare_vessel, start_quest, tiadeche_catch
 from rs2004.quests.defs.tbwt.crafting import burn_jogre_bones, buy_rum, combine, cook_on_fire, fish_karambwan, fish_karambwanji, grind, kill_for, load_vessel, make_sandwich, paste_bones, pick_banana, poison_spear
 from rs2004.quests.defs.tbwt.journal import TB_FLAG, parse_tbwt_journal, read_tbwt_progress
@@ -76,6 +76,20 @@ def karambwan_spear(snap):
         return custom('grind the cooked Karambwan into poison', grind(TB_ID.POORLY_COOKED_KARAMBWAN, TB_ID.KARAMBWAN_POISON_PASTE))
     if held_id(snap, TB_ID.RAW_KARAMBWAN) > 0:
         return custom('cook the Karambwan on the jungle fire', cook_on_fire(TB_ID.RAW_KARAMBWAN, TB_ID.POORLY_COOKED_KARAMBWAN, 'raw Karambwan'))
+    for id, name in [
+        [TB_ID.KARAMBWAN_POISON_PASTE, 'Karambwan paste'],
+        [TB_ID.POORLY_COOKED_KARAMBWAN, 'Cooked karambwan'],
+        [TB_ID.RAW_KARAMBWAN, 'Raw karambwan'],
+    ]:
+        _v2 = (snap.bank_ids.get(id) if snap.bank_ids is not None else None)
+        if ((_v2 if _v2 is not None else 0)) > 0:
+            return Record({
+                'kind': 'withdraw',
+                'items': [Record({'id': id, 'name': name, 'qty': 1})],
+                'bank': TB_TILE.ARDOUGNE_BANK,
+            })
+    if skills.level('fishing') < 65:
+        return wait('replacement Karambwan needs 65 Fishing or a banked raw Karambwan; the one-time gift is missing')
     # Why: 2 spare Karambwanji ride along, so a burn is re-cooked from this trip.
     if held_id(snap, TB_ID.RAW_KARAMBWANJI) < KARAMBWAN_BAIT:
         return custom('net bait for the Karambwan shoal', fish_karambwanji(KARAMBWAN_BAIT))
@@ -96,8 +110,8 @@ def tamayu_leg(snap, stage):
             return wait(f'Tamayu is short of his four doses and the pack holds {doses_held(snap)}')
         return custom(f'give Tamayu the {bottle.name}', give_tamayu(bottle.id))
     if not has_flag(snap.progress, TB_FLAG.SPEAR):
-        _v2 = karambwan_spear(snap)
-        return (_v2 if _v2 is not None else custom('give Tamayu the Karambwan-poisoned spear', give_tamayu(kp_spear_held(snap))))
+        _v3 = karambwan_spear(snap)
+        return (_v3 if _v3 is not None else custom('give Tamayu the Karambwan-poisoned spear', give_tamayu(kp_spear_held(snap))))
     return custom('follow Tamayu on the killing hunt', hunt_shaikahan)
 
 
@@ -204,7 +218,11 @@ def observe(snap, step=None):
     return [f'lubufu={lubufu_stage(snap)} tiadeche={tiadeche_stage(snap)} tamayu={tamayu_stage(snap)}' + f' tinsay={tinsay_stage(snap)} agility={has_flag(snap.progress, TB_FLAG.AGILITY)} spear={has_flag(snap.progress, TB_FLAG.SPEAR)}']
 
 
+from rs2004.quests.defs.tbwt.loadout import TB_FOODS
+
 tbwt = QuestModule(**{
+    'food': FOOD_TARGET,
+    'sustain': Record({'foods': TB_FOODS, 'eat_below_hp': 0.5}),
     'record': quest_record('tbwt'),
     # Why: Karamja has no bank until Shilo Village is complete, and Ardougne West is the nearest booth to the Brimhaven ferry.
     'bank': TB_TILE.ARDOUGNE_BANK,

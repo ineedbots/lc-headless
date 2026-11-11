@@ -20,6 +20,20 @@ void BotMessenger::Unregister(std::string_view username)
 
 std::optional<bool> BotMessenger::Send(std::string_view username, BotMessage_s message) const
 {
+    if (username == "*")
+    {
+        auto accepted = true;
+        const auto sender = StringUtils::ToLower(message.sender);
+        for (const auto& [name, receiver] : m_receivers)
+        {
+            if (name != sender)
+            {
+                accepted = receiver(message) && accepted;
+            }
+        }
+        return accepted;
+    }
+
     const auto receiver = m_receivers.find(StringUtils::ToLower(username));
     if (receiver == m_receivers.end())
     {

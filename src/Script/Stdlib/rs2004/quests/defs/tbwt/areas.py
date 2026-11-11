@@ -2,7 +2,6 @@
 
 from rs2004.catalogs.record import Record
 from rs2004.geometry import Tile
-from rs2004.quests.food import FOOD_FLOAT
 
 __all__ = ['TBWT_QUEST', 'TB_VARP', 'TB_MAIN', 'TB_TIADECHE', 'TB_TINSAY', 'TB_TAMAYU', 'TB_LUBUFU', 'KARAMBWANJI_WANTED', 'KARAMBWAN_BAIT', 'TB_ID', 'TB_NAME', 'TB_SPEARS', 'SPEAR_HUNT_KILLS', 'TB_SPEAR_IDS', 'TB_SPEAR_DROPS', 'AGILITY_DOSES', 'TB_POTIONS', 'TB_POTION_IDS', 'TB_BOWS', 'TB_ARROWS', 'TB_ARMOUR', 'TB_ARMOUR_SLOTS', 'ARROW_TARGET', 'FOOD_TARGET', 'COIN_TARGET', 'TB_TILE', 'TB_LOC', 'TB_NPC', 'TIMFRAKU_START', 'TIMFRAKU_REWARD', 'on_karamja', 'in_cutscene']
 
@@ -142,7 +141,7 @@ TB_ARROWS = ['Adamant arrow', 'Rune arrow', 'Mithril arrow', 'Steel arrow', 'Iro
 TB_ARMOUR = [TB_NAME.BODY, TB_NAME.LEGS, TB_NAME.HELM]
 TB_ARMOUR_SLOTS = ['torso', 'legs', 'hat']
 ARROW_TARGET = 200
-FOOD_TARGET = FOOD_FLOAT
+FOOD_TARGET = 6
 COIN_TARGET = 500
 TB_TILE = Record({
     'ARDOUGNE_BANK': Tile(2616, 3332, 0),

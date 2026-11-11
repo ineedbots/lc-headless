@@ -15,6 +15,7 @@ SHIELD_NAME = 'Dragonfire shield'
 BOOTH = {'name': 'Bank booth', 'op': 'Use-quickly'}
 
 SECONDARIES = [
+    Record({'id': 'blue_dragon_scale', 'name': 'Blue dragon scale', 'mode': 'loot', 'anchor': Tile(2906, 9804, 0), 'search_radius': 9, 'bank': Tile(2946, 3369, 0), 'bank_name': 'Falador West', 'take_food': True, 'need_shield': True, 'key_name': 'Dusty key'}),
     Record({'id': 'red_spiders_eggs', 'name': "Red spiders' eggs", 'mode': 'loot', 'anchor': Tile(3120, 9952, 0), 'search_radius': 14,
             'bank': Tile(3094, 3493, 0), 'bank_name': 'Edgeville', 'take_food': True, 'need_shield': False}),
     Record({'id': 'snape_grass', 'name': 'Snape grass', 'mode': 'loot', 'anchor': Tile(2908, 3294, 0), 'search_radius': 16,
@@ -88,6 +89,8 @@ def keep_on_deposit(d, food):
         keep.append('Coins')
     if d.take_food:
         keep.append(food)
+    if d.key_name:
+        keep.append(d.key_name)
     if d.need_shield:
         keep.append(SHIELD_NAME)
     if d.tool_name:
@@ -98,7 +101,7 @@ def keep_on_deposit(d, food):
     return keep
 
 
-def needs_restock(d, food_in_pack, food_want, coins, has_shield, pack_full, grind_left):
+def needs_restock(d, food_in_pack, food_want, coins, has_shield, pack_full, grind_left, has_key=True):
     mid_grind = grinds(d) and grind_left > 0
     if pack_full and not mid_grind:
         return True
@@ -106,6 +109,8 @@ def needs_restock(d, food_in_pack, food_want, coins, has_shield, pack_full, grin
         return True
     # Food is restocked only once it's gone; eating mid-trip is fine until then.
     if d.take_food and food_want > 0 and food_in_pack < 1:
+        return True
+    if d.key_name and not has_key:
         return True
     if d.need_shield and not has_shield:
         return True
@@ -166,7 +171,7 @@ class BankTrip(Task):
     def validate(self):
         bot = self.bot
         return needs_restock(bot.secondary, bot.food_in_pack(), bot.food_want, bot.coin_count(), bot.has_shield(),
-                             inventory.is_full() and bot.product_count() + bot.source_count() > 0, bot.grind_left())
+                             inventory.is_full() and bot.product_count() + bot.source_count() > 0, bot.grind_left(), has_key=not bot.secondary.key_name or inventory.contains(bot.secondary.key_name))
 
     def stop(self, reason):
         """Use with yield from."""
@@ -186,12 +191,22 @@ class BankTrip(Task):
             bot.log('could not open bank')
             return
         keep = [n.lower() for n in keep_on_deposit(d, food)]
+        if d.key_name and bot.food_in_pack() > bot.food_want:
+            keep = [name for name in keep if name not in food_forms(food)]
         yield from bank.deposit_all_matching(lambda name, *_args: name.lower() not in keep)
         if d.need_shield and not bot.has_shield():
             if bank.count(SHIELD_NAME) < 1:
-                yield from self.stop(f'no {SHIELD_NAME} banked for white berries')
+                yield from self.stop(f'no {SHIELD_NAME} banked for {d.name}')
                 return
             yield from bank.withdraw_x(SHIELD_NAME, 1)
+        if d.key_name and not inventory.contains(d.key_name):
+            if bank.count(d.key_name) < 1:
+                yield from self.stop(f'no {d.key_name} banked for {d.name}')
+                return
+            taken = yield from bank.withdraw_x(d.key_name, 1)
+            if not taken or not inventory.contains(d.key_name):
+                yield from bank.close()
+                return
         if d.take_food and bot.food_want > 0:
             have = bot.food_in_pack()
             if have < bot.food_want:
@@ -323,7 +338,7 @@ class Grind(Task):
                 return
             source = sources[0]
             before = bot.product_count()
-            want = min(5, bot.grind_left())
+            want = min(5, bot.grind_left(), has_key=not bot.secondary.key_name or inventory.contains(bot.secondary.key_name))
             sent = 0
             for _ in range(want):
                 if event_signal.pending() or not pestle.use_on(source):
@@ -438,7 +453,7 @@ class HerbloreSecondaries(TaskBot):
         if not self.resolve_site(d):
             return
         self.food_name = script_food(self.settings, FOOD_DEFAULT)
-        self.food_want = self.settings.num('food_withdraw', FOOD_DEFAULT_COUNT)
+        self.food_want = min(self.settings.num('food_withdraw', FOOD_DEFAULT_COUNT), 25 if d.key_name else 27)
         shield = f", shield '{SHIELD_NAME}'" if d.need_shield else ''
         self.log(f"HerbloreSecondaries — {d.name} ({d.mode}) bank {self.bank_name}, food '{self.food_name}' x{self.food_want}{shield}")
         # Why: ProcessSource comes before BankTrip so swamp toads become legs before the deposit, and Eat does too,
@@ -511,6 +526,15 @@ class HerbloreSecondaries(TaskBot):
 
     def walk_to(self, dest, what):
         """Use with yield from."""
+        if self.secondary.id == 'blue_dragon_scale':
+            from rs2004.hunting.sites import TAVERLEY_BLUE
+            from rs2004.quests.exec.prompts import cross_teleport_door
+            entering = TAVERLEY_BLUE.in_area(dest)
+            if TAVERLEY_BLUE.in_area(game.tile()) != entering:
+                gate = TAVERLEY_BLUE.gate
+                crossed = yield from cross_teleport_door(Record({'id': gate.loc_id, 'name': 'Gate', 'stand': gate.outside if entering else gate.inside, 'stand_radius': 0 if entering else 1, 'use_item': TAVERLEY_BLUE.key_item.id if entering else None, 'is_far': lambda: game.tile() is not None and TAVERLEY_BLUE.in_area(game.tile()) == entering, 'log': self.log}))
+                if not crossed:
+                    return False
         if near(dest, 3):
             return True
         self.status = f'walking to {what}'

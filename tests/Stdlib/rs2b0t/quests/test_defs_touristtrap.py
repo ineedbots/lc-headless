@@ -1,5 +1,6 @@
 """rs2b0t's test/api/ai/quests/defs/touristtrap.test.ts (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and expect."""
 
+import json
 from rs2004.catalogs.record import Record
 from rs2004.execution import event_signal
 from rs2004.messages import game_messages
@@ -40,14 +41,14 @@ def snap(options=None):
         options = Record({})
     inv = count_map(options.inv)
     has_charged_skin = any([((inv.get(name) if inv.get(name) is not None else 0)) > 0 for name in ['waterskin(4)', 'waterskin(3)', 'waterskin(2)', 'waterskin(1)']])
-    skins = (options.skins if options.skins is not None else 4)
+    skins = (options.skins if options.skins is not None else 0)
     if not has_charged_skin and skins > 0:
         inv['waterskin(4)'] = skins
     kebabs = (options.kebabs if options.kebabs is not None else 8)
     _v2 = inv.get('kebab')
     if ((_v2 if _v2 is not None else 0)) == 0 and kebabs > 0:
         inv['kebab'] = kebabs
-    food = (options.food if options.food is not None else 16)
+    food = (options.food if options.food is not None else 8)
     _v3 = inv.get('trout')
     if ((_v3 if _v3 is not None else 0)) == 0 and food > 0:
         inv['trout'] = food
@@ -343,7 +344,6 @@ def _fn18():
         ['Desert shirt', 1],
         ['Desert robe', 1],
         ['Desert boots', 1],
-        ['Waterskin(4)', 4],
         ['Bronze bar', 3],
         ['Feather', 50],
         ['Hammer', 1],
@@ -846,8 +846,8 @@ def _fn56():
 describe('Tourist Trap surface rescue orchestration', _fn56)
 
 
-def _fn79():
-    def _fn80():
+def _upstream_fn84():
+    def _upstream_fn85():
         s = snap(Record({
         'stage': TOURIST_TRAP_STAGE.STARTED,
         'tile': CAPTAIN,
@@ -858,12 +858,12 @@ def _fn79():
         lines = observe_tourist_trap(s, step)
         expect(any([('stage=1' in l) for l in lines])).to_be(True)
         expect(any([('area=desert' in l) or ('area=' in l) for l in lines])).to_be(True)
-        expect(any([('water=8 doses across 2 skins' in l) for l in lines])).to_be(True)
+        expect(any([('food=Trout:8' in l) for l in lines])).to_be(True)
         expect(any([l.startswith('tt: decide→') for l in lines])).to_be(True)
         expect(any([('WARN' in l) and ('waterskin' in l) for l in lines])).to_be(False)
-    test('dumps stage, area, skins, and decide step', _fn80)
+    test('dumps stage, area, food, and decide step', _upstream_fn85)
 
-    def _fn81():
+    def _upstream_fn86():
         s = snap(Record({
         'stage': TOURIST_TRAP_STAGE.STARTED,
         'tile': CAPTAIN,
@@ -872,25 +872,26 @@ def _fn79():
         'skins': 0,
     }))
         lines = observe_tourist_trap(s, Record({'kind': 'wait', 'reason': 'death'}))
-        expect(any([('WARN' in l) and ('0 waterskin doses' in l) for l in lines])).to_be(True)
+        expect(any([('WARN' in l) and ('waterskin' in l) for l in lines])).to_be(False)
         expect(any([('death dump' in l) for l in lines])).to_be(True)
-    test('warns when in desert with zero charged waterskins', _fn81)
+    test('does not warn about missing waterskins', _upstream_fn86)
 
-    def _fn82():
-        s = snap(Record({'stage': TOURIST_TRAP_STAGE.LEARNED_DARTS, 'tile': MAINLAND, 'inv': [['Coins', 200]], 'skins': 0}))
-        step = decide(s)
-        expect(step.kind).to_be('buy')
-        if step.kind == 'buy':
-            expect(step.item).to_be('Waterskin(4)')
-            expect(step.qty).to_be(4)
-    test('refuses to re-enter the desert without charged waterskins after death recovery', _fn82)
+    def _upstream_fn87():
+        step = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.LEARNED_DARTS,
+        'tile': MAINLAND,
+        'inv': [['Coins', 200], ['Shantay pass', 1]],
+        'skins': 0,
+    })))
+        expect(custom_name(step)).to_be('cross the Shantay Pass')
+    test('re-enters the desert without waterskins after death recovery', _upstream_fn87)
 
-    def _fn83():
+    def _upstream_fn88():
         s = snap(Record({'stage': TOURIST_TRAP_STAGE.LEARNED_DARTS, 'tile': IRENA, 'inv': [['Coins', 50]], 'skins': 0}))
-        expect(custom_name(decide(s))).to_be('cross the Shantay Pass north for supplies')
-    test('already south with zero skins routes north for restock before pineapple recovery', _fn83)
+        expect(custom_name(decide(s))).to_be('replace the Tenti pineapple at Al Shabim')
+    test('already south with no waterskins continues pineapple recovery', _upstream_fn88)
 
-    def _fn84():
+    def _upstream_fn89():
         expect(custom_name(decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.KILLED_CAPTAIN,
         'tile': CAPTAIN,
@@ -899,19 +900,65 @@ def _fn79():
         'kebabs': 0,
         'food': 0,
     }))))).to_be('provoke and defeat the respawned Mercenary Captain')
-    test('configured food permits captain recovery without kebabs', _fn84)
+    test('configured food permits captain recovery without kebabs', _upstream_fn89)
 
 
-describe('Tourist Trap observe (logging pilot)', _fn79)
+describe('Tourist Trap observe (logging pilot)', _upstream_fn84)
 
 
-def _fn85():
-    def _fn86():
-        expect(waterskin_doses(snap(Record({'inv': [['Waterskin(1)', 4]], 'skins': 0})))).to_be(4)
-        expect(waterskin_doses(snap(Record({'inv': [['Waterskin(4)', 1], ['Waterskin(3)', 1], ['Waterskin(2)', 1], ['Waterskin(1)', 1]], 'skins': 0})))).to_be(10)
-    test('counts doses rather than charged containers', _fn86)
+def surplus_food_case(food):
+    def _upstream_fn94():
+        quest_food.name = food
+        rations = ([['Cake', 8], ['2/3 cake', 4], ['Slice of cake', 4]] if food == 'Cake' else [[(food if food is not None else 'Kebab'), 16]])
+        inventory = list(rations) + [['Metal key', 1], ['Cell door key', 1], ['Bedobin key', 1], ['Technical plans', 1], ['Bronze bar', 1], ['Hammer', 1], ['Feather', 10]]
+        step = decide(snap(Record({
+    'stage': TOURIST_TRAP_STAGE.SHOWN_PLANS,
+    'tile': MAINLAND,
+    'inv': inventory,
+    'food': 0,
+    'kebabs': 0,
+    'free_slots': 0,
+})))
+        expect(step.kind).to_be('deposit')
+        if step.kind != 'deposit':
+            return
+        expect(step.exact_keep).to_be(True)
+        for name, _2 in rations:
+            expect(step.keep).not_.to_contain(name.lower())
+        for name, _2 in inventory[len(rations):]:
+            expect(step.keep).to_contain(name.lower())
+        remaining = [(name, _2) for name, _2 in inventory if (name.lower() in step.keep)]
+        restock = decide(snap(Record({
+    'stage': TOURIST_TRAP_STAGE.SHOWN_PLANS,
+    'tile': MAINLAND,
+    'inv': remaining,
+    'bank': rations,
+    'food': 0,
+    'kebabs': 0,
+    'free_slots': 16,
+})))
+        expect(restock.kind == 'withdraw' and restock.items).to_equal([Record({'name': (food if food is not None else 'Kebab'), 'qty': 8})])
 
-    def _fn87():
+    return _upstream_fn94
+
+
+def waterskin_case(skins):
+    def _upstream_fn107():
+        step = decide(snap(Record({
+    'stage': TOURIST_TRAP_STAGE.LEARNED_DARTS,
+    'tile': MAINLAND,
+    'inv': list(skins) + [['Tenti pineapple', 1], ['Shantay pass', 1], ['Metal key', 1]] + list([[name, 1] for name in SLAVE_OUTFIT]),
+    'worn': DESERT_WORN,
+    'bank': [['Waterskin(4)', 50]],
+    'skins': 0,
+})))
+        expect(custom_name(step)).to_be('cross the Shantay Pass')
+
+    return _upstream_fn107
+
+
+def _upstream_fn90():
+    def _upstream_fn91():
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.STARTED,
         'tile': MAINLAND,
@@ -920,37 +967,120 @@ def _fn85():
         'kebabs': 0,
         'free_slots': 20,
     })))
-        expect(step.kind == 'withdraw' and step.items).to_equal([Record({'name': 'Trout', 'qty': 16})])
-    test('withdraws only the configured food', _fn87)
+        expect(step.kind == 'withdraw' and step.items).to_equal([Record({'name': 'Trout', 'qty': 8})])
+    test('withdraws only the configured food', _upstream_fn91)
 
-    def _fn88():
+    def _upstream_fn92():
+        inventory = list([[name, 1] for name in DESERT_OUTFIT]) + list([[name, 1] for name in SLAVE_OUTFIT]) + [['Bronze pickaxe', 1], ['Coins', 1000], ['Shantay pass', 1], ['Waterskin(4)', 4], ['Metal key', 1], ['Bedobin key', 1], ['Technical plans', 1], ['Bronze bar', 1], ['Hammer', 1], ['Feather', 10]]
+        free_slots = 28 - sum([((1 if (name in ['Coins', 'Feather', 'Shantay pass']) else count)) for name, count in inventory])
+        step = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.SHOWN_PLANS,
+        'tile': MAINLAND,
+        'inv': inventory,
+        'bank': [['Trout', 100]],
+        'food': 0,
+        'kebabs': 0,
+        'free_slots': free_slots,
+    })))
+        expect(step.kind).to_be('withdraw')
+        if step.kind != 'withdraw':
+            return
+        expect(step.items).to_equal([Record({'name': 'Trout', 'qty': 8})])
+        expect(free_slots - sum([item.get('qty') for item in step.items])).to_be_greater_than_or_equal(1)
+    test('leaves space for quest pickups after provisioning a forge loadout', _upstream_fn92)
+    for food in ['Trout', 'Cake', None]:
+        def _upstream_fn94():
+            quest_food.name = food
+            rations = ([['Cake', 8], ['2/3 cake', 4], ['Slice of cake', 4]] if food == 'Cake' else [[(food if food is not None else 'Kebab'), 16]])
+            inventory = list(rations) + [['Metal key', 1], ['Cell door key', 1], ['Bedobin key', 1], ['Technical plans', 1], ['Bronze bar', 1], ['Hammer', 1], ['Feather', 10]]
+            step = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.SHOWN_PLANS,
+        'tile': MAINLAND,
+        'inv': inventory,
+        'food': 0,
+        'kebabs': 0,
+        'free_slots': 0,
+    })))
+            expect(step.kind).to_be('deposit')
+            if step.kind != 'deposit':
+                return
+            expect(step.exact_keep).to_be(True)
+            for name, _2 in rations:
+                expect(step.keep).not_.to_contain(name.lower())
+            for name, _2 in inventory[len(rations):]:
+                expect(step.keep).to_contain(name.lower())
+            remaining = [(name, _2) for name, _2 in inventory if (name.lower() in step.keep)]
+            restock = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.SHOWN_PLANS,
+        'tile': MAINLAND,
+        'inv': remaining,
+        'bank': rations,
+        'food': 0,
+        'kebabs': 0,
+        'free_slots': 16,
+    })))
+            expect(restock.kind == 'withdraw' and restock.items).to_equal([Record({'name': (food if food is not None else 'Kebab'), 'qty': 8})])
+        test(f"banks an oversized {(food if food is not None else 'Kebab')} loadout and preserves quest items", surplus_food_case(food))
+
+    def _upstream_fn96():
+        step = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.GIVEN_PINEAPPLE,
+        'tile': MINE_DEEP,
+        'inv': [['Metal key', 1]],
+        'worn': SLAVE_WORN,
+        'food': 16,
+        'kebabs': 0,
+        'free_slots': 0,
+    })))
+        expect(custom_name(step)).to_be('ride back to the lower mine for item recovery')
+    test('leaves the mine before banking excess food from a full pack', _upstream_fn96)
+
+    def _upstream_fn97():
+        step = decide(snap(Record({'stage': TOURIST_TRAP_STAGE.REWARD, 'tile': IRENA, 'food': 16, 'kebabs': 0, 'free_slots': 0})))
+        expect(custom_name(step)).to_be('claim both Tourist Trap skill rewards')
+    test('claims the reward without a food-banking detour', _upstream_fn97)
+
+    def _upstream_fn98():
+        step = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.RESCUE,
+        'tile': CAMP_SURFACE,
+        'inv': [['Ana in a barrel', 1]],
+        'worn': SLAVE_WORN,
+        'food': 16,
+        'kebabs': 0,
+        'free_slots': 0,
+    })))
+        expect(custom_name(step)).to_be('resolve the surface winch/cart checkpoint')
+    test('does not interrupt the rescue while carrying Ana to bank excess food', _upstream_fn98)
+
+    def _upstream_fn99():
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.RESCUE,
         'tile': MAINLAND,
         'bank': [['Trout', 8]],
-        'food': 8,
+        'food': 3,
         'kebabs': 0,
         'free_slots': 20,
     })))
-        expect(step.kind == 'withdraw' and step.items).to_equal([Record({'name': 'Trout', 'qty': 8})])
-    test('tops up a partial configured loadout while already on the mainland', _fn88)
+        expect(step.kind == 'withdraw' and step.items).to_equal([Record({'name': 'Trout', 'qty': 5})])
+    test('tops up a partial configured loadout while already on the mainland', _upstream_fn99)
 
-    def _fn89():
+    def _upstream_fn100():
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.STARTED,
         'tile': MAINLAND,
-        'bank': [['Trout', 15], ['Kebab', 50]],
+        'bank': [['Trout', 7], ['Kebab', 50]],
         'food': 0,
         'kebabs': 0,
         'free_slots': 20,
     })))
         expect(step).to_equal(Record({
         'kind': 'wait',
-        'reason': "configured Tourist Trap food 'Trout' unavailable: need 16, carried 0, banked 15",
+        'reason': "configured Tourist Trap food 'Trout' unavailable: need 8, carried 0, banked 7",
     }))
-    test('fails explicitly when the configured food target is unavailable', _fn89)
+    test('fails explicitly when the configured food target is unavailable', _upstream_fn100)
 
-    def _fn90():
+    def _upstream_fn101():
         quest_food.name = 'Cake'
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.STARTED,
@@ -961,11 +1091,11 @@ def _fn85():
         'kebabs': 0,
     })))
         expect(custom_name(step)).to_be('provoke the Mercenary Captain')
-    test('recognizes every configured Cake form', _fn90)
+    test('recognizes every configured Cake form', _upstream_fn101)
 
-    def _fn91():
+    def _upstream_fn102():
         quest_food.name = None
-        expect(custom_name(decide(snap(Record({'stage': TOURIST_TRAP_STAGE.RESCUE, 'tile': MAINLAND, 'kebabs': 8, 'food': 0}))))).to_be('buy 8 Kebabs')
+        expect(custom_name(decide(snap(Record({'stage': TOURIST_TRAP_STAGE.RESCUE, 'tile': MAINLAND, 'kebabs': 3, 'food': 0}))))).to_be('buy 5 Kebabs')
         expect(custom_name(decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.KILLED_CAPTAIN,
         'tile': CAPTAIN,
@@ -974,25 +1104,25 @@ def _fn85():
         'kebabs': 8,
         'food': 0,
     }))))).to_be('provoke and defeat the respawned Mercenary Captain')
-    test('quest-ration mode tops up to sixteen on the mainland but accepts eight in the desert', _fn91)
+    test('quest-ration mode tops up to eight on the mainland and accepts eight in the desert', _upstream_fn102)
 
-    def _fn92():
+    def _upstream_fn103():
         quest_food.name = None
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.RESCUE,
         'tile': tile(3302, 3118),
         'inv': list([[name, 1] for name in SLAVE_OUTFIT]) + [['Waterskin(4)', 3], ['Waterskin(3)', 1], ['Metal key', 1]],
         'worn': DESERT_WORN,
-        'kebabs': 15,
+        'kebabs': 7,
         'food': 0,
         'skins': 0,
         'coins': 200,
         'free_slots': 4,
     })))
         expect(step).to_match_object(Record({'kind': 'buy', 'item': 'Shantay pass', 'qty': 1}))
-    test('entry hysteresis does not detour for one consumed food or water dose', _fn92)
+    test('entry hysteresis does not detour for one consumed food', _upstream_fn103)
 
-    def _fn93():
+    def _upstream_fn104():
         quest_food.name = None
         rescue_pack = list([[name, 1] for name in SLAVE_OUTFIT]) + [['Waterskin(4)', 3], ['Waterskin(3)', 1], ['Metal key', 1], ['Shantay pass', 1]]
         step = decide(snap(Record({
@@ -1000,16 +1130,16 @@ def _fn85():
         'tile': tile(3308, 3120),
         'inv': rescue_pack,
         'worn': DESERT_WORN,
-        'kebabs': 16,
+        'kebabs': 8,
         'food': 0,
         'skins': 0,
         'coins': 195,
         'free_slots': 0,
     })))
         expect(custom_name(step)).to_be('cross the Shantay Pass')
-    test('does not refill the rescue float after buying a pass while at the 100-coin cart floor', _fn93)
+    test('does not refill the rescue float after buying a pass while at the 100-coin cart floor', _upstream_fn104)
 
-    def _fn94():
+    def _upstream_fn105():
         quest_food.name = None
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.RESCUE,
@@ -1017,22 +1147,22 @@ def _fn85():
         'inv': [[name, 1] for name in SLAVE_OUTFIT],
         'worn': DESERT_WORN,
         'bank': [['Coins', 500]],
-        'kebabs': 16,
+        'kebabs': 8,
         'food': 0,
         'coins': 99,
         'free_slots': 8,
     })))
         expect(step.kind == 'withdraw' and step.items).to_equal([Record({'name': 'Coins', 'qty': 40})])
-    test('refills to the rescue target below the 100-coin cart floor', _fn94)
+    test('refills to the rescue target below the 100-coin cart floor', _upstream_fn105)
 
-    def _fn95():
+    def _upstream_fn106():
         quest_food.name = None
         shared_inventory = [['Desert shirt', 2], ['Desert robe', 2], ["Slaves' shirt", 1], ['Bronze pickaxe', 1]]
         first_boot = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.ENTERED_CAMP,
         'tile': MAINLAND,
         'inv': shared_inventory,
-        'kebabs': 16,
+        'kebabs': 8,
         'food': 0,
         'coins': 160,
         'free_slots': 1,
@@ -1042,40 +1172,45 @@ def _fn85():
         'stage': TOURIST_TRAP_STAGE.ENTERED_CAMP,
         'tile': MAINLAND,
         'inv': list(shared_inventory) + [['Desert boots', 1]],
-        'kebabs': 16,
+        'kebabs': 8,
         'food': 0,
         'coins': 135,
         'free_slots': 0,
     })))
         expect(custom_name(make_space)).to_be('wear the first desert outfit to free recovery slots')
-    test('rebuilds a two-copy desert outfit through a one-slot recovery pack', _fn95)
-
-    def _fn96():
-        step = decide(snap(Record({
+    test('rebuilds a two-copy desert outfit through a one-slot recovery pack', _upstream_fn106)
+    for skins in [[], [['Waterskin(1)', 4]], [['Waterskin(4)', 1]]]:
+        def _upstream_fn107():
+            step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.LEARNED_DARTS,
         'tile': MAINLAND,
-        'inv': [['Waterskin(1)', 4], ['Tenti pineapple', 1]],
-        'bank': [['Waterskin(4)', 4]],
+        'inv': list(skins) + [['Tenti pineapple', 1], ['Shantay pass', 1], ['Metal key', 1]] + list([[name, 1] for name in SLAVE_OUTFIT]),
+        'worn': DESERT_WORN,
+        'bank': [['Waterskin(4)', 50]],
         'skins': 0,
+    })))
+            expect(custom_name(step)).to_be('cross the Shantay Pass')
+        test(f'does not restock water before returning to the mine with {json.dumps(skins)}', waterskin_case(skins))
+
+    def _upstream_fn108():
+        step = decide(snap(Record({
+        'stage': TOURIST_TRAP_STAGE.NOT_STARTED,
+        'tile': MAINLAND,
+        'inv': [['Waterskin(4)', 4], ['Waterskin(0)', 1], ['Metal key', 1]],
+        'worn': DESERT_WORN,
+        'coins': 1000,
+        'kebabs': 0,
     })))
         expect(step.kind).to_be('deposit')
-        if step.kind == 'deposit':
-            expect(step.keep).not_.to_contain('waterskin(1)')
-            expect(step.keep).to_contain('waterskin(4)')
-    test('normalizes partial skins before adding full containers', _fn96)
+        if step.kind != 'deposit':
+            return
+        expect(step.keep).not_.to_contain('waterskin(4)')
+        expect(step.keep).not_.to_contain('waterskin(0)')
+        expect(step.keep).to_contain('metal key')
+        expect(step.keep).to_contain('trout')
+    test('banks existing waterskins instead of reserving loadout space for them', _upstream_fn108)
 
-    def _fn97():
-        step = decide(snap(Record({
-        'stage': TOURIST_TRAP_STAGE.LEARNED_DARTS,
-        'tile': MAINLAND,
-        'inv': [['Waterskin(4)', 1], ['Tenti pineapple', 1]],
-        'bank': [['Waterskin(4)', 3]],
-        'skins': 0,
-    })))
-        expect(step.kind == 'withdraw' and step.items).to_equal([Record({'name': 'Waterskin(4)', 'qty': 3})])
-    test('withdraws only the full skins needed to reach the entry-dose target', _fn97)
-
-    def _fn98():
+    def _upstream_fn109():
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.RESCUE,
         'tile': MINE_ENTRANCE,
@@ -1085,14 +1220,14 @@ def _fn85():
         'coins': 0,
     })))
         expect(custom_name(step)).to_be('return to the punishment mine to recover the slave disguise')
-    test('recovers a missing slave garment locally before trying to restock', _fn98)
+    test('recovers a missing slave garment locally before trying to restock', _upstream_fn109)
 
-    def _fn99():
+    def _upstream_fn110():
         step = decide(snap(Record({'stage': TOURIST_TRAP_STAGE.ENTERED_CAMP, 'tile': MAINLAND, 'coins': 0})))
         expect(custom_name(step)).to_be('earn 90 gp (Al Kharid Man + Kebabs)')
-    test('funds only the exact cost of a missing trade outfit purchase', _fn99)
+    test('funds only the exact cost of a missing trade outfit purchase', _upstream_fn110)
 
-    def _fn100():
+    def _upstream_fn111():
         step = decide(snap(Record({
         'stage': TOURIST_TRAP_STAGE.RETRIEVED_PLANS,
         'tile': MAINLAND,
@@ -1100,10 +1235,10 @@ def _fn85():
         'coins': 0,
     })))
         expect(custom_name(step)).to_be('earn 8 gp (Al Kharid Man + Kebabs)')
-    test('funds only the exact cost of a missing crafting consumable', _fn100)
+    test('funds only the exact cost of a missing crafting consumable', _upstream_fn111)
 
 
-describe('Tourist Trap survival accounting', _fn85)
+describe('Tourist Trap survival accounting', _upstream_fn90)
 
 
 def _fn101():

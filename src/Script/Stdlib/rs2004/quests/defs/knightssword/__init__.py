@@ -104,6 +104,7 @@ def decide(snap):
 
 
 knightssword = QuestModule(**{
+    'auto_retaliate': False,
     'record': ([r for r in QUESTS if r.id == 'squire'] or [None])[0],
     'bank': 'nearest',
     'tools': [

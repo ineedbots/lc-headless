@@ -2,7 +2,9 @@
 # the bars and repeats. rs2b0t's Superheater (MIT, see thirdparty/rs2b0t). It wields a fire staff, so the casts
 # take only nature runes.
 
-from rs2004.catalogs import STAFF_RUNES
+import _core
+from rs2004.execution import event_signal
+from rs2004.catalogs import STAFF_RUNES, ContinueDialog
 
 BOOTH = {'name': 'Bank booth', 'op': 'Use-quickly'}
 MAGIC_TAB = 6
@@ -56,6 +58,8 @@ def _fire_staves():
 FIRE_STAVES = _fire_staves()
 
 SETTINGS = {
+    'goldsmith_gauntlets': SettingDef('boolean', True, 'Goldsmith gauntlets'),
+    'fast_bank': SettingDef('boolean', True, 'Instant bank leg'),
     'bar': SettingDef('string', 'Bronze', 'Bar to smelt', options=BAR_OPTIONS, help='withdraw plan + coal ratio are derived from this; cast onto the primary ore'),
     'natures': SettingDef('number', NATURES_DEFAULT, 'Nature runes to keep in the pack', NATURES_MIN, 1000,
                           help='topped up whenever the pack count drops below this; keep it above the casts-per-trip so a short bank stock never stalls the run'),
@@ -102,13 +106,55 @@ def bars_smeltable(recipe, count):
 
 # Why: a fire staff is worn once: everything deposited, one withdrawn, the bank shut so Wield is a backpack
 # option, wielded, the bank opened again.
+def must_yield():
+    return event_signal.pending() or chat_dialog.is_open() or chat_dialog.can_continue()
+
+
+def wants_goldsmith_gauntlets(bar, enabled):
+    return enabled and bar.strip().lower() == 'gold'
+
+
+class EnsureGauntlets(Task):
+    def __init__(self, bot):
+        Task.__init__(self, label='ensure goldsmith gauntlets')
+        self.bot = bot
+
+    def validate(self):
+        return not must_yield() and wants_goldsmith_gauntlets(self.bot.recipe.bar, self.bot.goldsmith) and not equipment.contains('Goldsmith gauntlet')
+
+    def execute(self):
+        bot = self.bot
+        opened = yield from bot.open_bank()
+        if not opened or must_yield():
+            return
+        name = 'Goldsmith gauntlet'
+        if not inventory.contains(name):
+            taken = yield from bank.withdraw_x(name, 1)
+            if not taken:
+                out = yield from bot.bank_truly_out_of([name])
+                if out:
+                    bot.request_finish('no Goldsmith gauntlet in the bank')
+                return
+        closed = yield from bank.close()
+        if not closed:
+            return
+        yield from execution.delay_until(lambda: inventory.first(name) is not None and any([op.lower() in ['wear', 'wield', 'equip'] for op in inventory.first(name).actions()]), 3000)
+        if must_yield():
+            return
+        equipped = yield from equipment.equip(name)
+        if not equipped:
+            bot.request_finish('could not equip the Goldsmith gauntlet')
+            return
+        yield from bot.open_bank()
+
+
 class EnsureGear(Task):
     def __init__(self, bot):
         Task.__init__(self, label='ensure gear')
         self.bot = bot
 
     def validate(self):
-        return pick_fire_staff(equipment.contains) is None
+        return not must_yield() and pick_fire_staff(equipment.contains) is None
 
     def execute(self):
         bot = self.bot
@@ -162,10 +208,22 @@ class Restock(Task):
         self.bot = bot
 
     def validate(self):
-        return not self.bot.can_smelt_one()
+        return not must_yield() and not self.bot.can_smelt_one()
 
     def execute(self):
         bot = self.bot
+        opened = yield from bot.open_bank()
+        if not opened:
+            return
+        if must_yield():
+            return
+        topped = yield from self.top_up_natures()
+        if not topped or must_yield():
+            return
+        fast = yield from bot.fast_restock()
+        if fast:
+            bot.trips += 1
+            return
         opened = yield from bot.open_bank()
         if not opened:
             return
@@ -215,6 +273,20 @@ class Restock(Task):
     def withdraw_ores(self):
         bot = self.bot
         for ore, count in withdraw_set(bot.recipe):
+            if must_yield():
+                return False
+            if len(bot.recipe.ingredients) == 1:
+                before = inventory.count(ore)
+                sent = bank.withdraw(ore, 'Withdraw All')
+                landed = False
+                if sent:
+                    landed = yield from execution.delay_until(lambda: inventory.count(ore) > before, 3000)
+                if landed:
+                    return True
+                out = yield from bot.bank_truly_out_of([ore])
+                if out:
+                    bot.request_finish(f'no {ore} in the bank')
+                return False
             before = inventory.count(ore)
             ok = yield from bank.withdraw_x(ore, count)
             got = inventory.count(ore) - before
@@ -245,7 +317,7 @@ class Smelt(Task):
         self.bot = bot
 
     def validate(self):
-        return not bank.is_open() and self.bot.can_smelt_one()
+        return not must_yield() and not bank.is_open() and self.bot.can_smelt_one()
 
     def execute(self):
         bot = self.bot
@@ -259,6 +331,9 @@ class Smelt(Task):
         # the whole set and a nature rune, and waits for the bar to form before the next.
         start = bars_smeltable(recipe, inventory.count)
         while bot.can_smelt_one():
+            if must_yield():
+                bot.smelted += start - bars_smeltable(recipe, inventory.count)
+                return
             ore = inventory.first(primary_ore(recipe))
             if ore is None:
                 break
@@ -303,6 +378,8 @@ class Superheater(TaskBot):
     def on_start(self):
         s = self.settings
         self.recipe = recipe_for_bar(s.str('bar', 'Bronze')) or recipe_for_bar('Bronze')
+        self.goldsmith = s.bool('goldsmith_gauntlets', True)
+        self.fast_bank = s.bool('fast_bank', True)
         self.natures = s.num('natures', NATURES_DEFAULT)
         self.known_bank = None
         self.smelted = 0
@@ -323,7 +400,7 @@ class Superheater(TaskBot):
         resolved = yield from self.resolve_bank()
         if not resolved:
             return
-        self.add(EnsureGear(self), BankBars(self), Restock(self), Smelt(self))
+        self.add(ContinueDialog(), EnsureGear(self), EnsureGauntlets(self), Restock(self), Smelt(self))
 
     # Why: the nearest bank is found once and walked to; later trips only open it.
     def resolve_bank(self):
@@ -369,6 +446,33 @@ class Superheater(TaskBot):
         if not settled:
             return False
         return all([bank.count(name) == 0 for name in names])
+
+    def fast_restock(self):
+        if not self.fast_bank or len(self.recipe.ingredients) != 1 or must_yield():
+            return False
+        side = bank.side_items()
+        bar_name = (self.recipe.bar + ' bar').lower()
+        bars = [item for item in side if (item.name or '').lower() == bar_name]
+        if not bars or any([(item.name or '').lower() not in [bar_name, NATURE_RUNE.lower()] for item in side]):
+            return False
+        ore_name = primary_ore(self.recipe)
+        bar_ops = [op for op in bars[0].actions() if op.lower().replace('-', '').replace(' ', '') == 'depositall']
+        if not bar_ops:
+            return False
+        if not bars[0].interact(bar_ops[0]):
+            return False
+        if not bank.withdraw(ore_name, 'Withdraw All'):
+            return False
+        _core.close_interfaces()
+        landed = yield from execution.delay_until(lambda: inventory.count(ore_name) > 0, 1500)
+        if not landed:
+            self.log('instant bank missed; using the confirmed route')
+            return False
+        if bank.is_open():
+            closed = yield from bank.close()
+            if not closed:
+                return False
+        return True
 
     def on_progress_report(self):
         return {'Status': self.status, 'Bars': self.smelted, 'Smithing xp': skills.xp('smithing') - self.xp_at_start,

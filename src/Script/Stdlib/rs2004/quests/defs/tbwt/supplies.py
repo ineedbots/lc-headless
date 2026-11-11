@@ -57,22 +57,12 @@ def tiadeche_stage(snap):
     return value if value is not None else 0
 
 
-def food_names():
-    """Food this quest will carry, the script's chosen food first."""
-    chosen = (quest_food.name.strip() if quest_food.name is not None else None)
-    names = [n for n in [chosen, 'Lobster', 'Swordfish', 'Tuna', 'Trout', 'Salmon'] if bool(n)]
-    unique = []
-    seen = set()
-    for n in names:
-        if n.lower() in seen:
-            continue
-        seen.add(n.lower())
-        unique.append(n)
-    return unique
-
 
 def food_held(snap):
-    return sum([held(snap, name) for name in food_names()])
+    _flat1 = []
+    for _x in food_names():
+        _flat1.extend(food_forms(_x))
+    return sum([held(snap, name) for name in list(set(_flat1))])
 
 
 NET = Record({'name': TB_NAME.NET, 'id': TB_ID.NET, 'qty': 1})
@@ -84,24 +74,8 @@ SEAWEED = Record({'name': TB_NAME.SEAWEED, 'id': TB_ID.SEAWEED, 'qty': 1})
 
 # Why: a supply drops off the list once its leg is behind us, so the quest never crosses back to Ardougne for a knife it already used.
 def outstanding_supplies(snap):
-    """Everything the legs still ahead of the bot consume."""
-    lubufu = lubufu_stage(snap)
-    tinsay = tinsay_stage(snap)
-    tamayu = tamayu_stage(snap)
-    out = []
-    # Karambwanji bait Lubufu, load the vessel for Tiadeche, and grind into Tinsay's marinade.
-    if lubufu < TB_LUBUFU.COMPLETE or tinsay < TB_TINSAY.COMPLETE:
-        out.append(NET)
-    if tinsay < TB_TINSAY.GIVEN_RUM:
-        out.append(KNIFE)
-    if tamayu < TB_TAMAYU.COMPLETE or tinsay < TB_TINSAY.COMPLETE:
-        out.append(PESTLE)
-    if tinsay < TB_TINSAY.COMPLETE:
-        out.append(TINDERBOX)
-    # The sandwich consumes it, and the stage only advances when Tinsay eats, so a made sandwich retires the need.
-    if tinsay < TB_TINSAY.GIVEN_SANDWICH and held_id(snap, TB_ID.SANDWICH) == 0:
-        out.append(SEAWEED)
-    return out
+    tools = set(loadout(snap).tools)
+    return [supply for supply in [NET, KNIFE, PESTLE, TINDERBOX, SEAWEED] if (supply.id in tools)]
 
 
 TB_KEEP_IDS = [TB_ID.get(key) for key in TB_ID.keys()] + list(TB_SPEAR_IDS) + list(TB_POTION_IDS)
@@ -211,34 +185,69 @@ def buy_at_jiminua(item, qty):
     }))
 
 
-DEPOSIT_BELOW_FREE = 6
+def clear_space(snap, remove_food=False):
+    if held_id(snap, TB_ID.RUM) > 0:
+        return Record({'kind': 'wait', 'reason': 'make and deliver the Karamjan rum before leaving the island to bank'})
+    names = {_k: _v for _k, _v in list([[item.id, item.name] for item in ITEM_DB]) + list([[item.id, item.name] for item in [NET, KNIFE, PESTLE, TINDERBOX, SEAWEED]])}
+    inventory = [(Record({'noted': False, 'id': id, 'count': count, 'name': (names.get(id) if names.get(id) is not None else None)})) for id, count in list((snap.inv_ids or {}).items())]
+    for name, count in snap.inv.items():
+        id = (([item for item in ITEM_DB if item.name.lower() == name] or [None])[0].id if ([item for item in ITEM_DB if item.name.lower() == name] or [None])[0] is not None else None)
+        if id is not None and not any([item.id == id for item in inventory]):
+            inventory.append(Record({'noted': False, 'id': id, 'count': count, 'name': name}))
+    retained = retain_loadout(snap, inventory, quest_food.name)
+    _flat11 = []
+    for _x in food_names():
+        _flat11.extend(food_forms(_x))
+    foods = set(_flat11)
+    keep_ids = [id for id in retained.keep_ids if not remove_food or not (((names.get(id).lower() if names.get(id) is not None else None) if (names.get(id).lower() if names.get(id) is not None else None) is not None else '') in foods)]
+    caps = [cap for cap in retained.caps if (cap.id in keep_ids)]
+    expendable = any([not (item.id in keep_ids) for item in inventory]) or len(caps) > 0
+    return (Record({
+        'kind': 'deposit',
+        'keep': [],
+        'keep_ids': keep_ids,
+        'caps': caps,
+        'bank': TB_TILE.ARDOUGNE_BANK,
+        'exact_keep': True,
+    }) if expendable else None)
 
 
 # Why: this runs on every decide() tick, so each branch is idempotent and falls silent as soon as the pack is right.
 def prepare(snap):
     """The pack and the worn kit, bank first. Null once nothing is outstanding."""
+    plan = loadout(snap)
+    if plan.deliver_catch or plan.compact:
+        return None
     missing = [s for s in outstanding_supplies(snap) if held_id(snap, s.id) < s.qty]
     bow = bow_choice(snap)
     arrows = arrow_choice(snap)
     kit = [n for n in [bow, arrows] if bool(n)]
     armour = [(Record({'slot': slot, 'piece': armour_choice(snap, slot)})) for slot in TB_ARMOUR_SLOTS]
     armour_missing = [entry for entry in armour if not entry.piece]
-    gear_missing = [name for name in kit if not worn(snap, name)]
+
+    _flat13 = []
     for entry in armour:
-        if entry.piece and not armour_worn(snap, entry.piece):
-            gear_missing.append(entry.piece.name)
+        piece = entry.piece
+        _flat13.extend(([piece.name] if piece and not armour_worn(snap, piece) else []))
+    gear_missing = list([name for name in kit if not worn(snap, name)]) + list(_flat13)
     # Why: only an outstanding purchase justifies a crossing for coin; the ferry's own 30gp fare is covered by the float this withdraws.
-    buying = tinsay_stage(snap) < TB_TINSAY.GIVEN_RUM or any([s.from_jiminua for s in missing])
-    coins_low = buying and held(snap, TB_NAME.COINS) < 100
+    buying = plan.phase == 'rum' or any([s.from_jiminua for s in missing])
+    coins_low = held(snap, TB_NAME.COINS) < ((100 if buying else 60))
     starving = food_held(snap) == 0
-    want_spear = spear_wanted(snap)
-    want_doses = doses_wanted(snap)
-    if len(missing) == 0 and len(gear_missing) == 0 and len(armour_missing) == 0 and len(kit) == 2 and not coins_low and not starving and not want_spear and not want_doses:
-        return None
-    # Wearing what is already in the pack never needs a bank.
+    want_spear = plan.spear and spear_wanted(snap)
+    want_doses = plan.potions and doses_wanted(snap)
     carried = [name for name in gear_missing if held(snap, name) > 0]
     if len(carried) > 0:
         return wear_all(carried)
+    food = food_held(snap)
+    if food > plan.food or ((snap.free_slots if snap.free_slots is not None else 28)) < plan.min_free:
+        _v14 = clear_space(snap)
+        space = (_v14 if _v14 is not None else clear_space(snap, True))
+        if space:
+            return space
+        return Record({'kind': 'wait', 'reason': f'{plan.phase} needs {plan.min_free} free inventory slots'})
+    if len(missing) == 0 and len(gear_missing) == 0 and len(armour_missing) == 0 and len(kit) == 2 and not coins_low and not starving and not want_spear and not want_doses:
+        return None
     if not snap.bank_known:
         return scan_bank
     # Jiminua's counter is inside the quest area; only the ferry is worth avoiding.
@@ -246,53 +255,73 @@ def prepare(snap):
         shopped = ([s for s in missing if s.from_jiminua and banked_id(snap, s.id) == 0] or [None])[0]
         if shopped:
             return buy_at_jiminua(shopped.name, shopped.qty)
-    if (snap.free_slots if snap.free_slots is not None else 28) < DEPOSIT_BELOW_FREE:
-        return Record({
-            'kind': 'deposit',
-            'keep': keep_names(snap),
-            'keep_ids': TB_KEEP_IDS,
-            'bank': TB_TILE.ARDOUGNE_BANK,
-            'exact_keep': True,
-        })
     from_bank = []
+
     unavailable = [f'usable {entry.slot} armour' for entry in armour_missing]
     for s in missing:
         stocked = banked_id(snap, s.id)
         if stocked > 0:
-            from_bank.append({'name': s.name, 'qty': min(s.qty - held_id(snap, s.id), stocked), 'id': s.id})
+            from_bank.append(Record({'name': s.name, 'qty': min(s.qty - held_id(snap, s.id), stocked), 'id': s.id}))
         elif not s.from_jiminua:
             unavailable.append(s.name)
     if not bow:
-        ranged = snap.ranged if snap.ranged is not None else '?'
-        unavailable.append(f'any bow this account can draw at Ranged {ranged}')
+        unavailable.append(f"any bow this account can draw at Ranged {(snap.ranged if snap.ranged is not None else '?')}")
     if not arrows:
         unavailable.append('any arrows')
     for name in gear_missing:
         if banked(snap, name) > 0:
-            from_bank.append({'name': name, 'qty': (ARROW_TARGET if name == arrows else 1)})
+            from_bank.append(Record({'name': name, 'qty': (ARROW_TARGET if name == arrows else 1)}))
         else:
             unavailable.append(name)
     # Why: Jogres drop spears and their patch is on the route, so an empty bank isn't a dead end.
     if want_spear:
         stocked = spear_in_bank(snap)
         if stocked:
-            from_bank.append({'name': stocked.name, 'qty': 1, 'id': stocked.id})
+            from_bank.append(Record({'name': stocked.name, 'qty': 1, 'id': stocked.id}))
     if want_doses:
         bottles = potions_in_bank(snap)
         if len(bottles) > 0:
-            from_bank.extend(bottles)
+            from_bank.extend(list(bottles))
         else:
             unavailable.append('an agility potion, any dose')
     if coins_low and banked(snap, TB_NAME.COINS) > 0:
-        from_bank.append({'name': TB_NAME.COINS, 'qty': COIN_TARGET})
-    if food_held(snap) < FOOD_TARGET:
-        stocked = ([name for name in food_names() if banked(snap, name) > 0] or [None])[0]
-        if stocked:
-            from_bank.append({'name': stocked, 'qty': FOOD_TARGET - food_held(snap)})
-        elif starving:
-            unavailable.append('any combat food')
+        from_bank.append(Record({'name': TB_NAME.COINS, 'qty': COIN_TARGET}))
+
+    def _fn16(total, item):
+        stackable = item.get('name') == TB_NAME.COINS or (item.get('name') in TB_ARROWS)
+        return total + ((((0 if held(snap, item.get('name')) > 0 else 1)) if stackable else item.get('qty')))
+
+    def _fn17(total, item):
+        stackable = item.get('name') == TB_NAME.COINS or (item.get('name') in TB_ARROWS)
+        return total + ((((0 if held(snap, item.get('name')) > 0 else 1)) if stackable else item.get('qty')))
+
+    def _fn19(total, item):
+        stackable = item.get('name') == TB_NAME.COINS or (item.get('name') in TB_ARROWS)
+        return total + ((((0 if held(snap, item.get('name')) > 0 else 1)) if stackable else item.get('qty')))
+    _acc18 = 0
+    for _x in from_bank:
+        _acc18 = _fn19(_acc18, _x)
+    supplies_slots = _acc18
+    if supplies_slots + plan.min_free > ((snap.free_slots if snap.free_slots is not None else 28)):
+        _v20 = clear_space(snap)
+        _v21 = (_v20 if _v20 is not None else clear_space(snap, True))
+        return (_v21 if _v21 is not None else Record({'kind': 'wait', 'reason': f'{plan.phase} needs room for supplies and {plan.min_free} free slots'}))
+    food_capacity = max(0, ((snap.free_slots if snap.free_slots is not None else 28)) - supplies_slots - plan.min_free)
+    if food < plan.food:
+        _flat22 = []
+        for name in food_names():
+            _flat22.extend([name] + list([form for form in food_forms(name) if form != name.lower()]))
+        stocked = ([name for name in _flat22 if banked(snap, name) > 0] or [None])[0]
+        if stocked and food_capacity > 0:
+            from_bank.append(Record({'name': stocked, 'qty': min(plan.food - food, food_capacity, banked(snap, stocked))}))
+        elif stocked and starving and len(from_bank) == 0:
+            _v23 = clear_space(snap)
+            return (_v23 if _v23 is not None else Record({'kind': 'wait', 'reason': 'no room for combat food and Karambwan catches'}))
+        else:
+            if starving:
+                unavailable.append('any combat food')
     if len(from_bank) > 0:
-        return Record({'kind': 'withdraw', 'items': from_bank, 'bank': TB_TILE.ARDOUGNE_BANK})
+        return Record({'kind': 'withdraw', 'items': [{'name': item.get('name'), 'qty': item.get('qty'), 'id': item.get('id')} for item in from_bank], 'bank': TB_TILE.ARDOUGNE_BANK})
     if len(unavailable) > 0:
         return Record({'kind': 'wait', 'reason': f"bank has none of: {', '.join(unavailable)}"})
     # What is left is a Jiminua line and the bank does not stock it.
@@ -312,3 +341,9 @@ def readiness(level_of):
     if len(short) == 0:
         return None
     return f"proven at {TB_PROVEN.skills} across the board; {'; '.join(short)}"
+
+
+from rs2004.catalogs.combat import food_forms
+from rs2004.catalogs.tables import item_db
+ITEM_DB = item_db()
+from rs2004.quests.defs.tbwt.loadout import food_names, loadout, retain_loadout

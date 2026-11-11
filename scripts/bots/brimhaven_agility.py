@@ -10,6 +10,7 @@ from rs2004.catalogs import CAKE_ITEMS, FLEE_TILE, LOADOUT_SETTING, STUN_COMBAT_
 from rs2004.catalogs import matches_any, script_food, steal_cakes, target_spot
 
 BOAT_FARE = 30
+TRIP_COINS = 260
 ENTRANCE_FEE = 200
 DEFAULT_FOOD_PER_TRIP = 25
 DEFAULT_BANK_TICKETS = 1000
@@ -1147,7 +1148,7 @@ class BrimhavenAgility(TaskBot):
         self.avoid_hop = -1
         yield from execution.delay_until(lambda: game.ingame() and game.tile() is not None, 0)
         s = self.settings
-        self.food_name = script_food(s, 'Lobster')
+        self.food_name = s.str('food', '') or script_food(s, 'Lobster')
         self.food_per_trip = s.num('food_withdraw', DEFAULT_FOOD_PER_TRIP)
         self.bank_at_tickets = s.num('bank_at_tickets', DEFAULT_BANK_TICKETS)
         self.steal_restock = s.bool('steal_restock', False)
@@ -1271,6 +1272,9 @@ class BrimhavenAgility(TaskBot):
         """The ticket pillar the hint arrow points at."""
         h = reader.hint_tile()
         return pillar_from_hint(h.x, h.z) if h is not None else -1
+
+    def leave_arena(self):
+        return leave_arena(self)
 
     def in_arena_now(self):
         t = game.tile()

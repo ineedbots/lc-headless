@@ -178,7 +178,7 @@ def _fn3():
     test_each([723, 724, 725, 726])('does not send a filled Legends bowl %i to the bank', _fn20)
 
     def _fn21(quest, id, name):
-        expect(resume_preparation(module_for(quest), snap(), [item(id, name, 12), item(1436, 'Rune essence')], name)).to_equal(Record({'keep_ids': [id], 'caps': []}))
+        expect(resume_preparation(module_for(quest), snap(), [item(id, name, 12), item(1436, 'Rune essence')], name)).to_equal(Record({'keep_ids': [id], 'caps': [Record({'id': id, 'qty': 1})] if quest == 'tbwt' else []}))
     test_each([['eadgar', 2116, 'Pineapple chunks'], ['tbwt', 1963, 'Banana']])('does not trim %s quest materials selected as food', _fn21)
 
     def _fn22():

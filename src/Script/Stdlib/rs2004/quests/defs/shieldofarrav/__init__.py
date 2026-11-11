@@ -4,14 +4,14 @@ from rs2004.quests.engine.types import banked_id, held_id
 from rs2004.quests.engine.types import QuestModule
 from rs2004.catalogs.record import Record
 from rs2004.quests.data import QUESTS
-from rs2004.quests.engine.types import held_id
+from rs2004.quests.engine.types import banked_id, held_id
 from rs2004.quests.defs.shieldofarrav.areas import SOA_HOPS, SOA_ID
 from rs2004.quests.defs.shieldofarrav.blackarm import blackarm_step
 from rs2004.quests.defs.shieldofarrav.certs import cert_step, certs_banked, certs_held, curator_step
 from rs2004.quests.defs.shieldofarrav.config import arrav_config, resolve_gang
 from rs2004.quests.defs.shieldofarrav.journal import read_shield_of_arrav_progress, SOA_STAGE
 from rs2004.quests.defs.shieldofarrav.partner import arrav_handoff_state, decide_handoff, handoff_step
-from rs2004.quests.defs.shieldofarrav.phoenix import phoenix_step
+from rs2004.quests.defs.shieldofarrav.phoenix import phoenix_step, recover_store_key
 from rs2004.quests.defs.shieldofarrav.state import other_half, own_half
 from rs2004.game import game
 
@@ -57,6 +57,10 @@ def decide(snap):
     curator = curator_step(snap, mine)
     if curator:
         return curator
+    if mine == 'phoenix' and stage == SOA_STAGE.PHOENIX_JOINED and arrav_config.partner.strip() and arrav_config.partner_stage == SOA_STAGE.KATRINE_TASK and arrav_config.partner_has_key != True and held_id(snap, SOA_ID.STORE_KEY) == 0:
+        if banked_id(snap, SOA_ID.STORE_KEY) > 0:
+            return Record({'kind': 'withdraw', 'items': [Record({'name': 'Key', 'qty': 1, 'id': SOA_ID.STORE_KEY})]})
+        return Record({'kind': 'custom', 'name': 'recover the Phoenix weapon-store key', 'run': recover_store_key})
     handoff = decide_handoff(Record({
         'gang': mine,
         'stage': stage,
@@ -66,7 +70,7 @@ def decide(snap):
         'certs': certs_held(snap) + certs_banked(snap),
         'certs_held': certs_held(snap),
         'cert_target': arrav_config.cert_target,
-        'partner_configured': len(arrav_config.partner.strip()) > 0,
+        'partner_stage': arrav_config.partner_stage, 'partner_has_key': arrav_config.partner_has_key, 'partner_configured': len(arrav_config.partner.strip()) > 0,
         'halves_given': arrav_handoff_state.halves_given,
         'gave_cert': arrav_handoff_state.gave_cert,
     }))
@@ -79,6 +83,7 @@ def decide(snap):
     if len(arrav_config.partner.strip()) == 0 and certs_held(snap) + certs_banked(snap) == 0 and held_id(snap, own_half(mine)) > 0:
         return Record({
             'kind': 'wait',
+            'cooperative': True,
             'reason': "own half held, no partner and no banked certificate: the other gang's half is out of reach alone",
         })
     return (phoenix_step(snap) if mine == 'phoenix' else blackarm_step(snap))

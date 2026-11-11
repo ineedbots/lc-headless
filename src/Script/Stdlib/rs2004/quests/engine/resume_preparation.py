@@ -70,6 +70,12 @@ def resume_preparation(module, snap, inventory, food):
         return None
     if module.record.id == 'legends' and any([(((snap.inv_ids.get(id) if snap.inv_ids is not None else None) if (snap.inv_ids.get(id) if snap.inv_ids is not None else None) is not None else 0)) > 0 or any([item.id == id and item.count > 0 for item in inventory]) for id in [LQ_ID.GOLD_BOWL_WATER, LQ_ID.GOLD_BOWL_PURE, LQ_ID.GOLD_BOWL_BLESSED_WATER, LQ_ID.GOLD_BOWL_BLESSED_PURE]]):
         return None
+    if module.record.id == 'tbwt':
+        from rs2004.quests.defs.tbwt.loadout import retain_loadout
+        return retain_loadout(snap, inventory, food)
+    if module.record.id == 'itwatchtower':
+        from rs2004.quests.defs.watchtower.loadout import retain_watchtower_loadout
+        return retain_watchtower_loadout(snap, inventory, food)
     _v1 = QUEST_IDS.get(module.record.id)
     quest_ids = set((_v1 if _v1 is not None else []))
     _v2 = MATERIAL_FOOD.get(module.record.id)

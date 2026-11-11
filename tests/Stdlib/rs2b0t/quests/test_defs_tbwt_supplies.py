@@ -3,7 +3,7 @@
 from rs2004.catalogs.record import Record
 from rs2004.quests.engine.types import QuestProgress, QuestSnapshot
 from rs2004.game import skills
-from rs2004.quests.defs.tbwt.areas import TB_ARMOUR, TB_ID, TB_LUBUFU, TB_MAIN, TB_NAME, TB_POTIONS, TB_SPEARS, TB_TAMAYU, TB_TINSAY
+from rs2004.quests.defs.tbwt.areas import TB_ARMOUR, TB_ID, TB_LUBUFU, TB_MAIN, TB_NAME, TB_POTIONS, TB_SPEARS, TB_TAMAYU, TB_TIADECHE, TB_TINSAY
 from rs2004.quests.defs.tbwt.journal import TB_FLAG
 from rs2004.quests.defs.tbwt.supplies import TB_KEEP_IDS, arrow_choice, bow_choice, doses_wanted, outstanding_supplies, potions_in_bank, prepare, spear_in_bank, spear_wanted
 
@@ -21,6 +21,7 @@ def snap(options=None):
     if options is None:
         options = Record({})
     flags = set([
+        f'{TB_FLAG.TIADECHE}:{(options.tiadeche if options.tiadeche is not None else TB_TIADECHE.UNKNOWN)}',
         f'{TB_FLAG.LUBUFU}:{(options.lubufu if options.lubufu is not None else TB_LUBUFU.UNKNOWN)}',
         f'{TB_FLAG.TAMAYU}:{(options.tamayu if options.tamayu is not None else TB_TAMAYU.UNKNOWN)}',
         f'{TB_FLAG.TINSAY}:{(options.tinsay if options.tinsay is not None else TB_TINSAY.UNKNOWN)}',
@@ -57,122 +58,131 @@ def names(options=None):
 DRESSED = Record({'worn': KIT, 'inv': [['coins', 500], ['lobster', 6]]})
 
 
-def _fn2():
-
-    _merged3 = {}
+def _upstream_fn2():
+    _upstream_merged3 = {}
     for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-        _merged3[_k] = _v
-    for _k, _v in {'lubufu': TB_LUBUFU.COMPLETE, 'tamayu': TB_TAMAYU.COMPLETE, 'tinsay': TB_TINSAY.COMPLETE}.items():
-        _merged3[_k] = _v
-    ready = Record(_merged3)
+        _upstream_merged3[_k] = _v
+    for _k, _v in {
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'tamayu': TB_TAMAYU.COMPLETE,
+        'tinsay': TB_TINSAY.COMPLETE,
+        'tiadeche': TB_TIADECHE.REQUEST_MANUAL,
+    }.items():
+        _upstream_merged3[_k] = _v
+    ready = Record(_upstream_merged3)
     lower = ['Adamant chainbody', 'Adamant platelegs', 'Adamant full helm']
     leather = ['Leather body', 'Leather chaps', 'Leather cowl']
 
-    def _fn4():
+    def _upstream_fn4():
         spy_on(skills, 'level').mock_return_value(1)
-        _merged5 = {}
+        _upstream_merged5 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged5[_k] = _v
+            _upstream_merged5[_k] = _v
         for _k, _v in {'worn': ['Maple shortbow', 'Adamant arrow'], 'bank': [[name, 1] for name in leather]}.items():
-            _merged5[_k] = _v
-        step = prepare(snap(Record(_merged5)))
-        expect(([item['name'] for item in step.items] if (step.kind if step is not None else None) == 'withdraw' else step)).to_equal(leather)
-    test('withdraws a complete banked leather kit', _fn4)
+            _upstream_merged5[_k] = _v
+        step = prepare(snap(Record(_upstream_merged5)))
+        expect(([item.get('name') for item in step.items] if (step.kind if step is not None else None) == 'withdraw' else step)).to_equal(leather)
+    test('withdraws a complete banked leather kit', _upstream_fn4)
 
-    def _fn6():
+    def _upstream_fn6():
         spy_on(skills, 'level').mock_return_value(1)
-        _merged7 = {}
+        _upstream_merged7 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged7[_k] = _v
+            _upstream_merged7[_k] = _v
         for _k, _v in {
         'bank_known': False,
         'worn': ['Maple shortbow', 'Adamant arrow'],
         'inv': list(((ready.inv if ready.inv is not None else []))) + list([[name.lower(), 1] for name in leather]),
     }.items():
-            _merged7[_k] = _v
-        step = prepare(snap(Record(_merged7)))
+            _upstream_merged7[_k] = _v
+        step = prepare(snap(Record(_upstream_merged7)))
         expect((step.kind if step is not None else None)).to_be('custom')
-    test('equips carried leather without a bank trip', _fn6)
+    test('equips carried leather without a bank trip', _upstream_fn6)
 
-    def _fn8():
-        _merged9 = {}
+    def _upstream_fn8():
+        _upstream_merged9 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged9[_k] = _v
+            _upstream_merged9[_k] = _v
         for _k, _v in {'worn': ['Maple shortbow', 'Adamant arrow'] + list(leather), 'bank': [[name, 1] for name in lower]}.items():
-            _merged9[_k] = _v
-        step = prepare(snap(Record(_merged9)))
+            _upstream_merged9[_k] = _v
+        step = prepare(snap(Record(_upstream_merged9)))
         expect(step).to_be_null()
-    test('retains worn leather even with metal armor banked', _fn8)
+    test('retains worn leather even with metal armor banked', _upstream_fn8)
 
-    def _fn10():
+    def _upstream_fn10():
         spy_on(skills, 'level').mock_return_value(70)
-        _merged11 = {}
+        _upstream_merged11 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged11[_k] = _v
+            _upstream_merged11[_k] = _v
         for _k, _v in {'worn': ['Maple shortbow', 'Adamant arrow'], 'bank': [[name, 1] for name in lower]}.items():
-            _merged11[_k] = _v
-        step = prepare(snap(Record(_merged11)))
-        expect(([item['name'] for item in step.items] if (step.kind if step is not None else None) == 'withdraw' else step)).to_equal(lower)
-    test('withdraws lower armor when Rune is not owned', _fn10)
+            _upstream_merged11[_k] = _v
+        step = prepare(snap(Record(_upstream_merged11)))
+        expect(([item.get('name') for item in step.items] if (step.kind if step is not None else None) == 'withdraw' else step)).to_equal(lower)
+    test('withdraws lower armor when Rune is not owned', _upstream_fn10)
 
-    def _fn12():
+    def _upstream_fn12():
         spy_on(skills, 'level').mock_return_value(30)
-        _merged13 = {}
+        _upstream_merged13 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged13[_k] = _v
+            _upstream_merged13[_k] = _v
         for _k, _v in {
         'worn': ['Maple shortbow', 'Adamant arrow'],
         'bank': [[name, 1] for name in list(TB_ARMOUR) + list(lower)],
     }.items():
-            _merged13[_k] = _v
-        step = prepare(snap(Record(_merged13)))
-        expect(([item['name'] for item in step.items] if (step.kind if step is not None else None) == 'withdraw' else step)).to_equal(lower)
-    test('skips banked Rune when Defence is insufficient', _fn12)
+            _upstream_merged13[_k] = _v
+        step = prepare(snap(Record(_upstream_merged13)))
+        expect(([item.get('name') for item in step.items] if (step.kind if step is not None else None) == 'withdraw' else step)).to_equal(lower)
+    test('skips banked Rune when Defence is insufficient', _upstream_fn12)
 
-    def _fn14():
+    def _upstream_fn14():
         spy_on(skills, 'level').mock_return_value(70)
-        _merged15 = {}
+        _upstream_merged15 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged15[_k] = _v
+            _upstream_merged15[_k] = _v
         for _k, _v in {'worn': ['Maple shortbow', 'Adamant arrow'] + list(lower), 'bank': [[name, 1] for name in TB_ARMOUR]}.items():
-            _merged15[_k] = _v
-        step = prepare(snap(Record(_merged15)))
+            _upstream_merged15[_k] = _v
+        step = prepare(snap(Record(_upstream_merged15)))
         expect(step).to_be_null()
-    test('keeps worn alternatives even when Rune is banked', _fn14)
+    test('keeps worn alternatives even when Rune is banked', _upstream_fn14)
 
-    def _fn16():
+    def _upstream_fn16():
         spy_on(skills, 'level').mock_return_value(30)
-        _merged17 = {}
+        _upstream_merged17 = {}
         for _k, _v in (ready._fields if isinstance(ready, Record) else ready).items():
-            _merged17[_k] = _v
+            _upstream_merged17[_k] = _v
         for _k, _v in {'worn': ['Maple shortbow', 'Adamant arrow']}.items():
-            _merged17[_k] = _v
-        step = prepare(snap(Record(_merged17)))
+            _upstream_merged17[_k] = _v
+        step = prepare(snap(Record(_upstream_merged17)))
         expect((step.kind if step is not None else None)).to_be('wait')
-    test('waits rather than departing with empty armor slots', _fn16)
+    test('waits rather than departing with empty armor slots', _upstream_fn16)
 
 
-describe('tbwt flexible armour', _fn2)
+describe('tbwt flexible armour', _upstream_fn2)
 
 
-def _fn18():
-    def _fn19():
-        expect(names()).to_equal([TB_NAME.NET, TB_NAME.KNIFE, TB_NAME.PESTLE, TB_NAME.TINDERBOX, TB_NAME.SEAWEED])
-    test('a fresh quest wants the whole kit', _fn19)
+def _upstream_fn18():
+    def _upstream_fn19():
+        expect(names()).to_equal([TB_NAME.NET])
+    test('a fresh quest only requires the fishing net', _upstream_fn19)
 
     # Why: each of these is consumed by one leg, and a supply left on the list after its leg drags the bot back across the ferry for it.
-    def _fn20():
+    def _upstream_fn20():
         expect(names(Record({'tinsay': TB_TINSAY.GIVEN_RUM}))).not_.to_contain(TB_NAME.KNIFE)
         expect(names(Record({'tinsay': TB_TINSAY.GIVEN_SANDWICH}))).not_.to_contain(TB_NAME.SEAWEED)
-        expect(names(Record({'tamayu': TB_TAMAYU.COMPLETE, 'tinsay': TB_TINSAY.COMPLETE, 'lubufu': TB_LUBUFU.COMPLETE}))).to_equal([])
-    test('a supply drops off the list the moment its leg is behind us', _fn20)
+        expect(names(Record({
+        'tamayu': TB_TAMAYU.COMPLETE,
+        'tinsay': TB_TINSAY.COMPLETE,
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'tiadeche': TB_TIADECHE.REQUEST_MANUAL,
+    }))).to_equal([])
+    test('a supply drops off the list the moment its leg is behind us', _upstream_fn20)
 
-    def _fn21():
+    def _upstream_fn21():
         expect(names(Record({'tinsay': TB_TINSAY.FETCH_SANDWICH, 'inv_ids': [[TB_ID.SANDWICH, 1]]}))).not_.to_contain(TB_NAME.SEAWEED)
-    test('a made sandwich retires the seaweed before Tinsay has eaten it', _fn21)
+    test('a made sandwich retires the seaweed before Tinsay has eaten it', _upstream_fn21)
 
 
-describe('tbwt supplies', _fn18)
+describe('tbwt supplies', _upstream_fn18)
 
 
 def _fn22():
@@ -225,15 +235,15 @@ def _fn22():
 describe('tbwt spear choice', _fn22)
 
 
-def _fn30():
-    def _fn31():
+def _upstream_fn30():
+    def _upstream_fn31():
         expect(doses_wanted(snap(Record({'inv_ids': [[DOSE1.id, 1]]})))).to_be(False)
         expect(doses_wanted(snap(Record({'agility': True})))).to_be(False)
         expect(doses_wanted(snap(Record({'tamayu': TB_TAMAYU.COMPLETE})))).to_be(False)
         expect(doses_wanted(snap())).to_be(True)
-    test('four doses in any mix satisfy him', _fn31)
+    test('four doses in any mix satisfy him', _upstream_fn31)
 
-    def _fn32():
+    def _upstream_fn32():
         expect(potions_in_bank(snap(Record({'bank_ids': [[DOSE4.id, 3]]})))).to_equal([Record({'name': DOSE4.name, 'qty': 1, 'id': DOSE4.id})])
         expect(potions_in_bank(snap(Record({'bank_ids': [[DOSE2.id, 5]]})))).to_equal([Record({'name': DOSE2.name, 'qty': 2, 'id': DOSE2.id})])
         expect(potions_in_bank(snap(Record({'bank_ids': [[DOSE2.id, 1], [DOSE1.id, 4]]})))).to_equal([
@@ -241,29 +251,33 @@ def _fn30():
         Record({'name': DOSE1.name, 'qty': 2, 'id': DOSE1.id}),
     ])
         expect(potions_in_bank(snap())).to_equal([])
-    test('bottles are drawn fullest first, up to four doses', _fn32)
+    test('bottles are drawn fullest first, up to four doses', _upstream_fn32)
 
     # Why: no shop on the island sells one and no leg of this quest brews one.
-    def _fn33():
-        _merged34 = {}
+    def _upstream_fn33():
+        _upstream_merged34 = {}
         for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-            _merged34[_k] = _v
-        for _k, _v in {'inv_ids': [
+            _upstream_merged34[_k] = _v
+        for _k, _v in {
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'tiadeche': TB_TIADECHE.REQUEST_MANUAL,
+        'inv_ids': [
         [TB_ID.NET, 1],
         [TB_ID.KNIFE, 1],
         [TB_ID.PESTLE, 1],
         [TB_ID.TINDERBOX, 1],
         [TB_ID.SEAWEED, 1],
         [IRON.id, 1],
-    ]}.items():
-            _merged34[_k] = _v
-        step = prepare(snap(Record(_merged34)))
+    ],
+    }.items():
+            _upstream_merged34[_k] = _v
+        step = prepare(snap(Record(_upstream_merged34)))
         expect((step.kind if step is not None else None)).to_be('wait')
         expect((step.kind if step is not None else None) == 'wait' and step.reason).to_contain('agility potion')
-    test('a bank with no agility potion parks with a reason', _fn33)
+    test('a bank with no agility potion parks with a reason', _upstream_fn33)
 
 
-describe('tbwt agility doses', _fn30)
+describe('tbwt agility doses', _upstream_fn30)
 
 
 def _fn35():
@@ -301,7 +315,7 @@ def _fn35():
 describe('tbwt ranged kit', _fn35)
 
 
-def _fn41():
+def _upstream_fn41():
     stocked = [[TB_NAME.COINS, 2000000], ['Lobster', 60]] + list([[n, 200] for n in KIT])
     stocked_ids = [
         [TB_ID.NET, 1],
@@ -313,95 +327,257 @@ def _fn41():
         [DOSE4.id, 1],
     ]
 
-    def _fn42():
-        expect((prepare(snap(Record({'bank_known': False, 'worn': KIT}))).kind if prepare(snap(Record({'bank_known': False, 'worn': KIT}))) is not None else None)).to_be('scan_bank')
-    test('an unread bank is scanned before anything is judged missing', _fn42)
+    def _upstream_fn42():
+        _upstream_merged43 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged43[_k] = _v
+        for _k, _v in {'inv_ids': stocked_ids, 'inv': [['coins', 500], ['lobster', 16]], 'free_slots': 0}.items():
+            _upstream_merged43[_k] = _v
+        step = prepare(snap(Record(_upstream_merged43)))
+        expect((step.kind if step is not None else None)).to_be('deposit')
+        if (step.kind if step is not None else None) != 'deposit':
+            return
+        expect(step.keep).not_.to_contain('lobster')
+        expect(step.keep_ids).to_contain(TB_ID.NET)
+        expect(step.keep_ids).not_.to_contain(TB_ID.KNIFE)
+        expect(step.caps).to_contain_equal(Record({'id': 379, 'qty': 6}))
+    test('banks excess food while retaining quest items and the ranged kit', _upstream_fn42)
 
-    def _fn43():
+    def _upstream_fn44():
+        _upstream_merged46 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged46[_k] = _v
+        for _k, _v in {
+        'inv': [['coins', 500]],
+        'inv_ids': [(id, _2) for id, _2 in stocked_ids if id != TB_ID.NET],
+        'bank': stocked,
+        'bank_ids': stocked_ids,
+        'free_slots': 8,
+    }.items():
+            _upstream_merged46[_k] = _v
+        step = prepare(snap(Record(_upstream_merged46)))
+        expect((step.kind if step is not None else None)).to_be('withdraw')
+        if (step.kind if step is not None else None) != 'withdraw':
+            return
+        expect(step.items).to_contain_equal(Record({'name': TB_NAME.NET, 'id': TB_ID.NET, 'qty': 1}))
+        expect(step.items).to_contain_equal(Record({'name': 'Lobster', 'qty': 6}))
+        expect(8 - sum([item.get('qty') for item in step.items])).to_be(1)
+    test('reserves catch space after withdrawing quest supplies and food together', _upstream_fn44)
+
+    def _upstream_fn47():
+        _upstream_merged48 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged48[_k] = _v
+        for _k, _v in {'inv_ids': stocked_ids, 'lubufu': TB_LUBUFU.COMPLETE, 'free_slots': 0}.items():
+            _upstream_merged48[_k] = _v
+        step = prepare(snap(Record(_upstream_merged48)))
+        expect((step.kind if step is not None else None)).to_be('deposit')
+        if (step.kind if step is not None else None) == 'deposit':
+            expect(step.keep).not_.to_contain('lobster')
+    test("removes food from a full resumed pack before accepting Tiadeche's catch", _upstream_fn47)
+
+    def _upstream_fn49():
+        _upstream_merged50 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged50[_k] = _v
+        for _k, _v in {'inv_ids': stocked_ids, 'lubufu': TB_LUBUFU.COMPLETE, 'free_slots': 0}.items():
+            _upstream_merged50[_k] = _v
+        initial = prepare(snap(Record(_upstream_merged50)))
+        expect((initial.kind if initial is not None else None)).to_be('deposit')
+        _upstream_merged51 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged51[_k] = _v
+        for _k, _v in {
+        'inv_ids': stocked_ids,
+        'inv': [['coins', 500]],
+        'bank': [['Lobster', 6]],
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'free_slots': 6,
+    }.items():
+            _upstream_merged51[_k] = _v
+        refill = prepare(snap(Record(_upstream_merged51)))
+        expect(refill).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'name': 'Lobster', 'qty': 5})]}))
+        _upstream_merged52 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged52[_k] = _v
+        for _k, _v in {
+        'inv_ids': stocked_ids,
+        'inv': [['coins', 500], ['lobster', 2]],
+        'bank': [['Lobster', 4]],
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'free_slots': 4,
+    }.items():
+            _upstream_merged52[_k] = _v
+        expect(prepare(snap(Record(_upstream_merged52)))).to_be_null()
+    test('a trimmed full pack refills only the food that fits and resumes the quest', _upstream_fn49)
+
+    def _upstream_fn53():
+        _upstream_merged54 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged54[_k] = _v
+        for _k, _v in {'inv_ids': stocked_ids, 'lubufu': TB_LUBUFU.FETCH_KARAMBWANJI, 'free_slots': 0}.items():
+            _upstream_merged54[_k] = _v
+        step = prepare(snap(Record(_upstream_merged54)))
+        expect((step.kind if step is not None else None)).to_be('deposit')
+        if (step.kind if step is not None else None) == 'deposit':
+            expect(step.keep).not_.to_contain('lobster')
+    test('makes room before the first Karambwanji catch from a full pack', _upstream_fn53)
+
+    def _upstream_fn55():
+        _upstream_merged56 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged56[_k] = _v
+        for _k, _v in {
+        'inv': [['coins', 500], ['lobster', 8]],
+        'inv_ids': list(stocked_ids) + [[TB_ID.RAW_KARAMBWANJI, 10]],
+        'lubufu': TB_LUBUFU.FETCH_KARAMBWANJI,
+        'free_slots': 0,
+    }.items():
+            _upstream_merged56[_k] = _v
+        expect(prepare(snap(Record(_upstream_merged56)))).to_be_null()
+    test('lets Lubufu take a full catch before trimming excess food', _upstream_fn55)
+
+    def _upstream_fn57():
+        _upstream_merged58 = {}
+        for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+            _upstream_merged58[_k] = _v
+        for _k, _v in {'inv': [['coins', 500]], 'inv_ids': [[TB_ID.NET, 1]], 'bank': [['Lobster', 100]], 'free_slots': 2}.items():
+            _upstream_merged58[_k] = _v
+        step = prepare(snap(Record(_upstream_merged58)))
+        expect(step).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'name': 'Lobster', 'qty': 1})]}))
+    test('a tight pack can still take food when the next catch fits', _upstream_fn57)
+
+    def _upstream_fn59():
+        previous = quest_food.name
+        quest_food.name = 'Cake'
+        try:
+            _upstream_merged60 = {}
+            for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+                _upstream_merged60[_k] = _v
+            for _k, _v in {'inv_ids': stocked_ids, 'inv': [['coins', 500], ['cake', 4], ['2/3 cake', 3], ['slice of cake', 2]]}.items():
+                _upstream_merged60[_k] = _v
+            step = prepare(snap(Record(_upstream_merged60)))
+            expect((step.kind if step is not None else None)).to_be('deposit')
+            if (step.kind if step is not None else None) == 'deposit':
+                for name in ['cake', '2/3 cake', 'slice of cake']:
+                    expect(step.keep).not_.to_contain(name)
+        except Exception as e:
+            quest_food.name = previous
+            raise e
+
+        quest_food.name = previous
+    test('counts partially eaten cakes when trimming the food loadout', _upstream_fn59)
+
+    def _upstream_fn61():
+        previous = quest_food.name
+        quest_food.name = 'Cake'
+        try:
+            _upstream_merged62 = {}
+            for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+                _upstream_merged62[_k] = _v
+            for _k, _v in {
+            'inv_ids': stocked_ids,
+            'inv': [['coins', 500]],
+            'bank': [['2/3 cake', 4], ['Slice of cake', 2]],
+            'free_slots': 8,
+        }.items():
+                _upstream_merged62[_k] = _v
+            step = prepare(snap(Record(_upstream_merged62)))
+            expect(step).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'name': '2/3 cake', 'qty': 4})]}))
+            _upstream_merged63 = {}
+            for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
+                _upstream_merged63[_k] = _v
+            for _k, _v in {'inv_ids': stocked_ids, 'inv': [['coins', 500], ['2/3 cake', 4]], 'free_slots': 4}.items():
+                _upstream_merged63[_k] = _v
+            expect(prepare(snap(Record(_upstream_merged63)))).to_be_null()
+        except Exception as e:
+            quest_food.name = previous
+            raise e
+
+        quest_food.name = previous
+    test('can refill with the partial cakes it just banked', _upstream_fn61)
+
+    def _upstream_fn64():
+        expect((prepare(snap(Record({'bank_known': False, 'worn': KIT}))).kind if prepare(snap(Record({'bank_known': False, 'worn': KIT}))) is not None else None)).to_be('scan_bank')
+    test('an unread bank is scanned before anything is judged missing', _upstream_fn64)
+
+    def _upstream_fn65():
         step = prepare(snap(Record({'bank': stocked, 'bank_ids': stocked_ids, 'worn': KIT, 'inv': [['lobster', 6], ['coins', 500]]})))
         expect((step.kind if step is not None else None)).to_be('withdraw')
-    test('a stocked bank is withdrawn from', _fn43)
+    test('a stocked bank is withdrawn from', _upstream_fn65)
 
-    def _fn44():
-        _merged45 = {}
+    def _upstream_fn66():
+        _upstream_merged67 = {}
         for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-            _merged45[_k] = _v
-        for _k, _v in {'bank': stocked, 'bank_ids': stocked_ids}.items():
-            _merged45[_k] = _v
-        step = prepare(snap(Record(_merged45)))
+            _upstream_merged67[_k] = _v
+        for _k, _v in {
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'tiadeche': TB_TIADECHE.REQUEST_MANUAL,
+        'bank': stocked,
+        'bank_ids': stocked_ids,
+    }.items():
+            _upstream_merged67[_k] = _v
+        step = prepare(snap(Record(_upstream_merged67)))
         expect((step.kind if step is not None else None)).to_be('withdraw')
-        drawn = ([i['name'] for i in step.items] if (step.kind if step is not None else None) == 'withdraw' else [])
+        drawn = ([i.get('name') for i in step.items] if (step.kind if step is not None else None) == 'withdraw' else [])
         expect(drawn).to_contain(IRON.name)
         expect(drawn).to_contain(DOSE4.name)
-    test('the spear and the potion ride out on the same withdrawal', _fn44)
+    test('the spear and the potion ride out on the same withdrawal', _upstream_fn66)
 
-    def _fn46():
+    def _upstream_fn68():
         carried = [[n.lower(), 1] for n in KIT]
-        _merged47 = {}
+        _upstream_merged69 = {}
         for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-            _merged47[_k] = _v
+            _upstream_merged69[_k] = _v
         for _k, _v in {'worn': [], 'inv': list(((DRESSED.inv if DRESSED.inv is not None else []))) + list(carried)}.items():
-            _merged47[_k] = _v
-        step = prepare(snap(Record(_merged47)))
+            _upstream_merged69[_k] = _v
+        step = prepare(snap(Record(_upstream_merged69)))
         expect((step.kind if step is not None else None)).to_be('custom')
         expect((step.kind if step is not None else None) == 'custom' and step.name).to_contain('wear')
-    test('gear already in the pack is worn without a bank trip', _fn46)
+    test('gear already in the pack is worn without a bank trip', _upstream_fn68)
 
     # Why: Jiminua's counter is inside the quest area and the bank is a 30gp ferry away.
-    def _fn48():
-        _merged51 = {}
+    def _upstream_fn70():
+        _upstream_merged73 = {}
         for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-            _merged51[_k] = _v
+            _upstream_merged73[_k] = _v
         for _k, _v in {
+        'lubufu': TB_LUBUFU.COMPLETE,
+        'tiadeche': TB_TIADECHE.REQUEST_MANUAL,
+        'tamayu': TB_TAMAYU.COMPLETE,
         'bank': stocked,
-        'bank_ids': [(id, count) for id, count in stocked_ids if id != TB_ID.KNIFE],
-        'inv_ids': [(id, count) for id, count in stocked_ids if id != TB_ID.KNIFE],
+        'bank_ids': [(id, _2) for id, _2 in stocked_ids if id != TB_ID.KNIFE],
+        'inv_ids': [(id, _2) for id, _2 in stocked_ids if id != TB_ID.KNIFE],
     }.items():
-            _merged51[_k] = _v
-        step = prepare(snap(Record(_merged51)))
+            _upstream_merged73[_k] = _v
+        step = prepare(snap(Record(_upstream_merged73)))
         expect((step.kind if step is not None else None)).to_be('buy')
         expect((step.kind if step is not None else None) == 'buy' and step.item).to_be(TB_NAME.KNIFE)
-    test('a knife the bank does not stock is bought in the village', _fn48)
+    test('a knife the bank does not stock is bought in the village', _upstream_fn70)
 
     # Why: nothing else stocks a small fishing net on Karamja, so a bank without one is a dead end that has to say so.
-    def _fn52():
+    def _upstream_fn74():
         shop_bought = [[TB_ID.KNIFE, 1], [TB_ID.PESTLE, 1], [TB_ID.TINDERBOX, 1], [IRON.id, 1], [DOSE4.id, 1]]
-        _merged53 = {}
+        _upstream_merged75 = {}
         for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-            _merged53[_k] = _v
+            _upstream_merged75[_k] = _v
         for _k, _v in {'inv_ids': shop_bought}.items():
-            _merged53[_k] = _v
-        step = prepare(snap(Record(_merged53)))
+            _upstream_merged75[_k] = _v
+        step = prepare(snap(Record(_upstream_merged75)))
         expect((step.kind if step is not None else None)).to_be('wait')
         expect((step.kind if step is not None else None) == 'wait' and step.reason).to_contain(TB_NAME.NET)
-    test('a bank with none of it parks with a reason rather than looping', _fn52)
+    test('a bank with none of it parks with a reason rather than looping', _upstream_fn74)
 
-    def _fn54():
-        _merged55 = {}
+    def _upstream_fn76():
+        _upstream_merged77 = {}
         for _k, _v in (DRESSED._fields if isinstance(DRESSED, Record) else DRESSED).items():
-            _merged55[_k] = _v
+            _upstream_merged77[_k] = _v
         for _k, _v in {'inv_ids': stocked_ids}.items():
-            _merged55[_k] = _v
-        expect(prepare(snap(Record(_merged55)))).to_be_null()
-    test('nothing is outstanding once the pack is right', _fn54)
-
-    # Why: the three "Karambwan vessel"s and three "Karamjan rum"s are only separable by id.
-    def _fn56():
-        expect(TB_KEEP_IDS).to_contain(TB_ID.VESSEL)
-        expect(TB_KEEP_IDS).to_contain(TB_ID.VESSEL_LOADED)
-        expect(TB_KEEP_IDS).to_contain(TB_ID.RUM)
-        expect(TB_KEEP_IDS).to_contain(TB_ID.RUM_SLICED)
-        expect(TB_KEEP_IDS).to_contain(TB_ID.KARAMBWAN_POISON_PASTE)
-    test('every quest object is kept by id through a deposit', _fn56)
-
-    # Why: a deposit that misses a tier drops the spear this leg was built around.
-    def _fn57():
-        for spear in TB_SPEARS:
-            expect(TB_KEEP_IDS).to_contain(spear.id)
-            expect(TB_KEEP_IDS).to_contain(spear.kp_id)
-        for potion in TB_POTIONS:
-            expect(TB_KEEP_IDS).to_contain(potion.id)
-    test('every spear tier and every dose survives a deposit', _fn57)
+            _upstream_merged77[_k] = _v
+        expect(prepare(snap(Record(_upstream_merged77)))).to_be_null()
+    test('nothing is outstanding once the pack is right', _upstream_fn76)
 
 
-describe('tbwt prepare', _fn41)
+describe('tbwt prepare', _upstream_fn41)
+
+from rs2004.quests.food import quest_food

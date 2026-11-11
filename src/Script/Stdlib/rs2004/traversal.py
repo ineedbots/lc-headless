@@ -14,6 +14,7 @@ import json
 import random
 
 import _core
+from rs2004.execution import event_signal
 from rs2004 import execution
 from rs2004 import walkgeom
 from rs2004.dialogue import chat_dialog, modals
@@ -354,6 +355,13 @@ def _exact_placement(transport):
     if action == 'slash' and 'web' in name:
         return True
     return transport.get('loc_id') is not None and action.startswith('climb') and 'ladder' in name
+
+
+def dungeon_entry_loc(transport, level):
+    ids = _ids_of(transport)
+    x = transport['loc_x']
+    z = transport['loc_z']
+    return locs.query().where(lambda loc: loc.id in ids and loc.tile().level == level and _near(loc.tile(), x, z, 0)).nearest()
 
 
 def find_transport_loc(transport):
@@ -741,9 +749,9 @@ class _Traversal:
     def _check_route_items(self, waypoints, say):
         """False, with last_outcome unreachable, when the route needs what the account doesn't hold."""
         missing = missing_items_for_path(waypoints, world_state())
+        self.last_missing_gate_items = missing
         if len(missing) == 0:
             return True
-        self.last_missing_gate_items = missing
         self.last_outcome = 'unreachable'
         say(f"route needs {', '.join([repr(m) for m in missing])} before departure")
         return False
@@ -958,6 +966,9 @@ class _Traversal:
         if transport.get('kind') == 'teleport':
             done = yield from self._teleport(transport, say)
             return done
+        dungeon = yield from self._dungeon_entry(approach, step, say)
+        if dungeon is not None:
+            return dungeon
         crossing = special_crossing_for_transport(transport, approach, step)
         if crossing is not None:
             done = yield from self._special_crossing(approach, step, crossing, say)
@@ -967,6 +978,66 @@ class _Traversal:
             return done
         done = yield from self._use_transport_loc(approach, step, transport, say)
         return done
+
+    def _dungeon_entry(self, approach, step, say):
+        transport = step.transport
+        brimhaven = transport.get('loc_id') == 5083 and transport.get('loc_x') == 2743 and transport.get('loc_z') == 3153 and approach.level == 0
+        kalphite = transport.get('loc_id') == 3827 and transport.get('loc_x') == 3227 and transport.get('loc_z') == 3108 and approach.level == 0
+        if not brimhaven and not kalphite:
+            return None
+        arrived = lambda: local_tile() is not None and local_tile().level == step.level and walkgeom.chebyshev(local_tile(), step) <= 2
+        if arrived():
+            return True
+        if brimhaven:
+            npc = npcs.query().name('Saniboch').action('Pay').within_of(approach, 10).nearest()
+            if npc is None:
+                return False
+            mark = game_messages.mark()
+            before = inventory.count('Coins')
+            if not npc.interact('Pay'):
+                return False
+            quiet = 0
+            paid = False
+            for _ in range(40):
+                if event_signal.pending():
+                    return False
+                paid = paid or inventory.count('Coins') < before or game_messages.saw_since(mark, 'you pay saniboch 875 coins') or any(['already given me lots of nice coins' in text.lower() for text in chat_dialog.texts()])
+                if chat_dialog.can_continue():
+                    yield from chat_dialog.continue_()
+                    quiet = 0
+                elif modals.is_open():
+                    yield from modals.close()
+                    quiet = 0
+                elif chat_dialog.is_open() or not paid:
+                    quiet = 0
+                else:
+                    quiet += 1
+                if quiet >= 3:
+                    break
+                yield from execution.delay_ticks(1)
+            if not paid or quiet < 3 or event_signal.pending():
+                return False
+        find = lambda: dungeon_entry_loc(transport, approach.level)
+        yield from execution.delay_until(lambda: find() is not None, 3000)
+        loc = find()
+        if loc is None:
+            return False
+        if kalphite and loc.id == 3827:
+            rope = inventory.first('Rope')
+            if rope is None or not rope.use_on(loc):
+                return False
+            opened = yield from execution.delay_until(lambda: find() is not None and find().id == 3828, 4000)
+            if not opened:
+                return False
+            loc = find()
+        if event_signal.pending() or loc is None or not loc.interact(transport['action']):
+            return False
+        landed = yield from execution.delay_until(arrived, 10000)
+        if not landed:
+            return False
+        yield from execution.delay_ticks(2)
+        say('Brimhaven Dungeon: entered' if brimhaven else 'Kalphite burrow: entered')
+        return True
 
     def _teleport(self, transport, say):
         """A spell cast, or a jewellery rub and its destination chosen: True when it lands. Mirrors rs2b0t's

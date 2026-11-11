@@ -15,10 +15,13 @@ from rs2004.geometry import Tile
 from rs2004.items import equipment, inventory
 from rs2004.messages import game_messages
 from rs2004.navigation import reachability
+from rs2004.quests.defs.touristtrap_supplies import TOURIST_TRAP_FOOD_TARGET as FOOD_ENTRY_TARGET
 from rs2004.quests.data import quest_record
 from rs2004.quests.engine.types import QuestModule
 from rs2004.quests.exec.fund_coins import earn_quest_coins_step
 from rs2004.quests.food import quest_food
+
+WATERSKINS = ['Waterskin(4)', 'Waterskin(3)', 'Waterskin(2)', 'Waterskin(1)', 'Waterskin(0)']
 from rs2004.quests.journal_text import normalize_journal as journal_text
 from rs2004.tabs import quests
 from rs2004.traversal import traversal
@@ -245,7 +248,6 @@ ITEM = Record({
     'SLAVE_SHIRT': "Slaves' shirt",
     'SLAVE_ROBE': 'Slave robe',
     'SLAVE_BOOTS': 'Slave boots',
-    'WATERSKIN': 'Waterskin(4)',
     'BAR': 'Bronze bar',
     'FEATHER': 'Feather',
     'HAMMER': 'Hammer',
@@ -264,13 +266,8 @@ ITEM = Record({
 DESERT_OUTFIT = [ITEM.DESERT_SHIRT, ITEM.DESERT_ROBE, ITEM.DESERT_BOOTS]
 SLAVE_OUTFIT = [ITEM.SLAVE_SHIRT, ITEM.SLAVE_ROBE, ITEM.SLAVE_BOOTS]
 SLAVE_OUTFIT_DROP_IDS = [1844, 1845, 1846]
-WATERSKINS = ['Waterskin(4)', 'Waterskin(3)', 'Waterskin(2)', 'Waterskin(1)', 'Waterskin(0)']
-FOOD_ENTRY_TARGET = 16
-FOOD_ENTRY_FLOOR = 12
+FOOD_ENTRY_FLOOR = 6
 FOOD_RESTOCK_FLOOR = 4
-WATER_ENTRY_DOSES = 16
-WATER_ENTRY_FLOOR = 12
-WATER_RESTOCK_FLOOR = 8
 RESCUE_COIN_FLOOR = 100
 RESCUE_COIN_TARGET = 200
 IRENA_START = [
@@ -506,13 +503,13 @@ def banked(snap, name):
 
 
 def waterskin_containers(snap):
-    return sum([held_count(snap, name) for name in WATERSKINS])
+    return sum([held_count(snap, name) for name in ['Waterskin(4)', 'Waterskin(3)', 'Waterskin(2)', 'Waterskin(1)', 'Waterskin(0)']])
 
 
 def waterskin_doses(snap):
     doses = 0
     for index in range(4):
-        doses += held_count(snap, WATERSKINS[index]) * (4 - index)
+        doses += held_count(snap, ['Waterskin(4)', 'Waterskin(3)', 'Waterskin(2)', 'Waterskin(1)'][index]) * (4 - index)
     return doses
 
 
@@ -552,16 +549,37 @@ def scan_bank():
 
 
 def preparation_keep():
-    return [lower(_x) for _x in [ITEM.COINS, ITEM.PICKAXE, ITEM.KEBAB] + list(configured_food_forms()) + list(DESERT_OUTFIT) + list(SLAVE_OUTFIT) + list(WATERSKINS) + [ITEM.BAR, ITEM.FEATHER, ITEM.HAMMER, ITEM.PASS, ITEM.DISCLAIMER, ITEM.METAL_KEY, ITEM.BEDABIN_KEY, ITEM.PLANS, ITEM.DART_TIP, ITEM.DART, ITEM.PINEAPPLE, ITEM.BARREL, ITEM.ANA_BARREL]]
+    return [lower(_x) for _x in [ITEM.COINS, ITEM.PICKAXE, ITEM.KEBAB] + list(configured_food_forms()) + list(DESERT_OUTFIT) + list(SLAVE_OUTFIT) + [ITEM.BAR, ITEM.FEATHER, ITEM.HAMMER, ITEM.PASS, ITEM.DISCLAIMER, ITEM.CELL_KEY, ITEM.METAL_KEY, ITEM.BEDABIN_KEY, ITEM.PLANS, ITEM.DART_TIP, ITEM.DART, ITEM.PINEAPPLE, ITEM.BARREL, ITEM.ANA_BARREL]]
 
 
 def rescue_keep():
-    return [lower(_x) for _x in [ITEM.COINS, ITEM.PICKAXE, ITEM.KEBAB] + list(configured_food_forms()) + list(DESERT_OUTFIT) + list(SLAVE_OUTFIT) + list(WATERSKINS) + [ITEM.PASS, ITEM.DISCLAIMER, ITEM.METAL_KEY, ITEM.PINEAPPLE, ITEM.BARREL, ITEM.ANA_BARREL]]
+    return [lower(_x) for _x in [ITEM.COINS, ITEM.PICKAXE, ITEM.KEBAB] + list(configured_food_forms()) + list(DESERT_OUTFIT) + list(SLAVE_OUTFIT) + [ITEM.PASS, ITEM.DISCLAIMER, ITEM.METAL_KEY, ITEM.PINEAPPLE, ITEM.BARREL, ITEM.ANA_BARREL]]
 
 
 def has_preparation_spillover(snap):
     keep = preparation_keep()
     return any([not (name in keep) for name in list(list(snap.inv.keys()))])
+
+
+def reduce_food_loadout(snap):
+    if held(snap, ITEM.ANA_BARREL) or ((snap.stage if snap.stage is not None else 0)) >= TOURIST_TRAP_STAGE.REWARD:
+        return None
+    food = (configured_food_count(snap) if configured_food_name() else held_count(snap, ITEM.KEBAB))
+    if food <= FOOD_ENTRY_TARGET:
+        return None
+    area = tourist_trap_area(snap.tile)
+    if area != 'mainland' and area != 'shantayNorth' and ((snap.free_slots if snap.free_slots is not None else 2)) >= 2:
+        return None
+    _v16 = safe_recovery_route(area)
+    route = (_v16 if _v16 is not None else route_north(snap))
+    if route:
+        return route
+    rations = [lower(ITEM.KEBAB)] + list(configured_food_forms())
+    return Record({
+        'kind': 'deposit',
+        'keep': [name for name in preparation_keep() if not (name in rations)],
+        'exact_keep': True,
+    })
 
 
 def make_preparation_space(snap, slots):
@@ -591,7 +609,6 @@ SHANTAY_TARGETS = [
     Record({'name': ITEM.DESERT_SHIRT, 'qty': 1, 'shop': SHANTAY_SHOP, 'est_gp': 45}),
     Record({'name': ITEM.DESERT_ROBE, 'qty': 1, 'shop': SHANTAY_SHOP, 'est_gp': 45}),
     Record({'name': ITEM.DESERT_BOOTS, 'qty': 1, 'shop': SHANTAY_SHOP, 'est_gp': 25}),
-    Record({'name': ITEM.WATERSKIN, 'qty': 4, 'shop': SHANTAY_SHOP, 'est_gp': 35}),
     Record({'name': ITEM.PASS, 'qty': 1, 'shop': SHANTAY_SHOP, 'est_gp': 6}),
     Record({'name': ITEM.BAR, 'qty': 3, 'shop': SHANTAY_SHOP, 'est_gp': 8}),
     Record({'name': ITEM.FEATHER, 'qty': 10, 'shop': SHANTAY_SHOP, 'est_gp': 2}),
@@ -704,11 +721,6 @@ def preparation_acquisition_step(snap):
     for target in INITIAL_SHANTAY_TARGETS:
         # Crossing south consumes the pass; buying another from the desert would route you back north and the quest would never start.
         if target.name == ITEM.PASS and already_south:
-            continue
-        if target.name == ITEM.WATERSKIN:
-            water = source_water_doses(snap, WATER_ENTRY_DOSES, WATER_ENTRY_DOSES, make_preparation_space)
-            if water:
-                return water
             continue
         bank_item = withdraw_banked_shortage(snap, target.name, target.qty)
         if bank_item:
@@ -1945,6 +1957,8 @@ def route_north(snap):
     return custom('cross the Shantay Pass north for supplies', cross_shantay_pass_north)
 
 
+ITEM.WATERSKIN = 'Waterskin(4)'
+
 def source_water_doses(snap, minimum, target, make_space):
     doses = waterskin_doses(snap)
     if doses >= minimum:
@@ -1957,7 +1971,7 @@ def source_water_doses(snap, minimum, target, make_space):
         return north
     if not snap.bank_known:
         return scan_bank()
-    partial_names = [lower(_x) for _x in WATERSKINS[1:]]
+    partial_names = [lower(_x) for _x in ['Waterskin(3)', 'Waterskin(2)', 'Waterskin(1)', 'Waterskin(0)']]
     if any([(name in partial_names) for name in list(list(snap.inv.keys()))]):
         keep = [name for name in rescue_keep() if not (name in partial_names)]
         return Record({'kind': 'deposit', 'keep': keep, 'exact_keep': True})
@@ -2032,18 +2046,13 @@ def survival_step(snap):
         ration = (source_kebabs(snap, FOOD_ENTRY_TARGET) if held_count(snap, ITEM.KEBAB) < minimum else None)
         if ration:
             return ration
-    area = tourist_trap_area(snap.tile)
-    minimum = (WATER_ENTRY_FLOOR if area == 'mainland' or area == 'shantayNorth' else WATER_RESTOCK_FLOOR)
-    return source_water_doses(snap, minimum, WATER_ENTRY_DOSES, make_rescue_space)
+    return None
 
 
 def route_south(snap):
     area = tourist_trap_area(snap.tile)
     if area != 'mainland' and area != 'shantayNorth':
         return None
-    skins = source_water_doses(snap, WATER_ENTRY_FLOOR, WATER_ENTRY_DOSES, make_rescue_space)
-    if skins:
-        return skins
     if not held(snap, ITEM.PASS):
         if not snap.bank_known:
             return scan_bank()
@@ -2346,19 +2355,15 @@ def observe_tourist_trap(snap, step):
     if snap.tile:
         level = f',L{snap.tile.level}' if snap.tile.level else ''
         tile = f'({snap.tile.x},{snap.tile.z}' + level + ')'
-    water = waterskin_doses(snap)
-    containers = waterskin_containers(snap)
     food = configured_food_name()
     desert_worn = len([n for n in DESERT_OUTFIT if worn(snap, n)])
     slave_owned = len([n for n in SLAVE_OUTFIT if owned_now(snap, n) > 0])
     lines = [
         f"tt: stage={(snap.stage if snap.stage is not None else '?')} journal={snap.journal} area={area} tile={tile} free={(snap.free_slots if snap.free_slots is not None else '?')} bankKnown={snap.bank_known == True}",
-        f"tt: water={water} doses across {containers} skins food={(food if food is not None else '(disabled)')}:{configured_food_count(snap)} " + f'pass={held_count(snap, ITEM.PASS)} coins={held_count(snap, ITEM.COINS)} ' + f'pick={owned_now(snap, ITEM.PICKAXE)} metalKey={held_count(snap, ITEM.METAL_KEY)} ' + f'bedabinKey={held_count(snap, ITEM.BEDABIN_KEY)} pineapple={held_count(snap, ITEM.PINEAPPLE)} ' + f'anaBarrel={held_count(snap, ITEM.ANA_BARREL)} barrel={held_count(snap, ITEM.BARREL)}',
+        f"tt: food={(food if food is not None else '(disabled)')}:{configured_food_count(snap)} " + f'pass={held_count(snap, ITEM.PASS)} coins={held_count(snap, ITEM.COINS)} ' + f'pick={owned_now(snap, ITEM.PICKAXE)} metalKey={held_count(snap, ITEM.METAL_KEY)} ' + f'bedabinKey={held_count(snap, ITEM.BEDABIN_KEY)} pineapple={held_count(snap, ITEM.PINEAPPLE)} ' + f'anaBarrel={held_count(snap, ITEM.ANA_BARREL)} barrel={held_count(snap, ITEM.BARREL)}',
         f'tt: desertWorn={desert_worn}/{len(DESERT_OUTFIT)} slaveOwned={slave_owned}/{len(SLAVE_OUTFIT)} ' + f'kebabs={held_count(snap, ITEM.KEBAB)} plans={held_count(snap, ITEM.PLANS)} ' + f'dartTip={held_count(snap, ITEM.DART_TIP)} dart={held_count(snap, ITEM.DART)}',
         f'tt: decide→ {step_label(step)}',
     ]
-    if (area == 'desert' or area == 'irena' or area == 'bedabin') and water < WATER_RESTOCK_FLOOR:
-        lines.append(f'tt: WARN only {water} waterskin doses in the desert — below {WATER_RESTOCK_FLOOR}-dose safety floor')
     if step.kind == 'wait' and step.reason == 'death':
         lines.append('tt: death dump — next loop re-provisions (ownsInventory) then re-decides from journal')
     return lines
@@ -2381,6 +2386,9 @@ def decide(snap):
     if stage >= TOURIST_TRAP_STAGE.TRADED_CLOTHES and (area == 'mineEntrance' or area == 'mineLower' or area == 'mineDeep') and not has_outfit(snap, SLAVE_OUTFIT):
         # The supply route can't leave this component without the disguise it wants to replace, so recover the outfit here first.
         return custom('return to the punishment mine to recover the slave disguise', return_to_punishment_mine_for_outfit)
+    food_space = reduce_food_loadout(snap)
+    if food_space:
+        return food_space
     if stage >= TOURIST_TRAP_STAGE.STARTED and stage <= TOURIST_TRAP_STAGE.REWARD and (stage < TOURIST_TRAP_STAGE.REWARD or (stage == TOURIST_TRAP_STAGE.REWARD and (area == 'mainland' or area == 'shantayNorth'))):
         survival = survival_step(snap)
         if survival:
@@ -2558,6 +2566,10 @@ def decide(snap):
         if area == 'desert' or area == 'irena' or area == 'bedabin':
             camp = ensure_camp_surface(snap)
             return (camp if camp is not None else custom("return to the mining camp to resume Ana's rescue", enter_camp))
+        if (area == 'mainland' or area == 'shantayNorth') and not held(snap, ITEM.ANA_BARREL):
+            loadout = ensure_desert_exterior_loadout(snap)
+            if loadout:
+                return loadout
         south = route_south(snap)
         return (south if south is not None else Record({'kind': 'wait', 'reason': 'locating the visible Ana rescue checkpoint'}))
     if stage == TOURIST_TRAP_STAGE.REWARD:

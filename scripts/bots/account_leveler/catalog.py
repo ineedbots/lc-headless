@@ -106,6 +106,14 @@ FISH = [
     'location': 'Catherby',
     'tool': 'Lobster pot',
 }),
+    Record({
+    'level': 76,
+    'cooking': 80,
+    'food': 'Shark',
+    'method': 'Harpoon — sharks',
+    'location': 'Catherby',
+    'tool': 'Harpoon',
+}),
 ]
 MILESTONES = Record({
     'agility': [15],

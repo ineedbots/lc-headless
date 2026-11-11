@@ -320,6 +320,75 @@ def ladder():
             'loc_x': 3200, 'loc_z': 3200, 'to_level': 1}
 
 
+def test_brimhaven_entry_waits_for_payment_and_accepts_an_existing_payment():
+    for mode in ['pay', 'already-paid', 'refused', 'silent', 'missing-npc', 'missing-door', 'no-arrival']:
+        with TransportWorld() as world:
+            world.here = Tile(2747, 3152)
+            world.coins = 1200
+            approach = Tile(2747, 3152)
+            transport = {'kind': 'dungeon', 'loc_id': 5083, 'loc_x': 2743, 'loc_z': 3153,
+                         'loc_name': 'Dungeon entrance', 'action': 'Enter', 'to_tile': [2713, 9564]}
+            hop = PathTile(2713, 9564, 0, transport)
+            npc = Entity(world, 'Saniboch', ['Pay'], Tile(2747, 3152))
+            door = Entity(world, 'Dungeon entrance', ['Enter'], Tile(2743, 3153), id=5083)
+
+            def pay(action):
+                if mode == 'refused':
+                    return False
+                if mode == 'pay' or mode == 'missing-door' or mode == 'no-arrival':
+                    world.coins -= 875
+                if mode == 'already-paid':
+                    world.dialogue.lines = ['You have already given me lots of nice coins.']
+                    world.dialogue.open = True
+                return True
+
+            def enter(action):
+                if mode != 'no-arrival':
+                    world.events.append(('land', Tile(2713, 9564)))
+                return True
+
+            npc.on_interact = pay
+            door.on_interact = enter
+            world.npc_items = [] if mode == 'missing-npc' else [npc]
+            world.loc_items = [] if mode == 'missing-door' else [door]
+            assert world.run(walker._Traversal()._handle_transport(approach, hop, world.logs.append)) == (mode in ['pay', 'already-paid'])
+            if mode in ['silent', 'refused', 'missing-npc']:
+                assert ('Dungeon entrance', 'Enter') not in world.interactions
+
+
+def test_kalphite_entry_installs_rope_before_climbing_and_accepts_open_entrance():
+    for mode in ['closed', 'open', 'no-rope', 'rope-refused', 'silent', 'no-arrival']:
+        with TransportWorld() as world:
+            world.here = Tile(3226, 3108)
+            approach = Tile(3226, 3108)
+            transport = {'kind': 'dungeon', 'loc_id': 3827, 'open_loc_id': 3828, 'loc_x': 3227, 'loc_z': 3108,
+                         'loc_name': 'Tunnel entrance', 'action': 'Climb-down', 'to_tile': [3483, 9510], 'to_level': 2}
+            hop = PathTile(3483, 9510, 2, transport)
+            entrance = Entity(world, 'Tunnel entrance', ['Climb-down'] if mode == 'open' else [], Tile(3227, 3108), id=3828 if mode == 'open' else 3827)
+            rope = Entity(world, 'Rope', [])
+
+            def install(loc):
+                if mode == 'rope-refused':
+                    return False
+                if mode != 'silent':
+                    entrance.id = 3828
+                    entrance.ops = ['Climb-down']
+                return True
+
+            def climb(action):
+                if mode != 'no-arrival':
+                    world.events.append(('land', Tile(3483, 9510, 2)))
+                return True
+
+            rope.use_on = install
+            world.first = lambda name: None if mode == 'no-rope' else rope
+            entrance.on_interact = climb
+            world.loc_items = [entrance]
+            assert world.run(walker._Traversal()._handle_transport(approach, hop, world.logs.append)) == (mode in ['closed', 'open'])
+            if mode in ['no-rope', 'rope-refused', 'silent']:
+                assert world.interactions == []
+
+
 def ship():
     return {'kind': 'npc', 'loc_name': 'Captain', 'action': 'Pay-fare', 'loc_x': 3200, 'loc_z': 3200,
             'to_tile': [3000, 3000]}

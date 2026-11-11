@@ -65,6 +65,9 @@ SETTINGS = {
     'bury_bones': SettingDef('boolean', False, 'Bury regular bones', group='Banking & loot', help='pick up and bury regular Bones for Prayer XP (always looted when on)'),
     'bury_big_bones': SettingDef('boolean', False, 'Bury big bones', group='Banking & loot',
                                  help='pick up and bury Big bones for Prayer XP, independently of regular bones (always looted when on)'),
+    'bury_baby_dragon_bones': SettingDef('boolean', False, 'Bury babydragon bones', group='Banking & loot'),
+    'travel_coins': SettingDef('number', 0, 'Travel coins per trip', 0, 200000, group='Banking & loot'),
+    'travel_items': SettingDef('string[]', [], 'Travel items', group='Banking & loot', help='Keep one of each and replace it from the bank before returning to camp'),
     'solve_clues': SettingDef('boolean', True, 'Solve clue drops', group='Clues'),
     'banking': SettingDef('string', 'Auto', 'Banking', options=BANKING_OPTIONS, help='Auto = bank loot at the nearest bank and return; None = no loot-only bank trips'),
     'bank_location': SettingDef('string', 'Nearest', 'Bank location', options=BANK_LOCATION_OPTIONS, group='Banking & loot',
@@ -105,7 +108,7 @@ def withdraw_to(name, target):
     return inventory.count(name) - start
 
 
-def should_keep_bank_item(name, id, food, bank_common, ammo=None, gear=None, bury_bones=False, bury_big_bones=False):
+def should_keep_bank_item(name, id, food, bank_common, ammo=None, gear=None, bury_bones=False, bury_big_bones=False, bury_baby_dragon_bones=False):
     """Whether a backpack item stays out of the deposit: the food, coins, clue kit and clues, a casket (the random
     event's only with bank_common off), the ammo, the gear, and unnoted bones to bury."""
     n = name.lower()
@@ -114,7 +117,7 @@ def should_keep_bank_item(name, id, food, bank_common, ammo=None, gear=None, bur
     gear_match = len([g for g in (gear or []) if g.lower() == n]) > 0
     return matches_any(name, [food]) or n == 'coins' or n in KIT or 'clue' in n \
         or ('casket' in n and not generic_casket) or (generic_casket and not bank_common) \
-        or ammo_match or gear_match or is_burial_bone(name, bury_bones and id == 526, bury_big_bones and id == 532)
+        or ammo_match or gear_match or is_burial_bone(name, bury_bones and id == 526, bury_big_bones and id == 532, bury_baby_dragon_bones and id == 534)
 
 
 class EnableAutoRetaliate(Task):
@@ -253,6 +256,9 @@ class PanicRetreat(Task):
         yield from traversal.walk_resilient(bot.bank_tile_of(destination), radius=3, attempts=4, timeout_ms=180000, log=say)
         opened = yield from open_bank_access(destination, BOOTH, log=say)
         if opened:
+            ready = yield from bot.restock_travel()
+            if not ready:
+                return
             for _ in range(bot.food_withdraw):
                 if inventory.is_full():
                     break
@@ -275,7 +281,7 @@ class BuryBones(Task):
 
     def validate(self):
         bot = self.bot
-        return not event_signal.pending() and should_bury_regular_bones(bot.bury_bones or bot.bury_big_bones, game.in_combat(), bank.is_open(),
+        return not event_signal.pending() and should_bury_regular_bones(bot.bury_bones or bot.bury_big_bones or bot.bury_baby_dragon_bones, game.in_combat(), bank.is_open(),
                                                                         len(bot.burial_bones()), inventory.is_full())
 
     def execute(self):
@@ -351,8 +357,11 @@ class BankRun(Task):
         if not opened:
             return
         ammo = [bot.ammo] if bot.style == 'range' else []
-        yield from bank.deposit_all_matching(lambda name, id: not should_keep_bank_item(name, id, bot.food, bot.bank_common, ammo, bot.tracked_gear,
-                                                                                        bot.bury_bones, bot.bury_big_bones))
+        yield from bank.deposit_all_matching(lambda name, id: not should_keep_bank_item(name, id, bot.food, bot.bank_common, ammo, bot.tracked_gear + [need[0] for need in bot.travel_supplies],
+                                                                                        bot.bury_bones, bot.bury_big_bones, bot.bury_baby_dragon_bones))
+        ready = yield from bot.restock_travel()
+        if not ready:
+            return
         for _ in range(bot.food_withdraw):
             if bot.food_count() >= bot.food_withdraw or inventory.is_full():
                 break
@@ -667,6 +676,8 @@ class Fight(Task):
                 return
             # Why: inline, not left to the sibling task; this loop owns the bot until the target dies.
             yield from bot.arm_special()
+            if bot.resume_attack:
+                return
             yield from execution.delay_ticks(2)
 
 
@@ -726,6 +737,9 @@ class AutoFighter(TaskBot):
                 self.avoid_herb_ids.add(herb.unid_id)
         self.bury_bones = s.bool('bury_bones', False)
         self.bury_big_bones = s.bool('bury_big_bones', False)
+        self.bury_baby_dragon_bones = s.bool('bury_baby_dragon_bones', False)
+        coins = max(0, int(s.num('travel_coins', 0)))
+        self.travel_supplies = ([('Coins', coins)] if coins else []) + [(item, 1) for item in s.list('travel_items') if item.strip() and item.lower() != 'coins']
         self.solve_clues = s.bool('solve_clues', True)
         self.bank_at = s.num('bank_at_loot_slots', 12)
         self.bank_every_minutes = s.num('bank_every_minutes', 0)
@@ -913,10 +927,10 @@ class AutoFighter(TaskBot):
         return should_eat(skills.effective('hitpoints'), skills.level('hitpoints'), food_heal_amount(self.food), self.food_count())
 
     def is_loot(self, name):
-        return wants_auto_fighter_loot(name, self.loot, self.bury_bones, self.bury_big_bones)
+        return wants_auto_fighter_loot(name, self.loot, self.bury_bones, self.bury_big_bones, self.bury_baby_dragon_bones)
 
     def burial_bones(self):
-        return [i for i in inventory.items() if not i.noted and is_burial_bone(i.name, self.bury_bones, self.bury_big_bones)
+        return [i for i in inventory.items() if not i.noted and is_burial_bone(i.name, self.bury_bones, self.bury_big_bones, self.bury_baby_dragon_bones)
                 and len([a for a in i.actions() if a.lower() == 'bury']) > 0]
 
     def loot_count(self):
@@ -932,11 +946,24 @@ class AutoFighter(TaskBot):
         weapon = special.wielded()
         return weapon if special_available(self.use_special, self.style, special.cost(weapon)) else ''
 
+    def special_needs_ammo(self):
+        return special.wielded().lower() == 'magic shortbow' and sum([i.count for i in equipment.items() if i.slot == 13]) < 2
+
     def special_due(self):
+        if self.special_needs_ammo():
+            return special.armed()
         return should_arm_special(self.use_special, self.style, special.cost(special.wielded()), special.energy(), special.armed())
 
     # Why: arming is one-shot; the next attack spends it and the engine clears the flag, so it's armed again for each.
     def arm_special(self):
+        if self.special_needs_ammo():
+            if not special.armed():
+                return False
+            disarmed = yield from special.disarm()
+            if not disarmed:
+                return False
+            self.resume_attack = True
+            return True
         weapon = special.wielded()
         if not self.special_due():
             return False
@@ -945,6 +972,17 @@ class AutoFighter(TaskBot):
             return False
         self.specials += 1
         self.log(f'special armed with {weapon} (bar at {round(special.energy() / 10)}%, spent on the next hit)')
+        return True
+
+    def restock_travel(self):
+        for item, target in self.travel_supplies:
+            if inventory.count(item) >= target:
+                continue
+            yield from withdraw_to(item, target)
+            if inventory.count(item) < target:
+                yield from bank.close()
+                self.request_finish(f'Missing travel supply: {item}')
+                return False
         return True
 
     def wielded_names(self):

@@ -6,6 +6,8 @@ from bots.account_leveler.methods import method_for, producer
 from bots.account_leveler.offers import supply_offer
 from bots.account_leveler.combat import COMBAT_CAMPS, combat_plan
 from bots.account_leveler.session import LevelerSession
+from bots.account_leveler.types import requirement_key, stock_of
+from bots.account_leveler.combat_progression import TARGET_TIERS
 
 def snapshot(level=1):
     return Record({'levels': {_k: _v for _k, _v in [[s, (max(10, level) if s == 'hitpoints' else level)] for s in enabled_skills]}, 'stock': Record({'coins': 100000}), 'bank_ready': True, 'quests': Record({}), 'target': 40, 'wilderness': True, 'now': 1000})
@@ -21,7 +23,7 @@ def validate(plan, s):
             for chosen in (value if isinstance(value, list) else [value]):
                 expect(def_.options, f'{plan.script}.{key}={chosen}').to_contain(chosen)
     for need in plan.needs:
-        if need.item == 'Coins':
+        if need.item == 'Coins' or stock_of(s, requirement_key(need)) >= need.count:
             continue
         expect(supply_offer(need.item) or producer(s, plan.objective, need, empty_memory(), lambda: 0), need.item).to_be_truthy()
 

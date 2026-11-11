@@ -1,13 +1,14 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/watchtower/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
+from rs2004.game import game
 from rs2004.quests.defs.watchtower.bones import dragon_bank_pending, hunt_dragon_bones, in_dragon_lair, leave_dragon_lair, refresh_dragon_bank
 from rs2004.quests.food import quest_food
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.watchtower.areas import CRYSTALS, RELIC_PARTS, WT_ITEM, WT_TILE, watchtower_area
 from rs2004.quests.defs.watchtower.caves import answer_mad_skavid, learn_from_scared_skavid, learn_word, leave_cave, next_skavid_cave, take_nightshade
 from rs2004.quests.defs.watchtower.enclave import dissolve_shamans, enter_enclave, leave_enclave, mine_dalgroth, search_shaman_robe
-from rs2004.quests.defs.watchtower.gutanoth import CHASM_TOLL, answer_riddle, ask_riddle, cross_battlement, jump_back, leave_lower_city, show_relic_to_guard, steal_rock_cake
+from rs2004.quests.defs.watchtower.gutanoth import leave_city, gold_gate_needs_payment, CHASM_TOLL, answer_riddle, ask_riddle, cross_battlement, jump_back, leave_lower_city, show_relic_to_guard, steal_rock_cake
 from rs2004.quests.defs.watchtower.journal import WATCHTOWER_STAGE, read_watchtower_progress
 from rs2004.quests.defs.watchtower.potion import brew_ogre_potion, grind_bat_bones, infuse_potion
 from rs2004.quests.defs.watchtower.supplies import bank_only, banked, held, make_room, owned, quest_kit, scan_bank, source_coins, source_death_rune, source_food, source_light_source, source_pestle, source_pickaxe, source_rope, source_vial, withdraw_from
@@ -35,12 +36,20 @@ def escape_pocket(area, wanted):
     elif area == 'cityGuard':
         return Record({'kind': 'custom', 'name': 'jump back out of the city-guard pocket', 'run': jump_back})
     elif area == 'skavidCaves':
-        return Record({'kind': 'custom', 'name': 'leave the skavid cave', 'run': leave_cave})
+        def _fn1(log):
+            _w2 = yield from leave_cave(log)
+            if not (_w2):
+                return False
+            _c3 = watchtower_area(game.tile()) != 'lowerCity'
+            if _c3:
+                return _c3
+            _result4 = yield from leave_city(log)
+            return _result4
+        return Record({'kind': 'custom', 'name': 'leave the skavid cave', 'run': _fn1})
     elif area == 'enclave':
         return Record({'kind': 'custom', 'name': 'leave the shaman enclave', 'run': leave_enclave})
     elif area == 'lowerCity':
-        # The battlement is a two-way climb once the market gift is paid.
-        return Record({'kind': 'custom', 'name': 'climb back over the battlement', 'run': leave_lower_city})
+        return Record({'kind': 'custom', 'name': 'leave the ogre city', 'run': leave_city})
     else:
         return None
 
@@ -48,8 +57,8 @@ def escape_pocket(area, wanted):
 # Why: `wanted` is where the step's own leg expects to begin, and the open mainland always qualifies, as every leg can walk from there.
 def at(area, wanted, step):
     """Take `step` only once somewhere it can start from, escaping any other sealed pocket first."""
-    _v1 = escape_pocket(area, wanted)
-    return (_v1 if _v1 is not None else step)
+    _v5 = escape_pocket(area, wanted)
+    return (_v5 if _v5 is not None else step)
 
 
 def need_rope(snap, area):
@@ -168,9 +177,10 @@ def need_cave_kit(snap, area):
     """The cave kit shortfall, or null when both are held."""
     if held(snap, WT_ITEM.SKAVID_MAP.id) == 0:
         in_bank = bank_only(snap, WT_ITEM.SKAVID_MAP)
-        if in_bank and in_bank.kind == 'withdraw':
+        if in_bank and in_bank.kind != 'wait':
             return at(area, 'yanille', in_bank)
-        return Record({'kind': 'custom', 'name': 'ask the city guard for another skavid map', 'run': ask_riddle})
+        purse = (source_coins(snap, CITY_PURSE) if held(snap, WT_ITEM.COINS.id) < CHASM_TOLL * 2 else None)
+        return (at(area, 'yanille', purse) if purse else at(area, 'cityGuard', Record({'kind': 'custom', 'name': 'ask the city guard for another skavid map', 'run': ask_riddle})))
     light = source_light_source(snap)
     return (at(area, 'yanille', light) if light else None)
 
@@ -192,22 +202,30 @@ def stage_caves(snap, area):
             'name': f'answer the skavid in cave {cave}',
             'run': lambda log: learn_word(cave, log),
         })
-    # Cave 6 is behind the gold-bar gate, so the bar has to be in the pack first.
-    bar = bank_only(snap, WT_ITEM.GOLD_BAR)
-    return (at(area, 'yanille', bar) if bar else Record({'kind': 'custom', 'name': 'answer the mad skavid for a crystal', 'run': answer_mad_skavid}))
+    payment = gold_gate_needs_payment()
+    if area != 'skavidCaves' and payment != False and (area != 'lowerCity' or payment == True):
+        bar = bank_only(snap, WT_ITEM.GOLD_BAR)
+        if bar and (bar.kind != 'wait' or payment == True):
+            return at(area, 'yanille', bar)
+    return at(area, 'skavidCaves', Record({'kind': 'custom', 'name': 'answer the mad skavid for a crystal', 'run': answer_mad_skavid}))
 
 
 def stage_enclave_entry(snap, area):
     if area == 'enclave':
         return Record({'kind': 'custom', 'name': 'leave the shaman enclave', 'run': leave_enclave})
     if held(snap, WT_ITEM.NIGHTSHADE.id) == 0:
-        _v4 = need_cave_kit(snap, area)
-        return (_v4 if _v4 is not None else Record({'kind': 'custom', 'name': 'take Nightshade from the skavid cave', 'run': take_nightshade}))
+        _v9 = need_cave_kit(snap, area)
+        return (_v9 if _v9 is not None else Record({'kind': 'custom', 'name': 'take Nightshade from the skavid cave', 'run': take_nightshade}))
     food = source_food(snap, ENCLAVE_FOOD)
     return (at(area, 'yanille', food) if food else Record({'kind': 'custom', 'name': 'feed the enclave guard Nightshade', 'run': enter_enclave}))
 
 
 def stage_potion(snap, area):
+    for potion in [WT_ITEM.MAGIC_OGRE_POTION, WT_ITEM.OGRE_POTION, WT_ITEM.GUAM_JANGER_VIAL, WT_ITEM.GUAM_VIAL]:
+        if held(snap, potion.id) > 0:
+            break
+        if banked(snap, potion.id) > 0:
+            return at(area, 'yanille', withdraw_from([{'id': potion.id, 'name': potion.name, 'qty': 1}]))
     if held(snap, WT_ITEM.OGRE_POTION.id) > 0:
         return at(area, 'towerFloor', Record({'kind': 'custom', 'name': 'have the wizard infuse the ogre potion', 'run': infuse_potion}))
     escape = escape_pocket(area, 'yanille')
@@ -222,9 +240,13 @@ def stage_potion(snap, area):
         if vial:
             return vial
     if held(snap, WT_ITEM.GUAM_JANGER_VIAL.id) == 0 and held(snap, WT_ITEM.JANGERBERRIES.id) == 0:
+        if banked(snap, WT_ITEM.JANGERBERRIES.id) > 0:
+            return withdraw_from([{'id': WT_ITEM.JANGERBERRIES.id, 'name': WT_ITEM.JANGERBERRIES.name, 'qty': 1}])
         _v5 = need_rope(snap, area)
         return (_v5 if _v5 is not None else Record({'kind': 'custom', 'name': 'pick jangerberries on Grew island', 'run': pick_jangerberries}))
     if held(snap, WT_ITEM.GROUND_BAT_BONES.id) == 0:
+        if banked(snap, WT_ITEM.GROUND_BAT_BONES.id) > 0:
+            return withdraw_from([{'id': WT_ITEM.GROUND_BAT_BONES.id, 'name': WT_ITEM.GROUND_BAT_BONES.name, 'qty': 1}])
         bones = bank_only(snap, WT_ITEM.BAT_BONES)
         if bones:
             return bones
@@ -236,8 +258,8 @@ def stage_potion(snap, area):
 
 
 def stage_shamans(snap, area):
-    _v6 = flag_value(snap.progress, 'shamans-left')
-    left = (_v6 if _v6 is not None else 6)
+    _v14 = flag_value(snap.progress, 'shamans-left')
+    left = (_v14 if _v14 is not None else 6)
     # Why: dissolved shamans respawn, so any trip back in needs food, but only the steps that go back in.
     # Why: demanding it while carrying the crystals to the wizard parks the quest for no reason.
     enclave_food = (None if area == 'enclave' else source_food(snap, ENCLAVE_FOOD))
@@ -251,8 +273,8 @@ def stage_shamans(snap, area):
                 return Record({'kind': 'custom', 'name': 'leave the enclave to brew another potion', 'run': leave_enclave})
             return stage_potion(snap, area)
         if area != 'enclave' and held(snap, WT_ITEM.NIGHTSHADE.id) == 0:
-            _v7 = need_cave_kit(snap, area)
-            return (_v7 if _v7 is not None else provisioned(Record({'kind': 'custom', 'name': 'take Nightshade for the enclave', 'run': take_nightshade})))
+            _v15 = need_cave_kit(snap, area)
+            return (_v15 if _v15 is not None else provisioned(Record({'kind': 'custom', 'name': 'take Nightshade for the enclave', 'run': take_nightshade})))
         # The mining follows in the same visit, so the pickaxe rides along and saves a second trip through the guard.
         pick = (None if area == 'enclave' else source_pickaxe(snap))
         if pick:
@@ -264,17 +286,17 @@ def stage_shamans(snap, area):
         if pick:
             return at(area, 'yanille', pick)
         if area != 'enclave' and held(snap, WT_ITEM.NIGHTSHADE.id) == 0:
-            _v8 = need_cave_kit(snap, area)
-            return (_v8 if _v8 is not None else provisioned(Record({'kind': 'custom', 'name': 'take Nightshade for the enclave', 'run': take_nightshade})))
+            _v16 = need_cave_kit(snap, area)
+            return (_v16 if _v16 is not None else provisioned(Record({'kind': 'custom', 'name': 'take Nightshade for the enclave', 'run': take_nightshade})))
         return provisioned(Record({'kind': 'custom', 'name': 'mine the Rock of Dalgroth', 'run': mine_dalgroth}))
     if held(snap, WT_ITEM.CRYSTAL3.id) == 0 and banked(snap, WT_ITEM.CRYSTAL3.id) == 0:
         if area != 'enclave' and held(snap, WT_ITEM.NIGHTSHADE.id) == 0:
-            _v9 = need_cave_kit(snap, area)
-            return (_v9 if _v9 is not None else provisioned(Record({'kind': 'custom', 'name': 'take Nightshade for the enclave', 'run': take_nightshade})))
+            _v17 = need_cave_kit(snap, area)
+            return (_v17 if _v17 is not None else provisioned(Record({'kind': 'custom', 'name': 'take Nightshade for the enclave', 'run': take_nightshade})))
         return provisioned(Record({'kind': 'custom', 'name': 'search a shaman robe for the third crystal', 'run': search_shaman_robe}))
     if area == 'enclave':
         return Record({'kind': 'custom', 'name': 'leave the shaman enclave', 'run': leave_enclave})
-    recovery = recover_crystals(snap)
+    recovery = recover_crystals(snap, area)
     if recovery:
         return recovery
     return at(area, 'towerFloor', Record({'kind': 'custom', 'name': 'take all four crystals to the wizard', 'run': show_crystals_to_wizard}))
@@ -282,13 +304,13 @@ def stage_shamans(snap, area):
 
 CRYSTAL_RECOVERY = {
     WT_ITEM.CRYSTAL1.id: Record({'name': 'ask Grew for another crystal', 'run': talk_to_grew}),
-    WT_ITEM.CRYSTAL2.id: Record({'name': 'ask the mad skavid for another crystal', 'run': answer_mad_skavid}),
+    WT_ITEM.CRYSTAL2.id: Record({'name': 'ask the mad skavid for another crystal', 'run': lambda log: answer_mad_skavid(log, True)}),
     WT_ITEM.CRYSTAL3.id: Record({'name': 'search a shaman robe for the third crystal', 'run': search_shaman_robe}),
     WT_ITEM.CRYSTAL4.id: Record({'name': 'mine the Rock of Dalgroth again', 'run': mine_dalgroth}),
 }
 
 
-def recover_crystals(snap):
+def recover_crystals(snap, area):
     # Nothing to recover once all four are carried; don't walk to the bank only to learn what's in it.
     lost = ([crystal for crystal in CRYSTALS if held(snap, crystal.id) == 0] or [None])[0]
     if not lost:
@@ -296,14 +318,23 @@ def recover_crystals(snap):
     # Every re-issue check reads the bank as well as the pack, so a banked crystal blocks its own replacement. Withdraw before asking for another.
     in_bank = [crystal for crystal in CRYSTALS if held(snap, crystal.id) == 0 and banked(snap, crystal.id) > 0]
     if len(in_bank) > 0:
-        return withdraw_from([{'name': crystal.name, 'id': crystal.id, 'qty': 1} for crystal in in_bank])
+        return at(area, 'yanille', withdraw_from([({'name': crystal.name, 'id': crystal.id, 'qty': 1}) for crystal in in_bank]))
     if not snap.bank_known:
-        return scan_bank()
+        return at(area, 'yanille', scan_bank())
     recovery = CRYSTAL_RECOVERY[lost.id]
-    return Record({'kind': 'custom', 'name': recovery.name, 'run': recovery.run})
+    step = Record({'kind': 'custom', 'name': recovery.name, 'run': recovery.run})
+    if lost.id == WT_ITEM.CRYSTAL1.id:
+        rope = need_rope(snap, area)
+        return (at(area, 'yanille', rope) if rope else at(area, 'grewIsland', step))
+    if lost.id == WT_ITEM.CRYSTAL2.id:
+        kit = need_cave_kit(snap, area)
+        if kit:
+            return kit
+        return at(area, 'skavidCaves', step)
+    return step
 
 
-def decide(snap):
+def decide_next(snap):
     if in_dragon_lair(snap.tile):
         return Record({'kind': 'custom', 'name': 'leave the dragon lair', 'run': leave_dragon_lair})
     if dragon_bank_pending():
@@ -329,6 +360,8 @@ def decide(snap):
         return Record({'kind': 'custom', 'name': 'climb down from the activated Watchtower', 'run': leave_wizard_floor})
     # Why: one bank trip for everything the bank can supply; what the bank lacks still falls to the shop, the ground candle and the guard's riddle.
     # Why: bounded to the collecting stages, as past the potion the kit is spent and a trip proves nothing.
+    if (snap.free_slots if snap.free_slots is not None else 28) < 2 or food_count(snap) > 8:
+        return at(area, 'yanille', clear_space(snap))
     if snap.stage > WATCHTOWER_STAGE.NOT_STARTED and snap.stage <= WATCHTOWER_STAGE.MADE_POTION:
         room = make_room(snap)
         if room:
@@ -371,12 +404,19 @@ def decide(snap):
         return Record({'kind': 'wait', 'reason': 'Watch Tower stage ' + str(snap.stage) + ' is not implemented yet'})
 
 
+from rs2004.quests.defs.watchtower.loadout import fit_supplies, clear_space, food_count, WATCHTOWER_FOODS
+
+def decide(snap):
+    return fit_supplies(snap, decide_next(snap))
+
 watchtower = QuestModule(**{
+    'auto_retaliate': lambda snap: not in_dragon_lair(snap.tile) and watchtower_area(snap.tile) != 'enclave',
+    'recover': lambda tile: Record({'kind': 'custom', 'name': 'leave the dragon lair', 'run': leave_dragon_lair}) if in_dragon_lair(tile) else escape_pocket(watchtower_area(tile), 'yanille'),
     'record': quest_record('itwatchtower'),
     'bank': WT_TILE.YANILLE_BANK,
     'owns_inventory': True,
-    'resume_at': in_dragon_lair,
+    'resume_at': lambda tile: in_dragon_lair(tile) or escape_pocket(watchtower_area(tile), 'yanille') is not None,
     'read_progress': read_watchtower_progress,
-    'sustain': Record({'foods': ['Lobster', 'Swordfish', 'Tuna'], 'eat_below_hp': 0.6}),
+    'sustain': Record({'foods': WATCHTOWER_FOODS, 'eat_below_hp': 0.6}),
     'decide': decide,
 })

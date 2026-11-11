@@ -4,6 +4,34 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+TEST_CASE("BotMessenger broadcasts independent copies to other accounts", "[BotMessenger]")
+{
+    auto messenger = BotMessenger{};
+    auto received = std::vector<BotMessage_s>{};
+    messenger.Register("Sender", [](BotMessage_s)
+    {
+        FAIL("sender received its own broadcast");
+        return false;
+    });
+    messenger.Register("One", [&received](BotMessage_s message)
+    {
+        received.push_back(std::move(message));
+        return true;
+    });
+    messenger.Register("Two", [&received](BotMessage_s message)
+    {
+        received.push_back(std::move(message));
+        return false;
+    });
+    CHECK(messenger.Send("*", BotMessage_s{.sender = "SENDER", .json = "42"}) == std::optional{false});
+    REQUIRE(received.size() == 2);
+    CHECK(received[0].json == "42");
+    CHECK(received[1].json == "42");
+    messenger.Unregister("Two");
+    CHECK(messenger.Send("*", BotMessage_s{.sender = "sender", .json = "43"}) == std::optional{true});
+    CHECK(received.size() == 3);
+}
+
 TEST_CASE("BotMessenger delivers to the account with that username, in any case", "[BotMessenger]")
 {
     auto messenger = BotMessenger{};

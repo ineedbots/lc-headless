@@ -5,7 +5,33 @@ from rs2004.quests.defs.shieldofarrav.areas import SOA_ID
 from rs2004.quests.defs.shieldofarrav.config import arrav_config
 from rs2004.quests.defs.shieldofarrav.journal import SOA_STAGE
 from rs2004.quests.defs.shieldofarrav.phoenix import phoenix_step
+import rs2004.quests.defs.shieldofarrav.phoenix as phoenix
 VARROCK = Fake(**{'x': 3210, 'z': 3490, 'level': 0})
+
+
+def answer(value):
+    yield from ()
+    return value
+
+
+def recover_key():
+    scene = Scene()
+    enter = spy_on(phoenix, 'enter_hideout', impl=lambda log: answer(False))
+    spy_on(phoenix, 'leave_hideout', impl=lambda log: answer(True))
+    expect(run_wait(phoenix.recover_store_key(scene.log))).to_be(False)
+    enter.mock_implementation(lambda log: answer(True))
+    spy_on(phoenix, 'talk_until', impl=lambda talk, prefer, held, log: answer(False))
+    expect(run_wait(phoenix.recover_store_key(scene.log))).to_be(False)
+    def returned(talk, prefer, held, log):
+        scene.item(SOA_ID.STORE_KEY, 'Weapon store key')
+        yield from ()
+        return held()
+    spy_on(phoenix, 'talk_until', impl=returned)
+    expect(run_wait(phoenix.recover_store_key(scene.log))).to_be(True)
+    expect(run_wait(phoenix.recover_store_key(scene.log))).to_be(True)
+
+
+test('a Phoenix member recovers a lost store key from Straven before leaving', recover_key)
 
 def at(stage, flags=None, ids=None, bank_ids=None, bank_known=True):
     if flags is None:

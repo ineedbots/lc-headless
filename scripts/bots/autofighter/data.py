@@ -27,15 +27,15 @@ def should_bank_after_minutes(auto_bank, every_minutes, minutes_since_last_bank,
     return minutes_since_last_bank >= every_minutes
 
 
-def is_burial_bone(name, bury_bones=True, bury_big_bones=False):
+def is_burial_bone(name, bury_bones=True, bury_big_bones=False, bury_baby_dragon_bones=False):
     normalized = name.strip().lower() if name is not None else None
-    return (bury_bones and normalized == BURIAL_BONE_NAME.lower()) or (bury_big_bones and normalized == 'big bones')
+    return (bury_bones and normalized == BURIAL_BONE_NAME.lower()) or (bury_big_bones and normalized == 'big bones') or (bury_baby_dragon_bones and normalized == 'babydragon bones')
 
 
-def wants_auto_fighter_loot(name, configured, bury_bones, bury_big_bones=False):
+def wants_auto_fighter_loot(name, configured, bury_bones, bury_big_bones=False, bury_baby_dragon_bones=False):
     normalized = name.strip().lower() if name is not None else None
     listed = normalized is not None and len([entry for entry in configured if entry.strip().lower() == normalized]) > 0
-    return listed or is_burial_bone(name, bury_bones, bury_big_bones)
+    return listed or is_burial_bone(name, bury_bones, bury_big_bones, bury_baby_dragon_bones)
 
 
 # Why: Fight's validate is false while in combat, so with retaliate off an attacking random event (strange fruit)

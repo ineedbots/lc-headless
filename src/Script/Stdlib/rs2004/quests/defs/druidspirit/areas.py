@@ -97,6 +97,7 @@ NS_TILE = Record({
     'GROTTO_TREE': Tile(3439, 3338, 0),
     'GROTTO_DOOR': Tile(3440, 3337, 0),
     'GROTTO_INSIDE': Tile(3442, 9734, 0),
+    'POUCH': Tile(3443, 9741, 0),
     'TEMPLE_ALTAR': Tile(3416, 3488, 0),
     'GHAST_HUNT': Tile(3424, 3337, 0),
     'URHNEY': Tile(3235, 3154, 0),

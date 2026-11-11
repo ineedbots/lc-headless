@@ -110,6 +110,7 @@ def where(snap):
 
 
 witchshouse = QuestModule(**{
+    'auto_retaliate': False,
     'record': quest_record('ball'),
     'resume_at': lambda tile: in_garden(tile) or in_shed(tile),
     'bank': FALADOR_WEST_BANK,

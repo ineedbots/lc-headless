@@ -104,6 +104,24 @@ A quest declares the protection prayer it fights under as `{'protect': 'melee', 
 
 `QuestEngine(host)` is a `Task`. AIOQuester (`bots/aio_quester.py`) is its host, and any bot can be: the host has `log(m)`, `verbose()`, `food_item()`, `picked_ids()` (the record ids to run), `skip_pending()`, `consume_skip()`, `consume_death()`, `note_state(rows, running_id, step_desc, no_progress, parked)` and `finish(reason)`.
 
+AIOQuester expands selected prerequisites and quest-point requirements, respecting `-quest_id` exclusions.
+Before a quest it can train missing skills and source supported food and supplies through child activities.
+Preparation never starts another quest recursively: finish Druidic Ritual or Rune Mysteries first when their
+skills are locked. Unavailable suppliers produce a blocked reason.
+
+Automatic recovery refreshes stalled quest state, then tries a bank reset, then aborts that quest for the
+session. Three deaths also abort it. The `restart` console command requests a bank reset. Preparation, Skip
+and Restart restore the saved quest inventory and equipment before changing quests; an unsafe exit or
+failed restoration stops with a reason. Carried Karamja rum and filled Legends bowls must be delivered first.
+
+Custom engine hosts can opt into these paths with `automatic_recovery()`, `consume_restart()`,
+`prepare(request)` (a Wait returning `'working'` or `'ready'`), `preparation_status()`, `stop_preparation()`
+and `exit_preparation()`. `QuestModule.auto_retaliate` accepts a boolean or snapshot predicate; the engine
+confirms the setting before executing a step. A deposit step can set `caps` to records of `id` and `qty` to
+bank excess copies. Cooperative wait/custom steps set `cooperative=True`; a host's `waiting_for_partner(id)`
+and `partner_progress_key(id)` keep active handoffs out of the ordinary stall counter while retaining a
+ten-minute partnership deadline.
+
 Each pass the engine:
 1. reads the quest list and evaluates every quest (`rs2004.quests.eligibility`): `DONE`, `READY`, or `BLOCKED` with its reasons, such as `needs 12 quest points (have 10)`;
 2. takes the first picked quest that's `READY`, in the list's order, which puts prerequisites first;
@@ -381,7 +399,13 @@ AIOQuester offers `arrav_gang` (`random`, `phoenix` or `blackarm`), `arrav_partn
 
 ## Hero's Quest and its partner
 
-AIOQuester's `hero_partner` names the character running the other gang, since the master thief armband can't be earned alone. There is no gang setting: Grip refuses a Black Arm attacker and Katrine a Phoenix candlestick, so the gang is the one the character joined for Shield of Arrav. Run both accounts at once, each naming the other.
+AIOQuester's `hero_partner` names the character running the other gang, since the master thief armband can't be earned alone. There is no gang setting: Grip refuses a Black Arm attacker and Katrine a Phoenix candlestick, so the gang is the one the character joined for Shield of Arrav.
+
+Leave `arrav_partner` or `hero_partner` blank to pair automatically with an eligible opposite-gang
+AIOQuester in the same process and configured world. Pairing requires mutual claims, expires stale peers
+after fifteen seconds and preserves an active trade's partner. Explicit names override discovery and can
+coordinate accounts in separate processes. The native message bus supplies discovery; browser
+BroadcastChannel and cross-process automatic discovery are outside this port.
 
 ## The barcrawl
 

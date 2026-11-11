@@ -4,6 +4,7 @@ from rs2004.game import game
 from rs2004.geometry import Tile
 from rs2004.quests.defs.watchtower import caves, enclave, gutanoth, potion, tower, tribes
 from rs2004.quests.defs.watchtower.areas import WT_CAVES, WT_ITEM, WT_LOC, WT_NPC, WT_TILE
+from rs2004.quests.engine.types import QuestProgress
 
 
 def answer(value):
@@ -491,6 +492,7 @@ test('the enclave guard must be distracted with nightshade before crossing', enc
 
 def enclave_gathering():
     scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
     enter = spy_on(enclave, 'enter_enclave', impl=answer(False))
     for fn in [enclave.mine_dalgroth, enclave.search_shaman_robe, enclave.dissolve_shamans]:
         expect(run_wait(fn(scene.log))).to_be(False)
@@ -501,8 +503,8 @@ def enclave_gathering():
     scene.walk_ok = True
     expect(run_wait(enclave.mine_dalgroth(scene.log))).to_be(False)
     scene.loc('Rock', ['Mine'], id=WT_LOC.ROCK_OF_DALGROTH, effect=give(scene, WT_ITEM.CRYSTAL4))
-    expect(run_wait(enclave.mine_dalgroth(scene.log))).to_be(True)
-    expect(run_wait(enclave.mine_dalgroth(scene.log))).to_be(True)
+    assert run_wait(enclave.mine_dalgroth(scene.log)), 'mine_dalgroth failed: ' + str(scene.lines)
+    assert run_wait(enclave.mine_dalgroth(scene.log)), 'mine_dalgroth failed: ' + str(scene.lines)
     expect(run_wait(enclave.search_shaman_robe(scene.log))).to_be(False)
     scene.on_ground(WT_ITEM.SHAMAN_ROBE.id, WT_ITEM.SHAMAN_ROBE.name, effect=lambda op: True)
     expect(run_wait(enclave.search_shaman_robe(scene.log))).to_be(False)
@@ -515,18 +517,22 @@ def enclave_gathering():
         scene.item(WT_ITEM.SHAMAN_ROBE.id, WT_ITEM.SHAMAN_ROBE.name, effect=give(scene, WT_ITEM.CRYSTAL3))
 
     scene.on_ground(WT_ITEM.SHAMAN_ROBE.id, WT_ITEM.SHAMAN_ROBE.name, effect=robe_taken)
-    expect(run_wait(enclave.search_shaman_robe(scene.log))).to_be(True)
-    expect(run_wait(enclave.search_shaman_robe(scene.log))).to_be(True)
-    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(True)
-    expect(scene.logged('potion is spent')).to_be(True)
+    assert run_wait(enclave.search_shaman_robe(scene.log)), 'search_shaman_robe failed: ' + str(scene.lines)
+    assert run_wait(enclave.search_shaman_robe(scene.log)), 'search_shaman_robe failed: ' + str(scene.lines)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
     scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name)
     scene.walk_ok = False
-    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(True)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
     scene.walk_ok = True
-    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(True)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
     scene.npc(WT_NPC.SHAMAN, dist=2)
-    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(True)
-    expect(scene.ticks > 0).to_be(True)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.clock > 0).to_be(True)
+    scene.pack = [item for item in scene.pack if item.id != WT_ITEM.MAGIC_OGRE_POTION.id]
+    def dissolve(target):
+        scene.say('The ogre dissolves into spirit form')
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    assert run_wait(enclave.dissolve_shamans(scene.log)), 'dissolve_shamans failed: ' + str(scene.lines)
 
 
 test('enclave crystals are mined, searched from the robe and dissolved with potion', enclave_gathering)

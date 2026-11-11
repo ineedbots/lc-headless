@@ -71,6 +71,8 @@ Accounts in the same process can message each other's scripts.
 
 Sends `message` to the script of the account with that username (as in its account file, in any case). That script's `on_bot_message(sender, message)` hook, and `bot_message` subscribers, receive it with the sender's username.
 
+Use `'*'` as the username to broadcast to every other account registered in this process. Each receiver gets its own JSON copy. The return value is `True` only when every receiver accepts the message; a refusal does not prevent delivery to the remaining receivers. With no other accounts, the broadcast succeeds without delivery. AIOQuester uses this for partner discovery and heartbeats.
+
 ```python
 # The worker
 send_bot_message(settings.mule, {'want': 'trade', 'items': [[995, 1000]]})

@@ -100,7 +100,7 @@ def audit_supplies(s):
         add('Fly fishing rod')
     if any_('crafting') and s.levels.get('crafting') < 10:
         add('Needle')
-    if any_('ranged'):
+    if any_('ranged') and s.levels.get('ranged') < 40:
         add('Bronze arrow', 1000)
     if fly_fishing:
         add('Feather', 1000)

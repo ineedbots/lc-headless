@@ -67,24 +67,32 @@ def exact_targets():
 test('training camp targets and exact variants exist and are attackable in the cache', exact_targets)
 
 
-def route(start, dest, wilderness=False):
+def route(start, dest, wilderness=False, camp=None):
     state = world_state()
     state['members'] = True
     state['items']['Coins'] = 200
     state['skills']['agility'] = 1
+    if camp is not None:
+        state['items']['Coins'] = max(200, camp.coins or 0)
+        for need in camp.supplies or []:
+            state['worn' if need.equip else 'items'][need.item] = need.carry or need.count
+        for skill, level in (camp.skills.items() if camp.skills else []):
+            state['skills'][skill] = level
+        for quest in camp.quests or []:
+            state['quests'][quest] = 'complete'
     return navigator.find_path(start, dest, max_expansions=4000000, policy={'use_teleports': False},
                                avoid_zones=resolve_danger_zones(leveler_travel_zones(dest, wilderness)), state=state)
 
 
 def camps():
     for camp in COMBAT_CAMPS:
-        dest = Tile(camp.x, camp.z)
+        dest = Tile(camp.x, camp.z, camp.level or 0)
         for start in [Tile(3093, 3243), Tile(2946, 3368), Tile(3185, 3436)]:
-            path = route(start, dest, bool(camp.wilderness))
+            path = route(start, dest, bool(camp.wilderness), camp)
             assert path.ok, camp.id + ': ' + path.reason
 
 
-test('all training camps can be routed from Draynor, Falador and Varrock without quest unlocks', camps)
+test('all training camps route from Draynor, Falador and Varrock with their access requirements', camps)
 
 
 def shops():

@@ -157,10 +157,15 @@ def phoenix_armband_step(snap, stage):
         kit = snipe_kit_step(snap)
         if kit:
             return kit
-        return Record({'kind': 'custom', 'name': 'shoot Grip through the arrow slit', 'run': snipe_grip})
+        return Record({
+            'kind': 'custom',
+            'cooperative': True,
+            'name': 'shoot Grip through the arrow slit',
+            'run': snipe_grip,
+        })
     elif stage == HERO_STAGE.PHOENIX_KILLED_GRIP:
         if held_id(snap, HERO_ID.CANDLESTICK) == 0:
-            return Record({'kind': 'wait', 'reason': 'waiting on the rival to hand over a candlestick'})
+            return Record({'kind': 'wait', 'cooperative': True, 'reason': 'waiting on the rival to hand over a candlestick'})
         return Record({'kind': 'custom', 'name': 'give Straven the candlestick', 'run': hand_in_candlestick})
     else:
         return None

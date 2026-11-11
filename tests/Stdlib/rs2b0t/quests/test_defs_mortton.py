@@ -183,58 +183,58 @@ def _fn7():
 describe('the serum chain', _fn7)
 
 
-def _fn26():
-    def _fn27():
+def _upstream_fn26():
+    def _upstream_fn27():
         bare = snap()
         bare.inv_ids = {}
         bare.bank_known = False
         expect(decide(bare).kind).to_be('scan_bank')
-    test('an empty pack scans the bank before anything else', _fn27)
+    test('an empty pack scans the bank before anything else', _upstream_fn27)
 
-    def _fn28():
+    def _upstream_fn28():
         bare = snap()
         bare.inv_ids = {_k: _v for _k, _v in [[SM_ID.COINS, 30000], [SM_ID.ASHES, 2], [SM_ID.LOGS, 1]]}
         s = decide(bare)
         expect(s.kind).to_be('buy')
         expect(s.kind == 'buy' and s.item).to_be('Tinderbox')
-    test('a missing tinderbox with an empty bank is bought in Varrock', _fn28)
+    test('a missing tinderbox with an empty bank is bought in Varrock', _upstream_fn28)
 
-    def _fn29():
+    def _upstream_fn29():
         bare = snap(Record({'bank_ids': [[SM_ID.TINDERBOX, 1]]}))
         bare.inv_ids = {_k: _v for _k, _v in [[SM_ID.COINS, 30000], [SM_ID.ASHES, 2], [SM_ID.LOGS, 1]]}
         s = decide(bare)
         expect(s.kind).to_be('withdraw')
-    test('a banked tinderbox is withdrawn rather than bought', _fn29)
+    test('a banked tinderbox is withdrawn rather than bought', _upstream_fn29)
 
-    def _fn30():
+    def _upstream_fn30():
         bare = snap()
         bare.bank = {_k: _v for _k, _v in [['coins', 2000000], ['rune scimitar', 1], ['rune chainbody', 1]]}
         s = decide(bare)
         expect(s.kind).to_be('withdraw')
-        expect(s.kind == 'withdraw' and [i['name'] for i in s.items]).to_equal(['Rune scimitar', 'Rune chainbody'])
-    test('a banked melee kit is drawn before the swamp crossing', _fn30)
+        expect(s.kind == 'withdraw' and [i.get('name') for i in s.items]).to_equal(['Rune scimitar', 'Rune chainbody'])
+    test('a banked melee kit is drawn before the swamp crossing', _upstream_fn30)
 
-    def _fn31():
+    def _upstream_fn31():
         bare = snap()
         bare.inv = {_k: _v for _k, _v in [[FOOD.lower(), 6], ['rune scimitar', 1]]}
         bare.bank = {_k: _v for _k, _v in [['coins', 2000000], ['rune scimitar', 1]]}
         expect(named(decide(bare))).to_be('wear Rune scimitar')
-    test('a carried kit is worn rather than withdrawn again', _fn31)
+    test('a carried kit is worn rather than withdrawn again', _upstream_fn31)
 
-    def _fn32():
+    def _upstream_fn32():
         bare = snap()
         bare.inv_ids = {_k: _v for _k, _v in [[SM_ID.COINS, 30000], [SM_ID.TINDERBOX, 1], [SM_ID.LOGS, 1]]}
         expect(named(decide(bare))).to_be('burn logs for ashes')
-    test('no ashes means a trip to the Varrock logs', _fn32)
+    test('no ashes means a trip to the Varrock logs', _upstream_fn32)
 
-    def _fn33():
+    def _upstream_fn33():
         bare = snap(Record({'inv_ids': [[SM_ID.PYRE_LOGS, 1]], 'stage': SM_STAGE.CREATED_PYRE_LOGS}))
-        bare.inv_ids = {_k: _v for _k, _v in [[SM_ID.COINS, 30000], [SM_ID.TINDERBOX, 1], [SM_ID.PYRE_LOGS, 1], [SM_ID.SERUM3, 1]]}
-        expect(named(decide(bare))).to_be('stack the pyre logs')
-    test('pyre logs in the pack retire the spare log', _fn33)
+        bare.inv_ids = {_k: _v for _k, _v in [[SM_ID.COINS, 30000], [SM_ID.TINDERBOX, 1], [SM_ID.PYRE_LOGS, 1], [SM_ID.SERUM3, 1], [SM_ID.REMAINS, 1]]}
+        expect(named(decide(bare))).to_be('cremate the shade')
+    test('pyre logs in the pack retire the spare log', _upstream_fn33)
 
 
-describe('sourcing', _fn26)
+describe('sourcing', _upstream_fn26)
 
 
 def hunts_at(stage):
@@ -261,7 +261,7 @@ def _fn34():
 describe('the shade hunt', _fn34)
 
 
-def _fn38():
+def _upstream_fn38():
     stocked = [
         [SM_ID.HAMMER, 1],
         [SM_ID.OLIVE_OIL3, 1],
@@ -271,108 +271,167 @@ def _fn38():
     ]
 
     # Why: the oil has nowhere to land beside eleven slots of plank, brick and paste, so it waits for the rebuild to spend them.
-    def _fn39():
+    def _upstream_fn39():
         s = step(Record({'stage': SM_STAGE.SHADES_TO_RAZMIRE, 'inv_ids': list(SERUMS) + [[SM_ID.HAMMER, 1], [SM_ID.REMAINS, 3]]}))
         expect(named(s)).to_be('buy temple materials from Razmire')
-    test('the handover trip buys building material and leaves the oil for later', _fn39)
+    test('the handover trip buys building material and leaves the oil for later', _upstream_fn39)
 
-    def _fn40():
+    def _upstream_fn40():
         s = step(Record({'stage': SM_STAGE.SHADES_TO_RAZMIRE, 'inv_ids': list(SERUMS) + list(stocked) + [[SM_ID.REMAINS, 3]]}))
         expect(named(s)).to_be('talk to Ulsquire')
-    test('a stocked pack past the handover shows the remains to Ulsquire', _fn40)
+    test('a stocked pack past the handover shows the remains to Ulsquire', _upstream_fn40)
 
-    def _fn41():
+    def _upstream_fn41():
         s = step(Record({'stage': SM_STAGE.ULSQUIRE_TEMPLE, 'inv_ids': list(SERUMS) + [[SM_ID.OLIVE_OIL3, 1]]}))
         expect(named(s)).to_be("buy from Razmire's general store")
-    test('a missing hammer sends the bot to the general counter', _fn41)
+    test('a missing hammer sends the bot to the general counter', _upstream_fn41)
 
-    def _fn42():
+    def _upstream_fn42():
         s = step(Record({'stage': SM_STAGE.ULSQUIRE_TEMPLE, 'inv_ids': list(SERUMS) + [[SM_ID.HAMMER, 1], [SM_ID.OLIVE_OIL3, 1]]}))
         expect(named(s)).to_be('buy temple materials from Razmire')
-    test('an empty material pool sends the bot to the builders counter', _fn42)
+    test('an empty material pool sends the bot to the builders counter', _upstream_fn42)
 
-    def _fn43():
+    def _upstream_fn43():
         s = step(Record({
         'stage': SM_STAGE.REBUILD_TEMPLE,
         'inv_ids': list(SERUMS) + [[SM_ID.HAMMER, 1], [SM_ID.OLIVE_OIL3, 1]],
         'flags': [f'{SM_FLAG.RESOURCES}:40'],
     }))
         expect(named(s)).to_be('rebuild the Flamtaer temple')
-    test('a pool that still has resources builds without shopping', _fn43)
+    test('a pool that still has resources builds without shopping', _upstream_fn43)
 
-    def _fn44():
+    def _upstream_fn44():
         s = step(Record({'stage': SM_STAGE.ULSQUIRE_TEMPLE, 'inv_ids': list(SERUMS) + list(stocked)}))
         expect(named(s)).to_be('rebuild the Flamtaer temple')
-    test('carried materials build without shopping', _fn44)
+    test('carried materials build without shopping', _upstream_fn44)
 
-    def _fn45():
+    def _upstream_fn45():
         s = step(Record({'stage': SM_STAGE.CAN_LIGHT_ALTAR, 'inv_ids': list(SERUMS) + list(stocked)}))
         expect(named(s)).to_be('light the altar and sanctify the oil')
-    test('the rebuilt temple lights the altar', _fn45)
+    test('the rebuilt temple lights the altar', _upstream_fn45)
 
-    def _fn46():
+    def _upstream_fn46():
         s = step(Record({'stage': SM_STAGE.CAN_LIGHT_ALTAR, 'inv_ids': SERUMS}))
         expect(named(s)).to_be("buy from Razmire's general store")
-    test('an altar with nothing to sanctify buys oil first, and the hammer is no longer wanted', _fn46)
+    test('an altar with nothing to sanctify buys oil first, and the hammer is no longer wanted', _upstream_fn46)
 
-    def _fn47():
+    def _upstream_fn47():
         s = step(Record({
         'stage': SM_STAGE.CAN_LIGHT_ALTAR,
         'inv_ids': list(SERUMS) + [[SM_ID.PYRE_LOGS, 1]],
         'flags': [f'{SM_FLAG.SANCTITY}:40', f'{SM_FLAG.REPAIRED}:100'],
     }))
         expect(named(s)).to_be('light the altar and sanctify the oil')
-    test('pyre logs already made count as oil, so the altar leg runs', _fn47)
+    test('pyre logs already made count as oil, so the altar leg runs', _upstream_fn47)
 
     # Why: sanctity is a player varp, so a temple another run left finished still owes this character a load of material before the flame answers.
-    def _fn48():
+    def _upstream_fn48():
         s = step(Record({'stage': SM_STAGE.CAN_LIGHT_ALTAR, 'inv_ids': list(SERUMS) + [[SM_ID.HAMMER, 1], [SM_ID.OLIVE_OIL3, 1]]}))
         expect(named(s)).to_be('buy temple materials from Razmire')
-    test('a rebuilt temple with no sanctity of its own buys material first', _fn48)
+    test('a rebuilt temple with no sanctity of its own buys material first', _upstream_fn48)
 
 
-describe('the temple', _fn38)
+describe('the temple', _upstream_fn38)
 
 
-def _fn49():
+def _upstream_fn49():
     late = [[SM_ID.SERUM3, 1], [SM_ID.REMAINS, 2], [SM_ID.HAMMER, 1]]
     sanctified = [f'{SM_FLAG.SANCTITY}:40', f'{SM_FLAG.REPAIRED}:100']
 
-    def _fn50():
+    def _upstream_fn50():
+        expect(named(step(Record({
+        'stage': SM_STAGE.CREATED_SACRED_OIL,
+        'inv_ids': list(late) + [[SM_ID.PYRE_LOGS, 1], [SM_ID.SACRED_OIL3, 1]],
+        'flags': sanctified,
+    })))).to_be('soak the logs in sacred oil')
+    test('stage 65 makes its own logs even when traded pyre logs are already carried', _upstream_fn50)
+
+    def _upstream_fn51():
+        expect(step(Record({
+        'stage': SM_STAGE.CREATED_SACRED_OIL,
+        'inv_ids': late,
+        'bank_ids': [[SM_ID.PYRE_LOGS, 1], [SM_ID.SACRED_OIL3, 1]],
+    }))).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'id': SM_ID.SACRED_OIL3, 'qty': 1})]}))
+    test('stage 65 sources oil instead of withdrawing pyre logs it cannot use yet', _upstream_fn51)
+
+    def _upstream_fn52():
+        expect(named(step(Record({
+        'stage': SM_STAGE.CREATED_SACRED_OIL,
+        'inv_ids': list(late) + [[SM_ID.LOGS, 0], [SM_ID.PYRE_LOGS, 1], [SM_ID.SACRED_OIL3, 1]],
+        'flags': sanctified,
+    })))).to_be('burn logs for ashes')
+    test('stage 65 gathers ordinary logs despite carrying traded pyre logs', _upstream_fn52)
+
+    def _upstream_fn53():
+        expect(step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': late, 'bank_ids': [[SM_ID.PYRE_LOGS, 1]]}))).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'id': SM_ID.PYRE_LOGS, 'qty': 1})]}))
+    test('stage 75 recovers banked pyre logs after the old pyre expires', _upstream_fn53)
+
+    def _upstream_fn54():
+        expect(named(step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': list(late) + [[SM_ID.SACRED_OIL3, 1]], 'flags': sanctified})))).to_be('soak the logs in sacred oil')
+    test('stage 75 remakes expired pyre logs from carried sacred oil', _upstream_fn54)
+
+    def _upstream_fn55():
+        expect(step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': late, 'bank_ids': [[SM_ID.SACRED_OIL2, 1]]}))).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'id': SM_ID.SACRED_OIL2, 'qty': 1})]}))
+    test('stage 75 recovers banked sacred oil before rebuilding the temple', _upstream_fn55)
+
+    def _upstream_fn56():
+        expect(named(step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': late})))).to_be("buy from Razmire's general store")
+    test('stage 75 buys replacement oil when the bank and pack are empty', _upstream_fn56)
+
+    def _upstream_fn57():
+        expect(named(step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': [[SM_ID.SERUM3, 1], [SM_ID.PYRE_LOGS, 1]]})))).to_be('hunt a Loar Shade')
+    test('stage 75 hunts replacement remains before stacking new logs', _upstream_fn57)
+
+    def _upstream_fn58():
+        expect(step(Record({
+        'stage': SM_STAGE.LOGS_ON_PYRE,
+        'inv_ids': [[SM_ID.SERUM3, 1], [SM_ID.PYRE_LOGS, 1]],
+        'bank_ids': [[SM_ID.REMAINS, 2]],
+    }))).to_match_object(Record({'kind': 'withdraw', 'items': [Record({'id': SM_ID.REMAINS, 'qty': 1})]}))
+    test('stage 75 withdraws banked remains before hunting more', _upstream_fn58)
+
+    def _upstream_fn59():
+        snapshot = snap(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': late, 'bank_ids': [[SM_ID.PYRE_LOGS, 1]]}))
+        snapshot.free_slots = 0
+        snapshot.inv = {_k: _v for _k, _v in [['loar remains', 28]]}
+        expect(decide(snapshot)).to_match_object(Record({'kind': 'wait', 'reason': 'no pack room for pyre recovery'}))
+    test('pyre recovery does not repeat deposits when every carried item would be kept', _upstream_fn59)
+
+    def _upstream_fn60():
         s = step(Record({
         'stage': SM_STAGE.CREATED_SACRED_OIL,
         'inv_ids': list(late) + [[SM_ID.SACRED_OIL3, 1]],
         'flags': sanctified,
     }))
         expect(named(s)).to_be('soak the logs in sacred oil')
-    test('sacred oil goes onto the logs', _fn50)
+    test('sacred oil goes onto the logs', _upstream_fn60)
 
-    def _fn51():
+    def _upstream_fn61():
         s = step(Record({
         'stage': SM_STAGE.CREATED_SACRED_OIL,
         'inv_ids': list(late) + [[SM_ID.OLIVE_OIL3, 1]],
         'flags': sanctified,
     }))
         expect(named(s)).to_be('sanctify more oil in the flame')
-    test('a sacred-oil stage with no oil left goes back to the flame', _fn51)
+    test('a sacred-oil stage with no oil left goes back to the flame', _upstream_fn61)
 
-    def _fn52():
+    def _upstream_fn62():
         s = step(Record({'stage': SM_STAGE.CREATED_PYRE_LOGS, 'inv_ids': list(late) + [[SM_ID.PYRE_LOGS, 1]]}))
-        expect(named(s)).to_be('stack the pyre logs')
-    test('pyre logs are stacked', _fn52)
-
-    def _fn53():
-        s = step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': late}))
         expect(named(s)).to_be('cremate the shade')
-    test('a stacked pyre takes the remains and the flame', _fn53)
+    test('pyre logs are stacked', _upstream_fn62)
 
-    def _fn54():
+    def _upstream_fn63():
+        s = step(Record({'stage': SM_STAGE.LOGS_ON_PYRE, 'inv_ids': list(late) + [[SM_ID.PYRE_LOGS, 1]]}))
+        expect(named(s)).to_be('cremate the shade')
+    test('a stacked pyre takes the remains and the flame', _upstream_fn63)
+
+    def _upstream_fn64():
         s = step(Record({'stage': SM_STAGE.LIT_PYRE, 'inv_ids': late}))
         expect(named(s)).to_be('talk to Ulsquire')
-    test('a lit pyre is reported to Ulsquire', _fn54)
+    test('a lit pyre is reported to Ulsquire', _upstream_fn64)
 
 
-describe('the cremation', _fn49)
+describe('the cremation', _upstream_fn49)
 
 
 def _fn55():

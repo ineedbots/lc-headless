@@ -601,6 +601,7 @@ def decide(snap):
 
 
 lostcity = QuestModule(**{
+    'auto_retaliate': lambda snap: lost_city_area(snap.tile) != 'dungeon' or not has_axe(snap),
     'record': quest_record('zanaris'),
     'bank': DRAYNOR_BANK,
     'grind': ['Zombie', 'Tree spirit'],

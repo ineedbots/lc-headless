@@ -76,7 +76,7 @@ def decide(snap):
         })
     gang = hero_gang()
     # Why: the trades outrank the gang legs: the rival is waiting at the rendezvous and every other leg on this side is blocked until the key or the candlestick has moved.
-    handoff = decide_hero_handoff(gang, stage, held_id(snap, HERO_ID.MISC_KEY) > 0, held_id(snap, HERO_ID.CANDLESTICK), partner_configured(), gang != 'phoenix' or snipe_kit_step(snap) is None)
+    handoff = decide_hero_handoff(gang, stage, held_id(snap, HERO_ID.MISC_KEY) > 0, held_id(snap, HERO_ID.CANDLESTICK), partner_configured(), gang != 'phoenix' or snipe_kit_step(snap) is None, partner_stage=hero_config.partner_stage, partner_has_key=hero_config.partner_has_key)
     if handoff:
         return hero_handoff_step(handoff)
     if anywhere(snap, HERO_ID.ARMBAND) == 0:
@@ -85,6 +85,7 @@ def decide(snap):
             return egress(snap, armband)
         return Record({
             'kind': 'wait',
+            'cooperative': True,
             'reason': (f'waiting on {hero_config.partner} at stage {stage}' if partner_configured() else 'Heroes Quest needs a rival-gang partner — set heroPartner'),
         })
     # Why: Entrana is a one-ferry island with no walkable route home, so a bot standing on it settles the feather leg before the chain order gets a say.
