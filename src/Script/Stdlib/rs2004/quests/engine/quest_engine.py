@@ -27,6 +27,9 @@ from rs2004.quests.engine.provisioning import COIN_FLOAT, coin_float_plan, depos
 from rs2004.quests.engine.provisioning import should_freshen_pack
 from rs2004.quests.engine.queue import QueueRow, next_quest, queue_rows
 from rs2004.quests.engine.trace import FAIL_WARN, StepTracker, format_duration, format_tile, inv_delta
+from rs2004.quests.engine.preparation_policy import quest_preparation_request
+from rs2004.quests.engine.recovery import QuestBankReset
+from rs2004.quests.engine.retaliation import prepare_quest_retaliation
 from rs2004.quests.engine.types import QuestSnapshot, quest_step
 from rs2004.quests.engine.watchdog import NO_PROGRESS_PARK, NO_PROGRESS_WARN, ProgressWatchdog, progress_signature
 from rs2004.quests.exec.steps import execute_step, run_maybe
@@ -171,6 +174,24 @@ class QuestEngine(Task):
         self._tracker = StepTracker()
         self._tick = 0
         self._fail_streak = 0
+        self._prepared = set()
+        self._death_counts = {}
+        self._restart_counts = {}
+        self._recovery = None
+        self._preparation = None
+        self._coordination = {}
+        self._progress_key = ''
+        self._progress_at = 0
+        self._partner_progress = ''
+        self._partner_progress_at = 0
+
+    def _automatic_recovery(self):
+        hook = getattr(self.host, 'automatic_recovery', None)
+        return hook is not None and hook()
+
+    def _consume_restart(self):
+        hook = getattr(self.host, 'consume_restart', None)
+        return hook is not None and hook()
 
     def _log(self, m):
         self.host.log(f'  {m}')
@@ -182,6 +203,16 @@ class QuestEngine(Task):
         # Death participates in the event signal, so it's consumed before the signal is checked.
         recovered = yield from self._recover_death_if_pending()
         if recovered:
+            return
+        if self._preparation is not None:
+            yield from self._run_preparation()
+            return
+        if self._recovery is not None:
+            yield from self._run_recovery()
+            return
+        if self._consume_restart() and self.running_id is not None:
+            self._begin_recovery(self.running_id, 'restart requested', True)
+            yield from self._run_recovery()
             return
         # Skip is applied before the random-event yield, so a mid-walk interrupt lands on the next quest instead of
         # spinning on event_signal.pending().
@@ -216,6 +247,10 @@ class QuestEngine(Task):
 
         skip = self.host.consume_skip()
         if skip and self.running_id is not None:
+            if self._automatic_recovery():
+                self._recovery = Record({'id': self.running_id, 'mode': 'bank', 'reset': QuestBankReset(self.host.food_item()), 'tries': 0, 'skip': True})
+                yield from self._run_recovery()
+                return
             self._apply_user_skip(self.running_id, elig)
 
         recovered_area = yield from self._recover_area(picked, elig)
@@ -239,6 +274,12 @@ class QuestEngine(Task):
                 self.running_id = owner
             else:
                 self.running_id = next_quest(self._order, selectable, elig, self._parked)
+                if self.running_id is None and callable(getattr(self.host, 'prepare', None)):
+                    for candidate in self._records:
+                        req = candidate.requirements
+                        if candidate.id in selectable and elig[candidate.id].status != 'DONE' and quests.status(candidate.name) != 'unknown' and player.quest_points >= (req.min_quest_points or 0) and all([q in player.completed_quests for q in (req.quests or [])]):
+                            self.running_id = candidate.id
+                            break
         rows = self._apply_blocked(queue_rows(self._order, picked, elig, self._parked, self.running_id))
 
         if self.running_id is None:
@@ -265,11 +306,20 @@ class QuestEngine(Task):
                 self.host.log(f'{module.record.name}: {note}')
         stage, progress = yield from self._read_stage(module)
         snap = self._build_snapshot(module, stage, progress)
+        self._coordination[id] = Record({'stage': stage})
+        if snap.journal == 'unknown':
+            self.host.note_state(rows, id, 'waiting for quest journal', 0, len(self._parked))
+            return
+        preparing = yield from self._prepare_candidate(id, module, snap)
+        if preparing:
+            return
         combat_active = self._combat_advancing(snap)
 
         if self._pending_failed_signature is not None:
             if not combat_active and progress_signature(snap) == self._pending_failed_signature:
                 self.host.log(f'no progress after {self._no_progress_count} steps on {module.record.name}')
+                if self._begin_recovery(id, 'no progress after failed step'):
+                    return
                 self._park_or_give_up(id, module.record.name)
                 self._reset_watchdog()
                 self.running_id = None
@@ -360,40 +410,26 @@ class QuestEngine(Task):
             prepared = yield from self._prepare_resume(module, id, snap, rows, step)
             if prepared:
                 return
+        partner_waiting = self._monitor_progress(id, step, snap, combat_active)
+        if partner_waiting is None:
+            return
         step_desc = describe_step(step)
         self.host.note_state(rows, id, step_desc, self._no_progress_count, len(self._parked))
 
         verbose = self.host.verbose()
-        now = _now_ms()
-        attempt = self._tracker.open(f'{id}|{step_desc}', now)
-        step_line = f'{module.record.name}: {step_desc}'
-        fresh = step_line != self._last_step_logged
-        # Why: re-deciding the same step is how this engine loops, so repeats are silent by default.
-        # Why: the heartbeat stops a long mine, smelt and hammer chain, all called 'smith 8 nails', from looking like a
-        # hang.
-        announce = verbose or fresh or self._tracker.beat(now)
-        if announce:
-            stage_text = snap.stage if snap.stage is not None else '?'
-            context = f'stage {stage_text} · {format_tile(snap.tile)} · {snap.free_slots} free'
-            repeat = f' — attempt {attempt}, {format_duration(self._tracker.elapsed(now))} on this step' if attempt > 1 else ''
-            prefix = ''
-            if verbose:
-                self._tick += 1
-                prefix = f'[t{self._tick}] '
-            self.host.log(f'{prefix}{step_line}{repeat} · {context}')
-            self._last_step_logged = step_line
-            self._step_sub_log = set()
-            if module.observe is not None:
-                for line in module.observe(snap, step):
-                    self.host.log(f'  {line}')
+        announce = self._announce_step(id, module, snap, step, step_desc, verbose)
 
-        if step.kind == 'wait':
+        if step.kind == 'wait' and not partner_waiting:
             key = f'{id}|{step.reason}'
             self._wait_count = self._wait_count + 1 if key == self._wait_key else 1
             self._wait_key = key
             if self._wait_count >= WAIT_PARK:
+                if self._begin_recovery(id, 'waiting: ' + step.reason):
+                    return
                 self.host.log(f"{module.record.name} waiting on '{step.reason}' with no way to resolve it — parking")
                 self._parked_reasons[id] = [f'waiting: {step.reason}']
+                if self._begin_recovery(id, 'no progress after failed step'):
+                    return
                 self._park_or_give_up(id, module.record.name)
                 self._reset_watchdog()
                 self.running_id = None
@@ -408,7 +444,10 @@ class QuestEngine(Task):
         if step.kind == 'withdraw' or step.kind == 'deposit':
             run_step = self._with_field(step, 'leave_open', True)
         started_at = _now_ms()
-        ok = yield from execute_step(run_step, module.hops or [], _SubLog(self, verbose))
+        ready = yield from prepare_quest_retaliation(module, snap)
+        ok = False
+        if ready:
+            ok = yield from execute_step(run_step, module.hops or [], _SubLog(self, verbose))
         took = _now_ms() - started_at
 
         # Why: a cooperative step may have returned because death interrupted it.
@@ -436,7 +475,7 @@ class QuestEngine(Task):
             self._refresh_bank_counts(True)
             yield from modals.close()
 
-        if advances_world(step):
+        if advances_world(step) and not partner_waiting:
             after = self._build_snapshot(module, stage, progress)
             signature = progress_signature(after)
             combat_active = self._combat_advancing(after)
@@ -458,6 +497,8 @@ class QuestEngine(Task):
                 self._pending_failed_signature = signature
             elif count >= NO_PROGRESS_PARK:
                 self.host.log(f'no progress after {count} steps on {module.record.name}')
+                if self._begin_recovery(id, 'no progress after failed step'):
+                    return
                 self._park_or_give_up(id, module.record.name)
                 self._reset_watchdog()
                 self.running_id = None
@@ -493,7 +534,8 @@ class QuestEngine(Task):
         held = {name: snap.inv[name] for name in snap.inv}
         for name in snap.worn:
             held[name] = held.get(name, 0) + 1
-        plan = plan_provisioning(module.record.items, held, self._last_bank_counts)
+        requirements = [] if snap.journal == 'in_progress' and callable(getattr(self.host, 'prepare', None)) else module.record.items
+        plan = plan_provisioning(requirements, held, self._last_bank_counts)
         # Why: restoring the float after every purchase made a 10gp gate emit withdraw Coins every tick while egg,
         # milk and flour were outstanding.
         coin_target = module.coin_float if module.coin_float is not None else COIN_FLOAT
@@ -567,6 +609,28 @@ class QuestEngine(Task):
             return True
         dead_id = self.running_id
         dead_module = def_by_id(dead_id)
+        if self._automatic_recovery():
+            deaths = self._death_counts.get(dead_id, 0) + 1
+            self._death_counts[dead_id] = deaths
+            stop = getattr(self.host, 'stop_preparation', None)
+            if stop is not None:
+                stop()
+            if self._recovery is not None and self._recovery.reset.pending:
+                self.host.finish('died while restoring the quest loadout; check the bank before restarting')
+                return True
+            self._recovery = None
+            if self._preparation is not None:
+                self._preparation.phase = 'restore'
+                self._preparation.retry = True
+                if deaths >= 3:
+                    self._preparation.error = '3 deaths during quest preparation'
+            elif deaths >= 3:
+                self._block(dead_id, ['3 deaths during this quest; aborting for this session'])
+                self.running_id = None
+                return True
+            self._prepared.discard(dead_id)
+            if dead_module.on_start is not None:
+                dead_module.on_start()
         name = dead_module.record.name if dead_module is not None else dead_id
         self.host.log(f'died during {name} — re-provisioning and resuming')
         chat = game_messages.recent(10)
@@ -735,6 +799,10 @@ class QuestEngine(Task):
         self._tracker.reset()
         self._fail_streak = 0
         self._combat_idle_since = None
+        self._progress_key = ''
+        self._progress_at = 0
+        self._partner_progress = ''
+        self._partner_progress_at = 0
 
     def _combat_advancing(self, snap):
         if not game.in_combat():
@@ -863,3 +931,292 @@ class QuestEngine(Task):
         self._last_bank_counts = _counts_by_name(items)
         self._last_bank_id_counts = _counts_by_id(items)
         self._bank_known = True
+
+    def coordination_progress(self):
+        return self._coordination
+
+
+    def _needs_preparation(self, request, stock):
+        return any([skills.level(req.skill) < req.level for req in ((request.skills if request.skills is not None else []))]) or any([((stock.get(req.item.lower()) if stock.get(req.item.lower()) is not None else 0)) < req.count for req in ((request.items if request.items is not None else []))]) or not not request.food and ((stock.get(request.food.item.lower()) if stock.get(request.food.item.lower()) is not None else 0)) < request.food.count
+
+
+    def _current_rows(self):
+        player = self._read_player_state()
+        items = self._read_item_snapshot()
+        elig = {_k: _v for _k, _v in [[record.id, evaluate(record, player, items, quests.status(record.name))] for record in self._records]}
+        return self._apply_blocked(queue_rows(self._order, self.host.picked_ids(), elig, self._parked, self.running_id))
+
+
+    def _preparation_note(self, id, message):
+        self.host.note_state(self._current_rows(), id, message, self._no_progress_count, len(self._parked))
+
+
+    def _run_preparation(self):
+        task = self._preparation
+        if not task:
+            return
+        module = def_by_id(task.id)
+
+        def log(message):
+            return self.host.log(f'{module.record.name}: {message}')
+
+        if self.host.consume_skip():
+            _fn54 = getattr(self.host, 'stop_preparation', None)
+            if _fn54 is not None:
+                _fn54()
+            task.skip = True
+            if task.phase != 'bank':
+                task.phase = 'restore'
+        else:
+            _fn56 = getattr(self.host, 'consume_restart', None)
+            if (_fn56() if _fn56 is not None else None):
+                _fn57 = getattr(self.host, 'stop_preparation', None)
+                if _fn57 is not None:
+                    _fn57()
+                task.retry = True
+                if task.phase != 'bank':
+                    task.phase = 'restore'
+        if event_signal.pending():
+            return
+        try:
+            if task.phase == 'bank':
+                self._preparation_note(task.id, 'banking before quest preparation')
+                _w58 = yield from task.reset.prepare(module, self._build_snapshot(module), log)
+                if not (_w58):
+                    task.tries += 1
+                    if task.tries >= FRESH_GIVE_UP:
+                        self.host.finish(f"cannot safely prepare {module.record.name}: {task.reset.reason or 'could not reach the bank'}")
+                    return
+                task.tries = 0
+                self._refresh_bank_counts(True)
+                _v59 = quest_preparation_request(module, self.host.food_item(), quests.status(module.record.name), self._last_bank_counts, self._last_bank_id_counts, task.progress)
+                task.request = (_v59 if _v59 is not None else task.request)
+                _merged60 = {}
+                for _k, _v in (task.request._fields if isinstance(task.request, Record) else task.request).items():
+                    _merged60[_k] = _v
+                for _k, _v in {'items': list((task.request.items if task.request.items is not None else [])) + list(task.reset.supplies)}.items():
+                    _merged60[_k] = _v
+                task.request = Record(_merged60)
+                task.phase = ('restore' if task.skip or task.retry else 'work')
+            if task.phase == 'work':
+                result = yield from self.host.prepare(task.request)
+                _fn61 = getattr(self.host, 'preparation_status', None)
+                _v62 = (_fn61() if _fn61 is not None else None)
+                self._preparation_note(task.id, (_v62 if _v62 is not None else 'preparing quest requirements'))
+                if result == 'working':
+                    return
+                _fn63 = getattr(self.host, 'stop_preparation', None)
+                if _fn63 is not None:
+                    _fn63()
+                task.phase = 'restore'
+            self._preparation_note(task.id, 'leaving quest preparation activity')
+            _fn64 = getattr(self.host, 'exit_preparation', None)
+            if _fn64 is not None:
+                yield from _fn64()
+            self._preparation_note(task.id, 'restoring quest inventory and equipment')
+            _c65 = task.reset.pending
+            if _c65:
+                _w66 = yield from task.reset.restore(log)
+                _c65 = not (_w66)
+            if _c65:
+                task.tries += 1
+                if task.tries >= FRESH_GIVE_UP:
+                    self.host.finish(f'cannot restore {module.record.name}: {task.reset.reason}')
+                return
+            self._preparation = None
+            self._bank_known = False
+            self._last_bank_counts.clear()
+            self._last_bank_id_counts.clear()
+            self._reset_watchdog()
+            self._provisioned.discard(task.id)
+            self._food_drawn.discard(task.id)
+            self._potions_drawn.discard(task.id)
+            self._coins_drawn.discard(task.id)
+            self._deposited.add(task.id)
+            self._freshened.add(task.id)
+            _fn67 = getattr(module, 'on_start', None)
+            if _fn67 is not None:
+                _fn67()
+            if task.skip:
+                self._apply_user_skip(task.id, {})
+            elif task.error:
+                self._block(task.id, [task.error])
+                self.running_id = None
+            else:
+                if task.retry:
+                    self._prepared.discard(task.id)
+                else:
+                    self._prepared.add(task.id)
+                log('requirements ready; resuming quest')
+        except Exception as error:
+            if getattr(error, 'name', '') == 'ScriptAborted':
+                raise error
+            _fn68 = getattr(self.host, 'stop_preparation', None)
+            if _fn68 is not None:
+                _fn68()
+            task.error = (str(error) if isinstance(error, Exception) else str(error))
+            if task.reset.pending:
+                task.phase = 'restore'
+            task.tries += 1
+            if task.tries >= FRESH_GIVE_UP:
+                self.host.finish(f'cannot safely finish preparation for {module.record.name}: {task.error}')
+
+
+    def _begin_recovery(self, id, reason, force_bank=False):
+        _fn69 = getattr(self.host, 'automatic_recovery', None)
+        if not (_fn69() if _fn69 is not None else None):
+            return False
+        _v70 = self._restart_counts.get(id)
+        count = ((_v70 if _v70 is not None else 0)) + 1
+        self._restart_counts[id] = count
+        self._reset_watchdog()
+        self._wait_key = ''
+        self._wait_count = 0
+        if count > 2:
+            self._recovery = Record({
+                'id': id,
+                'mode': 'bank',
+                'reset': QuestBankReset(self.host.food_item()),
+                'tries': 0,
+                'abort': f'{reason}; refresh and bank restart exhausted; aborted for this session',
+            })
+        else:
+            self._recovery = Record({
+                'id': id,
+                'mode': ('bank' if force_bank or count == 2 else 'refresh'),
+                'reset': QuestBankReset(self.host.food_item()),
+                'tries': 0,
+            })
+            self.host.log(f'{(def_by_id(id).record if def_by_id(id) is not None else None).name}: {reason}; {self._recovery.mode} recovery ({count}/2)')
+        return True
+
+
+    def _run_recovery(self):
+        task = self._recovery
+        if not task:
+            return
+        module = def_by_id(task.id)
+        if self.host.consume_skip():
+            task.skip = True
+            task.mode = 'bank'
+        _fn71 = getattr(self.host, 'consume_restart', None)
+        if (_fn71() if _fn71 is not None else None):
+            task.mode = 'bank'
+        if event_signal.pending():
+            return
+        try:
+            self._preparation_note(task.id, ('refreshing quest state' if task.mode == 'refresh' else 'restarting from a clean bank loadout'))
+            if task.mode == 'refresh':
+                yield from modals.close_if_open()
+                _fn72 = getattr(module, 'on_start', None)
+                if _fn72 is not None:
+                    _fn72()
+                if not game.in_combat():
+                    yield from quests.journal(module.record.name)
+                    yield from modals.close_if_open()
+            else:
+                _w73 = yield from task.reset.tick(module, self._build_snapshot(module), lambda message: self.host.log(message))
+                if not (_w73):
+                    task.tries += 1
+                    if task.tries >= FRESH_GIVE_UP:
+                        self.host.finish(f'cannot safely restart {module.record.name}: {task.reset.reason}')
+                    return
+                self._bank_known = False
+                self._last_bank_counts.clear()
+                self._last_bank_id_counts.clear()
+                self._prepared.discard(task.id)
+                self._provisioned.discard(task.id)
+                self._deposited.add(task.id)
+                self._freshened.add(task.id)
+                self._food_drawn.discard(task.id)
+                self._potions_drawn.discard(task.id)
+                self._coins_drawn.discard(task.id)
+                _fn74 = getattr(module, 'on_start', None)
+                if _fn74 is not None:
+                    _fn74()
+            self._recovery = None
+            self._reset_watchdog()
+            self._last_step_logged = ''
+            if task.skip:
+                self._apply_user_skip(task.id, {})
+            elif task.abort:
+                self._block(task.id, [task.abort])
+                self.running_id = None
+        except Exception as error:
+            if getattr(error, 'name', '') == 'ScriptAborted':
+                raise error
+            task.tries += 1
+            if task.tries >= FRESH_GIVE_UP:
+                self.host.finish(f'cannot safely restart {module.record.name}: {(str(error) if isinstance(error, Exception) else str(error))}')
+
+
+    def _prepare_candidate(self, id, module, snap):
+        if not callable(getattr(self.host, 'prepare', None)) or id in self._prepared or snap.journal == 'complete':
+            return False
+        stock = {name: count for name, count in self._last_bank_counts.items()}
+        ids = {key: count for key, count in self._last_bank_id_counts.items()}
+        for item in inventory.items() + equipment.items():
+            if item.name:
+                name = item.name.lower()
+                stock[name] = stock.get(name, 0) + item.count
+            ids[item.id] = ids.get(item.id, 0) + item.count
+        request = quest_preparation_request(module, self.host.food_item(), snap.journal, stock, ids, snap.progress)
+        if request is not None and self._needs_preparation(request, stock):
+            self._preparation = Record({'id': id, 'request': request, 'progress': snap.progress, 'reset': QuestBankReset(self.host.food_item()), 'phase': 'bank', 'tries': 0})
+            yield from self._run_preparation()
+            return True
+        self._prepared.add(id)
+        return False
+
+    def _monitor_progress(self, id, step, snap, combat_active):
+        waiting = getattr(self.host, 'waiting_for_partner', None)
+        partner_waiting = step.kind in ['wait', 'custom'] and step.cooperative == True and waiting is not None and waiting(id)
+        signature = progress_signature(snap.with_fields({'tile': None}))
+        key = f'{id}|{signature}'
+        if partner_waiting:
+            partner_key = getattr(self.host, 'partner_progress_key', None)
+            progress_key = key + '|' + (partner_key(id) if partner_key is not None else '')
+            if progress_key != self._partner_progress:
+                self._partner_progress = progress_key
+                self._partner_progress_at = _now_ms()
+            elif _now_ms() - self._partner_progress_at >= 600000 and self._begin_recovery(id, 'ten minutes without partnership progress'):
+                return None
+            self._watchdog.reset()
+            self._failed_watchdog.reset()
+            self._no_progress_count = 0
+        else:
+            self._partner_progress = ''
+        if self._automatic_recovery():
+            if key != self._progress_key or combat_active or partner_waiting:
+                self._progress_key = key
+                self._progress_at = _now_ms()
+            elif _now_ms() - self._progress_at >= 300000:
+                self._begin_recovery(id, 'five minutes without quest, inventory or combat progress')
+                return None
+        return partner_waiting
+
+    def _announce_step(self, id, module, snap, step, step_desc, verbose):
+        now = _now_ms()
+        attempt = self._tracker.open(f'{id}|{step_desc}', now)
+        step_line = f'{module.record.name}: {step_desc}'
+        fresh = step_line != self._last_step_logged
+        # Why: re-deciding the same step is how this engine loops, so repeats are silent by default.
+        # Why: the heartbeat stops a long mine, smelt and hammer chain, all called 'smith 8 nails', from looking like a
+        # hang.
+        announce = verbose or fresh or self._tracker.beat(now)
+        if announce:
+            stage_text = snap.stage if snap.stage is not None else '?'
+            context = f'stage {stage_text} · {format_tile(snap.tile)} · {snap.free_slots} free'
+            repeat = f' — attempt {attempt}, {format_duration(self._tracker.elapsed(now))} on this step' if attempt > 1 else ''
+            prefix = ''
+            if verbose:
+                self._tick += 1
+                prefix = f'[t{self._tick}] '
+            self.host.log(f'{prefix}{step_line}{repeat} · {context}')
+            self._last_step_logged = step_line
+            self._step_sub_log = set()
+            if module.observe is not None:
+                for line in module.observe(snap, step):
+                    self.host.log(f'  {line}')
+
+        return announce

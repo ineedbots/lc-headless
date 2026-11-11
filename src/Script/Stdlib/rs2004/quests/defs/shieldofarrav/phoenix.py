@@ -4,10 +4,11 @@ import _core
 from rs2004 import execution
 from rs2004.catalogs.record import Record
 from rs2004.quests.engine.types import banked_id, held_id
+from rs2004.quests.exec.legs import talk_until
 from rs2004.quests.exec.prompts import prompt_loc
 from rs2004.quests.defs.shieldofarrav.areas import BARAEK, RELDO, SOA_ID, SOA_LOC, SOA_TILE, STRAVEN_HANDIN, STRAVEN_JOIN
 from rs2004.quests.defs.shieldofarrav.config import arrav_config
-from rs2004.quests.defs.shieldofarrav.hideout import enter_phoenix_inner, leave_hideout, open_container, talk_in_hideout, walk_and_talk
+from rs2004.quests.defs.shieldofarrav.hideout import enter_hideout, enter_phoenix_inner, leave_hideout, open_container, talk_in_hideout, walk_and_talk
 from rs2004.quests.defs.shieldofarrav.journal import SOA_STAGE
 from rs2004.quests.defs.shieldofarrav.state import live_item, modal_said
 from rs2004.catalogs.tasks import sustain
@@ -114,17 +115,35 @@ def hand_in_report(log):
     return inventory.count_by_id(SOA_ID.REPORT) == 0
 
 
+def recover_store_key(log):
+    def held():
+        return inventory.count_by_id(SOA_ID.STORE_KEY) > 0
+
+    _c4 = not held()
+    if _c4:
+        _w6 = yield from enter_hideout(log)
+        _c5 = not (_w6)
+        if not _c5:
+            _w7 = yield from talk_until(STRAVEN_HANDIN, [], held, log)
+            _c5 = not (_w7)
+        _c4 = (_c5)
+    if _c4:
+        return False
+    _result8 = yield from leave_hideout(log)
+    return _result8
+
+
 def take_phoenix_half(log):
     if inventory.count_by_id(SOA_ID.SHIELD_PHOENIX) > 0:
         yield from leave_hideout(log)
         return True
-    _w4 = yield from enter_phoenix_inner(log)
-    if not (_w4):
+    _w9 = yield from enter_phoenix_inner(log)
+    if not (_w9):
         log('could not get through the gang door to the chest')
         return False
     # Why: the chest renders as 2 locs and only the open one carries Search.
-    _w5 = yield from open_container('Chest', SOA_LOC.CHEST_SHUT, SOA_LOC.CHEST_OPEN, SOA_TILE.CHEST_STAND, log)
-    if not (_w5):
+    _w10 = yield from open_container('Chest', SOA_LOC.CHEST_SHUT, SOA_LOC.CHEST_OPEN, SOA_TILE.CHEST_STAND, log)
+    if not (_w10):
         yield from leave_hideout(log)
         return False
     yield from prompt_loc(Record({
@@ -142,8 +161,8 @@ def take_phoenix_half(log):
         yield from leave_hideout(log)
         return False
     # Why: the half in the pack is the work; the next pass's early branch retries a failed climb out, and failing here would throw away a half you're holding.
-    _w6 = yield from leave_hideout(log)
-    if not (_w6):
+    _w11 = yield from leave_hideout(log)
+    if not (_w11):
         log('half taken, but the climb back to the surface did not land — retrying next pass')
     return True
 
@@ -165,11 +184,11 @@ def banked_recovery(snap):
 
 
 def phoenix_step(snap):
-    _v7 = (snap.progress.stage if snap.progress is not None else None)
-    _v8 = (_v7 if _v7 is not None else snap.stage)
-    stage = (_v8 if _v8 is not None else SOA_STAGE.NOT_STARTED)
-    _v9 = (snap.progress.flags if snap.progress is not None else None)
-    flags = (_v9 if _v9 is not None else set())
+    _v12 = (snap.progress.stage if snap.progress is not None else None)
+    _v13 = (_v12 if _v12 is not None else snap.stage)
+    stage = (_v13 if _v13 is not None else SOA_STAGE.NOT_STARTED)
+    _v14 = (snap.progress.flags if snap.progress is not None else None)
+    flags = (_v14 if _v14 is not None else set())
     if stage == SOA_STAGE.NOT_STARTED:
         return say(RELDO, 'ask Reldo for a quest')
     elif stage == SOA_STAGE.TOLD_OF_BOOK:
@@ -196,7 +215,11 @@ def phoenix_step(snap):
         if len(recover) > 0:
             return Record({'kind': 'withdraw', 'items': recover})
         if held_id(snap, SOA_ID.SHIELD_PHOENIX) > 0:
-            return Record({'kind': 'wait', 'reason': 'phoenix half held — the other half is not this leg'})
+            return Record({
+                'kind': 'wait',
+                'cooperative': True,
+                'reason': 'phoenix half held — the other half is not this leg',
+            })
         return Record({'kind': 'custom', 'name': 'search the Phoenix hideout chest', 'run': take_phoenix_half})
     else:
         return Record({'kind': 'wait', 'reason': f'phoenix leg has nothing for stage {stage}'})

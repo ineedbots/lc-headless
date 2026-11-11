@@ -144,27 +144,34 @@ def take_nightshade(log):
     return _result16
 
 
-def answer_mad_skavid(log):
-    # Cave 6 sits on the far side of the gold-bar gate, and the trip is one leg so the crossing state never has to survive a decide() round trip.
-    _c17 = watchtower_area(game.tile()) != 'skavidCaves'
+def answer_mad_skavid(log, gate_paid=False):
+    cave = ([entry for entry in WT_CAVES if entry.index == 6] or [None])[0]
+    here = game.tile()
+    _c17 = here and watchtower_area(here) == 'skavidCaves' and cave.landing.distance_to(here) > 5
     if _c17:
-        _w18 = yield from cross_east_gate(log)
+        _w18 = yield from leave_cave(log)
         _c17 = not (_w18)
     if _c17:
         return False
-    _w19 = yield from reach_skavid(6, log)
-    if not (_w19):
+    _c19 = watchtower_area(game.tile()) != 'skavidCaves'
+    if _c19:
+        _w20 = yield from cross_east_gate(log, gate_paid)
+        _c19 = not (_w20)
+    if _c19:
+        return False
+    _w21 = yield from reach_skavid(6, log)
+    if not (_w21):
         return False
     # He says one of 4 phrases at random, so a wrong guess costs only a retry.
     for attempt in range(5):
         yield from talk_choosing_by(WT_NPC.MAD_SKAVID, MAD_SKAVID_RULES, ["But I've lost it!"], log)
         if held_id(WT_ITEM.CRYSTAL2.id) > 0:
-            _w21 = yield from leave_cave(log)
-            _c20 = (_w21)
-            if not (_c20):
-                return _c20
-            _result22 = yield from leave_east_gate(log)
-            return _result22
+            _w23 = yield from leave_cave(log)
+            _c22 = (_w23)
+            if not (_c22):
+                return _c22
+            _result24 = yield from leave_east_gate(log)
+            return _result24
         yield from execution.delay_ticks(2)
     # Why: the region beyond the east gate overlaps the battlement side, so decide() can't tell them apart and would aim the escape at a battlement it has no path to; leave under our own steam even on failure.
     log('the mad skavid did not hand over a crystal in five attempts')

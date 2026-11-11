@@ -352,6 +352,9 @@ def pass_and_tower_supplies():
     snap.inv_ids[watchtower.WT_ITEM.COINS.id] = 100
     expect(watchtower.bank_only(snap, watchtower.WT_ITEM.PESTLE)).to_be_null()
     expect(watchtower.source_coins(snap, 100)).to_be_null()
+    snap.inv_ids[watchtower.WT_ITEM.COINS.id] = 60
+    snap.bank_ids[watchtower.WT_ITEM.COINS.id] = 1000
+    expect(watchtower.source_coins(snap, 100).items[0]['qty']).to_be(40)
 
 
 test('Pass equipment refusals and Watchtower drop-only supplies use bounded recovery and bank-first sourcing', pass_and_tower_supplies)

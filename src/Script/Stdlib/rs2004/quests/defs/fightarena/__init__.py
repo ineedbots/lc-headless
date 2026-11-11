@@ -196,6 +196,7 @@ def decide(snap):
 # Why: the fights are back to back with no bank between the jail and the escape, so the pack carries every meal the quest gets.
 FOOD = 8
 fightarena = QuestModule(**{
+    'auto_retaliate': False,
     'record': quest_record('arena'),
     'resume_at': walled_in,
     'pray': Record({'protect': 'melee', 'potions': 2}),

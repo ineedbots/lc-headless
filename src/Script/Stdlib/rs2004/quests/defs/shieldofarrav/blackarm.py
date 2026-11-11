@@ -179,7 +179,7 @@ def blackarm_step(snap):
         if banked_id(snap, SOA_ID.STORE_KEY) > 0:
             return Record({'kind': 'withdraw', 'items': [{'name': 'Key', 'qty': 1, 'id': SOA_ID.STORE_KEY}]})
         # Why: the store door yields only to phoenixkey2, which only Straven issues, so a keyless bot has to be given one.
-        return Record({'kind': 'wait', 'reason': 'needs a Phoenix weapon-store key from a partner'})
+        return Record({'kind': 'wait', 'cooperative': True, 'reason': 'needs a Phoenix weapon-store key from a partner'})
     elif stage == SOA_STAGE.BLACKARM_JOINED:
         if held_id(snap, SOA_ID.SHIELD_BLACKARM) > 0:
             return Record({'kind': 'wait', 'reason': 'black arm half held — the other half is not this leg'})

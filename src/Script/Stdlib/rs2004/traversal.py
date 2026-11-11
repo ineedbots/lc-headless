@@ -741,9 +741,9 @@ class _Traversal:
     def _check_route_items(self, waypoints, say):
         """False, with last_outcome unreachable, when the route needs what the account doesn't hold."""
         missing = missing_items_for_path(waypoints, world_state())
+        self.last_missing_gate_items = missing
         if len(missing) == 0:
             return True
-        self.last_missing_gate_items = missing
         self.last_outcome = 'unreachable'
         say(f"route needs {', '.join([repr(m) for m in missing])} before departure")
         return False

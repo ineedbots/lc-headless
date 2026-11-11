@@ -614,7 +614,8 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Treasure Trails | ClueSolver | `clue_solver.py`: solves the clue or opens the casket in the pack, then banks the reward |
 | Quests | ArravSupplier | `arrav_supplier.py`, its logic in `bots/arravsupplier/`: prepares the Phoenix mission, joins both gangs, banks certificates without redeeming |
 | Quests | Barcrawl | `barcrawl.py`: obtains the card, visits all ten bars and hands it in |
-| Quests | AIOQuester | `aio_quester.py`, its logic in `bots/aioquester/`: runs a queue of quests on [`rs2004.quests`](quests.md). Its paint's Skip button is the `skip` console command, and the paint is its progress report |
+| Quests | AIOQuester | `aio_quester.py`, its logic in `bots/aioquester/`: prepares requirements and runs a queue on [`rs2004.quests`](quests.md). Console commands `skip` and `restart` control the active quest |
+| Quest supplies | DragonfireShield | `dragonfire_shield.py`: farms Duke Horacio's free shields after the Dragon Slayer shield entitlement is unlocked. `trip_secs` controls each farming window; `carry_notes` brings banked shields as notes |
 | Fighting | ChickenKiller, CowKiller, ChaosDruidKiller, HillGiant | `chicken_killer.py`, `cow_killer.py` (ChickenKiller with a cow field preset), `chaos_druid_killer.py`, `hill_giant.py` |
 | Combat | MossGiant, BrimhavenMossGiants, FireGiant, GreenDragon, RockCrab, RangingGuild, AutoFighter, JiveChests | `moss_giant.py`, `brimhaven_moss_giants.py`, `fire_giant.py`, `green_dragon.py`, `rock_crab.py`, `ranging_guild.py`, `auto_fighter.py`, `jive_chests.py`, with their logic in `bots/firegiant/`, `bots/greendragon/`, `bots/rangingguild/`, `bots/autofighter/` and `bots/jivechests/`. GreenDragon, RockCrab and AutoFighter solve the clues they pick up, on [`rs2004.clues`](clues.md) |
 | Bosses and dragons | JiveDragons, JiveDemons, JiveKBD | `jive_dragons.py`, `jive_demons.py`, `jive_kbd.py`, on [`rs2004.hunting`](hunting.md). JiveDragons solves the hard clues the dragons drop |
@@ -670,6 +671,18 @@ inventory change. Three empty stock reads stop dumping or mark shortages, which 
 The delivery ledger is in memory for the current run, not persistent shared stock; restarting Supply
 starts a fresh delivery run. Coordinated live acceptance is tracked in
 [#32](https://github.com/ineedbots/lc-headless/issues/32).
+
+### Superheater and quest supply activities
+
+Superheater's `goldsmith_gauntlets` setting defaults to enabled and requires the
+gauntlets when making gold. `fast_bank` defaults to enabled and combines the
+deposit, ore withdrawal and close actions, falling back to confirmed banking
+when needed. Interruptions yield before continuing the bank or casting leg.
+
+PotionMaker accepts optional `output_id` and `output_count` targets for bounded
+supply activities, reuses unfinished potions and supports toad's legs.
+HerbloreSecondaries supports blue dragon scales with a Dusty key and protective
+shield; AIOQuester selects these activities when preparing quest supplies.
 
 ### WildyAgility
 

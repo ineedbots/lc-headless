@@ -13,7 +13,7 @@ from rs2004 import execution
 from rs2004.catalogs.tasks import sustain
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import ground_items, locs, npcs
-from rs2004.game import game, reader
+from rs2004.game import game, reader, skills
 from rs2004.geometry import Tile
 from rs2004.items import equipment, inventory
 from rs2004.messages import game_messages
@@ -74,8 +74,8 @@ class Jungle:
         spy_on(npcs, 'all', impl=lambda: self.npcs)
         spy_on(inventory, 'items', impl=lambda: self.pack)
         spy_on(inventory, 'free', impl=lambda: 28 - len(self.pack))
-        spy_on(inventory, 'count', impl=lambda name: sum([i.count for i in self.pack if i.name == name]))
-        spy_on(inventory, 'first', impl=lambda name: ([i for i in self.pack if i.name == name] or [None])[0])
+        spy_on(inventory, 'count', impl=lambda name: sum([i.count for i in self.pack if i.name is not None and i.name.lower() == name.lower()]))
+        spy_on(inventory, 'first', impl=lambda name: ([i for i in self.pack if i.name is not None and i.name.lower() == name.lower()] or [None])[0])
         spy_on(sustain, 'run', impl=lambda: result(True))
         spy_on(game_messages, 'mark', returns=7)
         spy_on(game_messages, 'saw_since', impl=lambda mark, text: self.refused)
@@ -268,13 +268,14 @@ def nets_the_bait():
     expect(jungle.count(TB_ID.RAW_KARAMBWANJI)).to_be(2)
     for i in range(26):
         jungle.hold(1000 + i)
-    expect(run_wait(crafting.fish_karambwanji(3)(jungle.log))).to_be(True)
+    expect(run_wait(crafting.fish_karambwanji(3)(jungle.log))).to_be(False)
 
 
 test('Karambwanji are netted at the Holy Lake, dropping the shrimp the shoal yields too', nets_the_bait)
 
 
 def lowers_the_vessel():
+    spy_on(skills, 'level', returns=65)
     jungle = Jungle(TB_TILE.KARAMBWAN_SHOAL)
     jungle.hold(TB_ID.RAW_KARAMBWAN, 2)
     expect(run_wait(crafting.fish_karambwan()(jungle.log))).to_be(True)
@@ -463,6 +464,7 @@ test('the Jogre bones are burnt with the tinderbox, stepping off a tile that alr
 
 
 def wears_and_deposits_the_kit():
+    spy_on(skills, 'level', returns=70)
     jungle = Jungle(VILLAGE)
     worn = []
 
@@ -481,8 +483,8 @@ def wears_and_deposits_the_kit():
             quest_food.name.lower(): 20}
     snap = QuestSnapshot(**{
         'journal': 'in_progress',
-        'inv': {'coins': 3},
-        'inv_ids': {TB_ID.COINS: 3},
+        'inv': {'coins': 3, 'raw shrimps': 24},
+        'inv_ids': {TB_ID.COINS: 3, 317: 24},
         'worn': set(),
         'worn_ids': set(),
         'bank': bank,
@@ -496,7 +498,7 @@ def wears_and_deposits_the_kit():
     })
     step = supplies.prepare(snap)
     expect(step.kind).to_be('deposit')
-    expect(step.keep).to_contain('maple shortbow')
+    expect(step.keep_ids).not_.to_contain(317)
     step = supplies.prepare(snap.with_fields({'free_slots': 20}))
     expect(step.kind).to_be('withdraw')
     expect([w for w in step.items if w['name'] == 'Coins'][0]['qty']).to_be(500)

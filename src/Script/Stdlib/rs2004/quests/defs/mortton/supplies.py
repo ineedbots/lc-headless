@@ -12,7 +12,7 @@ from rs2004.quests.exec.prompts import settle_scene, use_on_loc
 from rs2004.quests.food import quest_food
 from rs2004.traversal import traversal
 
-__all__ = ['COIN_TARGET', 'COIN_LOW', 'FOOD_TARGET', 'FOOD_LOW', 'DOSES_PER_VIAL', 'SM_TOOLS', 'held_id', 'banked_id', 'SERUM_BY_DOSE', 'PERM_SERUM_BY_DOSE', 'serum_doses', 'perm_serum_doses', 'serum_vials', 'serum_vial_id', 'perm_serum_vial_id', 'doses_needed', 'serums_short', 'recover_serum', 'ashes_short', 'logs_short', 'kit', 'make_ashes', 'fill_vial']
+__all__ = ['COIN_TARGET', 'COIN_LOW', 'FOOD_TARGET', 'FOOD_LOW', 'DOSES_PER_VIAL', 'SM_TOOLS', 'held_id', 'banked_id', 'SERUM_BY_DOSE', 'PERM_SERUM_BY_DOSE', 'serum_doses', 'perm_serum_doses', 'serum_vials', 'serum_vial_id', 'perm_serum_vial_id', 'recover_pyre_supplies', 'doses_needed', 'serums_short', 'recover_serum', 'ashes_short', 'logs_short', 'kit', 'make_ashes', 'fill_vial']
 
 COIN_TARGET = 30000
 COIN_LOW = 5000
@@ -155,7 +155,7 @@ def ashes_short(snap, stage):
 # Why: After `logs_on_pyre`, the log has been consumed and should not trigger another swamp trip.
 def logs_short(snap, stage):
     """Logs the pack still needs: one per outstanding burn, plus the one the pyre consumes."""
-    spent = stage >= SM_STAGE.LOGS_ON_PYRE or held_id(snap, SM_ID.PYRE_LOGS) > 0
+    spent = stage >= SM_STAGE.LOGS_ON_PYRE or (stage >= SM_STAGE.CREATED_PYRE_LOGS and held_id(snap, SM_ID.PYRE_LOGS) > 0)
     return max(0, ashes_short(snap, stage) + ((0 if spent else 1)) - held_id(snap, SM_ID.LOGS))
 
 
@@ -212,26 +212,26 @@ def burn_one(log):
     def ashes_near():
         return ground_items.query().where(lambda g: g.id == SM_ID.ASHES).within(3).nearest() is not None
 
-    _w9 = yield from execution.delay_until(ashes_near, 180000)
-    if not (_w9):
+    _w10 = yield from execution.delay_until(ashes_near, 180000)
+    if not (_w10):
         log('burnOne: the fire never left any ashes')
         return False
     ash = ground_items.query().where(lambda g: g.id == SM_ID.ASHES).within(3).nearest()
     if not ash or not (ash.interact('Take')):
         return False
-    _result10 = yield from execution.delay_until(lambda: inventory.count_by_id(SM_ID.ASHES) > before, 8000)
-    return _result10
+    _result11 = yield from execution.delay_until(lambda: inventory.count_by_id(SM_ID.ASHES) > before, 8000)
+    return _result11
 
 
 # Why: the spawn is 2 logs at a time on its own timer, so the loop burns whatever is spare as it goes.
 def make_ashes(ashes, logs):
     """Take logs from the Varrock spawns, burning them until the pack holds the ashes and the pyre log."""
 
-    def _fn11(log):
+    def _fn12(log):
         if bank.is_open():
             yield from bank.close()
-        _w12 = yield from traversal.walk_resilient(SM_TILE.VARROCK_LOGS, radius=2, attempts=3, timeout_ms=180000, log=log)
-        if not (_w12):
+        _w13 = yield from traversal.walk_resilient(SM_TILE.VARROCK_LOGS, radius=2, attempts=3, timeout_ms=180000, log=log)
+        if not (_w13):
             return False
         yield from settle_scene()
         deadline = _core.step_time() + BURN_BUDGET_MS
@@ -241,8 +241,8 @@ def make_ashes(ashes, logs):
             if burns_left == 0 and held >= logs:
                 return True
             if burns_left > 0 and held > logs:
-                _w13 = yield from burn_one(log)
-                if not (_w13):
+                _w14 = yield from burn_one(log)
+                if not (_w14):
                     return False
                 continue
             spawn = ground_items.query().where(lambda g: g.id == SM_ID.LOGS).within(8).nearest()
@@ -254,10 +254,40 @@ def make_ashes(ashes, logs):
                 yield from execution.delay_until(lambda: inventory.count_by_id(SM_ID.LOGS) > held, 8000)
         log(f'makeAshes: gave up holding {inventory.count_by_id(SM_ID.ASHES)} ashes and {inventory.count_by_id(SM_ID.LOGS)} logs')
         return False
-    return _fn11
+    return _fn12
 
 
 def fill_vial(log):
     """Fill an empty vial at the Mort'ton sink."""
     before = inventory.count_by_id(SM_ID.VIAL_WATER)
     return use_on_loc(SM_ID.VIAL_EMPTY, Record({'name': SM_LOC.SINK, 'near': SM_TILE.SINK, 'id': SM_LOC_ID.SINK, 'within': 8}), [], lambda: inventory.count_by_id(SM_ID.VIAL_WATER) > before, log)
+
+
+def recover_pyre_supplies(snap, need_logs, need_oil, need_remains):
+    if not need_logs and not need_oil and not need_remains:
+        return None
+    if not snap.bank_known:
+        return scan_bank
+    items = []
+    if need_logs and banked_id(snap, SM_ID.PYRE_LOGS) > 0:
+        items.append(Record({'name': SM_NAME.PYRE_LOGS, 'id': SM_ID.PYRE_LOGS, 'qty': 1}))
+    elif need_oil:
+        oil = ([id for id in [
+            SM_ID.SACRED_OIL4,
+            SM_ID.SACRED_OIL3,
+            SM_ID.SACRED_OIL2,
+            SM_ID.OLIVE_OIL4,
+            SM_ID.OLIVE_OIL3,
+            SM_ID.OLIVE_OIL2,
+        ] if banked_id(snap, id) > 0] or [None])[0]
+        if oil is not None:
+            items.append(Record({'name': ('Olive oil' if oil <= SM_ID.OLIVE_OIL2 else 'Sacred oil'), 'id': oil, 'qty': 1}))
+    if need_remains and banked_id(snap, SM_ID.REMAINS) > 0:
+        items.append(Record({'name': SM_NAME.REMAINS, 'id': SM_ID.REMAINS, 'qty': 1}))
+    if len(items) == 0:
+        return None
+    if ((snap.free_slots if snap.free_slots is not None else len(items))) < len(items):
+        keep = list(SM_TOOLS) + list((([quest_food.name.lower()] if quest_food.name else [])))
+        expendable = any([count > 0 and not any([(k in name.lower()) for k in keep]) for name, count in list(snap.inv.items())])
+        return (Record({'kind': 'deposit', 'keep': keep}) if expendable else Record({'kind': 'wait', 'reason': 'no pack room for pyre recovery'}))
+    return Record({'kind': 'withdraw', 'items': items})

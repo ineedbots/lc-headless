@@ -651,7 +651,7 @@ def loops_the_ghasts():
     expect(step.items[0]['qty']).to_be(3)
     step = druidspirit.decide(ghast_snap(blessed, {NS_ID.POUCH_EMPTY: 2}))
     expect(step.items[0]['qty']).to_be(1)
-    expect(druidspirit.decide(ghast_snap(blessed)).reason).to_be('no Druid pouch held or banked')
+    expect(druidspirit.decide(ghast_snap(blessed)).name).to_be('replace the druid pouch')
     with_pouch = {NS_ID.SICKLE_BLESSED: 1, NS_ID.POUCH_EMPTY: 1}
     full = {NS_ID.SICKLE_BLESSED: 1, NS_ID.POUCH_EMPTY: 1, NS_ID.PEAR: 1, NS_ID.STEM: 1, NS_ID.FUNGI: 1}
     expect(druidspirit.decide(ghast_snap(full)).name).to_be('fill the druid pouch')
@@ -760,3 +760,21 @@ def reads_the_journal():
 
 
 test("the journal reader closes the swamp gate's message box and keeps the last good page through an empty read", reads_the_journal)
+
+
+def replaces_lost_pouch():
+    swamp = Swamp(GROTTO)
+    spy_on(grotto, 'enter_grotto', impl=lambda log: result(True))
+    expect(run_wait(grotto.replace_pouch(swamp.log))).to_be(False)
+    spawn = Fake(id=NS_ID.POUCH_EMPTY, distance=lambda: 1, tile=lambda: NS_TILE.POUCH, interact=lambda op: False)
+    swamp.ground.append(spawn)
+    expect(run_wait(grotto.replace_pouch(swamp.log))).to_be(False)
+    spawn.interact = lambda op: swamp.hold(NS_ID.POUCH_EMPTY) is not None
+    expect(run_wait(grotto.replace_pouch(swamp.log))).to_be(True)
+    expect(run_wait(grotto.replace_pouch(swamp.log))).to_be(True)
+    swamp.pack = []
+    swamp.walk_ok = False
+    expect(run_wait(grotto.replace_pouch(swamp.log))).to_be(False)
+
+
+test('a lost druid pouch is replaced only after the grotto spawn is taken', replaces_lost_pouch)

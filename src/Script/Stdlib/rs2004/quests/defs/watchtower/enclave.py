@@ -4,9 +4,12 @@ from rs2004 import execution
 from rs2004.catalogs.tasks import sustain
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import ground_items, locs, npcs
+from rs2004.execution import event_signal
 from rs2004.game import game, skills
 from rs2004.items import inventory
+from rs2004.messages import game_messages
 from rs2004.quests.defs.watchtower.areas import WT_ITEM, WT_LOC, WT_NPC, WT_TILE, watchtower_area
+from rs2004.quests.defs.watchtower.loadout import edible_names
 from rs2004.quests.defs.watchtower.scene import settle_scene
 from rs2004.quests.exec.primitives import drive_dialog
 from rs2004.traversal import traversal
@@ -23,6 +26,9 @@ def loc_near(id, op, within=10):
 
 def enter_enclave(log):
     """Every entry burns one nightshade; the guard is distracted only for the run past."""
+    if event_signal.pending():
+        return False
+    game.set_auto_retaliate(False)
     if watchtower_area(game.tile()) == 'enclave':
         return True
     if held_id(WT_ITEM.NIGHTSHADE.id) == 0:
@@ -64,67 +70,118 @@ def leave_enclave(log):
     return True
 
 
+def safe_to_continue(log):
+    if event_signal.pending():
+        return False
+    if skills.effective('hitpoints') < skills.level('hitpoints') * 0.6:
+        yield from sustain.run()
+    if event_signal.pending():
+        return False
+    foods = set(edible_names())
+    food = sum([item.count for item in [item for item in inventory.items() if (((item.name.lower() if item.name is not None else None) if (item.name.lower() if item.name is not None else None) is not None else '') in foods)]])
+    if food >= 2 and inventory.free() >= 2 and skills.effective('hitpoints') >= skills.level('hitpoints') * 0.6:
+        return True
+    log('enclave reserve exhausted; retreating for food or inventory space')
+    yield from leave_enclave(log)
+    return False
+
+
 def dissolve_shamans(log):
-    _w6 = yield from enter_enclave(log)
-    if not (_w6):
+    _c7 = event_signal.pending()
+    if not _c7:
+        _w8 = yield from safe_to_continue(log)
+        _c7 = not (_w8)
+    _c6 = _c7
+    if not _c6:
+        _w9 = yield from enter_enclave(log)
+        _c6 = not (_w9)
+    if _c6:
         return False
     for spot in WT_TILE.SHAMANS:
-        if held_id(WT_ITEM.MAGIC_OGRE_POTION.id) == 0:
-            # Why: the potion is spent on the sixth shaman or lost, and either way staying put lets decide() choose.
-            # Why: the rock is mined from in here, and a brewing trip leaves through the ordinary escape.
-            log('the magic ogre potion is spent')
-            return True
-        if skills.effective('hitpoints') * 2 < skills.level('hitpoints'):
-            yield from sustain.run()
-        _w7 = yield from traversal.walk_resilient(spot, radius=2, attempts=2, timeout_ms=90000, log=log)
-        if not (_w7):
+        _w10 = yield from safe_to_continue(log)
+        if not (_w10) or held_id(WT_ITEM.MAGIC_OGRE_POTION.id) == 0:
+            return False
+        _w11 = yield from traversal.walk_resilient(spot, radius=2, attempts=2, timeout_ms=90000, log=log)
+        if not (_w11):
+            if event_signal.pending():
+                return False
             continue
-        # Never talk to or attack a shaman: opnpc1 is a flat 20 damage and attacking draws 30. Only the potion works.
+        _w12 = yield from safe_to_continue(log)
+        if not (_w12):
+            return False
         shaman = npcs.query().name(WT_NPC.SHAMAN).where(lambda npc: npc.distance() <= 4).nearest()
         potion = ([item for item in inventory.items() if item.id == WT_ITEM.MAGIC_OGRE_POTION.id] or [None])[0]
         if not shaman or not potion:
             continue
-        if potion.use_on(shaman):
-            yield from execution.delay_ticks(3)
-    return True
+        mark = game_messages.mark()
+        if not (potion.use_on(shaman)):
+            return False
+        _w13 = yield from execution.delay_until(lambda: game_messages.saw_since(mark, 'the ogre dissolves into spirit form'), 8000)
+        if not (_w13):
+            return False
+        if event_signal.pending():
+            return False
+        _w14 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 8000)
+        if _w14:
+            yield from drive_dialog([], log)
+        if event_signal.pending():
+            return False
+        execution.note_progress()
+        return True
+    log('no reachable ogre shaman dissolved')
+    return False
 
 
 def mine_dalgroth(log):
     if held_id(WT_ITEM.CRYSTAL4.id) > 0:
         return True
-    _w8 = yield from enter_enclave(log)
-    if not (_w8):
+    _w16 = yield from safe_to_continue(log)
+    _c15 = not (_w16)
+    if not _c15:
+        _w17 = yield from enter_enclave(log)
+        _c15 = not (_w17)
+    if _c15:
         return False
-    _w9 = yield from traversal.walk_resilient(WT_TILE.ROCK_OF_DALGROTH, radius=2, attempts=3, timeout_ms=180000, log=log)
-    if not (_w9):
+    _w18 = yield from traversal.walk_resilient(WT_TILE.ROCK_OF_DALGROTH, radius=2, attempts=3, timeout_ms=180000, log=log)
+    if not (_w18):
+        return False
+    _w19 = yield from safe_to_continue(log)
+    if not (_w19):
         return False
     rock = loc_near(WT_LOC.ROCK_OF_DALGROTH, 'Mine')
     if not rock or not (rock.interact('Mine')):
         log('no Rock of Dalgroth in range, or no pickaxe carried')
         return False
-    _result10 = yield from execution.delay_until(lambda: held_id(WT_ITEM.CRYSTAL4.id) > 0, 20000)
-    return _result10
+    _result20 = yield from execution.delay_until(lambda: held_id(WT_ITEM.CRYSTAL4.id) > 0, 20000)
+    return _result20
 
 
 def search_shaman_robe(log):
     if held_id(WT_ITEM.CRYSTAL3.id) > 0:
         return True
-    _w11 = yield from enter_enclave(log)
-    if not (_w11):
+    _w22 = yield from safe_to_continue(log)
+    _c21 = not (_w22)
+    if not _c21:
+        _w23 = yield from enter_enclave(log)
+        _c21 = not (_w23)
+    if _c21:
         return False
-    _w12 = yield from traversal.walk_resilient(WT_TILE.SHAMAN_ROBE, radius=2, attempts=3, timeout_ms=180000, log=log)
-    if not (_w12):
+    _w24 = yield from traversal.walk_resilient(WT_TILE.SHAMAN_ROBE, radius=2, attempts=3, timeout_ms=180000, log=log)
+    if not (_w24):
+        return False
+    _w25 = yield from safe_to_continue(log)
+    if not (_w25):
         return False
     if held_id(WT_ITEM.SHAMAN_ROBE.id) == 0:
         robe = ground_items.query().name(WT_ITEM.SHAMAN_ROBE.name).within(4).nearest()
         if not robe or not (robe.interact('Take')):
             log('no shaman robe on the enclave floor')
             return False
-        _w13 = yield from execution.delay_until(lambda: held_id(WT_ITEM.SHAMAN_ROBE.id) > 0, 6000)
-        if not (_w13):
+        _w26 = yield from execution.delay_until(lambda: held_id(WT_ITEM.SHAMAN_ROBE.id) > 0, 6000)
+        if not (_w26):
             return False
     carried = ([item for item in inventory.items() if item.id == WT_ITEM.SHAMAN_ROBE.id] or [None])[0]
     if not carried or not (carried.interact('Search')):
         return False
-    _result14 = yield from execution.delay_until(lambda: held_id(WT_ITEM.CRYSTAL3.id) > 0, 8000)
-    return _result14
+    _result27 = yield from execution.delay_until(lambda: held_id(WT_ITEM.CRYSTAL3.id) > 0, 8000)
+    return _result27

@@ -18,6 +18,7 @@ public:
 
     void Register(std::string_view username, Receiver receiver);
     void Unregister(std::string_view username);
+    // "*" sends to every other account; returns whether all receivers accepted it.
     // Empty when no account has that username; otherwise whether its receiver took the message.
     [[nodiscard]] std::optional<bool> Send(std::string_view username, BotMessage_s message) const;
 

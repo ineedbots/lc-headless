@@ -9,6 +9,7 @@ MODULES = {
     'AIOQuester': 'aio_quester', 'PotionMaker': 'potion_maker', 'RuneCrafter': 'rune_crafter',
     'TannerBot': 'tanner_bot', 'HerbCleaner': 'herb_cleaner', 'EssMiner': 'ess_miner',
     'GreenDragon': 'green_dragon', 'JiveDragons': 'jive_dragons',
+    'HerbloreSecondaries': 'herblore_secondaries',
 }
 
 

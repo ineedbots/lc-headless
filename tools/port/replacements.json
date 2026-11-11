@@ -533,5 +533,11 @@
         ],
         "implementation": "src/Script/Stdlib/rs2004/game.py",
         "anchor": "def world("
+    },
+    {
+        "module": "client/config/worlds.ts",
+        "exports": ["resolveNodeId"],
+        "implementation": "scripts/bots/aio_quester.py",
+        "anchor": "'world': str(game.world())"
     }
 ]

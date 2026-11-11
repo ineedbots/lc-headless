@@ -33,7 +33,7 @@ def decide_handoff(state):
     target = max(1, cert_target)
     if gang == 'phoenix':
         # Why: Straven re-issues the key whenever obj_gettotal reads zero, so giving it away costs nothing.
-        if stage >= SOA_STAGE.PHOENIX_JOINED and stage < SOA_STAGE.COMPLETE and has_key:
+        if stage >= SOA_STAGE.PHOENIX_JOINED and stage < SOA_STAGE.COMPLETE and has_key and state.partner_has_key != True and (state.partner_stage is None or state.partner_stage < SOA_STAGE.BLACKARM_JOINED):
             return 'give-key'
         if has_own_half and has_other_half:
             return None
@@ -93,6 +93,7 @@ def run_handoff(handoff, gang, log):
 def handoff_step(handoff, gang):
     return Record({
         'kind': 'custom',
+        'cooperative': True,
         'name': f'{handoff} with {arrav_config.partner}',
         'run': lambda log: run_handoff(handoff, gang, log),
     })

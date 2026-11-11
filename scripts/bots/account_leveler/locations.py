@@ -36,7 +36,7 @@ def sites(plan):
                 gather('Seers (fly fishing)', FISHING_LOCATIONS, True),
                 gather('Barbarian Village', FISHING_LOCATIONS),
             ]
-        if str(plan.settings.get('fish_method')).startswith('Lobster cage'):
+        if str(plan.settings.get('fish_method')).startswith('Lobster cage') or str(plan.settings.get('fish_method')).startswith('Harpoon'):
             return [gather('Catherby', FISHING_LOCATIONS, True)]
         return [gather('Draynor Village', FISHING_LOCATIONS)]
     elif plan.script == 'Miner':

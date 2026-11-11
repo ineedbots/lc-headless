@@ -143,6 +143,7 @@ def decide(snap):
 
 
 grandtree = QuestModule(**{
+    'auto_retaliate': lambda snap: not in_caves(snap.tile),
     'record': quest_record('grandtree'),
     'bank': 'nearest',
     'hops': GT_HOPS,

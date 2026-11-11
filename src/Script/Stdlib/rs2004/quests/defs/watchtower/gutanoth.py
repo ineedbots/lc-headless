@@ -5,6 +5,7 @@ from rs2004.dialogue import chat_dialog
 from rs2004.entities import locs, npcs
 from rs2004.game import game
 from rs2004.items import inventory
+from rs2004.messages import game_messages
 from rs2004.navigation import navigator
 from rs2004.quests.defs.watchtower.areas import WT_CAVES, WT_ITEM, WT_LOC, WT_NPC, WT_TILE, watchtower_area
 from rs2004.quests.defs.watchtower.scene import settle_scene
@@ -12,7 +13,7 @@ from rs2004.quests.exec.primitives import drive_dialog, talk_strict, talk_throug
 from rs2004.reach import reach
 from rs2004.traversal import traversal
 
-__all__ = ['CHASM_TOLL', 'show_relic_to_guard', 'steal_rock_cake', 'cross_battlement', 'leave_lower_city', 'jump_back', 'ask_riddle', 'answer_riddle', 'cross_east_gate', 'leave_east_gate']
+__all__ = ['CHASM_TOLL', 'show_relic_to_guard', 'steal_rock_cake', 'cross_battlement', 'leave_lower_city', 'jump_back', 'ask_riddle', 'answer_riddle', 'gold_gate_needs_payment', 'cross_east_gate', 'leave_east_gate', 'leave_city']
 
 CHASM_TOLL = 20
 
@@ -275,20 +276,48 @@ def offer_gold_bar(log):
     return _result33
 
 
-def cross_east_gate(log):
-    if past_east_gate():
+def cross_east_gate(log, paid=False):
+    _w34 = past_east_gate()
+    if _w34:
+        remember_gate_payment(False)
         return True
-    if held_id(WT_ITEM.GOLD_BAR.id) == 0:
-        log('no Gold bar for the east gate guard')
+    if paid or gold_gate_needs_payment() == False or held_id(WT_ITEM.GOLD_BAR.id) == 0:
+        _w35 = yield from traversal.walk_resilient(WT_TILE.EAST_GATE_STAND, radius=1, attempts=3, timeout_ms=180000, log=log)
+        if not (_w35):
+            return False
+        gate = loc_near(WT_LOC.GATE_EAST, 'Open', 6)
+        mark = game_messages.mark()
+        if not gate or not (gate.interact('Open')):
+            return False
+
+        def crossed():
+            return (((game.tile().z if game.tile() is not None else None) if (game.tile().z if game.tile() is not None else None) is not None else 9999)) <= 3027 and (((game.tile().x if game.tile() is not None else None) if (game.tile().x if game.tile() is not None else None) is not None else 0)) >= 2540
+
+        yield from execution.delay_until(lambda: crossed() or chat_dialog.is_open() or chat_dialog.can_continue(), 8000)
+        if chat_dialog.is_open() or chat_dialog.can_continue():
+            yield from drive_dialog([], log)
+        _w36 = yield from execution.delay_until(crossed, 4000)
+        if _w36:
+            yield from settle_scene()
+            _w37 = past_east_gate()
+            if _w37:
+                remember_gate_payment(False)
+                return True
+
+        if game_messages.saw_since(mark, 'guard pushes you outside the city'):
+            remember_gate_payment(True)
+        log('east gate did not open; a gold bar is needed if the guard refused passage')
         return False
-    _w35 = yield from offer_gold_bar(log)
-    if _w35:
+    _w38 = yield from offer_gold_bar(log)
+    if _w38:
+        remember_gate_payment(False)
         yield from settle_scene()
         return True
-    log('east gate guard threw us down the hill — returning to pay again')
-    _w36 = yield from offer_gold_bar(log)
-    if not (_w36):
+    log('east gate guard threw us down the hill; returning to pay again')
+    _w39 = yield from offer_gold_bar(log)
+    if not (_w39):
         return False
+    remember_gate_payment(False)
     yield from settle_scene()
     return True
 
@@ -309,3 +338,26 @@ def leave_east_gate(log):
         return False
     yield from settle_scene()
     return True
+
+
+def gold_gate_needs_payment():
+    name = game.my_name()
+    return (gate_payments.get(name) if name else None)
+
+
+
+def remember_gate_payment(needed):
+    name = game.my_name()
+    if name:
+        gate_payments[name] = needed
+
+
+
+def leave_city(log):
+    _w43 = past_east_gate()
+    result = yield from leave_east_gate(log) if _w43 else leave_lower_city(log)
+    return result
+
+
+
+gate_payments = {}

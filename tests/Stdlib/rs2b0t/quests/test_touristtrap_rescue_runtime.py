@@ -1068,7 +1068,7 @@ def food_withdrawal():
 test('configured food comes from the bank, or the quest waits for it', food_withdrawal)
 
 
-FULL_KIT = {ITEM.COINS: 1000, ITEM.PICKAXE: 1, ITEM.KEBAB: 16, ITEM.DESERT_SHIRT: 1, ITEM.DESERT_ROBE: 1, ITEM.DESERT_BOOTS: 1, 'Waterskin(4)': 4, ITEM.PASS: 1}
+FULL_KIT = {ITEM.COINS: 1000, ITEM.PICKAXE: 1, ITEM.KEBAB: 8, ITEM.DESERT_SHIRT: 1, ITEM.DESERT_ROBE: 1, ITEM.DESERT_BOOTS: 1, ITEM.PASS: 1}
 
 
 def kit_without(*names):
@@ -1086,12 +1086,12 @@ def preparation_order():
     expect(step(snap(inv=kit_without(ITEM.PICKAXE))).item).to_be(ITEM.PICKAXE)
     expect(step(snap(inv=kit_without(ITEM.PICKAXE), free=0)).kind).to_be('wait')
 
-    is_custom(step(snap(inv=kit_without(ITEM.KEBAB), free=16)), 'buy 16 Kebabs')
+    is_custom(step(snap(inv=kit_without(ITEM.KEBAB), free=16)), 'buy 8 Kebabs')
 
     expect(step(snap(inv=kit_without(ITEM.DESERT_SHIRT))).item).to_be(ITEM.DESERT_SHIRT)
     withdraws(step(snap(inv=kit_without(ITEM.DESERT_SHIRT), bank={ITEM.DESERT_SHIRT: 2})), ITEM.DESERT_SHIRT, 1)
     expect(step(snap(inv=kit_without(ITEM.DESERT_SHIRT), free=0)).kind).to_be('wait')
-    expect(step(snap(inv=kit_without('Waterskin(4)'))).item).to_be(ITEM.WATERSKIN)
+    expect(step(snap(inv=FULL_KIT))).to_be_null()
     expect(step(snap(inv=kit_without(ITEM.PASS))).item).to_be(ITEM.PASS)
     expect(step(snap(inv=FULL_KIT))).to_be_null()
 
@@ -1102,9 +1102,9 @@ test('preparation buys each thing in its order, from the bank first', preparatio
 def preparation_with_configured_food():
     quest_food.name = 'Trout'
     kit = kit_without(ITEM.KEBAB)
-    kit['Trout'] = 16
+    kit['Trout'] = 8
     expect(tt.preparation_acquisition_step(snap(inv=kit))).to_be_null()
-    withdraws(tt.preparation_acquisition_step(snap(inv=kit_without(ITEM.KEBAB), bank={'Trout': 20}, free=16)), 'Trout', 16)
+    withdraws(tt.preparation_acquisition_step(snap(inv=kit_without(ITEM.KEBAB), bank={'Trout': 20}, free=16)), 'Trout', 8)
 
 
 test('with food configured, preparation banks that rather than buying Kebabs', preparation_with_configured_food)
@@ -1208,7 +1208,7 @@ def survival_food():
     is_custom(src(snap(tile=CAMP)), 'leave the camp')
     is_custom(src(snap(tile=DESERT)), 'cross the Shantay Pass north')
     expect(src(snap(inv={'Trout': tt.FOOD_ENTRY_FLOOR}))).to_be_null()
-    withdraws(src(snap(inv={'Trout': 2}, bank={'Trout': 20}, free=14)), 'Trout', 14)
+    withdraws(src(snap(inv={'Trout': 2}, bank={'Trout': 20}, free=14)), 'Trout', 6)
 
 
 test('survival food is sourced from somewhere safe', survival_food)
@@ -1434,7 +1434,7 @@ test('every step kind has a label for the stuck-run dump', labels)
 
 
 def decide_branches():
-    water = {'Waterskin(4)': 4, ITEM.KEBAB: 16, ITEM.COINS: 1000}
+    water = {'Waterskin(4)': 4, ITEM.KEBAB: 8, ITEM.COINS: 1000}
 
     # Not started: preparation, then dress, then go south, then Irena.
     is_custom(tt.decide(snap(stage=STAGE.NOT_STARTED, inv=FULL_KIT)), 'wear the desert quest loadout')
@@ -1450,11 +1450,11 @@ def decide_branches():
 
 
     # Plans held, kit complete, in the tent: out first.
-    kit = {'Waterskin(4)': 4, ITEM.KEBAB: 16, ITEM.PLANS: 1, ITEM.BAR: 1, ITEM.HAMMER: 1, ITEM.FEATHER: 10}
+    kit = {'Waterskin(4)': 4, ITEM.KEBAB: 8, ITEM.PLANS: 1, ITEM.BAR: 1, ITEM.HAMMER: 1, ITEM.FEATHER: 10}
     is_custom(tt.decide(snap(tile=TENT, stage=STAGE.RETRIEVED_PLANS, inv=kit)), 'leave the prototype tent')
 
     # The pineapple is gone: south to Al Shabim, with water already in hand.
-    south_kit = {'Waterskin(4)': 4, ITEM.KEBAB: 16}
+    south_kit = {'Waterskin(4)': 4, ITEM.KEBAB: 8}
     step = tt.decide(snap(stage=STAGE.LEARNED_DARTS, inv=south_kit))
     expect(step.kind in ['buy', 'custom', 'scan_bank', 'withdraw']).to_be(True)
 

@@ -213,12 +213,12 @@ def _withdraw(step, log):
     for it in step.items:
         id = it.get('id')
         if id is None:
-            withdrawn = yield from bank.withdraw_x(it['name'], it['qty'])
+            withdrawn = yield from bank.withdraw_x(it.get('name'), it.get('qty'))
         else:
-            withdrawn = yield from bank.withdraw_x_by_id(id, it['qty'])
+            withdrawn = yield from bank.withdraw_x_by_id(id, it.get('qty'))
         if not withdrawn:
             exact = '' if id is None else f' (id {id})'
-            log(f"withdraw: '{it['name']}'{exact} x{it['qty']} failed")
+            log(f"withdraw: '{it.get('name')}'{exact} x{it.get('qty')} failed")
             ok = False
     if not step.leave_open:
         yield from modals.close()
@@ -247,6 +247,17 @@ def _deposit(step, log):
         yield from bank.deposit_all_matching(unkept)
         ok = yield from bank.backpack_ready(log=log)
         ok = ok and not any([unkept(item.name or '', item.id) for item in inventory.items()])
+    for cap in step.caps or []:
+        while ok and inventory.count_by_id(cap.id) > cap.qty:
+            before = inventory.count_by_id(cap.id)
+            items = [item for item in inventory.items() if item.id == cap.id]
+            ops = [op for op in items[0].actions() if op.lower().replace('-', ' ') == 'deposit 1'] if items else []
+            if not ops or not items[0].interact(ops[0]):
+                ok = False
+                break
+            ok = yield from execution.delay_until(lambda: inventory.count_by_id(cap.id) < before, 3000)
+            if ok:
+                ok = yield from bank.backpack_ready(log=log)
     if not ok:
         log('deposit: backpack contents did not confirm the deposit')
     if not step.leave_open:

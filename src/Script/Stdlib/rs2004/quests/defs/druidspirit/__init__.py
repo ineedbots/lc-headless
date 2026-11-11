@@ -8,7 +8,7 @@ from rs2004.quests.defs.fightarena.legs import wear_kit
 from rs2004.quests.defs.druidspirit.areas import BLOOM_MAX_COST, DREZEL, NS_HOPS, NS_ID, NS_STAGE, in_grotto
 from rs2004.quests.defs.druidspirit.camp import ask_to_help, bloom_with_scroll, feed_stones, journal_leg, mirror_leg, solve_puzzle, talk_filliman
 from rs2004.quests.defs.druidspirit.ghasts import bloom_with_sickle, fill_pouch, kill_ghast
-from rs2004.quests.defs.druidspirit.grotto import bless_sickle, enter_grotto, exit_after_quest, leave_grotto, recharge_prayer, talk_in_grotto
+from rs2004.quests.defs.druidspirit.grotto import bless_sickle, enter_grotto, exit_after_quest, leave_grotto, recharge_prayer, replace_pouch, talk_in_grotto
 from rs2004.quests.defs.druidspirit.journal import NS_FLAG, read_druid_progress
 from rs2004.quests.defs.druidspirit.supplies import NS_TOOLS, amulet, banked_id, held_id, sickle_step
 
@@ -93,7 +93,7 @@ def ghast_loop(snap):
                     'kind': 'withdraw',
                     'items': [{'name': 'Druid pouch', 'id': id, 'qty': (min(3, count) if id == NS_ID.POUCH else 1)}],
                 })
-        return Record({'kind': 'wait', 'reason': 'no Druid pouch held or banked'})
+        return custom('replace the druid pouch', replace_pouch)
     if harvest_held(snap) >= 3:
         return custom('fill the druid pouch', fill_pouch)
     # Why: only the bloom costs prayer (pouch fills and ghast kills are free), so the altar trip is taken here only.
@@ -139,7 +139,8 @@ def decide(snap):
         fetch = sickle_step(snap)
         return (outside(snap, fetch) if fetch else custom('hand over the sickle', lambda log: talk_in_grotto(THANKS, log)))
     elif stage in [NS_STAGE.BLESSED_SICKLE, NS_STAGE.CASTED_SICKLE_BLOOM, NS_STAGE.PICKED_SICKLE, NS_STAGE.ADDED_POUCH, NS_STAGE.KILLED_GHAST1, NS_STAGE.KILLED_GHAST2]:
-        return outside(snap, ghast_loop(snap))
+        step = ghast_loop(snap)
+        return (step if step.kind == 'custom' and step.run == replace_pouch else outside(snap, step))
     elif stage == NS_STAGE.KILLED_GHAST3:
         return custom('claim the reward', lambda log: talk_in_grotto(THANKS, log))
     else:

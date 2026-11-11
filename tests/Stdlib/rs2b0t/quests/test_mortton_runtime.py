@@ -708,34 +708,33 @@ test('the olive oil and a vial of serum are sanctified in the lit flame', sancti
 
 
 def builds_the_pyre():
-    place = Town(SM_TILE.TOWN)
-    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(False)
-    expect(place.logged('only 0 dose(s) of sacred oil')).to_be(True)
-    oil = place.hold(SM_ID.SACRED_OIL2, use_on=lambda other: False)
-    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(False)
-    expect(place.logged('no sacred oil vial or no logs')).to_be(True)
-    place.hold(SM_ID.LOGS)
-    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(False)
-    oil._fields['use_on'] = place.gives(SM_ID.PYRE_LOGS, SM_ID.LOGS)
-    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(True)
-
-    stage = [SM_LOC_ID.PYRE_EMPTY]
-
-    def use_on_loc(item_id, loc, prefer, expect_fn, log):
-        stage[0] = SM_LOC_ID.PYRE_LOGS if loc.id == SM_LOC_ID.PYRE_EMPTY else SM_LOC_ID.PYRE_BONES
-        place.locs = [Fake(id=stage[0], distance=lambda: 1, interact=lambda op: True)]
-        return expect_fn()
-        yield
-    spy_on(pyre, 'use_on_loc', impl=use_on_loc)
-    place.walk_ok = False
+    place = Town(SM_TILE.PYRE)
+    pyre.active_pyre = None
     expect(run_wait(pyre.stack_pyre(place.log))).to_be(False)
     expect(run_wait(pyre.lay_remains(place.log))).to_be(False)
-    place.walk_ok = True
+    empty = place.loc(SM_LOC_ID.PYRE_EMPTY, [])
+    logs = place.hold(SM_ID.PYRE_LOGS, use_on=lambda other: False)
+    expect(run_wait(pyre.stack_pyre(place.log))).to_be(False)
+    def stack(other):
+        place.drop(SM_ID.PYRE_LOGS)
+        place.locs = []
+        place.loc(SM_LOC_ID.PYRE_LOGS, [])
+        return True
+    logs._fields['use_on'] = stack
     expect(run_wait(pyre.stack_pyre(place.log))).to_be(True)
     expect(run_wait(pyre.stack_pyre(place.log))).to_be(True)
+    remains = place.hold(SM_ID.REMAINS, use_on=lambda other: False)
+    expect(run_wait(pyre.lay_remains(place.log))).to_be(False)
+    def lay(other):
+        place.drop(SM_ID.REMAINS)
+        place.locs = []
+        place.loc(SM_LOC_ID.PYRE_BONES, ['Light'])
+        return True
+    remains._fields['use_on'] = lay
     expect(run_wait(pyre.lay_remains(place.log))).to_be(True)
     expect(run_wait(pyre.lay_remains(place.log))).to_be(True)
-    expect(run_wait(pyre.at_pyres(place.log))).to_be(True)
+    pyre.active_pyre.expires = -1
+    expect(pyre.bodied_pyre()).to_be(None)
 
 
 test('sacred oil soaks the pyre logs, which are stacked on our own pyre before the remains are laid on them', builds_the_pyre)
@@ -743,27 +742,24 @@ test('sacred oil soaks the pyre logs, which are stacked on our own pyre before t
 
 def lights_the_pyre():
     place = Town(SM_TILE.PYRE)
+    pyre.active_pyre = None
     expect(run_wait(pyre.light_pyre(place.log))).to_be(False)
-    expect(place.logged('no tinderbox in the pack')).to_be(True)
     place.hold(SM_ID.TINDERBOX)
-    place.at = VARROCK
-    place.walk_ok = False
+    bodied = place.loc(SM_LOC_ID.PYRE_BONES, ['Light'], interact=lambda op: False)
     expect(run_wait(pyre.light_pyre(place.log))).to_be(False)
-    place.walk_ok = True
+    pyre.active_pyre = Record({'tile': place.at, 'expires': 999999999999999})
     expect(run_wait(pyre.light_pyre(place.log))).to_be(False)
-    expect(place.logged('no loaded funeral pyre in reach')).to_be(True)
-    bodied = Fake(id=SM_LOC_ID.PYRE_BONES, distance=lambda: 1, interact=lambda op: False)
-    place.locs = [bodied]
-    expect(run_wait(pyre.light_pyre(place.log))).to_be(False)
+    xp = [0]
+    spy_on(skills, 'xp', impl=lambda skill: xp[0])
     bodied._fields['interact'] = lambda op: True
     expect(run_wait(pyre.light_pyre(place.log))).to_be(False)
-    expect(place.logged('the funeral pyre never caught')).to_be(True)
-
+    expect(pyre.active_pyre is not None).to_be(True)
     def burn(op):
-        place.locs = []
+        xp[0] += 10
         return True
     bodied._fields['interact'] = burn
     expect(run_wait(pyre.light_pyre(place.log))).to_be(True)
+    expect(pyre.active_pyre).to_be(None)
 
 
 test('the funeral pyre is lit and the leg waits for it to revert once the reward has run', lights_the_pyre)
@@ -890,7 +886,7 @@ def decides_the_corners():
     expect(run_wait(step.run(place.log))).to_be(True)
     expect(dropped).to_equal([[SM_ID.REMAINS, 2]])
     flags = [f'{SM_FLAG.SANCTITY}:30', f'{SM_FLAG.REPAIRED}:100']
-    step = mortton.decide(ready_snap(SM_STAGE.CREATED_SACRED_OIL, {SM_ID.PYRE_LOGS: 0}, flags=flags))
+    step = mortton.decide(ready_snap(SM_STAGE.CREATED_SACRED_OIL, {SM_ID.PYRE_LOGS: 0, SM_ID.REMAINS: 1}, flags=flags))
     expect(step.name).to_be("buy from Razmire's general store")
     step = mortton.decide(ready_snap(SM_STAGE.REBUILD_TEMPLE, {SM_ID.HAMMER: 1}, free_slots=0))
     expect(step.reason).to_be('no pack room for building material')
@@ -932,3 +928,29 @@ def reads_the_journal():
 
 
 test("the journal reader carries the temple's meters as flags and keeps the last stage through a blanked read", reads_the_journal)
+
+
+def pyre_preconditions():
+    place = Town(SM_TILE.PYRE)
+    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(False)
+    place.hold(SM_ID.SACRED_OIL2, use_on=lambda target: False)
+    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(False)
+    place.hold(SM_ID.LOGS)
+    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(False)
+    place.pack[0].use_on = lambda target: place.hold(SM_ID.PYRE_LOGS) is not None
+    expect(run_wait(pyre.make_pyre_logs(place.log))).to_be(True)
+    place.pack = []
+    expect(run_wait(pyre.cremate_shade(place.log))).to_be(False)
+    place.hold(SM_ID.TINDERBOX)
+    place.hold(SM_ID.REMAINS)
+    spy_on(pyre, 'stack_pyre', impl=lambda log: result(False))
+    expect(run_wait(pyre.cremate_shade(place.log))).to_be(False)
+    spy_on(pyre, 'stack_pyre', impl=lambda log: result(True))
+    spy_on(pyre, 'lay_remains', impl=lambda log: result(True))
+    spy_on(pyre, 'light_pyre', impl=lambda log: result(True))
+    expect(run_wait(pyre.cremate_shade(place.log))).to_be(True)
+    spy_on(event_signal, 'pending', returns=True)
+    expect(run_wait(pyre.cremate_shade(place.log))).to_be(False)
+
+
+test('pyre preparation requires oil, logs, remains and an uninterrupted funeral sequence', pyre_preconditions)

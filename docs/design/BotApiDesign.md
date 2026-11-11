@@ -606,7 +606,9 @@ describe the public behavior.
 The original parity baseline was upstream `4417d0b7`. A later selective review covered `32d52004`
 through `8b7db422`, including quest recovery, Cosmic/JiveRC, multilocs, three-tick fly fishing,
 MuleCrafter meeting/banking modes, MuleDepot and WildyAgility retry timing. This is a pinned scope,
-not a claim about upstream's current tip. Upstream code/data are MIT licensed; retain provenance and
+not a claim about upstream's current tip. The [2026-11-11 review](Rs2b0tUpstreamReview.md) extends the
+pinned endpoint to `95175bcc` and also inventories the local fork through `af3235b4`.
+Upstream code/data are MIT licensed; retain provenance and
 the notice in `thirdparty/rs2b0t/LICENSE` when porting. Later upstream review is [#29](https://github.com/ineedbots/lc-headless/issues/29).
 
 ### Porting tools

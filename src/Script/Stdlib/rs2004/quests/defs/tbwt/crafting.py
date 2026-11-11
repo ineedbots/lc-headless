@@ -6,12 +6,12 @@ from rs2004.catalogs.record import Record
 from rs2004.catalogs.tables import CANT_LIGHT
 from rs2004.catalogs.tasks import sustain
 from rs2004.entities import ground_items, locs, npcs
-from rs2004.game import game
+from rs2004.game import game, skills
 from rs2004.geometry import Tile
 from rs2004.items import inventory
 from rs2004.messages import game_messages
 from rs2004.quests.defs.tbwt.areas import TB_ID, TB_LOC, TB_NAME, TB_NPC, TB_TILE
-from rs2004.quests.defs.tbwt.supplies import food_names
+from rs2004.quests.defs.tbwt.loadout import food_forms_for_quest
 from rs2004.quests.defs.tbwt.talk import walk_to
 from rs2004.quests.exec.prompts import settle_scene, use_on_loc
 from rs2004.trade import shop
@@ -44,7 +44,7 @@ def held_any(ids):
 
 
 def food_held():
-    return sum([inventory.count(name) for name in food_names()])
+    return sum([inventory.count(name) for name in food_forms_for_quest()])
 
 
 def quiet(message):
@@ -69,8 +69,13 @@ def fish_karambwanji(want):
     """Net Karambwanji until the pack holds `want` of them, or has no room left."""
 
     def _fn3(log):
+        if want <= 0:
+            return False
         if held_id(TB_ID.RAW_KARAMBWANJI) >= want:
             return True
+        if inventory.free() < 1:
+            log('Karambwanji catch needs a free inventory slot')
+            return False
         _w4 = yield from walk_to(TB_TILE.KARAMBWANJI_SHOAL, 5, log)
         if not (_w4):
             return False
@@ -93,7 +98,7 @@ def fish_karambwanji(want):
             if not (spot.interact('Net')):
                 return False
             yield from execution.delay_until(lambda: held_id(TB_ID.RAW_KARAMBWANJI) > before, 20000)
-        return held_id(TB_ID.RAW_KARAMBWANJI) > 0
+        return held_id(TB_ID.RAW_KARAMBWANJI) >= want
     return _fn3
 
 
@@ -105,6 +110,12 @@ def fish_karambwan(want=2):
         target = want
         if held_id(TB_ID.RAW_KARAMBWAN) >= target:
             return True
+        if skills.level('fishing') < 65:
+            log('replacement Karambwan requires 65 Fishing')
+            return False
+        if inventory.free() < 1:
+            log('Karambwan catch needs a free inventory slot')
+            return False
         _w6 = yield from walk_to(TB_TILE.KARAMBWAN_SHOAL, 5, log)
         if not (_w6):
             return False
@@ -119,6 +130,9 @@ def fish_karambwan(want=2):
                 _c7 = not (_w8)
             if _c7:
                 break
+            if inventory.free() < 1:
+                log('Karambwan catch needs a free inventory slot')
+                return False
             spot = npcs.query().name(TB_NPC.FISHING_SPOT).action('Fish').within(8).nearest()
             if not spot:
                 log("no Karambwan shoal in reach of Lubufu's stand")
@@ -300,3 +314,5 @@ def burn_jogre_bones(log):
         return False
     _result20 = yield from take_ground([TB_ID.BURNT_JOGRE_BONES], TB_NAME.BURNT_JOGRE_BONES, log)
     return _result20
+
+from rs2004.quests.defs.tbwt.loadout import food_forms_for_quest

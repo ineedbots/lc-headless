@@ -972,7 +972,9 @@ class _RunManager:
     def policy(self) -> tuple[bool, int]: ...
 
 run_manager: _RunManager
-def send_bot_message(username: str, message: Any) -> bool: ...
+def send_bot_message(username: str, message: Any) -> bool:
+    """Send to an account in this process, or '*' to every other account."""
+    ...
 
 # The side tabs
 

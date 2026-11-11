@@ -146,6 +146,7 @@ def _gather_cabbage(snap, need=1):
 
 
 blackknight = QuestModule(
+    auto_retaliate=False,
     record=quest_record('blackknight'),
     bank=Tile(2946, 3369, 0),
     grind=['black knight', 'aggressive black knight'],

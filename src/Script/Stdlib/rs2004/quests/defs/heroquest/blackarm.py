@@ -232,6 +232,7 @@ def blackarm_armband_step(snap, stage):
             })
         return Record({
             'kind': 'custom',
+            'cooperative': True,
             'name': 'lure Grip to the arrow slit for the rival',
             'run': lure_grip_and_take_keyring,
         })

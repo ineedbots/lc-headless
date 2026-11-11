@@ -168,6 +168,7 @@ def decide(snap):
 
 
 horror = QuestModule(**{
+    'auto_retaliate': False,
     'record': quest_record('horror'),
     'pray': Record({'protect': 'melee', 'potions': 2}),
     'bank': 'nearest',

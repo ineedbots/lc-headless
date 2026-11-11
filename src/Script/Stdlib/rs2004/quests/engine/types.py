@@ -161,7 +161,9 @@ class QuestModule:
     # on its instance.
     def __init__(self, record=None, decide=None, on_start=None, hops=None, bank=None, grind=None, food=None, gather=None,
                  tools=None, exit=None, owns_inventory=False, food_ready=None, read_stage=None, read_progress=None,
-                 sustain=None, pray=None, coin_float=None, warn_readiness=None, observe=None, resume_at=None, recover=None):
+                 sustain=None, pray=None, coin_float=None, warn_readiness=None, observe=None, resume_at=None, recover=None,
+                 auto_retaliate=None):
+        self.auto_retaliate = auto_retaliate
         self.record = record
         self.decide = decide
         self.on_start = on_start

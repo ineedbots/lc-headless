@@ -95,7 +95,7 @@ def prerequisite_combat(s, objective, memory, random, levels):
 
 def select_method(s, objective, memory, random):
     from bots.account_leveler.dragons import dragon_food_levels, dragon_prayer, dragon_ready, dragon_supply_levels, next_dragon_quest
-    if objective in ['attack', 'strength', 'defence', 'prayer'] and s.levels.get(objective) < s.target:
+    if s.allow_quests != False and objective in ['attack', 'strength', 'defence', 'prayer'] and s.levels.get(objective) < s.target:
         quest = next_dragon_quest(s, memory)
         if quest or objective == 'prayer' and dragon_ready(s) and stock_of(s, 'Dragonfire shield') > 0:
             levels = dragon_food_levels(s)
@@ -210,6 +210,8 @@ def select_method(s, objective, memory, random):
         return Record(_merged7)
     elif objective == 'herblore':
         if not s.quests.get('Druidic Ritual'):
+            if s.allow_quests == False:
+                return None
             levels = Record({'attack': 20, 'strength': 20, 'defence': 20, 'hitpoints': 25})
             if any([s.levels.get(skill) < level for skill, level in list(levels.items())]):
                 return prerequisite_combat(s, objective, memory, random, levels)
@@ -218,6 +220,8 @@ def select_method(s, objective, memory, random):
         recipe = (_v9 if _v9 is not None else POTIONS[0])
         return activity(objective, f"make-{recipe.herb.lower().replace(' ', '-')}-potions", 'PotionMaker', Record({'herb': recipe.herb, 'secondary': recipe.secondary}), [banked(recipe.herb, 14), banked('Vial of water', 14), banked(recipe.secondary, 14)])
     elif objective == 'runecraft':
+        if s.allow_quests == False and not s.quests.get('Rune Mysteries Quest'):
+            return None
         if not s.quests.get('Rune Mysteries Quest'):
             return quest_plan(s, objective, 'runemysteries', 'Rune Mysteries Quest')
         return activity(objective, 'craft-air-runes', 'RuneCrafter', Record({'rune': 'Air runes', 'mode': 'Solo'}), [tool('Air talisman'), banked('Rune essence', 27)])
@@ -310,9 +314,9 @@ def producer(s, objective, need, memory, random):
         food = food_for(s)
         plan = activity(objective, 'pickpocket-paladins', 'Thiever', Record({'target': 'Paladin', 'action': 'Pickpocket', 'banking': 'Auto', 'food': food, 'food_withdraw': 12, 'suicide': False, 'loadout': ''}), [Record({'item': food, 'count': 24, 'carry': 12})])
         plan['food'] = food
-    elif _case16 in ['shrimps', 'trout', 'salmon', 'lobster']:
+    elif _case16 in ['shrimps', 'trout', 'salmon', 'lobster', 'shark']:
         plan = (cook_plan(s, objective, need.item) if s.levels.get('cooking') >= ([f for f in FISH if f.food.lower() == need.item.lower()] or [None])[0].cooking else None)
-    elif _case16 in ['raw shrimps', 'raw trout', 'raw salmon', 'raw lobster']:
+    elif _case16 in ['raw shrimps', 'raw trout', 'raw salmon', 'raw lobster', 'raw shark']:
         fish = ([f for f in FISH if f'raw {f.food.lower()}' == need.item.lower()] or [None])[0]
         plan = (fish_plan(s, objective, need.item) if s.levels.get('fishing') >= fish.level else None)
     elif _case16 in ['logs', 'oak logs', 'willow logs']:
