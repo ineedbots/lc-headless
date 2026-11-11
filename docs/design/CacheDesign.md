@@ -1412,8 +1412,17 @@ currently visible child; packets retain the base loc identity. A varp update ref
 shown. A hidden child disappears from queries; a retained snapshot becomes invalid after a child change.
 Older revision decoders retain their own formats and reject unsupported opcode 77.
 
-Current tests use synthetic decoded fixtures: the local 289 cache used for acceptance has varbit
-definitions but no multiloc loc definitions. Real-content validation remains in
+The local acceptance cache at `data/cache` has 5,116 loc definitions and varbit definitions, but no
+opcode-77 loc definitions, so it cannot exercise a real transition. The cache is gitignored; its
+`main_file_cache.dat` SHA-256 at validation was
+`81140509371B8ADEBD21407F52B1618C88A00D81913374392C5E4C7E89273CD6`. This fingerprints only the
+data file, not the complete cache or its upstream source, so it does not establish cache provenance.
+The real-cache reference test passed for revision 289 and skipped revisions 225 and 274 because their
+cache paths were unset. The 289 test confirmed varbits load; with no multilocs, its reference loop had
+no records to inspect. Selectors, visible and hidden children, collision updates, packet identity and
+stale snapshots therefore remain covered only by synthetic fixtures. Completing live validation
+requires a revision-289 cache with opcode-77 locs and recording its source plus each tested base loc,
+varbit/varp selector and child IDs. This dependency is tracked in
 [#33](https://github.com/ineedbots/lc-headless/issues/33). The Python player/NPC snapshots also expose
 raw `animation_id` and `animation_tick`, including repeated sequence starts; the existing `animation`
 property retains its expiry behavior. Fisher uses the raw fields for tick timing.
