@@ -8,9 +8,10 @@ from bots.rangingguild.logic import ARCHERY_TICKET, BOWS, BRONZE_ARROW, BRONZE_A
 from bots.rangingguild.logic import JUDGE_PREFS, JUDGE_STAND, MERCHANT, MERCHANT_STAND, RANGED_REQUIRED, RUNE_ARROW, RUNE_ARROWS_PER_TRADE
 from bots.rangingguild.logic import SEERS_BANK, SHOTS_PER_ROUND, STAND, TARGET, TICKET_NAME, TICKETS_PER_RUNE_ARROWS, VARP_TARGET_COUNT
 from bots.rangingguild.logic import VARP_TARGET_HIT, VARP_TARGET_SCORE, WorldView, best_bow, classify_shot, decide, hit_label, hit_points
-from bots.rangingguild.logic import is_bow, pick_option
+from bots.rangingguild.logic import is_bow, pick_option, ARROW_RESTOCK_FEE
 
 SETTINGS = {
+    'coins_reserve': SettingDef('number', 0, 'Coins to keep', 0, 1000000, help='Keep this many coins across the backpack and bank'),
     'coins_per_trip': SettingDef('number', 10000, 'Coins per bank trip', ENTRY_FEE, 1000000,
                                  help='200 coins buys a round of ten shots; the bot banks for more when the pack runs dry'),
 }
@@ -89,6 +90,7 @@ class RangingGuild(LoopingBot):
         self.recoveries = 0
         self.pending_recovery = None
         self.bank_fails = 0
+        self.banked_coins = 0
         yield from execution.delay_until(lambda: game.ingame() and game.tile() is not None, 0)
         self.started_at = time.time()
         self.xp_start = skills.xp('ranged')
@@ -145,12 +147,15 @@ class RangingGuild(LoopingBot):
     def coins_per_trip(self):
         return self.settings.num('coins_per_trip', 10000)
 
+    def coins_reserve(self):
+        return max(0, self.settings.num('coins_reserve', 0))
+
     def view(self):
         worn = equipment.items()
         return WorldView(
             target_count=reader.varp(VARP_TARGET_COUNT),
             tickets=inventory.count_by_id(ARCHERY_TICKET),
-            coins=inventory.count_by_id(COINS),
+            coins=max(0, inventory.count_by_id(COINS) - max(0, self.coins_reserve() - self.banked_coins)),
             bow_worn=len([i for i in worn if is_bow(i.name)]) > 0,
             bow_held=len([i for i in inventory.items() if is_bow(i.name)]) > 0,
             bronze_worn=sum([i.count for i in worn if i.id == BRONZE_ARROW]),
@@ -166,6 +171,9 @@ class RangingGuild(LoopingBot):
         yield from self.drain_chat()
 
     def enter(self):
+        if self.view().coins < ENTRY_FEE:
+            yield from self.bank_trip()
+            return
         self.status = 'paying the judge'
         opened = yield from self.open_judge()
         if not opened:
@@ -179,6 +187,9 @@ class RangingGuild(LoopingBot):
         self.log(f'paid {ENTRY_FEE} coins for a round of {SHOTS_PER_ROUND} ({inventory.count_by_id(COINS)} coins left)')
 
     def restock_arrows(self):
+        if self.view().coins < ARROW_RESTOCK_FEE:
+            yield from self.bank_trip()
+            return
         self.status = 'buying arrows from the judge'
         opened = yield from self.open_judge()
         if not opened:
@@ -358,7 +369,7 @@ class RangingGuild(LoopingBot):
         if not opened:
             self.bank_fails += 1
             if self.bank_fails >= MAX_BANK_FAILS:
-                self.stop('could not open the Seers bank')
+                self.stop('could not open the Seers bank', True)
                 return
             self.log('could not open the bank, will retry')
             return
@@ -374,7 +385,7 @@ class RangingGuild(LoopingBot):
         if not view.bow_worn and not view.bow_held:
             bow = best_bow(skills.level('ranged'), lambda name: bank.count(name) > 0)
             if bow is None:
-                self.stop('no bow held, worn or banked')
+                self.stop('no bow held, worn or banked', True)
                 return
             if not bank.withdraw(bow):
                 self.fail(f'could not withdraw the {bow}')
@@ -382,15 +393,20 @@ class RangingGuild(LoopingBot):
             self.log(f'withdrew a {bow}')
         want = self.coins_per_trip() - inventory.count_by_id(COINS)
         banked = bank.count_by_id(COINS)
-        if want > 0 and banked > 0:
-            taken = min(want, banked)
+        self.banked_coins = banked
+        available = max(0, banked - self.coins_reserve())
+        if want > 0 and available > 0:
+            taken = min(want, available)
             ok = yield from bank.withdraw_x_by_id(COINS, taken)
             if not ok:
                 self.fail('could not withdraw coins')
                 return
             yield from execution.delay_ticks(1)
+            self.banked_coins = bank.count_by_id(COINS)
             self.log(f'withdrew {taken} coins ({banked - taken} left in the bank)')
-        if inventory.count_by_id(COINS) < ENTRY_FEE and inventory.count_by_id(ARCHERY_TICKET) < TICKETS_PER_RUNE_ARROWS:
+        ready = self.view()
+        fee = (0 if ready.bronze_held + ready.bronze_worn > 0 else ARROW_RESTOCK_FEE) if 1 <= ready.target_count <= SHOTS_PER_ROUND else ENTRY_FEE
+        if ready.coins < fee and ready.tickets < TICKETS_PER_RUNE_ARROWS:
             self.stop(f'out of coins, {inventory.count_by_id(ARCHERY_TICKET)} tickets held, {self.arrows_bought} rune arrows bought')
 
     def progress(self):
@@ -409,7 +425,7 @@ class RangingGuild(LoopingBot):
     def recover(self, message):
         self.recoveries += 1
         if self.recoveries > MAX_RECOVERIES:
-            self.stop(f'gave up after {MAX_RECOVERIES} recoveries: {message}')
+            self.stop(f'gave up after {MAX_RECOVERIES} recoveries: {message}', True)
             return
         self.status = f'recovering ({self.recoveries}/{MAX_RECOVERIES})'
         self.log(f'recovering after {MAX_FAILURES} failures ({self.recoveries}/{MAX_RECOVERIES}): {message}')
@@ -418,7 +434,9 @@ class RangingGuild(LoopingBot):
         yield from self.walk_to(STAND, 1)
         self.failures = 0
 
-    def stop(self, reason):
+    def stop(self, reason, failed=False):
+        if self.delegated and failed:
+            raise RuntimeError(f'RangingGuild: {reason}')
         self.status = f'stopped: {reason}'
         self.request_finish(f'RangingGuild: {reason}')
 

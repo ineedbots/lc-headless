@@ -90,7 +90,7 @@ class TabWorld(PatchWorld):
             elif id == 1:
                 self.values[tabs.ATTACKSTYLE_MAGIC_VARP] = (0 if tabs.autocast.armed() else tabs.AUTOCAST_ARMED)
             elif id == 2:
-                self.values[tabs.SA_ARMED_VARP] = 1
+                self.values[tabs.SA_ARMED_VARP] = 1 - self.values.get(tabs.SA_ARMED_VARP, 0)
             elif id == 50:
                 self.main = 600
             elif 20 <= id < 35:
@@ -165,6 +165,19 @@ def test_quest_lookup_refreshes_when_its_tab_loads_or_changes():
         world.components[301][0].text = '@gre@Renamed quest'
         assert journal.status("Doric's Quest") == 'unknown'
         assert journal.status('renamed quest') == 'in_progress'
+
+
+def test_special_disarms_once_and_reports_rejected_or_silent_server():
+    for outcome in ['success', 'rejected', 'silent', 'missing']:
+        with TabWorld() as world:
+            world.values[tabs.SA_ARMED_VARP] = 1
+            world.accept = outcome != 'rejected'
+            world.arrives = outcome != 'silent'
+            if outcome == 'missing':
+                world.components[100] = []
+            assert world.run(tabs.special.disarm()) == (outcome == 'success')
+            if outcome == 'success':
+                assert world.run(tabs.special.disarm()) and world.clicks == [2]
 
 
 def test_special_arms_once_and_reports_rejected_or_silent_server():

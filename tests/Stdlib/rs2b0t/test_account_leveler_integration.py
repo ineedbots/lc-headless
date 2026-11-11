@@ -6,6 +6,8 @@ from bots.account_leveler.methods import method_for, producer
 from bots.account_leveler.offers import supply_offer
 from bots.account_leveler.combat import COMBAT_CAMPS, combat_plan
 from bots.account_leveler.session import LevelerSession
+from bots.account_leveler.types import requirement_key, stock_of
+from bots.account_leveler.combat_progression import TARGET_TIERS
 
 def snapshot(level=1):
     return Record({'levels': {_k: _v for _k, _v in [[s, (max(10, level) if s == 'hitpoints' else level)] for s in enabled_skills]}, 'stock': Record({'coins': 100000}), 'bank_ready': True, 'quests': Record({}), 'target': 40, 'wilderness': True, 'now': 1000})
@@ -21,7 +23,7 @@ def validate(plan, s):
             for chosen in (value if isinstance(value, list) else [value]):
                 expect(def_.options, f'{plan.script}.{key}={chosen}').to_contain(chosen)
     for need in plan.needs:
-        if need.item == 'Coins':
+        if need.item == 'Coins' or stock_of(s, requirement_key(need)) >= need.count:
             continue
         expect(supply_offer(need.item) or producer(s, plan.objective, need, empty_memory(), lambda: 0), need.item).to_be_truthy()
 
@@ -43,16 +45,26 @@ def _fn2(*_args):
 test('every training adapter uses an installed script and supported settings', _fn2)
 
 def _fn3(*_args):
-    s = snapshot(39)
+    s = snapshot(80)
+    for camp in COMBAT_CAMPS:
+        for quest in camp.quests or []:
+            s.quests[quest] = True
+    for item in ['climbing boots', 'dusty key', 'dragonfire shield']:
+        s.stock[item] = 1
     for camp in COMBAT_CAMPS:
         memory = empty_memory()
         memory.cooldowns = {_k: _v for _k, _v in [[c.id, s.now + 60000] for c in [c for c in COMBAT_CAMPS if c.id != camp.id]]}
         for objective in ['attack', 'ranged', 'magic']:
             plan = combat_plan(s, objective, memory, lambda: 0)
+            style = 'melee' if objective == 'attack' else ('range' if objective == 'ranged' else 'mage')
+            tier = camp.training_tier or TARGET_TIERS.get(camp.target, 0)
+            if (objective == 'ranged' and tier > 2) or (camp.styles and style not in camp.styles):
+                expect(plan, camp.id).to_be_null()
+                continue
             expect((plan.id if plan is not None else None), camp.id).to_be(camp.id)
             if plan:
                 validate(plan, s)
-test('every eligible combat camp has a valid adapter for all three combat styles', _fn3)
+test('every eligible combat camp has a valid adapter for its supported combat styles', _fn3)
 
 def _fn4(*_args):
     s = snapshot()

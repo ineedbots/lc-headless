@@ -1,5 +1,8 @@
-from rs2004.geometry import Tile
 """Ported from rs2b0t's src/bot/scripts/AccountLeveler/dragons.ts (MIT, see thirdparty/rs2b0t)."""
+from rs2004.catalogs._drops import DROP_DB
+from bots.account_leveler.loot import SECONDARY_LOOT
+from rs2004.geometry import Tile
+
 
 import math
 from bots.account_leveler.record import Record
@@ -84,11 +87,11 @@ def dragon_prayer(s, memory, random):
         'food': 'Lobster',
         'food_withdraw': 20,
         'use_potions': False,
-        'use_special': False,
+        'use_special': True,
         'bury_bones': True,
         'solve_clues': False,
         'bank_common_junk': False,
-        'loot': ['Dragon bones', 'Dragonhide'],
+        'loot': ['Dragon bones', 'Dragonhide'] + [item for item in DROP_DB['Green dragon' if green else 'Blue dragon'] if item in SECONDARY_LOOT],
     }.items():
         _merged5[_k] = _v
     for _k, _v in (((Record({'escape': 'Flee to bank'}) if green else Record({'site': 'taverley-blue', 'leave_via': 'walk'})))._fields if isinstance(((Record({'escape': 'Flee to bank'}) if green else Record({'site': 'taverley-blue', 'leave_via': 'walk'}))), Record) else ((Record({'escape': 'Flee to bank'}) if green else Record({'site': 'taverley-blue', 'leave_via': 'walk'})))).items():

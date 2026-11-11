@@ -631,6 +631,11 @@ The data comes from rs2b0t through `tools/catalogs/export_rs2b0t.ts`, run with B
 | Herblore | RoguesPurse | `rogues_purse.py`, with `bots/roguespurse/logic.py`: searches, identifies and drops herbs by default; `mode=bank` banks full loads. Requires Herblore 3 and Jungle Potion at the Rogues purse stage |
 | Event looting | WanderLooter | `wander_looter.py`, its logic and tasks in `bots/wanderlooter/`: wanders and picks up drops by exact name (Pumpkin by default), without fighting, and leaves alone drops where it took damage |
 
+AutoFighter's `travel_coins` and `travel_items` settings retain and replenish fares and
+one of each travel item at bank visits. `bury_baby_dragon_bones` enables looting and
+burying unnoted Babydragon bones. RangingGuild's `coins_reserve` keeps a minimum coin
+balance across the backpack and bank. These options also support AccountLeveler trips.
+
 `scripts/examples/aio_thiever.py` joins three of them, ThievingBot, ArdyCakes and ArdyThiever, into one that trains Thieving from 1: Lumbridge's men and women to 5, East Ardougne's Baker's stall to 40, then the market's guards to 55 and its knights after that, eating the cakes it banked.
 
 ## Bot feature settings

@@ -14,8 +14,12 @@ def travel_food(s):
     return ([food for food in ['Lobster', 'Salmon', 'Trout', 'Shrimps'] if stock_of(s, food) >= 12] or [None])[0]
 
 
+def members_travel_ready(s):
+    return all([s.levels.get(skill) >= 20 for skill in ['attack', 'strength', 'defence']]) and s.levels.get('hitpoints') >= 25 and stock_of(s, 'Coins') >= 200
+
+
 def members_ready(s):
-    return all([s.levels.get(skill) >= 20 for skill in ['attack', 'strength', 'defence']]) and s.levels.get('hitpoints') >= 25 and stock_of(s, 'Coins') >= 200 and travel_food(s) is not None
+    return members_travel_ready(s) and travel_food(s) is not None
 
 
 def gather(name, locations, members=False):
@@ -146,7 +150,8 @@ def locate_method(s, input, memory, random):
         }.items():
             _merged5[_k] = _v
         return Record(_merged5)
-    ready = can_steal_chaos(s) if input.settings.get('target') == 'Paladin' else members_ready(s)
+    prepare_food = input.script == 'Fisher' and input.settings.get('fish_method') in ['Lobster cage — lobster', 'Harpoon — sharks'] and members_travel_ready(s)
+    ready = can_steal_chaos(s) if input.settings.get('target') == 'Paladin' else members_ready(s) or prepare_food
     _merged6 = {}
     for _k, _v in (input.settings._fields if isinstance(input.settings, Record) else input.settings).items():
         _merged6[_k] = _v
@@ -192,4 +197,4 @@ def locate_method(s, input, memory, random):
     }.items():
         _merged11[_k] = _v
     located = Record(_merged11)
-    return (transit(located, plan.food or travel_food(s)) if stock_of(s, 'Coins') >= 200 else located)
+    return (transit(located, plan.food or travel_food(s) or ('Shrimps' if prepare_food else None)) if stock_of(s, 'Coins') >= 200 else located)

@@ -5,7 +5,7 @@ from bots.account_leveler.record import Record
 __all__ = ['uses_activity_cooldown', 'LevelerSession']
 
 def uses_activity_cooldown(plan):
-    return plan.combat == True or not not plan.quest
+    return plan.combat == True or not not plan.quest or plan.script == 'RangingGuild'
 
 
 class LevelerSession:

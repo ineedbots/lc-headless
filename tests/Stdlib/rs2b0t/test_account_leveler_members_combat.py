@@ -179,6 +179,9 @@ test_each(['#199', 'Air talisman', 'Cow hide'])('region rotation keeps %s produc
 def _fn15(objective, *_args):
     baseline = combat_plan(snapshot(), objective, isolate('lumbridge-chickens'), lambda: 0)
     for id, ids in members:
+        if objective == 'ranged' and id == 'taverley-surface-druids':
+            expect(combat_plan(snapshot(), objective, isolate(id), lambda: 0)).to_be_null()
+            continue
         plan = combat_plan(snapshot(), objective, isolate(id), lambda: 0)
         expect([need for need in ((plan.needs if plan is not None else None)) if need.item != 'Coins'], id).to_equal([need for need in baseline.needs if need.item != 'Coins'])
         expect(((plan.settings if plan is not None else None)).get('combat_style')).to_be(baseline.settings.get('combat_style'))

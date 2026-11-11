@@ -48,6 +48,18 @@ Dragon progression checks food, armour, Prayer and quest readiness. It can prepa
 Druidic Ritual and Dragon Slayer, collect Paladin chaos runes, and buy dragon weapons after
 Lost City using the Zanaris bank, diamond gate and an escape route.
 
+Combat camps progress through tougher surface and dungeon targets as stats improve.
+Quest, skill, food, tool and fare requirements gate each camp; Wilderness camps still
+require `wilderness=true`. Dungeon trips retain and restock their travel coins and tools.
+Baby blue dragons require a Dusty key and Dragonfire shield, and their bones are buried.
+Combat loot includes herbs, potion secondaries and runes for later supply preparation.
+Eligible melee and ranged weapons use their special attacks.
+
+At Ranged 40, an affordable Ranging Guild session takes priority over ordinary combat.
+It keeps a shopping coin reserve across the pack and bank; a failed guild activity enters
+the same persistent cooldown as other failed combat routes. Ranged combat stays at the
+lower two camp tiers. Lobster and shark fishing can prepare travel food before departure.
+
 A parent tick observes XP and bank changes even while a child is waiting. Sessions end at
 their skill, stock, quest or duration goal; failures retain actionable shortages, back off
 preparation, and cool down failed combat routes. Death interrupts the child and replans.

@@ -277,6 +277,15 @@ class _Special:
                 return component.id
         return -1
 
+    def disarm(self):
+        if not self.armed():
+            return True
+        bar = self.bar_component()
+        if bar == -1 or not _core.click_component(bar):
+            return False
+        disarmed = yield from execution.delay_until_ticks(lambda: not self.armed(), ARM_TICKS)
+        return disarmed
+
     def arm(self):
         """Arms the next attack; an armed one is left alone. Use with yield from."""
         if self.armed():

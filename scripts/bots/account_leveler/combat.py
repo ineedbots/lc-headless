@@ -3,8 +3,6 @@
 import math
 from bots.account_leveler.record import Record
 
-from rs2004.geometry import Tile
-
 __all__ = ['COMBAT_CAMPS', 'scimitar_for', 'food_for', 'combat_plan']
 
 from bots.account_leveler.equipment import melee_equipment, ranged_bow
@@ -13,6 +11,10 @@ from bots.account_leveler.catalog import can_catch, consumable_batch, FISH
 from bots.account_leveler.magic import magic_equipment
 from bots.account_leveler.combat_progression import combat_level, TARGET_TIERS, training_tier
 from bots.account_leveler.training_camps import TRAINING_CAMPS
+from bots.account_leveler.advanced_camps import ADVANCED_CAMPS
+from bots.account_leveler.loot import SECONDARY_LOOT
+from bots.account_leveler.types import requirement_key, stock_of
+
 COMBAT_CAMPS = [Record({
     'id': 'lumbridge-chickens',
     'region': 'lumbridge',
@@ -562,7 +564,7 @@ COMBAT_CAMPS = [Record({
     'offence': 20,
     'defence': 20,
     'wilderness': True,
-})] + list(TRAINING_CAMPS)
+})] + list(TRAINING_CAMPS) + list(ADVANCED_CAMPS)
 
 
 def scimitar_for(attack):
@@ -580,16 +582,39 @@ def food_for(s):
     return ('Trout' if s.levels.get('cooking') >= 15 and (((s.stock.get('raw trout') if s.stock.get('raw trout') is not None else 0)) >= 28 or can_catch(s, FISH[1])) else 'Shrimps')
 
 
+def supply_cost(s, camp):
+    cost = 0
+    for need in (camp.supplies if camp.supplies is not None else []):
+        missing = need.count - stock_of(s, requirement_key(need))
+        if missing <= 0:
+            continue
+        if ((need.item.lower() in s.unavailable_items) if s.unavailable_items is not None else None):
+            return float('inf')
+        offer = supply_offer(need.item)
+        if not offer:
+            return float('inf')
+        cost += purchase_budget(offer, missing)
+    return cost
+
+
+def can_supply_food(s, food=None):
+    if not food or stock_of(s, food) >= 24:
+        return True
+    fish = ([fish for fish in FISH if fish.food == food] or [None])[0]
+    return not not fish and s.levels.get('cooking') >= fish.cooking and (stock_of(s, f'Raw {food}') >= 28 or can_catch(s, fish))
+
+
 def combat_plan(s, objective, memory, random, resource=None):
     style = ('mage' if objective == 'magic' else ('range' if objective == 'ranged' else 'melee'))
     offence = (s.levels.get('magic') if style == 'mage' else (s.levels.get('ranged') if style == 'range' else min(s.levels.get('attack'), s.levels.get('strength'))))
     level = combat_level(s.levels)
     death_walk = style == 'melee' and level < 15
-    camps = [c for c in COMBAT_CAMPS if s.levels.get('hitpoints') >= c.hp and offence >= c.offence and s.levels.get('defence') >= c.defence and level >= ((c.min_combat if c.min_combat is not None else 0)) and (not death_walk or c.offence <= 15 and c.defence <= 15 and c.x >= 2840 and c.z < 3520 and not c.wilderness) and (c.x >= 2840 or ((s.stock.get('coins') if s.stock.get('coins') is not None else 0)) >= 200) and (not c.wilderness or s.wilderness) and ((memory.cooldowns.get(c.id) if memory.cooldowns.get(c.id) is not None else 0)) <= s.now and (resource != '#199' or c.herbs) and (resource != 'Air talisman' or c.talisman) and (resource != 'Cow hide' or c.target == 'Cow')]
-    if level >= 15 and not resource and len(camps):
-        def tier(camp):
-            return ((camp.training_tier if camp.training_tier is not None else TARGET_TIERS.get(camp.target)) if (camp.training_tier if camp.training_tier is not None else TARGET_TIERS.get(camp.target)) is not None else 0)
 
+    def tier(camp):
+        return ((camp.training_tier if camp.training_tier is not None else TARGET_TIERS.get(camp.target)) if (camp.training_tier if camp.training_tier is not None else TARGET_TIERS.get(camp.target)) is not None else 0)
+
+    camps = [c for c in COMBAT_CAMPS if s.levels.get('hitpoints') >= c.hp and offence >= c.offence and s.levels.get('defence') >= c.defence and level >= ((c.min_combat if c.min_combat is not None else 0)) and (not c.styles or (style in c.styles)) and (style != 'range' or tier(c) <= 2) and all([s.quests.get(quest) for quest in ((c.quests if c.quests is not None else []))]) and all([((s.levels.get(skill) if s.levels.get(skill) is not None else 1)) >= required for skill, required in list((c.skills if c.skills is not None else Record({})).items())]) and stock_of(s, 'Coins') >= ((c.coins if c.coins is not None else ((200 if c.x < 2840 else 0)))) + supply_cost(s, c) and can_supply_food(s, c.food) and (objective != 'prayer' or c.prayer != False) and (not death_walk or c.offence <= 15 and c.defence <= 15 and c.x >= 2840 and c.z < 3520 and not c.wilderness) and (not c.wilderness or s.wilderness) and ((memory.cooldowns.get(c.id) if memory.cooldowns.get(c.id) is not None else 0)) <= s.now and (resource != '#199' or c.herbs) and (resource != 'Air talisman' or c.talisman) and (resource != 'Cow hide' or c.target == 'Cow')]
+    if level >= 15 and not resource and len(camps):
         camps = [camp for camp in camps if tier(camp) <= training_tier(s.levels)]
         best = max([tier(_x) for _x in camps] or [-1])
         camps = [camp for camp in camps if tier(camp) == best]
@@ -599,10 +624,10 @@ def combat_plan(s, objective, memory, random, resource=None):
     if not len(camps):
         return None
     regions = list(set([camp.region for camp in camps]))
-    _flat3 = []
+    _flat5 = []
     for id in memory.recent:
-        _flat3.extend([camp.region for camp in [camp for camp in COMBAT_CAMPS if camp.id == id]])
-    recent_regions = _flat3
+        _flat5.extend([camp.region for camp in [camp for camp in COMBAT_CAMPS if camp.id == id]])
+    recent_regions = _flat5
 
     def visits(region):
         return len([recent for recent in recent_regions if recent == region])
@@ -612,58 +637,69 @@ def combat_plan(s, objective, memory, random, resource=None):
     region = fresh_regions[min(len(fresh_regions) - 1, math.floor(max(0, random()) * len(fresh_regions)))]
     camps = [camp for camp in camps if camp.region == region]
     camp = camps[min(len(camps) - 1, math.floor(max(0, random()) * len(camps)))]
-    food = (None if death_walk else food_for(s))
+    food = (None if death_walk else (camp.food if camp.food is not None else food_for(s)))
     needs = ([Record({'item': food, 'count': 24, 'carry': 12, 'equip': False})] if food else [])
-    _v4 = s.stock.get('coins')
-    if ((_v4 if _v4 is not None else 0)) >= 200:
-        needs.append(Record({'item': 'Coins', 'count': 200, 'carry': 200}))
-    magic = (magic_equipment(s) if style == 'mage' else None)
-    ammo = (consumable_batch(s, [Record({'item': 'Bronze arrow', 'count': 1})], 300) or [None])[0]
+    coins = max((camp.coins if camp.coins is not None else 0), (200 if stock_of(s, 'Coins') >= 200 else 0))
+    if coins:
+        needs.append(Record({'item': 'Coins', 'count': coins, 'carry': coins}))
+
+    needs.extend([Record(need._fields) for need in (camp.supplies or [])])
+    _merged10 = {}
+    for _k, _v in (s.stock._fields if isinstance(s.stock, Record) else s.stock).items():
+        _merged10[_k] = _v
+    for _k, _v in {'coins': max(0, stock_of(s, 'Coins') - max(0, coins - 200) - supply_cost(s, camp))}.items():
+        _merged10[_k] = _v
+    _merged11 = {}
+    for _k, _v in (s._fields if isinstance(s, Record) else s).items():
+        _merged11[_k] = _v
+    for _k, _v in {'stock': Record(_merged10)}.items():
+        _merged11[_k] = _v
+    gear_snapshot = Record(_merged11)
+    magic = (magic_equipment(gear_snapshot) if style == 'mage' else None)
+    ammo = (consumable_batch(gear_snapshot, [Record({'item': 'Bronze arrow', 'count': 1})], 300) or [None])[0]
     if style == 'melee':
-        needs.extend(list(melee_equipment(s)))
+        needs.extend(list(melee_equipment(gear_snapshot)))
     elif style == 'range':
-        _v5 = s.stock.get('bronze arrow')
-        missing_ammo = max(0, ammo.count - ((_v5 if _v5 is not None else 0)))
+        _v12 = s.stock.get('bronze arrow')
+        missing_ammo = max(0, ammo.count - ((_v12 if _v12 is not None else 0)))
         ammo_budget = (purchase_budget(supply_offer('Bronze arrow'), missing_ammo) if missing_ammo else 0)
-        _v6 = s.stock.get('coins')
-        _merged7 = {}
-        for _k, _v in (s.stock._fields if isinstance(s.stock, Record) else s.stock).items():
-            _merged7[_k] = _v
-        for _k, _v in {'coins': ((_v6 if _v6 is not None else 0)) - ammo_budget}.items():
-            _merged7[_k] = _v
-        _merged8 = {}
-        for _k, _v in (s._fields if isinstance(s, Record) else s).items():
-            _merged8[_k] = _v
-        for _k, _v in {'stock': Record(_merged7)}.items():
-            _merged8[_k] = _v
-        _v9 = s.stock.get('coins')
-        _merged10 = {}
-        for _k, _v in (s.stock._fields if isinstance(s.stock, Record) else s.stock).items():
-            _merged10[_k] = _v
-        for _k, _v in {'coins': ((_v9 if _v9 is not None else 0)) - ammo_budget}.items():
-            _merged10[_k] = _v
-        _merged11 = {}
-        for _k, _v in (s._fields if isinstance(s, Record) else s).items():
-            _merged11[_k] = _v
-        for _k, _v in {'stock': Record(_merged10)}.items():
-            _merged11[_k] = _v
-        needs.append(ranged_bow(Record(_merged8)))
-        _merged12 = {}
-        for _k, _v in (ammo._fields if isinstance(ammo, Record) else ammo).items():
-            _merged12[_k] = _v
-        for _k, _v in {'equip': True}.items():
-            _merged12[_k] = _v
         _merged13 = {}
+        for _k, _v in (gear_snapshot.stock._fields if isinstance(gear_snapshot.stock, Record) else gear_snapshot.stock).items():
+            _merged13[_k] = _v
+        for _k, _v in {'coins': gear_snapshot.stock.coins - ammo_budget}.items():
+            _merged13[_k] = _v
+        _merged14 = {}
+        for _k, _v in (gear_snapshot._fields if isinstance(gear_snapshot, Record) else gear_snapshot).items():
+            _merged14[_k] = _v
+        for _k, _v in {'stock': Record(_merged13)}.items():
+            _merged14[_k] = _v
+        _merged15 = {}
+        for _k, _v in (gear_snapshot.stock._fields if isinstance(gear_snapshot.stock, Record) else gear_snapshot.stock).items():
+            _merged15[_k] = _v
+        for _k, _v in {'coins': gear_snapshot.stock.coins - ammo_budget}.items():
+            _merged15[_k] = _v
+        _merged16 = {}
+        for _k, _v in (gear_snapshot._fields if isinstance(gear_snapshot, Record) else gear_snapshot).items():
+            _merged16[_k] = _v
+        for _k, _v in {'stock': Record(_merged15)}.items():
+            _merged16[_k] = _v
+        needs.append(ranged_bow(Record(_merged14)))
+        _merged17 = {}
         for _k, _v in (ammo._fields if isinstance(ammo, Record) else ammo).items():
-            _merged13[_k] = _v
+            _merged17[_k] = _v
         for _k, _v in {'equip': True}.items():
-            _merged13[_k] = _v
-        needs.append(Record(_merged12))
+            _merged17[_k] = _v
+        _merged18 = {}
+        for _k, _v in (ammo._fields if isinstance(ammo, Record) else ammo).items():
+            _merged18[_k] = _v
+        for _k, _v in {'equip': True}.items():
+            _merged18[_k] = _v
+        needs.append(Record(_merged17))
     else:
         needs.extend(list(magic.needs))
     melee_style = (objective if (objective in ['attack', 'strength', 'defence']) else (sorted(['attack', 'strength', 'defence'], key=lambda a: s.levels.get(a)) or [None])[0])
-    _v14 = (magic.spell if magic is not None else None)
-    _v15 = (magic.casts if magic is not None else None)
+    _v19 = (magic.spell if magic is not None else None)
+    _v20 = (magic.casts if magic is not None else None)
     return Record({
         'id': camp.id,
         'label': f"{camp.target} at {camp.id.replace('-', ' ')}{str((' (death walk)' if death_walk else ''))}",
@@ -674,21 +710,23 @@ def combat_plan(s, objective, memory, random, resource=None):
         'death_walk': death_walk,
         'wilderness': camp.wilderness,
         'food': food,
-        'travel': Tile(camp.x, camp.z, 0),
+        'travel': Tile(camp.x, camp.z, (camp.level if camp.level is not None else 0)),
         'output': (Record({'item': resource, 'count': (14 if resource == '#199' else 1)}) if resource else None),
         'settings': Record({
         'target': camp.target,
         'spot': 'Custom coordinates',
-        'coordinates': Tile(camp.x, camp.z, 0),
-        'leash_radius': 12,
+        'coordinates': Tile(camp.x, camp.z, (camp.level if camp.level is not None else 0)),
+        'leash_radius': (camp.leash_radius if camp.leash_radius is not None else 12),
+        'travel_coins': coins,
+        'travel_items': [need.item for need in [need for need in ((camp.supplies if camp.supplies is not None else [])) if not need.equip]],
         'combat_style': style,
         'melee_style': melee_style,
         'range_style': 'rapid',
-        'spell': (_v14 if _v14 is not None else 'Wind Strike'),
-        'runes_withdraw': (_v15 if _v15 is not None else 150),
+        'spell': (_v19 if _v19 is not None else 'Wind Strike'),
+        'runes_withdraw': (_v20 if _v20 is not None else 150),
         'ammo': 'Bronze arrow',
         'ammo_withdraw': ammo.carry,
-        'use_special': False,
+        'use_special': style != 'mage',
         'solve_clues': False,
         'banking': 'Auto',
         'food': (food if food is not None else 'Shrimps'),
@@ -696,7 +734,8 @@ def combat_plan(s, objective, memory, random, resource=None):
         'panic_hp': (0 if death_walk else 15),
         'bury_bones': True,
         'bury_big_bones': True,
-        'loot': ['Bones', 'Herb', 'Air talisman'] + list(((['Cow hide'] if resource == 'Cow hide' else []))),
+        'bury_baby_dragon_bones': camp.target == 'Baby blue dragon',
+        'loot': ['Bones', 'Air talisman'] + list(SECONDARY_LOOT) + list(((['Cow hide'] if resource == 'Cow hide' else []))),
         'avoid_herbs': [],
         'loadout': '',
         'bank_every_minutes': 8,

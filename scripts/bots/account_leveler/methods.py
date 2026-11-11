@@ -118,6 +118,11 @@ def select_method(s, objective, memory, random):
             plan = dragon_prayer(s, memory, random)
             if plan:
                 return plan
+    if objective == 'ranged':
+        from bots.account_leveler.ranging_guild import ranging_guild_plan
+        guild = ranging_guild_plan(s, memory)
+        if guild is not None:
+            return guild
     if objective in ['attack', 'strength', 'defence', 'hitpoints', 'ranged', 'magic', 'prayer']:
         return combat_plan(s, objective, memory, random)
     elif objective == 'fishing':

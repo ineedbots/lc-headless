@@ -22,6 +22,10 @@ def combat_level(levels):
 
 def training_tier(levels):
     level = combat_level(levels)
+    if level >= 80:
+        return 5
+    if level >= 60:
+        return 4
     return (3 if level >= 35 else (2 if level >= 25 else (1 if level >= 15 else 0)))
 
 

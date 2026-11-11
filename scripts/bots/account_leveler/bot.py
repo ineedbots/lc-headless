@@ -621,7 +621,7 @@ class AccountLeveler(LoopingBot):
             for key, value in values.items():
                 if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
                     continue
-                if field == 'cooldowns' and not key.startswith('quest-') and key not in DRAGON_CAMPS and not any([camp.id == key for camp in COMBAT_CAMPS]):
+                if field == 'cooldowns' and not key.startswith('quest-') and key != 'ranging-guild' and key not in DRAGON_CAMPS and not any([camp.id == key for camp in COMBAT_CAMPS]):
                     continue
                 memory[field][key] = now + min(900000, max(0, value)) if field == 'cooldowns' else value
         deaths = saved.get('deaths', 0)
