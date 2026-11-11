@@ -1,4 +1,8 @@
 # fixture: jive_dragons
+import bots.jive_dragons as dragons
+from rs2004.game import game
+from rs2004.navigation import navigator
+
 """rs2b0t's test/scripts/JiveDragons/clue.test.ts and post-clue-bank.test.ts, and hardPreparation.test.ts's
 JiveDragons cases (MIT, see thirdparty/rs2b0t), on spec.py's describe, test and expect, with the facades patched as
 rs2b0t's scheduler fixture spies on them. pocketpy calls a class's method over one set on an instance, so a task's
@@ -44,6 +48,41 @@ def banked_first(*a):
 def ready():
     return True
     yield
+
+
+def clue_bank_after_egress(egress_ok):
+    world, bot, clue = scenario('melee')
+    here = Tile(2898, 9803, 0)
+    bank = {'name': 'nearest reachable', 'tile': {'x': 2946, 'z': 3369, 'level': 0}}
+    order = []
+
+    def leave(host, site):
+        order.append(('egress', site.key))
+        return egress_ok
+        yield
+
+    def nearest(tile, nav):
+        order.append(('nearest', tile))
+        expect(nav).to_be(navigator)
+        return bank
+
+    def walk(tile, log):
+        order.append(('walk', tile))
+        return True
+        yield
+
+    spy_on(dragons, 'leave_lair', impl=leave)
+    spy_on(dragons, 'nearest_bank_reachable', impl=nearest)
+    spy_on(dragons, 'walk_to_bank', impl=walk)
+    spy_on(game, 'tile', returns=here)
+    expect(run_wait(bot.prepare_clue_bank())).to_be(egress_ok)
+    if egress_ok:
+        expect(order).to_equal([('egress', bot.site.key), ('nearest', here), ('walk', Tile(2946, 3369, 0))])
+    else:
+        expect(order).to_equal([('egress', bot.site.key)])
+
+
+test_each([True, False])('clue preparation leaves the lair before routing to the nearest reachable bank: %s', clue_bank_after_egress)
 
 
 # clue.test.ts
