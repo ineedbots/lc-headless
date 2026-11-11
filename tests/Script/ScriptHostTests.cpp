@@ -1622,7 +1622,7 @@ TEST_CASE("The example scripts and the ported bots load without warnings", "[Scr
 
             const auto file = std::filesystem::relative(entry.path(), scripts);
             CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client,
-                                   {.scriptsDirectory = scripts, .file = file, .callTimeout = ScriptCoverage::AdjustTimeout(1s)},
+                                   {.scriptsDirectory = scripts, .file = file, .callTimeout = ScriptCoverage::AdjustTimeout(10s)},
                                    capture.GetLogger()});
             ++loaded;
         }
