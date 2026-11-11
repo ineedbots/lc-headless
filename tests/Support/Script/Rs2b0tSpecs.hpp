@@ -1,6 +1,8 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
+#include <string_view>
 #include <vector>
 
 class ScriptVm;
@@ -15,5 +17,5 @@ public:
     // The test_*.py files directly in folder, sorted.
     [[nodiscard]] static std::vector<std::filesystem::path> GetFiles(const std::filesystem::path& folder);
     // Loads spec.py and the file into vm, then runs every test, as Catch checks.
-    static void Run(ScriptVm& vm, const std::filesystem::path& file);
+    static void Run(ScriptVm& vm, const std::filesystem::path& file, std::optional<std::string_view> spec = std::nullopt);
 };

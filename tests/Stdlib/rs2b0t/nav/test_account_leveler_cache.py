@@ -84,15 +84,26 @@ def route(start, dest, wilderness=False, camp=None):
                                avoid_zones=resolve_danger_zones(leveler_travel_zones(dest, wilderness)), state=state)
 
 
-def camps():
-    for camp in COMBAT_CAMPS:
+def camps(first, last):
+    for index, camp in enumerate(COMBAT_CAMPS):
+        if index < first or index >= last:
+            continue
         dest = Tile(camp.x, camp.z, camp.level or 0)
         for start in [Tile(3093, 3243), Tile(2946, 3368), Tile(3185, 3436)]:
             path = route(start, dest, bool(camp.wilderness), camp)
             assert path.ok, camp.id + ': ' + path.reason
 
 
-test('all training camps route from Draynor, Falador and Varrock with their access requirements', camps)
+test('training camps 0-5 route with their access requirements', lambda: camps(0, 6))
+test('training camps 6-11 route with their access requirements', lambda: camps(6, 12))
+test('training camps 12-17 route with their access requirements', lambda: camps(12, 18))
+test('training camps 18-23 route with their access requirements', lambda: camps(18, 24))
+test('training camps 24-29 route with their access requirements', lambda: camps(24, 30))
+test('training camps 30-35 route with their access requirements', lambda: camps(30, 36))
+test('training camps 36-41 route with their access requirements', lambda: camps(36, 42))
+test('training camps 42-47 route with their access requirements', lambda: camps(42, 48))
+test('training camps 48-53 route with their access requirements', lambda: camps(48, 54))
+test('training camps 54-56 route with their access requirements', lambda: camps(54, 57))
 
 
 def shops():

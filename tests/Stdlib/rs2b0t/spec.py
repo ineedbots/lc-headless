@@ -83,9 +83,13 @@ def _drain(result):
             pass
 
 
-def run_specs():
+def run_specs(selected_name=None):
     failures = []
+    selected = 0
     for name, body in _SPECS:
+        if selected_name is not None and name != selected_name:
+            continue
+        selected += 1
         try:
             for hook in _BEFORE:
                 _drain(hook())
@@ -96,9 +100,11 @@ def run_specs():
             _drain(hook())
         restore_all()
     if len(failures) > 0:
-        raise AssertionError(f'{len(failures)} of {len(_SPECS)} failed:\n' + '\n'.join(failures))
+        raise AssertionError(f'{len(failures)} of {selected} failed:\n' + '\n'.join(failures))
     if len(_SPECS) == 0:
         raise AssertionError('no tests')
+    if selected_name is not None and selected == 0:
+        raise AssertionError('no test named ' + selected_name)
 
 
 # rs2b0t's spyOn and stubs. pocketpy ignores a method set on an instance, but takes one set on its class, so a spy on
