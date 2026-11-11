@@ -6,3 +6,6 @@ accounts/*.jsonc
 /profiles/
 /data/cache/
 *.log
+/equipment/
+/experience/
+/inventory/
