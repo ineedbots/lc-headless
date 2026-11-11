@@ -28,7 +28,7 @@ std::vector<std::filesystem::path> Rs2b0tSpecs::GetFiles(const std::filesystem::
     return files;
 }
 
-void Rs2b0tSpecs::Run(ScriptVm& vm, const std::filesystem::path& file)
+void Rs2b0tSpecs::Run(ScriptVm& vm, const std::filesystem::path& file, const std::optional<std::string_view> selectedSpec)
 {
     const auto spec = FileUtils::ReadText(GetFolder() / "spec.py");
     REQUIRE(spec.has_value());
@@ -52,6 +52,15 @@ void Rs2b0tSpecs::Run(ScriptVm& vm, const std::filesystem::path& file)
     CHECK_NOTHROW((vm.RunSource(*source, file.filename().string()), loaded = true));
     if (loaded)
     {
-        CHECK_NOTHROW(vm.Call("run_specs"));
+        if (selectedSpec)
+        {
+            py_newstr(py_r0(), std::string{*selectedSpec}.c_str());
+            const auto args = std::array{py_r0()};
+            CHECK_NOTHROW(vm.Call("run_specs", args));
+        }
+        else
+        {
+            CHECK_NOTHROW(vm.Call("run_specs"));
+        }
     }
 }
