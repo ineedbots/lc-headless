@@ -6,10 +6,11 @@
 #include "ProgressReportFile.hpp"
 #include "Type/ProgressReport_s.hpp"
 
-ProgressReporter::ProgressReporter(std::chrono::minutes interval, std::filesystem::path file, std::shared_ptr<Logger> logger)
+ProgressReporter::ProgressReporter(std::chrono::minutes interval, std::filesystem::path file, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport)
     : m_interval{interval}
     , m_file{std::move(file)}
     , m_logger{std::move(logger)}
+    , m_onReport{std::move(onReport)}
 {
 }
 
@@ -37,6 +38,11 @@ void ProgressReporter::Step(Clock::time_point now, ScriptHost& script)
     if (const auto report = script.RunProgressReport(now))
     {
         Write(*report);
+
+        if (m_onReport)
+        {
+            m_onReport(*report);
+        }
     }
 }
 

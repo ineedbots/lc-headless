@@ -19,6 +19,7 @@
 #include "ExperienceLog.hpp"
 #include "ItemLog.hpp"
 #include "ProgressReporter.hpp"
+#include "Type/ProgressReport_s.hpp"
 
 struct AccountOptions_s
 {
@@ -31,6 +32,7 @@ struct AccountOptions_s
     // Without it, scripts can't plan routes beyond the loaded area.
     std::shared_ptr<const Navigation> navigation;
     std::chrono::milliseconds reloginDelay = 60s;
+    std::function<void(std::string_view, const ProgressReport_s&)> onProgressReport;
 };
 
 // Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is

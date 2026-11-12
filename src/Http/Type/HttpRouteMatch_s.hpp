@@ -9,6 +9,11 @@ struct HttpRouteMatch_s
 
     [[nodiscard]] HttpDecodeResult Decode(std::string body)
     {
+        if (!route.decode)
+        {
+            throw std::logic_error{"Upgrade routes do not decode application requests"};
+        }
+
         request.body = std::move(body);
         return route.decode(request);
     }

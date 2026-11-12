@@ -14,4 +14,5 @@ struct HttpRoute_s
     std::string path;
     bool requiresJson = false;
     Decoder decode = nullptr;
+    bool webSocket = false;
 };

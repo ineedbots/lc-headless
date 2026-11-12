@@ -4,6 +4,7 @@
 #include "Type/ConnectionOptions_s.hpp"
 #include "Link.hpp"
 #include "../Http/HttpServer.hpp"
+#include "../Application/Events/ApplicationEventBridge.hpp"
 
 // Every link a loop opens does its I/O on the thread that runs the loop: in Poll, Wait and Settle, and so in a
 // Connection's Pump and waits. Wake is the only member another thread may call. Abstract so that no shared header
@@ -25,7 +26,7 @@ public:
     [[nodiscard]] virtual std::shared_ptr<Link> Open(const ConnectionOptions_s& options, std::shared_ptr<Logger> logger) = 0;
     // Runs what is ready, without waiting.
     virtual void Poll() = 0;
-    [[nodiscard]] virtual std::unique_ptr<HttpServer> ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge);
+    [[nodiscard]] virtual std::unique_ptr<HttpServer> ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge, std::shared_ptr<ApplicationEventBridge> events = {});
     // Waits until something happens or the deadline passes, then runs whatever is ready. Nullopt waits for something.
     virtual void Wait(Deadline deadline) = 0;
     // Runs the loop until every link it opened has finished, or the deadline passes.

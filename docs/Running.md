@@ -130,6 +130,40 @@ The server refuses logout during combat and for ten seconds afterward, so reques
 
 The process returns 0 only when every account logged out cleanly and no script failed. Startup errors, account failures and forced disconnections can produce a nonzero exit. If startup fails, use the [configuration troubleshooting table](Configuration.md#troubleshooting-configuration) before changing script code.
 
+## Live progress events
+
+Native operator clients can connect to `ws://127.0.0.1:8080/api/v1/events` on the
+configured HTTP listener. The sole event is `account.progress`, emitted when
+ProgressReporter obtains an `on_progress_report()` result. The account must have
+`script.progressReportMinutes` enabled. File-write failures do not prevent events.
+
+Send JSON text:
+
+```json
+{"version":1,"type":"subscribe","id":"progress","events":["account.progress"],"accounts":["bot1"]}
+```
+
+The server acknowledges, sends a snapshot of the latest available report for each
+matching account, then sends ordered live reports. Empty/omitted `accounts` means
+all configured accounts. Names are exact account config names. Empty snapshots
+are normal before the first report. Subscribing never invokes a script hook.
+
+```json
+{"version":1,"type":"unsubscribe","id":"progress"}
+```
+
+Unsubscribe is effective at its acknowledgement. Reconnect and subscribe again
+after disconnect; there is no replay. Compare `instance` to detect process
+restarts; global sequence gaps can arise from filtering. Slow subscribers and
+publisher overflow close with 1013 and require a fresh subscription/snapshot.
+
+Reports expose script-provided data. Browser Origin headers are rejected; the
+service has no authentication or native TLS. Use a private bind and a controlled
+proxy for remote access. The [native Python example](../tools/events/progress.py)
+subscribes and reconnects using the separately installed `websockets` package.
+The [protocol design](design/WebSocketEventsDesign.md) defines exact schemas,
+limits, ordering, extension steps, and shutdown behavior.
+
 ## HTTP API
 
 Enable `http.host` in `client.jsonc` as described in [Configuration](Configuration.md#http-operator-api).

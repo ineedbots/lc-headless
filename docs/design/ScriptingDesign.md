@@ -596,6 +596,12 @@ report is due one interval after script start; a due report waits until the scri
 then schedules the next interval from that time. `ScriptHost` only invokes `on_progress_report` and
 returns the report. Its hook validation remains part of the script layer.
 
+An optional ProgressReporter callback also publishes the owned report to the
+[application event bridge](WebSocketEventsDesign.md). The application supplies
+the account identity and enables this producer only with the HTTP listener.
+Publication follows report logging/file output, including a handled file-write
+failure; subscriptions do not invoke the hook themselves.
+
 `Application/CommandLine` parses startup options and `InterruptSignal` owns Ctrl+C state. `Config/`
 owns account discovery/parsing/validation/overrides; `Console/` owns commands, terminal I/O and logging;
 `Utils/` contains shared string/file/endian utilities. Tests mirror subsystem ownership and reuse

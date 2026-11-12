@@ -6,6 +6,10 @@ LostCity Headless maintains game state from server packets and exposes it to Pyt
 
 ## Connections and accounts
 
+The optional HTTP operator listener supports REST commands/status and
+[WebSocket progress subscriptions](Running.md#live-progress-events), with
+account/event filters, latest-report snapshots and bounded delivery.
+
 Connections can use WebSocket (`ws`), secure WebSocket (`wss`) or the engine's raw TCP port (`tcp`). Each supports SOCKS5, including proxy authentication. For `wss`, certificate verification uses the platform trust store or a configured PEM CA bundle.
 
 One process runs up to 16 accounts. Each account has its own Python interpreter, game state, script settings and log name. The game cache and protocol revision are shared. Accounts can connect to different worlds of the same revision, with separate server and proxy sections in their account files. These sections replace the process-wide sections; see [account overrides](Configuration.md#account-overrides).

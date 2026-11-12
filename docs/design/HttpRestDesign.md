@@ -1,5 +1,8 @@
 # HTTP REST design
 
+WebSocket upgrade metadata and the shared listener's progress-event integration
+are specified in [WebSocket events](WebSocketEventsDesign.md).
+
 Implementation specification from [issue #67](https://github.com/ineedbots/lc-headless/issues/67).
 
 ## Complete implementation specification

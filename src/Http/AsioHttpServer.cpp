@@ -1,9 +1,12 @@
 #include "pch.hpp"
 #include "AsioHttpServer.hpp"
+#include "AsioWebSocketSession.hpp"
+#include "../Application/Events/ApplicationEventBridge.hpp"
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include <boost/beast/websocket.hpp>
 #include "HttpRouter.hpp"
 #include "HttpResponses.hpp"
 
@@ -19,6 +22,8 @@ struct AsioHttpServer::State : std::enable_shared_from_this<State>
     HttpSettings_s settings;
     HttpRouter router;
     std::shared_ptr<ApplicationRequestBridge> bridge;
+    std::shared_ptr<ApplicationEventBridge> events;
+    std::vector<std::unique_ptr<AsioWebSocketSession>> webSockets;
     std::unordered_map<Session*, std::shared_ptr<Session>> sessions;
     std::unordered_map<u64, std::weak_ptr<Session>> pending;
     std::size_t operations = 0;
@@ -26,11 +31,12 @@ struct AsioHttpServer::State : std::enable_shared_from_this<State>
     u16 port;
     std::chrono::steady_clock::time_point shutdownDeadline = std::chrono::steady_clock::time_point::max();
 
-    State(asio::io_context& io, HttpSettings_s options, std::shared_ptr<ApplicationRequestBridge> requests, HttpRouter routes)
+    State(asio::io_context& io, HttpSettings_s options, std::shared_ptr<ApplicationRequestBridge> requests, HttpRouter routes, std::shared_ptr<ApplicationEventBridge> eventBridge)
         : acceptor{io}
         , settings{std::move(options)}
         , router{std::move(routes)}
         , bridge{std::move(requests)}
+        , events{std::move(eventBridge)}
     {
         const auto address = asio::ip::make_address(settings.host == "localhost" ? "127.0.0.1" : settings.host);
         const auto endpoint = Tcp::endpoint{address, static_cast<u16>(settings.port)};
@@ -249,6 +255,12 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
 
         route = std::get<HttpRouteMatch_s>(std::move(match));
 
+        if (route->route.webSocket)
+        {
+            Upgrade();
+            return;
+        }
+
         if (state->stopping)
         {
             Error(503, "stopping", "Application stopping", true);
@@ -292,6 +304,31 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
         }
 
         Body();
+    }
+
+    void Upgrade()
+    {
+        if (!state->events)
+        {
+            Error(503, "events_unavailable", "Application event servicing is unavailable", true);
+            return;
+        }
+
+        const auto& request = parser->get();
+        if (state->stopping || !beast::websocket::is_upgrade(request) || request.method() != http::verb::get ||
+            request.find(http::field::origin) != request.end() || !route->request.queryParameters.empty() ||
+            request.chunked() || parser->content_length().value_or(0) != 0 || !request[http::field::expect].empty())
+        {
+            Error(400, "invalid_upgrade", "Native WebSocket upgrade without Origin, query or body required", true);
+            return;
+        }
+
+        auto upgraded = std::make_unique<AsioWebSocketSession>(std::move(stream.socket()), std::move(parser->get()), beast::buffers_to_string(buffer.data()), state->events);
+        closed = true;
+        timer.cancel();
+        state->sessions.erase(this);
+        state->webSockets.push_back(std::move(upgraded));
+        state->webSockets.back()->Start();
     }
 
     void Body()
@@ -431,7 +468,7 @@ void AsioHttpServer::State::Accept()
 
     acceptor.async_accept(Track([self = shared_from_this()](boost::system::error_code error, Tcp::socket socket)
     {
-        if (!error && !self->stopping && self->sessions.size() < 128)
+        if (!error && !self->stopping && self->sessions.size() + self->webSockets.size() < 128)
         {
             auto session = std::make_shared<Session>(self, std::move(socket));
             self->sessions.emplace(session.get(), session);
@@ -455,6 +492,15 @@ void AsioHttpServer::State::Stop()
     stopping = true;
     shutdownDeadline = std::chrono::steady_clock::now() + 2s;
     bridge->Close();
+    if (events)
+    {
+        events->Stop();
+    }
+
+    for (const auto& session : webSockets)
+    {
+        session->Stop();
+    }
 
     auto error = boost::system::error_code{};
     acceptor.cancel(error);
@@ -483,6 +529,11 @@ void AsioHttpServer::State::Close()
 {
     Stop();
 
+    for (const auto& session : webSockets)
+    {
+        session->Close();
+    }
+
     const auto copy = sessions;
     for (const auto& [key, session] : copy)
     {
@@ -491,8 +542,8 @@ void AsioHttpServer::State::Close()
     }
 }
 
-AsioHttpServer::AsioHttpServer(asio::io_context& io, const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge, HttpRouter routes)
-    : m_state{std::make_shared<State>(io, settings, std::move(bridge), std::move(routes))}
+AsioHttpServer::AsioHttpServer(asio::io_context& io, const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge, HttpRouter routes, std::shared_ptr<ApplicationEventBridge> events)
+    : m_state{std::make_shared<State>(io, settings, std::move(bridge), std::move(routes), std::move(events))}
 {
     m_state->Accept();
 }
@@ -514,7 +565,10 @@ void AsioHttpServer::Close()
 
 bool AsioHttpServer::IsDrained() const
 {
-    return m_state->sessions.empty() && m_state->operations == 0;
+    return m_state->sessions.empty() && m_state->operations == 0 && std::ranges::all_of(m_state->webSockets, [](const auto& session)
+    {
+        return session->IsDrained();
+    });
 }
 
 u16 AsioHttpServer::GetPort() const
@@ -524,6 +578,16 @@ u16 AsioHttpServer::GetPort() const
 
 void AsioHttpServer::Service()
 {
+    for (const auto& session : m_state->webSockets)
+    {
+        session->Service();
+    }
+
+    std::erase_if(m_state->webSockets, [](const auto& session)
+    {
+        return session->IsDrained();
+    });
+
     const auto copy = m_state->sessions;
     for (const auto& [key, session] : copy)
     {
