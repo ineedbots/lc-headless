@@ -14,6 +14,7 @@ namespace
         {
             value.remove_suffix(1);
         }
+
         auto lowered = std::string{value};
         std::ranges::transform(lowered, lowered.begin(), [](unsigned char c)
         {
@@ -54,6 +55,7 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
         {
             throw std::invalid_argument{"HTTP routes need a path template, method and decoder"};
         }
+
         auto node = std::size_t{0};
         auto names = std::vector<std::string>{};
         for (const auto segment : HttpUrl::Segments(route.path))
@@ -64,18 +66,22 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
                 {
                     throw std::invalid_argument{"Path parameters must occupy an entire segment"};
                 }
+
                 const auto name = segment.substr(1, segment.size() - 2);
                 if (!IsParameterName(name) || std::ranges::find(names, name) != names.end())
                 {
                     throw std::invalid_argument{"Path parameters need unique identifier names"};
                 }
+
                 names.emplace_back(name);
+
                 if (!m_nodes[node].parameter)
                 {
                     const auto child = m_nodes.size();
                     m_nodes.emplace_back();
                     m_nodes[node].parameter = child;
                 }
+
                 node = *m_nodes[node].parameter;
             }
             else
@@ -95,6 +101,7 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
                 }
             }
         }
+
         auto& methods = m_nodes[node].methods;
         if (std::ranges::find(methods, route.method, [](const auto& entry) -> const std::string&
         {
@@ -103,6 +110,7 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
         {
             throw std::invalid_argument{std::format("Duplicate HTTP route pattern: {} {}", route.method, route.path)};
         }
+
         methods.push_back({std::move(route), std::move(names)});
     }
 }
@@ -114,17 +122,20 @@ HttpRouter::MatchResult HttpRouter::Match(std::string_view method, std::string_v
     {
         return HttpResponses::Error(400, "invalid_target", "Malformed request path or query string", {}, true);
     }
+
     struct Candidate_s
     {
         std::size_t node;
         std::size_t segment;
         std::vector<std::string> values;
     };
+
     auto candidates = std::vector<Candidate_s>{{0, 0, {}}};
     while (!candidates.empty())
     {
         auto candidate = std::move(candidates.back());
         candidates.pop_back();
+
         const auto& node = m_nodes[candidate.node];
         if (candidate.segment == url->segments.size())
         {
@@ -132,6 +143,7 @@ HttpRouter::MatchResult HttpRouter::Match(std::string_view method, std::string_v
             {
                 continue;
             }
+
             const auto route = std::ranges::find(node.methods, method, [](const auto& entry) -> const std::string&
             {
                 return entry.route.method;
@@ -145,21 +157,27 @@ HttpRouter::MatchResult HttpRouter::Match(std::string_view method, std::string_v
                     {
                         response.allow += ", ";
                     }
+
                     response.allow += entry.route.method;
                 }
+
                 return response;
             }
+
             if (route->route.requiresJson && !IsJson(contentType))
             {
                 return HttpResponses::Error(415, "content_type", "application/json required", {}, true);
             }
+
             auto matched = HttpRouteMatch_s{.route = route->route, .request = {.queryParameters = std::move(url->query)}};
             for (std::size_t i = 0; i < candidate.values.size(); ++i)
             {
                 matched.request.pathParameters.emplace(route->parameterNames[i], std::move(candidate.values[i]));
             }
+
             return matched;
         }
+
         const auto& segment = url->segments[candidate.segment];
         if (node.parameter && !segment.empty())
         {
@@ -167,11 +185,13 @@ HttpRouter::MatchResult HttpRouter::Match(std::string_view method, std::string_v
             values.push_back(segment);
             candidates.push_back({*node.parameter, candidate.segment + 1, std::move(values)});
         }
+
         const auto literal = node.literals.find(segment);
         if (literal != node.literals.end())
         {
             candidates.push_back({literal->second, candidate.segment + 1, std::move(candidate.values)});
         }
     }
+
     return HttpResponses::Error(404, "not_found", "Unknown endpoint", {}, true);
 }

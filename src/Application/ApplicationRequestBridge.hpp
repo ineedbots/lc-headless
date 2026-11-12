@@ -1,4 +1,5 @@
 #pragma once
+
 #include "../Console/CommandExecution.hpp"
 #include "../Config/HttpSettings_s.hpp"
 
@@ -6,9 +7,11 @@ struct ExecuteConsoleCommand_s
 {
     std::string command;
 };
+
 struct GetApplicationStatus_s
 {
 };
+
 struct AccountStatus_s
 {
     std::string name;
@@ -16,12 +19,14 @@ struct AccountStatus_s
     bool finished;
     std::string status;
 };
+
 struct ApplicationStatus_s
 {
     std::string state = "running";
     s64 uptimeMs = 0;
     std::vector<AccountStatus_s> accounts;
 };
+
 struct ConsoleCommandResult_s
 {
     std::string output;
@@ -29,6 +34,7 @@ struct ConsoleCommandResult_s
     bool executionStarted = false;
     std::vector<CommandRecipient_s> recipients;
 };
+
 struct RequestControl_s
 {
     u64 id;
@@ -45,6 +51,7 @@ struct ApplicationRequest_s
     std::shared_ptr<RequestControl_s> control;
     ApplicationRequestPayload payload;
 };
+
 struct CompletedApplicationRequest_s
 {
     u64 id;
@@ -69,14 +76,17 @@ public:
     {
         return m_closing;
     }
+
     bool HasIncoming() const
     {
         return !m_incoming.empty();
     }
+
     std::size_t Outstanding() const
     {
         return m_active.size();
     }
+
     const HttpSettings_s& GetSettings() const
     {
         return m_settings;

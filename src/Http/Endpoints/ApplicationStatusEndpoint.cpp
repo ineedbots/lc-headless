@@ -21,9 +21,11 @@ HttpResponse_s ApplicationStatusEndpoint::Respond(u64 id, const ApplicationStatu
     {
         body["accounts"].push_back({{"name", account.name}, {"started", account.started}, {"finished", account.finished}, {"status", account.status}});
     }
+
     if (!errorCode.empty())
     {
         body["error"] = {{"code", errorCode}, {"message", errorCode}};
     }
+
     return HttpJson::Response(200, body);
 }

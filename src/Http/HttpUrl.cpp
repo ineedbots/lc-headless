@@ -9,14 +9,17 @@ namespace
         {
             return value - '0';
         }
+
         if (value >= 'a' && value <= 'f')
         {
             return value - 'a' + 10;
         }
+
         if (value >= 'A' && value <= 'F')
         {
             return value - 'A' + 10;
         }
+
         return -1;
     }
 }
@@ -30,6 +33,7 @@ bool HttpUrl::IsUtf8(std::string_view text)
         {
             continue;
         }
+
         auto remaining = 0;
         auto code = u32{0};
         auto minimum = u32{0};
@@ -55,24 +59,29 @@ bool HttpUrl::IsUtf8(std::string_view text)
         {
             return false;
         }
+
         for (auto n = 0; n < remaining; ++n)
         {
             if (i == text.size())
             {
                 return false;
             }
+
             const auto next = static_cast<unsigned char>(text[i++]);
             if ((next & 0xc0) != 0x80)
             {
                 return false;
             }
+
             code = (code << 6) | (next & 0x3f);
         }
+
         if (code < minimum || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))
         {
             return false;
         }
     }
+
     return true;
 }
 
@@ -89,12 +98,14 @@ std::optional<std::string> HttpUrl::Decode(std::string_view value, bool query)
             {
                 return {};
             }
+
             const auto high = Hex(static_cast<unsigned char>(value[i + 1]));
             const auto low = Hex(static_cast<unsigned char>(value[i + 2]));
             if (high < 0 || low < 0)
             {
                 return {};
             }
+
             byte = static_cast<unsigned char>((high << 4) | low);
             i += 2;
         }
@@ -102,16 +113,20 @@ std::optional<std::string> HttpUrl::Decode(std::string_view value, bool query)
         {
             byte = ' ';
         }
+
         if (byte < 0x20 || byte == 0x7f)
         {
             return {};
         }
+
         decoded += static_cast<char>(byte);
     }
+
     if (!IsUtf8(decoded))
     {
         return {};
     }
+
     return decoded;
 }
 
@@ -119,17 +134,21 @@ std::vector<std::string_view> HttpUrl::Segments(std::string_view path)
 {
     assert(path.starts_with('/'));
     path.remove_prefix(1);
+
     auto segments = std::vector<std::string_view>{};
     for (;;)
     {
         const auto slash = path.find('/');
         segments.push_back(path.substr(0, slash));
+
         if (slash == std::string_view::npos)
         {
             break;
         }
+
         path.remove_prefix(slash + 1);
     }
+
     return segments;
 }
 
@@ -143,6 +162,7 @@ std::optional<HttpUrl_s> HttpUrl::Parse(std::string_view target)
     {
         return {};
     }
+
     auto result = HttpUrl_s{};
     const auto question = target.find('?');
     for (const auto segment : Segments(target.substr(0, question)))
@@ -152,12 +172,15 @@ std::optional<HttpUrl_s> HttpUrl::Parse(std::string_view target)
         {
             return {};
         }
+
         result.segments.push_back(std::move(*decoded));
     }
+
     if (question == std::string_view::npos)
     {
         return result;
     }
+
     auto query = target.substr(question + 1);
     while (!query.empty())
     {
@@ -172,13 +195,17 @@ std::optional<HttpUrl_s> HttpUrl::Parse(std::string_view target)
             {
                 return {};
             }
+
             result.query[*key].push_back(std::move(*value));
         }
+
         if (ampersand == std::string_view::npos)
         {
             break;
         }
+
         query.remove_prefix(ampersand + 1);
     }
+
     return result;
 }

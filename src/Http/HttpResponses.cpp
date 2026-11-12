@@ -11,6 +11,7 @@ HttpResponse_s HttpResponses::Error(unsigned status, std::string_view code, std:
     {
         body["requestId"] = std::to_string(*id);
     }
+
     auto response = HttpJson::Response(status, body);
     response.close = close;
     return response;
@@ -45,5 +46,6 @@ HttpResponse_s HttpResponses::Timeout(u64 id, bool executionStarted, const Compl
             body["outputTruncated"] = command->outputTruncated;
         }
     }
+
     return HttpJson::Response(504, body);
 }

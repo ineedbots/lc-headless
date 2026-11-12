@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "ApplicationRequestProcessor.hpp"
+
 ApplicationRequestProcessor::ApplicationRequestProcessor(AccountRunner& runner, std::shared_ptr<ApplicationRequestBridge> bridge,
                                                          std::chrono::steady_clock::time_point started)
     : m_runner{runner}
@@ -7,6 +8,7 @@ ApplicationRequestProcessor::ApplicationRequestProcessor(AccountRunner& runner, 
     , m_started{started}
 {
 }
+
 void ApplicationRequestProcessor::Dispatch()
 {
     const auto until = std::chrono::steady_clock::now() + 2ms;
@@ -17,12 +19,14 @@ void ApplicationRequestProcessor::Dispatch()
         {
             break;
         }
+
         auto control = request->control;
         if (control->abandoned || std::chrono::steady_clock::now() >= control->deadline)
         {
             m_bridge->Complete({.id = control->id, .outcome = "cancelled", .errorCode = "request_cancelled"});
             continue;
         }
+
         std::visit([&](const auto& payload)
         {
             Process(control, payload);
@@ -35,6 +39,7 @@ void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s
     auto execution = std::make_shared<CommandExecution>(static_cast<std::size_t>(m_bridge->GetSettings().maxOutputBytes), control->deadline);
     control->execution = execution;
     m_executing.push_back(control);
+
     try
     {
         const auto capture = ConsoleCaptureScope{&execution->capture};
@@ -44,6 +49,7 @@ void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s
     {
         execution->errorCode = "internal_failure";
     }
+
     execution->dispatched = true;
 }
 
@@ -56,6 +62,7 @@ void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s
         const auto& account = m_runner.GetAccount(i);
         status.accounts.push_back({account.GetName(), account.IsStarted(), account.IsFinished(), account.DescribeStatus()});
     }
+
     m_bridge->Complete({.id = control->id, .payload = std::move(status)});
 }
 
@@ -67,6 +74,7 @@ void ApplicationRequestProcessor::Finalize()
         if (control->abandoned || std::chrono::steady_clock::now() >= control->deadline || m_bridge->IsClosing())
         {
             execution.abandoned = true;
+
             for (auto& recipient : execution.recipients)
             {
                 if (recipient.outcome == "pending")
@@ -76,10 +84,12 @@ void ApplicationRequestProcessor::Finalize()
                 }
             }
         }
+
         if (!execution.IsComplete())
         {
             continue;
         }
+
         auto result = CompletedApplicationRequest_s{.id = control->id};
         const auto succeeded = std::ranges::count(execution.recipients, "completed", &CommandRecipient_s::outcome);
         const auto failed = std::ranges::count(execution.recipients, "failed", &CommandRecipient_s::outcome);
@@ -100,6 +110,7 @@ void ApplicationRequestProcessor::Finalize()
         {
             result.outcome = "rejected";
         }
+
         result.errorCode = execution.errorCode;
         if (result.errorCode.empty())
         {
@@ -116,14 +127,17 @@ void ApplicationRequestProcessor::Finalize()
                 result.errorCode = "command_rejected";
             }
         }
+
         result.payload = ConsoleCommandResult_s{std::move(execution.capture.output), execution.capture.truncated, execution.started, execution.recipients};
         m_bridge->Complete(std::move(result));
     }
+
     std::erase_if(m_executing, [](const auto& control)
     {
         return control->engineDone;
     });
 }
+
 void ApplicationRequestProcessor::Stop()
 {
     m_bridge->Close();
@@ -131,5 +145,6 @@ void ApplicationRequestProcessor::Stop()
     {
         m_bridge->Complete({.id = request->control->id, .outcome = "cancelled", .errorCode = "stopping"});
     }
+
     Finalize();
 }

@@ -1,5 +1,7 @@
 #pragma once
+
 #include "../Application/ApplicationRequestBridge.hpp"
+
 class HttpServer
 {
 public:

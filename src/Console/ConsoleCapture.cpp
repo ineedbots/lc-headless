@@ -2,14 +2,17 @@
 #include "ConsoleCapture.hpp"
 
 thread_local ConsoleCapture* ConsoleCaptureScope::s_current = nullptr;
+
 ConsoleCaptureScope::ConsoleCaptureScope(ConsoleCapture* capture)
     : m_previous{std::exchange(s_current, capture)}
 {
 }
+
 ConsoleCaptureScope::~ConsoleCaptureScope()
 {
     s_current = m_previous;
 }
+
 void ConsoleCaptureScope::Write(std::string_view text)
 {
     if (s_current)
@@ -17,12 +20,14 @@ void ConsoleCaptureScope::Write(std::string_view text)
         s_current->Append(text);
     }
 }
+
 void ConsoleCapture::Append(std::string_view text)
 {
     if (truncated)
     {
         return;
     }
+
     auto count = std::min(text.size(), m_limit - output.size());
     if (count < text.size())
     {
@@ -30,7 +35,9 @@ void ConsoleCapture::Append(std::string_view text)
         {
             --count;
         }
+
         truncated = true;
     }
+
     output.append(text.substr(0, count));
 }

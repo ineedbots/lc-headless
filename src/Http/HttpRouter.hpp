@@ -1,4 +1,5 @@
 #pragma once
+
 #include "HttpRouteMatch_s.hpp"
 
 class HttpRouter
@@ -15,11 +16,13 @@ private:
         HttpRoute_s route;
         std::vector<std::string> parameterNames;
     };
+
     struct Node_s
     {
         std::unordered_map<std::string, std::size_t> literals;
         std::optional<std::size_t> parameter;
         std::vector<RegisteredRoute_s> methods;
     };
+
     std::vector<Node_s> m_nodes{1};
 };

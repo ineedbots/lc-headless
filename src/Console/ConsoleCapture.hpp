@@ -7,6 +7,7 @@ public:
         : m_limit{limit}
     {
     }
+
     void Append(std::string_view text);
     std::string output;
     bool truncated = false;

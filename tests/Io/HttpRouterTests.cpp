@@ -10,6 +10,7 @@ namespace
     {
         return ApplicationRequestPayload{GetApplicationStatus_s{}};
     }
+
     HttpDecodeResult Echo(const HttpEndpointRequest_s& request)
     {
         return ApplicationRequestPayload{ExecuteConsoleCommand_s{request.body}};
@@ -23,14 +24,19 @@ TEST_CASE("HTTP router registers new endpoints and multiple methods without tran
         {.method = "POST", .path = "/api/v1/future", .requiresJson = true, .decode = Echo},
         {.method = "GET", .path = "/api/v1/other", .decode = Status},
     }};
+
     auto get = router.Match("GET", "/api/v1/future", "");
     REQUIRE(std::holds_alternative<HttpRouteMatch_s>(get));
+
     auto snapshot = std::get<HttpRouteMatch_s>(get).Decode("");
     CHECK(std::holds_alternative<GetApplicationStatus_s>(std::get<ApplicationRequestPayload>(snapshot)));
+
     auto post = router.Match("POST", "/api/v1/future", "Application/JSON; charset=utf-8");
     REQUIRE(std::holds_alternative<HttpRouteMatch_s>(post));
+
     auto decoded = std::get<HttpRouteMatch_s>(post).Decode("owned body");
     CHECK(std::get<ExecuteConsoleCommand_s>(std::get<ApplicationRequestPayload>(decoded)).command == "owned body");
+
     auto unsupported = router.Match("DELETE", "/api/v1/future", "");
     REQUIRE(std::holds_alternative<HttpResponse_s>(unsupported));
     CHECK(std::get<HttpResponse_s>(unsupported).status == 405);
@@ -58,9 +64,11 @@ TEST_CASE("Matched routes own their metadata through deferred body reads", "[Htt
         auto router = HttpRouter{{{.method = "POST", .path = path, .decode = Echo}}};
         return router.Match("POST", path, "");
     }();
+
     auto& route = std::get<HttpRouteMatch_s>(matched);
     CHECK(route.route.path == "/api/v1/temporary");
     CHECK(route.route.method == "POST");
+
     auto result = route.Decode("later body");
     CHECK(std::get<ExecuteConsoleCommand_s>(std::get<ApplicationRequestPayload>(result)).command == "later body");
 }
@@ -72,6 +80,7 @@ TEST_CASE("Default HTTP endpoints decode owned requests and retain the existing 
     auto& route = std::get<HttpRouteMatch_s>(match);
     auto command = route.Decode(R"({"command":"@main status"})");
     CHECK(std::get<ExecuteConsoleCommand_s>(std::get<ApplicationRequestPayload>(command)).command == "@main status");
+
     for (const auto body : {R"({"command":""})", R"({"command":"help","extra":1})", R"({"command":10})", R"({"command":"help\nquit"})", "bad json"})
     {
         auto decoded = route.Decode(body);
@@ -79,6 +88,7 @@ TEST_CASE("Default HTTP endpoints decode owned requests and retain the existing 
         CHECK(std::get<HttpResponse_s>(decoded).status == 400);
         CHECK_FALSE(std::get<HttpResponse_s>(decoded).close);
     }
+
     CHECK(std::get<HttpResponse_s>(router.Match("GET", "/api/v1/console/commands", "")).allow == "POST");
     CHECK(std::get<HttpResponse_s>(router.Match("POST", "/api/v1/status", "")).allow == "GET");
 }
@@ -90,18 +100,21 @@ TEST_CASE("HTTP result serialization dispatches by payload type and preserves er
     {
         const auto response = HttpResponses::Complete({.id = 42, .outcome = outcome, .errorCode = "test_error", .payload = ConsoleCommandResult_s{.output = "line\n", .recipients = {{"main", "failed", "handler_failed"}}}});
         CHECK(response.status == expected);
+
         const auto body = nlohmann::json::parse(response.body);
         CHECK(body["requestId"] == "42");
         CHECK(body["outcome"] == outcome);
         CHECK(body["recipients"][0]["errorCode"] == "handler_failed");
         CHECK(body["error"]["code"] == "test_error");
     }
+
     const auto status = HttpResponses::Complete({.id = 43, .payload = ApplicationStatus_s{.uptimeMs = 123, .accounts = {{"main", true, false, "in game"}}}});
     const auto body = nlohmann::json::parse(status.body);
     CHECK(status.status == 200);
     CHECK(body["application"]["uptimeMs"] == 123);
     CHECK(body["accounts"][0]["name"] == "main");
     CHECK_FALSE(body.contains("output"));
+
     const auto result = CompletedApplicationRequest_s{.id = 44, .payload = ConsoleCommandResult_s{.output = "final output", .outputTruncated = true}};
     const auto expired = HttpResponses::Timeout(44, true, &result);
     const auto error = nlohmann::json::parse(expired.body);
@@ -116,6 +129,7 @@ TEST_CASE("HTTP templates extract multiple path parameters and decoded query val
     auto router = HttpRouter{{{.method = "GET", .path = "/api/v1/status/{id}/items/{name}", .decode = Status}}};
     auto result = router.Match("GET", "/api/v1/status/1/items/caf%C3%A9?something=1&tag=one&tag=two&flag&empty=&text=a+b%2Bc&literal=a%26b%3Dc", "");
     REQUIRE(std::holds_alternative<HttpRouteMatch_s>(result));
+
     const auto& request = std::get<HttpRouteMatch_s>(result).request;
     CHECK(request.pathParameters.at("id") == "1");
     CHECK(request.pathParameters.at("name") == "caf\xc3\xa9");
@@ -135,10 +149,12 @@ TEST_CASE("HTTP path decoding preserves segment boundaries and separates the que
     {
         const auto result = router.Match("GET", target, "");
         REQUIRE(std::holds_alternative<HttpRouteMatch_s>(result));
+
         const auto& request = std::get<HttpRouteMatch_s>(result).request;
         CHECK(request.pathParameters.at("id") == expected);
         CHECK(request.queryParameters.empty());
     }
+
     CHECK(std::get<HttpResponse_s>(router.Match("GET", "/items/a/b", "")).status == 404);
     CHECK(std::get<HttpResponse_s>(router.Match("GET", "/items/", "")).status == 404);
     CHECK(std::get<HttpResponse_s>(router.Match("GET", "/items/a/", "")).status == 404);
@@ -157,11 +173,14 @@ TEST_CASE("Literal HTTP routes take priority independent of registration order w
         {
             std::ranges::reverse(routes);
         }
+
         auto router = HttpRouter{std::move(routes)};
         CHECK(std::get<HttpRouteMatch_s>(router.Match("POST", "/items/latest", "")).request.pathParameters.empty());
+
         const auto wrongMethod = std::get<HttpResponse_s>(router.Match("GET", "/items/latest", ""));
         CHECK(wrongMethod.status == 405);
         CHECK(wrongMethod.allow == "POST");
+
         const auto fallback = router.Match("GET", "/items/latest/detail", "");
         REQUIRE(std::holds_alternative<HttpRouteMatch_s>(fallback));
         CHECK(std::get<HttpRouteMatch_s>(fallback).request.pathParameters.at("id") == "latest");
@@ -193,8 +212,10 @@ TEST_CASE("HTTP router rejects malformed escapes controls fragments and invalid 
                               "/status/1?x=%", "/status/1?x=%FF", "/status/1?%00=value", "/status/1?=empty", "/status/1#fragment", "relative", "/status/a b"})
     {
         INFO(target);
+
         const auto result = router.Match("GET", target, "");
         REQUIRE(std::holds_alternative<HttpResponse_s>(result));
+
         const auto& response = std::get<HttpResponse_s>(result);
         CHECK(response.status == 400);
         CHECK(nlohmann::json::parse(response.body)["error"]["code"] == "invalid_target");
@@ -209,9 +230,11 @@ TEST_CASE("HTTP matched parameter values remain owned while body reading is defe
         auto url = std::string{"/status/alice%20smith?tag=one&%74ag=two&empty=&"};
         return router.Match("POST", url, "");
     }();
+
     auto& match = std::get<HttpRouteMatch_s>(result);
     CHECK(match.request.pathParameters.at("id") == "alice smith");
     CHECK(match.request.queryParameters.at("tag") == std::vector<std::string>{"one", "two"});
+
     auto payload = match.Decode("later body");
     CHECK(std::get<ExecuteConsoleCommand_s>(std::get<ApplicationRequestPayload>(payload)).command == "later body");
     CHECK(match.request.pathParameters.at("id") == "alice smith");
@@ -221,9 +244,11 @@ TEST_CASE("HTTP router handles the root path empty queries and UTF8 range bounda
 {
     auto router = HttpRouter{{{.method = "GET", .path = "/", .decode = Status}, {.method = "GET", .path = "/{id}", .decode = Status}}};
     CHECK(std::get<HttpRouteMatch_s>(router.Match("GET", "/?&&", "")).request.queryParameters.empty());
+
     for (const auto target : {"/%C2%80", "/%E0%A0%80", "/%ED%9F%BF", "/%EE%80%80", "/%F0%90%80%80", "/%F4%8F%BF%BF"})
     {
         CHECK(std::holds_alternative<HttpRouteMatch_s>(router.Match("GET", target, "")));
     }
+
     CHECK(std::holds_alternative<HttpRouteMatch_s>(HttpRouter{}.Match("GET", "/api/v1/%73tatus?something=1", "")));
 }

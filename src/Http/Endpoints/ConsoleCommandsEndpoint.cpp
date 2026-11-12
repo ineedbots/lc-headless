@@ -15,6 +15,7 @@ HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& re
     {
         return HttpResponses::Error(400, "invalid_command", "Expected one command string");
     }
+
     auto line = value["command"].get<std::string>();
     if (std::ranges::all_of(line, [](unsigned char c)
     {
@@ -24,6 +25,7 @@ HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& re
     {
         return HttpResponses::Error(400, "invalid_command", "Expected a nonempty single line command");
     }
+
     return ApplicationRequestPayload{ExecuteConsoleCommand_s{std::move(line)}};
 }
 
@@ -37,8 +39,10 @@ HttpResponse_s ConsoleCommandsEndpoint::Respond(u64 id, std::string_view outcome
         {
             item["errorCode"] = recipient.errorCode;
         }
+
         body["recipients"].push_back(std::move(item));
     }
+
     auto code = 200u;
     if (outcome == "rejected")
     {
@@ -52,9 +56,11 @@ HttpResponse_s ConsoleCommandsEndpoint::Respond(u64 id, std::string_view outcome
     {
         code = 503;
     }
+
     if (!errorCode.empty())
     {
         body["error"] = {{"code", errorCode}, {"message", errorCode}};
     }
+
     return HttpJson::Response(code, body);
 }

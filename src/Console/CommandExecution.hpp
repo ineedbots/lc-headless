@@ -1,4 +1,5 @@
 #pragma once
+
 #include "ConsoleCapture.hpp"
 
 struct CommandRecipient_s
@@ -16,6 +17,7 @@ public:
         , deadline{expires}
     {
     }
+
     bool CanExecute() const;
     bool IsComplete() const;
     ConsoleCapture capture;
