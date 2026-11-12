@@ -419,9 +419,18 @@ std::vector<ScriptCommand_s> Account::GetCommands() const
     return m_script->GetCommands();
 }
 
-bool Account::SendCommand(ConsoleCommand_s command)
+bool Account::SendCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
 {
-    return m_script && !m_finished && m_script->ReceiveCommand(std::move(command));
+    return QueueCommand(std::move(command), std::move(recipient)) == CommandQueueResult_e::Accepted;
+}
+
+CommandQueueResult_e Account::QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
+{
+    if (!m_script || m_finished)
+    {
+        return CommandQueueResult_e::Unavailable;
+    }
+    return m_script->QueueCommand(std::move(command), std::move(recipient));
 }
 
 bool Account::Say(std::string_view text)
@@ -716,4 +725,18 @@ void Account::UpdateFinished()
 {
     const auto status = m_client.GetStatus();
     m_finished = status == ClientStatus_e::LoggedOut || status == ClientStatus_e::Disconnected;
+    if (m_finished && m_script)
+    {
+        m_script->CancelCommands("account_finished");
+    }
+}
+
+void Account::CloseNetwork()
+{
+    if (m_script)
+    {
+        m_script->CancelCommands("application_stopping");
+    }
+    m_client.Disconnect();
+    UpdateFinished();
 }

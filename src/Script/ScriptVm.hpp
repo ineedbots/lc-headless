@@ -20,6 +20,7 @@ struct ScriptVmOptions_s
 class ScriptVm
 {
 public:
+    void FlushOutput();
     static constexpr std::string_view LIBRARY_FOLDER = "lib";
     static constexpr auto DEBUGGER_HOST = "127.0.0.1";
     static constexpr u16 DEBUGGER_PORT = 6110;
@@ -70,7 +71,6 @@ private:
     [[noreturn]] void ThrowPythonError(py_StackRef unwindPoint);
     [[nodiscard]] std::optional<std::filesystem::path> ResolveImport(std::string_view request) const;
     void AppendOutput(std::string_view text);
-    void FlushOutput();
     void RecordProfileSource(std::string_view filename, std::string_view source);
 
     static bool Log(int argc, py_StackRef argv) noexcept;

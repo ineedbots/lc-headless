@@ -21,18 +21,19 @@ public:
     // Ctrl+C presses so far; each new one interrupts every account.
     using InterruptCount = std::function<u32()>;
 
-    AccountRunner(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {});
+    AccountRunner(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger = Logger::GetDefault(), AccountOptions_s options = {}, std::shared_ptr<NetLoop> net = NetLoop::Create());
 
     AccountRunner(const AccountRunner&) = delete;
     AccountRunner& operator=(const AccountRunner&) = delete;
 
     // After an interrupt, accounts not yet started never are. True when every started account logged out cleanly.
-    [[nodiscard]] bool Run(const InterruptCount& interrupts, ConsoleInput* console = nullptr);
+    [[nodiscard]] bool Run(const InterruptCount& interrupts, ConsoleInput* console = nullptr, const std::function<void(bool)>& service = {}, const std::function<bool()>& hasIncoming = {}, const std::function<void()>& onStopping = {});
     // help, status, quit (or exit, which is a Ctrl+C), loglevel and say are the runner's own; any other command
     // goes to every running script that added it. "@<account> <command>" sends a line to one account, named by
     // its file or its username, in any case; quit then stops just that account.
-    void HandleCommand(std::string_view line);
+    void HandleCommand(std::string_view line, std::shared_ptr<CommandExecution> execution = {});
 
+    void CloseNetwork();
     [[nodiscard]] std::size_t GetAccountCount() const;
     [[nodiscard]] const Account& GetAccount(std::size_t index) const;
 
@@ -47,7 +48,7 @@ private:
     std::shared_ptr<const GameCache_s> m_cache;
     std::shared_ptr<Logger> m_logger;
     // Every account's connection runs on it, so a packet for any of them wakes the runner.
-    std::shared_ptr<NetLoop> m_net = NetLoop::Create();
+    std::shared_ptr<NetLoop> m_net;
     // Every account's login attempts take turns on it, so reconnects and relogins are spaced out as the first
     // logins are.
     std::shared_ptr<LoginQueue> m_loginQueue;

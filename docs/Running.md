@@ -129,3 +129,59 @@ Ctrl+C advances through three stages:
 The server refuses logout during combat and for ten seconds afterward, so requesting logout may not end the connection immediately. Console `quit` and `exit` use the same staged shutdown.
 
 The process returns 0 only when every account logged out cleanly and no script failed. Startup errors, account failures and forced disconnections can produce a nonzero exit. If startup fails, use the [configuration troubleshooting table](Configuration.md#troubleshooting-configuration) before changing script code.
+
+## HTTP API
+
+Enable `http.host` in `client.jsonc` as described in [Configuration](Configuration.md#http-operator-api).
+The API supports HTTP/1.1 and sequential keep-alive, including buffered pipelined requests.
+
+```sh
+curl http://127.0.0.1:8080/api/v1/status
+curl -H 'Content-Type: application/json' --data '{"command":"@main status"}' http://127.0.0.1:8080/api/v1/console/commands
+```
+
+`GET /api/v1/status` queues a fresh main-thread snapshot, returning a decimal-string `requestId`,
+`application` (`state`, `uptimeMs`), and `accounts` (`name`, `started`, `finished`, `status`).
+It excludes configuration and credentials. Status text is descriptive and may evolve.
+
+`POST /api/v1/console/commands` accepts exactly one nonempty string field, `command`, using the
+same syntax and dispatcher as stdin. Embedded CR, LF and NUL are rejected. This executes the
+application's console language. The original connection waits for the handler to return,
+including every accepted script recipient of a broadcast. Completion acknowledges a handler's
+return; later walking, bot activity, logout and packet delivery may still be in progress.
+
+Command responses include `requestId`, `outcome`, `output`, `outputTruncated`, `executionStarted`,
+and `recipients` (each with `account`, `outcome`, and optional `errorCode`). Mixed broadcast results
+return HTTP 200 with `outcome: "partial"`; inspect recipients. Captured output preserves the console
+log threshold and ordered plain lines, including script logs and partial Python print lines.
+It tees to the existing terminal and file output. Unrelated account steps, local commands,
+other threads, and nested network callbacks are excluded. Captured UTF-8 is truncated at a codepoint
+boundary when full; execution and normal logging continue. Invalid log bytes are replaced during
+JSON serialization. Direct third-party `printf` output is outside this contract.
+
+| HTTP status | Meaning |
+|---|---|
+| 200 | Handler/snapshot completed; inspect outcome for partial results |
+| 400 | Malformed HTTP/JSON or invalid request envelope |
+| 404 / 405 | Unknown route / unsupported method (`Allow` lists the accepted method) |
+| 413 / 415 / 417 / 431 | Body limit / content type / expectation / header limit |
+| 422 | Console command rejected |
+| 500 | Internal or script handler failure without a successful recipient |
+| 503 | Capacity exhausted or application stopping/cancellation |
+| 504 | Admitted request deadline elapsed |
+
+Errors include `error.code`, `error.message`, and a request ID after admission. Finalized command
+output is included when available. Routes match exact paths; query parameters are rejected.
+Bodies are limited while reading both fixed-length and chunked requests. Headers and receive
+buffers are capped at 16 KiB, active connections at 128, receive operations at ten seconds, and
+response writes at five seconds. `Expect: 100-continue` is supported after header validation.
+Capacity covers queued work, deferred handlers, completed results and response delivery.
+
+Deadlines are checked before dispatch, before each script recipient, and before delivery.
+Expired or disconnected work that has not started is cancelled. A handler already running finishes;
+its effects may have occurred even when the response is 504. Do not automatically retry commands.
+HTTP shares the main thread: a long handler stalls requests and timer delivery alongside game I/O.
+The request timeout is eligibility for execution/success, not a hard client response-time bound.
+`scripting.callTimeoutMs: 0` disables the Python watchdog. Shutdown closes admission, cancels pending
+work, and drains response writes and network cancellation for a bounded period. `quit` acknowledges
+its handler before teardown. Delivery still depends on a connected client and a responsive main loop.

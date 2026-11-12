@@ -45,5 +45,14 @@
         "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
         "progressDirectory": "progress"
+    },
+    "http": {
+        // Empty disables the listener; use 127.0.0.1 for local operator access.
+        "host": "",
+        "port": 8080,
+        "requestTimeoutMs": 30000,
+        "maxPendingRequests": 64,
+        "maxRequestBodyBytes": 16384,
+        "maxOutputBytes": 1048576
     }
 }

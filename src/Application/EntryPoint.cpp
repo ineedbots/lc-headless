@@ -7,6 +7,7 @@
 
 int ApplicationEntryPoint::Run(int argc, char** argv)
 {
+    static_cast<void>(GetStartTime());
     const auto logger = std::make_shared<Logger>();
     Logger::SetDefault(logger);
 
@@ -21,4 +22,10 @@ int ApplicationEntryPoint::Run(int argc, char** argv)
         logger->Error("Fatal error: {}", e.what());
         return EXIT_FAILURE;
     }
+}
+
+std::chrono::steady_clock::time_point ApplicationEntryPoint::GetStartTime()
+{
+    static const auto started = std::chrono::steady_clock::now();
+    return started;
 }

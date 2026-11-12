@@ -24,10 +24,11 @@ namespace
 
 }
 
-AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options)
+AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, std::vector<AccountConfig_s> accounts, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, std::shared_ptr<NetLoop> net)
     : m_config{std::move(config)}
     , m_cache{std::move(cache)}
     , m_logger{std::move(logger)}
+    , m_net{std::move(net)}
     , m_loginQueue{std::make_shared<LoginQueue>(m_config->scripting.loginIntervalSeconds)}
     , m_commands{m_accounts, *m_logger}
 {
@@ -40,7 +41,7 @@ AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared
     }
 }
 
-bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
+bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console, const std::function<void(bool)>& service, const std::function<bool()>& hasIncoming, const std::function<void()>& onStopping)
 {
     m_loginTurns = 0;
     m_nextLogin = m_accounts.empty() ? std::nullopt : std::optional{Clock::now()};
@@ -68,6 +69,11 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
             }
         }
 
+        if (service)
+        {
+            service(true);
+        }
+
         const auto now = Clock::now();
         if (m_nextLogin && now >= *m_nextLogin)
         {
@@ -84,6 +90,11 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
             InterruptAll();
         }
 
+        if (service)
+        {
+            service(false);
+        }
+
         const auto running = std::ranges::any_of(m_accounts, [](const std::unique_ptr<Account>& account)
         {
             return account->IsStarted() && !account->IsFinished();
@@ -94,7 +105,14 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
             break;
         }
 
-        Wait(now);
+        if (!hasIncoming || !hasIncoming())
+        {
+            Wait(now);
+        }
+        else
+        {
+            m_net->Poll();
+        }
     }
 
     if (console != nullptr)
@@ -102,16 +120,32 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console)
         console->SetOnArrived({});
     }
 
+    if (onStopping)
+    {
+        onStopping();
+    }
+
     // So every account's last close ends with a close frame rather than a dropped socket.
-    m_net->Settle(Clock::now() + SETTLE_TIMEOUT);
+    if (!onStopping)
+    {
+        m_net->Settle(Clock::now() + SETTLE_TIMEOUT);
+    }
     return LogOutcomes();
 }
 
-void AccountRunner::HandleCommand(std::string_view line)
+void AccountRunner::HandleCommand(std::string_view line, std::shared_ptr<CommandExecution> execution)
 {
+    const auto reject = [&execution](std::string error)
+    {
+        if (execution)
+        {
+            execution->errorCode = std::move(error);
+        }
+    };
     const auto parsed = ConsoleCommandParser::Parse(line);
     if (!parsed)
     {
+        reject("invalid_command");
         return;
     }
 
@@ -122,6 +156,7 @@ void AccountRunner::HandleCommand(std::string_view line)
         target = m_commands.FindAccount(*name);
         if (target == nullptr)
         {
+            reject("unknown_target");
             auto names = std::vector<std::string>{};
             for (const auto& account : m_accounts)
             {
@@ -134,12 +169,17 @@ void AccountRunner::HandleCommand(std::string_view line)
 
         if (parsed->command.name.empty())
         {
+            reject("invalid_command");
             m_logger->Warning("{}{} needs a command after it, such as {}{} {}", TARGET_PREFIX, *name, TARGET_PREFIX, *name, AccountCommands::HELP);
             return;
         }
     }
 
     const auto& command = parsed->command;
+    if (execution && command.name != AccountCommands::PAUSE && command.name != AccountCommands::RESUME)
+    {
+        execution->started = true;
+    }
     if (command.name == AccountCommands::HELP)
     {
         m_commands.ShowHelp(target);
@@ -154,15 +194,28 @@ void AccountRunner::HandleCommand(std::string_view line)
     }
     else if (command.name == AccountCommands::LOG_LEVEL)
     {
-        m_commands.SetLogLevel(target, command.args);
+        if (!m_commands.SetLogLevel(target, command.args))
+        {
+            reject("invalid_arguments");
+        }
     }
     else if (command.name == AccountCommands::SAY)
     {
-        m_commands.Say(target, command.text);
+        if (!m_commands.Say(target, command.text))
+        {
+            reject("account_unavailable_or_invalid_arguments");
+        }
     }
     else
     {
-        m_commands.SendToScripts(target, command);
+        if (execution)
+        {
+            execution->started = false;
+        }
+        if (!m_commands.SendToScripts(target, command, execution))
+        {
+            reject("command_rejected");
+        }
     }
 }
 
@@ -265,4 +318,12 @@ bool AccountRunner::LogOutcomes() const
     }
 
     return succeeded;
+}
+
+void AccountRunner::CloseNetwork()
+{
+    for (const auto& account : m_accounts)
+    {
+        account->CloseNetwork();
+    }
 }
