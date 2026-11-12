@@ -23,35 +23,42 @@ void ApplicationRequestProcessor::Dispatch()
             m_bridge->Complete({.id = control->id, .outcome = "cancelled", .errorCode = "request_cancelled"});
             continue;
         }
-        if (const auto command = std::get_if<ExecuteConsoleCommand_s>(&request->payload))
+        std::visit([&](const auto& payload)
         {
-            auto execution = std::make_shared<CommandExecution>(static_cast<std::size_t>(m_bridge->GetSettings().maxOutputBytes), control->deadline);
-            control->execution = execution;
-            m_executing.push_back(control);
-            try
-            {
-                const auto capture = ConsoleCaptureScope{&execution->capture};
-                m_runner.HandleCommand(command->command, execution);
-            }
-            catch (const std::exception&)
-            {
-                execution->errorCode = "internal_failure";
-            }
-            execution->dispatched = true;
-        }
-        else
-        {
-            auto status = ApplicationStatus_s{};
-            status.uptimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_started).count();
-            for (std::size_t i = 0; i < m_runner.GetAccountCount(); ++i)
-            {
-                const auto& account = m_runner.GetAccount(i);
-                status.accounts.push_back({account.GetName(), account.IsStarted(), account.IsFinished(), account.DescribeStatus()});
-            }
-            m_bridge->Complete({.id = control->id, .payload = std::move(status)});
-        }
+            Process(control, payload);
+        }, request->payload);
     }
 }
+
+void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s>& control, const ExecuteConsoleCommand_s& command)
+{
+    auto execution = std::make_shared<CommandExecution>(static_cast<std::size_t>(m_bridge->GetSettings().maxOutputBytes), control->deadline);
+    control->execution = execution;
+    m_executing.push_back(control);
+    try
+    {
+        const auto capture = ConsoleCaptureScope{&execution->capture};
+        m_runner.HandleCommand(command.command, execution);
+    }
+    catch (const std::exception&)
+    {
+        execution->errorCode = "internal_failure";
+    }
+    execution->dispatched = true;
+}
+
+void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s>& control, const GetApplicationStatus_s&)
+{
+    auto status = ApplicationStatus_s{};
+    status.uptimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_started).count();
+    for (std::size_t i = 0; i < m_runner.GetAccountCount(); ++i)
+    {
+        const auto& account = m_runner.GetAccount(i);
+        status.accounts.push_back({account.GetName(), account.IsStarted(), account.IsFinished(), account.DescribeStatus()});
+    }
+    m_bridge->Complete({.id = control->id, .payload = std::move(status)});
+}
+
 void ApplicationRequestProcessor::Finalize()
 {
     for (const auto& control : m_executing)

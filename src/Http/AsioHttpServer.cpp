@@ -4,19 +4,20 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#include <nlohmann/json.hpp>
+#include "HttpRouter.hpp"
+#include "HttpResponses.hpp"
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
 namespace http = beast::http;
 using Tcp = asio::ip::tcp;
-using Json = nlohmann::json;
 
 struct AsioHttpServer::State : std::enable_shared_from_this<State>
 {
     struct Session;
     Tcp::acceptor acceptor;
     HttpSettings_s settings;
+    HttpRouter router;
     std::shared_ptr<ApplicationRequestBridge> bridge;
     std::unordered_map<Session*, std::shared_ptr<Session>> sessions;
     std::unordered_map<u64, std::weak_ptr<Session>> pending;
@@ -62,6 +63,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
     std::optional<http::response<http::string_body>> response;
     std::optional<http::response<http::empty_body>> interim;
     std::shared_ptr<RequestControl_s> control;
+    std::optional<HttpRoute_s> route;
     bool closed = false;
     bool writing = false;
     bool keepAlive = false;
@@ -97,14 +99,9 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
     }
     void Error(unsigned code, std::string error, std::string message, bool close = false)
     {
-        auto body = Json{{"error", {{"code", std::move(error)}, {"message", std::move(message)}}}};
-        if (control)
-        {
-            body["requestId"] = std::to_string(control->id);
-        }
-        Respond(code, std::move(body), close);
+        Respond(HttpResponses::Error(code, error, message, control ? std::optional{control->id} : std::nullopt, close));
     }
-    void Respond(unsigned code, Json body, bool close = false, std::string_view allow = {})
+    void Respond(HttpResponse_s reply)
     {
         if (closed || writing)
         {
@@ -118,15 +115,15 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
         {
             state->pending.erase(control->id);
         }
-        response.emplace(static_cast<http::status>(code), 11);
+        response.emplace(static_cast<http::status>(reply.status), 11);
         response->set(http::field::content_type, "application/json");
         response->set(http::field::cache_control, "no-store");
-        if (!allow.empty())
+        if (!reply.allow.empty())
         {
-            response->set(http::field::allow, allow);
+            response->set(http::field::allow, reply.allow);
         }
-        response->keep_alive(keepAlive && !close && !state->stopping);
-        response->body() = body.dump(-1, ' ', false, Json::error_handler_t::replace);
+        response->keep_alive(keepAlive && !reply.close && !state->stopping);
+        response->body() = std::move(reply.body);
         response->prepare_payload();
         stream.expires_at(std::min(std::chrono::steady_clock::now() + 5s, state->shutdownDeadline));
         http::async_write(stream, *response, state->Track([self = shared_from_this()](boost::system::error_code error, std::size_t)
@@ -190,6 +187,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             return;
         }
         timedOut = false;
+        route.reset();
         parser.emplace();
         parser->body_limit(static_cast<u64>(state->settings.maxRequestBodyBytes));
         parser->header_limit(16384);
@@ -212,43 +210,13 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             Error(400, "http_version", "HTTP/1.1 required", true);
             return;
         }
-        const auto target = request.target();
-        if (target.find('?') != beast::string_view::npos)
+        auto match = state->router.Match(request.method_string(), request.target(), request[http::field::content_type]);
+        if (const auto error = std::get_if<HttpResponse_s>(&match))
         {
-            Error(400, "query_not_supported", "Query parameters are unsupported", true);
+            Respond(std::move(*error));
             return;
         }
-        const auto command = target == "/api/v1/console/commands";
-        const auto status = target == "/api/v1/status";
-        if (!command && !status)
-        {
-            Error(404, "not_found", "Unknown endpoint", true);
-            return;
-        }
-        if (request.method() != (command ? http::verb::post : http::verb::get))
-        {
-            Respond(405, {{"error", {{"code", "method_not_allowed"}, {"message", "Unsupported method"}}}}, true, command ? "POST" : "GET");
-            return;
-        }
-        if (command)
-        {
-            auto contentType = std::string{request[http::field::content_type]};
-            const auto separator = contentType.find(';');
-            contentType.resize(separator == std::string::npos ? contentType.size() : separator);
-            while (!contentType.empty() && contentType.back() == ' ')
-            {
-                contentType.pop_back();
-            }
-            std::ranges::transform(contentType, contentType.begin(), [](unsigned char c)
-            {
-                return static_cast<char>(std::tolower(c));
-            });
-            if (contentType != "application/json")
-            {
-                Error(415, "content_type", "application/json required", true);
-                return;
-            }
-        }
+        route = std::get<HttpRoute_s>(std::move(match));
         if (state->stopping)
         {
             Error(503, "stopping", "Application stopping", true);
@@ -300,33 +268,19 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
     void Admit()
     {
         const auto& request = parser->get();
-        const auto command = request.target() == "/api/v1/console/commands";
-        auto payload = std::variant<ExecuteConsoleCommand_s, GetApplicationStatus_s>{GetApplicationStatus_s{}};
         if (request.body().size() > static_cast<std::size_t>(state->settings.maxRequestBodyBytes))
         {
             Error(413, "body_too_large", "Request body exceeds limit", true);
             return;
         }
-        if (command)
+        assert(route);
+        auto decoded = route->decode(request.body());
+        if (const auto error = std::get_if<HttpResponse_s>(&decoded))
         {
-            const auto value = Json::parse(request.body(), nullptr, false);
-            if (!value.is_object() || value.size() != 1 || !value.contains("command") || !value["command"].is_string())
-            {
-                Error(400, "invalid_command", "Expected one command string");
-                return;
-            }
-            auto line = value["command"].get<std::string>();
-            if (std::ranges::all_of(line, [](unsigned char c)
-            {
-                return std::isspace(c) != 0;
-            }) ||
-                line.find_first_of(std::string{"\r\n\0", 3}) != std::string::npos)
-            {
-                Error(400, "invalid_command", "Expected a nonempty single line command");
-                return;
-            }
-            payload = ExecuteConsoleCommand_s{std::move(line)};
+            Respond(std::move(*error));
+            return;
         }
+        auto payload = std::get<ApplicationRequestPayload>(std::move(decoded));
         control = state->bridge->Reserve();
         if (!control)
         {
@@ -380,16 +334,10 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             }
         }));
     }
-    void Timeout(const ConsoleCommandResult_s* result = nullptr)
+    void Timeout(const CompletedApplicationRequest_s* result = nullptr)
     {
         state->bridge->Abandon(control->id);
-        auto body = Json{{"requestId", std::to_string(control->id)}, {"outcome", "cancelled"}, {"error", {{"code", "deadline_exceeded"}, {"message", "Request expired; execution effects may already have occurred"}}}, {"executionStarted", control->execution && control->execution->started}};
-        if (result)
-        {
-            body["output"] = result->output;
-            body["outputTruncated"] = result->outputTruncated;
-        }
-        Respond(504, std::move(body));
+        Respond(HttpResponses::Timeout(control->id, control->execution && control->execution->started, result));
     }
     void Service()
     {
@@ -410,55 +358,10 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
         }
         if (timedOut || std::chrono::steady_clock::now() >= control->deadline)
         {
-            Timeout(std::get_if<ConsoleCommandResult_s>(&result.payload));
+            Timeout(&result);
             return;
         }
-        auto body = Json{{"requestId", std::to_string(result.id)}};
-        auto code = 200u;
-        if (const auto status = std::get_if<ApplicationStatus_s>(&result.payload))
-        {
-            body["application"] = {{"state", status->state}, {"uptimeMs", status->uptimeMs}};
-            body["accounts"] = Json::array();
-            for (const auto& account : status->accounts)
-            {
-                body["accounts"].push_back({{"name", account.name}, {"started", account.started}, {"finished", account.finished}, {"status", account.status}});
-            }
-        }
-        else
-        {
-            const auto& command = std::get<ConsoleCommandResult_s>(result.payload);
-            body["outcome"] = result.outcome;
-            body["output"] = command.output;
-            body["outputTruncated"] = command.outputTruncated;
-            body["executionStarted"] = command.executionStarted;
-            body["recipients"] = Json::array();
-            for (const auto& recipient : command.recipients)
-            {
-                auto item = Json{{"account", recipient.account}, {"outcome", recipient.outcome}};
-                if (!recipient.errorCode.empty())
-                {
-                    item["errorCode"] = recipient.errorCode;
-                }
-                body["recipients"].push_back(std::move(item));
-            }
-            if (result.outcome == "rejected")
-            {
-                code = 422;
-            }
-            else if (result.outcome == "failed")
-            {
-                code = 500;
-            }
-            else if (result.outcome == "cancelled")
-            {
-                code = 503;
-            }
-        }
-        if (!result.errorCode.empty())
-        {
-            body["error"] = {{"code", result.errorCode}, {"message", result.errorCode}};
-        }
-        Respond(code, std::move(body));
+        Respond(HttpResponses::Complete(result));
     }
 };
 

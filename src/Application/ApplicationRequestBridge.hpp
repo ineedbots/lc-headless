@@ -38,10 +38,12 @@ struct RequestControl_s
     bool abandoned = false;
     std::shared_ptr<CommandExecution> execution;
 };
+using ApplicationRequestPayload = std::variant<ExecuteConsoleCommand_s, GetApplicationStatus_s>;
+
 struct ApplicationRequest_s
 {
     std::shared_ptr<RequestControl_s> control;
-    std::variant<ExecuteConsoleCommand_s, GetApplicationStatus_s> payload;
+    ApplicationRequestPayload payload;
 };
 struct CompletedApplicationRequest_s
 {

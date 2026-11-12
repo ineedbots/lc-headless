@@ -354,3 +354,27 @@ Candidate direction for the follow-up:
 - Test filtering, subscribe/unsubscribe behavior, event ordering, snapshot/reconnect semantics, multiple clients, slow consumers, and shutdown without starving the shared loop.
 
 For the current REST implementation, keep routing, session ownership, and typed application data extensible enough to add an upgrade route later. Do not prebuild unused subscription infrastructure or broaden the current acceptance criteria.
+
+## Adding endpoints
+
+`HttpRouter` owns a path index and the allowed methods for each path. Its default constructor is the
+single registration table. Each `HttpRoute_s` provides a method, exact path, content-type policy and
+body decoder. Multiple methods can share a path; the router builds `Allow` from that path's registrations
+and rejects duplicate method/path registrations at startup.
+
+Endpoint adapters in `src/Http/Endpoints/` own request-envelope validation and result JSON. A decoder
+returns either an owned `ApplicationRequestPayload` or an owned `HttpResponse_s` rejection. It does not
+call the runner or script VM. `HttpResponses` selects the result adapter by visiting the completed
+payload type; `HttpJson` applies the shared UTF-8 replacement and JSON encoding policy.
+
+To add an endpoint:
+
+1. Define its typed application request/result values and implement safe-point processing.
+2. Add an endpoint adapter with route metadata, a decoder and a result serializer.
+3. Register its route in `HttpRouter` and add its result overload to `HttpResponses`.
+4. Cover its validation and response contract, plus a real loopback request through the existing bridge.
+
+`AsioHttpServer` sessions own transport reads/writes, bounded parsers, admission, timers and connection
+lifetime. They hold the matched route through body reading and forward only decoded values to the
+request bridge. New endpoint paths, validation rules and result schemas require no session changes.
+Shared response headers, sequential keep-alive and safe-point delivery apply to every endpoint.
