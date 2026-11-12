@@ -1184,76 +1184,61 @@ test vector.
 
 ## Headless Client Implementation Notes
 
-These notes are for extending [`headless-client/src/protocol.cpp`](../../../headless-client/src/protocol.cpp),
-which today frames server packets and discards their payloads.
+The revision-289 headless client is implemented in this repository under `src/Game`. The protocol
+reader frames and ISAAC-decrypts server packets; `ServerPacketDecoder` dispatches payloads to
+stateful decoders. The table below reflects the native code and its tests, rather than a separate
+`headless-client` directory.
 
-### Known Gap
+### Current Support
 
-`Protocol::server_packet_length` has no entry for opcode **60** (`OBJ_ADD`, size 5). The engine
-sends standalone `OBJ_ADD` packets whenever a zone containing a dropped item comes into view, so
-the client currently fails with "unknown server opcode 60" in any area with ground items. Add it
-first. All other 68 opcodes match the engine and webclient tables. Consider replacing the switch
-with a 256-entry size table, with a sentinel for "never sent", mirrored from
-[`ServerProtSizes`](../../../289server/webclient/src/io/ServerProt.ts) and covered by a test that
-checks every opcode in the table above.
+- **Framing and opcode table:** all 69 revision-289 server opcodes have declared sizes in
+  [`ServerProt.cpp`](../../src/Game/Protocol/ServerProt.cpp). `ServerPacketReader` buffers split
+  frames, decrypts each opcode once, and rejects opcodes the selected revision does not send
+  ([implementation](../../src/Game/Net/ServerPacketReader.cpp),
+  [tests](../../tests/Game/NetTests.cpp)).
+- **Payload dispatch:** every server packet enum is handled by
+  [`ServerPacketDecoder.cpp`](../../src/Game/Decode/ServerPacketDecoder.cpp); its dispatcher
+  rejects unconsumed payload bytes. Some packets are intentionally consumed without updating
+  game state (for example logout and tracking control); this is distinct from an unknown opcode.
+- **Entity state:** `PLAYER_INFO` and `NPC_INFO` are decoded into tracked entity state, including
+  movement, masks, and appearance data ([player](../../src/Game/Decode/PlayerInfoDecoder.cpp),
+  [NPC](../../src/Game/Decode/NpcInfoDecoder.cpp),
+  [tests](../../tests/Game/EntityInfoTests.cpp)).
+- **Zones and ground items:** zone framing, enclosed updates, and zone sub-packets are decoded.
+  In particular, revision-289 `OBJ_ADD` is opcode **60**, size **5**, and is supported through the
+  same zone decoder as `OBJ_DEL`, `OBJ_COUNT`, and `OBJ_REVEAL`
+  ([zone decoder](../../src/Game/Decode/ZoneDecoder.cpp),
+  [protocol table](../../src/Game/Protocol/ServerProt.cpp),
+  [tests](../../tests/Game/SceneZonePacketTests.cpp)).
+- **Other game state:** scene/build-area, interfaces, inventories, player state, and social packets
+  have dedicated decoders selected by the dispatcher. See [`src/Game/Decode`](../../src/Game/Decode)
+  and the integration coverage in [`GameEventTests.cpp`](../../tests/Game/GameEventTests.cpp).
 
-### Suggested Structure
+### Limits and Unsupported Behavior
 
-1. **Framing** (exists): decrypt the opcode, look up the size, and wait for the whole frame. Hand
-   `(opcode, payload span)` to a dispatcher instead of discarding it.
-2. **Dispatcher**: one decoder per opcode, grouped as in this document. Every decoder must
-   consume exactly the declared payload. For variable packets, check that the read position ends
-   at the payload length.
-3. **State model**: build-area base, local player index (`UPDATE_PID`), local position and level,
-   tracked player and NPC lists, per-index entity state and appearance, inventories keyed by
-   component, varps, stats, run energy and weight, ground items and loc changes keyed by absolute
-   tile, modal and tab state, friends and ignores, and recent messages.
-4. **Entity info**: a bounds-checked MSB-first bit reader. Keep the list-order rules exactly;
-   any divergence desynchronises every later `PLAYER_INFO` and `NPC_INFO`.
-5. **Zones**: one sub-packet decoder shared by the standalone and enclosed paths, driven by the
-   fixed sizes above.
-6. **Actions**: builders for the client packets above. Movement needs waypoints that avoid
-   obstacles, because the default server configuration does not pathfind for the client.
-7. **Reconnect**: opcode `18`, status `15`, and fresh ISAAC streams. Entity lists are emptied
-   by the server's first info packets, as described in [Reconnect](#reconnect).
+The client does not render the game. Camera state and sound events may be recorded, but there is
+no visual or audio output. Map-file transfer packets (`DATA_LAND`, `DATA_LOC`, and their done
+markers) are consumed but not assembled into map files; this is marked as a TODO in
+[`SceneDecoder.cpp`](../../src/Game/Decode/SceneDecoder.cpp). Other server packets are consumed
+without a state update, as listed in `ServerPacketDecoder::DecodePacket`. The protocol tables
+describe wire support, not complete support for every gameplay feature or server-side outcome.
+Check the individual decoder and tests before relying on a particular state effect. Unknown server
+opcodes remain fatal because their frame lengths cannot be determined safely.
 
-### Decode Priority for a Bot
+Client-to-server packet construction is implemented under
+[`src/Game/Protocol`](../../src/Game/Protocol) and [`src/Game/Net`](../../src/Game/Net), with
+packet coverage in [`ClientPacketsTests.cpp`](../../tests/Game/ClientPacketsTests.cpp). Movement
+and interaction behavior is handled in [`GameActions.cpp`](../../src/Game/GameActions.cpp) and
+uses the local map/pathfinding code. Reconnect and login handling are covered in
+[`LoginHandshakeTests.cpp`](../../tests/Game/LoginHandshakeTests.cpp) and
+[`NetTests.cpp`](../../tests/Game/NetTests.cpp).
 
-Every packet must be framed and consumed; this is only the order in which to decode payloads.
+### Native Source and Test Map
 
-| Priority | Packets |
-|---|---|
-| Essential | `REBUILD_NORMAL`, `UPDATE_PID`, `PLAYER_INFO`, `NPC_INFO`, `UPDATE_INV_FULL`, `UPDATE_INV_PARTIAL`, `UPDATE_INV_STOP_TRANSMIT`, `UPDATE_STAT`, `VARP_SMALL`, `VARP_LARGE`, the zone framing packets and all zone sub-packets, `MESSAGE_GAME`, `LOGOUT` |
-| Interaction | `IF_OPENMAIN`, `IF_OPENSIDE`, `IF_OPENCHAT`, `IF_OPENMAIN_SIDE`, `IF_CLOSE`, `IF_SETTAB`, `IF_SETTEXT`, `IF_SETHIDE`, `P_COUNTDIALOG`, `UPDATE_RUNENERGY`, `UPDATE_RUNWEIGHT`, `SET_PLAYER_OP`, `HINT_ARROW`, `UNSET_MAP_FLAG`, `UPDATE_REBOOT_TIMER` |
-| Social | `MESSAGE_PRIVATE`, `UPDATE_FRIENDLIST`, `UPDATE_IGNORELIST`, `FRIENDLIST_LOADED`, `CHAT_FILTER_SETTINGS` |
-| Render-only (consume and ignore) | Camera, audio, `IF_SETOBJECT`, `IF_SETMODEL`, `IF_SETANIM`, `IF_SETPLAYERHEAD`, `IF_SETNPCHEAD`, `IF_SETCOLOUR`, `IF_SETPOSITION`, `IF_SETSCROLLPOS`, `IF_OPENOVERLAY`, `IF_SETTAB_ACTIVE`, `TUT_OPEN`, `TUT_FLASH`, `MINIMAP_TOGGLE`, `SET_MULTIWAY`, `RESET_ANIMS`, `RESET_CLIENT_VARCACHE`, `LAST_LOGIN_INFO` |
-
-### Testing
-
-- Build fixtures from the engine's encoders: each server packet's bytes are produced by one
-  `encode` method in [`server/codec/`](../../../289server/engine/src/network/game/server/codec) (or
-  [`rsbuf/info.ts`](../../../289server/engine/src/network/rsbuf/info.ts) for entity info), so every
-  decoder can be tested byte for byte without a running server.
-- For entity info, cover: local walk, run, and teleport; tracked-list removal by a short
-  `count`; removal by type 3; new entries with negative `dx`/`dz`; a packet with no extended
-  blocks (no terminator); a player mask above `0xff`; and an appearance with an NPC transform.
-- For zones, cover an `UPDATE_ZONE_PARTIAL_ENCLOSED` holding several sub-opcodes, and a
-  standalone `OBJ_ADD` after `UPDATE_ZONE_PARTIAL_FOLLOWS`.
-- The existing scripted-server tests (RSA exponent 1, so the test server can read the ISAAC
-  seed) can feed encrypted frames of any of these packets through the full state machine.
-
-## Source Map
-
-| Topic | Engine | Webclient |
+| Topic | Implementation | Tests |
 |---|---|---|
-| Login | [`World.onClientData`, `processLogins`](../../../289server/engine/src/engine/World.ts) | [`Client.login`](../../../289server/webclient/src/client/Client.ts) |
-| Server opcode table | [`ServerGameProt.ts`](../../../289server/engine/src/network/game/server/ServerGameProt.ts), [`ServerGameZoneProt.ts`](../../../289server/engine/src/network/game/server/ServerGameZoneProt.ts) | [`ServerProt.ts`](../../../289server/webclient/src/io/ServerProt.ts) |
-| Server payloads | [`server/codec/`](../../../289server/engine/src/network/game/server/codec) | `Client.tcpIn`, `Client.zonePacket` in [`Client.ts`](../../../289server/webclient/src/client/Client.ts) |
-| Player and NPC info | [`rsbuf/info.ts`](../../../289server/engine/src/network/rsbuf/info.ts), [`rsbuf/messages.ts`](../../../289server/engine/src/network/rsbuf/messages.ts), [`rsbuf/prot.ts`](../../../289server/engine/src/network/rsbuf/prot.ts) | `Client.getPlayerPos`, `Client.getNpcPos`; [`ClientPlayer.ts`](../../../289server/webclient/src/dash3d/ClientPlayer.ts), [`ClientNpc.ts`](../../../289server/webclient/src/dash3d/ClientNpc.ts) |
-| Appearance | `Player.generateAppearance` in [`Player.ts`](../../../289server/engine/src/engine/entity/Player.ts) | `ClientPlayer.setAppearance` |
-| Zones | [`Zone.ts`](../../../289server/engine/src/engine/zone/Zone.ts), [`BuildArea.ts`](../../../289server/engine/src/engine/entity/BuildArea.ts) | `Client.zonePacket`, [`LocShape.ts`](../../../289server/webclient/src/dash3d/LocShape.ts) |
-| Client opcode table | [`ClientGameProt.ts`](../../../289server/engine/src/network/game/client/ClientGameProt.ts), [`ClientGameProtRepository.ts`](../../../289server/engine/src/network/game/client/ClientGameProtRepository.ts) | [`ClientProt.ts`](../../../289server/webclient/src/io/ClientProt.ts) |
-| Client payloads | [`client/codec/`](../../../289server/engine/src/network/game/client/codec), [`client/handler/`](../../../289server/engine/src/network/game/client/handler) | `Client.doAction`, `Client.tryMove`, `Client.interactWithLoc` |
-| Per-tick output | [`NetworkPlayer.ts`](../../../289server/engine/src/engine/entity/NetworkPlayer.ts), `World.processClientsOut` | - |
-| Primitives | [`io/Packet.ts`](../../../289server/engine/src/io/Packet.ts) | [`io/Packet.ts`](../../../289server/webclient/src/io/Packet.ts), [`io/Isaac.ts`](../../../289server/webclient/src/io/Isaac.ts) |
-| Text and names | [`wordenc/WordPack.ts`](../../../289server/engine/src/wordenc/WordPack.ts) | [`datastruct/JString.ts`](../../../289server/webclient/src/datastruct/JString.ts) |
+| Opcode tables and framing | [`ServerProt.cpp`](../../src/Game/Protocol/ServerProt.cpp), [`ServerPacketReader.cpp`](../../src/Game/Net/ServerPacketReader.cpp) | [`ProtocolTests.cpp`](../../tests/Game/ProtocolTests.cpp), [`NetTests.cpp`](../../tests/Game/NetTests.cpp) |
+| Payload dispatch and state updates | [`ServerPacketDecoder.cpp`](../../src/Game/Decode/ServerPacketDecoder.cpp), [`src/Game/Decode`](../../src/Game/Decode) | [`ServerPacketDecoderTests.cpp`](../../tests/Game/ServerPacketDecoderTests.cpp) |
+| Player and NPC info | [`PlayerInfoDecoder.cpp`](../../src/Game/Decode/PlayerInfoDecoder.cpp), [`NpcInfoDecoder.cpp`](../../src/Game/Decode/NpcInfoDecoder.cpp) | [`EntityInfoTests.cpp`](../../tests/Game/EntityInfoTests.cpp) |
+| Zone updates and `OBJ_ADD` | [`ZoneDecoder.cpp`](../../src/Game/Decode/ZoneDecoder.cpp) | [`SceneZonePacketTests.cpp`](../../tests/Game/SceneZonePacketTests.cpp) |
+| Login and client packets | [`LoginHandshake.cpp`](../../src/Game/Net/LoginHandshake.cpp), [`ClientPackets.cpp`](../../src/Game/Protocol/ClientPackets.cpp) | [`LoginHandshakeTests.cpp`](../../tests/Game/LoginHandshakeTests.cpp), [`ClientPacketsTests.cpp`](../../tests/Game/ClientPacketsTests.cpp) |
