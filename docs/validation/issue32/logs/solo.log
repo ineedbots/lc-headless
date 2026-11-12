@@ -1,0 +1,158 @@
+2026-11-12T02:35:37.862Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\solo\client.log too
+2026-11-12T02:35:37.864Z INFO    Config loaded from build/issue32-live/solo/client.json
+2026-11-12T02:35:38.059Z INFO    Revision 289 cache loaded from data/cache in 194 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:35:38.360Z INFO    Walking map built and walker graph loaded from data/nav in 300 ms: 7.9 MB, 3482 edges
+2026-11-12T02:35:38.412Z ERROR   Fatal error: participant0.py can't run:
+Traceback (most recent call last):
+  File "rs2004\_runtime.py", line 118, in load
+    warnings += apply_schema(settings, manifest.settings_schema, bot_settings_path(manifest.name))
+  File "rs2004\settings.py", line 225, in apply_schema
+    values[key] = _check(key, definition, values[key], where)
+  File "rs2004\settings.py", line 173, in _check
+    raise ValueError(f'{where} must be one of: {", ".join(definition.options)}')
+ValueError: settings["MuleCrafter"].rune must be one of: Air rune, Mind rune, Water rune, Earth rune, Fire rune, Body rune, Cosmic rune, Chaos rune, Nature rune, Law rune, Death rune
+2026-11-12T02:37:44.054Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\solo\client.log too
+2026-11-12T02:37:44.055Z INFO    Config loaded from build/issue32-live/solo/client.json
+2026-11-12T02:37:44.235Z INFO    Revision 289 cache loaded from data/cache in 179 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:37:44.504Z INFO    Walking map built and walker graph loaded from data/nav in 267 ms: 7.9 MB, 3482 edges
+2026-11-12T02:37:44.535Z INFO    [0] Loaded script participant0.py
+2026-11-12T02:37:44.535Z INFO    Running 1 account
+2026-11-12T02:37:44.536Z INFO    [0] Logging in as q32solo0
+2026-11-12T02:37:44.537Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:37:44.539Z INFO    [0] Connection open
+2026-11-12T02:37:44.812Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:37:44.814Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:37:45.416Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:37:45.416Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:37:46.031Z INFO    [0] tutorial: stage 1
+2026-11-12T02:37:48.416Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:37:59.807Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:37:59.807Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:38:01.001Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:38:01.002Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:38:05.855Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:38:11.868Z INFO    [0] ACCEPT_START Tile(3013, 3355, 0) inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:38:11.869Z INFO    [0] MuleCrafter: No partners configured. Running in Solo Crafter mode.
+2026-11-12T02:38:11.900Z INFO    [0]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:38:12.425Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=557 tile=Tile(3013, 3357, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:38:24.457Z INFO    [0] ACCEPT_SAMPLE ticks=21 ms=12588 tile=Tile(3006, 3323, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:38:35.821Z INFO    [0]   arrived (4 clicks)
+2026-11-12T02:38:36.443Z INFO    [0] ACCEPT_SAMPLE ticks=41 ms=24575 tile=Tile(2983, 3288, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:38:36.444Z INFO    [0] using the Air talisman on the mysterious ruins
+2026-11-12T02:38:38.220Z INFO    [0] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:38:38.220Z INFO    [0] [game] You feel a powerful force take hold of you...
+2026-11-12T02:38:38.221Z INFO    [0] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:38:38.221Z INFO    [0] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:38:39.421Z INFO    [0] entered the altar
+2026-11-12T02:38:40.025Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:38:41.825Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:38:41.825Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:38:41.830Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:38:42.422Z INFO    [0] taking the portal back to the ruins
+2026-11-12T02:38:46.022Z INFO    [0] [game] You step through the portal...
+2026-11-12T02:38:46.023Z INFO    [0] SERVER You step through the portal...
+2026-11-12T02:38:46.026Z INFO    [0] back at the mysterious ruins
+2026-11-12T02:38:46.640Z INFO    [0]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:38:48.458Z INFO    [0] ACCEPT_SAMPLE ticks=61 ms=36590 tile=Tile(2983, 3294, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 27, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 135} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:39:00.433Z INFO    [0] ACCEPT_SAMPLE ticks=81 ms=48565 tile=Tile(3005, 3330, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 27, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 135} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:39:10.641Z INFO    [0]   arrived (5 clicks)
+2026-11-12T02:39:11.852Z INFO    [0] Bank (open): Coins x25, Rune essence x200
+2026-11-12T02:39:12.434Z INFO    [0] ACCEPT_SAMPLE ticks=101 ms=60566 tile=Tile(3011, 3355, 0) xp=0 report={'Status': 'Crafter — banking', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 27, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 135} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:39:13.048Z INFO    [0] deposited 270 Air runes
+2026-11-12T02:39:13.621Z INFO    [0] cleared 1 slot(s)
+2026-11-12T02:39:16.033Z INFO    [0] withdrew 27 essence from the bank
+2026-11-12T02:39:16.683Z INFO    [0]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:39:24.471Z INFO    [0] ACCEPT_SAMPLE ticks=121 ms=72603 tile=Tile(3008, 3339, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 27, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 135} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:36.429Z INFO    [0] ACCEPT_SAMPLE ticks=141 ms=84561 tile=Tile(2988, 3301, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 27, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 135} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:40.623Z INFO    [0]   arrived (4 clicks)
+2026-11-12T02:39:41.222Z INFO    [0] using the Air talisman on the mysterious ruins
+2026-11-12T02:39:43.018Z INFO    [0] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:39:43.019Z INFO    [0] [game] You feel a powerful force take hold of you...
+2026-11-12T02:39:43.019Z INFO    [0] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:39:43.019Z INFO    [0] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:39:44.241Z INFO    [0] entered the altar
+2026-11-12T02:39:44.831Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:39:46.630Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:39:46.631Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:39:46.635Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:39:47.253Z INFO    [0] taking the portal back to the ruins
+2026-11-12T02:39:48.453Z INFO    [0] ACCEPT_SAMPLE ticks=161 ms=96585 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — taking the portal out', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:39:50.871Z INFO    [0] [game] You step through the portal...
+2026-11-12T02:39:50.872Z INFO    [0] SERVER You step through the portal...
+2026-11-12T02:39:50.880Z INFO    [0] back at the mysterious ruins
+2026-11-12T02:39:51.490Z INFO    [0]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:40:00.447Z INFO    [0] ACCEPT_SAMPLE ticks=181 ms=108579 tile=Tile(2997, 3314, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:40:12.414Z INFO    [0] ACCEPT_SAMPLE ticks=201 ms=120546 tile=Tile(3006, 3346, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:40:22.654Z INFO    [0]   arrived (6 clicks)
+2026-11-12T02:40:24.433Z INFO    [0] ACCEPT_SAMPLE ticks=221 ms=132564 tile=Tile(3011, 3355, 0) xp=0 report={'Status': 'Crafter — banking', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:40:24.434Z INFO    [0] Bank (open): Air rune x270, Coins x25, Rune essence x173
+2026-11-12T02:40:25.636Z INFO    [0] deposited 270 Air runes
+2026-11-12T02:40:26.250Z INFO    [0] cleared 1 slot(s)
+2026-11-12T02:40:28.026Z INFO    [0] withdrew 27 essence from the bank
+2026-11-12T02:40:29.263Z INFO    [0] withdrew Air talisman
+2026-11-12T02:40:29.900Z INFO    [0]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:40:36.427Z INFO    [0] ACCEPT_SAMPLE ticks=241 ms=144559 tile=Tile(3008, 3354, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 270} inv=[(1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1438, 1)]
+2026-11-12T02:40:48.431Z INFO    [0] ACCEPT_SAMPLE ticks=261 ms=156562 tile=Tile(3008, 3334, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 270} inv=[(1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1438, 1)]
+2026-11-12T02:41:00.439Z INFO    [0] ACCEPT_SAMPLE ticks=281 ms=168571 tile=Tile(2997, 3316, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 270} inv=[(1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1438, 1)]
+2026-11-12T02:41:12.463Z INFO    [0] ACCEPT_SAMPLE ticks=301 ms=180595 tile=Tile(2985, 3296, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 270} inv=[(1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1438, 1)]
+2026-11-12T02:41:17.879Z INFO    [0]   arrived (6 clicks)
+2026-11-12T02:41:18.434Z INFO    [0] using the Air talisman on the mysterious ruins
+2026-11-12T02:41:20.847Z INFO    [0] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:41:20.848Z INFO    [0] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:41:20.850Z INFO    [0] [game] You feel a powerful force take hold of you...
+2026-11-12T02:41:20.851Z INFO    [0] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:41:22.041Z INFO    [0] entered the altar
+2026-11-12T02:41:22.631Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:41:24.483Z INFO    [0] ACCEPT_SAMPLE ticks=321 ms=192615 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — crafting runes', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 270} inv=[(1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1438, 1)]
+2026-11-12T02:41:25.037Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:41:25.038Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:41:25.043Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:41:25.638Z INFO    [0] taking the portal back to the ruins
+2026-11-12T02:41:29.869Z INFO    [0] [game] You step through the portal...
+2026-11-12T02:41:29.870Z INFO    [0] SERVER You step through the portal...
+2026-11-12T02:41:29.876Z INFO    [0] back at the mysterious ruins
+2026-11-12T02:41:30.562Z INFO    [0]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:41:36.459Z INFO    [0] ACCEPT_SAMPLE ticks=341 ms=204591 tile=Tile(2985, 3296, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 405} inv=[(556, 270), (1438, 1)]
+2026-11-12T02:41:48.422Z INFO    [0] ACCEPT_SAMPLE ticks=361 ms=216554 tile=Tile(2997, 3314, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 405} inv=[(556, 270), (1438, 1)]
+2026-11-12T02:42:00.447Z INFO    [0] ACCEPT_SAMPLE ticks=381 ms=228579 tile=Tile(3006, 3334, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 405} inv=[(556, 270), (1438, 1)]
+2026-11-12T02:42:12.439Z INFO    [0] ACCEPT_SAMPLE ticks=401 ms=240570 tile=Tile(3006, 3354, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 405} inv=[(556, 270), (1438, 1)]
+2026-11-12T02:42:17.246Z INFO    [0]   arrived (7 clicks)
+2026-11-12T02:42:19.651Z INFO    [0] Bank (open): Air rune x540, Coins x25, Rune essence x146
+2026-11-12T02:42:20.846Z INFO    [0] deposited 270 Air runes
+2026-11-12T02:42:21.432Z INFO    [0] cleared 1 slot(s)
+2026-11-12T02:42:23.822Z INFO    [0] withdrew 27 essence from the bank
+2026-11-12T02:42:24.432Z INFO    [0] ACCEPT_SAMPLE ticks=421 ms=252563 tile=Tile(3011, 3355, 0) xp=0 report={'Status': 'Crafter — banking', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 405} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:24.469Z INFO    [0]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:42:36.471Z INFO    [0] ACCEPT_SAMPLE ticks=441 ms=264603 tile=Tile(3008, 3345, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 405} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:48.431Z INFO    [0] ACCEPT_SAMPLE ticks=461 ms=276562 tile=Tile(2998, 3317, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 405} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:58.037Z INFO    [0]   arrived (5 clicks)
+2026-11-12T02:42:58.632Z INFO    [0] using the Air talisman on the mysterious ruins
+2026-11-12T02:43:00.463Z INFO    [0] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:43:00.463Z INFO    [0] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:43:00.464Z INFO    [0] [game] You feel a powerful force take hold of you...
+2026-11-12T02:43:00.464Z INFO    [0] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:43:00.469Z INFO    [0] ACCEPT_SAMPLE ticks=481 ms=288600 tile=Tile(2984, 3290, 0) xp=0 report={'Status': 'Crafter — entering the altar', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 405} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:43:01.637Z INFO    [0] entered the altar
+2026-11-12T02:43:02.235Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:43:04.024Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:43:04.025Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:43:04.032Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:43:04.632Z INFO    [0] taking the portal back to the ruins
+2026-11-12T02:43:08.223Z INFO    [0] [game] You step through the portal...
+2026-11-12T02:43:08.224Z INFO    [0] SERVER You step through the portal...
+2026-11-12T02:43:08.229Z INFO    [0] back at the mysterious ruins
+2026-11-12T02:43:08.874Z INFO    [0]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:43:12.423Z INFO    [0] ACCEPT_SAMPLE ticks=501 ms=300555 tile=Tile(2985, 3296, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:24.421Z INFO    [0] ACCEPT_SAMPLE ticks=521 ms=312553 tile=Tile(2997, 3314, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:36.419Z INFO    [0] ACCEPT_SAMPLE ticks=541 ms=324551 tile=Tile(3006, 3334, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:48.435Z INFO    [0] ACCEPT_SAMPLE ticks=561 ms=336567 tile=Tile(3006, 3354, 0) xp=0 report={'Status': 'Crafter — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:53.221Z INFO    [0]   arrived (7 clicks)
+2026-11-12T02:43:55.657Z INFO    [0] Bank (open): Air rune x810, Coins x25, Rune essence x119
+2026-11-12T02:43:56.825Z INFO    [0] deposited 270 Air runes
+2026-11-12T02:43:57.425Z INFO    [0] cleared 1 slot(s)
+2026-11-12T02:43:59.829Z INFO    [0] withdrew 27 essence from the bank
+2026-11-12T02:44:00.431Z INFO    [0] ACCEPT_SAMPLE ticks=581 ms=348563 tile=Tile(3011, 3355, 0) xp=0 report={'Status': 'Crafter — banking', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 540} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:00.450Z INFO    [0]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:44:11.828Z INFO    [0] ACCEPT_FINISH ACCEPT_LIMIT 600 ticks
+2026-11-12T02:44:11.829Z INFO    [0] ACCEPT_FINAL ticks=600 ms=359960 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 540}
+2026-11-12T02:44:11.829Z INFO    [0] The script stopped itself; the account stays logged in

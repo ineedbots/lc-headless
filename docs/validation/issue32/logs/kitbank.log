@@ -1,0 +1,40 @@
+2026-11-12T02:44:58.859Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\kitbank\client.log too
+2026-11-12T02:44:58.860Z INFO    Config loaded from build/issue32-live/kitbank/client.json
+2026-11-12T02:44:59.046Z INFO    Revision 289 cache loaded from data/cache in 185 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:44:59.328Z INFO    Walking map built and walker graph loaded from data/nav in 280 ms: 7.9 MB, 3482 edges
+2026-11-12T02:44:59.403Z INFO    [0] Added Fisher's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\kitbank\accounts\0.jsonc: bait_qty, leash_radius, tick_manip, guild_feather_minutes, custom_location, cook_fish, cook_fish_custom, burnt_policy, bank_raw_before_cook, after_cook_cycle, mule_partner, tool_acquire, forgetful_bank, pack_junk, withdraw_coins, bank_teleport, tele_casts
+2026-11-12T02:44:59.403Z INFO    [0] Loaded script participant0.py
+2026-11-12T02:44:59.403Z INFO    Running 1 account
+2026-11-12T02:44:59.403Z INFO    [0] Logging in as q32kitba0
+2026-11-12T02:44:59.404Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:44:59.406Z INFO    [0] Connection open
+2026-11-12T02:44:59.841Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:44:59.847Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:45:00.427Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:45:00.427Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:45:01.037Z INFO    [0] tutorial: stage 1
+2026-11-12T02:45:03.417Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:45:14.817Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:45:14.819Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:45:16.024Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:45:16.025Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:45:26.878Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:45:29.865Z INFO    [0] ACCEPT_START Tile(2722, 3493, 0) inv=[]
+2026-11-12T02:45:29.867Z INFO    [0] 3-tick fly: drops catches in each batch; bank trips restock gear and feathers
+2026-11-12T02:45:29.869Z INFO    [0] combat: Location Use Start Position — mob flee off (may die)
+2026-11-12T02:45:29.869Z INFO    [0] location: no preset — nearest bank
+2026-11-12T02:45:29.870Z INFO    [0] bank: Bank location = Seers
+2026-11-12T02:45:29.870Z INFO    [0] gather: 'Fishing spot' (Lure + pair 'Bait') leash 18 @ Tile(2722, 3493, 0); banking raw when full
+2026-11-12T02:45:29.871Z INFO    [0] restock: missing Fly fishing rod, Feather, Knife, Logs
+2026-11-12T02:45:29.888Z INFO    [0]   path: cost 3, 3 waypoints, 14 expanded, hops []
+2026-11-12T02:45:30.433Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=567 tile=Tile(2724, 3492, 0) xp=0 report={'Status': 'restock: Fly fishing rod + Feather + Knife + Logs', 'Location': 'nearest bank', 'Gathered': 0, 'Banked': 0, 'Trips': 0, 'Fishing xp': 0, 'Fishing xp/hr': '—'} inv=[]
+2026-11-12T02:45:31.056Z INFO    [0]   arrived (1 clicks)
+2026-11-12T02:45:32.890Z INFO    [0] Bank (open): Fly fishing rod x1, Feather x10000, Knife x1, Coins x25, Logs x1
+2026-11-12T02:45:34.649Z INFO    [0] restock: withdraw 1× Fly fishing rod
+2026-11-12T02:45:36.502Z INFO    [0] restock: withdraw 1000× Feather
+2026-11-12T02:45:38.254Z INFO    [0] restock: withdraw 1× Knife
+2026-11-12T02:45:40.654Z INFO    [0] restock: withdraw 1× Logs
+2026-11-12T02:45:41.869Z INFO    [0] ACCEPT_BANK_KIT [(309, 1), (314, 1000), (946, 1), (1511, 1)]
+2026-11-12T02:45:41.870Z INFO    [0] ACCEPT_FINISH bank kit acquisition complete
+2026-11-12T02:45:41.872Z INFO    [0] ACCEPT_FINAL ticks=20 ms=12004 report={'Status': 'restock: Fly fishing rod + Feather + Knife + Logs', 'Location': 'nearest bank', 'Gathered': 0, 'Banked': 0, 'Trips': 0, 'Fishing xp': 0, 'Fishing xp/hr': '—'}
+2026-11-12T02:45:41.873Z INFO    [0] The script stopped itself; the account stays logged in

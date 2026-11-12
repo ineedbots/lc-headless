@@ -1,0 +1,889 @@
+{
+  "cosmic": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32cosmb0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "JiveRC": {
+              "rune": "Cosmic runes",
+              "mode": "Master",
+              "partner": "q32cosmb1",
+              "bank_every": 0,
+              "stay_in_altar": true,
+              "withdraw_ess": 0,
+              "withdraw_coins": 10000
+            }
+          }
+        }
+      },
+      "harness": "af480e902d4e.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32cosmb1",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant1.py",
+          "settings": {
+            "JiveRC": {
+              "rune": "Cosmic runes",
+              "mode": "Runner",
+              "partner": "q32cosmb0",
+              "bank_every": 0,
+              "stay_in_altar": true,
+              "withdraw_ess": 0,
+              "withdraw_coins": 10000
+            }
+          }
+        }
+      },
+      "harness": "af480e902d4e.py"
+    }
+  ],
+  "infix": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32infix0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Crafter",
+              "partner": "q32infix1",
+              "meeting_point": "Altar (inside)",
+              "bank_fill": false,
+              "trades_per_bank": 0
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32infix1",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant1.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Mule",
+              "partner": "q32infix0",
+              "meeting_point": "Altar (inside)",
+              "bank_fill": false,
+              "trades_per_bank": 0
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    }
+  ],
+  "outfix": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32outfi0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Crafter",
+              "partner": "q32outfi1",
+              "meeting_point": "Ruins (outside)",
+              "bank_fill": true,
+              "trades_per_bank": 1
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32outfi1",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant1.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Mule",
+              "partner": "q32outfi0",
+              "meeting_point": "Ruins (outside)",
+              "bank_fill": true,
+              "trades_per_bank": 1
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    }
+  ],
+  "inbank": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32inban0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Crafter",
+              "partner": "q32inban1",
+              "meeting_point": "Altar (inside)",
+              "bank_fill": true,
+              "trades_per_bank": 1
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32inban1",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant1.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Mule",
+              "partner": "q32inban0",
+              "meeting_point": "Altar (inside)",
+              "bank_fill": true,
+              "trades_per_bank": 1
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    }
+  ],
+  "solo": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32solo0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "MuleCrafter": {
+              "rune": "Air rune",
+              "mode": "Crafter",
+              "partner": "",
+              "meeting_point": "Altar (inside)",
+              "bank_fill": true,
+              "trades_per_bank": 0
+            }
+          }
+        }
+      },
+      "harness": "2e6cd6414c8f.py"
+    }
+  ],
+  "sup2a": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32sup2a0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "MuleDepot": {
+              "mode": "Supply",
+              "designation": "Supplier",
+              "bank": "Seers",
+              "accounts": "q32sup2a1,q32sup2a2",
+              "loadout": [
+                "100 Air rune",
+                "200 Mind rune",
+                "5 Law rune"
+              ],
+              "trade_slots": 1,
+              "items": [
+                "Air rune",
+                "water rune",
+                "earth rune",
+                "fire rune",
+                "cosmic rune",
+                "law rune",
+                "mind rune",
+                "body rune",
+                "nature rune",
+                "chaos rune",
+                "death rune",
+                "soul rune",
+                "blood rune",
+                "Bronze arrow",
+                "iron arrow",
+                "steel arrow",
+                "mithril arrow",
+                "adamant arrow",
+                "rune arrow",
+                "rune dart",
+                "rune knife",
+                "Feather",
+                "cowhide",
+                "dragonhide",
+                "dragon bones",
+                "big bones",
+                "Snape grass",
+                "unicorn horn",
+                "limpwurt root",
+                "herb",
+                "Nature talisman",
+                "half of a key",
+                "uncut sapphire",
+                "uncut emerald",
+                "uncut ruby",
+                "uncut diamond",
+                "chaos talisman",
+                "rune javelin",
+                "dragon spear",
+                "rune spear",
+                "shield left half",
+                "rune longsword",
+                "adamant platebody",
+                "rune dagger",
+                "adamant full helm",
+                "rune sq shield",
+                "rune battleaxe",
+                "runite bar",
+                "runite ore",
+                "rune kiteshield",
+                "rune scimitar",
+                "rune sword",
+                "rune full helm",
+                "dragon platelegs",
+                "dragon plateskirt",
+                "dragon chainbody",
+                "adamant platelegs",
+                "Air talisman",
+                "earth talisman",
+                "water talisman",
+                "fire talisman",
+                "mind talisman",
+                "body talisman",
+                "cosmic talisman",
+                "Ashes",
+                "eye of newt",
+                "vial",
+                "vial of water",
+                "rune essence",
+                "coal",
+                "iron ore",
+                "gold ore",
+                "mithril ore",
+                "adamantite ore",
+                "runite ore",
+                "yew logs",
+                "magic logs",
+                "hard leather",
+                "leather",
+                "seaweed"
+              ]
+            }
+          }
+        }
+      },
+      "harness": "46d6c4c6bff4.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32sup2a1",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant1.py",
+          "settings": {
+            "MuleDepot": {
+              "mode": "Supply",
+              "designation": "Client",
+              "bank": "Seers",
+              "accounts": "q32sup2a0",
+              "loadout": [
+                "100 Air rune",
+                "200 Mind rune",
+                "5 Law rune"
+              ],
+              "trade_slots": 1,
+              "items": [
+                "Air rune",
+                "water rune",
+                "earth rune",
+                "fire rune",
+                "cosmic rune",
+                "law rune",
+                "mind rune",
+                "body rune",
+                "nature rune",
+                "chaos rune",
+                "death rune",
+                "soul rune",
+                "blood rune",
+                "Bronze arrow",
+                "iron arrow",
+                "steel arrow",
+                "mithril arrow",
+                "adamant arrow",
+                "rune arrow",
+                "rune dart",
+                "rune knife",
+                "Feather",
+                "cowhide",
+                "dragonhide",
+                "dragon bones",
+                "big bones",
+                "Snape grass",
+                "unicorn horn",
+                "limpwurt root",
+                "herb",
+                "Nature talisman",
+                "half of a key",
+                "uncut sapphire",
+                "uncut emerald",
+                "uncut ruby",
+                "uncut diamond",
+                "chaos talisman",
+                "rune javelin",
+                "dragon spear",
+                "rune spear",
+                "shield left half",
+                "rune longsword",
+                "adamant platebody",
+                "rune dagger",
+                "adamant full helm",
+                "rune sq shield",
+                "rune battleaxe",
+                "runite bar",
+                "runite ore",
+                "rune kiteshield",
+                "rune scimitar",
+                "rune sword",
+                "rune full helm",
+                "dragon platelegs",
+                "dragon plateskirt",
+                "dragon chainbody",
+                "adamant platelegs",
+                "Air talisman",
+                "earth talisman",
+                "water talisman",
+                "fire talisman",
+                "mind talisman",
+                "body talisman",
+                "cosmic talisman",
+                "Ashes",
+                "eye of newt",
+                "vial",
+                "vial of water",
+                "rune essence",
+                "coal",
+                "iron ore",
+                "gold ore",
+                "mithril ore",
+                "adamantite ore",
+                "runite ore",
+                "yew logs",
+                "magic logs",
+                "hard leather",
+                "leather",
+                "seaweed"
+              ]
+            }
+          }
+        }
+      },
+      "harness": "19bd599ac926.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32sup2a2",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant2.py",
+          "settings": {
+            "MuleDepot": {
+              "mode": "Supply",
+              "designation": "Client",
+              "bank": "Seers",
+              "accounts": "q32sup2a0",
+              "loadout": [
+                "100 Air rune",
+                "200 Mind rune",
+                "5 Law rune"
+              ],
+              "trade_slots": 1,
+              "items": [
+                "Air rune",
+                "water rune",
+                "earth rune",
+                "fire rune",
+                "cosmic rune",
+                "law rune",
+                "mind rune",
+                "body rune",
+                "nature rune",
+                "chaos rune",
+                "death rune",
+                "soul rune",
+                "blood rune",
+                "Bronze arrow",
+                "iron arrow",
+                "steel arrow",
+                "mithril arrow",
+                "adamant arrow",
+                "rune arrow",
+                "rune dart",
+                "rune knife",
+                "Feather",
+                "cowhide",
+                "dragonhide",
+                "dragon bones",
+                "big bones",
+                "Snape grass",
+                "unicorn horn",
+                "limpwurt root",
+                "herb",
+                "Nature talisman",
+                "half of a key",
+                "uncut sapphire",
+                "uncut emerald",
+                "uncut ruby",
+                "uncut diamond",
+                "chaos talisman",
+                "rune javelin",
+                "dragon spear",
+                "rune spear",
+                "shield left half",
+                "rune longsword",
+                "adamant platebody",
+                "rune dagger",
+                "adamant full helm",
+                "rune sq shield",
+                "rune battleaxe",
+                "runite bar",
+                "runite ore",
+                "rune kiteshield",
+                "rune scimitar",
+                "rune sword",
+                "rune full helm",
+                "dragon platelegs",
+                "dragon plateskirt",
+                "dragon chainbody",
+                "adamant platelegs",
+                "Air talisman",
+                "earth talisman",
+                "water talisman",
+                "fire talisman",
+                "mind talisman",
+                "body talisman",
+                "cosmic talisman",
+                "Ashes",
+                "eye of newt",
+                "vial",
+                "vial of water",
+                "rune essence",
+                "coal",
+                "iron ore",
+                "gold ore",
+                "mithril ore",
+                "adamantite ore",
+                "runite ore",
+                "yew logs",
+                "magic logs",
+                "hard leather",
+                "leather",
+                "seaweed"
+              ]
+            }
+          }
+        }
+      },
+      "harness": "19bd599ac926.py"
+    }
+  ],
+  "dump3": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32dump30",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "MuleDepot": {
+              "mode": "Dump",
+              "designation": "Mule",
+              "bank": "Seers",
+              "accounts": "q32dump31",
+              "items": [
+                "Air rune",
+                "water rune",
+                "earth rune",
+                "fire rune",
+                "cosmic rune",
+                "law rune",
+                "mind rune",
+                "body rune",
+                "nature rune",
+                "chaos rune",
+                "death rune",
+                "soul rune",
+                "blood rune",
+                "Bronze arrow",
+                "iron arrow",
+                "steel arrow",
+                "mithril arrow",
+                "adamant arrow",
+                "rune arrow",
+                "rune dart",
+                "rune knife",
+                "Feather",
+                "cowhide",
+                "dragonhide",
+                "dragon bones",
+                "big bones",
+                "Snape grass",
+                "unicorn horn",
+                "limpwurt root",
+                "herb"
+              ],
+              "loadout": [
+                "10000 Air rune",
+                "10000 Mind rune"
+              ],
+              "trade_slots": 28
+            }
+          }
+        }
+      },
+      "harness": "0c17b9d7de3c.py"
+    },
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32dump31",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant1.py",
+          "settings": {
+            "MuleDepot": {
+              "mode": "Dump",
+              "designation": "Supermule",
+              "bank": "Seers",
+              "accounts": "q32dump30",
+              "items": [
+                "Air rune",
+                "water rune",
+                "earth rune",
+                "fire rune",
+                "cosmic rune",
+                "law rune",
+                "mind rune",
+                "body rune",
+                "nature rune",
+                "chaos rune",
+                "death rune",
+                "soul rune",
+                "blood rune",
+                "Bronze arrow",
+                "iron arrow",
+                "steel arrow",
+                "mithril arrow",
+                "adamant arrow",
+                "rune arrow",
+                "rune dart",
+                "rune knife",
+                "Feather",
+                "cowhide",
+                "dragonhide",
+                "dragon bones",
+                "big bones",
+                "Snape grass",
+                "unicorn horn",
+                "limpwurt root",
+                "herb"
+              ],
+              "loadout": [
+                "10000 Air rune",
+                "10000 Mind rune"
+              ],
+              "trade_slots": 28
+            }
+          }
+        }
+      },
+      "harness": "19bd599ac926.py"
+    }
+  ],
+  "fish": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32fish0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "Fisher": {
+              "fish_method": "Fly fishing \u2014 trout/salmon",
+              "location": "Barbarian Village",
+              "bank": false,
+              "cook_mode": "Off",
+              "mule_mode": "Off",
+              "three_tick_fly": true,
+              "purge_pack_on_start": false,
+              "bait_qty": 1000,
+              "leash_radius": 18,
+              "tick_manip": "Off",
+              "guild_feather_minutes": 0,
+              "custom_location": [
+                3200,
+                3200,
+                0
+              ],
+              "bank_location": "Auto",
+              "cook_fish": "All raw",
+              "cook_fish_custom": "",
+              "burnt_policy": "Drop",
+              "bank_raw_before_cook": 56,
+              "after_cook_cycle": "Stop",
+              "mule_partner": "",
+              "tool_acquire": "Off",
+              "forgetful_bank": false,
+              "pack_junk": "Bank",
+              "withdraw_coins": 0,
+              "bank_teleport": "Off",
+              "tele_casts": 1
+            }
+          }
+        }
+      },
+      "harness": "919bdddb4474.py"
+    }
+  ],
+  "native": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32nativ0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "Fisher": {
+              "fish_method": "Fly fishing \u2014 trout/salmon",
+              "location": "Barbarian Village",
+              "bank": false,
+              "cook_mode": "Off",
+              "mule_mode": "Off",
+              "three_tick_fly": false,
+              "purge_pack_on_start": false,
+              "bait_qty": 1000,
+              "leash_radius": 18,
+              "tick_manip": "Off",
+              "guild_feather_minutes": 0,
+              "custom_location": [
+                3200,
+                3200,
+                0
+              ],
+              "bank_location": "Auto",
+              "cook_fish": "All raw",
+              "cook_fish_custom": "",
+              "burnt_policy": "Drop",
+              "bank_raw_before_cook": 56,
+              "after_cook_cycle": "Stop",
+              "mule_partner": "",
+              "tool_acquire": "Off",
+              "forgetful_bank": false,
+              "pack_junk": "Bank",
+              "withdraw_coins": 0,
+              "bank_teleport": "Off",
+              "tele_casts": 1
+            }
+          }
+        }
+      },
+      "harness": "0b65f07e51c4.py"
+    }
+  ],
+  "ground": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32groun0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "Fisher": {
+              "fish_method": "Fly fishing \u2014 trout/salmon",
+              "location": "Use Start Position",
+              "bank": false,
+              "cook_mode": "Off",
+              "mule_mode": "Off",
+              "three_tick_fly": true,
+              "purge_pack_on_start": false,
+              "bait_qty": 1000,
+              "leash_radius": 18,
+              "tick_manip": "Off",
+              "guild_feather_minutes": 0,
+              "custom_location": [
+                3200,
+                3200,
+                0
+              ],
+              "bank_location": "Auto",
+              "cook_fish": "All raw",
+              "cook_fish_custom": "",
+              "burnt_policy": "Drop",
+              "bank_raw_before_cook": 56,
+              "after_cook_cycle": "Stop",
+              "mule_partner": "",
+              "tool_acquire": "Off",
+              "forgetful_bank": false,
+              "pack_junk": "Bank",
+              "withdraw_coins": 0,
+              "bank_teleport": "Off",
+              "tele_casts": 1
+            }
+          }
+        }
+      },
+      "harness": "911fa5721569.py"
+    }
+  ],
+  "stall": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32stall0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "Fisher": {
+              "fish_method": "Fly fishing \u2014 trout/salmon",
+              "location": "Barbarian Village",
+              "bank": false,
+              "cook_mode": "Off",
+              "mule_mode": "Off",
+              "three_tick_fly": true,
+              "purge_pack_on_start": false,
+              "bait_qty": 1000,
+              "leash_radius": 18,
+              "tick_manip": "Off",
+              "guild_feather_minutes": 0,
+              "custom_location": [
+                3200,
+                3200,
+                0
+              ],
+              "bank_location": "Auto",
+              "cook_fish": "All raw",
+              "cook_fish_custom": "",
+              "burnt_policy": "Drop",
+              "bank_raw_before_cook": 56,
+              "after_cook_cycle": "Stop",
+              "mule_partner": "",
+              "tool_acquire": "Off",
+              "forgetful_bank": false,
+              "pack_junk": "Bank",
+              "withdraw_coins": 0,
+              "bank_teleport": "Off",
+              "tele_casts": 1
+            }
+          }
+        }
+      },
+      "harness": "e2eec227c848.py"
+    }
+  ],
+  "kitbank": [
+    {
+      "account": {
+        "enabled": true,
+        "username": "q32kitba0",
+        "randomEvents": false,
+        "stallMinutes": 0,
+        "script": {
+          "file": "participant0.py",
+          "settings": {
+            "Fisher": {
+              "fish_method": "Fly fishing \u2014 trout/salmon",
+              "location": "Use Start Position",
+              "bank_location": "Seers",
+              "bank": true,
+              "cook_mode": "Off",
+              "mule_mode": "Off",
+              "three_tick_fly": true,
+              "purge_pack_on_start": false,
+              "bait_qty": 1000,
+              "leash_radius": 18,
+              "tick_manip": "Off",
+              "guild_feather_minutes": 0,
+              "custom_location": [
+                3200,
+                3200,
+                0
+              ],
+              "cook_fish": "All raw",
+              "cook_fish_custom": "",
+              "burnt_policy": "Drop",
+              "bank_raw_before_cook": 56,
+              "after_cook_cycle": "Stop",
+              "mule_partner": "",
+              "tool_acquire": "Off",
+              "forgetful_bank": false,
+              "pack_junk": "Bank",
+              "withdraw_coins": 0,
+              "bank_teleport": "Off",
+              "tele_casts": 1
+            }
+          }
+        }
+      },
+      "harness": "87addf244a94.py"
+    }
+  ]
+}

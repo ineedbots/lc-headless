@@ -1,0 +1,79 @@
+{
+  "engine_sha": "278bd51cc17cc0d093e1ea3895536a8054583f97",
+  "client_executable_sha256": "62d5194bf6844d1d579b8a050520a35fb57ae0b4146e4ae5607f511c68a7791b",
+  "tick_ms": 600,
+  "xp_rate": 1,
+  "engine_config": {
+    "easyStartup": false,
+    "website": {
+      "registration": true
+    },
+    "web": {
+      "port": 18032,
+      "allowedOrigin": "",
+      "managementPort": 18033
+    },
+    "engine": {
+      "revision": 289
+    },
+    "node": {
+      "id": 10,
+      "port": 43632,
+      "members": true,
+      "autoSubscribeMembers": true,
+      "xpRate": 1,
+      "production": false,
+      "minimumWealthValueEvent": 10,
+      "debug": true,
+      "debugProfile": false,
+      "clientRoutefinder": true,
+      "profile": "issue32",
+      "maxConnected": 1000,
+      "debugProcChar": "~",
+      "hopTime": 45000,
+      "rateLimitAddressLogin": 30,
+      "rateLimitDeviceLogin": 5
+    },
+    "login": {
+      "enabled": false,
+      "host": "localhost",
+      "port": 43500
+    },
+    "friend": {
+      "enabled": false,
+      "host": "localhost",
+      "port": 45099
+    },
+    "logger": {
+      "enabled": false,
+      "host": "localhost",
+      "port": 43501
+    },
+    "db": {
+      "backend": "sqlite",
+      "host": "localhost",
+      "port": 3306,
+      "user": "root",
+      "name": "lostcity",
+      "verbose": false
+    },
+    "build": {
+      "verbose": false,
+      "startup": false,
+      "verify": true,
+      "verifyFolder": true,
+      "verifyPack": true,
+      "liveReload": false,
+      "srcDir": "C:\\Users\\NewBuilt\\source\\repos\\runescape\\289server\\content"
+    }
+  },
+  "source_sha256": {
+    "scripts\\bots\\mule_crafter.py": "3238cdb6ffcb569dbc1793923e574827f0e5c502959bfe3ccf1597d36516694b",
+    "scripts\\bots\\nature_crafter.py": "cdda7f83624704d24c4767e6f27668b635be7136f1d2e237e50276bc31801fb3",
+    "scripts\\bots\\mule_depot.py": "9c0aac3ef7535170efe5ea669d5a16ca76d5fcaf56a8c63d24f8fea680ca2815",
+    "scripts\\bots\\gathering\\three_tick.py": "23d95a9b56135d8f2e31dae4205d23176f6fa1857b41205a5f0218b75aeb1716"
+  },
+  "base_client_source_sha": "57b0e47ee2d4be540b3b3f6c873157a93d2238d9",
+  "native_binary_source_sha": "87049a4c844bafd440b8a39436d4b521cdac0e27",
+  "native_source_comparison": "git diff 57b0e47ee2d4be540b3b3f6c873157a93d2238d9 87049a4c844bafd440b8a39436d4b521cdac0e27 -- src: empty"
+}

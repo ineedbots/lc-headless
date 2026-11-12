@@ -465,13 +465,30 @@ class CrafterRequestTrade(Task):
 
 
 # ── Crafter: trade with ONE mule at ruins ───────────────────────────────────────
-class CrafterTradeAtRuins(Task):
+class ActiveTradeTask(Task):
+    """Keep ownership during the offer-to-confirm interface gap."""
+
+    def __init__(self):
+        super().__init__()
+        self._trading = False
+        self._closed = stable_closed_poll()
+
+    def trade_pending(self):
+        closed = self._closed()
+        if trade.active():
+            self._trading = True
+        elif closed:
+            self._trading = False
+        return self._trading
+
+
+class CrafterTradeAtRuins(ActiveTradeTask):
     def __init__(self, bot):
         super().__init__()
         self._bot = bot
 
     def validate(self):
-        return self._bot.get_mode() == 'Crafter' and trade.active() and self._bot.has_partners()
+        return self._bot.get_mode() == 'Crafter' and self._bot.has_partners() and self.trade_pending()
 
     def execute(self):
         if trade.on_confirm_screen():
@@ -684,14 +701,14 @@ class MuleTradeWithCrafter(Task):
 
 
 # ── Mule: handle an active trade window (offer essence, accept, confirm) ─────────
-class MuleTradeExecute(Task):
+class MuleTradeExecute(ActiveTradeTask):
     def __init__(self, bot):
         super().__init__()
         self._bot = bot
         self._before_ess = 0
 
     def validate(self):
-        return self._bot.get_mode() == 'Mule' and trade.active()
+        return self._bot.get_mode() == 'Mule' and self.trade_pending()
 
     def execute(self):
         if trade.on_offer_screen():

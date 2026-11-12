@@ -1,0 +1,275 @@
+2026-11-12T02:42:42.661Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\sup2a\client.log too
+2026-11-12T02:42:42.662Z INFO    Config loaded from build/issue32-live/sup2a/client.json
+2026-11-12T02:42:42.857Z INFO    Revision 289 cache loaded from data/cache in 194 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:42:43.130Z INFO    Walking map built and walker graph loaded from data/nav in 272 ms: 7.9 MB, 3482 edges
+2026-11-12T02:42:43.178Z INFO    [0] Added MuleDepot's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\sup2a\accounts\0.jsonc: items
+2026-11-12T02:42:43.179Z INFO    [0] Loaded script participant0.py
+2026-11-12T02:42:43.222Z INFO    [1] Added MuleDepot's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\sup2a\accounts\1.jsonc: items
+2026-11-12T02:42:43.223Z INFO    [1] Loaded script participant1.py
+2026-11-12T02:42:43.265Z INFO    [2] Added MuleDepot's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\sup2a\accounts\2.jsonc: items
+2026-11-12T02:42:43.265Z INFO    [2] Loaded script participant2.py
+2026-11-12T02:42:43.266Z INFO    Running 3 accounts
+2026-11-12T02:42:43.266Z INFO    [0] Logging in as q32sup2a0
+2026-11-12T02:42:43.267Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:42:43.269Z INFO    [0] Connection open
+2026-11-12T02:42:43.631Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:42:43.633Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:42:44.228Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:42:44.228Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:42:44.829Z INFO    [0] tutorial: stage 1
+2026-11-12T02:42:45.266Z INFO    [1] Logging in as q32sup2a1
+2026-11-12T02:42:45.267Z INFO    [1] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:42:45.268Z INFO    [1] Connection open
+2026-11-12T02:42:45.422Z INFO    [1] Logged in (staff level 2)
+2026-11-12T02:42:45.423Z INFO    [1] [game] Welcome to RuneScape.
+2026-11-12T02:42:46.021Z INFO    [1] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:42:46.022Z INFO    [1] tutorial: saving a character design
+2026-11-12T02:42:46.639Z INFO    [1] tutorial: stage 1
+2026-11-12T02:42:47.269Z INFO    [2] Logging in as q32sup2a2
+2026-11-12T02:42:47.270Z INFO    [2] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:42:47.271Z INFO    [2] Connection open
+2026-11-12T02:42:47.819Z INFO    [2] Logged in (staff level 2)
+2026-11-12T02:42:47.820Z INFO    [2] [game] Welcome to RuneScape.
+2026-11-12T02:42:47.830Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:42:48.442Z INFO    [2] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:42:48.443Z INFO    [2] tutorial: saving a character design
+2026-11-12T02:42:49.048Z INFO    [2] tutorial: stage 1
+2026-11-12T02:42:49.633Z INFO    [1] tutorial: completed; arrived on the mainland
+2026-11-12T02:42:52.031Z INFO    [2] tutorial: completed; arrived on the mainland
+2026-11-12T02:42:59.216Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:42:59.216Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:43:00.425Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:43:00.427Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:43:01.017Z INFO    [1] [game] World speed was changed to 600ms
+2026-11-12T02:43:01.018Z INFO    [1] SERVER World speed was changed to 600ms
+2026-11-12T02:43:02.216Z INFO    [1] [game] set tutorial: to 1000
+2026-11-12T02:43:02.216Z INFO    [1] SERVER set tutorial: to 1000
+2026-11-12T02:43:03.417Z INFO    [2] [game] World speed was changed to 600ms
+2026-11-12T02:43:03.418Z INFO    [2] SERVER World speed was changed to 600ms
+2026-11-12T02:43:04.037Z INFO    [1] ACCEPT_START Tile(2725, 3491, 0) inv=[]
+2026-11-12T02:43:04.612Z INFO    [2] [game] set tutorial: to 1000
+2026-11-12T02:43:04.613Z INFO    [2] SERVER set tutorial: to 1000
+2026-11-12T02:43:04.637Z INFO    [0] ACCEPT_START Tile(2725, 3491, 0) inv=[(556, 150), (558, 300)]
+2026-11-12T02:43:04.684Z INFO    [1] ACCEPT_SAMPLE ticks=1 ms=647 tile=Tile(2723, 3492, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:05.238Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=601 tile=Tile(2723, 3492, 0) xp=0 report={'Role': 'Supplier', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[(556, 150), (558, 300)]
+2026-11-12T02:43:05.838Z INFO    [1] Bank (open): Coins x25
+2026-11-12T02:43:06.445Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:43:06.446Z INFO    [1] MuleDepot Client: 1 partner(s) at Tile(2725, 3491, 0)
+2026-11-12T02:43:06.446Z INFO    [2] ACCEPT_START Tile(2725, 3491, 0) inv=[]
+2026-11-12T02:43:07.030Z INFO    [1] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:07.031Z INFO    [1] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:07.038Z INFO    [2] ACCEPT_SAMPLE ticks=1 ms=592 tile=Tile(2723, 3492, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:08.233Z INFO    [0] MuleDepot Supplier: 2 partner(s) at Tile(2725, 3491, 0)
+2026-11-12T02:43:08.234Z INFO    [2] Bank (open): Coins x25
+2026-11-12T02:43:08.846Z INFO    [2] MuleDepot Client: 1 partner(s) at Tile(2725, 3491, 0)
+2026-11-12T02:43:09.415Z INFO    [2] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:09.416Z INFO    [2] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:09.424Z INFO    [0] Bank (open): Air rune x150, Mind rune x300, Coins x25
+2026-11-12T02:43:11.214Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:43:11.215Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:43:13.019Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:43:13.020Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:43:13.020Z INFO    [1] [trade request] Q32sup2a0: wishes to trade with you.
+2026-11-12T02:43:13.020Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:43:13.021Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:43:13.021Z INFO    [2] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:13.021Z INFO    [2] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:16.631Z INFO    [2] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:16.631Z INFO    [2] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:16.646Z INFO    [1] ACCEPT_SAMPLE ticks=21 ms=12609 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'trading with Q32sup2a0', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:17.254Z INFO    [0] ACCEPT_SAMPLE ticks=21 ms=12617 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'trading with Q32sup2a1', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:18.406Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:43:18.407Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:43:18.407Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:43:18.408Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:43:19.048Z INFO    [2] ACCEPT_SAMPLE ticks=21 ms=12602 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:20.231Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:20.232Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:20.232Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:20.241Z INFO    [0] MuleDepot: transfer 1, 100 units
+2026-11-12T02:43:20.839Z INFO    [1] MuleDepot: transfer 1, 100 units
+2026-11-12T02:43:22.024Z INFO    [0] Bank (open): Air rune x50, Mind rune x300, Coins x25
+2026-11-12T02:43:23.806Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:43:23.807Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:43:24.425Z INFO    [1] Bank (open): Coins x25
+2026-11-12T02:43:25.630Z INFO    [0] [game] Q32sup2a1 is busy at the moment.
+2026-11-12T02:43:25.630Z INFO    [0] SERVER Q32sup2a1 is busy at the moment.
+2026-11-12T02:43:26.815Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:43:26.816Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:43:26.816Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:43:26.816Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:26.816Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:26.822Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:27.425Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:27.426Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:27.431Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:28.630Z INFO    [1] ACCEPT_SAMPLE ticks=41 ms=24593 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 1, 'Units': 100, 'Clients served': 0} inv=[]
+2026-11-12T02:43:29.221Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:43:29.222Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:43:29.227Z INFO    [0] ACCEPT_SAMPLE ticks=41 ms=24590 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 1, 'Units': 100, 'Clients served': 0} inv=[(558, 200)]
+2026-11-12T02:43:31.027Z INFO    [2] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:31.027Z INFO    [2] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:31.032Z INFO    [2] ACCEPT_SAMPLE ticks=41 ms=24586 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:34.016Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:43:34.016Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:43:34.029Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:43:34.029Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:43:34.621Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:34.621Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:34.621Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:35.820Z INFO    [1] MuleDepot: transfer 2, 200 units
+2026-11-12T02:43:36.422Z INFO    [0] MuleDepot: transfer 2, 200 units
+2026-11-12T02:43:37.636Z INFO    [1] Bank (open): Air rune x100, Coins x25
+2026-11-12T02:43:38.227Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:38.227Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:38.227Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:40.021Z INFO    [1] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:40.021Z INFO    [1] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:43:40.026Z INFO    [0] Bank (open): Air rune x50, Mind rune x100, Coins x25
+2026-11-12T02:43:40.632Z INFO    [1] ACCEPT_SAMPLE ticks=61 ms=36595 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:43:41.223Z INFO    [0] ACCEPT_SAMPLE ticks=61 ms=36586 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:43:41.814Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:41.814Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:41.815Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:43.023Z INFO    [0] Bank (open): Air rune x50, Mind rune x100, Coins x25
+2026-11-12T02:43:43.024Z INFO    [2] ACCEPT_SAMPLE ticks=61 ms=36578 tile=Tile(2722, 3492, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:44.222Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:43:44.222Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:43:44.228Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:43:45.418Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:45.419Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:45.419Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:47.219Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:43:47.219Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:43:47.226Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:43:47.834Z INFO    [0] Bank (open): Air rune x50, Mind rune x100, Coins x25
+2026-11-12T02:43:48.437Z INFO    [0] MuleDepot: bank cannot supply 5 Law rune
+2026-11-12T02:43:50.227Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:50.227Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:50.232Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:50.846Z INFO    [0] Bank (open): Air rune x50, Mind rune x100, Coins x25
+2026-11-12T02:43:52.612Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:43:52.612Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:43:52.626Z INFO    [1] ACCEPT_SAMPLE ticks=81 ms=48588 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:43:53.223Z INFO    [0] ACCEPT_SAMPLE ticks=81 ms=48586 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 1} inv=[(556, 50)]
+2026-11-12T02:43:53.817Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:53.818Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:53.818Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:54.426Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:43:54.427Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:43:54.432Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:43:55.039Z INFO    [2] ACCEPT_SAMPLE ticks=81 ms=48593 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:43:56.830Z INFO    [0] Bank (open): Mind rune x100, Coins x25
+2026-11-12T02:43:58.617Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:43:58.618Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:43:58.618Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:43:59.215Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:43:59.215Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:43:59.225Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:43:59.832Z INFO    [0] Bank (open): Mind rune x100, Coins x25
+2026-11-12T02:44:01.026Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:01.027Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:01.027Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:02.827Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:02.827Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:02.828Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:04.628Z INFO    [0] Bank (open): Mind rune x100, Coins x25
+2026-11-12T02:44:04.629Z INFO    [1] ACCEPT_SAMPLE ticks=101 ms=60592 tile=Tile(2724, 3491, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:44:05.229Z INFO    [0] ACCEPT_SAMPLE ticks=101 ms=60592 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 1} inv=[(556, 50)]
+2026-11-12T02:44:05.229Z INFO    [0] MuleDepot: bank cannot supply 50 Air rune
+2026-11-12T02:44:06.420Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:06.420Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:06.421Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:07.017Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:07.017Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:07.017Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:07.025Z INFO    [2] ACCEPT_SAMPLE ticks=101 ms=60579 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:44:07.628Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:44:07.628Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:44:10.023Z INFO    [1] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:44:10.023Z INFO    [1] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:44:13.018Z INFO    [2] [game] Accepted trade.
+2026-11-12T02:44:13.018Z INFO    [2] SERVER Accepted trade.
+2026-11-12T02:44:13.018Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:44:13.018Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:44:13.624Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:13.625Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:13.625Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:14.823Z INFO    [2] MuleDepot: transfer 1, 50 units
+2026-11-12T02:44:15.420Z INFO    [0] MuleDepot: transfer 3, 50 units
+2026-11-12T02:44:16.623Z INFO    [1] ACCEPT_SAMPLE ticks=121 ms=72586 tile=Tile(2722, 3492, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:44:17.225Z INFO    [1] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:44:17.226Z INFO    [1] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:44:17.232Z INFO    [0] ACCEPT_SAMPLE ticks=121 ms=72595 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 3, 'Units': 350, 'Clients served': 1} inv=[]
+2026-11-12T02:44:17.247Z INFO    [0] Bank (open): Mind rune x100, Coins x25
+2026-11-12T02:44:18.436Z INFO    [2] Bank (open): Coins x25
+2026-11-12T02:44:19.015Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:44:19.015Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:44:19.038Z INFO    [2] ACCEPT_SAMPLE ticks=121 ms=72592 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 1, 'Units': 50, 'Clients served': 0} inv=[]
+2026-11-12T02:44:20.817Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:20.817Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:20.818Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:20.818Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:20.819Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:20.824Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:23.270Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:44:25.621Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:25.622Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:25.622Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:25.622Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:25.628Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:25.629Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:26.252Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:44:28.631Z INFO    [1] ACCEPT_SAMPLE ticks=141 ms=84594 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:44:29.214Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:29.214Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:29.215Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:29.215Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:29.215Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:29.220Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:29.220Z INFO    [0] ACCEPT_SAMPLE ticks=141 ms=84583 tile=Tile(2725, 3491, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 3, 'Units': 350, 'Clients served': 1} inv=[(558, 100)]
+2026-11-12T02:44:31.078Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:44:31.081Z INFO    [2] ACCEPT_SAMPLE ticks=141 ms=84635 tile=Tile(2724, 3491, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 1, 'Units': 50, 'Clients served': 0} inv=[]
+2026-11-12T02:44:31.635Z INFO    [0] MuleDepot: bank cannot supply 100 Mind rune
+2026-11-12T02:44:32.827Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:32.828Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:32.828Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:32.828Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:32.834Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:32.834Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:33.425Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:44:33.425Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:44:36.417Z INFO    [1] [game] Q32sup2a0 is busy at the moment.
+2026-11-12T02:44:36.417Z INFO    [1] SERVER Q32sup2a0 is busy at the moment.
+2026-11-12T02:44:37.603Z INFO    [2] [game] Accepted trade.
+2026-11-12T02:44:37.604Z INFO    [2] SERVER Accepted trade.
+2026-11-12T02:44:37.604Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:44:37.604Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:44:39.421Z INFO    [0] MuleDepot: transfer 4, 100 units
+2026-11-12T02:44:39.422Z INFO    [2] MuleDepot: transfer 2, 100 units
+2026-11-12T02:44:40.013Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:40.013Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:40.014Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:40.618Z INFO    [1] ACCEPT_SAMPLE ticks=161 ms=96581 tile=Tile(2722, 3492, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 300, 'Clients served': 0} inv=[]
+2026-11-12T02:44:41.217Z INFO    [0] ACCEPT_SAMPLE ticks=161 ms=96580 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 4, 'Units': 450, 'Clients served': 1} inv=[]
+2026-11-12T02:44:41.219Z INFO    [2] Bank (open): Air rune x50, Coins x25
+2026-11-12T02:44:41.220Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:44:43.069Z INFO    [2] ACCEPT_SAMPLE ticks=161 ms=96623 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Client', 'Status': 'banking', 'Trades': 2, 'Units': 150, 'Clients served': 0} inv=[]
+2026-11-12T02:44:43.650Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:43.651Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:43.652Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:43.654Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:43.667Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:43.668Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:46.047Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:44:48.431Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:48.432Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:48.433Z INFO    [2] [game] Sending trade offer...
+2026-11-12T02:44:48.434Z INFO    [2] SERVER Sending trade offer...
+2026-11-12T02:44:48.441Z INFO    [0] [trade request] Q32sup2a1: wishes to trade with you.
+2026-11-12T02:44:48.441Z INFO    [0] [trade request] Q32sup2a2: wishes to trade with you.
+2026-11-12T02:44:49.051Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:44:49.673Z INFO    [0] MuleDepot: bank cannot supply 5 Law rune
+2026-11-12T02:44:49.674Z INFO    [0] ACCEPT_FINISH MuleDepot: supplied 2 account(s), 450 units moved — short: q32sup2a1: 5 Law rune; q32sup2a2: 50 Air rune; q32sup2a2: 100 Mind rune; q32sup2a2: 5 Law rune
+2026-11-12T02:44:49.674Z INFO    [0] ACCEPT_FINAL ticks=175 ms=105036 report={'Role': 'Supplier', 'Status': 'banking', 'Trades': 4, 'Units': 450, 'Clients served': 2}
+2026-11-12T02:44:49.675Z INFO    [0] The script stopped itself; the account stays logged in

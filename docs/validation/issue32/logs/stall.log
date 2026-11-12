@@ -1,0 +1,263 @@
+2026-11-12T02:42:01.434Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\stall\client.log too
+2026-11-12T02:42:01.435Z INFO    Config loaded from build/issue32-live/stall/client.json
+2026-11-12T02:42:01.656Z INFO    Revision 289 cache loaded from data/cache in 220 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:42:01.904Z INFO    Walking map built and walker graph loaded from data/nav in 247 ms: 7.9 MB, 3482 edges
+2026-11-12T02:42:01.980Z INFO    [0] Added Fisher's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\stall\accounts\0.jsonc: bait_qty, leash_radius, tick_manip, guild_feather_minutes, custom_location, bank_location, cook_fish, cook_fish_custom, burnt_policy, bank_raw_before_cook, after_cook_cycle, mule_partner, tool_acquire, forgetful_bank, pack_junk, withdraw_coins, bank_teleport, tele_casts
+2026-11-12T02:42:01.980Z INFO    [0] Loaded script participant0.py
+2026-11-12T02:42:01.981Z INFO    Running 1 account
+2026-11-12T02:42:01.981Z INFO    [0] Logging in as q32stall0
+2026-11-12T02:42:01.981Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:42:01.983Z INFO    [0] Connection open
+2026-11-12T02:42:02.232Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:42:02.234Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:42:02.837Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:42:02.838Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:42:03.429Z INFO    [0] tutorial: stage 1
+2026-11-12T02:42:05.831Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:42:17.206Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:42:17.207Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:42:18.418Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:42:18.420Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:42:29.842Z INFO    [0] ACCEPT_START Tile(3104, 3430, 0) inv=[(309, 1), (314, 10000), (946, 1), (1511, 1)]
+2026-11-12T02:42:29.843Z INFO    [0] 3-tick fly: drops catches in each batch; bank trips restock gear and feathers
+2026-11-12T02:42:29.844Z INFO    [0] pack junk: bank (Bank=false → drop if no bank)
+2026-11-12T02:42:29.849Z INFO    [0] combat: Auto Retaliate off (gather — flee, do not fight)
+2026-11-12T02:42:29.849Z INFO    [0] location: Barbarian Village; bank Tile(3094, 3493, 0)
+2026-11-12T02:42:29.849Z INFO    [0] location: Bank=false (power) — drop haul; bank only to fetch missing tools (nearest bank)
+2026-11-12T02:42:29.849Z INFO    [0] gather: 'Fishing spot' (Lure + pair 'Bait') leash 72 @ Tile(3104, 3430, 0); Bank=false: batch dropping raw when full
+2026-11-12T02:42:30.444Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=602 tile=Tile(3102, 3430, 0) xp=0 report={'Status': 'fish: walking to spot @ Tile(3104, 3424, 0)', 'Location': 'Barbarian Village', 'Gathered': 0, 'Banked': 0, 'Trips': 0, 'Fishing xp': 0, 'Fishing xp/hr': '—'} inv=[(309, 1), (314, 10000), (946, 1), (1511, 1)]
+2026-11-12T02:42:34.632Z INFO    [0] [game] You cast out your line...
+2026-11-12T02:42:34.632Z INFO    [0] SERVER You cast out your line...
+2026-11-12T02:42:35.251Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:35.252Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:36.496Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @58
+2026-11-12T02:42:37.036Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:37.037Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:37.673Z INFO    [0] ACCEPT_CYCLE 3-tick fly: fallback click
+2026-11-12T02:42:41.243Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:42:41.244Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:42:41.259Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @66
+2026-11-12T02:42:41.818Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:41.819Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:42.424Z INFO    [0] ACCEPT_SAMPLE ticks=21 ms=12583 tile=Tile(3103, 3424, 0) xp=70 report={'Status': '3-tick fly: batch @66', 'Location': 'Barbarian Village', 'Gathered': 1, 'Banked': 0, 'Trips': 0, 'Fishing xp': 70, 'Fishing xp/hr': '—'} inv=[(309, 1), (314, 9999), (946, 1), (1511, 1), (331, 1)]
+2026-11-12T02:42:43.033Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:43.033Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:43.039Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @69
+2026-11-12T02:42:43.622Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:43.623Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:44.822Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:42:44.823Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:42:44.829Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @72
+2026-11-12T02:42:45.418Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:45.419Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:46.631Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:46.632Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:46.639Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @75
+2026-11-12T02:42:47.226Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:47.227Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:48.424Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:48.425Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:48.438Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @78
+2026-11-12T02:42:49.028Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:49.028Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:50.223Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:42:50.224Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:42:50.232Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @81
+2026-11-12T02:42:50.822Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:50.822Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:52.022Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:42:52.023Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:42:52.031Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @84
+2026-11-12T02:42:52.630Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:52.631Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:53.813Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:53.813Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:53.818Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @87
+2026-11-12T02:42:54.425Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:54.425Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:54.432Z INFO    [0] ACCEPT_SAMPLE ticks=41 ms=24591 tile=Tile(3103, 3424, 0) xp=480 report={'Status': '3-tick fly: batch @87', 'Location': 'Barbarian Village', 'Gathered': 8, 'Banked': 0, 'Trips': 0, 'Fishing xp': 480, 'Fishing xp/hr': '—'} inv=[(309, 1), (314, 9992), (946, 1), (1511, 1), (331, 1), (335, 1)]
+2026-11-12T02:42:55.619Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:55.620Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:55.625Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @90
+2026-11-12T02:42:56.219Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:56.219Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:57.420Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:57.421Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:57.428Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @93
+2026-11-12T02:42:58.032Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:58.032Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:42:59.229Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:42:59.229Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:42:59.238Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @96
+2026-11-12T02:42:59.892Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:42:59.893Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:01.037Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:01.038Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:01.047Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @99
+2026-11-12T02:43:01.632Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:01.632Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:02.825Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:02.826Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:02.834Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @102
+2026-11-12T02:43:02.861Z INFO    [0] experience: Defence +13034431 xp (782065860 an hour), Hitpoints +13033277 xp (781996620 an hour), Fletching +13034431 xp (782065860 an hour), Fishing +13035201 xp (782112060 an hour)
+2026-11-12T02:43:03.437Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:03.438Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:04.628Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:04.628Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:04.636Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @105
+2026-11-12T02:43:05.229Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:05.230Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:06.444Z INFO    [0] ACCEPT_SAMPLE ticks=61 ms=36603 tile=Tile(3103, 3424, 0) xp=840 report={'Status': '3-tick fly: batch @105', 'Location': 'Barbarian Village', 'Gathered': 14, 'Banked': 0, 'Trips': 0, 'Fishing xp': 840, 'Fishing xp/hr': '82.6k'} inv=[(309, 1), (314, 9986), (946, 1), (1511, 1), (331, 1)]
+2026-11-12T02:43:06.444Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @108
+2026-11-12T02:43:07.030Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:07.031Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:08.224Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:08.224Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:08.232Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @111
+2026-11-12T02:43:08.831Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:08.832Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:10.041Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @114
+2026-11-12T02:43:10.630Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:10.631Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:11.825Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:11.826Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:11.838Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @117
+2026-11-12T02:43:12.418Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:12.419Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:13.629Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:13.630Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:13.641Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @120
+2026-11-12T02:43:14.220Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:14.221Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:15.420Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:15.421Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:15.429Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @123
+2026-11-12T02:43:16.022Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:16.022Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:17.237Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:17.238Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:17.254Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @126
+2026-11-12T02:43:17.833Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:17.833Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:18.428Z INFO    [0] ACCEPT_SAMPLE ticks=81 ms=48587 tile=Tile(3103, 3424, 0) xp=1150 report={'Status': '3-tick fly: batch @126', 'Location': 'Barbarian Village', 'Gathered': 19, 'Banked': 0, 'Trips': 0, 'Fishing xp': 1150, 'Fishing xp/hr': '85.2k'} inv=[(309, 1), (314, 9981), (946, 1), (1511, 1), (335, 1)]
+2026-11-12T02:43:19.038Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:19.038Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:19.048Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @129
+2026-11-12T02:43:19.642Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:19.643Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:20.838Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @132
+2026-11-12T02:43:21.420Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:21.421Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:22.614Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:22.614Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:22.620Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @135
+2026-11-12T02:43:23.222Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:23.222Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:24.417Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:24.418Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:24.424Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @138
+2026-11-12T02:43:25.030Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:25.031Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:26.231Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @141
+2026-11-12T02:43:26.815Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:26.816Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:28.028Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:28.029Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:28.034Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @144
+2026-11-12T02:43:28.624Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:28.624Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:29.822Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @147
+2026-11-12T02:43:30.415Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:30.415Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:30.420Z INFO    [0] ACCEPT_SAMPLE ticks=101 ms=60579 tile=Tile(3103, 3424, 0) xp=1410 report={'Status': '3-tick fly: batch @147', 'Location': 'Barbarian Village', 'Gathered': 23, 'Banked': 0, 'Trips': 0, 'Fishing xp': 1410, 'Fishing xp/hr': '83.8k'} inv=[(309, 1), (314, 9977), (946, 1), (1511, 1), (335, 1)]
+2026-11-12T02:43:31.628Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @150
+2026-11-12T02:43:32.227Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:32.227Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:33.423Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:33.424Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:33.429Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @153
+2026-11-12T02:43:34.028Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:34.028Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:35.216Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:35.217Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:35.222Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @156
+2026-11-12T02:43:35.814Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:35.815Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:37.012Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:37.013Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:37.017Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @159
+2026-11-12T02:43:37.629Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:37.629Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:38.832Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @162
+2026-11-12T02:43:39.425Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:39.426Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:40.624Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:40.625Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:40.631Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @165
+2026-11-12T02:43:41.218Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:41.218Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:42.422Z INFO    [0] ACCEPT_SAMPLE ticks=121 ms=72580 tile=Tile(3103, 3424, 0) xp=1690 report={'Status': '3-tick fly: batch @165', 'Location': 'Barbarian Village', 'Gathered': 27, 'Banked': 0, 'Trips': 0, 'Fishing xp': 1690, 'Fishing xp/hr': '83.8k'} inv=[(309, 1), (314, 9973), (946, 1), (1511, 1), (331, 1)]
+2026-11-12T02:43:42.422Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @168
+2026-11-12T02:43:43.016Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:43.016Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:44.222Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:44.222Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:44.228Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @171
+2026-11-12T02:43:44.821Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:44.822Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:46.024Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:46.025Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:46.034Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @174
+2026-11-12T02:43:47.822Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:47.823Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:47.833Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @177
+2026-11-12T02:43:48.430Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:48.431Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:49.628Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @180
+2026-11-12T02:43:50.227Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:50.227Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:51.432Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:51.434Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:51.445Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @183
+2026-11-12T02:43:52.023Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:52.024Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:53.217Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:53.217Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:53.223Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @186
+2026-11-12T02:43:53.817Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:53.818Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:54.432Z INFO    [0] ACCEPT_SAMPLE ticks=141 ms=84591 tile=Tile(3103, 3424, 0) xp=1960 report={'Status': '3-tick fly: batch @186', 'Location': 'Barbarian Village', 'Gathered': 32, 'Banked': 0, 'Trips': 0, 'Fishing xp': 1960, 'Fishing xp/hr': '83.4k'} inv=[(309, 1), (314, 9968), (946, 1), (1511, 1), (331, 1)]
+2026-11-12T02:43:55.019Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:43:55.020Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:43:55.031Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @189
+2026-11-12T02:43:55.650Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:55.650Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:56.829Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @192
+2026-11-12T02:43:57.422Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:57.423Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:43:58.617Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:43:58.617Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:43:58.625Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @195
+2026-11-12T02:43:59.214Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:43:59.215Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:44:00.425Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:44:00.426Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:44:00.434Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @198
+2026-11-12T02:44:01.026Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:44:01.027Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:44:02.228Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:44:02.228Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:44:02.233Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @201
+2026-11-12T02:44:02.826Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:44:02.827Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:44:02.862Z INFO    [0] experience: Fishing +1450 xp (87000 an hour)
+2026-11-12T02:44:04.024Z INFO    [0] [game] You catch a trout.
+2026-11-12T02:44:04.025Z INFO    [0] SERVER You catch a trout.
+2026-11-12T02:44:04.033Z INFO    [0] ACCEPT_CYCLE 3-tick fly: batch @204
+2026-11-12T02:44:04.622Z INFO    [0] [game] You attempt to catch a fish.
+2026-11-12T02:44:04.622Z INFO    [0] SERVER You attempt to catch a fish.
+2026-11-12T02:44:05.823Z INFO    [0] [game] You catch a salmon.
+2026-11-12T02:44:05.824Z INFO    [0] SERVER You catch a salmon.
+2026-11-12T02:44:05.830Z INFO    [0] ACCEPT_FINISH ACCEPT_LIMIT 600 ticks
+2026-11-12T02:44:05.830Z INFO    [0] ACCEPT_FINAL ticks=160 ms=95989 report={'Status': '3-tick fly: batch @204', 'Location': 'Barbarian Village', 'Gathered': 37, 'Banked': 0, 'Trips': 0, 'Fishing xp': 2270, 'Fishing xp/hr': '85.1k'}
+2026-11-12T02:44:05.830Z INFO    [0] The script stopped itself; the account stays logged in

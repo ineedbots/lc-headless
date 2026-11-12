@@ -1,0 +1,466 @@
+2026-11-12T02:38:36.717Z INFO    [0] Logging in as q32cosmb0
+2026-11-12T02:38:36.718Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:38:36.720Z INFO    [0] Connection open
+2026-11-12T02:38:37.014Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:38:37.016Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:38:37.625Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:38:37.625Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:38:38.224Z INFO    [0] tutorial: stage 1
+2026-11-12T02:38:38.730Z INFO    [1] Logging in as q32cosmb1
+2026-11-12T02:38:38.730Z INFO    [1] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:38:38.731Z INFO    [1] Connection open
+2026-11-12T02:38:38.820Z INFO    [1] Logged in (staff level 2)
+2026-11-12T02:38:38.821Z INFO    [1] [game] Welcome to RuneScape.
+2026-11-12T02:38:39.425Z INFO    [1] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:38:39.425Z INFO    [1] tutorial: saving a character design
+2026-11-12T02:38:40.031Z INFO    [1] tutorial: stage 1
+2026-11-12T02:38:40.621Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:38:42.423Z INFO    [1] tutorial: completed; arrived on the mainland
+2026-11-12T02:38:52.011Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:38:52.013Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:38:53.209Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:38:53.211Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:38:53.809Z INFO    [1] [game] World speed was changed to 600ms
+2026-11-12T02:38:53.810Z INFO    [1] SERVER World speed was changed to 600ms
+2026-11-12T02:38:55.028Z INFO    [1] [game] set tutorial: to 1000
+2026-11-12T02:38:55.030Z INFO    [1] SERVER set tutorial: to 1000
+2026-11-12T02:38:58.071Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:38:59.865Z INFO    [1] Bank (open): Coins x25
+2026-11-12T02:39:06.431Z INFO    [0] ACCEPT_START Tile(3152, 9575, 0) inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:06.433Z INFO    [0] NatureCrafter master starting — Cosmic runes at Tile(3173, 9501, 0), accepting essence from [q32cosmb1], never banking, staying in the altar
+2026-11-12T02:39:06.555Z INFO    [0]   path: cost 137, 53 waypoints, 7485 expanded, hops []
+2026-11-12T02:39:07.033Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=601 tile=Tile(3154, 9575, 0) xp=0 report={'Status': 'entering the altar to craft', 'Mode': 'Master', 'Crafted': 0, 'Received': 0, 'Trades': 0, 'Runecraft xp': 0, 'Pack ess': 25} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:08.255Z INFO    [1] ACCEPT_START Tile(3152, 9575, 0) inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:08.258Z INFO    [1] NatureCrafter runner starting — ferrying essence for Cosmic runes to [q32cosmb0] straight from the bank (unnoted), staying in the altar
+2026-11-12T02:39:08.349Z INFO    [1]   path: cost 137, 53 waypoints, 7485 expanded, hops []
+2026-11-12T02:39:08.879Z INFO    [1] ACCEPT_SAMPLE ticks=1 ms=624 tile=Tile(3154, 9575, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 0, 'Trades': 0, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:19.074Z INFO    [0] ACCEPT_SAMPLE ticks=21 ms=12641 tile=Tile(3184, 9545, 0) xp=0 report={'Status': 'entering the altar to craft', 'Mode': 'Master', 'Crafted': 0, 'Received': 0, 'Trades': 0, 'Runecraft xp': 0, 'Pack ess': 25} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:20.867Z INFO    [1] ACCEPT_SAMPLE ticks=21 ms=12612 tile=Tile(3184, 9545, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 0, 'Trades': 0, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:31.042Z INFO    [0] ACCEPT_SAMPLE ticks=41 ms=24611 tile=Tile(3159, 9528, 0) xp=0 report={'Status': 'entering the altar to craft', 'Mode': 'Master', 'Crafted': 0, 'Received': 0, 'Trades': 0, 'Runecraft xp': 0, 'Pack ess': 25} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:32.876Z INFO    [1] ACCEPT_SAMPLE ticks=41 ms=24622 tile=Tile(3159, 9528, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 0, 'Trades': 0, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:43.023Z INFO    [0] ACCEPT_SAMPLE ticks=61 ms=36592 tile=Tile(3166, 9514, 0) xp=0 report={'Status': 'entering the altar to craft', 'Mode': 'Master', 'Crafted': 0, 'Received': 0, 'Trades': 0, 'Runecraft xp': 0, 'Pack ess': 25} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:44.833Z INFO    [1] ACCEPT_SAMPLE ticks=61 ms=36579 tile=Tile(3166, 9514, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 0, 'Trades': 0, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:47.255Z INFO    [0]   arrived (7 clicks)
+2026-11-12T02:39:47.258Z INFO    [0] using the Cosmic talisman on the mysterious ruins
+2026-11-12T02:39:49.051Z INFO    [0] [game] You hold the Cosmic Talisman towards the mysterious ruins.
+2026-11-12T02:39:49.052Z INFO    [0] SERVER You hold the Cosmic Talisman towards the mysterious ruins.
+2026-11-12T02:39:49.059Z INFO    [0] [game] You feel a powerful force take hold of you...
+2026-11-12T02:39:49.061Z INFO    [0] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:39:49.062Z INFO    [1]   arrived (7 clicks)
+2026-11-12T02:39:49.066Z INFO    [1] using the Cosmic talisman on the mysterious ruins
+2026-11-12T02:39:50.256Z INFO    [0] entered the altar
+2026-11-12T02:39:50.264Z INFO    [0]   path: cost 25, 8 waypoints, 106 expanded, hops []
+2026-11-12T02:39:50.873Z INFO    [1] [game] You hold the Cosmic Talisman towards the mysterious ruins.
+2026-11-12T02:39:50.874Z INFO    [1] [game] You feel a powerful force take hold of you...
+2026-11-12T02:39:50.875Z INFO    [1] SERVER You hold the Cosmic Talisman towards the mysterious ruins.
+2026-11-12T02:39:50.876Z INFO    [1] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:39:52.025Z INFO    [1] entered the altar
+2026-11-12T02:39:52.034Z INFO    [1]   path: cost 25, 8 waypoints, 106 expanded, hops []
+2026-11-12T02:39:55.037Z INFO    [0] ACCEPT_SAMPLE ticks=81 ms=48606 tile=Tile(2142, 4837, 0) xp=0 report={'Status': 'entering the altar to craft', 'Mode': 'Master', 'Crafted': 0, 'Received': 0, 'Trades': 0, 'Runecraft xp': 0, 'Pack ess': 25} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:56.868Z INFO    [1] ACCEPT_SAMPLE ticks=81 ms=48613 tile=Tile(2142, 4837, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 0, 'Trades': 0, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:39:57.431Z INFO    [0]   arrived (2 clicks)
+2026-11-12T02:39:58.038Z INFO    [0] crafting 25 essence at the altar
+2026-11-12T02:39:59.232Z INFO    [0] [game] You bind the temple's power into Cosmic Runes.
+2026-11-12T02:39:59.234Z INFO    [0] SERVER You bind the temple's power into Cosmic Runes.
+2026-11-12T02:39:59.238Z INFO    [0] crafted 25 Cosmic runes
+2026-11-12T02:39:59.242Z INFO    [1]   arrived (2 clicks)
+2026-11-12T02:39:59.851Z INFO    [1] runner: Trade-with 'Q32cosmb0' d=1 closed with=- mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:00.442Z INFO    [1] [game] Q32cosmb0 is busy at the moment.
+2026-11-12T02:40:00.443Z INFO    [1] SERVER Q32cosmb0 is busy at the moment.
+2026-11-12T02:40:02.860Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:40:02.862Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:40:02.863Z INFO    [0] [trade request] Q32cosmb1: wishes to trade with you.
+2026-11-12T02:40:02.864Z INFO    [0] master: trade-ask from Q32cosmb1
+2026-11-12T02:40:03.430Z INFO    [0] master: Trade-with 'Q32cosmb1' asked=Q32cosmb1 nearest=Q32cosmb1 d=1 closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:04.047Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:40:04.048Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:40:04.053Z INFO    [0] master: window opened offer with=Q32cosmb1 mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:04.664Z INFO    [0] master: offer-wait offer with=Q32cosmb1 mine=0 theirs=0 unnoted=0 asked=Q32cosmb1
+2026-11-12T02:40:04.666Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.701Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.735Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.768Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.799Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.830Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.861Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.891Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.922Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.954Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:04.985Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.016Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.048Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.080Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.111Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.141Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.170Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.200Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.204Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.221Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:05.222Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.248Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.251Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.279Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.281Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.314Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.318Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.347Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.353Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.374Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.378Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.404Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.406Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.437Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.444Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.472Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.479Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.503Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.507Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.533Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.541Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.562Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.565Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.598Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.604Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.624Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.626Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.654Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.656Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.686Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.688Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.717Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.718Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.747Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.749Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.777Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.779Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.813Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.817Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.820Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:05.843Z INFO    [0] master: handshake dropped closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:05.884Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.921Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.954Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:05.985Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.018Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.058Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.080Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.111Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.144Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.173Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.203Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.235Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.269Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.300Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.333Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.362Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.392Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.420Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.422Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.451Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.452Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.453Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.487Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.489Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.520Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.525Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.552Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.557Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.583Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.588Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.615Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.623Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.649Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.658Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.680Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.684Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.713Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.714Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.743Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.751Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.772Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.782Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.802Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.808Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.848Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.854Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.859Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.881Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.884Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.913Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.918Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.943Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.947Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:06.978Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:06.985Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:07.009Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:07.015Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:40:07.018Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:40:07.020Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:40:07.022Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:40:07.023Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:40:07.025Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:40:07.028Z INFO    [1] runner: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:07.032Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:07.052Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:07.053Z INFO    [1] runner: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:07.056Z INFO    [0] ACCEPT_SAMPLE ticks=101 ms=60625 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'confirming the essence trade', 'Mode': 'Master', 'Crafted': 25, 'Received': 0, 'Trades': 0, 'Runecraft xp': 200, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 50)]
+2026-11-12T02:40:07.056Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:07.069Z INFO    [0] master: received 25 essence closed with=- mine=0 theirs=0 unnoted=25
+2026-11-12T02:40:07.101Z INFO    [0] crafting 25 essence at the altar
+2026-11-12T02:40:07.675Z INFO    [0] [game] You bind the temple's power into Cosmic Runes.
+2026-11-12T02:40:07.676Z INFO    [0] SERVER You bind the temple's power into Cosmic Runes.
+2026-11-12T02:40:07.690Z INFO    [0] crafted 25 Cosmic runes
+2026-11-12T02:40:08.236Z INFO    [1] runner: delivered 25 ess closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:08.833Z INFO    [1] ACCEPT_SAMPLE ticks=101 ms=60579 tile=Tile(2142, 4830, 0) xp=0 report={'Status': 'confirming the trade', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:40:08.834Z INFO    [1] runner: leaving altar after delivery closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:40:08.834Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:40:14.815Z INFO    [1] [game] You step through the portal...
+2026-11-12T02:40:14.816Z INFO    [1] SERVER You step through the portal...
+2026-11-12T02:40:14.820Z INFO    [1] back at the mysterious ruins
+2026-11-12T02:40:15.632Z INFO    [1]   path: cost 137, 53 waypoints, 2456 expanded, hops []
+2026-11-12T02:40:19.086Z INFO    [0] ACCEPT_SAMPLE ticks=121 ms=72654 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:40:20.889Z INFO    [1] ACCEPT_SAMPLE ticks=121 ms=72635 tile=Tile(3163, 9513, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:40:31.021Z INFO    [0] ACCEPT_SAMPLE ticks=141 ms=84590 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:40:32.828Z INFO    [1] ACCEPT_SAMPLE ticks=141 ms=84574 tile=Tile(3162, 9528, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:40:43.019Z INFO    [0] ACCEPT_SAMPLE ticks=161 ms=96588 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:40:44.864Z INFO    [1] ACCEPT_SAMPLE ticks=161 ms=96610 tile=Tile(3184, 9548, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:40:55.034Z INFO    [0] ACCEPT_SAMPLE ticks=181 ms=108603 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:40:56.852Z INFO    [1] ACCEPT_SAMPLE ticks=181 ms=108597 tile=Tile(3159, 9573, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:40:59.887Z INFO    [1]   arrived (8 clicks)
+2026-11-12T02:41:01.039Z INFO    [1] Bank (open): Coins x25, Rune essence x200
+2026-11-12T02:41:02.868Z INFO    [1] withdrew 25 unnoted essence for the run
+2026-11-12T02:41:03.562Z INFO    [1]   path: cost 136, 53 waypoints, 7485 expanded, hops []
+2026-11-12T02:41:07.035Z INFO    [0] ACCEPT_SAMPLE ticks=201 ms=120604 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:41:08.829Z INFO    [1] ACCEPT_SAMPLE ticks=201 ms=120575 tile=Tile(3162, 9573, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:19.073Z INFO    [0] ACCEPT_SAMPLE ticks=221 ms=132642 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:41:20.863Z INFO    [1] ACCEPT_SAMPLE ticks=221 ms=132608 tile=Tile(3177, 9557, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:31.032Z INFO    [0] ACCEPT_SAMPLE ticks=241 ms=144601 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:41:32.881Z INFO    [1] ACCEPT_SAMPLE ticks=241 ms=144626 tile=Tile(3187, 9537, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:43.076Z INFO    [0] ACCEPT_SAMPLE ticks=261 ms=156644 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:41:44.848Z INFO    [1] ACCEPT_SAMPLE ticks=261 ms=156594 tile=Tile(3171, 9527, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:55.056Z INFO    [0] ACCEPT_SAMPLE ticks=281 ms=168625 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:41:56.833Z INFO    [1] ACCEPT_SAMPLE ticks=281 ms=168579 tile=Tile(3151, 9530, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:07.015Z INFO    [0] ACCEPT_SAMPLE ticks=301 ms=180584 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:42:08.833Z INFO    [1] ACCEPT_SAMPLE ticks=301 ms=180578 tile=Tile(3154, 9518, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:19.035Z INFO    [0] ACCEPT_SAMPLE ticks=321 ms=192603 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:42:20.850Z INFO    [1] ACCEPT_SAMPLE ticks=321 ms=192596 tile=Tile(3172, 9508, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:25.084Z INFO    [1]   arrived (10 clicks)
+2026-11-12T02:42:25.087Z INFO    [1] using the Cosmic talisman on the mysterious ruins
+2026-11-12T02:42:26.868Z INFO    [1] [game] You hold the Cosmic Talisman towards the mysterious ruins.
+2026-11-12T02:42:26.870Z INFO    [1] SERVER You hold the Cosmic Talisman towards the mysterious ruins.
+2026-11-12T02:42:26.872Z INFO    [1] [game] You feel a powerful force take hold of you...
+2026-11-12T02:42:26.873Z INFO    [1] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:42:28.040Z INFO    [1] entered the altar
+2026-11-12T02:42:28.048Z INFO    [1]   path: cost 25, 8 waypoints, 106 expanded, hops []
+2026-11-12T02:42:31.069Z INFO    [0] ACCEPT_SAMPLE ticks=341 ms=204638 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:42:32.875Z INFO    [1] ACCEPT_SAMPLE ticks=341 ms=204621 tile=Tile(2142, 4845, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:42.423Z INFO    [1]   arrived (3 clicks)
+2026-11-12T02:42:43.037Z INFO    [0] ACCEPT_SAMPLE ticks=361 ms=216606 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 50, 'Received': 25, 'Trades': 1, 'Runecraft xp': 400, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 100)]
+2026-11-12T02:42:43.038Z INFO    [1] runner: Trade-with 'Q32cosmb0' d=1 closed with=- mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:43.622Z INFO    [0] [trade request] Q32cosmb1: wishes to trade with you.
+2026-11-12T02:42:43.623Z INFO    [0] master: trade-ask from Q32cosmb1
+2026-11-12T02:42:43.623Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:42:43.624Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:42:44.225Z INFO    [0] master: Trade-with 'Q32cosmb1' asked=Q32cosmb1 nearest=Q32cosmb1 d=1 closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:44.822Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:42:44.822Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:42:44.828Z INFO    [0] master: window opened offer with=Q32cosmb1 mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:44.829Z INFO    [1] ACCEPT_SAMPLE ticks=361 ms=216575 tile=Tile(2142, 4830, 0) xp=0 report={'Status': 'requesting a trade with Q32cosmb0', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 25, 'Trades': 1, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:45.432Z INFO    [0] master: offer-wait offer with=Q32cosmb1 mine=0 theirs=0 unnoted=0 asked=Q32cosmb1
+2026-11-12T02:42:45.432Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.454Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.485Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.517Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.548Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.580Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.612Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.643Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.675Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.706Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.738Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.770Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.802Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.833Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.864Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.894Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.925Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.957Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:45.989Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:46.006Z INFO    [1] runner: offering 25 ess offer with=Q32cosmb0 mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:46.019Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.020Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.052Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.053Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.083Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.083Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.113Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.114Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.146Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.147Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.177Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.178Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.209Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.210Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.240Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.242Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.273Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.280Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.303Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.304Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.336Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.337Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.365Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.366Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.396Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.397Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.428Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.429Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.460Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.461Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.490Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.492Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.522Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.523Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.553Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.554Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.584Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.586Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.614Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.615Z INFO    [1] runner: offer-accept offer with=Q32cosmb0 mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.616Z INFO    [0] master: offer-accept 25 ess offer with=Q32cosmb1 mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:46.629Z INFO    [0] master: handshake dropped closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:46.638Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.660Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.690Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.723Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.754Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.784Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.816Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.848Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.880Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.912Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.943Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:46.974Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.005Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.037Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.069Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.100Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.131Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.163Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.193Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.212Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.213Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.233Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.255Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.286Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.317Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.350Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.381Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.415Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.448Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.482Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.510Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.539Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.570Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.602Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.632Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.664Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.695Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.726Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.759Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.789Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.806Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.807Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.829Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.830Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.830Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.851Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.853Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.881Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.882Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.912Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.913Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.944Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.944Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:47.975Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:47.977Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.006Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.008Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.037Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.039Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.073Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.078Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.102Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.107Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.134Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.138Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.164Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.167Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.195Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.197Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.227Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.229Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.258Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.260Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.290Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.291Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.322Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.323Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.354Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.356Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.385Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.387Z INFO    [1] runner: confirm-accept confirm with=- mine=25 theirs=0 unnoted=0
+2026-11-12T02:42:48.403Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:42:48.403Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:42:48.405Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=25 unnoted=0
+2026-11-12T02:42:48.407Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:42:48.407Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:42:48.407Z INFO    [1] runner: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:48.408Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:48.432Z INFO    [0] master: confirm-accept confirm with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:48.448Z INFO    [0] master: received 25 essence closed with=- mine=0 theirs=0 unnoted=25
+2026-11-12T02:42:48.480Z INFO    [0] crafting 25 essence at the altar
+2026-11-12T02:42:49.027Z INFO    [0] [game] You bind the temple's power into Cosmic Runes.
+2026-11-12T02:42:49.027Z INFO    [0] SERVER You bind the temple's power into Cosmic Runes.
+2026-11-12T02:42:49.035Z INFO    [0] crafted 25 Cosmic runes
+2026-11-12T02:42:49.631Z INFO    [1] runner: delivered 25 ess closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:50.230Z INFO    [1] runner: leaving altar after delivery closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:50.230Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:42:55.029Z INFO    [0] ACCEPT_SAMPLE ticks=381 ms=228598 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:42:56.829Z INFO    [1] ACCEPT_SAMPLE ticks=381 ms=228575 tile=Tile(2142, 4819, 0) xp=0 report={'Status': 'taking the portal out', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:42:59.901Z INFO    [1] runner: leaving altar after delivery closed with=- mine=0 theirs=0 unnoted=0
+2026-11-12T02:42:59.902Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:43:01.037Z INFO    [1] [game] You step through the portal...
+2026-11-12T02:43:01.038Z INFO    [1] SERVER You step through the portal...
+2026-11-12T02:43:01.041Z INFO    [1] back at the mysterious ruins
+2026-11-12T02:43:01.805Z INFO    [1]   path: cost 137, 53 waypoints, 2456 expanded, hops []
+2026-11-12T02:43:07.035Z INFO    [0] ACCEPT_SAMPLE ticks=401 ms=240604 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:43:08.842Z INFO    [1] ACCEPT_SAMPLE ticks=401 ms=240588 tile=Tile(3169, 9511, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:43:19.045Z INFO    [0] ACCEPT_SAMPLE ticks=421 ms=252614 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:43:20.836Z INFO    [1] ACCEPT_SAMPLE ticks=421 ms=252582 tile=Tile(3149, 9520, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:43:31.030Z INFO    [0] ACCEPT_SAMPLE ticks=441 ms=264599 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:43:32.829Z INFO    [1] ACCEPT_SAMPLE ticks=441 ms=264575 tile=Tile(3171, 9528, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:43:43.020Z INFO    [0] ACCEPT_SAMPLE ticks=461 ms=276589 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:43:44.826Z INFO    [1] ACCEPT_SAMPLE ticks=461 ms=276572 tile=Tile(3182, 9552, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:43:55.026Z INFO    [0] ACCEPT_SAMPLE ticks=481 ms=288595 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:43:56.827Z INFO    [1] ACCEPT_SAMPLE ticks=481 ms=288573 tile=Tile(3167, 9567, 0) xp=0 report={'Status': 'restocking at the bank', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 0, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1)]
+2026-11-12T02:44:04.030Z INFO    [1]   arrived (7 clicks)
+2026-11-12T02:44:05.227Z INFO    [1] Bank (open): Coins x25, Rune essence x175
+2026-11-12T02:44:07.022Z INFO    [0] ACCEPT_SAMPLE ticks=501 ms=300591 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:44:07.023Z INFO    [1] withdrew 25 unnoted essence for the run
+2026-11-12T02:44:07.731Z INFO    [1]   path: cost 136, 53 waypoints, 7485 expanded, hops []
+2026-11-12T02:44:08.825Z INFO    [1] ACCEPT_SAMPLE ticks=501 ms=300571 tile=Tile(3155, 9575, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:19.034Z INFO    [0] ACCEPT_SAMPLE ticks=521 ms=312602 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:44:20.822Z INFO    [1] ACCEPT_SAMPLE ticks=521 ms=312568 tile=Tile(3175, 9564, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:31.064Z INFO    [0] ACCEPT_SAMPLE ticks=541 ms=324633 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:44:32.832Z INFO    [1] ACCEPT_SAMPLE ticks=541 ms=324578 tile=Tile(3185, 9544, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:43.062Z INFO    [0] ACCEPT_SAMPLE ticks=561 ms=336630 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:44:44.874Z INFO    [1] ACCEPT_SAMPLE ticks=561 ms=336620 tile=Tile(3178, 9527, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:55.031Z INFO    [0] ACCEPT_SAMPLE ticks=581 ms=348600 tile=Tile(2142, 4831, 0) xp=0 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0} inv=[(1454, 1), (772, 1), (564, 150)]
+2026-11-12T02:44:56.869Z INFO    [1] ACCEPT_SAMPLE ticks=581 ms=348615 tile=Tile(3158, 9528, 0) xp=0 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 25, 'Noted': 0, 'Coins': 0} inv=[(1454, 1), (772, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:45:06.436Z INFO    [0] ACCEPT_FINISH ACCEPT_LIMIT 600 ticks
+2026-11-12T02:45:06.437Z INFO    [0] ACCEPT_FINAL ticks=600 ms=360005 report={'Status': 'runner in sight — standing for the trade', 'Mode': 'Master', 'Crafted': 75, 'Received': 50, 'Trades': 2, 'Runecraft xp': 600, 'Pack ess': 0}
+2026-11-12T02:45:06.437Z INFO    [0] The script stopped itself; the account stays logged in
+2026-11-12T02:45:08.230Z INFO    [1] ACCEPT_FINISH ACCEPT_LIMIT 600 ticks
+2026-11-12T02:45:08.231Z INFO    [1] ACCEPT_FINAL ticks=600 ms=359976 report={'Status': 'entering the altar to deliver', 'Mode': 'Runner', 'To': 'q32cosmb0', 'Delivered': 50, 'Trades': 2, 'Unnoted': 25, 'Noted': 0, 'Coins': 0}
+2026-11-12T02:45:08.231Z INFO    [1] The script stopped itself; the account stays logged in

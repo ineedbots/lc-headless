@@ -1,0 +1,22 @@
+{
+  "fish": {
+    "start_tick": 21,
+    "end_tick": 581,
+    "elapsed_ticks": 560,
+    "elapsed_ms": 336181,
+    "catches": 126,
+    "xp": 7600,
+    "catches_per_hour": 1349.27,
+    "xp_per_hour": 81384.73
+  },
+  "native": {
+    "start_tick": 21,
+    "end_tick": 581,
+    "elapsed_ticks": 560,
+    "elapsed_ms": 336050,
+    "catches": 79,
+    "xp": 4850,
+    "catches_per_hour": 846.3,
+    "xp_per_hour": 51956.55
+  }
+}

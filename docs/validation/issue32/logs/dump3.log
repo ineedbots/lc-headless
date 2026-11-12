@@ -1,0 +1,190 @@
+2026-11-12T02:45:52.255Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\dump3\client.log too
+2026-11-12T02:45:52.256Z INFO    Config loaded from build/issue32-live/dump3/client.json
+2026-11-12T02:45:52.435Z INFO    Revision 289 cache loaded from data/cache in 177 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:45:52.688Z INFO    Walking map built and walker graph loaded from data/nav in 252 ms: 7.9 MB, 3482 edges
+2026-11-12T02:45:52.738Z INFO    [0] Added MuleDepot's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\dump3\accounts\0.jsonc: loadout, trade_slots
+2026-11-12T02:45:52.739Z INFO    [0] Loaded script participant0.py
+2026-11-12T02:45:52.788Z INFO    [1] Added MuleDepot's default settings to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\dump3\accounts\1.jsonc: loadout, trade_slots
+2026-11-12T02:45:52.789Z INFO    [1] Loaded script participant1.py
+2026-11-12T02:45:52.789Z INFO    Running 2 accounts
+2026-11-12T02:45:52.789Z INFO    [0] Logging in as q32dump30
+2026-11-12T02:45:52.790Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:45:52.791Z INFO    [0] Connection open
+2026-11-12T02:45:53.220Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:45:53.223Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:45:53.827Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:45:53.828Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:45:54.429Z INFO    [0] tutorial: stage 1
+2026-11-12T02:45:54.804Z INFO    [1] Logging in as q32dump31
+2026-11-12T02:45:54.804Z INFO    [1] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:45:54.805Z INFO    [1] Connection open
+2026-11-12T02:45:55.030Z INFO    [1] Logged in (staff level 2)
+2026-11-12T02:45:55.032Z INFO    [1] [game] Welcome to RuneScape.
+2026-11-12T02:45:55.625Z INFO    [1] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:45:55.626Z INFO    [1] tutorial: saving a character design
+2026-11-12T02:45:56.228Z INFO    [1] tutorial: stage 1
+2026-11-12T02:45:56.831Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:45:58.618Z INFO    [1] tutorial: completed; arrived on the mainland
+2026-11-12T02:46:08.218Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:46:08.221Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:46:09.418Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:46:09.420Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:46:10.017Z INFO    [1] [game] World speed was changed to 600ms
+2026-11-12T02:46:10.019Z INFO    [1] SERVER World speed was changed to 600ms
+2026-11-12T02:46:11.221Z INFO    [1] [game] set tutorial: to 1000
+2026-11-12T02:46:11.223Z INFO    [1] SERVER set tutorial: to 1000
+2026-11-12T02:46:13.050Z INFO    [1] ACCEPT_START Tile(2725, 3491, 0) inv=[]
+2026-11-12T02:46:13.657Z INFO    [1] ACCEPT_SAMPLE ticks=1 ms=607 tile=Tile(2723, 3492, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:46:14.880Z INFO    [1] Bank (open): Coins x25
+2026-11-12T02:46:15.471Z INFO    [1] MuleDepot Supermule: 1 partner(s) at Tile(2725, 3491, 0)
+2026-11-12T02:46:17.833Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:17.834Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:17.834Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:21.427Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:21.427Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:21.428Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:25.058Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:25.059Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:25.060Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:25.690Z INFO    [1] ACCEPT_SAMPLE ticks=21 ms=12640 tile=Tile(2726, 3491, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:46:28.652Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:28.653Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:28.658Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:31.060Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:46:32.827Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:46:32.827Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:46:36.430Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:46:36.431Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:46:37.629Z INFO    [1] ACCEPT_SAMPLE ticks=41 ms=24579 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:46:40.050Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:46:40.051Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:46:43.667Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:43.668Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:43.668Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:47.247Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:47.248Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:47.248Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:49.652Z INFO    [1] ACCEPT_SAMPLE ticks=61 ms=36602 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:46:50.822Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:50.823Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:50.823Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:54.420Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:54.421Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:54.422Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:58.062Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:46:58.063Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:46:58.066Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:46:58.685Z INFO    [0] ACCEPT_START Tile(2722, 3493, 0) inv=[(886, 1), (888, 1), (890, 1), (892, 1), (811, 1), (868, 1), (314, 1), (1739, 1), (1753, 1), (536, 1), (532, 1), (231, 1), (237, 1), (225, 1), (3051, 1)]
+2026-11-12T02:46:59.249Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=564 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Mule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[(886, 1), (888, 1), (890, 1), (892, 1), (811, 1), (868, 1), (314, 1), (1739, 1), (1753, 1), (536, 1), (532, 1), (231, 1), (237, 1), (225, 1), (3051, 1)]
+2026-11-12T02:46:59.842Z INFO    [0] Bank (open): Fire rune x1, Water rune x1, Air rune x1, Earth rune x1, Mind rune x1, Body rune x1, Death rune x1, Nature rune x1, Chaos rune x1, Law rune x1, Cosmic rune x1, Blood rune x1, Soul rune x1, Bronze arrow x1, Iron arrow x1, Coins x25
+2026-11-12T02:47:01.670Z INFO    [1] ACCEPT_SAMPLE ticks=81 ms=48620 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:47:07.653Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:07.654Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:08.833Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:08.835Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:09.458Z INFO    [0] MuleDepot Mule: 1 partner(s) at Tile(2725, 3491, 0)
+2026-11-12T02:47:11.268Z INFO    [0] ACCEPT_SAMPLE ticks=21 ms=12583 tile=Tile(2723, 3492, 0) xp=0 report={'Role': 'Mule', 'Status': 'banking', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:47:12.452Z INFO    [0] Bank (open): Limpwurt root x1, Snape grass x1, Unicorn horn x1, Feather x1, Big bones x1, Dragon bones x1, Fire rune x1, Water rune x1, Air rune x1, Earth rune x1, Mind rune x1, Body rune x1, Death rune x1, Nature rune x1, Chaos rune x1, Law rune x1, Cosmic rune x1, Blood rune x1, Soul rune x1, Rune dart x1, Rune knife x1, Bronze arrow x1, Iron arrow x1, Steel arrow x1, Mithril arrow x1, Adamant arrow x1, Rune arrow x1, Coins x25, Cowhide x1, Dragonhide x1, Herb x1
+2026-11-12T02:47:13.605Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:13.606Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:13.642Z INFO    [1] ACCEPT_SAMPLE ticks=101 ms=60592 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:47:14.219Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:14.220Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:14.813Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:14.814Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:14.835Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:14.835Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:15.415Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:15.415Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:16.010Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:16.010Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:16.608Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:16.609Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:17.208Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:17.209Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:17.806Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:17.806Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:18.402Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:18.403Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:18.414Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:18.414Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:19.010Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:19.010Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:19.607Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:19.607Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:20.206Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:20.207Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:20.806Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:20.807Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:21.406Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:21.407Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:22.018Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:22.018Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:22.029Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:22.029Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:22.603Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:22.604Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:23.215Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:23.216Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:23.246Z INFO    [0] ACCEPT_SAMPLE ticks=41 ms=24561 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Mule', 'Status': 'banking', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[(556, 1), (555, 1), (557, 1), (554, 1), (564, 1), (563, 1), (558, 1), (559, 1), (561, 1), (562, 1), (560, 1), (566, 1), (565, 1), (882, 1), (884, 1), (886, 1)]
+2026-11-12T02:47:23.810Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:23.810Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:24.407Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:24.408Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:25.005Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:25.005Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:25.608Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:25.608Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:25.618Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:25.618Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:25.624Z INFO    [1] ACCEPT_SAMPLE ticks=121 ms=72574 tile=Tile(2722, 3492, 0) xp=0 report={'Role': 'Supermule', 'Status': 'starting', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:47:26.205Z INFO    [0] [game] This item can not be withdrawn as a note.
+2026-11-12T02:47:26.206Z INFO    [0] SERVER This item can not be withdrawn as a note.
+2026-11-12T02:47:29.218Z INFO    [1] [game] Q32dump30 is busy at the moment.
+2026-11-12T02:47:29.218Z INFO    [1] SERVER Q32dump30 is busy at the moment.
+2026-11-12T02:47:31.627Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:47:31.629Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:47:35.262Z INFO    [0] ACCEPT_SAMPLE ticks=61 ms=36576 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Mule', 'Status': 'trading with Q32dump31', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[(868, 1), (314, 1), (1740, 1), (1754, 1), (537, 1), (533, 1), (232, 1), (238, 1)]
+2026-11-12T02:47:37.616Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:47:37.618Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:47:37.618Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:47:37.618Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:47:37.646Z INFO    [1] ACCEPT_SAMPLE ticks=141 ms=84595 tile=Tile(2722, 3492, 0) xp=0 report={'Role': 'Supermule', 'Status': 'trading with Q32dump30', 'Trades': 0, 'Units': 0, 'Clients served': 0} inv=[]
+2026-11-12T02:47:39.440Z INFO    [0] MuleDepot: transfer 1, 28 units
+2026-11-12T02:47:39.441Z INFO    [1] MuleDepot: transfer 1, 28 units
+2026-11-12T02:47:41.259Z INFO    [0] Bank (open): Limpwurt root x1, Coins x25, Herb x1
+2026-11-12T02:47:41.263Z INFO    [1] Bank (open): Coins x25
+2026-11-12T02:47:45.426Z INFO    [0] [game] Q32dump31 is busy at the moment.
+2026-11-12T02:47:45.427Z INFO    [0] SERVER Q32dump31 is busy at the moment.
+2026-11-12T02:47:47.233Z INFO    [0] ACCEPT_SAMPLE ticks=81 ms=48548 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Mule', 'Status': 'banking', 'Trades': 1, 'Units': 28, 'Clients served': 0} inv=[(226, 1), (3052, 1)]
+2026-11-12T02:47:48.419Z INFO    [0] [game] Q32dump31 is busy at the moment.
+2026-11-12T02:47:48.420Z INFO    [0] SERVER Q32dump31 is busy at the moment.
+2026-11-12T02:47:49.628Z INFO    [1] ACCEPT_SAMPLE ticks=161 ms=96578 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'banking', 'Trades': 1, 'Units': 28, 'Clients served': 0} inv=[(884, 1), (886, 1), (888, 1), (890, 1), (892, 1), (811, 1), (868, 1), (314, 1), (1740, 1), (1754, 1), (537, 1), (533, 1), (232, 1), (238, 1)]
+2026-11-12T02:47:52.015Z INFO    [0] [game] Q32dump31 is busy at the moment.
+2026-11-12T02:47:52.016Z INFO    [0] SERVER Q32dump31 is busy at the moment.
+2026-11-12T02:47:55.634Z INFO    [0] [game] Q32dump31 is busy at the moment.
+2026-11-12T02:47:55.636Z INFO    [0] SERVER Q32dump31 is busy at the moment.
+2026-11-12T02:47:59.240Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:47:59.240Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:47:59.241Z INFO    [1] [trade request] Q32dump30: wishes to trade with you.
+2026-11-12T02:47:59.250Z INFO    [0] ACCEPT_SAMPLE ticks=101 ms=60565 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Mule', 'Status': 'banking', 'Trades': 1, 'Units': 28, 'Clients served': 0} inv=[(226, 1), (3052, 1)]
+2026-11-12T02:47:59.841Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:47:59.842Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:48:01.637Z INFO    [1] ACCEPT_SAMPLE ticks=181 ms=108587 tile=Tile(2721, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'trading with Q32dump30', 'Trades': 1, 'Units': 28, 'Clients served': 0} inv=[]
+2026-11-12T02:48:04.615Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:48:04.615Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:48:04.616Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:48:04.616Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:48:05.876Z INFO    [0] MuleDepot: transfer 2, 2 units
+2026-11-12T02:48:06.440Z INFO    [1] MuleDepot: transfer 2, 2 units
+2026-11-12T02:48:07.635Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:48:10.068Z INFO    [1] Bank (open): Snape grass x1, Unicorn horn x1, Feather x1, Big bones x1, Dragon bones x1, Fire rune x1, Water rune x1, Air rune x1, Earth rune x1, Mind rune x1, Body rune x1, Death rune x1, Nature rune x1, Chaos rune x1, Law rune x1, Cosmic rune x1, Blood rune x1, Soul rune x1, Rune dart x1, Rune knife x1, Bronze arrow x1, Iron arrow x1, Steel arrow x1, Mithril arrow x1, Adamant arrow x1, Rune arrow x1, Coins x25, Cowhide x1, Dragonhide x1
+2026-11-12T02:48:11.239Z INFO    [0] ACCEPT_SAMPLE ticks=121 ms=72554 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Mule', 'Status': 'banking', 'Trades': 2, 'Units': 30, 'Clients served': 0} inv=[]
+2026-11-12T02:48:11.831Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:48:13.628Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:48:13.629Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:48:13.643Z INFO    [0] [trade request] Q32dump31: wishes to trade with you.
+2026-11-12T02:48:13.645Z INFO    [1] ACCEPT_SAMPLE ticks=201 ms=120595 tile=Tile(2722, 3493, 0) xp=0 report={'Role': 'Supermule', 'Status': 'banking', 'Trades': 2, 'Units': 30, 'Clients served': 0} inv=[]
+2026-11-12T02:48:14.235Z INFO    [0] ACCEPT_FINISH MuleDepot: dump list exhausted after three bank reads
+2026-11-12T02:48:14.235Z INFO    [0] ACCEPT_FINAL ticks=126 ms=75550 report={'Role': 'Mule', 'Status': 'banking', 'Trades': 2, 'Units': 30, 'Clients served': 0}
+2026-11-12T02:48:14.235Z INFO    [0] The script stopped itself; the account stays logged in

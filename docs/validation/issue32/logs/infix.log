@@ -1,0 +1,343 @@
+2026-11-12T02:40:32.169Z INFO    Logging to C:\Users\NewBuilt\source\repos\runescape\rs2004-headless\build\issue32-live\infix\client.log too
+2026-11-12T02:40:32.170Z INFO    Config loaded from build/issue32-live/infix/client.json
+2026-11-12T02:40:32.376Z INFO    Revision 289 cache loaded from data/cache in 205 ms: 5116 locs, 1596 NPCs, 4089 objs, 534 map squares with 567454 locs
+2026-11-12T02:40:32.688Z INFO    Walking map built and walker graph loaded from data/nav in 311 ms: 7.9 MB, 3482 edges
+2026-11-12T02:40:32.719Z INFO    [0] Loaded script participant0.py
+2026-11-12T02:40:32.750Z INFO    [1] Loaded script participant1.py
+2026-11-12T02:40:32.751Z INFO    Running 2 accounts
+2026-11-12T02:40:32.751Z INFO    [0] Logging in as q32infix0
+2026-11-12T02:40:32.752Z INFO    [0] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:40:32.754Z INFO    [0] Connection open
+2026-11-12T02:40:32.814Z INFO    [0] Logged in (staff level 2)
+2026-11-12T02:40:32.815Z INFO    [0] [game] Welcome to RuneScape.
+2026-11-12T02:40:33.425Z INFO    [0] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:40:33.426Z INFO    [0] tutorial: saving a character design
+2026-11-12T02:40:34.018Z INFO    [0] tutorial: stage 1
+2026-11-12T02:40:34.763Z INFO    [1] Logging in as q32infix1
+2026-11-12T02:40:34.763Z INFO    [1] Connecting to tcp://127.0.0.1:43632
+2026-11-12T02:40:34.764Z INFO    [1] Connection open
+2026-11-12T02:40:35.212Z INFO    [1] Logged in (staff level 2)
+2026-11-12T02:40:35.214Z INFO    [1] [game] Welcome to RuneScape.
+2026-11-12T02:40:35.836Z INFO    [1] tutorial: leaving Tutorial Island; skipping if the initial guide offers it
+2026-11-12T02:40:35.837Z INFO    [1] tutorial: saving a character design
+2026-11-12T02:40:36.429Z INFO    [0] tutorial: completed; arrived on the mainland
+2026-11-12T02:40:36.434Z INFO    [1] tutorial: stage 1
+2026-11-12T02:40:38.830Z INFO    [1] tutorial: completed; arrived on the mainland
+2026-11-12T02:40:47.821Z INFO    [0] [game] World speed was changed to 600ms
+2026-11-12T02:40:47.823Z INFO    [0] SERVER World speed was changed to 600ms
+2026-11-12T02:40:49.006Z INFO    [0] [game] set tutorial: to 1000
+2026-11-12T02:40:49.007Z INFO    [0] SERVER set tutorial: to 1000
+2026-11-12T02:40:50.214Z INFO    [1] [game] World speed was changed to 600ms
+2026-11-12T02:40:50.215Z INFO    [1] SERVER World speed was changed to 600ms
+2026-11-12T02:40:51.415Z INFO    [1] [game] set tutorial: to 1000
+2026-11-12T02:40:51.417Z INFO    [1] SERVER set tutorial: to 1000
+2026-11-12T02:40:53.831Z INFO    [0] Bank (open): Coins x25
+2026-11-12T02:40:56.274Z INFO    [1] Bank (open): Coins x25
+2026-11-12T02:40:59.887Z INFO    [0] ACCEPT_START Tile(3013, 3355, 0) inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:40:59.888Z INFO    [0] MuleCrafter crafter starting — Air rune, accepting essence from [q32infix1], mules bring all essence
+2026-11-12T02:40:59.913Z INFO    [0]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:41:00.441Z INFO    [0] ACCEPT_SAMPLE ticks=1 ms=554 tile=Tile(3013, 3357, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:02.250Z INFO    [1] ACCEPT_START Tile(3013, 3355, 0) inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:02.251Z INFO    [1] MuleCrafter mule starting — ferrying essence for Air rune to [q32infix0]
+2026-11-12T02:41:02.275Z INFO    [1]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:41:02.868Z INFO    [1] ACCEPT_SAMPLE ticks=1 ms=618 tile=Tile(3013, 3357, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:12.464Z INFO    [0] ACCEPT_SAMPLE ticks=21 ms=12577 tile=Tile(3006, 3323, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:14.892Z INFO    [1] ACCEPT_SAMPLE ticks=21 ms=12641 tile=Tile(3006, 3323, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:23.889Z INFO    [0]   arrived (4 clicks)
+2026-11-12T02:41:24.486Z INFO    [0] ACCEPT_SAMPLE ticks=41 ms=24599 tile=Tile(2983, 3288, 0) xp=0 report={'Status': 'Crafter — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:24.487Z INFO    [0] using the Air talisman on the mysterious ruins
+2026-11-12T02:41:26.248Z INFO    [0] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:41:26.249Z INFO    [0] [game] You feel a powerful force take hold of you...
+2026-11-12T02:41:26.251Z INFO    [0] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:41:26.252Z INFO    [0] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:41:26.265Z INFO    [1]   arrived (4 clicks)
+2026-11-12T02:41:26.889Z INFO    [1] ACCEPT_SAMPLE ticks=41 ms=24638 tile=Tile(2983, 3288, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:41:26.890Z INFO    [1] using the Air talisman on the mysterious ruins
+2026-11-12T02:41:27.460Z INFO    [0] entered the altar
+2026-11-12T02:41:28.072Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:41:28.660Z INFO    [1] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:41:28.661Z INFO    [1] [game] You feel a powerful force take hold of you...
+2026-11-12T02:41:28.663Z INFO    [1] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:41:28.664Z INFO    [1] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:41:29.870Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:41:29.871Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:41:29.883Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:41:29.885Z INFO    [1] entered the altar
+2026-11-12T02:41:30.490Z INFO    [0] CrafterRequestTrade: Trade.request(Q32infix1) returned True
+2026-11-12T02:41:30.494Z INFO    [1] MuleTradeWithCrafter: Trade.request(Q32infix0) returned True
+2026-11-12T02:41:31.629Z INFO    [1] [game] Q32infix0 is busy at the moment.
+2026-11-12T02:41:31.630Z INFO    [1] SERVER Q32infix0 is busy at the moment.
+2026-11-12T02:41:34.493Z INFO    [0] CrafterRequestTrade: trade did not become active within 4s
+2026-11-12T02:41:34.496Z INFO    [1] MuleTradeWithCrafter: trade did not become active within 4s
+2026-11-12T02:41:34.628Z INFO    [0] CrafterRequestTrade: Trade.request(Q32infix1) returned True
+2026-11-12T02:41:34.629Z INFO    [1] MuleTradeWithCrafter: Trade.request(Q32infix0) returned True
+2026-11-12T02:41:35.227Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:41:35.227Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:41:35.227Z INFO    [1] [trade request] Q32infix0: wishes to trade with you.
+2026-11-12T02:41:35.228Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:41:35.228Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:41:35.238Z INFO    [0] CrafterRequestTrade: trade became active with Q32infix1
+2026-11-12T02:41:35.238Z INFO    [1] MuleTradeWithCrafter: trade became active with Q32infix0
+2026-11-12T02:41:35.885Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=empty, my runes=270, my ess=0
+2026-11-12T02:41:35.887Z INFO    [0] CrafterTradeAtRuins: waiting for Q32infix1 to offer essence (their offer: [])
+2026-11-12T02:41:35.889Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=27, runes=0
+2026-11-12T02:41:35.890Z INFO    [1] MuleTradeExecute: trade open — offering 27 essence
+2026-11-12T02:41:35.891Z INFO    [1] MuleTradeExecute: Trade.offerAll returned True
+2026-11-12T02:41:36.463Z INFO    [0] ACCEPT_SAMPLE ticks=61 ms=36576 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for Q32infix1\'s offer', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 27, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 135} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:41:36.464Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=0, runes=0
+2026-11-12T02:41:36.465Z INFO    [1] MuleTradeExecute: held 0 essence, waiting
+2026-11-12T02:41:37.031Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=has-essence, my runes=270, my ess=0
+2026-11-12T02:41:37.031Z INFO    [0] CrafterTradeAtRuins: offered Air rune returned True
+2026-11-12T02:41:37.678Z INFO    [0] CrafterTradeAtRuins: offer-screen accept returned True
+2026-11-12T02:41:37.682Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:41:37.684Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:41:38.877Z INFO    [1] ACCEPT_SAMPLE ticks=61 ms=36627 tile=Tile(2843, 4831, 0) xp=0 report={'Status': 'Mule — accepting the offer', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 0, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1)]
+2026-11-12T02:41:38.877Z INFO    [1] MuleTradeExecute: confirm screen, beforeEss=27
+2026-11-12T02:41:38.878Z INFO    [1] MuleTradeExecute: confirm-screen accept returned True
+2026-11-12T02:41:39.459Z INFO    [0] CrafterTradeAtRuins: confirm-screen accept returned True
+2026-11-12T02:41:40.028Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:41:40.030Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:41:40.033Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:41:40.035Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:41:40.681Z INFO    [0] CrafterTradeAtRuins: trade closed, essCount went 0 -> 27 (delta 27)
+2026-11-12T02:41:40.682Z INFO    [0] received 27 essence
+2026-11-12T02:41:40.683Z INFO    [1] MuleTradeExecute: trade closed, delivered 27 essence (beforeEss=27, ess now=0)
+2026-11-12T02:41:40.683Z INFO    [1] delivered 27 essence to the crafter
+2026-11-12T02:41:41.874Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:41:42.457Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:41:43.064Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:41:43.065Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:41:43.080Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:41:43.670Z INFO    [1] [game] You step through the portal...
+2026-11-12T02:41:43.671Z INFO    [1] SERVER You step through the portal...
+2026-11-12T02:41:43.685Z INFO    [1] back at the mysterious ruins
+2026-11-12T02:41:44.273Z INFO    [1]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:41:48.423Z INFO    [0] ACCEPT_SAMPLE ticks=81 ms=48536 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:41:50.881Z INFO    [1] ACCEPT_SAMPLE ticks=81 ms=48631 tile=Tile(2989, 3308, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '0m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:00.448Z INFO    [0] ACCEPT_SAMPLE ticks=101 ms=60561 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:02.835Z INFO    [1] ACCEPT_SAMPLE ticks=101 ms=60585 tile=Tile(3006, 3346, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:08.229Z INFO    [1]   arrived (6 clicks)
+2026-11-12T02:42:09.433Z INFO    [1] Bank (open): Coins x25, Rune essence x200
+2026-11-12T02:42:10.036Z INFO    [1] deposited 270 Air runes
+2026-11-12T02:42:11.827Z INFO    [1] withdrew 27 essence from the bank
+2026-11-12T02:42:12.442Z INFO    [0] ACCEPT_SAMPLE ticks=121 ms=72555 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:12.462Z INFO    [1]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:42:14.874Z INFO    [1] ACCEPT_SAMPLE ticks=121 ms=72624 tile=Tile(3008, 3357, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 2, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:24.437Z INFO    [0] ACCEPT_SAMPLE ticks=141 ms=84550 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:26.878Z INFO    [1] ACCEPT_SAMPLE ticks=141 ms=84627 tile=Tile(3000, 3317, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 2, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:36.483Z INFO    [0] ACCEPT_SAMPLE ticks=161 ms=96596 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 1, 'Essence': 0, 'Runecraft xp': 270} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:36.484Z INFO    [1]   arrived (4 clicks)
+2026-11-12T02:42:37.044Z INFO    [1] using the Air talisman on the mysterious ruins
+2026-11-12T02:42:38.843Z INFO    [1] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:42:38.844Z INFO    [1] [game] You feel a powerful force take hold of you...
+2026-11-12T02:42:38.845Z INFO    [1] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:42:38.846Z INFO    [1] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:42:38.859Z INFO    [1] ACCEPT_SAMPLE ticks=161 ms=96609 tile=Tile(2984, 3290, 0) xp=0 report={'Status': 'Mule — entering the altar', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 2, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:40.058Z INFO    [1] entered the altar
+2026-11-12T02:42:40.686Z INFO    [1] MuleTradeWithCrafter: Trade.request(Q32infix0) returned True
+2026-11-12T02:42:41.252Z INFO    [0] CrafterRequestTrade: Trade.request(Q32infix1) returned True
+2026-11-12T02:42:41.817Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:42:41.818Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:42:41.818Z INFO    [1] [trade request] Q32infix0: wishes to trade with you.
+2026-11-12T02:42:41.819Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:42:41.819Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:42:41.824Z INFO    [0] CrafterRequestTrade: trade became active with Q32infix1
+2026-11-12T02:42:41.826Z INFO    [1] MuleTradeWithCrafter: trade became active with Q32infix0
+2026-11-12T02:42:42.424Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=empty, my runes=270, my ess=0
+2026-11-12T02:42:42.424Z INFO    [0] CrafterTradeAtRuins: waiting for Q32infix1 to offer essence (their offer: [])
+2026-11-12T02:42:42.425Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=27, runes=0
+2026-11-12T02:42:42.426Z INFO    [1] MuleTradeExecute: trade open — offering 27 essence
+2026-11-12T02:42:42.426Z INFO    [1] MuleTradeExecute: Trade.offerAll returned True
+2026-11-12T02:42:43.039Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=27, runes=0
+2026-11-12T02:42:43.039Z INFO    [1] MuleTradeExecute: trade open — offering 27 essence
+2026-11-12T02:42:43.039Z INFO    [1] MuleTradeExecute: Trade.offerAll returned True
+2026-11-12T02:42:43.640Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=has-essence, my runes=270, my ess=0
+2026-11-12T02:42:43.641Z INFO    [0] CrafterTradeAtRuins: offered Air rune returned True
+2026-11-12T02:42:43.643Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:42:43.644Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:42:44.226Z INFO    [0] CrafterTradeAtRuins: offer-screen accept returned True
+2026-11-12T02:42:44.228Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:42:44.228Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:42:45.433Z INFO    [1] MuleTradeExecute: confirm screen, beforeEss=27
+2026-11-12T02:42:45.433Z INFO    [1] MuleTradeExecute: confirm-screen accept returned True
+2026-11-12T02:42:46.019Z INFO    [0] CrafterTradeAtRuins: confirm-screen accept returned True
+2026-11-12T02:42:46.617Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:42:46.617Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:42:46.618Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:42:46.618Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:42:47.829Z INFO    [0] CrafterTradeAtRuins: trade closed, essCount went 0 -> 27 (delta 27)
+2026-11-12T02:42:47.829Z INFO    [0] received 27 essence
+2026-11-12T02:42:47.830Z INFO    [1] MuleTradeExecute: trade closed, delivered 27 essence (beforeEss=27, ess now=0)
+2026-11-12T02:42:47.832Z INFO    [1] delivered 27 essence to the crafter
+2026-11-12T02:42:48.433Z INFO    [0] ACCEPT_SAMPLE ticks=181 ms=108545 tile=Tile(2842, 4832, 0) xp=0 report={'Status': 'Crafter — confirming trade', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 54, 'Trades': 2, 'Essence': 27, 'Runecraft xp': 270} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:42:49.037Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:42:49.631Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:42:50.223Z INFO    [1] [game] You step through the portal...
+2026-11-12T02:42:50.224Z INFO    [1] SERVER You step through the portal...
+2026-11-12T02:42:50.231Z INFO    [1] back at the mysterious ruins
+2026-11-12T02:42:50.821Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:42:50.822Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:42:50.828Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:42:50.830Z INFO    [1] ACCEPT_SAMPLE ticks=181 ms=108580 tile=Tile(2983, 3288, 0) xp=0 report={'Status': 'Mule — taking the portal out', 'Runtime': '1m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:42:50.853Z INFO    [1]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:43:00.470Z INFO    [0] ACCEPT_SAMPLE ticks=201 ms=120583 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:02.833Z INFO    [1] ACCEPT_SAMPLE ticks=201 ms=120583 tile=Tile(3005, 3324, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:12.425Z INFO    [0] ACCEPT_SAMPLE ticks=221 ms=132538 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:14.846Z INFO    [1] ACCEPT_SAMPLE ticks=221 ms=132596 tile=Tile(3006, 3354, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:19.655Z INFO    [1]   arrived (6 clicks)
+2026-11-12T02:43:22.023Z INFO    [1] Bank (open): Air rune x270, Coins x25, Rune essence x173
+2026-11-12T02:43:22.619Z INFO    [1] deposited 270 Air runes
+2026-11-12T02:43:22.620Z INFO    [1] cleared 1 slot(s)
+2026-11-12T02:43:24.421Z INFO    [0] ACCEPT_SAMPLE ticks=241 ms=144534 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:24.423Z INFO    [1] withdrew 27 essence from the bank
+2026-11-12T02:43:25.053Z INFO    [1]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:43:26.821Z INFO    [1] ACCEPT_SAMPLE ticks=241 ms=144571 tile=Tile(3012, 3358, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 4, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:43:36.420Z INFO    [0] ACCEPT_SAMPLE ticks=261 ms=156533 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:38.831Z INFO    [1] ACCEPT_SAMPLE ticks=261 ms=156581 tile=Tile(3008, 3342, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 4, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:43:48.437Z INFO    [0] ACCEPT_SAMPLE ticks=281 ms=168549 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:43:50.830Z INFO    [1] ACCEPT_SAMPLE ticks=281 ms=168580 tile=Tile(3005, 3322, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '2m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 4, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:00.432Z INFO    [0] ACCEPT_SAMPLE ticks=301 ms=180545 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:44:02.833Z INFO    [1] ACCEPT_SAMPLE ticks=301 ms=180583 tile=Tile(2991, 3304, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 4, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:12.427Z INFO    [0] ACCEPT_SAMPLE ticks=321 ms=192540 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 0, 'Runecraft xp': 405} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:44:13.031Z INFO    [1]   arrived (5 clicks)
+2026-11-12T02:44:13.630Z INFO    [1] using the Air talisman on the mysterious ruins
+2026-11-12T02:44:14.822Z INFO    [1] ACCEPT_SAMPLE ticks=321 ms=192572 tile=Tile(2983, 3290, 0) xp=0 report={'Status': 'Mule — entering the altar', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 4, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:16.018Z INFO    [1] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:44:16.019Z INFO    [1] [game] You feel a powerful force take hold of you...
+2026-11-12T02:44:16.019Z INFO    [1] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:44:16.019Z INFO    [1] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:44:17.230Z INFO    [1] entered the altar
+2026-11-12T02:44:17.832Z INFO    [0] CrafterRequestTrade: Trade.request(Q32infix1) returned True
+2026-11-12T02:44:17.833Z INFO    [1] MuleTradeWithCrafter: Trade.request(Q32infix0) returned True
+2026-11-12T02:44:18.424Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:44:18.424Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:44:18.425Z INFO    [1] [trade request] Q32infix0: wishes to trade with you.
+2026-11-12T02:44:18.425Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:44:18.426Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:44:18.432Z INFO    [0] CrafterRequestTrade: trade became active with Q32infix1
+2026-11-12T02:44:18.433Z INFO    [1] MuleTradeWithCrafter: trade became active with Q32infix0
+2026-11-12T02:44:19.035Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=empty, my runes=270, my ess=0
+2026-11-12T02:44:19.035Z INFO    [0] CrafterTradeAtRuins: waiting for Q32infix1 to offer essence (their offer: [])
+2026-11-12T02:44:19.037Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=27, runes=0
+2026-11-12T02:44:19.037Z INFO    [1] MuleTradeExecute: trade open — offering 27 essence
+2026-11-12T02:44:19.038Z INFO    [1] MuleTradeExecute: Trade.offerAll returned True
+2026-11-12T02:44:19.632Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=0, runes=0
+2026-11-12T02:44:19.632Z INFO    [1] MuleTradeExecute: held 0 essence, waiting
+2026-11-12T02:44:20.222Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=has-essence, my runes=270, my ess=0
+2026-11-12T02:44:20.223Z INFO    [0] CrafterTradeAtRuins: offered Air rune returned True
+2026-11-12T02:44:20.822Z INFO    [0] CrafterTradeAtRuins: offer-screen accept returned True
+2026-11-12T02:44:20.825Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:44:20.825Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:44:22.016Z INFO    [1] MuleTradeExecute: confirm screen, beforeEss=27
+2026-11-12T02:44:22.017Z INFO    [1] MuleTradeExecute: confirm-screen accept returned True
+2026-11-12T02:44:22.629Z INFO    [0] CrafterTradeAtRuins: confirm-screen accept returned True
+2026-11-12T02:44:23.220Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:44:23.222Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:44:23.225Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:44:23.226Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:44:24.431Z INFO    [0] ACCEPT_SAMPLE ticks=341 ms=204544 tile=Tile(2842, 4830, 0) xp=0 report={'Status': 'Crafter — confirming trade', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 81, 'Trades': 2, 'Essence': 27, 'Runecraft xp': 405} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:44:24.432Z INFO    [0] CrafterTradeAtRuins: trade closed, essCount went 0 -> 27 (delta 27)
+2026-11-12T02:44:24.432Z INFO    [0] received 27 essence
+2026-11-12T02:44:24.433Z INFO    [1] MuleTradeExecute: trade closed, delivered 27 essence (beforeEss=27, ess now=0)
+2026-11-12T02:44:24.433Z INFO    [1] delivered 27 essence to the crafter
+2026-11-12T02:44:26.225Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:44:26.228Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:44:26.817Z INFO    [1] ACCEPT_SAMPLE ticks=341 ms=204567 tile=Tile(2841, 4829, 0) xp=0 report={'Status': 'Mule — taking the portal out', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 5, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:44:27.414Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:44:27.414Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:44:27.415Z INFO    [1] [game] You step through the portal...
+2026-11-12T02:44:27.416Z INFO    [1] SERVER You step through the portal...
+2026-11-12T02:44:27.418Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:44:27.419Z INFO    [1] back at the mysterious ruins
+2026-11-12T02:44:28.044Z INFO    [1]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:44:36.422Z INFO    [0] ACCEPT_SAMPLE ticks=361 ms=216534 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:44:38.824Z INFO    [1] ACCEPT_SAMPLE ticks=361 ms=216574 tile=Tile(2986, 3304, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 5, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:44:48.440Z INFO    [0] ACCEPT_SAMPLE ticks=381 ms=228553 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:44:50.875Z INFO    [1] ACCEPT_SAMPLE ticks=381 ms=228624 tile=Tile(3005, 3322, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '3m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 5, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:00.425Z INFO    [0] ACCEPT_SAMPLE ticks=401 ms=240538 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:02.828Z INFO    [1] ACCEPT_SAMPLE ticks=401 ms=240578 tile=Tile(3006, 3342, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 5, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:12.432Z INFO    [0] ACCEPT_SAMPLE ticks=421 ms=252545 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:14.880Z INFO    [1] ACCEPT_SAMPLE ticks=421 ms=252630 tile=Tile(3012, 3358, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 5, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:14.881Z INFO    [1]   arrived (6 clicks)
+2026-11-12T02:45:17.282Z INFO    [1] Bank (open): Air rune x540, Coins x25, Rune essence x146
+2026-11-12T02:45:17.857Z INFO    [1] deposited 270 Air runes
+2026-11-12T02:45:17.858Z INFO    [1] cleared 1 slot(s)
+2026-11-12T02:45:19.691Z INFO    [1] withdrew 27 essence from the bank
+2026-11-12T02:45:20.290Z INFO    [1]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:45:24.423Z INFO    [0] ACCEPT_SAMPLE ticks=441 ms=264536 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:26.874Z INFO    [1] ACCEPT_SAMPLE ticks=441 ms=264623 tile=Tile(3008, 3354, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 6, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:45:36.498Z INFO    [0] ACCEPT_SAMPLE ticks=461 ms=276611 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:38.885Z INFO    [1] ACCEPT_SAMPLE ticks=461 ms=276634 tile=Tile(3008, 3334, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 6, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:45:48.424Z INFO    [0] ACCEPT_SAMPLE ticks=481 ms=288537 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:45:50.858Z INFO    [1] ACCEPT_SAMPLE ticks=481 ms=288607 tile=Tile(2986, 3298, 0) xp=0 report={'Status': 'Mule — walking to the ruins', 'Runtime': '4m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 6, 'Essence': 27, 'Runecraft xp': 0} inv=[(1438, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1), (1436, 1)]
+2026-11-12T02:45:53.825Z INFO    [1]   arrived (4 clicks)
+2026-11-12T02:45:54.429Z INFO    [1] using the Air talisman on the mysterious ruins
+2026-11-12T02:45:56.218Z INFO    [1] [game] You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:45:56.218Z INFO    [1] [game] You feel a powerful force take hold of you...
+2026-11-12T02:45:56.219Z INFO    [1] SERVER You hold the Air Talisman towards the mysterious ruins.
+2026-11-12T02:45:56.219Z INFO    [1] SERVER You feel a powerful force take hold of you...
+2026-11-12T02:45:57.426Z INFO    [1] entered the altar
+2026-11-12T02:45:58.023Z INFO    [0] CrafterRequestTrade: Trade.request(Q32infix1) returned True
+2026-11-12T02:45:58.025Z INFO    [1] MuleTradeWithCrafter: Trade.request(Q32infix0) returned True
+2026-11-12T02:45:58.613Z INFO    [0] [game] Sending trade offer...
+2026-11-12T02:45:58.614Z INFO    [0] SERVER Sending trade offer...
+2026-11-12T02:45:58.614Z INFO    [1] [trade request] Q32infix0: wishes to trade with you.
+2026-11-12T02:45:58.614Z INFO    [1] [game] Sending trade offer...
+2026-11-12T02:45:58.615Z INFO    [1] SERVER Sending trade offer...
+2026-11-12T02:45:58.617Z INFO    [0] CrafterRequestTrade: trade became active with Q32infix1
+2026-11-12T02:45:58.618Z INFO    [1] MuleTradeWithCrafter: trade became active with Q32infix0
+2026-11-12T02:45:59.233Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=empty, my runes=270, my ess=0
+2026-11-12T02:45:59.234Z INFO    [0] CrafterTradeAtRuins: waiting for Q32infix1 to offer essence (their offer: [])
+2026-11-12T02:45:59.235Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=0, ess=27, runes=0
+2026-11-12T02:45:59.235Z INFO    [1] MuleTradeExecute: trade open — offering 27 essence
+2026-11-12T02:45:59.235Z INFO    [1] MuleTradeExecute: Trade.offerAll returned True
+2026-11-12T02:45:59.817Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:45:59.818Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:46:00.426Z INFO    [0] ACCEPT_SAMPLE ticks=501 ms=300539 tile=Tile(2842, 4830, 0) xp=0 report={'Status': 'Crafter — waiting for Q32infix1\'s offer', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 108, 'Trades': 3, 'Essence': 0, 'Runecraft xp': 540} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:00.427Z INFO    [0] CrafterTradeAtRuins: offer screen with Q32infix1, their offer state=has-essence, my runes=270, my ess=0
+2026-11-12T02:46:00.428Z INFO    [0] CrafterTradeAtRuins: offered Air rune returned True
+2026-11-12T02:46:00.429Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:46:00.429Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:46:01.029Z INFO    [0] CrafterTradeAtRuins: offer-screen accept returned True
+2026-11-12T02:46:01.030Z INFO    [1] MuleTradeExecute: offer screen with Q32infix0, myOffer.length=27, ess=0, runes=0
+2026-11-12T02:46:01.030Z INFO    [1] MuleTradeExecute: offer-screen accept returned True
+2026-11-12T02:46:01.659Z INFO    [1] MuleTradeExecute: confirm screen, beforeEss=27
+2026-11-12T02:46:01.661Z INFO    [1] MuleTradeExecute: confirm-screen accept returned True
+2026-11-12T02:46:02.825Z INFO    [0] CrafterTradeAtRuins: confirm-screen accept returned True
+2026-11-12T02:46:02.826Z INFO    [1] ACCEPT_SAMPLE ticks=501 ms=300576 tile=Tile(2841, 4830, 0) xp=0 report={'Status': 'Mule — confirming the trade', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 6, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1)]
+2026-11-12T02:46:03.403Z INFO    [0] [game] Accepted trade.
+2026-11-12T02:46:03.404Z INFO    [0] SERVER Accepted trade.
+2026-11-12T02:46:03.404Z INFO    [1] [game] Accepted trade.
+2026-11-12T02:46:03.404Z INFO    [1] SERVER Accepted trade.
+2026-11-12T02:46:04.072Z INFO    [0] CrafterTradeAtRuins: trade closed, essCount went 0 -> 27 (delta 27)
+2026-11-12T02:46:04.073Z INFO    [0] received 27 essence
+2026-11-12T02:46:04.074Z INFO    [1] MuleTradeExecute: trade closed, delivered 27 essence (beforeEss=27, ess now=0)
+2026-11-12T02:46:04.075Z INFO    [1] delivered 27 essence to the crafter
+2026-11-12T02:46:05.877Z INFO    [0] crafting 27 essence at the altar
+2026-11-12T02:46:05.877Z INFO    [1] taking the portal back to the ruins
+2026-11-12T02:46:07.053Z INFO    [0] [game] You bind the temple's power into Air Runes.
+2026-11-12T02:46:07.054Z INFO    [0] SERVER You bind the temple's power into Air Runes.
+2026-11-12T02:46:07.054Z INFO    [1] [game] You step through the portal...
+2026-11-12T02:46:07.056Z INFO    [1] SERVER You step through the portal...
+2026-11-12T02:46:07.059Z INFO    [0] crafted 27 Air runes - exiting temple
+2026-11-12T02:46:07.060Z INFO    [1] back at the mysterious ruins
+2026-11-12T02:46:07.687Z INFO    [1]   path: cost 81, 21 waypoints, 14019 expanded, hops []
+2026-11-12T02:46:12.456Z INFO    [0] ACCEPT_SAMPLE ticks=521 ms=312569 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 135, 'Trades': 4, 'Essence': 0, 'Runecraft xp': 675} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:14.878Z INFO    [1] ACCEPT_SAMPLE ticks=521 ms=312628 tile=Tile(2987, 3306, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 7, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:24.458Z INFO    [0] ACCEPT_SAMPLE ticks=541 ms=324570 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 135, 'Trades': 4, 'Essence': 0, 'Runecraft xp': 675} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:26.865Z INFO    [1] ACCEPT_SAMPLE ticks=541 ms=324615 tile=Tile(3005, 3324, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 7, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:36.439Z INFO    [0] ACCEPT_SAMPLE ticks=561 ms=336551 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 135, 'Trades': 4, 'Essence': 0, 'Runecraft xp': 675} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:38.882Z INFO    [1] ACCEPT_SAMPLE ticks=561 ms=336632 tile=Tile(3006, 3344, 0) xp=0 report={'Status': 'Mule — walking to the bank', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 7, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:48.438Z INFO    [0] ACCEPT_SAMPLE ticks=581 ms=348551 tile=Tile(2843, 4832, 0) xp=0 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 135, 'Trades': 4, 'Essence': 0, 'Runecraft xp': 675} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:49.651Z INFO    [1]   arrived (6 clicks)
+2026-11-12T02:46:50.840Z INFO    [1] ACCEPT_SAMPLE ticks=581 ms=348590 tile=Tile(3012, 3356, 0) xp=0 report={'Status': 'Mule — banking', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 7, 'Essence': 0, 'Runecraft xp': 0} inv=[(1438, 1), (556, 270)]
+2026-11-12T02:46:52.063Z INFO    [1] Bank (open): Air rune x810, Coins x25, Rune essence x119
+2026-11-12T02:46:52.679Z INFO    [1] deposited 270 Air runes
+2026-11-12T02:46:54.454Z INFO    [1] withdrew 27 essence from the bank
+2026-11-12T02:46:55.046Z INFO    [1]   path: cost 81, 21 waypoints, 8262 expanded, hops []
+2026-11-12T02:46:59.840Z INFO    [0] ACCEPT_FINISH ACCEPT_LIMIT 600 ticks
+2026-11-12T02:46:59.840Z INFO    [0] ACCEPT_FINAL ticks=600 ms=359953 report={'Status': 'Crafter — waiting for  at ruins', 'Runtime': '5m', 'Rune': 'Air rune', 'Crafted': 135, 'Trades': 4, 'Essence': 0, 'Runecraft xp': 675}
+2026-11-12T02:46:59.840Z INFO    [0] The script stopped itself; the account stays logged in
+2026-11-12T02:47:02.271Z INFO    [1] ACCEPT_FINISH ACCEPT_LIMIT 600 ticks
+2026-11-12T02:47:02.272Z INFO    [1] ACCEPT_FINAL ticks=600 ms=360021 report={'Status': 'Mule — walking to the ruins', 'Runtime': '6m', 'Rune': 'Air rune', 'Crafted': 0, 'Trades': 8, 'Essence': 27, 'Runecraft xp': 0}
+2026-11-12T02:47:02.272Z INFO    [1] The script stopped itself; the account stays logged in
