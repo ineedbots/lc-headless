@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Console/Logger.hpp"
-#include "GameCache_s.hpp"
+#include "Type/GameCache_s.hpp"
 
 // Reads the revision's layout: the 225 engine's folder of loose archive files and map files, or 289's store.
 class CacheLoader

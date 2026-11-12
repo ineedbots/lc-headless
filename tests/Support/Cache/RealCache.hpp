@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Cache/GameCache_s.hpp"
-#include "Config/Revision_e.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Config/Type/Revision_e.hpp"
 
 // A real cache, loaded once per revision for every test that reads it; the load's log goes to the test output.
 // The 289 cache is the folder in RS2004_CACHE_DIR, such as ../289server/engine/data/pack, the 274 cache the one

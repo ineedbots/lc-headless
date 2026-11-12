@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "SearchFilter_s.hpp"
 
-#include "../../Utils/StringUtils.hpp"
-#include "../Tile_s.hpp"
+#include "../../../Utils/StringUtils.hpp"
+#include "../../Type/Tile_s.hpp"
 
 bool SearchFilter_s::MatchesType(s32 id, std::string_view name) const
 {

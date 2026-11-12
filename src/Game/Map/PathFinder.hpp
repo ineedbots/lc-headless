@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Tile_s.hpp"
+#include "../Type/Tile_s.hpp"
 #include "WorldMap.hpp"
 
 enum class RouteKind_e : u8

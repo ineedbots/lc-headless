@@ -2,9 +2,9 @@
 #include "../Support/Cache/TestCache.hpp"
 #include "../Support/Game/Fixtures.hpp"
 
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
 #include "Game/Map/CollisionFlag.hpp"
@@ -13,9 +13,9 @@
 #include "Game/Map/PathFinder.hpp"
 #include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/State/Zone_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
+#include "Game/State/Type/Zone_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>

@@ -2,7 +2,7 @@
 #include "EntityStatus.hpp"
 
 #include "../../Cache/SeqDecoder.hpp"
-#include "Entity_s.hpp"
+#include "Type/Entity_s.hpp"
 
 bool EntityStatus::IsMoving(const Entity_s& entity, u64 tick)
 {

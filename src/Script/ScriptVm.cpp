@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "ScriptVm.hpp"
 
-#include "../Console/LogLevel_e.hpp"
+#include "../Console/Type/LogLevel_e.hpp"
 #include "../Console/Logger.hpp"
 #include "../Utils/FileUtils.hpp"
 #include "../Utils/StringUtils.hpp"

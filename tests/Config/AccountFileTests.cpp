@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "../Support/TempFolder.hpp"
 
-#include "Config/AccountConfig_s.hpp"
+#include "Config/Type/AccountConfig_s.hpp"
 #include "Config/AccountFile.hpp"
 #include "Config/Error/ConfigError.hpp"
-#include "Config/Transport_e.hpp"
+#include "Config/Type/Transport_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>

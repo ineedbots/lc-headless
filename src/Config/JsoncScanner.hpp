@@ -1,6 +1,6 @@
 #pragma once
 
-#include "JsoncValue_s.hpp"
+#include "Type/JsoncValue_s.hpp"
 
 // Finds where each value of a JSON document with comments sits in its text. Anything it doesn't expect throws a
 // ConfigError, so a bad edit is never made.

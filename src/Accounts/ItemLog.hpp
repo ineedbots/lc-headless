@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Cache/GameCache_s.hpp"
+#include "../Cache/Type/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
-#include "../Game/State/GameState_s.hpp"
+#include "../Game/State/Type/GameState_s.hpp"
 
 #include <chrono>
 #include <filesystem>

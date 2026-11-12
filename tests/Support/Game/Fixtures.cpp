@@ -2,10 +2,10 @@
 #include "Fixtures.hpp"
 
 #include "BitWriter.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Game/Protocol/Base37.hpp"
-#include "Game/State/BuildArea_s.hpp"
-#include "Game/State/GameState_s.hpp"
+#include "Game/State/Type/BuildArea_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
 #include "Io/Packet.hpp"
 
 namespace

@@ -2,7 +2,7 @@
 #include "ConsoleCommandParser.hpp"
 
 #include "../Utils/StringUtils.hpp"
-#include "ConsoleCommand_s.hpp"
+#include "Type/ConsoleCommand_s.hpp"
 
 std::optional<ConsoleLine_s> ConsoleCommandParser::Parse(std::string_view line)
 {

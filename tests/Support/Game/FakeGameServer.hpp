@@ -1,12 +1,12 @@
 #pragma once
 
 #include "../Io/ServerThread.hpp"
-#include "Cache/GameCache_s.hpp"
-#include "Config/AccountConfig_s.hpp"
-#include "Config/Config_s.hpp"
-#include "Config/Revision_e.hpp"
-#include "Config/ServerSettings_s.hpp"
-#include "Config/Transport_e.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Config/Type/AccountConfig_s.hpp"
+#include "Config/Type/Config_s.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Config/Type/ServerSettings_s.hpp"
+#include "Config/Type/Transport_e.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Isaac.hpp"

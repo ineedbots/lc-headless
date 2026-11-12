@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Trim the fleet-tracking journals and client console logs in place.
 
-The writers open their files with O_APPEND for every line (std::ios::app), and the
-console logs are shell `>>` redirects, so rewriting a file at offset 0 and truncating
-it keeps the same inode and the next append lands at the new end. Nothing needs to be
-stopped, and the fleet page keeps reading the newest lines.
+Stop journal writers and clients before applying compaction: an append between the
+read and rewrite can be lost. The fleet page can stay open to read the retained lines.
 
     python3 tools/fleet/compact_logs.py --dry-run
     python3 tools/fleet/compact_logs.py

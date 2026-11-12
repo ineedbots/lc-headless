@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "ConfigOverrides.hpp"
 
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 
 std::shared_ptr<const Config_s> ConfigOverrides::ForAccount(std::shared_ptr<const Config_s> config, const AccountConfig_s& account)
 {

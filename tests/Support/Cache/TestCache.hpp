@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Cache/GameCache_s.hpp"
-#include "Cache/IfComponent_s.hpp"
-#include "Cache/LocType_s.hpp"
-#include "Cache/NpcType_s.hpp"
-#include "Cache/ObjType_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Cache/Type/IfComponent_s.hpp"
+#include "Cache/Type/LocType_s.hpp"
+#include "Cache/Type/NpcType_s.hpp"
+#include "Cache/Type/ObjType_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 // A loc in a map square, by absolute tile, on the level it's seen on.
 struct TestLoc_s

@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "LogFile.hpp"
 
-#include "LogEntry_s.hpp"
+#include "Type/LogEntry_s.hpp"
 #include "LogFormatter.hpp"
 
 LogFile::LogFile(std::filesystem::path path)

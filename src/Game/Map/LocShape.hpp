@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../State/Zone_s.hpp"
+#include "../State/Type/Zone_s.hpp"
 
 // The webclient's loc shapes. A shape decides the layer a loc sits in on its tile, and how it blocks.
 class LocShape

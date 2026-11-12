@@ -80,7 +80,7 @@
             "essenceReturnIdFromPacked",
             "essenceExitEdges"
         ],
-        "implementation": "src/Game/Nav/NavRequires_s.cpp",
+        "implementation": "src/Game/Nav/Type/NavRequires_s.cpp",
         "anchor": "NavRequires_s::"
     },
     {
@@ -262,7 +262,7 @@
             "hasGatingRequires",
             "isEdgeAllowed"
         ],
-        "implementation": "src/Game/Nav/NavRequires_s.cpp",
+        "implementation": "src/Game/Nav/Type/NavRequires_s.cpp",
         "anchor": "NavRequires_s::"
     },
     {
@@ -347,7 +347,7 @@
             "activationForEdge",
             "isStateDeferredReason"
         ],
-        "implementation": "src/Game/Nav/NavRequires_s.cpp",
+        "implementation": "src/Game/Nav/Type/NavRequires_s.cpp",
         "anchor": "NavRequires_s::"
     },
     {

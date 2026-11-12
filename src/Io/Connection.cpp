@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "Connection.hpp"
 
-#include "../Config/Transport_e.hpp"
+#include "../Config/Type/Transport_e.hpp"
 #include "../Console/Logger.hpp"
-#include "ConnectionOptions_s.hpp"
+#include "Type/ConnectionOptions_s.hpp"
 #include "Error/ConnectionClosedError.hpp"
 #include "Error/ConnectionError.hpp"
 #include "Link.hpp"

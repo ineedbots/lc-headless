@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LogEntry_s.hpp"
+#include "Type/LogEntry_s.hpp"
 
 class LogFormatter
 {

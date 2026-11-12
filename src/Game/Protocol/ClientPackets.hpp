@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../../Io/Packet.hpp"
-#include "../Tile_s.hpp"
-#include "ClientPacket_s.hpp"
+#include "../Type/Tile_s.hpp"
+#include "Type/ClientPacket_s.hpp"
 #include "ClientProt.hpp"
 #include "Protocol.hpp"
 

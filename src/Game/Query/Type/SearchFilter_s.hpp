@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Tile_s.hpp"
+#include "../../Type/Tile_s.hpp"
 
 // Empty id and name lists match anything. Names match a type's name without regard to case, and a type
 // with no name never matches one. A radius counts tiles from the centre, on its level.

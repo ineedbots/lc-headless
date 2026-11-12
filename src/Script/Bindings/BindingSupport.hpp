@@ -1,12 +1,12 @@
 #pragma once
 
 #include "../../Game/Map/WorldMap.hpp"
-#include "../../Game/Query/InventoryItem_s.hpp"
-#include "../../Game/State/Npc_s.hpp"
-#include "../../Game/State/Player_s.hpp"
-#include "../../Game/State/Social_s.hpp"
-#include "../../Game/State/Zone_s.hpp"
-#include "../../Game/Tile_s.hpp"
+#include "../../Game/Query/Type/InventoryItem_s.hpp"
+#include "../../Game/State/Type/Npc_s.hpp"
+#include "../../Game/State/Type/Player_s.hpp"
+#include "../../Game/State/Type/Social_s.hpp"
+#include "../../Game/State/Type/Zone_s.hpp"
+#include "../../Game/Type/Tile_s.hpp"
 #include "../Convert/PyArgs.hpp"
 #include "../Error/ScriptRaisedError.hpp"
 #include "../Error/ScriptTypeError.hpp"

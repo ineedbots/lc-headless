@@ -1,19 +1,19 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../../Cache/IfComponent_s.hpp"
-#include "../../Cache/LocType_s.hpp"
-#include "../../Cache/NpcType_s.hpp"
-#include "../../Cache/ObjType_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../../Cache/Type/IfComponent_s.hpp"
+#include "../../Cache/Type/LocType_s.hpp"
+#include "../../Cache/Type/NpcType_s.hpp"
+#include "../../Cache/Type/ObjType_s.hpp"
 #include "../../Game/Interface/InterfaceView.hpp"
 #include "../../Game/Map/WorldMap.hpp"
 #include "../../Game/Menu/Menus.hpp"
-#include "../../Game/Query/InventoryItem_s.hpp"
-#include "../../Game/State/Entity_s.hpp"
-#include "../../Game/State/Npc_s.hpp"
-#include "../../Game/State/Player_s.hpp"
-#include "../../Game/State/Zone_s.hpp"
-#include "../../Game/Tile_s.hpp"
+#include "../../Game/Query/Type/InventoryItem_s.hpp"
+#include "../../Game/State/Type/Entity_s.hpp"
+#include "../../Game/State/Type/Npc_s.hpp"
+#include "../../Game/State/Type/Player_s.hpp"
+#include "../../Game/State/Type/Zone_s.hpp"
+#include "../../Game/Type/Tile_s.hpp"
 
 #include <pocketpy.h>
 

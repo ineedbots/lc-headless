@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WireProt_s.hpp"
+#include "Type/WireProt_s.hpp"
 
 // Builds one revision's opcode table at compile time, for ServerProt and ClientProt. A table has
 // `byOpcode` and `byProt` arrays; a row has `prot`, `opcode` and `size`.

@@ -1,11 +1,11 @@
 #include "pch.hpp"
 #include "InterfaceView.hpp"
 
-#include "../../Cache/ClientCode_e.hpp"
-#include "../../Cache/GameCache_s.hpp"
-#include "../../Cache/IfComponent_s.hpp"
+#include "../../Cache/Type/ClientCode_e.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../../Cache/Type/IfComponent_s.hpp"
 #include "../../Utils/StringUtils.hpp"
-#include "../State/Interfaces_s.hpp"
+#include "../State/Type/Interfaces_s.hpp"
 
 namespace
 {

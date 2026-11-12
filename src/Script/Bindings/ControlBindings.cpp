@@ -2,7 +2,7 @@
 #include "ControlBindings.hpp"
 
 #include "../../Accounts/Account.hpp"
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../Convert/PyValue.hpp"
 #include "../ScriptContext.hpp"
 #include "../ScriptControl.hpp"

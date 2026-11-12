@@ -4,7 +4,7 @@
 #include "Cache/CacheStore.hpp"
 #include "Cache/JagArchive.hpp"
 #include "Cache/MapSquare.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Io/Packet.hpp"
 
 #include <bzlib.h>

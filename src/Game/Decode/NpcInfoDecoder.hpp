@@ -2,9 +2,9 @@
 
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Protocol.hpp"
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Npc_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Npc_s.hpp"
 
 class NpcInfoDecoder
 {

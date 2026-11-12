@@ -7,7 +7,7 @@
 #include "Game/Error/ProtocolError.hpp"
 #include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
-#include "Game/State/GameState_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>

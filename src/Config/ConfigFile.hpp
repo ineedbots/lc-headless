@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Console/Logger.hpp"
-#include "Config_s.hpp"
+#include "Type/Config_s.hpp"
 
 // client.jsonc.
 class ConfigFile

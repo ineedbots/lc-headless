@@ -193,7 +193,7 @@ The opcodes each revision's webclient decodes, where they differ:
 
 The seq and varbit decoders differ too (289 adds seq `12` and varbit `2` to `4`), but this client decodes neither.
 
-Today each decoder hands two lists to `TypeDecoder::HasOpcode(revision, opcode, removedIn289, addedIn289)`, which can only put a revision on one side of 289. With three revisions, each opcode has to say where it starts and where it stops. `src/Cache/RevisionedOpcode_s.hpp`, beside `DroppedOpcodes_s.hpp`:
+Today each decoder hands two lists to `TypeDecoder::HasOpcode(revision, opcode, removedIn289, addedIn289)`, which can only put a revision on one side of 289. With three revisions, each opcode has to say where it starts and where it stops. `src/Cache/Type/RevisionedOpcode_s.hpp`, beside `DroppedOpcodes_s.hpp`:
 
 ```cpp
 #pragma once

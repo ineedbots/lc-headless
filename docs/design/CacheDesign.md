@@ -282,7 +282,7 @@ crcs[i] = Packet::GetCrc(store 0, file i)    for i from 0 to 8; 0 when the file 
 ### Structs
 
 ```cpp
-// src/Cache/LocType_s.hpp
+// src/Cache/Type/LocType_s.hpp
 #pragma once
 
 struct LocType_s
@@ -307,7 +307,7 @@ struct LocType_s
 ```
 
 ```cpp
-// src/Cache/NpcType_s.hpp
+// src/Cache/Type/NpcType_s.hpp
 #pragma once
 
 struct NpcType_s
@@ -325,7 +325,7 @@ struct NpcType_s
 ```
 
 ```cpp
-// src/Cache/ObjType_s.hpp
+// src/Cache/Type/ObjType_s.hpp
 #pragma once
 
 struct ObjType_s
@@ -484,7 +484,7 @@ The cache has no names, so `CacheLoader` finds each one by what the cache says a
 
 In the 289 content each rule matches only the component it's for. A missing match throws, naming what the rule marks: `store 0 file 3 (interface): no inventory lets its items be used, which marks the backpack`, `store 0 file 2 (config): no varp has client code 7, which marks the run varp`.
 
-`ClientCode_e` (`src/Cache/ClientCode_e.hpp`) is the webclient's `ClientCode` enum, with its values PascalCase (`CC_LOGOUT` is `Logout`) and a `None` for 0.
+`ClientCode_e` (`src/Cache/Type/ClientCode_e.hpp`) is the webclient's `ClientCode` enum, with its values PascalCase (`CC_LOGOUT` is `Logout`) and a `None` for 0.
 
 #### varp.dat
 
@@ -709,7 +709,7 @@ public:
 ### Interface
 
 ```cpp
-// src/Cache/GameCache_s.hpp
+// src/Cache/Type/GameCache_s.hpp
 #pragma once
 
 #include "LocType_s.hpp"

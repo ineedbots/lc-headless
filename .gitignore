@@ -10,3 +10,5 @@ accounts/*.jsonc
 /experience/
 /inventory/
 /bank/
+/logs/
+__pycache__/

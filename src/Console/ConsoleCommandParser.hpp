@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ConsoleCommand_s.hpp"
+#include "Type/ConsoleCommand_s.hpp"
 
 struct ConsoleLine_s
 {

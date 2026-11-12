@@ -3,7 +3,7 @@
 #include "../Console/Logger.hpp"
 #include "../Script/Host/ScriptHost.hpp"
 #include "ProgressReportFile.hpp"
-#include "ProgressReport_s.hpp"
+#include "Type/ProgressReport_s.hpp"
 
 // When the script's on_progress_report is due, and where the report goes: the log, and the account's
 // progress file. The first is due an interval after the script first started, and each after it an interval

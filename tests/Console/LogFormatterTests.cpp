@@ -1,8 +1,8 @@
 #include "pch.hpp"
 
-#include "Console/LogEntry_s.hpp"
+#include "Console/Type/LogEntry_s.hpp"
 #include "Console/LogFormatter.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

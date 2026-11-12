@@ -2,9 +2,9 @@
 #include "TestWorld.hpp"
 
 #include "FakeGameServer.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Fixtures.hpp"
-#include "Game/State/BuildArea_s.hpp"
+#include "Game/State/Type/BuildArea_s.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Io/Packet.hpp"
 

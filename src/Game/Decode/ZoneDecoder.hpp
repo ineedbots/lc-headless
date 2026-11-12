@@ -3,9 +3,9 @@
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Zone_s.hpp"
-#include "../Tile_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Zone_s.hpp"
+#include "../Type/Tile_s.hpp"
 
 class ZoneDecoder
 {

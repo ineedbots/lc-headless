@@ -1,13 +1,13 @@
 #include "pch.hpp"
 #include "SceneDecoder.hpp"
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/BuildArea_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Zone_s.hpp"
+#include "../State/Type/BuildArea_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Zone_s.hpp"
 #include "PacketFields.hpp"
 #include "StateLog.hpp"
 

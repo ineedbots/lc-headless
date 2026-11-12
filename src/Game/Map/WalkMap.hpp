@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 
 // The whole world's walking, for routes beyond the build area, built by the webclient's rules (SquareCollision
 // and PathFinder::CanStep). The doors the cache places shut are walls in it; NavGraph's door edges cross them.

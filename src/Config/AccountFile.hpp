@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AccountConfig_s.hpp"
+#include "Type/AccountConfig_s.hpp"
 
 // One file in the accounts folder.
 class AccountFile

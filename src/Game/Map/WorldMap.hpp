@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../../Cache/MapSquare.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Zone_s.hpp"
-#include "../Tile_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Zone_s.hpp"
+#include "../Type/Tile_s.hpp"
 #include "CollisionMap.hpp"
 
 // A loc in the build area as it is now: as the server changed it, or else as the cache has it.

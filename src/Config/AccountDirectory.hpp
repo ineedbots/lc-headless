@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AccountConfig_s.hpp"
+#include "Type/AccountConfig_s.hpp"
 
 // The accounts folder.
 class AccountDirectory

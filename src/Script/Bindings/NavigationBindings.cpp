@@ -6,7 +6,7 @@
 #include "../../Game/Nav/Navigation.hpp"
 #include "../../Game/Nav/WorldPathFinder.hpp"
 #include "../../Game/Query/ReachQuery.hpp"
-#include "../../Game/Tile_s.hpp"
+#include "../../Game/Type/Tile_s.hpp"
 #include "../Convert/PyArgs.hpp"
 #include "../Convert/PyValue.hpp"
 #include "../ScriptContext.hpp"

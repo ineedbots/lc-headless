@@ -5,14 +5,15 @@
 
 #include "Config/AccountFile.hpp"
 #include "Config/ConfigFile.hpp"
-#include "Config/Config_s.hpp"
+#include "Config/Type/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
-#include "Config/Revision_e.hpp"
-#include "Config/ServerSettings_s.hpp"
-#include "Config/Transport_e.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Config/Type/ServerSettings_s.hpp"
+#include "Config/Type/Transport_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Utils/BigUInt.hpp"
+#include "Utils/FileUtils.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>
@@ -1109,4 +1110,19 @@ TEST_CASE("Server world numbers round trip and reject negative values", "[Config
 
     json["server"]["world"] = -1;
     CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("server.world"));
+}
+
+TEST_CASE("The shipped sample includes every fleet setting with its default", "[ConfigFile]")
+{
+    const auto text = FileUtils::ReadText(std::filesystem::path{RS2004_SOURCE_DIR} / "client.jsonc.sample");
+    REQUIRE(text.has_value());
+    const auto sample = ParseJsonWithComments(*text);
+    const auto defaults = nlohmann::json::parse(ConfigFile::Serialize(Config_s{}));
+    for (const auto key : {"experienceDirectory", "experienceIntervalMinutes", "bankLogDirectory",
+                           "inventoryDirectory", "inventoryIntervalSeconds", "equipmentDirectory"})
+    {
+        CAPTURE(key);
+        REQUIRE(sample.at("scripting").contains(key));
+        CHECK(sample.at("scripting").at(key) == defaults.at("scripting").at(key));
+    }
 }

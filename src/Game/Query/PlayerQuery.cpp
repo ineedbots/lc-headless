@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "PlayerQuery.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../State/EntityStatus.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Stat_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Stat_s.hpp"
 
 PlayerQuery::PlayerQuery(const GameState_s& state, const GameCache_s& cache)
     : m_state{state}

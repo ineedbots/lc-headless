@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../HttpRoute_s.hpp"
+#include "../Type/HttpRoute_s.hpp"
 
 class ConsoleCommandsEndpoint
 {

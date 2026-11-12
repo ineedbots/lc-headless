@@ -2,13 +2,13 @@
 #include "AccountCommands.hpp"
 
 #include "../Console/ConsoleCommandParser.hpp"
-#include "../Console/ConsoleCommand_s.hpp"
+#include "../Console/Type/ConsoleCommand_s.hpp"
 #include "../Console/LogLevelNames.hpp"
-#include "../Console/LogLevel_e.hpp"
+#include "../Console/Type/LogLevel_e.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/Protocol/WordPack.hpp"
-#include "../Script/ScriptCommand_s.hpp"
+#include "../Script/Type/ScriptCommand_s.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "Account.hpp"
 

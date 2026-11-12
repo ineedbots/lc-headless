@@ -2,10 +2,10 @@
 #include "ClientPackets.hpp"
 
 #include "../../Io/Packet.hpp"
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../Menu/MenuOp.hpp"
-#include "../Tile_s.hpp"
-#include "ClientPacket_s.hpp"
+#include "../Type/Tile_s.hpp"
+#include "Type/ClientPacket_s.hpp"
 #include "ClientProt.hpp"
 #include "Protocol.hpp"
 #include "WordPack.hpp"

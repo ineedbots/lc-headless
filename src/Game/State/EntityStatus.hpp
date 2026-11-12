@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Entity_s.hpp"
+#include "Type/Entity_s.hpp"
 
 // What a player's or an NPC's tracked state says it's doing, on a given tick.
 class EntityStatus

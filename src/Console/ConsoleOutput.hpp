@@ -1,7 +1,7 @@
 #pragma once
 
-#include "LogEntry_s.hpp"
-#include "LogLevel_e.hpp"
+#include "Type/LogEntry_s.hpp"
+#include "Type/LogLevel_e.hpp"
 
 // Warnings and errors go to stderr, everything else to stdout.
 class ConsoleOutput

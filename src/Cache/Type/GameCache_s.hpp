@@ -1,12 +1,12 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "IfComponent_s.hpp"
 #include "LocType_s.hpp"
-#include "MapSquare.hpp"
+#include "../MapSquare.hpp"
 #include "NpcType_s.hpp"
 #include "ObjType_s.hpp"
-#include "TextPool.hpp"
+#include "../TextPool.hpp"
 #include "VarbitType_s.hpp"
 
 // The CRCs of a 225 map square's files as the cache holds them, to compare with the ones REBUILD_NORMAL

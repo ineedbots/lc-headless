@@ -5,13 +5,13 @@
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/LogCapture.hpp"
 
-#include "Cache/GameCache_s.hpp"
-#include "Config/Config_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Config/Type/Config_s.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Map/WorldMap.hpp"
 #include "Game/Protocol/ClientProt.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>

@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "../Support/Cache/RealCache.hpp"
 
-#include "Cache/GameCache_s.hpp"
-#include "Config/Revision_e.hpp"
-#include "Game/Nav/NavPoint_s.hpp"
-#include "Game/Nav/NavState_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Game/Nav/Type/NavPoint_s.hpp"
+#include "Game/Nav/Type/NavState_s.hpp"
 #include "Game/Nav/Navigation.hpp"
 #include "Game/Nav/WorldPathFinder.hpp"
 

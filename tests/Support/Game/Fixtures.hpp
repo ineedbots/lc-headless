@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Config/Revision_e.hpp"
-#include "Game/State/BuildArea_s.hpp"
-#include "Game/State/GameState_s.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Game/State/Type/BuildArea_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
 #include "Io/Packet.hpp"
 
 // Server packet payloads, encoded the way the engine's encoders do, in 289's layout unless a revision is given.

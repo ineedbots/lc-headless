@@ -1,20 +1,20 @@
 #include "pch.hpp"
 #include "ScriptActions.hpp"
 
-#include "../Cache/ClientCode_e.hpp"
-#include "../Cache/GameCache_s.hpp"
-#include "../Cache/IfComponent_s.hpp"
+#include "../Cache/Type/ClientCode_e.hpp"
+#include "../Cache/Type/GameCache_s.hpp"
+#include "../Cache/Type/IfComponent_s.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/Interface/DialogueTracker.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
 #include "../Game/Query/EntityQuery.hpp"
-#include "../Game/Query/InventoryItem_s.hpp"
+#include "../Game/Query/Type/InventoryItem_s.hpp"
 #include "../Game/Query/InventoryQuery.hpp"
-#include "../Game/State/GameState_s.hpp"
-#include "../Game/State/Interfaces_s.hpp"
-#include "../Game/Tile_s.hpp"
+#include "../Game/State/Type/GameState_s.hpp"
+#include "../Game/State/Type/Interfaces_s.hpp"
+#include "../Game/Type/Tile_s.hpp"
 
 ScriptActions::ScriptActions(const GameState_s& state, const WorldMap& map, GameActions& actions)
     : m_state{state}

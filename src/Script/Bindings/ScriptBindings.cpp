@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "ScriptBindings.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../../Game/State/EntityStatus.hpp"
-#include "../../Game/State/Stat_e.hpp"
-#include "../../Game/State/Zone_s.hpp"
+#include "../../Game/State/Type/Stat_e.hpp"
+#include "../../Game/State/Type/Zone_s.hpp"
 #include "../Convert/PyValue.hpp"
 #include "../ScriptContext.hpp"
 #include "../ScriptVm.hpp"

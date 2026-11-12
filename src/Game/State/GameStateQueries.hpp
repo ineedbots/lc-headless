@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
-#include "GameState_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "Type/GameState_s.hpp"
 
 // The questions more than one account writer asks of the state, so they agree on them.
 class GameStateQueries

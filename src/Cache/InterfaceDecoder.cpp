@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "InterfaceDecoder.hpp"
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Io/Packet.hpp"
-#include "ClientCode_e.hpp"
+#include "Type/ClientCode_e.hpp"
 #include "Error/CacheError.hpp"
 
 namespace

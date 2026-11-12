@@ -2,7 +2,7 @@
 #include "LocShape.hpp"
 
 #include "../Error/ProtocolError.hpp"
-#include "../State/Zone_s.hpp"
+#include "../State/Type/Zone_s.hpp"
 
 LocLayer_e LocShape::GetLayer(u8 shape)
 {

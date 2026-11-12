@@ -2,7 +2,7 @@
 
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
-#include "../Game/State/GameState_s.hpp"
+#include "../Game/State/Type/GameState_s.hpp"
 
 #include <chrono>
 #include <filesystem>

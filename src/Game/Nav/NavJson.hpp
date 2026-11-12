@@ -1,6 +1,6 @@
 #pragma once
 
-#include "NavPoint_s.hpp"
+#include "Type/NavPoint_s.hpp"
 #include "WorldPathFinder.hpp"
 
 struct NavRequest_s

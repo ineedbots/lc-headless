@@ -1,11 +1,11 @@
 #include "pch.hpp"
 #include "LocTypeDecoder.hpp"
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Io/Packet.hpp"
-#include "DroppedOpcodes_s.hpp"
-#include "LocType_s.hpp"
-#include "RevisionedOpcode_s.hpp"
+#include "Type/DroppedOpcodes_s.hpp"
+#include "Type/LocType_s.hpp"
+#include "Type/RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 #include "TypeDecoder.hpp"
 

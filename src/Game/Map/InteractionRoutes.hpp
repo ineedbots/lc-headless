@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Tile_s.hpp"
+#include "../Type/Tile_s.hpp"
 #include "PathFinder.hpp"
 #include "WorldMap.hpp"
 

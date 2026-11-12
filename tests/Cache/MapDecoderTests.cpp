@@ -2,7 +2,7 @@
 #include "../Support/Cache/CacheWriter.hpp"
 
 #include "Cache/Error/CacheError.hpp"
-#include "Cache/LocType_s.hpp"
+#include "Cache/Type/LocType_s.hpp"
 #include "Cache/MapDecoder.hpp"
 #include "Cache/MapSquare.hpp"
 #include "Cache/TextPool.hpp"

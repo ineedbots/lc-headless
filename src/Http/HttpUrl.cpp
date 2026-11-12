@@ -1,89 +1,7 @@
 #include "pch.hpp"
 #include "HttpUrl.hpp"
 
-namespace
-{
-    int Hex(unsigned char value)
-    {
-        if (value >= '0' && value <= '9')
-        {
-            return value - '0';
-        }
-
-        if (value >= 'a' && value <= 'f')
-        {
-            return value - 'a' + 10;
-        }
-
-        if (value >= 'A' && value <= 'F')
-        {
-            return value - 'A' + 10;
-        }
-
-        return -1;
-    }
-}
-
-bool HttpUrl::IsUtf8(std::string_view text)
-{
-    for (std::size_t i = 0; i < text.size();)
-    {
-        const auto first = static_cast<unsigned char>(text[i++]);
-        if (first < 0x80)
-        {
-            continue;
-        }
-
-        auto remaining = 0;
-        auto code = u32{0};
-        auto minimum = u32{0};
-        if (first >= 0xc2 && first <= 0xdf)
-        {
-            remaining = 1;
-            code = first & 0x1f;
-            minimum = 0x80;
-        }
-        else if (first >= 0xe0 && first <= 0xef)
-        {
-            remaining = 2;
-            code = first & 0x0f;
-            minimum = 0x800;
-        }
-        else if (first >= 0xf0 && first <= 0xf4)
-        {
-            remaining = 3;
-            code = first & 0x07;
-            minimum = 0x10000;
-        }
-        else
-        {
-            return false;
-        }
-
-        for (auto n = 0; n < remaining; ++n)
-        {
-            if (i == text.size())
-            {
-                return false;
-            }
-
-            const auto next = static_cast<unsigned char>(text[i++]);
-            if ((next & 0xc0) != 0x80)
-            {
-                return false;
-            }
-
-            code = (code << 6) | (next & 0x3f);
-        }
-
-        if (code < minimum || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
+#include "../Utils/StringUtils.hpp"
 
 std::optional<std::string> HttpUrl::Decode(std::string_view value, bool query)
 {
@@ -100,8 +18,8 @@ std::optional<std::string> HttpUrl::Decode(std::string_view value, bool query)
                 return {};
             }
 
-            const auto high = Hex(static_cast<unsigned char>(value[i + 1]));
-            const auto low = Hex(static_cast<unsigned char>(value[i + 2]));
+            const auto high = StringUtils::HexDigitValue(static_cast<unsigned char>(value[i + 1]));
+            const auto low = StringUtils::HexDigitValue(static_cast<unsigned char>(value[i + 2]));
             if (high < 0 || low < 0)
             {
                 return {};
@@ -123,7 +41,7 @@ std::optional<std::string> HttpUrl::Decode(std::string_view value, bool query)
         decoded += static_cast<char>(byte);
     }
 
-    if (!IsUtf8(decoded))
+    if (!StringUtils::IsUtf8(decoded))
     {
         return {};
     }

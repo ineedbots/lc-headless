@@ -1,18 +1,18 @@
 #include "pch.hpp"
 #include "GameActions.hpp"
 
-#include "../Cache/GameCache_s.hpp"
+#include "../Cache/Type/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
 #include "GameClient.hpp"
 #include "Map/InteractionRoutes.hpp"
 #include "Map/WorldMap.hpp"
 #include "Protocol/Base37.hpp"
-#include "Protocol/ClientPacket_s.hpp"
+#include "Protocol/Type/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
 #include "Protocol/Protocol.hpp"
-#include "State/GameState_s.hpp"
-#include "State/Zone_s.hpp"
-#include "Tile_s.hpp"
+#include "State/Type/GameState_s.hpp"
+#include "State/Type/Zone_s.hpp"
+#include "Type/Tile_s.hpp"
 
 GameActions::GameActions(GameClient& client)
     : m_client{client}

@@ -49,6 +49,22 @@ std::optional<std::vector<u8>> FileUtils::ReadBytes(const std::filesystem::path&
     return std::vector<u8>{text->begin(), text->end()};
 }
 
+void FileUtils::AppendText(const std::filesystem::path& path, std::string_view text)
+{
+    if (!path.parent_path().empty())
+    {
+        std::filesystem::create_directories(path.parent_path());
+    }
+
+    auto file = std::ofstream{path, std::ios::binary | std::ios::app};
+    file << text;
+    file.flush();
+    if (!file)
+    {
+        throw std::runtime_error{std::format("can't write {}", path.string())};
+    }
+}
+
 void FileUtils::ReplaceFile(const std::filesystem::path& path, std::string_view text)
 {
     auto temporary = path;

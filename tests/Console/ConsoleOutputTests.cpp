@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
 #include "Console/ConsoleOutput.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

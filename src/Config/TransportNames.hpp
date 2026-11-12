@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Transport_e.hpp"
+#include "Type/Transport_e.hpp"
 
 // The names client.jsonc uses for server.transport, and the log's connect line.
 class TransportNames

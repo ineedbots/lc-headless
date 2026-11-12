@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Game/State/GameState_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
 #include "Script/Host/LoopSchedule.hpp"
 
 #include <catch2/catch_test_macros.hpp>

@@ -2,10 +2,10 @@
 #include "AsioLink.hpp"
 
 #include "../Config/TransportNames.hpp"
-#include "../Config/Transport_e.hpp"
+#include "../Config/Type/Transport_e.hpp"
 #include "../Console/Logger.hpp"
 #include "AsioNetLoop.hpp"
-#include "ConnectionOptions_s.hpp"
+#include "Type/ConnectionOptions_s.hpp"
 #include "Error/ConnectionError.hpp"
 #include "Link.hpp"
 #include "Socks5Handshake.hpp"

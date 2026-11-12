@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HttpResponse_s.hpp"
+#include "Type/HttpResponse_s.hpp"
 #include <nlohmann/json.hpp>
 
 // Kept in the HTTP adapter; application and transport interfaces use owned values.

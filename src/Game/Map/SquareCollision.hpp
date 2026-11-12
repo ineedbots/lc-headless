@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "CollisionMap.hpp"
 
 // The collision a map square's tiles and locs add, as ClientBuild adds it, shared by the build area's

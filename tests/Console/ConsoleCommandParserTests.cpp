@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
 #include "Console/ConsoleCommandParser.hpp"
-#include "Console/ConsoleCommand_s.hpp"
+#include "Console/Type/ConsoleCommand_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

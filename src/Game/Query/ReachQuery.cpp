@@ -5,8 +5,8 @@
 #include "../Map/LineOfSight.hpp"
 #include "../Map/PathFinder.hpp"
 #include "../Map/WorldMap.hpp"
-#include "../State/GameState_s.hpp"
-#include "../Tile_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../Type/Tile_s.hpp"
 
 ReachQuery::ReachQuery(const GameState_s& state, const WorldMap& map)
     : m_state{state}

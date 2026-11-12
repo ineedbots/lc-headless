@@ -1,14 +1,14 @@
 #include "pch.hpp"
 #include "SocialDecoder.hpp"
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Base37.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
 #include "../Protocol/WordPack.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Social_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Social_s.hpp"
 #include "PacketFields.hpp"
 #include "StateLog.hpp"
 

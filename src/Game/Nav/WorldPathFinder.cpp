@@ -2,11 +2,11 @@
 #include "WorldPathFinder.hpp"
 
 #include "../../Utils/StringUtils.hpp"
-#include "NavEdge_s.hpp"
+#include "Type/NavEdge_s.hpp"
 #include "NavGraph.hpp"
-#include "NavPoint_s.hpp"
-#include "NavRect_s.hpp"
-#include "NavTeleport_s.hpp"
+#include "Type/NavPoint_s.hpp"
+#include "Type/NavRect_s.hpp"
+#include "Type/NavTeleport_s.hpp"
 #include "Navigation.hpp"
 
 #include <queue>

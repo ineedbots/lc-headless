@@ -2,7 +2,7 @@
 #include "AccountDirectory.hpp"
 
 #include "../Utils/StringUtils.hpp"
-#include "AccountConfig_s.hpp"
+#include "Type/AccountConfig_s.hpp"
 #include "AccountFile.hpp"
 #include "Error/ConfigError.hpp"
 

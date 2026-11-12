@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ProgressReport_s.hpp"
+#include "Type/ProgressReport_s.hpp"
 
 // The first report of a run starts the file afresh.
 class ProgressReportFile

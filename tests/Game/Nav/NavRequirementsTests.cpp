@@ -1,5 +1,5 @@
 #include "pch.hpp"
-#include "Game/Nav/NavRequires_s.hpp"
+#include "Game/Nav/Type/NavRequires_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

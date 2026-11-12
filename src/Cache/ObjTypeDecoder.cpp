@@ -1,12 +1,13 @@
 #include "pch.hpp"
 #include "ObjTypeDecoder.hpp"
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Io/Packet.hpp"
-#include "DroppedOpcodes_s.hpp"
+#include "../Utils/StringUtils.hpp"
+#include "Type/DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
-#include "ObjType_s.hpp"
-#include "RevisionedOpcode_s.hpp"
+#include "Type/ObjType_s.hpp"
+#include "Type/RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 #include "TypeDecoder.hpp"
 
@@ -190,7 +191,7 @@ namespace
             return "a";
         }
 
-        const auto initial = static_cast<char>(std::tolower(static_cast<unsigned char>(name.front())));
+        const auto initial = StringUtils::ToLowerChar(name.front());
         return VOWELS.find(initial) == std::string_view::npos ? "a"sv : "an"sv;
     }
 

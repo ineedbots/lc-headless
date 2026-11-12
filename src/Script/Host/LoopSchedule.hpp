@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Game/State/GameState_s.hpp"
+#include "../../Game/State/Type/GameState_s.hpp"
 
 // When the bot's loop() runs next: at a time, after the next update from the server (with or without a
 // timeout), or once the server's tick reaches a number.

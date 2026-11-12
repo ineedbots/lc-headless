@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "Navigation.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../../Utils/FileUtils.hpp"
 #include "../Map/WalkMap.hpp"
 #include "NavGraph.hpp"

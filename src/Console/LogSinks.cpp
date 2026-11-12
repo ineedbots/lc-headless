@@ -3,7 +3,7 @@
 
 #include "ConsoleInput.hpp"
 #include "ConsoleOutput.hpp"
-#include "LogEntry_s.hpp"
+#include "Type/LogEntry_s.hpp"
 #include "LogFile.hpp"
 #include "Logger.hpp"
 #include "ConsoleCapture.hpp"

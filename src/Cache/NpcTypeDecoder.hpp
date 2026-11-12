@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
-#include "NpcType_s.hpp"
+#include "../Config/Type/Revision_e.hpp"
+#include "Type/NpcType_s.hpp"
 #include "TextPool.hpp"
 
 class NpcTypeDecoder

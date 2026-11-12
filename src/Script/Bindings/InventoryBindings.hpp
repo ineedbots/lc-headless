@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "BindingSupport.hpp"
 
 class InventoryBindings

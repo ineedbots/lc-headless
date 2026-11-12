@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Game/Map/WorldMap.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/State/Npc_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
+#include "Game/State/Type/Npc_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 // A player placed at Fixtures::HOME on tick 100, with NPCs, ground items, a backpack and scenery around them.
 // Chicken 10 is penned in by blocked tiles, a door and a tree stand nearby, and the server has removed a

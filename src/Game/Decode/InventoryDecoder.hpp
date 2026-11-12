@@ -3,7 +3,7 @@
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/GameState_s.hpp"
+#include "../State/Type/GameState_s.hpp"
 
 // The packets that fill, change and stop an inventory.
 class InventoryDecoder

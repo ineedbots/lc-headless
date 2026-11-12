@@ -2,7 +2,7 @@
 #include "JsoncScanner.hpp"
 
 #include "Error/ConfigError.hpp"
-#include "JsoncValue_s.hpp"
+#include "Type/JsoncValue_s.hpp"
 
 #include <nlohmann/json.hpp>
 

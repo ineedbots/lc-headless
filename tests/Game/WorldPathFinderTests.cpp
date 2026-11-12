@@ -1,12 +1,12 @@
 #include "pch.hpp"
 #include "../Support/TempFolder.hpp"
 
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
 #include "Game/Nav/NavJson.hpp"
-#include "Game/Nav/NavPoint_s.hpp"
-#include "Game/Nav/NavRequires_s.hpp"
-#include "Game/Nav/NavState_s.hpp"
+#include "Game/Nav/Type/NavPoint_s.hpp"
+#include "Game/Nav/Type/NavRequires_s.hpp"
+#include "Game/Nav/Type/NavState_s.hpp"
 #include "Game/Nav/Navigation.hpp"
 #include "Game/Nav/WorldPathFinder.hpp"
 

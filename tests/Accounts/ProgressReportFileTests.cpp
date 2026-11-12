@@ -2,7 +2,7 @@
 #include "../Support/TempFolder.hpp"
 
 #include "Accounts/ProgressReportFile.hpp"
-#include "Accounts/ProgressReport_s.hpp"
+#include "Accounts/Type/ProgressReport_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

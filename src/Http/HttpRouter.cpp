@@ -1,5 +1,7 @@
 #include "pch.hpp"
 #include "HttpRouter.hpp"
+
+#include "../Utils/StringUtils.hpp"
 #include "Endpoints/ApplicationStatusEndpoint.hpp"
 #include "Endpoints/ConsoleCommandsEndpoint.hpp"
 #include "HttpResponses.hpp"
@@ -10,30 +12,7 @@ namespace
     bool IsJson(std::string_view value)
     {
         value = value.substr(0, value.find(';'));
-        while (!value.empty() && value.back() == ' ')
-        {
-            value.remove_suffix(1);
-        }
-
-        auto lowered = std::string{value};
-        std::ranges::transform(lowered, lowered.begin(), [](unsigned char c)
-        {
-            return static_cast<char>(std::tolower(c));
-        });
-        return lowered == "application/json";
-    }
-
-    bool IsParameterName(std::string_view name)
-    {
-        const auto letter = [](unsigned char c)
-        {
-            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
-        };
-        return !name.empty() && letter(static_cast<unsigned char>(name.front())) &&
-            std::ranges::all_of(name, [&](unsigned char c)
-        {
-            return letter(c) || (c >= '0' && c <= '9');
-        });
+        return StringUtils::EqualsIgnoringCase(StringUtils::TrimEnd(value, " "), "application/json");
     }
 }
 
@@ -51,7 +30,7 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
         {
             return c < 0x20 || c == 0x7f;
         }) ||
-            !HttpUrl::IsUtf8(route.path) || route.method.empty() || !route.decode)
+            !StringUtils::IsUtf8(route.path) || route.method.empty() || !route.decode)
         {
             throw std::invalid_argument{"HTTP routes need a path template, method and decoder"};
         }
@@ -68,7 +47,7 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
                 }
 
                 const auto name = segment.substr(1, segment.size() - 2);
-                if (!IsParameterName(name) || std::ranges::find(names, name) != names.end())
+                if (!StringUtils::IsIdentifierAscii(name) || std::ranges::find(names, name) != names.end())
                 {
                     throw std::invalid_argument{"Path parameters need unique identifier names"};
                 }

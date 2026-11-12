@@ -1,12 +1,12 @@
 #include "pch.hpp"
 #include "VarpTypeDecoder.hpp"
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Io/Packet.hpp"
-#include "DroppedOpcodes_s.hpp"
-#include "RevisionedOpcode_s.hpp"
+#include "Type/DroppedOpcodes_s.hpp"
+#include "Type/RevisionedOpcode_s.hpp"
 #include "TypeDecoder.hpp"
-#include "VarpType_s.hpp"
+#include "Type/VarpType_s.hpp"
 
 namespace
 {

@@ -4,8 +4,8 @@
 
 #include "Game/Query/PlayerQuery.hpp"
 #include "Game/State/EntityStatus.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/State/Stat_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
+#include "Game/State/Type/Stat_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

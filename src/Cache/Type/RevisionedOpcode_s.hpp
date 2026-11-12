@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 
 // An opcode only some revisions have: every revision from addedIn on, until removedIn if a later one dropped it.
 struct RevisionedOpcode_s

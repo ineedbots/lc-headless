@@ -2,7 +2,7 @@
 
 #include "../Console/Logger.hpp"
 #include "AsioNetLoop.hpp"
-#include "ConnectionOptions_s.hpp"
+#include "Type/ConnectionOptions_s.hpp"
 #include "Link.hpp"
 
 #include <boost/asio/awaitable.hpp>

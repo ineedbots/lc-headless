@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "SocialBindings.hpp"
 
-#include "../../Game/State/GameState_s.hpp"
-#include "../../Game/State/Social_s.hpp"
+#include "../../Game/State/Type/GameState_s.hpp"
+#include "../../Game/State/Type/Social_s.hpp"
 #include "../Convert/PyValue.hpp"
 #include "../ScriptActions.hpp"
 #include "../ScriptContext.hpp"

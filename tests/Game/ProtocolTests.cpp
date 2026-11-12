@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Game/Protocol/Base37.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/Protocol.hpp"

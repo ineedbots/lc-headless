@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GameCache_s.hpp"
+#include "Type/GameCache_s.hpp"
 
 class LocTypeResolver
 {

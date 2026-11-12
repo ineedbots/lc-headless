@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Cache/GameCache_s.hpp"
-#include "../Config/AccountConfig_s.hpp"
-#include "../Config/Config_s.hpp"
+#include "../Cache/Type/GameCache_s.hpp"
+#include "../Config/Type/AccountConfig_s.hpp"
+#include "../Config/Type/Config_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Io/Connection.hpp"
 #include "../Io/NetLoop.hpp"
@@ -14,12 +14,12 @@
 #include "Net/LoginQueue.hpp"
 #include "Net/RetrySchedule.hpp"
 #include "Net/ServerPacketReader.hpp"
-#include "Protocol/ClientPacket_s.hpp"
+#include "Protocol/Type/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
 #include "Protocol/Protocol.hpp"
 #include "Protocol/ServerProt.hpp"
-#include "State/GameState_s.hpp"
-#include "Tile_s.hpp"
+#include "State/Type/GameState_s.hpp"
+#include "Type/Tile_s.hpp"
 
 enum class ClientStatus_e : u8
 {

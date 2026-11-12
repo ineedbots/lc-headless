@@ -2,15 +2,16 @@
 #include "ConfigJson.hpp"
 
 #include "../Console/LogLevelNames.hpp"
-#include "../Console/LogLevel_e.hpp"
+#include "../Console/Type/LogLevel_e.hpp"
 #include "../Utils/BigUInt.hpp"
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "../Utils/StringUtils.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 #include "Error/ConfigError.hpp"
-#include "ProxySettings_s.hpp"
-#include "ServerSettings_s.hpp"
+#include "Type/ProxySettings_s.hpp"
+#include "Type/ServerSettings_s.hpp"
 #include "TransportNames.hpp"
-#include "Transport_e.hpp"
+#include "Type/Transport_e.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -308,9 +309,7 @@ Config_s ConfigJson::ParseConfig(std::string_view text)
         throw ConfigError{DescribeConversionError(e)};
     }
 
-    const auto first = config.http.host.find_first_not_of(" \t\r\n");
-    const auto last = config.http.host.find_last_not_of(" \t\r\n");
-    config.http.host = first == std::string::npos ? "" : config.http.host.substr(first, last - first + 1);
+    config.http.host = std::string{StringUtils::Trim(config.http.host, " \t\r\n")};
     return config;
 }
 

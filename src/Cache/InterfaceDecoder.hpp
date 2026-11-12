@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
-#include "IfComponent_s.hpp"
+#include "../Config/Type/Revision_e.hpp"
+#include "Type/IfComponent_s.hpp"
 
 class InterfaceDecoder
 {

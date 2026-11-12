@@ -38,7 +38,7 @@ Reference sources, beside this repository:
 
 ### 2.1 `Revision_e`
 
-`src/Config/Revision_e.hpp`, in `Config/` because the revision is a setting, read with the rest of `login`. The cache loader and `Protocol` include it from there:
+`src/Config/Type/Revision_e.hpp`, in `Config/` because the revision is a setting, read with the rest of `login`. The cache loader and `Protocol` include it from there:
 
 ```cpp
 #pragma once

@@ -2,7 +2,7 @@
 #include "../Support/Script/HostFixture.hpp"
 
 #include "Accounts/ProgressReporter.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

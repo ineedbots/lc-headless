@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../../Config/Revision_e.hpp"
-#include "../State/GameState_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../../Config/Type/Revision_e.hpp"
+#include "../State/Type/GameState_s.hpp"
 #include "MenuOp.hpp"
 
 // Each kind of target's right-click menu, by slot, as the webclient builds it, and choosing an option from one.
