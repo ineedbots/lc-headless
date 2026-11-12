@@ -38,6 +38,7 @@ void AsioNetLoop::Poll()
 void AsioNetLoop::Wait(Deadline deadline)
 {
     const auto capturePause = ConsoleCaptureScope{nullptr};
+
     if (deadline)
     {
         m_io.run_one_until(*deadline);
@@ -97,5 +98,6 @@ std::unique_ptr<HttpServer> AsioNetLoop::ListenHttp(const HttpSettings_s& settin
     {
         return {};
     }
+
     return std::make_unique<AsioHttpServer>(m_io, settings, std::move(bridge));
 }

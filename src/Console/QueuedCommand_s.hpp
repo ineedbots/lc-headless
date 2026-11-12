@@ -1,4 +1,5 @@
 #pragma once
+
 #include "ConsoleCommand_s.hpp"
 #include "CommandExecution.hpp"
 struct QueuedCommand_s

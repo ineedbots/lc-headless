@@ -430,6 +430,7 @@ CommandQueueResult_e Account::QueueCommand(ConsoleCommand_s command, std::shared
     {
         return CommandQueueResult_e::Unavailable;
     }
+
     return m_script->QueueCommand(std::move(command), std::move(recipient));
 }
 
@@ -737,6 +738,7 @@ void Account::CloseNetwork()
     {
         m_script->CancelCommands("application_stopping");
     }
+
     m_client.Disconnect();
     UpdateFinished();
 }

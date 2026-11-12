@@ -94,6 +94,7 @@ int Application::Run()
         .navigation = m_navigation,
         .reloginDelay = scripting.reloginDelaySeconds,
     };
+
     auto net = NetLoop::Create();
     auto bridge = std::make_shared<ApplicationRequestBridge>(m_config->http);
     auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options, net};
@@ -125,13 +126,16 @@ int Application::Run()
         {
             console->SetOnArrived({});
         }
+
         processor.Stop();
         runner.CloseNetwork();
+
         if (http)
         {
             http->Stop();
             http->Deliver(bridge->TakeCompleted());
         }
+
         const auto deadline = std::chrono::steady_clock::now() + 2s;
         while ((!net->IsSettled() || (http && !http->IsDrained())) && std::chrono::steady_clock::now() < deadline)
         {
@@ -139,18 +143,23 @@ int Application::Run()
             {
                 http->Service();
             }
+
             net->Wait(std::min(deadline, std::chrono::steady_clock::now() + 10ms));
         }
+
         if (http)
         {
             http->Close();
+
             while (!http->IsDrained() && std::chrono::steady_clock::now() < deadline + 100ms)
             {
                 net->Poll();
             }
         }
     };
+
     auto succeeded = false;
+
     try
     {
         succeeded = runner.Run(InterruptSignal::GetCount, console.get(), [&](bool dispatch)
@@ -162,6 +171,7 @@ int Application::Run()
             else
             {
                 processor.Finalize();
+
                 if (http)
                 {
                     http->Deliver(bridge->TakeCompleted());
@@ -174,6 +184,7 @@ int Application::Run()
         }, [&]
         {
             processor.Stop();
+
             if (http)
             {
                 http->Stop();
@@ -186,6 +197,7 @@ int Application::Run()
         drain();
         throw;
     }
+
     drain();
 
     return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;

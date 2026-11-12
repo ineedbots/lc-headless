@@ -1,4 +1,5 @@
 #pragma once
+
 #include "../../Console/CommandQueueResult_e.hpp"
 #include "../../Console/QueuedCommand_s.hpp"
 #include "../../Console/CommandExecution.hpp"

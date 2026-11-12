@@ -19,6 +19,7 @@ Logger::Sink LogSinks::Make(std::shared_ptr<LogFile> file, std::shared_ptr<Conso
     return [file = std::move(file), console = std::move(console), rawConsole](const LogEntry_s& entry)
     {
         ConsoleCaptureScope::Write(LogFormatter::FormatLine(entry) + '\n');
+
         if (file)
         {
             file->Write(entry);

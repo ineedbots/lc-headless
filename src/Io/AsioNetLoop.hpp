@@ -22,6 +22,7 @@ public:
     {
         return m_linkCount == 0;
     }
+
     void Wake() noexcept override;
 
     // AsioLink's constructor and destructor, so Settle knows when every link has finished.

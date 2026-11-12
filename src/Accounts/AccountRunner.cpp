@@ -130,6 +130,7 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console,
     {
         m_net->Settle(Clock::now() + SETTLE_TIMEOUT);
     }
+
     return LogOutcomes();
 }
 
@@ -142,6 +143,7 @@ void AccountRunner::HandleCommand(std::string_view line, std::shared_ptr<Command
             execution->errorCode = std::move(error);
         }
     };
+
     const auto parsed = ConsoleCommandParser::Parse(line);
     if (!parsed)
     {
@@ -157,6 +159,7 @@ void AccountRunner::HandleCommand(std::string_view line, std::shared_ptr<Command
         if (target == nullptr)
         {
             reject("unknown_target");
+
             auto names = std::vector<std::string>{};
             for (const auto& account : m_accounts)
             {
@@ -180,6 +183,7 @@ void AccountRunner::HandleCommand(std::string_view line, std::shared_ptr<Command
     {
         execution->started = true;
     }
+
     if (command.name == AccountCommands::HELP)
     {
         m_commands.ShowHelp(target);
@@ -212,6 +216,7 @@ void AccountRunner::HandleCommand(std::string_view line, std::shared_ptr<Command
         {
             execution->started = false;
         }
+
         if (!m_commands.SendToScripts(target, command, execution))
         {
             reject("command_rejected");

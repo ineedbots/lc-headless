@@ -8,6 +8,7 @@
 int ApplicationEntryPoint::Run(int argc, char** argv)
 {
     static_cast<void>(GetStartTime());
+
     const auto logger = std::make_shared<Logger>();
     Logger::SetDefault(logger);
 

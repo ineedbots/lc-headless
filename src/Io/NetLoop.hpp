@@ -34,6 +34,7 @@ public:
     {
         return true;
     }
+
     // Ends a Wait early. Safe from any thread.
     virtual void Wake() noexcept = 0;
 

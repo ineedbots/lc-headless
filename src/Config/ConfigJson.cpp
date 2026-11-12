@@ -281,6 +281,7 @@ Config_s ConfigJson::ParseConfig(std::string_view text)
         {
             throw ConfigError{"http: must be an object"};
         }
+
         for (const auto& [key, low, high] : std::vector<std::tuple<std::string, s64, s64>>{
                  {"port", 1, 65535}, {"requestTimeoutMs", 100, 120000}, {"maxPendingRequests", 1, 1024}, {"maxRequestBodyBytes", 1, 1048576}, {"maxOutputBytes", 1, 16777216}})
         {
@@ -288,6 +289,7 @@ Config_s ConfigJson::ParseConfig(std::string_view text)
             {
                 continue;
             }
+
             const auto& value = http.at(key);
             if (!value.is_number_integer() || value < low || value > high)
             {
@@ -295,6 +297,7 @@ Config_s ConfigJson::ParseConfig(std::string_view text)
             }
         }
     }
+
     auto config = Config_s{};
     try
     {

@@ -197,6 +197,7 @@ TEST_CASE("HTTP template methods retain their own parameter names and reject equ
     CHECK_THROWS_AS((HttpRouter{{{.method = "GET", .path = "/status/{id}", .decode = Status},
                                  {.method = "GET", .path = "/status/{other}", .decode = Status}}}),
                     std::invalid_argument);
+
     for (const auto pattern : {"/a/{}", "/a/{9id}", "/a/{bad-name}", "/a/pre{id}", "/a/{id}/b/{id}", "/a/{id", "/a/id}", "/a/{id}}", "/a/#fragment"})
     {
         INFO(pattern);

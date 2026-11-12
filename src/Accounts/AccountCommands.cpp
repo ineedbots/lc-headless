@@ -167,6 +167,7 @@ bool AccountCommands::Say(Account* target, std::string_view text) const
     }
 
     auto said = false;
+
     for (const auto& account : m_accounts)
     {
         if (account->Say(text))
@@ -180,6 +181,7 @@ bool AccountCommands::Say(Account* target, std::string_view text) const
     {
         m_logger.Warning("No account is in game to say it");
     }
+
     return said;
 }
 
@@ -187,22 +189,28 @@ bool AccountCommands::SendToScripts(Account* target, const ConsoleCommand_s& com
 {
     auto accepted = false;
     auto found = false;
+
     for (const auto& account : m_accounts)
     {
         if (target && account.get() != target)
         {
             continue;
         }
+
         const auto has = HasCommand(account->GetCommands(), command.name);
         if (!has && !target)
         {
             continue;
         }
+
         found = true;
+
         auto token = execution ? std::make_shared<CommandRecipient>(execution, account->GetName()) : nullptr;
+
         if (!has)
         {
             m_logger.Warning("{} has no console command {}; type {}{} {} for its commands", account->GetName(), command.name, TARGET_PREFIX, account->GetName(), HELP);
+
             if (token)
             {
                 token->Finish("rejected", account->IsFinished() ? "account_unavailable" : "unknown_command");
@@ -218,6 +226,7 @@ bool AccountCommands::SendToScripts(Account* target, const ConsoleCommand_s& com
             else
             {
                 m_logger.Warning("{} can't take more console commands until it has run the ones waiting", account->GetName());
+
                 if (token)
                 {
                     token->Finish("rejected", queued == CommandQueueResult_e::QueueFull ? "script_queue_full" : "account_unavailable");
@@ -225,9 +234,11 @@ bool AccountCommands::SendToScripts(Account* target, const ConsoleCommand_s& com
             }
         }
     }
+
     if (!found)
     {
         m_logger.Warning("Unknown command {}; type {} for the commands", command.name, HELP);
     }
+
     return accepted;
 }

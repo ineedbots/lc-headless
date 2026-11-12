@@ -279,6 +279,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
                 }
 
                 self->interim.reset();
+
                 if (self->state->stopping)
                 {
                     self->Error(503, "stopping", "Application stopping", true);
@@ -463,6 +464,7 @@ void AsioHttpServer::State::Stop()
     for (const auto& [key, session] : copy)
     {
         static_cast<void>(key);
+
         if (!session->control && !session->writing && !session->interim)
         {
             if (session->parser && session->parser->is_header_done())

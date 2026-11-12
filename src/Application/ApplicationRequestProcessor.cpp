@@ -57,6 +57,7 @@ void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s
 {
     auto status = ApplicationStatus_s{};
     status.uptimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_started).count();
+
     for (std::size_t i = 0; i < m_runner.GetAccountCount(); ++i)
     {
         const auto& account = m_runner.GetAccount(i);
@@ -141,6 +142,7 @@ void ApplicationRequestProcessor::Finalize()
 void ApplicationRequestProcessor::Stop()
 {
     m_bridge->Close();
+
     while (const auto request = m_bridge->Take())
     {
         m_bridge->Complete({.id = request->control->id, .outcome = "cancelled", .errorCode = "stopping"});

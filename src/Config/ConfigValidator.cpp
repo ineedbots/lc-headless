@@ -124,6 +124,7 @@ void ConfigValidator::Validate(const Config_s& config)
         const auto invalidSyntax = http.host.find_first_of("[]/\\ \t\r\n") != std::string::npos || http.host.find('\0') != std::string::npos;
         Check(!addressError && !embeddedPort && !invalidSyntax, "http.host", "must be an IPv4/IPv6 address, localhost or empty");
     }
+
     Check(http.port >= 1 && http.port <= 65535, "http.port", "must be from 1 to 65535");
     Check(http.requestTimeoutMs >= 100ms && http.requestTimeoutMs <= 120000ms, "http.requestTimeoutMs", "must be from 100 to 120000");
     Check(http.maxPendingRequests >= 1 && http.maxPendingRequests <= 1024, "http.maxPendingRequests", "must be from 1 to 1024");

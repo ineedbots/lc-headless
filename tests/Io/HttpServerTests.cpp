@@ -105,6 +105,7 @@ namespace
             while (future.wait_for(0ms) != std::future_status::ready && std::chrono::steady_clock::now() < deadline)
             {
                 net->Wait(std::chrono::steady_clock::now() + 1ms);
+
                 if (dispatch)
                 {
                     processor.Dispatch();
@@ -461,6 +462,7 @@ TEST_CASE("Beast caps idle pre-admission connections and retires their cancelled
     CHECK((error == asio::error::eof || error == asio::error::connection_reset));
     CHECK(fixture.bridge->Outstanding() == 0);
     fixture.server->Close();
+
     while (!fixture.server->IsDrained() && std::chrono::steady_clock::now() < deadline)
     {
         fixture.net->Poll();
@@ -556,6 +558,7 @@ TEST_CASE("Beast closes an incomplete upload on its receive deadline without adm
 {
     auto fixture = HttpFixture{};
     auto client = StartClient(fixture.server->GetPort(), "POST /api/v1/console/commands HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{", 1, 12s);
+
     try
     {
         static_cast<void>(fixture.Finish(client, false, 13s));
@@ -755,6 +758,7 @@ TEST_CASE("Beast passes decoded template and query values to endpoint decoders o
     CHECK(command == "alice smith:a+b c:body bytes");
     bridge->Complete({.id = request->control->id, .payload = ConsoleCommandResult_s{.output = command}});
     server.Deliver(bridge->TakeCompleted());
+
     while (client.wait_for(0ms) != std::future_status::ready && std::chrono::steady_clock::now() < deadline)
     {
         io.poll();
@@ -766,6 +770,7 @@ TEST_CASE("Beast passes decoded template and query values to endpoint decoders o
     CHECK(responses[0].result_int() == 200);
     CHECK(Json::parse(responses[0].body())["output"] == command);
     server.Close();
+
     while (!server.IsDrained() && std::chrono::steady_clock::now() < deadline)
     {
         io.poll();

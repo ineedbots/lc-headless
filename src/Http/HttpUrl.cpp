@@ -90,6 +90,7 @@ std::optional<std::string> HttpUrl::Decode(std::string_view value, bool query)
     auto decoded = std::string{};
     decoded.reserve(value.size());
     for (std::size_t i = 0; i < value.size(); ++i)
+
     {
         auto byte = static_cast<unsigned char>(value[i]);
         if (byte == '%')

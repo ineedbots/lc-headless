@@ -77,6 +77,7 @@ void ApplicationRequestBridge::Abandon(u64 id)
     }
 
     it->second->abandoned = true;
+
     if (it->second->execution)
     {
         it->second->execution->abandoned = true;
