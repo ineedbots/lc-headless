@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Cache/GameCache_s.hpp"
-#include "../Config/AccountConfig_s.hpp"
-#include "../Config/Config_s.hpp"
+#include "../Cache/Type/GameCache_s.hpp"
+#include "../Config/Type/AccountConfig_s.hpp"
+#include "../Config/Type/Config_s.hpp"
 #include "../Console/ConsoleInput.hpp"
 #include "../Console/LogFile.hpp"
 #include "../Console/Logger.hpp"

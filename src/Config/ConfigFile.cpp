@@ -5,7 +5,7 @@
 #include "../Utils/FileUtils.hpp"
 #include "ConfigJson.hpp"
 #include "ConfigValidator.hpp"
-#include "Config_s.hpp"
+#include "Type/Config_s.hpp"
 #include "Error/ConfigError.hpp"
 
 Config_s ConfigFile::Load(const std::filesystem::path& path, Logger& logger)

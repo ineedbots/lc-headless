@@ -3,7 +3,7 @@
 #include "../Support/TempFolder.hpp"
 
 #include "Accounts/ExperienceLog.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

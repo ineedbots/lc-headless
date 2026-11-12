@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Tile_s.hpp"
+#include "../../Type/Tile_s.hpp"
 #include "BuildArea_s.hpp"
 #include "Entity_s.hpp"
 #include "GameEvent_s.hpp"

@@ -2,13 +2,13 @@
 #include "../Support/Cache/TestCache.hpp"
 #include "../Support/Game/Fixtures.hpp"
 
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/CollisionMap.hpp"
 #include "Game/Map/PathFinder.hpp"
 #include "Game/Map/WorldMap.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

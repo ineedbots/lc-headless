@@ -1,7 +1,7 @@
 #pragma once
 
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 
 class ConfigOverrides
 {

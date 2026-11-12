@@ -4,7 +4,7 @@
 #include "../Console/Logger.hpp"
 #include "../Script/Host/ScriptHost.hpp"
 #include "ProgressReportFile.hpp"
-#include "ProgressReport_s.hpp"
+#include "Type/ProgressReport_s.hpp"
 
 ProgressReporter::ProgressReporter(std::chrono::minutes interval, std::filesystem::path file, std::shared_ptr<Logger> logger)
     : m_interval{interval}

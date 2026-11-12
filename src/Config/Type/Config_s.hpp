@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Console/LogLevel_e.hpp"
-#include "../Utils/BigUInt.hpp"
+#include "../../Console/Type/LogLevel_e.hpp"
+#include "../../Utils/BigUInt.hpp"
 #include "ProxySettings_s.hpp"
 #include "HttpSettings_s.hpp"
 #include "Revision_e.hpp"

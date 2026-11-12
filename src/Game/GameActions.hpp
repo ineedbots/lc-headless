@@ -1,12 +1,12 @@
 #pragma once
 
-#include "../Cache/IfComponent_s.hpp"
+#include "../Cache/Type/IfComponent_s.hpp"
 #include "GameClient.hpp"
 #include "Map/WorldMap.hpp"
-#include "Protocol/ClientPacket_s.hpp"
+#include "Protocol/Type/ClientPacket_s.hpp"
 #include "Protocol/ClientPackets.hpp"
 #include "Protocol/Protocol.hpp"
-#include "Tile_s.hpp"
+#include "Type/Tile_s.hpp"
 
 // The server walks each waypoint in a straight line, so walks and interactions route around obstacles first, as
 // the webclient does. An interaction sends its op even without a route.

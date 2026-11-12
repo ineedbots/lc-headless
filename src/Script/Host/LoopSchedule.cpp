@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "LoopSchedule.hpp"
 
-#include "../../Game/State/GameState_s.hpp"
+#include "../../Game/State/Type/GameState_s.hpp"
 
 void LoopSchedule::RunAt(Clock::time_point time)
 {

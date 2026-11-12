@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "StateLog.hpp"
 
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Social_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Social_s.hpp"
 
 void StateLog::AddMessage(GameState_s& state, MessageType_e type, std::string sender, u64 sender37, u8 rights, std::string text)
 {

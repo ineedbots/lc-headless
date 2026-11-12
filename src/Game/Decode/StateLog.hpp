@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Social_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Social_s.hpp"
 
 class StateLog
 {

@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
-#include "Game/Query/SearchFilter_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/Query/Type/SearchFilter_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

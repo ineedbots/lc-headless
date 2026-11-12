@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "PathFinder.hpp"
 
-#include "../State/GameState_s.hpp"
-#include "../Tile_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../Type/Tile_s.hpp"
 #include "CollisionFlag.hpp"
 #include "CollisionMap.hpp"
 #include "LocShape.hpp"

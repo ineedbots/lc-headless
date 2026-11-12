@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "GameState_s.hpp"
 
-#include "../Protocol/Base37.hpp"
-#include "../Tile_s.hpp"
+#include "../../Protocol/Base37.hpp"
+#include "../../Type/Tile_s.hpp"
 #include "GameEvent_s.hpp"
 #include "Npc_s.hpp"
 #include "Player_s.hpp"

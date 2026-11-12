@@ -3,7 +3,7 @@
 #include "../LogCapture.hpp"
 #include "../TempFolder.hpp"
 
-#include "Console/LogLevel_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"

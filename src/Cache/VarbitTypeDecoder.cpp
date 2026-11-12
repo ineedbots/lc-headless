@@ -4,7 +4,7 @@
 #include "../Io/Packet.hpp"
 #include "Error/CacheError.hpp"
 #include "TypeDecoder.hpp"
-#include "VarbitType_s.hpp"
+#include "Type/VarbitType_s.hpp"
 
 namespace
 {

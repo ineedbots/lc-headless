@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "Logger.hpp"
 
-#include "LogEntry_s.hpp"
-#include "LogLevel_e.hpp"
+#include "Type/LogEntry_s.hpp"
+#include "Type/LogLevel_e.hpp"
 
 namespace
 {

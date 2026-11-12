@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
-#include "VarpType_s.hpp"
+#include "../Config/Type/Revision_e.hpp"
+#include "Type/VarpType_s.hpp"
 
 class VarpTypeDecoder
 {

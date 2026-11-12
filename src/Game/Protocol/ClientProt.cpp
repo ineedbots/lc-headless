@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "ClientProt.hpp"
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "ProtTableBuilder.hpp"
-#include "WireProt_s.hpp"
+#include "Type/WireProt_s.hpp"
 
 namespace
 {

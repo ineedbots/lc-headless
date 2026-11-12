@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HttpEndpointRequest_s.hpp"
+#include "Type/HttpEndpointRequest_s.hpp"
 
 struct HttpUrl_s
 {

@@ -1,11 +1,11 @@
 #include "pch.hpp"
 
-#include "Config/AccountConfig_s.hpp"
+#include "Config/Type/AccountConfig_s.hpp"
 #include "Config/ConfigOverrides.hpp"
-#include "Config/Config_s.hpp"
-#include "Config/ProxySettings_s.hpp"
-#include "Config/ServerSettings_s.hpp"
-#include "Config/Transport_e.hpp"
+#include "Config/Type/Config_s.hpp"
+#include "Config/Type/ProxySettings_s.hpp"
+#include "Config/Type/ServerSettings_s.hpp"
+#include "Config/Type/Transport_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

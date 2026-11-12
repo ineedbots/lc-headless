@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "ProgressReportFile.hpp"
 
-#include "ProgressReport_s.hpp"
+#include "Type/ProgressReport_s.hpp"
 
 namespace
 {

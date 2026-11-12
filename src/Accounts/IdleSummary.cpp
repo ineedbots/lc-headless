@@ -2,11 +2,11 @@
 #include "IdleSummary.hpp"
 
 #include "../Console/Logger.hpp"
-#include "../Game/State/GameState_s.hpp"
-#include "../Game/State/Npc_s.hpp"
-#include "../Game/State/Stat_e.hpp"
-#include "../Game/State/Stat_s.hpp"
-#include "../Game/Tile_s.hpp"
+#include "../Game/State/Type/GameState_s.hpp"
+#include "../Game/State/Type/Npc_s.hpp"
+#include "../Game/State/Type/Stat_e.hpp"
+#include "../Game/State/Type/Stat_s.hpp"
+#include "../Game/Type/Tile_s.hpp"
 
 namespace
 {

@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "InteractionRoutes.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../../Cache/LocType_s.hpp"
-#include "../Tile_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../../Cache/Type/LocType_s.hpp"
+#include "../Type/Tile_s.hpp"
 #include "LocShape.hpp"
 #include "PathFinder.hpp"
 #include "WorldMap.hpp"

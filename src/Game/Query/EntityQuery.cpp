@@ -1,16 +1,16 @@
 #include "pch.hpp"
 #include "EntityQuery.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../Map/InteractionRoutes.hpp"
 #include "../Map/WorldMap.hpp"
 #include "../State/EntityStatus.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Npc_s.hpp"
-#include "../State/Player_s.hpp"
-#include "../State/Zone_s.hpp"
-#include "../Tile_s.hpp"
-#include "SearchFilter_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Npc_s.hpp"
+#include "../State/Type/Player_s.hpp"
+#include "../State/Type/Zone_s.hpp"
+#include "../Type/Tile_s.hpp"
+#include "Type/SearchFilter_s.hpp"
 
 namespace
 {

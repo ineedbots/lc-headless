@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LocType_s.hpp"
+#include "Type/LocType_s.hpp"
 #include "MapSquare.hpp"
 
 struct MapIndexEntry_s

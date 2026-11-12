@@ -2,7 +2,7 @@
 
 #include "../../Io/Packet.hpp"
 #include "../Error/ProtocolError.hpp"
-#include "../State/Entity_s.hpp"
+#include "../State/Type/Entity_s.hpp"
 
 // Pieces PLAYER_INFO and NPC_INFO share: the tracked-list walk, steps, and common extended blocks.
 class EntityInfo

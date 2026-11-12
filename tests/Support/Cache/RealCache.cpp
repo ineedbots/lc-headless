@@ -3,8 +3,8 @@
 #include "../LogCapture.hpp"
 
 #include "Cache/CacheLoader.hpp"
-#include "Cache/GameCache_s.hpp"
-#include "Config/Revision_e.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Config/Type/Revision_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

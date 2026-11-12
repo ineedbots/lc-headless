@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Io/Packet.hpp"
-#include "DroppedOpcodes_s.hpp"
+#include "Type/DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
-#include "RevisionedOpcode_s.hpp"
+#include "Type/RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 
 // What the loc, NPC, obj and varp decoders share: the .dat and .idx framing, the opcodes every type

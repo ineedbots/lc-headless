@@ -1,15 +1,15 @@
 #include "pch.hpp"
 #include "CacheLoader.hpp"
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Console/Logger.hpp"
 #include "../Io/Packet.hpp"
 #include "../Utils/FileUtils.hpp"
 #include "CacheStore.hpp"
-#include "ClientCode_e.hpp"
+#include "Type/ClientCode_e.hpp"
 #include "Compression.hpp"
 #include "Error/CacheError.hpp"
-#include "GameCache_s.hpp"
+#include "Type/GameCache_s.hpp"
 #include "InterfaceDecoder.hpp"
 #include "JagArchive.hpp"
 #include "SeqDecoder.hpp"
@@ -20,7 +20,7 @@
 #include "ObjTypeDecoder.hpp"
 #include "VarpTypeDecoder.hpp"
 #include "VarbitTypeDecoder.hpp"
-#include "VarpType_s.hpp"
+#include "Type/VarpType_s.hpp"
 
 namespace
 {

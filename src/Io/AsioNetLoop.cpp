@@ -3,7 +3,7 @@
 
 #include "../Console/Logger.hpp"
 #include "AsioLink.hpp"
-#include "ConnectionOptions_s.hpp"
+#include "Type/ConnectionOptions_s.hpp"
 #include "Link.hpp"
 
 #include <boost/asio/post.hpp>

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../Map/WorldMap.hpp"
-#include "../State/GameState_s.hpp"
-#include "../Tile_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../Type/Tile_s.hpp"
 
 // Routes from the local player across the build area, by the rule each kind of target is walked to.
 class ReachQuery

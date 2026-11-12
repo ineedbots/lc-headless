@@ -1,11 +1,11 @@
 #include "pch.hpp"
 #include "WorldBindings.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../../Cache/MapSquare.hpp"
 #include "../../Game/Map/WorldMap.hpp"
 #include "../../Game/Query/EntityQuery.hpp"
-#include "../../Game/Tile_s.hpp"
+#include "../../Game/Type/Tile_s.hpp"
 #include "../Convert/PyArgs.hpp"
 #include "../Convert/PyObjects.hpp"
 #include "../Convert/PyValue.hpp"

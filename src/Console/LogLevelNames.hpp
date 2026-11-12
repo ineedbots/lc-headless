@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LogLevel_e.hpp"
+#include "Type/LogLevel_e.hpp"
 
 // The names client.jsonc and the console's loglevel command use.
 class LogLevelNames

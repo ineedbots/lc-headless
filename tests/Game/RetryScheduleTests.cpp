@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Config/Config_s.hpp"
+#include "Config/Type/Config_s.hpp"
 #include "Game/Net/RetrySchedule.hpp"
 
 #include <catch2/catch_test_macros.hpp>

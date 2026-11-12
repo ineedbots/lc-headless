@@ -2,7 +2,7 @@
 #include "../Support/Game/QueryWorld.hpp"
 
 #include "Game/Query/ReachQuery.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

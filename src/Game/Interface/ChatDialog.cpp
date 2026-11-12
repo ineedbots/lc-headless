@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "ChatDialog.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../../Cache/IfComponent_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../../Cache/Type/IfComponent_s.hpp"
 #include "../../Utils/StringUtils.hpp"
 
 namespace

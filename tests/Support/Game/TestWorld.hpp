@@ -1,7 +1,7 @@
 #pragma once
 
 #include "FakeGameServer.hpp"
-#include "Game/State/BuildArea_s.hpp"
+#include "Game/State/Type/BuildArea_s.hpp"
 
 // What FakeGameServer sends on login in the client tests, in the server's revision: a rebuild, the PID, the
 // local player placed at home, one NPC two tiles east, coins one tile north-east, logs in the inventory and a

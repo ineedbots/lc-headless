@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../State/BuildArea_s.hpp"
+#include "../State/Type/BuildArea_s.hpp"
 
 // One level of the 104x104 build area, indexed by local tile: absolute minus the build area's base, or of
 // another square grid, such as the one WalkMap builds a map square on. Angles are the webclient's: 0 west,

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../Console/Logger.hpp"
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 
 // The rules a config must keep; each one broken throws a ConfigError naming the key.
 class ConfigValidator

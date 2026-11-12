@@ -4,9 +4,9 @@
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Interfaces_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Interfaces_s.hpp"
 #include "PacketFields.hpp"
 #include "StateLog.hpp"
 

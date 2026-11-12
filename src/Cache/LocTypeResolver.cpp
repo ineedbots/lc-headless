@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "LocTypeResolver.hpp"
 
-#include "GameCache_s.hpp"
-#include "LocType_s.hpp"
-#include "VarbitType_s.hpp"
+#include "Type/GameCache_s.hpp"
+#include "Type/LocType_s.hpp"
+#include "Type/VarbitType_s.hpp"
 
 s32 LocTypeResolver::ResolveId(const GameCache_s& cache, const std::unordered_map<u16, s32>& varps, s32 id)
 {

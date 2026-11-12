@@ -6,11 +6,11 @@
 #include "../Map/LocShape.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/Entity_s.hpp"
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Zone_s.hpp"
-#include "../Tile_s.hpp"
+#include "../State/Type/Entity_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Zone_s.hpp"
+#include "../Type/Tile_s.hpp"
 #include "StateLog.hpp"
 
 namespace

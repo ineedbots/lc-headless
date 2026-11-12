@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VarbitType_s.hpp"
+#include "Type/VarbitType_s.hpp"
 
 class VarbitTypeDecoder
 {

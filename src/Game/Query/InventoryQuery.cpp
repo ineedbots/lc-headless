@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "InventoryQuery.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "InventoryItem_s.hpp"
-#include "SearchFilter_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "Type/InventoryItem_s.hpp"
+#include "Type/SearchFilter_s.hpp"
 
 InventoryQuery::InventoryQuery(const GameState_s& state, const GameCache_s& cache)
     : m_state{state}

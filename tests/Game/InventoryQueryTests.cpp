@@ -2,7 +2,7 @@
 #include "../Support/Cache/TestCache.hpp"
 #include "../Support/Game/QueryWorld.hpp"
 
-#include "Game/Query/InventoryItem_s.hpp"
+#include "Game/Query/Type/InventoryItem_s.hpp"
 #include "Game/Query/InventoryQuery.hpp"
 
 #include <catch2/catch_test_macros.hpp>

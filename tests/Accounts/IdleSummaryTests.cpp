@@ -2,11 +2,11 @@
 #include "../Support/LogCapture.hpp"
 
 #include "Accounts/IdleSummary.hpp"
-#include "Console/LogLevel_e.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/State/Npc_s.hpp"
-#include "Game/State/Stat_e.hpp"
-#include "Game/State/Stat_s.hpp"
+#include "Console/Type/LogLevel_e.hpp"
+#include "Game/State/Type/GameState_s.hpp"
+#include "Game/State/Type/Npc_s.hpp"
+#include "Game/State/Type/Stat_e.hpp"
+#include "Game/State/Type/Stat_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

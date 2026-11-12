@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "LogLevelNames.hpp"
 
-#include "LogLevel_e.hpp"
+#include "Type/LogLevel_e.hpp"
 
 namespace
 {

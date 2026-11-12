@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ClientProt.hpp"
+#include "../ClientProt.hpp"
 
 struct ClientPacket_s
 {

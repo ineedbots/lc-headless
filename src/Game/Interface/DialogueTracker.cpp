@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "DialogueTracker.hpp"
 
-#include "../State/Interfaces_s.hpp"
+#include "../State/Type/Interfaces_s.hpp"
 #include "ChatDialog.hpp"
 #include "InterfaceView.hpp"
 

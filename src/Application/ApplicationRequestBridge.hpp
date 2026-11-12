@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Console/CommandExecution.hpp"
-#include "../Config/HttpSettings_s.hpp"
+#include "../Config/Type/HttpSettings_s.hpp"
 
 struct ExecuteConsoleCommand_s
 {

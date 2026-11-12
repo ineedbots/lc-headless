@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ScriptCommand_s.hpp"
+#include "../Type/ScriptCommand_s.hpp"
 #include "../ScriptVm.hpp"
 
 #include <pocketpy.h>

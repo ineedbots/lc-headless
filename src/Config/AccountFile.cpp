@@ -2,7 +2,7 @@
 #include "AccountFile.hpp"
 
 #include "../Utils/FileUtils.hpp"
-#include "AccountConfig_s.hpp"
+#include "Type/AccountConfig_s.hpp"
 #include "ConfigJson.hpp"
 #include "ConfigValidator.hpp"
 #include "Error/ConfigError.hpp"

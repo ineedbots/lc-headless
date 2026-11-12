@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../State/Interfaces_s.hpp"
+#include "../State/Type/Interfaces_s.hpp"
 #include "InterfaceView.hpp"
 
 // The webclient sends one resume per dialogue and one answer per count dialog. The server doesn't say when either

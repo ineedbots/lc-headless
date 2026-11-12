@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "InventoryItem_s.hpp"
-#include "SearchFilter_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "Type/InventoryItem_s.hpp"
+#include "Type/SearchFilter_s.hpp"
 
 // The tracked inventories, read in place, so it's cheap to make and can't go stale. A filter's radius doesn't apply.
 class InventoryQuery

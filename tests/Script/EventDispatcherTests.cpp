@@ -5,11 +5,11 @@
 #include "../Support/LogCapture.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
 
-#include "Config/Config_s.hpp"
+#include "Config/Type/Config_s.hpp"
 #include "Game/Decode/StateLog.hpp"
 #include "Game/GameActions.hpp"
 #include "Game/GameClient.hpp"
-#include "Game/State/Stat_e.hpp"
+#include "Game/State/Type/Stat_e.hpp"
 #include "Script/Bindings/ScriptBindings.hpp"
 #include "Script/Host/EventDispatcher.hpp"
 #include "Script/Host/ScriptHooks.hpp"

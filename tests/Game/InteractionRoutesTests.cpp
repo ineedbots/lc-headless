@@ -5,7 +5,7 @@
 
 #include "Game/Map/InteractionRoutes.hpp"
 #include "Game/Map/LocShape.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

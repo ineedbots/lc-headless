@@ -1,15 +1,15 @@
 #include "pch.hpp"
 #include "PlayerStateDecoder.hpp"
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../../Console/Logger.hpp"
 #include "../../Io/Packet.hpp"
 #include "../../Utils/StringUtils.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Stat_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Stat_s.hpp"
 #include "StateLog.hpp"
 
 namespace

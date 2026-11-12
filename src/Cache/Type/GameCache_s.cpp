@@ -1,12 +1,12 @@
 #include "pch.hpp"
 #include "GameCache_s.hpp"
 
-#include "../Utils/StringUtils.hpp"
+#include "../../Utils/StringUtils.hpp"
 #include "LocType_s.hpp"
-#include "MapSquare.hpp"
+#include "../MapSquare.hpp"
 #include "NpcType_s.hpp"
 #include "ObjType_s.hpp"
-#include "TextPool.hpp"
+#include "../TextPool.hpp"
 
 namespace
 {

@@ -3,19 +3,19 @@
 #include "../Support/LogCapture.hpp"
 
 #include "Cache/CacheLoader.hpp"
-#include "Cache/GameCache_s.hpp"
-#include "Cache/LocType_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
+#include "Cache/Type/LocType_s.hpp"
 #include "Cache/MapSquare.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Game/Interface/ChatDialog.hpp"
 #include "Game/Interface/InterfaceView.hpp"
 #include "Game/Map/CollisionFlag.hpp"
 #include "Game/Map/WorldMap.hpp"
-#include "Game/State/GameState_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
 #include "Game/State/EntityStatus.hpp"
-#include "Game/State/Interfaces_s.hpp"
-#include "Game/State/Zone_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/State/Type/Interfaces_s.hpp"
+#include "Game/State/Type/Zone_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

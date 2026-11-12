@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Stat_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Stat_s.hpp"
 
 // What the tracked state says about the local player, read in place, so it's cheap to make and can't go stale.
 class PlayerQuery

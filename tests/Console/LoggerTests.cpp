@@ -2,8 +2,8 @@
 #include "../Support/DefaultLoggerScope.hpp"
 #include "../Support/LogCapture.hpp"
 
-#include "Console/LogEntry_s.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Console/Type/LogEntry_s.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 
 #include <barrier>

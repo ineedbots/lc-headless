@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "../Support/Cache/CacheWriter.hpp"
 
-#include "Cache/ClientCode_e.hpp"
+#include "Cache/Type/ClientCode_e.hpp"
 #include "Cache/Error/CacheError.hpp"
 #include "Cache/InterfaceDecoder.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

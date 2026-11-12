@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "Protocol.hpp"
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "ClientProt.hpp"
 #include "ServerProt.hpp"
-#include "WireProt_s.hpp"
+#include "Type/WireProt_s.hpp"
 
 Protocol::Protocol(Revision_e revision)
     : m_revision{revision}

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Config/Transport_e.hpp"
+#include "../../Config/Type/Transport_e.hpp"
 
 struct Socks5Proxy_s
 {

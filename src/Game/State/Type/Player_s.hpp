@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Tile_s.hpp"
+#include "../../Type/Tile_s.hpp"
 #include "Entity_s.hpp"
 
 enum class WearKind_e : u8

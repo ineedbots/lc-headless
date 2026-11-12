@@ -1,12 +1,12 @@
 #include "pch.hpp"
 #include "ObjTypeDecoder.hpp"
 
-#include "../Config/Revision_e.hpp"
+#include "../Config/Type/Revision_e.hpp"
 #include "../Io/Packet.hpp"
-#include "DroppedOpcodes_s.hpp"
+#include "Type/DroppedOpcodes_s.hpp"
 #include "Error/CacheError.hpp"
-#include "ObjType_s.hpp"
-#include "RevisionedOpcode_s.hpp"
+#include "Type/ObjType_s.hpp"
+#include "Type/RevisionedOpcode_s.hpp"
 #include "TextPool.hpp"
 #include "TypeDecoder.hpp"
 

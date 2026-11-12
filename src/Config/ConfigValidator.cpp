@@ -4,13 +4,13 @@
 #include "../Console/Logger.hpp"
 #include "../Utils/BigUInt.hpp"
 #include "../Utils/StringUtils.hpp"
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 #include "Error/ConfigError.hpp"
-#include "ProxySettings_s.hpp"
-#include "Revision_e.hpp"
-#include "ServerSettings_s.hpp"
-#include "Transport_e.hpp"
+#include "Type/ProxySettings_s.hpp"
+#include "Type/Revision_e.hpp"
+#include "Type/ServerSettings_s.hpp"
+#include "Type/Transport_e.hpp"
 #include <boost/asio/ip/address.hpp>
 
 namespace

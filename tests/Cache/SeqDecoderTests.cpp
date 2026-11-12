@@ -3,7 +3,7 @@
 #include "Cache/SeqDecoder.hpp"
 #include "Cache/Error/CacheError.hpp"
 #include "Game/State/EntityStatus.hpp"
-#include "Game/State/Entity_s.hpp"
+#include "Game/State/Type/Entity_s.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>

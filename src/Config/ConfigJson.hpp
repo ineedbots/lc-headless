@@ -1,7 +1,7 @@
 #pragma once
 
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 
 // The only place that reads or writes the config as JSON. Errors are ConfigErrors that name the key and never
 // quote the text, which can hold the password.

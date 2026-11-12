@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../Cache/GameCache_s.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
 #include "../../Console/Logger.hpp"
-#include "../../Game/State/GameEvent_s.hpp"
-#include "../../Game/State/GameState_s.hpp"
+#include "../../Game/State/Type/GameEvent_s.hpp"
+#include "../../Game/State/Type/GameState_s.hpp"
 #include "ScriptHooks.hpp"
 
 // Passes what the server sent since the bot last looked to its hooks: game events, chat messages, and the

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "ConsoleOutput.hpp"
-#include "LogEntry_s.hpp"
-#include "LogFormat_s.hpp"
-#include "LogLevel_e.hpp"
+#include "Type/LogEntry_s.hpp"
+#include "Type/LogFormat_s.hpp"
+#include "Type/LogLevel_e.hpp"
 
 class Logger
 {

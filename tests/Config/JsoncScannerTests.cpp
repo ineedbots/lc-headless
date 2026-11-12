@@ -2,7 +2,7 @@
 
 #include "Config/Error/ConfigError.hpp"
 #include "Config/JsoncScanner.hpp"
-#include "Config/JsoncValue_s.hpp"
+#include "Config/Type/JsoncValue_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

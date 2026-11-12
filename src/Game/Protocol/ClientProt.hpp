@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../Config/Revision_e.hpp"
-#include "WireProt_s.hpp"
+#include "../../Config/Type/Revision_e.hpp"
+#include "Type/WireProt_s.hpp"
 
 // Every client packet any supported revision accepts, named as the engine names them. The values aren't
 // opcodes: each revision's table (ClientProt::GetTable) maps them to its own.

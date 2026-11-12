@@ -6,11 +6,11 @@
 #include "Cache/CacheLoader.hpp"
 #include "Cache/CacheStore.hpp"
 #include "Cache/Error/CacheError.hpp"
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Cache/JagArchive.hpp"
 #include "Cache/MapSquare.hpp"
-#include "Config/Revision_e.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>

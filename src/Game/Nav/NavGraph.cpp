@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "NavGraph.hpp"
 
-#include "NavEdge_s.hpp"
-#include "NavPoint_s.hpp"
-#include "NavRequires_s.hpp"
-#include "NavTeleport_s.hpp"
+#include "Type/NavEdge_s.hpp"
+#include "Type/NavPoint_s.hpp"
+#include "Type/NavRequires_s.hpp"
+#include "Type/NavTeleport_s.hpp"
 
 #include <nlohmann/json.hpp>
 

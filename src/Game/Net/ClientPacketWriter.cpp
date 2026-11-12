@@ -2,7 +2,7 @@
 #include "ClientPacketWriter.hpp"
 
 #include "../../Io/Isaac.hpp"
-#include "../Protocol/ClientPacket_s.hpp"
+#include "../Protocol/Type/ClientPacket_s.hpp"
 #include "../Protocol/ClientProt.hpp"
 #include "../Protocol/Protocol.hpp"
 

@@ -5,12 +5,12 @@
 
 #include "Config/AccountFile.hpp"
 #include "Config/ConfigFile.hpp"
-#include "Config/Config_s.hpp"
+#include "Config/Type/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
-#include "Config/Revision_e.hpp"
-#include "Config/ServerSettings_s.hpp"
-#include "Config/Transport_e.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Config/Type/ServerSettings_s.hpp"
+#include "Config/Type/Transport_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Utils/BigUInt.hpp"
 

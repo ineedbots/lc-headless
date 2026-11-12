@@ -4,7 +4,7 @@
 
 #include "Game/Query/EntityQuery.hpp"
 #include "Game/State/EntityStatus.hpp"
-#include "Game/State/Zone_s.hpp"
+#include "Game/State/Type/Zone_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

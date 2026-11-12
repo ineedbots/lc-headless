@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "../Support/TempFolder.hpp"
 
-#include "Config/AccountConfig_s.hpp"
+#include "Config/Type/AccountConfig_s.hpp"
 #include "Config/AccountDirectory.hpp"
 #include "Config/Error/ConfigError.hpp"
 

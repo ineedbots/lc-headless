@@ -2,7 +2,7 @@
 #include "../Support/Cache/TestCache.hpp"
 #include "../Support/Game/QueryWorld.hpp"
 
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Game/Menu/MenuOp.hpp"
 #include "Game/Menu/Menus.hpp"
 

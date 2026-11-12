@@ -4,7 +4,7 @@
 #include "../Utils/StringUtils.hpp"
 #include "Error/ConfigError.hpp"
 #include "JsoncScanner.hpp"
-#include "JsoncValue_s.hpp"
+#include "Type/JsoncValue_s.hpp"
 
 #include <nlohmann/json.hpp>
 

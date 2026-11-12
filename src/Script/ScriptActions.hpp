@@ -1,15 +1,15 @@
 #pragma once
 
-#include "../Cache/GameCache_s.hpp"
-#include "../Cache/IfComponent_s.hpp"
+#include "../Cache/Type/GameCache_s.hpp"
+#include "../Cache/Type/IfComponent_s.hpp"
 #include "../Game/GameActions.hpp"
 #include "../Game/Interface/DialogueTracker.hpp"
 #include "../Game/Interface/InterfaceView.hpp"
 #include "../Game/Map/WorldMap.hpp"
 #include "../Game/Protocol/ClientPackets.hpp"
-#include "../Game/Query/InventoryItem_s.hpp"
-#include "../Game/State/GameState_s.hpp"
-#include "../Game/Tile_s.hpp"
+#include "../Game/Query/Type/InventoryItem_s.hpp"
+#include "../Game/State/Type/GameState_s.hpp"
+#include "../Game/Type/Tile_s.hpp"
 
 // What a script does, checked against the tracked state first. Tiles given as x and z are on the local player's
 // level. Actions on a target that's no longer tracked return false and send nothing.

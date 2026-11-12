@@ -3,7 +3,7 @@
 
 #include "../Convert/PyValue.hpp"
 #include "../Error/ScriptError.hpp"
-#include "../ScriptCommand_s.hpp"
+#include "../Type/ScriptCommand_s.hpp"
 #include "../ScriptVm.hpp"
 
 #include <pocketpy.h>

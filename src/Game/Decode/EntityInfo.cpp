@@ -2,7 +2,7 @@
 #include "EntityInfo.hpp"
 
 #include "../../Io/Packet.hpp"
-#include "../State/Entity_s.hpp"
+#include "../State/Type/Entity_s.hpp"
 #include "PacketFields.hpp"
 
 namespace

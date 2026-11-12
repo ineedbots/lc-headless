@@ -57,15 +57,17 @@ ProjectName/
     │   ├── ConfigFile.hpp
     │   └── ConfigFile.cpp
     ├── Graphics/
-    │   ├── BlendMode_e.hpp
+    │   ├── Type/
+    │   │   ├── BlendMode_e.hpp
+    │   │   └── Vertex_s.hpp
     │   ├── Renderer.hpp
     │   ├── Renderer.cpp
     │   ├── TextureCache.hpp
-    │   ├── TextureCache.cpp
-    │   └── Vertex_s.hpp
+    │   └── TextureCache.cpp
     └── Utils/
         ├── Endian.hpp
-        ├── StringHash_s.hpp
+        ├── Type/
+        │   └── StringHash_s.hpp
         ├── StringUtils.hpp
         └── StringUtils.cpp
 ```
@@ -76,6 +78,7 @@ ProjectName/
 - Everything else lives in subfolders of `src/` that group related files by feature or subsystem (`Config/`, `Graphics/`). Nest folders when it helps, but keep the tree shallow.
 - Helpers that several subsystems share go in `Utils/`, as static members of one class per kind (`StringUtils`; see section 5), rather than as copies in each file that needs them.
 - A subsystem's exception types go in an `Error/` subfolder of its folder (see Error handling in section 8).
+- Standalone struct and enum files (`_s` and `_e`) go in a `Type/` subfolder of their subsystem, with any companion `.cpp` beside the header.
 - Folder names are PascalCase.
 - A header and its `.cpp` always sit side by side in the same folder.
 - Build output goes in `build/`, which is git-ignored.

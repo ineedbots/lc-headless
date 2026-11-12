@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Console/ConsoleCommand_s.hpp"
+#include "../Console/Type/ConsoleCommand_s.hpp"
 #include "../Console/Logger.hpp"
 #include "Account.hpp"
 

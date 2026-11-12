@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "ConsoleOutput.hpp"
 
-#include "LogEntry_s.hpp"
+#include "Type/LogEntry_s.hpp"
 #include "LogFormatter.hpp"
-#include "LogLevel_e.hpp"
+#include "Type/LogLevel_e.hpp"
 #include "Terminal.hpp"
 
 namespace

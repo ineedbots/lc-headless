@@ -196,7 +196,7 @@ Hooks see the state as it stands after the whole pump, not as it was when the ev
 
 ## 5. Events
 
-`GameState_s` gains an event log next to `messages`. The event types live in `src/Game/State/GameEvent_s.hpp`. `Stat_s` moved to its own header so the event can carry it.
+`GameState_s` gains an event log next to `messages`. The event types live in `src/Game/State/Type/GameEvent_s.hpp`. `Stat_s` moved to its own header so the event can carry it.
 
 ```cpp
 using GameEventData = std::variant<NpcAdded_s, NpcRemoved_s, NpcHit_s, PlayerAdded_s, PlayerRemoved_s,

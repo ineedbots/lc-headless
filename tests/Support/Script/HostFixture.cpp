@@ -8,8 +8,8 @@
 #include "ScriptTestRuntime.hpp"
 #include "ScriptCoverage.hpp"
 
-#include "Config/Config_s.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Config/Type/Config_s.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/ServerProt.hpp"

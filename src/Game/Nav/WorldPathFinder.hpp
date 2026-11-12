@@ -1,10 +1,10 @@
 #pragma once
 
-#include "NavEdge_s.hpp"
-#include "NavPoint_s.hpp"
-#include "NavRect_s.hpp"
-#include "NavState_s.hpp"
-#include "NavTeleport_s.hpp"
+#include "Type/NavEdge_s.hpp"
+#include "Type/NavPoint_s.hpp"
+#include "Type/NavRect_s.hpp"
+#include "Type/NavState_s.hpp"
+#include "Type/NavTeleport_s.hpp"
 #include "Navigation.hpp"
 
 // rs2b0t's PathPolicy: which kinds of hop a route may use.

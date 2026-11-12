@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "../Support/Cache/TestCache.hpp"
 
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Game/Interface/ChatDialog.hpp"
 #include "Game/Interface/InterfaceView.hpp"
-#include "Game/State/GameState_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

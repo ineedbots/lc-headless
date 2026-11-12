@@ -1,11 +1,11 @@
 #include "pch.hpp"
 #include "../Support/Game/QueryWorld.hpp"
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Game/Decode/EntityInfo.hpp"
 #include "Game/Map/WalkMap.hpp"
 #include "Game/Protocol/Base37.hpp"
 #include "Game/Query/ReachQuery.hpp"
-#include "Game/State/Player_s.hpp"
+#include "Game/State/Type/Player_s.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Face entity sentinels distinguish no target and both index spaces", "[EntityInfo][CompletionCoverage]")

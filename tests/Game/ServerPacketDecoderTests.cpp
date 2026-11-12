@@ -3,8 +3,8 @@
 #include "../Support/Game/Fixtures.hpp"
 #include "../Support/LogCapture.hpp"
 
-#include "Config/Revision_e.hpp"
-#include "Console/LogLevel_e.hpp"
+#include "Config/Type/Revision_e.hpp"
+#include "Console/Type/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
 #include "Game/Decode/ServerPacketDecoder.hpp"
 #include "Game/Error/ProtocolError.hpp"
@@ -12,11 +12,11 @@
 #include "Game/Protocol/Protocol.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Game/Protocol/WordPack.hpp"
-#include "Game/State/GameState_s.hpp"
-#include "Game/State/BuildArea_s.hpp"
-#include "Game/State/Social_s.hpp"
-#include "Game/State/Zone_s.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/State/Type/GameState_s.hpp"
+#include "Game/State/Type/BuildArea_s.hpp"
+#include "Game/State/Type/Social_s.hpp"
+#include "Game/State/Type/Zone_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 #include "Io/Packet.hpp"
 
 #include <catch2/catch_test_macros.hpp>

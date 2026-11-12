@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../Game/Query/InventoryItem_s.hpp"
-#include "../../Game/Query/SearchFilter_s.hpp"
-#include "../../Game/State/Zone_s.hpp"
-#include "../../Game/Tile_s.hpp"
+#include "../../Game/Query/Type/InventoryItem_s.hpp"
+#include "../../Game/Query/Type/SearchFilter_s.hpp"
+#include "../../Game/State/Type/Zone_s.hpp"
+#include "../../Game/Type/Tile_s.hpp"
 
 #include <pocketpy.h>
 

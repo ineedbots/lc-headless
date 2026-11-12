@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Cache/CacheStore.hpp"
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 
 struct WrittenStore_s
 {

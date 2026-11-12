@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "ClientProt.hpp"
 #include "ServerProt.hpp"
-#include "WireProt_s.hpp"
+#include "Type/WireProt_s.hpp"
 
 // One revision's wire protocol: its opcode tables, and the revision every layout difference branches on.
 // The tables are static, so a Protocol is cheap to copy.

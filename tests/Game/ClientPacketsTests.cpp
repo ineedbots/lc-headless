@@ -1,13 +1,13 @@
 #include "pch.hpp"
 
-#include "Config/Revision_e.hpp"
+#include "Config/Type/Revision_e.hpp"
 #include "Game/Net/ClientPacketWriter.hpp"
 #include "Game/Protocol/Base37.hpp"
-#include "Game/Protocol/ClientPacket_s.hpp"
+#include "Game/Protocol/Type/ClientPacket_s.hpp"
 #include "Game/Protocol/ClientPackets.hpp"
 #include "Game/Protocol/ClientProt.hpp"
 #include "Game/Protocol/Protocol.hpp"
-#include "Game/Tile_s.hpp"
+#include "Game/Type/Tile_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

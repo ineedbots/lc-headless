@@ -1,15 +1,15 @@
 #include "pch.hpp"
 #include "Menus.hpp"
 
-#include "../../Cache/GameCache_s.hpp"
-#include "../../Cache/IfComponent_s.hpp"
-#include "../../Cache/LocType_s.hpp"
-#include "../../Cache/NpcType_s.hpp"
-#include "../../Cache/ObjType_s.hpp"
-#include "../../Config/Revision_e.hpp"
+#include "../../Cache/Type/GameCache_s.hpp"
+#include "../../Cache/Type/IfComponent_s.hpp"
+#include "../../Cache/Type/LocType_s.hpp"
+#include "../../Cache/Type/NpcType_s.hpp"
+#include "../../Cache/Type/ObjType_s.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../../Utils/StringUtils.hpp"
-#include "../State/GameState_s.hpp"
-#include "../State/Npc_s.hpp"
+#include "../State/Type/GameState_s.hpp"
+#include "../State/Type/Npc_s.hpp"
 #include "MenuOp.hpp"
 
 namespace

@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "RetrySchedule.hpp"
 
-#include "../../Config/Config_s.hpp"
+#include "../../Config/Type/Config_s.hpp"
 
 RetrySchedule::RetrySchedule(u32 maxAttempts, std::chrono::milliseconds firstDelay, std::chrono::milliseconds maxDelay)
     : m_maxAttempts{maxAttempts}

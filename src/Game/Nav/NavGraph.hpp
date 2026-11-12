@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../Map/WalkMap.hpp"
-#include "NavEdge_s.hpp"
-#include "NavTeleport_s.hpp"
+#include "Type/NavEdge_s.hpp"
+#include "Type/NavTeleport_s.hpp"
 
 // Edges whose ends WalkMap can't stand on are left out, as rs2b0t's PathFinder leaves them out.
 class NavGraph

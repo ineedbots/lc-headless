@@ -2,15 +2,15 @@
 #include "ConfigJson.hpp"
 
 #include "../Console/LogLevelNames.hpp"
-#include "../Console/LogLevel_e.hpp"
+#include "../Console/Type/LogLevel_e.hpp"
 #include "../Utils/BigUInt.hpp"
-#include "AccountConfig_s.hpp"
-#include "Config_s.hpp"
+#include "Type/AccountConfig_s.hpp"
+#include "Type/Config_s.hpp"
 #include "Error/ConfigError.hpp"
-#include "ProxySettings_s.hpp"
-#include "ServerSettings_s.hpp"
+#include "Type/ProxySettings_s.hpp"
+#include "Type/ServerSettings_s.hpp"
 #include "TransportNames.hpp"
-#include "Transport_e.hpp"
+#include "Type/Transport_e.hpp"
 
 #include <nlohmann/json.hpp>
 

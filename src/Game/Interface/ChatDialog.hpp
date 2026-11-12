@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../State/GameState_s.hpp"
+#include "../State/Type/GameState_s.hpp"
 #include "InterfaceView.hpp"
 
 struct ChatOption_s

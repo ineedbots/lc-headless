@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "SquareCollision.hpp"
 
-#include "../../Cache/LocType_s.hpp"
+#include "../../Cache/Type/LocType_s.hpp"
 #include "../../Cache/MapSquare.hpp"
 #include "LocShape.hpp"
 

@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "TestCache.hpp"
 
-#include "Cache/GameCache_s.hpp"
+#include "Cache/Type/GameCache_s.hpp"
 #include "Cache/MapSquare.hpp"
 #include "Cache/TextPool.hpp"
 

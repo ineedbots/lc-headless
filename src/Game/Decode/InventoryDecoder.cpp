@@ -1,12 +1,12 @@
 #include "pch.hpp"
 #include "InventoryDecoder.hpp"
 
-#include "../../Config/Revision_e.hpp"
+#include "../../Config/Type/Revision_e.hpp"
 #include "../../Io/Packet.hpp"
 #include "../Protocol/Protocol.hpp"
 #include "../Protocol/ServerProt.hpp"
-#include "../State/GameEvent_s.hpp"
-#include "../State/GameState_s.hpp"
+#include "../State/Type/GameEvent_s.hpp"
+#include "../State/Type/GameState_s.hpp"
 #include "StateLog.hpp"
 
 namespace
