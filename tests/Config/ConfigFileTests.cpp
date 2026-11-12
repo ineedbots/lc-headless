@@ -127,6 +127,14 @@ namespace
         "inventoryDirectory": "inventory",
         "inventoryIntervalSeconds": 5,
         "equipmentDirectory": "equipment"
+    },
+    "http": {
+        "host": "",
+        "port": 8080,
+        "requestTimeoutMs": 30000,
+        "maxPendingRequests": 64,
+        "maxRequestBodyBytes": 16384,
+        "maxOutputBytes": 1048576
     }
 }
 )json"sv;
@@ -912,7 +920,8 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
         {
             json["proxy"]["username"] = "user";
             json["proxy"]["password"] = std::string(256, 'p');
-        }), "proxy.password");
+        }),
+                      "proxy.password");
     }
 
     SECTION("a rejected proxy names neither credential")
@@ -922,12 +931,14 @@ TEST_CASE("ConfigFile rejects invalid values", "[ConfigFile]")
             json["proxy"]["username"] = SECRET_PASSWORD;
             json["proxy"]["password"] = SECRET_PASSWORD;
             json["proxy"]["port"] = 0;
-        }), "proxy.port");
+        }),
+                      "proxy.port");
         CheckRejected(EditBase([](nlohmann::json& json)
         {
             json["proxy"]["username"] = std::string{SECRET_PASSWORD} + std::string(255, 'u');
             json["proxy"]["password"] = SECRET_PASSWORD;
-        }), "proxy.username");
+        }),
+                      "proxy.username");
     }
 }
 

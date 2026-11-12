@@ -193,3 +193,39 @@ Reports require an `on_progress_report()` hook returning a dictionary. They are 
 | Login rejected despite correct credentials | Server revision, RSA public key and cache from the same deployment. |
 | Account override loses a setting | Repeat it in the replacement section; override objects do not merge. |
 | Saving an account setting has no effect | Restart the client; `--watch` reloads Python source, not account configuration. |
+
+## HTTP operator API
+
+The process-wide `http` section is optional and has no account overrides. Changes require a restart.
+A missing, empty, or whitespace-only `host` disables HTTP. `--raw-console` independently controls
+terminal input and formatting. The shipped sample leaves HTTP disabled.
+
+```json
+"http": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "requestTimeoutMs": 30000,
+    "maxPendingRequests": 64,
+    "maxRequestBodyBytes": 16384,
+    "maxOutputBytes": 1048576
+}
+```
+
+| Setting | Accepted values |
+|---|---|
+| `host` | Empty, an IPv4/IPv6 bind address, or `localhost` (IPv4 loopback) |
+| `port` | Integer 1–65535 |
+| `requestTimeoutMs` | Integer 100–120000 milliseconds |
+| `maxPendingRequests` | Integer 1–1024 |
+| `maxRequestBodyBytes` | Integer 1–1048576 bytes |
+| `maxOutputBytes` | Integer 1–16777216 bytes per request |
+
+All numeric settings are validated even when HTTP is disabled. Schemes, paths, embedded ports,
+and other hostnames are rejected. Bind failure fails startup. An enabled listener shares the
+main-thread game-network loop and creates no additional thread or I/O context. It exists only
+while the account runner exists; it does not keep a completed or empty fleet alive.
+
+This API assumes a trusted operator network. It provides console command authority without
+authentication, TLS, or CORS. Use loopback or deploy behind appropriately configured access controls.
+Explicitly binding a non-loopback address exposes that authority to the network.
+See [Running](Running.md#http-api) for requests and [the design](design/HttpRestDesign.md) for lifecycle details.

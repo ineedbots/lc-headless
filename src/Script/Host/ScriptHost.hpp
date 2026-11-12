@@ -1,5 +1,9 @@
 #pragma once
 
+#include "../../Console/CommandQueueResult_e.hpp"
+#include "../../Console/QueuedCommand_s.hpp"
+#include "../../Console/CommandExecution.hpp"
+
 #include "../../Accounts/ProgressReport_s.hpp"
 #include "../../Console/ConsoleCommand_s.hpp"
 #include "../../Console/Logger.hpp"
@@ -79,6 +83,7 @@ public:
     ScriptHost& operator=(const ScriptHost&) = delete;
 
     void Step(Clock::time_point now);
+    void CancelCommands(std::string_view reason);
     // Ends the bot, once, calling on_stop(reason) and script_finish, for an account that stops for a
     // reason of its own, such as Ctrl+C. Stopping the script, or its failing, already does.
     void Finish(std::string_view reason);
@@ -91,7 +96,8 @@ public:
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
     // Queues a console command for the next Step that finds the player placed. False when the script isn't
     // running, hasn't added the command, or already has MAX_COMMANDS waiting.
-    [[nodiscard]] bool ReceiveCommand(ConsoleCommand_s command);
+    [[nodiscard]] bool ReceiveCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
+    [[nodiscard]] CommandQueueResult_e QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
     [[nodiscard]] ScriptStatus_e GetStatus() const;
     // Started and running, with the player placed and settled: when the loop and the hooks run.
     [[nodiscard]] bool IsActive() const;
@@ -116,6 +122,7 @@ private:
     void Start(Clock::time_point now);
     void DispatchBotMessages();
     void DispatchCommands();
+    void PruneCommands();
     void RunLoop(Clock::time_point now);
     void RunUpkeep(Clock::time_point now);
     void ScheduleLoop(Clock::time_point now, py_Ref wait);
@@ -142,7 +149,7 @@ private:
     LoopSchedule m_schedule;
     std::optional<FileWatcher> m_watcher;
     std::deque<BotMessage_s> m_botMessages;
-    std::deque<ConsoleCommand_s> m_commands;
+    std::deque<QueuedCommand_s> m_commands;
     ScriptStatus_e m_status = ScriptStatus_e::Running;
     bool m_started = false;
     bool m_finished = false;

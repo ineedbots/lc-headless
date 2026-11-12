@@ -23,6 +23,8 @@
 #include "../Script/ScriptRuntime.hpp"
 #include "CommandLine.hpp"
 #include "InterruptSignal.hpp"
+#include "ApplicationRequestProcessor.hpp"
+#include "EntryPoint.hpp"
 
 Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
     : m_logger{std::move(logger)}
@@ -92,7 +94,10 @@ int Application::Run()
         .navigation = m_navigation,
         .reloginDelay = scripting.reloginDelaySeconds,
     };
-    auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options};
+
+    auto net = NetLoop::Create();
+    auto bridge = std::make_shared<ApplicationRequestBridge>(m_config->http);
+    auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options, net};
 
     if (m_commandLine.watch)
     {
@@ -113,7 +118,87 @@ int Application::Run()
         m_logger->Info("Type {} for the console commands", AccountCommands::HELP);
     }
 
-    const auto succeeded = runner.Run(InterruptSignal::GetCount, console.get());
+    auto processor = ApplicationRequestProcessor{runner, bridge, ApplicationEntryPoint::GetStartTime()};
+    auto http = m_config->http.host.empty() ? nullptr : net->ListenHttp(m_config->http, bridge);
+    const auto drain = [&]
+    {
+        if (console)
+        {
+            console->SetOnArrived({});
+        }
+
+        processor.Stop();
+        runner.CloseNetwork();
+
+        if (http)
+        {
+            http->Stop();
+            http->Deliver(bridge->TakeCompleted());
+        }
+
+        const auto deadline = std::chrono::steady_clock::now() + 2s;
+        while ((!net->IsSettled() || (http && !http->IsDrained())) && std::chrono::steady_clock::now() < deadline)
+        {
+            if (http)
+            {
+                http->Service();
+            }
+
+            net->Wait(std::min(deadline, std::chrono::steady_clock::now() + 10ms));
+        }
+
+        if (http)
+        {
+            http->Close();
+
+            while (!http->IsDrained() && std::chrono::steady_clock::now() < deadline + 100ms)
+            {
+                net->Poll();
+            }
+        }
+    };
+
+    auto succeeded = false;
+
+    try
+    {
+        succeeded = runner.Run(InterruptSignal::GetCount, console.get(), [&](bool dispatch)
+        {
+            if (dispatch)
+            {
+                processor.Dispatch();
+            }
+            else
+            {
+                processor.Finalize();
+
+                if (http)
+                {
+                    http->Deliver(bridge->TakeCompleted());
+                    http->Service();
+                }
+            }
+        }, [&]
+        {
+            return bridge->HasIncoming();
+        }, [&]
+        {
+            processor.Stop();
+
+            if (http)
+            {
+                http->Stop();
+                http->Deliver(bridge->TakeCompleted());
+            }
+        });
+    }
+    catch (...)
+    {
+        drain();
+        throw;
+    }
+
+    drain();
 
     return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 }

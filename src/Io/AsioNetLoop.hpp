@@ -15,8 +15,14 @@ public:
 
     [[nodiscard]] std::shared_ptr<Link> Open(const ConnectionOptions_s& options, std::shared_ptr<Logger> logger) override;
     void Poll() override;
+    std::unique_ptr<HttpServer> ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge) override;
     void Wait(Deadline deadline) override;
     void Settle(Clock::time_point deadline) override;
+    bool IsSettled() const override
+    {
+        return m_linkCount == 0;
+    }
+
     void Wake() noexcept override;
 
     // AsioLink's constructor and destructor, so Settle knows when every link has finished.

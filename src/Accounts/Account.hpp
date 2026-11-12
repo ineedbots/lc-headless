@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../Console/CommandQueueResult_e.hpp"
+#include "../Console/CommandExecution.hpp"
+
 #include "../Cache/GameCache_s.hpp"
 #include "../Config/AccountConfig_s.hpp"
 #include "../Config/Config_s.hpp"
@@ -31,7 +34,7 @@ struct AccountOptions_s
 };
 
 // Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is
-// in docs/design/ScriptingDesign.md §8.
+// in docs/design/ScriptingDesign.md Â§8.
 class Account
 {
 public:
@@ -49,6 +52,7 @@ public:
 
     // Step does the rest.
     void Start();
+    void CloseNetwork();
     // For callers that run a single account.
     void Login();
     void Step(std::chrono::milliseconds maxWait);
@@ -66,7 +70,8 @@ public:
     [[nodiscard]] std::string DescribeStatus() const;
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
     // False without a script.
-    [[nodiscard]] bool SendCommand(ConsoleCommand_s command);
+    [[nodiscard]] bool SendCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
+    [[nodiscard]] CommandQueueResult_e QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
     // False, sending nothing, when the account isn't in game.
     [[nodiscard]] bool Say(std::string_view text);
     [[nodiscard]] std::optional<Clock::time_point> GetNextLoop() const;

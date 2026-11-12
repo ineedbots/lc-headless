@@ -1,6 +1,6 @@
 # Running
 
-[Back to README](../README.md) · [Features](Features.md) · [Requirements](Requirements.md) · [Configuration](Configuration.md) · [Building](Building.md)
+[Back to README](../README.md) Â· [Features](Features.md) Â· [Requirements](Requirements.md) Â· [Configuration](Configuration.md) Â· [Building](Building.md)
 
 ## First login
 
@@ -129,3 +129,80 @@ Ctrl+C advances through three stages:
 The server refuses logout during combat and for ten seconds afterward, so requesting logout may not end the connection immediately. Console `quit` and `exit` use the same staged shutdown.
 
 The process returns 0 only when every account logged out cleanly and no script failed. Startup errors, account failures and forced disconnections can produce a nonzero exit. If startup fails, use the [configuration troubleshooting table](Configuration.md#troubleshooting-configuration) before changing script code.
+
+## HTTP API
+
+Enable `http.host` in `client.jsonc` as described in [Configuration](Configuration.md#http-operator-api).
+The API supports HTTP/1.1 and sequential keep-alive, including buffered pipelined requests.
+
+```sh
+curl http://127.0.0.1:8080/api/v1/status
+curl -H 'Content-Type: application/json' --data '{"command":"@main status"}' http://127.0.0.1:8080/api/v1/console/commands
+```
+
+`GET /api/v1/status` queues a fresh main-thread snapshot, returning a decimal-string `requestId`,
+`application` (`state`, `uptimeMs`), and `accounts` (`name`, `started`, `finished`, `status`).
+It excludes configuration and credentials. Status text is descriptive and may evolve.
+
+`POST /api/v1/console/commands` accepts exactly one nonempty string field, `command`, using the
+same syntax and dispatcher as stdin. Embedded CR, LF and NUL are rejected. This executes the
+application's console language. The original connection waits for the handler to return,
+including every accepted script recipient of a broadcast. Completion acknowledges a handler's
+return; later walking, bot activity, logout and packet delivery may still be in progress.
+
+Command responses include `requestId`, `outcome`, `output`, `outputTruncated`, `executionStarted`,
+and `recipients` (each with `account`, `outcome`, and optional `errorCode`). Mixed broadcast results
+return HTTP 200 with `outcome: "partial"`; inspect recipients. Captured output preserves the console
+log threshold and ordered plain lines, including script logs and partial Python print lines.
+It tees to the existing terminal and file output. Unrelated account steps, local commands,
+other threads, and nested network callbacks are excluded. Captured UTF-8 is truncated at a codepoint
+boundary when full; execution and normal logging continue. Invalid log bytes are replaced during
+JSON serialization. Direct third-party `printf` output is outside this contract.
+
+| HTTP status | Meaning |
+|---|---|
+| 200 | Handler/snapshot completed; inspect outcome for partial results |
+| 400 | Malformed HTTP/JSON or invalid request envelope |
+| 404 / 405 | Unknown route / unsupported method (`Allow` lists the accepted method) |
+| 413 / 415 / 417 / 431 | Body limit / content type / expectation / header limit |
+| 422 | Console command rejected |
+| 500 | Internal or script handler failure without a successful recipient |
+| 503 | Capacity exhausted or application stopping/cancellation |
+| 504 | Admitted request deadline elapsed |
+
+Errors include `error.code`, `error.message`, and a request ID after admission. Finalized command
+output is included when available. Routes support literal paths and registered `{name}` path templates. Query parameters are URL-decoded and passed to the endpoint alongside path values and the request body.
+Bodies are limited while reading both fixed-length and chunked requests. Headers and receive
+buffers are capped at 16 KiB, active connections at 128, receive operations at ten seconds, and
+response writes at five seconds. `Expect: 100-continue` is supported after header validation.
+Capacity covers queued work, deferred handlers, completed results and response delivery.
+
+Deadlines are checked before dispatch, before each script recipient, and before delivery.
+Expired or disconnected work that has not started is cancelled. A handler already running finishes;
+its effects may have occurred even when the response is 504. Do not automatically retry commands.
+HTTP shares the main thread: a long handler stalls requests and timer delivery alongside game I/O.
+The request timeout is eligibility for execution/success, not a hard client response-time bound.
+`scripting.callTimeoutMs: 0` disables the Python watchdog. Shutdown closes admission, cancels pending
+work, and drains response writes and network cancellation for a bounded period. `quit` acknowledges
+its handler before teardown. Delivery still depends on a connected client and a responsive main loop.
+
+### Endpoint parameters
+
+A route registered as `/api/v1/status/{id}` can match
+`/api/v1/status/1?something=1&tag=one&tag=two`. Its decoder receives
+`pathParameters["id"] == "1"`, `queryParameters["something"] == ["1"]`, and
+`queryParameters["tag"] == ["one", "two"]` in an owned `HttpEndpointRequest_s`.
+Use `?` before the first query parameter and `&` between later parameters.
+An ampersand before `?` is part of the path.
+
+The built-in application snapshot remains at `/api/v1/status`; registering a template defines a new
+endpoint and its decoder defines the meaning and validation of its values. Existing endpoints do not
+use query values. Numeric conversion and endpoint-specific validation belong in the decoder.
+
+Path parameters match one nonempty segment and use identifier names such as `{id}` or `{account_name}`.
+Literal segments take priority over parameter segments; the router selects a full path before selecting
+a method. Trailing slashes are significant. Percent escapes are decoded once as UTF-8 after splitting
+path/query delimiters, so `%2F` within a path value stays within that value. Query `+` becomes a space;
+path `+` and encoded `%2B` stay plus signs. Repeated query keys preserve all their values in arrival order.
+Flags (`?flag`) and empty values (`?flag=`) produce an empty string; empty `&` fields are ignored.
+Malformed escapes, invalid UTF-8, control bytes, empty query names and URL fragments return `400`.

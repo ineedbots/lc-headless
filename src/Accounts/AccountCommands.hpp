@@ -25,9 +25,9 @@ public:
     [[nodiscard]] Account* FindAccount(std::string_view name) const;
     void ShowHelp(const Account* target) const;
     void ShowStatus(const Account* target) const;
-    void SetLogLevel(const Account* target, std::span<const std::string> args) const;
-    void Say(Account* target, std::string_view text) const;
-    void SendToScripts(Account* target, const ConsoleCommand_s& command) const;
+    bool SetLogLevel(const Account* target, std::span<const std::string> args) const;
+    bool Say(Account* target, std::string_view text) const;
+    bool SendToScripts(Account* target, const ConsoleCommand_s& command, std::shared_ptr<CommandExecution> execution = {}) const;
 
 private:
     const std::vector<std::unique_ptr<Account>>& m_accounts;

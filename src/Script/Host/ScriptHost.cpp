@@ -68,13 +68,16 @@ ScriptHost::ScriptHost(ScriptRuntime& runtime, GameClient& client, ScriptHostOpt
 
 ScriptHost::~ScriptHost()
 {
+    CancelCommands("host_destroyed");
     Unload();
 }
 
 void ScriptHost::Step(Clock::time_point now)
 {
+    PruneCommands();
     m_context.GetControl().SetStepTime(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
     CheckForChanges(now);
+
     if (m_vm)
     {
         m_vm->CheckpointProfile(now);
@@ -147,6 +150,8 @@ void ScriptHost::Step(Clock::time_point now)
 
 void ScriptHost::Finish(std::string_view reason)
 {
+    CancelCommands(reason);
+
     if (m_finished || !m_started || !m_vm)
     {
         return;
@@ -202,17 +207,33 @@ std::vector<ScriptCommand_s> ScriptHost::GetCommands() const
     return m_hooks->GetCommands();
 }
 
-bool ScriptHost::ReceiveCommand(ConsoleCommand_s command)
+bool ScriptHost::ReceiveCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
 {
-    const auto commands = GetCommands();
-    const auto added = std::ranges::find(commands, command.name, &ScriptCommand_s::name) != commands.end();
-    if (!added || m_commands.size() >= MAX_COMMANDS)
+    return QueueCommand(std::move(command), std::move(recipient)) == CommandQueueResult_e::Accepted;
+}
+
+CommandQueueResult_e ScriptHost::QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
+{
+    PruneCommands();
+
+    if (m_status != ScriptStatus_e::Running)
     {
-        return false;
+        return CommandQueueResult_e::Unavailable;
     }
 
-    m_commands.push_back(std::move(command));
-    return true;
+    const auto commands = GetCommands();
+    if (std::ranges::find(commands, command.name, &ScriptCommand_s::name) == commands.end())
+    {
+        return CommandQueueResult_e::UnknownCommand;
+    }
+
+    if (m_commands.size() >= MAX_COMMANDS)
+    {
+        return CommandQueueResult_e::QueueFull;
+    }
+
+    m_commands.push_back({std::move(command), std::move(recipient)});
+    return CommandQueueResult_e::Accepted;
 }
 
 ScriptStatus_e ScriptHost::GetStatus() const
@@ -348,6 +369,8 @@ void ScriptHost::LoadBot()
 
 void ScriptHost::Unload()
 {
+    CancelCommands("vm_unloaded");
+
     if (!m_vm)
     {
         return;
@@ -360,6 +383,7 @@ void ScriptHost::Unload()
 
 void ScriptHost::Reload()
 {
+    CancelCommands("vm_reloaded");
     m_logger->Info("The script's files changed; reloading {}", m_options.file.generic_string());
 
     if (m_status == ScriptStatus_e::Running)
@@ -486,15 +510,69 @@ void ScriptHost::DispatchBotMessages()
     }
 }
 
-// A command the script removed after it was queued is skipped.
+void ScriptHost::PruneCommands()
+{
+    std::erase_if(m_commands, [](auto& invocation)
+    {
+        if (!invocation.recipient || invocation.recipient->execution->CanExecute())
+        {
+            return false;
+        }
+
+        invocation.recipient->Finish("cancelled", "request_cancelled");
+        return true;
+    });
+}
+
+void ScriptHost::CancelCommands(std::string_view reason)
+{
+    std::erase_if(m_commands, [reason](auto& invocation)
+    {
+        if (!invocation.recipient)
+        {
+            return false;
+        }
+
+        invocation.recipient->Finish("cancelled", std::string{reason});
+        return true;
+    });
+}
+
 void ScriptHost::DispatchCommands()
 {
     const auto commands = std::exchange(m_commands, {});
-    for (const auto& command : commands)
+    for (const auto& invocation : commands)
     {
-        if (m_status != ScriptStatus_e::Running)
+        const auto& command = invocation.command;
+        const auto& token = invocation.recipient;
+        if (m_status != ScriptStatus_e::Running || (token && !token->execution->CanExecute()))
         {
-            return;
+            if (token)
+            {
+                token->Finish("cancelled", "invocation_cancelled");
+            }
+
+            continue;
+        }
+
+        const auto registered = GetCommands();
+        if (std::ranges::find(registered, command.name, &ScriptCommand_s::name) == registered.end())
+        {
+            if (token)
+            {
+                token->Finish("rejected", "command_removed");
+            }
+
+            continue;
+        }
+
+        m_vm->FlushOutput();
+
+        const auto capture = ConsoleCaptureScope{token ? &token->execution->capture : nullptr};
+
+        if (token)
+        {
+            token->execution->started = true;
         }
 
         m_vm->Activate();
@@ -512,10 +590,23 @@ void ScriptHost::DispatchCommands()
         {
             static_cast<void>(m_vm->CallBuiltin(RUN_COMMAND, std::array{py_r0(), py_r1(), py_r2()}));
             ApplyStopRequest();
+            m_vm->FlushOutput();
+
+            if (token)
+            {
+                token->Finish("completed");
+            }
         }
         catch (const ScriptError& e)
         {
+            m_vm->FlushOutput();
             Fail(std::format("the {} command", command.name), e.what());
+            m_vm->FlushOutput();
+
+            if (token)
+            {
+                token->Finish("failed", "handler_failed");
+            }
         }
     }
 }
@@ -643,6 +734,7 @@ void ScriptHost::Fail(std::string_view where, std::string_view message)
 
 void ScriptHost::Stop(ScriptStatus_e status, std::string_view reason)
 {
+    CancelCommands("script_stopped");
     m_status = status;
     Finish(reason);
 }

@@ -202,7 +202,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountSettings_s, username, pas
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, minRetryDelaySeconds, maxRetryDelaySeconds, reloginDelaySeconds, progressDirectory, experienceDirectory, experienceIntervalMinutes, bankLogDirectory, inventoryDirectory, inventoryIntervalSeconds, equipmentDirectory)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, proxy, login, client, scripting)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(HttpSettings_s, host, port, requestTimeoutMs, maxPendingRequests, maxRequestBodyBytes, maxOutputBytes)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, proxy, login, client, scripting, http)
 
 // An account's own copy of a client.jsonc section. Missing or null keeps client.jsonc's, and a key the object leaves
 // out takes the section's default.
@@ -273,6 +274,30 @@ void from_json(const nlohmann::json& value, AccountConfig_s& account)
 Config_s ConfigJson::ParseConfig(std::string_view text)
 {
     const auto root = ParseRootObject(text);
+    if (root.contains("http"))
+    {
+        const auto& http = root.at("http");
+        if (!http.is_object())
+        {
+            throw ConfigError{"http: must be an object"};
+        }
+
+        for (const auto& [key, low, high] : std::vector<std::tuple<std::string, s64, s64>>{
+                 {"port", 1, 65535}, {"requestTimeoutMs", 100, 120000}, {"maxPendingRequests", 1, 1024}, {"maxRequestBodyBytes", 1, 1048576}, {"maxOutputBytes", 1, 16777216}})
+        {
+            if (!http.contains(key))
+            {
+                continue;
+            }
+
+            const auto& value = http.at(key);
+            if (!value.is_number_integer() || value < low || value > high)
+            {
+                throw ConfigError{std::format("http.{}: must be an integer from {} to {}", key, low, high)};
+            }
+        }
+    }
+
     auto config = Config_s{};
     try
     {
@@ -283,6 +308,9 @@ Config_s ConfigJson::ParseConfig(std::string_view text)
         throw ConfigError{DescribeConversionError(e)};
     }
 
+    const auto first = config.http.host.find_first_not_of(" \t\r\n");
+    const auto last = config.http.host.find_last_not_of(" \t\r\n");
+    config.http.host = first == std::string::npos ? "" : config.http.host.substr(first, last - first + 1);
     return config;
 }
 

@@ -11,6 +11,7 @@
 #include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
 #include "Transport_e.hpp"
+#include <boost/asio/ip/address.hpp>
 
 namespace
 {
@@ -114,6 +115,21 @@ namespace
 
 void ConfigValidator::Validate(const Config_s& config)
 {
+    const auto& http = config.http;
+    auto addressError = boost::system::error_code{};
+    if (!http.host.empty() && http.host != "localhost")
+    {
+        const auto address = boost::asio::ip::make_address(http.host, addressError);
+        const auto embeddedPort = !addressError && address.is_v4() && http.host.find(':') != std::string::npos;
+        const auto invalidSyntax = http.host.find_first_of("[]/\\ \t\r\n") != std::string::npos || http.host.find('\0') != std::string::npos;
+        Check(!addressError && !embeddedPort && !invalidSyntax, "http.host", "must be an IPv4/IPv6 address, localhost or empty");
+    }
+
+    Check(http.port >= 1 && http.port <= 65535, "http.port", "must be from 1 to 65535");
+    Check(http.requestTimeoutMs >= 100ms && http.requestTimeoutMs <= 120000ms, "http.requestTimeoutMs", "must be from 100 to 120000");
+    Check(http.maxPendingRequests >= 1 && http.maxPendingRequests <= 1024, "http.maxPendingRequests", "must be from 1 to 1024");
+    Check(http.maxRequestBodyBytes >= 1 && http.maxRequestBodyBytes <= 1048576, "http.maxRequestBodyBytes", "must be from 1 to 1048576");
+    Check(http.maxOutputBytes >= 1 && http.maxOutputBytes <= 16777216, "http.maxOutputBytes", "must be from 1 to 16777216");
     ValidateServer(config.server);
     ValidateProxy(config.proxy);
 

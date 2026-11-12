@@ -7,6 +7,8 @@
 #include "Link.hpp"
 
 #include <boost/asio/post.hpp>
+#include "../Console/ConsoleCapture.hpp"
+#include "../Http/AsioHttpServer.hpp"
 
 AsioNetLoop::AsioNetLoop()
     : m_work{boost::asio::make_work_guard(m_io)}
@@ -22,11 +24,21 @@ std::shared_ptr<Link> AsioNetLoop::Open(const ConnectionOptions_s& options, std:
 
 void AsioNetLoop::Poll()
 {
-    m_io.poll();
+    const auto pause = ConsoleCaptureScope{nullptr};
+    const auto until = Clock::now() + 2ms;
+    for (auto count = 0; count < 64 && Clock::now() < until; ++count)
+    {
+        if (!m_io.poll_one())
+        {
+            break;
+        }
+    }
 }
 
 void AsioNetLoop::Wait(Deadline deadline)
 {
+    const auto capturePause = ConsoleCaptureScope{nullptr};
+
     if (deadline)
     {
         m_io.run_one_until(*deadline);
@@ -36,7 +48,15 @@ void AsioNetLoop::Wait(Deadline deadline)
         m_io.run_one();
     }
 
-    m_io.poll();
+    const auto pause = ConsoleCaptureScope{nullptr};
+    const auto until = Clock::now() + 2ms;
+    for (auto count = 1; count < 64 && Clock::now() < until; ++count)
+    {
+        if (!m_io.poll_one())
+        {
+            break;
+        }
+    }
 }
 
 void AsioNetLoop::Settle(Clock::time_point deadline)
@@ -70,4 +90,14 @@ void AsioNetLoop::RemoveLink() noexcept
 {
     assert(m_linkCount > 0 && "RemoveLink without AddLink");
     --m_linkCount;
+}
+
+std::unique_ptr<HttpServer> AsioNetLoop::ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge)
+{
+    if (settings.host.empty())
+    {
+        return {};
+    }
+
+    return std::make_unique<AsioHttpServer>(m_io, settings, std::move(bridge));
 }
