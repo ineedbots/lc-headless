@@ -15,10 +15,8 @@
 #include "../Script/Host/ScriptHost.hpp"
 #include "../Script/Type/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
-#include "BankLogger.hpp"
-#include "ExperienceLog.hpp"
-#include "ItemLog.hpp"
-#include "ProgressReporter.hpp"
+#include "AccountLifecycle.hpp"
+#include "AccountReporting.hpp"
 #include "Type/ProgressReport_s.hpp"
 
 struct AccountOptions_s
@@ -104,26 +102,8 @@ private:
     AccountOptions_s m_options;
     BotMessenger* m_messenger;
     GameClient m_client;
-    ProgressReporter m_progress;
-    // Each account's skill experience, for whatever reads experience/<name>.jsonl. Absent when off.
-    std::optional<ExperienceLog> m_experience;
-    // The bank's contents, written each time one opens. Absent when off.
-    std::optional<BankLogger> m_bankLog;
-    // The backpack and the worn equipment, written as they change. Absent when off.
-    std::optional<ItemLog> m_inventory;
-    std::optional<ItemLog> m_equipment;
+    AccountReporting m_reporting;
     std::optional<ScriptHost> m_script;
-    bool m_started = false;
-    bool m_finished = false;
-    bool m_failed = false;
-    // Logging out to end the account, so a failure on the way finishes it rather than logging back in.
-    bool m_stopping = false;
-    u32 m_interrupts = 0;
-    std::optional<Clock::time_point> m_killDeadline;
+    AccountLifecycle m_lifecycle;
     Clock::time_point m_nextSummary;
-    // Without a script: when its idleSeconds are up, from the first step in game.
-    std::optional<Clock::time_point> m_idleUntil;
-    // relog(): the wait still to come once its logout is done, then when to log back in.
-    std::optional<std::chrono::seconds> m_relogDelay;
-    std::optional<Clock::time_point> m_reloginAt;
 };

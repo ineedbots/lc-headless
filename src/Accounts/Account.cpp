@@ -17,13 +17,10 @@
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "IdleSummary.hpp"
-#include "ProgressReporter.hpp"
+#include "AccountLifecycle.hpp"
+#include "AccountReporting.hpp"
+#include "Type/AccountPhase_e.hpp"
 #include "Type/ProgressReport_s.hpp"
-
-namespace
-{
-    constexpr auto PROGRESS_EXTENSION = ".txt";
-}
 
 Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger, std::shared_ptr<NetLoop> net)
     : m_config{ConfigOverrides::ForAccount(std::move(config), account)}
@@ -32,7 +29,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     , m_options{options}
     , m_messenger{messenger}
     , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client, std::move(net)}
-    , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger, [this](const ProgressReport_s& report)
+    , m_reporting{*m_config, m_account, m_client.GetCache(), m_logger, [this](const ProgressReport_s& report)
 {
     if (m_options.onProgressReport)
     {
@@ -40,31 +37,6 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     }
 }}
 {
-    const auto& experience = m_config->scripting;
-    if (!experience.experienceDirectory.empty() && experience.experienceIntervalMinutes > std::chrono::minutes::zero())
-    {
-        m_experience.emplace(std::filesystem::path{experience.experienceDirectory}, m_account.name, experience.experienceIntervalMinutes, m_logger);
-    }
-
-    if (!m_config->scripting.bankLogDirectory.empty())
-    {
-        // The bank is the cache's, so this needs no script and works for every bot.
-        m_bankLog.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.bankLogDirectory});
-    }
-
-    if (!m_config->scripting.inventoryDirectory.empty())
-    {
-        m_inventory.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.inventoryDirectory},
-                            ItemLog::Kind_e::Backpack, m_config->scripting.inventoryIntervalSeconds);
-    }
-
-    if (!m_config->scripting.equipmentDirectory.empty())
-    {
-        // Worn equipment changes rarely, so every change is worth a line.
-        m_equipment.emplace(m_client.GetCache(), m_logger, m_account.name, std::filesystem::path{m_config->scripting.equipmentDirectory},
-                            ItemLog::Kind_e::Equipment, 0s);
-    }
-
     if (m_account.script)
     {
         const auto& scripting = m_config->scripting;
@@ -132,8 +104,7 @@ Account::~Account()
 
 void Account::Start()
 {
-    assert(!m_started && "Account started twice");
-    m_started = true;
+    m_lifecycle.Start();
     m_nextSummary = Clock::now() + SUMMARY_INTERVAL;
 
     try
@@ -150,7 +121,7 @@ void Account::Login()
 {
     Start();
 
-    while (!m_finished && m_client.GetStatus() == ClientStatus_e::Connecting)
+    while (!m_lifecycle.IsFinished() && m_client.GetStatus() == ClientStatus_e::Connecting)
     {
         Step(m_config->scripting.pollIntervalMs);
     }
@@ -158,7 +129,7 @@ void Account::Login()
 
 void Account::Step(std::chrono::milliseconds maxWait)
 {
-    if (!m_started || m_finished)
+    if (!m_lifecycle.IsStarted() || m_lifecycle.IsFinished())
     {
         return;
     }
@@ -190,11 +161,7 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
         // Before the early returns below: a logout, a disconnect and a relog are states worth recording too.
         // Settled, not merely in game: the stats arrive a tick after the player is placed.
-        if (m_experience)
-        {
-            const auto& state = m_client.GetState();
-            m_experience->Step(now, state, status, state.IsSettled());
-        }
+        m_reporting.ObserveSession(now, m_client.GetState(), status);
 
         if (StepRelog(now))
         {
@@ -217,7 +184,7 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
         UpdateFinished();
 
-        if (m_finished || status == ClientStatus_e::LoggingOut)
+        if (m_lifecycle.IsFinished() || status == ClientStatus_e::LoggingOut)
         {
             return;
         }
@@ -233,25 +200,11 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
         if (status == ClientStatus_e::InGame)
         {
-            if (m_bankLog)
-            {
-                m_bankLog->Step(m_client.GetState());
-            }
-
-            if (m_inventory)
-            {
-                m_inventory->Step(now, m_client.GetState());
-            }
-
-            if (m_equipment)
-            {
-                m_equipment->Step(now, m_client.GetState());
-            }
+            m_reporting.SampleItems(now, m_client.GetState());
         }
 
-        if (!m_finished && m_killDeadline && now >= *m_killDeadline)
+        if (!m_lifecycle.IsFinished() && m_lifecycle.KillGraceExpired(now))
         {
-            m_killDeadline.reset();
             LogOut("the script didn't stop within scripting.killGraceSeconds");
         }
     }
@@ -263,20 +216,19 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
 void Account::Interrupt()
 {
-    if (!m_started || m_finished)
+    if (!m_lifecycle.IsStarted() || m_lifecycle.IsFinished())
     {
         return;
     }
 
-    ++m_interrupts;
+    m_lifecycle.Interrupt();
 
-    if (m_relogDelay || m_reloginAt)
+    if (m_lifecycle.IsRelogging())
     {
         m_logger->Info("Interrupted during a relog; the account stays logged out");
 
-        const auto waiting = m_reloginAt.has_value();
-        m_relogDelay.reset();
-        m_reloginAt.reset();
+        const auto waiting = m_lifecycle.GetPhase() == AccountPhase_e::RelogWait;
+        m_lifecycle.BeginStopping();
 
         if (m_script)
         {
@@ -300,7 +252,7 @@ void Account::Interrupt()
         return;
     }
 
-    if (m_interrupts > 1 || !m_client.IsInGame() || !m_script || !m_script->HandlesKillSignal())
+    if (m_lifecycle.IsEscalated() || !m_client.IsInGame() || !m_script || !m_script->HandlesKillSignal())
     {
         LogOut("interrupted");
         return;
@@ -308,7 +260,7 @@ void Account::Interrupt()
 
     const auto grace = m_config->scripting.killGraceSeconds;
     m_logger->Info("Interrupted; the script has {} s to stop the account, or interrupt again to log out now", grace.count());
-    m_killDeadline = Clock::now() + grace;
+    m_lifecycle.BeginKillGrace(Clock::now() + grace);
     m_script->SignalKill();
 
     try
@@ -323,53 +275,38 @@ void Account::Interrupt()
 
 bool Account::IsStarted() const
 {
-    return m_started;
+    return m_lifecycle.IsStarted();
 }
 
 bool Account::IsFinished() const
 {
-    return m_finished;
+    return m_lifecycle.IsFinished();
 }
 
 bool Account::Succeeded() const
 {
-    return m_finished && !m_failed && m_client.GetStatus() == ClientStatus_e::LoggedOut;
+    return m_lifecycle.Succeeded();
 }
 
 std::string_view Account::DescribeOutcome() const
 {
-    if (!m_started)
-    {
-        return "never started";
-    }
-
-    if (!m_finished)
-    {
-        return "still running";
-    }
-
-    if (m_failed)
-    {
-        return "failed";
-    }
-
-    return m_client.GetStatus() == ClientStatus_e::LoggedOut ? "logged out" : "disconnected without a confirmed logout";
+    return m_lifecycle.DescribeOutcome();
 }
 
 std::string Account::DescribeStatus() const
 {
-    if (!m_started)
+    if (!m_lifecycle.IsStarted())
     {
         return "waiting to log in";
     }
 
-    if (m_finished)
+    if (m_lifecycle.IsFinished())
     {
         return std::string{DescribeOutcome()};
     }
 
     auto text = std::string{};
-    if (m_relogDelay || m_reloginAt)
+    if (m_lifecycle.IsRelogging())
     {
         text = "relogging";
     }
@@ -418,7 +355,7 @@ std::string Account::DescribeStatus() const
 
 std::vector<ScriptCommand_s> Account::GetCommands() const
 {
-    if (!m_script || m_finished)
+    if (!m_script || m_lifecycle.IsFinished())
     {
         return {};
     }
@@ -433,7 +370,7 @@ bool Account::SendCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecip
 
 CommandQueueResult_e Account::QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
 {
-    if (!m_script || m_finished)
+    if (!m_script || m_lifecycle.IsFinished())
     {
         return CommandQueueResult_e::Unavailable;
     }
@@ -443,7 +380,7 @@ CommandQueueResult_e Account::QueueCommand(ConsoleCommand_s command, std::shared
 
 bool Account::Say(std::string_view text)
 {
-    if (m_finished || !m_client.IsInGame())
+    if (m_lifecycle.IsFinished() || !m_client.IsInGame())
     {
         return false;
     }
@@ -454,7 +391,7 @@ bool Account::Say(std::string_view text)
 
 std::optional<Account::Clock::time_point> Account::GetNextLoop() const
 {
-    if (!m_script || m_finished)
+    if (!m_script || m_lifecycle.IsFinished())
     {
         return std::nullopt;
     }
@@ -492,7 +429,7 @@ std::chrono::milliseconds Account::GetWait(std::chrono::milliseconds maxWait) co
 void Account::StepScript(Clock::time_point now)
 {
     m_script->Step(now);
-    m_progress.Step(now, *m_script);
+    m_reporting.AfterScript(now, *m_script);
     m_client.Flush();
 
     switch (m_script->GetStatus())
@@ -516,7 +453,7 @@ void Account::StepScript(Clock::time_point now)
             return;
         }
 
-        m_failed = true;
+        m_lifecycle.MarkFailed();
         LogOut("the script failed");
         return;
     }
@@ -525,12 +462,7 @@ void Account::StepScript(Clock::time_point now)
 void Account::StepIdle(Clock::time_point now)
 {
     // The idle time counts from the first step in game, not from the login.
-    if (m_account.idleSeconds > 0s && !m_idleUntil)
-    {
-        m_idleUntil = now + m_account.idleSeconds;
-    }
-
-    if (m_idleUntil && now >= *m_idleUntil)
+    if (m_lifecycle.IdleExpired(now, m_account.idleSeconds))
     {
         LogOut(std::format("the account has idled for its idleSeconds ({} s)", m_account.idleSeconds.count()));
         return;
@@ -594,7 +526,7 @@ void Account::LogOut(std::string_view reason)
     }
 
     m_logger->Info("Logging out: {}", reason);
-    m_stopping = true;
+    m_lifecycle.BeginStopping();
 
     if (m_script)
     {
@@ -615,13 +547,13 @@ void Account::BeginRelog(std::chrono::seconds delay)
     }
 
     m_logger->Info("Relogging: logging out, then back in {} s later", delay.count());
-    m_relogDelay = delay;
+    m_lifecycle.BeginRelog(delay);
     m_client.RequestLogout(LOGOUT_TIMEOUT);
 }
 
 bool Account::StepRelog(Clock::time_point now)
 {
-    if (m_relogDelay)
+    if (m_lifecycle.GetPhase() == AccountPhase_e::RelogLogout)
     {
         const auto status = m_client.GetStatus();
         if (status != ClientStatus_e::LoggedOut && status != ClientStatus_e::Disconnected)
@@ -629,8 +561,7 @@ bool Account::StepRelog(Clock::time_point now)
             return true;
         }
 
-        m_reloginAt = now + *m_relogDelay;
-        m_relogDelay.reset();
+        m_lifecycle.WaitAfterLogout(now);
 
         // The script sees the account go, as it would a dropped connection.
         if (m_script)
@@ -641,17 +572,17 @@ bool Account::StepRelog(Clock::time_point now)
         return true;
     }
 
-    if (!m_reloginAt)
+    if (m_lifecycle.GetPhase() != AccountPhase_e::RelogWait)
     {
         return false;
     }
 
-    if (now < *m_reloginAt)
+    if (!m_lifecycle.LoginDue(now))
     {
         return true;
     }
 
-    m_reloginAt.reset();
+    m_lifecycle.ResumeLogin();
     m_logger->Info("Logging back in after the relog's wait");
 
     try
@@ -686,8 +617,7 @@ void Account::BeginRelogin()
     m_client.Disconnect();
 
     const auto now = Clock::now();
-    m_relogDelay.reset();
-    m_reloginAt = now + m_options.reloginDelay;
+    m_lifecycle.WaitToRecover(now + m_options.reloginDelay);
 
     if (!m_script)
     {
@@ -700,14 +630,13 @@ void Account::BeginRelogin()
     }
     catch (const std::exception& e)
     {
-        m_reloginAt.reset();
         Fail(e.what());
     }
 }
 
 bool Account::IsStopping() const
 {
-    return m_stopping || m_interrupts > 0;
+    return m_lifecycle.IsStopping();
 }
 
 s64 Account::GetReloginSeconds() const
@@ -724,7 +653,7 @@ void Account::Fail(std::string_view reason)
         m_script->Finish(reason);
     }
 
-    m_failed = true;
+    m_lifecycle.MarkFailed();
     m_client.Disconnect();
     UpdateFinished();
 }
@@ -732,8 +661,13 @@ void Account::Fail(std::string_view reason)
 void Account::UpdateFinished()
 {
     const auto status = m_client.GetStatus();
-    m_finished = status == ClientStatus_e::LoggedOut || status == ClientStatus_e::Disconnected;
-    if (m_finished && m_script)
+    if (status != ClientStatus_e::LoggedOut && status != ClientStatus_e::Disconnected)
+    {
+        return;
+    }
+
+    m_lifecycle.Finish(status == ClientStatus_e::LoggedOut);
+    if (m_script)
     {
         m_script->CancelCommands("account_finished");
     }
