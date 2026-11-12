@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "BigUInt.hpp"
 
+#include "StringUtils.hpp"
+
 namespace
 {
     constexpr auto LIMB_BITS = std::size_t{32};
@@ -16,30 +18,13 @@ namespace
 
     std::optional<u32> GetDigitValue(char digit, u32 radix)
     {
-        auto value = u32{0};
-        if (digit >= '0' && digit <= '9')
-        {
-            value = static_cast<u32>(digit - '0');
-        }
-        else if (digit >= 'a' && digit <= 'f')
-        {
-            value = static_cast<u32>(digit - 'a' + 10);
-        }
-        else if (digit >= 'A' && digit <= 'F')
-        {
-            value = static_cast<u32>(digit - 'A' + 10);
-        }
-        else
+        const auto value = StringUtils::HexDigitValue(static_cast<unsigned char>(digit));
+        if (value < 0 || static_cast<u32>(value) >= radix)
         {
             return std::nullopt;
         }
 
-        if (value >= radix)
-        {
-            return std::nullopt;
-        }
-
-        return value;
+        return static_cast<u32>(value);
     }
 }
 

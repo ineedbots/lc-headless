@@ -1,5 +1,7 @@
 #include "pch.hpp"
 #include "ConsoleCommandsEndpoint.hpp"
+
+#include "../../Utils/StringUtils.hpp"
 #include "../HttpJson.hpp"
 #include "../HttpResponses.hpp"
 
@@ -17,10 +19,7 @@ HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& re
     }
 
     auto line = value["command"].get<std::string>();
-    if (std::ranges::all_of(line, [](unsigned char c)
-    {
-        return std::isspace(c) != 0;
-    }) ||
+    if (StringUtils::Trim(line).empty() ||
         line.find_first_of(std::string{"\r\n\0", 3}) != std::string::npos)
     {
         return HttpResponses::Error(400, "invalid_command", "Expected a nonempty single line command");

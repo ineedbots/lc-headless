@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "WordPack.hpp"
 
+#include "../../Utils/StringUtils.hpp"
+
 namespace
 {
     constexpr auto ONE_NIBBLE_LIMIT = 13;
@@ -20,16 +22,6 @@ namespace
     // clang-format on
 
     static_assert(TABLE.size() == 61, "WordPack has 61 characters");
-
-    char ToLower(char character)
-    {
-        if (character >= 'A' && character <= 'Z')
-        {
-            return static_cast<char>(character - 'A' + 'a');
-        }
-
-        return character;
-    }
 
     s32 GetIndex(char character)
     {
@@ -85,7 +77,7 @@ std::vector<u8> WordPack::Pack(std::string_view text)
     auto carry = NO_CARRY;
     for (const auto character : text.substr(0, MAX_PACK_LENGTH))
     {
-        auto index = GetIndex(ToLower(character));
+        auto index = GetIndex(StringUtils::ToLowerChar(character));
         if (index >= ONE_NIBBLE_LIMIT)
         {
             index += TWO_NIBBLE_OFFSET;

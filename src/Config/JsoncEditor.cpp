@@ -229,7 +229,7 @@ namespace
         const auto indent = StartsLine(text, last.keyBegin) ? std::string{GetIndent(text, last.keyBegin)} : objectIndent + unit;
         const auto lineEnd = SkipToLineEnd(text, lastValue.end);
         auto between = text.substr(lastValue.end, lineEnd - lastValue.end);
-        between = between.substr(0, between.find_last_not_of(" \t") + 1);
+        between = StringUtils::TrimEnd(between, " \t");
 
         auto replacement = "," + std::string{between} + eol + FormatMemberLines(members, indent, layout);
         if (lineEnd == close)

@@ -34,6 +34,10 @@ TEST_CASE("HTTP router registers new endpoints and multiple methods without tran
     auto post = router.Match("POST", "/api/v1/future", "Application/JSON; charset=utf-8");
     REQUIRE(std::holds_alternative<HttpRouteMatch_s>(post));
 
+    CHECK(std::holds_alternative<HttpRouteMatch_s>(router.Match("POST", "/api/v1/future", "APPLICATION/JSON   ; charset=utf-8")));
+    CHECK(std::get<HttpResponse_s>(router.Match("POST", "/api/v1/future", " application/json")).status == 415);
+    CHECK(std::get<HttpResponse_s>(router.Match("POST", "/api/v1/future", "application/json\t")).status == 415);
+
     auto decoded = std::get<HttpRouteMatch_s>(post).Decode("owned body");
     CHECK(std::get<ExecuteConsoleCommand_s>(std::get<ApplicationRequestPayload>(decoded)).command == "owned body");
 
@@ -81,7 +85,7 @@ TEST_CASE("Default HTTP endpoints decode owned requests and retain the existing 
     auto command = route.Decode(R"({"command":"@main status"})");
     CHECK(std::get<ExecuteConsoleCommand_s>(std::get<ApplicationRequestPayload>(command)).command == "@main status");
 
-    for (const auto body : {R"({"command":""})", R"({"command":"help","extra":1})", R"({"command":10})", R"({"command":"help\nquit"})", "bad json"})
+    for (const auto body : {R"({"command":""})", R"({"command":" \t\u000b\f"})", R"({"command":"help","extra":1})", R"({"command":10})", R"({"command":"help\nquit"})", "bad json"})
     {
         auto decoded = route.Decode(body);
         REQUIRE(std::holds_alternative<HttpResponse_s>(decoded));
