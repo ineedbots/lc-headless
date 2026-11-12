@@ -3,11 +3,12 @@
 #include "../Application/Events/ApplicationEventBridge.hpp"
 
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/beast/http.hpp>
 
 class AsioWebSocketSession
 {
 public:
-    AsioWebSocketSession(boost::asio::ip::tcp::socket socket, std::string handshake, std::shared_ptr<ApplicationEventBridge> bridge);
+    AsioWebSocketSession(boost::asio::ip::tcp::socket socket, boost::beast::http::request<boost::beast::http::string_body> request, std::string buffered, std::shared_ptr<ApplicationEventBridge> bridge);
     ~AsioWebSocketSession();
     void Start();
     void Service();

@@ -70,8 +70,18 @@ bounded rejection/reset and close 1013 independently of the healthy workload.
 
 ## Remaining verification
 
-Local Docker's Linux engine is unavailable, so Linux builds and native/stdlib
-coverage require CI. Windows x86 and Linux arm64 also require CI. No real engine
-acceptance, sustained fleet soak, 60-second heartbeat expiry, or fault-injected
+All nine CI jobs for implementation commit `e1e8c6a` passed, including Linux native
+and stdlib coverage, Linux x64/arm64 Debug/Release, and Windows x64/x86 Debug/Release:
+[CI run 43291918554](https://github.com/ineedbots/lc-headless/actions/runs/43291918554).
+Docker was unavailable during the initial local run and is available for the
+readiness follow-up. Local Ubuntu/Arch results and current-head CI are recorded
+in [PR #79](https://github.com/ineedbots/lc-headless/pull/79).
+
+Readiness review added coverage for 3000-byte HTTP header padding and a 3000-byte
+padded subscription coalesced with the upgrade, separately and together. The
+handoff now uses the parsed request and a bounded buffered stream, avoiding
+Beast's 1536-byte internal raw-handshake buffer limit.
+
+No real-engine acceptance, sustained fleet soak, 60-second heartbeat expiry, or fault-injected
 allocation/upgrade failure run is claimed. The fixed conservative limits remain
 provisional; measure representative sustained workloads before raising them.

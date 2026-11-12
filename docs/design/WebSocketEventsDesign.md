@@ -42,6 +42,10 @@ The HTTP registry owns the connection until it transfers its socket and buffered
 bytes to `AsioWebSocketSession`. The WebSocket registry then owns the session;
 callbacks keep its state alive until retirement. Bridge connection IDs are never
 reused, so late completions cannot address a replacement connection.
+The upgrade passes the parsed request directly to Beast. `AsioBufferedStream`
+retains up to 16384 already-read bytes ahead of the TCP stream, preserving large
+coalesced frames without feeding headers back through Beast's smaller internal
+handshake buffer. Its teardown customization forwards to the owned TCP stream.
 
 To extend the catalog:
 

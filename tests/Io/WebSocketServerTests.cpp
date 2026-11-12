@@ -207,64 +207,82 @@ TEST_CASE("WebSocket validates Origin and upgrade policy on the existing HTTP li
 
 TEST_CASE("WebSocket preserves a subscription coalesced with its HTTP upgrade", "[Events][Http][WebSocket]")
 {
-    auto fixture = WebSocketFixture{};
-    const auto results = fixture.Run([](u16 port) -> asio::awaitable<std::vector<Json>>
+    for (const auto padding : {std::pair{0, 0}, std::pair{3000, 0}, std::pair{0, 3000}, std::pair{3000, 3000}})
     {
-        auto stream = beast::tcp_stream{co_await asio::this_coro::executor};
-        stream.expires_after(5s);
-        co_await stream.async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
-
-        auto wire = std::string{"GET /api/v1/events HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"};
-        wire.push_back(static_cast<char>(0x81));
-        wire.push_back(static_cast<char>(0x80 | SUBSCRIBE.size()));
-        wire.append(4, '\0');
-        wire += SUBSCRIBE;
-        co_await asio::async_write(stream, asio::buffer(wire), asio::use_awaitable);
-
-        auto buffer = beast::flat_buffer{};
-        auto response = http::response<http::string_body>{};
-        co_await http::async_read(stream, buffer, response, asio::use_awaitable);
-        auto results = std::vector<Json>{Json{{"status", response.result_int()}}};
-        for (int frame = 0; frame < 2; ++frame)
+        const auto [headerPadding, messagePadding] = padding;
+        auto fixture = WebSocketFixture{};
+        const auto results = fixture.Run([headerPadding, messagePadding](u16 port) -> asio::awaitable<std::vector<Json>>
         {
-            while (buffer.size() < 2)
+            auto stream = beast::tcp_stream{co_await asio::this_coro::executor};
+            stream.expires_after(5s);
+            co_await stream.async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
+
+            auto wire = std::string{"GET /api/v1/events HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nX-Padding: "};
+            wire.append(static_cast<std::size_t>(headerPadding), 'a');
+            wire += "\r\n\r\n";
+
+            const auto message = std::string{SUBSCRIBE} + std::string(static_cast<std::size_t>(messagePadding), ' ');
+            wire.push_back(static_cast<char>(0x81));
+            if (message.size() <= 125)
             {
-                const auto size = co_await stream.async_read_some(buffer.prepare(1024), asio::use_awaitable);
-                buffer.commit(size);
+                wire.push_back(static_cast<char>(0x80 | message.size()));
+            }
+            else
+            {
+                wire.push_back(static_cast<char>(0x80 | 126));
+                wire.push_back(static_cast<char>(message.size() >> 8));
+                wire.push_back(static_cast<char>(message.size() & 0xff));
             }
 
-            auto bytes = beast::buffers_to_string(buffer.data());
-            auto header = std::size_t{2};
-            auto length = static_cast<std::size_t>(static_cast<unsigned char>(bytes[1]) & 0x7f);
-            if (length == 126)
+            wire.append(4, '\0');
+            wire += message;
+            co_await asio::async_write(stream, asio::buffer(wire), asio::use_awaitable);
+
+            auto buffer = beast::flat_buffer{};
+            auto response = http::response<http::string_body>{};
+            co_await http::async_read(stream, buffer, response, asio::use_awaitable);
+            auto results = std::vector<Json>{Json{{"status", response.result_int()}}};
+            for (int frame = 0; frame < 2; ++frame)
             {
-                while (buffer.size() < 4)
+                while (buffer.size() < 2)
+                {
+                    const auto size = co_await stream.async_read_some(buffer.prepare(1024), asio::use_awaitable);
+                    buffer.commit(size);
+                }
+
+                auto bytes = beast::buffers_to_string(buffer.data());
+                auto header = std::size_t{2};
+                auto length = static_cast<std::size_t>(static_cast<unsigned char>(bytes[1]) & 0x7f);
+                if (length == 126)
+                {
+                    while (buffer.size() < 4)
+                    {
+                        const auto size = co_await stream.async_read_some(buffer.prepare(1024), asio::use_awaitable);
+                        buffer.commit(size);
+                    }
+
+                    bytes = beast::buffers_to_string(buffer.data());
+                    length = static_cast<std::size_t>(static_cast<unsigned char>(bytes[2])) * 256 + static_cast<unsigned char>(bytes[3]);
+                    header = 4;
+                }
+
+                while (buffer.size() < header + length)
                 {
                     const auto size = co_await stream.async_read_some(buffer.prepare(1024), asio::use_awaitable);
                     buffer.commit(size);
                 }
 
                 bytes = beast::buffers_to_string(buffer.data());
-                length = static_cast<std::size_t>(static_cast<unsigned char>(bytes[2])) * 256 + static_cast<unsigned char>(bytes[3]);
-                header = 4;
+                results.push_back(Json::parse(bytes.substr(header, length)));
+                buffer.consume(header + length);
             }
 
-            while (buffer.size() < header + length)
-            {
-                const auto size = co_await stream.async_read_some(buffer.prepare(1024), asio::use_awaitable);
-                buffer.commit(size);
-            }
-
-            bytes = beast::buffers_to_string(buffer.data());
-            results.push_back(Json::parse(bytes.substr(header, length)));
-            buffer.consume(header + length);
-        }
-
-        co_return results;
-    });
-    CHECK(results[0]["status"] == 101);
-    CHECK(results[1]["type"] == "ack");
-    CHECK(results[2]["type"] == "snapshot");
+            co_return results;
+        });
+        CHECK(results[0]["status"] == 101);
+        CHECK(results[1]["type"] == "ack");
+        CHECK(results[2]["type"] == "snapshot");
+    }
 }
 
 TEST_CASE("WebSocket fanout keeps REST progressing under a bounded multi-client workload", "[Events][Http][WebSocket][Load]")

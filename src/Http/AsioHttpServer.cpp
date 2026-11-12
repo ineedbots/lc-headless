@@ -323,16 +323,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             return;
         }
 
-        auto handshake = std::format("{} {} HTTP/1.1\r\n", std::string_view{request.method_string()}, std::string_view{request.target()});
-        for (const auto& field : request)
-        {
-            handshake += std::format("{}: {}\r\n", std::string_view{field.name_string()}, std::string_view{field.value()});
-        }
-
-        handshake += "\r\n";
-        handshake += beast::buffers_to_string(buffer.data());
-
-        auto upgraded = std::make_unique<AsioWebSocketSession>(std::move(stream.socket()), std::move(handshake), state->events);
+        auto upgraded = std::make_unique<AsioWebSocketSession>(std::move(stream.socket()), std::move(parser->get()), beast::buffers_to_string(buffer.data()), state->events);
         closed = true;
         timer.cancel();
         state->sessions.erase(this);

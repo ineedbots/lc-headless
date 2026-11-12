@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "AsioWebSocketSession.hpp"
 
+#include "AsioBufferedStream.hpp"
 #include "../Application/Events/ApplicationEventBridge.hpp"
 
 #include <boost/asio/steady_timer.hpp>
@@ -14,10 +15,10 @@ using Tcp = asio::ip::tcp;
 
 struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 {
-    websocket::stream<beast::tcp_stream> stream;
+    websocket::stream<AsioBufferedStream> stream;
     beast::flat_buffer input{ApplicationEventBridge::MAX_MESSAGE_BYTES * 2};
     asio::steady_timer writeTimer;
-    std::string handshake;
+    beast::http::request<beast::http::string_body> request;
     std::shared_ptr<ApplicationEventBridge> bridge;
     u64 client = 0;
     std::size_t operations = 0;
@@ -29,10 +30,10 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
     u16 closeCode = 0;
     std::string closeReason;
 
-    State(Tcp::socket socket, std::string header, std::shared_ptr<ApplicationEventBridge> events)
-        : stream{std::move(socket)}
+    State(Tcp::socket socket, beast::http::request<beast::http::string_body> header, std::string_view buffered, std::shared_ptr<ApplicationEventBridge> events)
+        : stream{std::move(socket), buffered}
         , writeTimer{stream.get_executor()}
-        , handshake{std::move(header)}
+        , request{std::move(header)}
         , bridge{std::move(events)}
     {
         client = bridge->Connect();
@@ -82,9 +83,9 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
         timeout.keep_alive_pings = true;
         stream.set_option(timeout);
         stream.read_message_max(ApplicationEventBridge::MAX_MESSAGE_BYTES);
-        stream.async_accept(asio::buffer(handshake), Track([self = shared_from_this()](boost::system::error_code error)
+        stream.async_accept(request, Track([self = shared_from_this()](boost::system::error_code error)
         {
-            self->handshake.clear();
+            self->request = {};
             if (error || self->closed)
             {
                 self->Close();
@@ -212,8 +213,8 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
     }
 };
 
-AsioWebSocketSession::AsioWebSocketSession(Tcp::socket socket, std::string handshake, std::shared_ptr<ApplicationEventBridge> bridge)
-    : m_state{std::make_shared<State>(std::move(socket), std::move(handshake), std::move(bridge))}
+AsioWebSocketSession::AsioWebSocketSession(Tcp::socket socket, beast::http::request<beast::http::string_body> request, std::string buffered, std::shared_ptr<ApplicationEventBridge> bridge)
+    : m_state{std::make_shared<State>(std::move(socket), std::move(request), buffered, std::move(bridge))}
 {
 }
 
