@@ -26,9 +26,10 @@ struct AsioHttpServer::State : std::enable_shared_from_this<State>
     u16 port;
     std::chrono::steady_clock::time_point shutdownDeadline = std::chrono::steady_clock::time_point::max();
 
-    State(asio::io_context& io, HttpSettings_s options, std::shared_ptr<ApplicationRequestBridge> requests)
+    State(asio::io_context& io, HttpSettings_s options, std::shared_ptr<ApplicationRequestBridge> requests, HttpRouter routes)
         : acceptor{io}
         , settings{std::move(options)}
+        , router{std::move(routes)}
         , bridge{std::move(requests)}
     {
         const auto address = asio::ip::make_address(settings.host == "localhost" ? "127.0.0.1" : settings.host);
@@ -63,7 +64,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
     std::optional<http::response<http::string_body>> response;
     std::optional<http::response<http::empty_body>> interim;
     std::shared_ptr<RequestControl_s> control;
-    std::optional<HttpRoute_s> route;
+    std::optional<HttpRouteMatch_s> route;
     bool closed = false;
     bool writing = false;
     bool keepAlive = false;
@@ -216,7 +217,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             Respond(std::move(*error));
             return;
         }
-        route = std::get<HttpRoute_s>(std::move(match));
+        route = std::get<HttpRouteMatch_s>(std::move(match));
         if (state->stopping)
         {
             Error(503, "stopping", "Application stopping", true);
@@ -274,7 +275,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             return;
         }
         assert(route);
-        auto decoded = route->decode(request.body());
+        auto decoded = route->Decode(std::move(parser->get().body()));
         if (const auto error = std::get_if<HttpResponse_s>(&decoded))
         {
             Respond(std::move(*error));
@@ -424,8 +425,8 @@ void AsioHttpServer::State::Close()
         session->Close();
     }
 }
-AsioHttpServer::AsioHttpServer(asio::io_context& io, const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge)
-    : m_state{std::make_shared<State>(io, settings, std::move(bridge))}
+AsioHttpServer::AsioHttpServer(asio::io_context& io, const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge, HttpRouter routes)
+    : m_state{std::make_shared<State>(io, settings, std::move(bridge), std::move(routes))}
 {
     m_state->Accept();
 }

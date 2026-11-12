@@ -2,6 +2,7 @@
 #include "Application/ApplicationRequestProcessor.hpp"
 #include "Console/LogSinks.hpp"
 #include "Io/NetLoop.hpp"
+#include "Http/AsioHttpServer.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/TempFolder.hpp"
@@ -148,7 +149,7 @@ TEST_CASE("Beast routes validate envelopes methods paths and content types", "[H
 {
     auto fixture = HttpFixture{};
     const auto cases = std::vector<std::pair<std::string, unsigned>>{
-        {Request("GET", "/missing"), 404}, {Request("POST", "/api/v1/status"), 405}, {Request("GET", "/api/v1/status?x=1"), 400}, {Request("POST", "/api/v1/console/commands", "{}"), 415}, {Request("POST", "/api/v1/console/commands", "broken", "Content-Type: application/json\r\n"), 400}, {Request("POST", "/api/v1/console/commands", R"({"command":" "})", "Content-Type: application/json\r\n"), 400}, {Request("POST", "/api/v1/console/commands", R"({"command":"help\nquit"})", "Content-Type: application/json\r\n"), 400}, {Request("POST", "/api/v1/console/commands", R"({"command":"help","extra":1})", "Content-Type: application/json\r\n"), 400}, {Request("GET", "/api/v1/status", {}, "Expect: nope\r\n"), 417}, {Command("unknown_command"), 422}, {Command("@missing status"), 422}, {Command("loglevel invalid"), 422}, {"garbage\r\n\r\n", 400}};
+        {Request("GET", "/missing"), 404}, {Request("POST", "/api/v1/status"), 405}, {Request("GET", "/api/v1/status?x=1"), 200}, {Request("POST", "/api/v1/console/commands", "{}"), 415}, {Request("POST", "/api/v1/console/commands", "broken", "Content-Type: application/json\r\n"), 400}, {Request("POST", "/api/v1/console/commands", R"({"command":" "})", "Content-Type: application/json\r\n"), 400}, {Request("POST", "/api/v1/console/commands", R"({"command":"help\nquit"})", "Content-Type: application/json\r\n"), 400}, {Request("POST", "/api/v1/console/commands", R"({"command":"help","extra":1})", "Content-Type: application/json\r\n"), 400}, {Request("GET", "/api/v1/status", {}, "Expect: nope\r\n"), 417}, {Command("unknown_command"), 422}, {Command("@missing status"), 422}, {Command("loglevel invalid"), 422}, {"garbage\r\n\r\n", 400}};
     for (const auto& [wire, code] : cases)
     {
         INFO(wire);
@@ -639,4 +640,48 @@ TEST_CASE("Shutdown returns unavailable to a validated upload before admission",
     const auto responses = fixture.Finish(client, false);
     CHECK(responses[0].result_int() == 503);
     CHECK_FALSE(responses[0].keep_alive());
+}
+
+TEST_CASE("Beast passes decoded template and query values to endpoint decoders over loopback", "[Http][Integration]")
+{
+    auto io = asio::io_context{};
+    auto settings = HttpSettings_s{.host = "127.0.0.1", .port = 0};
+    auto bridge = std::make_shared<ApplicationRequestBridge>(settings);
+    const auto mainThread = std::this_thread::get_id();
+    auto decode = +[](const HttpEndpointRequest_s& request) -> HttpDecodeResult
+    {
+        return ApplicationRequestPayload{ExecuteConsoleCommand_s{request.pathParameters.at("id") + ":" +
+                                                                 request.queryParameters.at("something").at(0) + ":" + request.body}};
+    };
+    auto server = AsioHttpServer{io, settings, bridge, HttpRouter{{{.method = "POST", .path = "/api/v1/status/{id}", .decode = decode}}}};
+    auto client = StartClient(server.GetPort(), Request("POST", "/api/v1/status/alice%20smith?something=a%2Bb+c", "body bytes"));
+    const auto deadline = std::chrono::steady_clock::now() + 3s;
+    while (!bridge->HasIncoming() && std::chrono::steady_clock::now() < deadline)
+    {
+        io.poll();
+    }
+    REQUIRE(bridge->HasIncoming());
+    CHECK(client.wait_for(0ms) == std::future_status::timeout);
+    REQUIRE(std::this_thread::get_id() == mainThread);
+    auto request = bridge->Take();
+    REQUIRE(request);
+    const auto command = std::get<ExecuteConsoleCommand_s>(request->payload).command;
+    CHECK(command == "alice smith:a+b c:body bytes");
+    bridge->Complete({.id = request->control->id, .payload = ConsoleCommandResult_s{.output = command}});
+    server.Deliver(bridge->TakeCompleted());
+    while (client.wait_for(0ms) != std::future_status::ready && std::chrono::steady_clock::now() < deadline)
+    {
+        io.poll();
+    }
+    REQUIRE(client.wait_for(0ms) == std::future_status::ready);
+    const auto responses = client.get();
+    CHECK(responses[0].result_int() == 200);
+    CHECK(Json::parse(responses[0].body())["output"] == command);
+    server.Close();
+    while (!server.IsDrained() && std::chrono::steady_clock::now() < deadline)
+    {
+        io.poll();
+    }
+    CHECK(server.IsDrained());
+    CHECK(bridge->Outstanding() == 0);
 }

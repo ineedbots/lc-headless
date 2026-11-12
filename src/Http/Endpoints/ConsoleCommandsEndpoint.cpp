@@ -8,9 +8,9 @@ HttpRoute_s ConsoleCommandsEndpoint::Route()
     return {.method = "POST", .path = "/api/v1/console/commands", .requiresJson = true, .decode = Decode};
 }
 
-HttpDecodeResult ConsoleCommandsEndpoint::Decode(std::string_view body)
+HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& request)
 {
-    const auto value = nlohmann::json::parse(body, nullptr, false);
+    const auto value = nlohmann::json::parse(request.body, nullptr, false);
     if (!value.is_object() || value.size() != 1 || !value.contains("command") || !value["command"].is_string())
     {
         return HttpResponses::Error(400, "invalid_command", "Expected one command string");

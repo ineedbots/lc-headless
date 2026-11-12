@@ -1,6 +1,6 @@
 # Running
 
-[Back to README](../README.md) · [Features](Features.md) · [Requirements](Requirements.md) · [Configuration](Configuration.md) · [Building](Building.md)
+[Back to README](../README.md) Â· [Features](Features.md) Â· [Requirements](Requirements.md) Â· [Configuration](Configuration.md) Â· [Building](Building.md)
 
 ## First login
 
@@ -171,7 +171,7 @@ JSON serialization. Direct third-party `printf` output is outside this contract.
 | 504 | Admitted request deadline elapsed |
 
 Errors include `error.code`, `error.message`, and a request ID after admission. Finalized command
-output is included when available. Routes match exact paths; query parameters are rejected.
+output is included when available. Routes support literal paths and registered `{name}` path templates. Query parameters are URL-decoded and passed to the endpoint alongside path values and the request body.
 Bodies are limited while reading both fixed-length and chunked requests. Headers and receive
 buffers are capped at 16 KiB, active connections at 128, receive operations at ten seconds, and
 response writes at five seconds. `Expect: 100-continue` is supported after header validation.
@@ -185,3 +185,24 @@ The request timeout is eligibility for execution/success, not a hard client resp
 `scripting.callTimeoutMs: 0` disables the Python watchdog. Shutdown closes admission, cancels pending
 work, and drains response writes and network cancellation for a bounded period. `quit` acknowledges
 its handler before teardown. Delivery still depends on a connected client and a responsive main loop.
+
+### Endpoint parameters
+
+A route registered as `/api/v1/status/{id}` can match
+`/api/v1/status/1?something=1&tag=one&tag=two`. Its decoder receives
+`pathParameters["id"] == "1"`, `queryParameters["something"] == ["1"]`, and
+`queryParameters["tag"] == ["one", "two"]` in an owned `HttpEndpointRequest_s`.
+Use `?` before the first query parameter and `&` between later parameters.
+An ampersand before `?` is part of the path.
+
+The built-in application snapshot remains at `/api/v1/status`; registering a template defines a new
+endpoint and its decoder defines the meaning and validation of its values. Existing endpoints do not
+use query values. Numeric conversion and endpoint-specific validation belong in the decoder.
+
+Path parameters match one nonempty segment and use identifier names such as `{id}` or `{account_name}`.
+Literal segments take priority over parameter segments; the router selects a full path before selecting
+a method. Trailing slashes are significant. Percent escapes are decoded once as UTF-8 after splitting
+path/query delimiters, so `%2F` within a path value stays within that value. Query `+` becomes a space;
+path `+` and encoded `%2B` stay plus signs. Repeated query keys preserve all their values in arrival order.
+Flags (`?flag`) and empty values (`?flag=`) produce an empty string; empty `&` fields are ignored.
+Malformed escapes, invalid UTF-8, control bytes, empty query names and URL fragments return `400`.

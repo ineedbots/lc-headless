@@ -9,5 +9,5 @@ public:
     [[nodiscard]] static HttpResponse_s Respond(u64 id, const ApplicationStatus_s& status, std::string_view errorCode);
 
 private:
-    static HttpDecodeResult Decode(std::string_view body);
+    static HttpDecodeResult Decode(const HttpEndpointRequest_s& request);
 };

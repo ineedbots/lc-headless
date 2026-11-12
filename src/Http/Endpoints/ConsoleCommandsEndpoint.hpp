@@ -9,5 +9,5 @@ public:
     [[nodiscard]] static HttpResponse_s Respond(u64 id, std::string_view outcome, std::string_view errorCode, const ConsoleCommandResult_s& command);
 
 private:
-    static HttpDecodeResult Decode(std::string_view body);
+    static HttpDecodeResult Decode(const HttpEndpointRequest_s& request);
 };

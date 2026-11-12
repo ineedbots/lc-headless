@@ -7,7 +7,7 @@ HttpRoute_s ApplicationStatusEndpoint::Route()
     return {.method = "GET", .path = "/api/v1/status", .decode = Decode};
 }
 
-HttpDecodeResult ApplicationStatusEndpoint::Decode(std::string_view)
+HttpDecodeResult ApplicationStatusEndpoint::Decode(const HttpEndpointRequest_s&)
 {
     return ApplicationRequestPayload{GetApplicationStatus_s{}};
 }

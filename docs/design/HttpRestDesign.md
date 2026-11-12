@@ -174,7 +174,7 @@ Use a session `steady_timer` for the admitted request deadline, including time s
 
 ### HTTP sessions and routing
 
-- Supply an explicit method/path dispatch table for the two endpoints. Recognized paths with unsupported methods return `405` and an `Allow` header; unknown paths return `404`. Initial routes match exact paths and reject query parameters with `400`.
+- Supply an explicit method/path dispatch table for the two endpoints. Recognized paths with unsupported methods return `405` and an `Allow` header; unknown paths return `404`. Routes match literal paths or whole-segment `{name}` templates. The router decodes path and query values before endpoint validation; malformed targets return `400`.
 - Use HTTP/1.1 sessions with one request in progress per connection. Read the next request only after the prior response finishes. Sequential keep-alive is supported; pipelined requests are processed in order, without concurrent commands on one connection.
 - Reset the parser and response between requests, preserve any buffered bytes for the next message, respect `Connection: close`, and close after malformed or oversized messages whose remaining body cannot safely be reused.
 - Configure body and header limits before reading, and bound the Beast receive buffer. Initially use a 16 KiB header limit and buffer cap, independent of the configured body limit; body bytes stream into the bounded parser body rather than accumulating the entire request in the receive buffer.
@@ -357,13 +357,13 @@ For the current REST implementation, keep routing, session ownership, and typed 
 
 ## Adding endpoints
 
-`HttpRouter` owns a path index and the allowed methods for each path. Its default constructor is the
-single registration table. Each `HttpRoute_s` provides a method, exact path, content-type policy and
+`HttpRouter` owns a segment trie and the allowed methods for each full path pattern. Its default constructor is the
+single registration table. Each `HttpRoute_s` provides a method, path template, content-type policy and
 body decoder. Multiple methods can share a path; the router builds `Allow` from that path's registrations
 and rejects duplicate method/path registrations at startup.
 
-Endpoint adapters in `src/Http/Endpoints/` own request-envelope validation and result JSON. A decoder
-returns either an owned `ApplicationRequestPayload` or an owned `HttpResponse_s` rejection. It does not
+Endpoint adapters in `src/Http/Endpoints/` own request-envelope validation and result JSON. A decoder receives an owned `HttpEndpointRequest_s` with path parameters, multivalue query parameters
+and body, and returns either an owned `ApplicationRequestPayload` or an owned `HttpResponse_s` rejection. It does not
 call the runner or script VM. `HttpResponses` selects the result adapter by visiting the completed
 payload type; `HttpJson` applies the shared UTF-8 replacement and JSON encoding policy.
 
@@ -378,3 +378,26 @@ To add an endpoint:
 lifetime. They hold the matched route through body reading and forward only decoded values to the
 request bridge. New endpoint paths, validation rules and result schemas require no session changes.
 Shared response headers, sequential keep-alive and safe-point delivery apply to every endpoint.
+
+### Parameter matching and ownership
+
+Templates use whole-segment identifiers (`/api/v1/accounts/{name}`). Literal edges are tried before
+parameter edges, with backtracking when a literal prefix has no full-path match. Full path selection
+precedes method selection, so a more specific literal path can produce `405` rather than invoking a
+less specific parameter route. Structurally equivalent templates cannot register the same method twice,
+including templates whose parameter names differ. Different methods can use their own parameter names.
+Names must be unique within a template and follow `[A-Za-z_][A-Za-z0-9_]*`.
+
+`HttpUrl` splits the target at the first `?`, path segments at `/`, query fields at `&`, and each query
+field at the first `=` before decoding. Percent escapes decode exactly once, including UTF-8 validation.
+An encoded separator stays data within its original component. Query `+` decodes to space; path `+`
+is literal. Repeated decoded query keys retain all values in order; flags have an empty value. Empty
+query fields are ignored and empty query names are rejected. Control bytes, fragments and malformed
+escapes/UTF-8 are rejected before admission. Paths are not normalized; trailing slashes are significant.
+
+`HttpRouteMatch_s` owns both the selected descriptor and decoded parameters during asynchronous body
+reading. Once the body is read, it moves into the matched request and its decoder receives that request
+by const reference. Decoder results remain owned application values. No URI/body views are retained in
+the bridge, and HTTP callbacks continue to enqueue work without entering application/script execution.
+The existing `/api/v1/status` and console endpoints do not consume query parameters; templates such as
+`/api/v1/status/{id}` are examples for future endpoint registrations, rather than a new status-ID API.
