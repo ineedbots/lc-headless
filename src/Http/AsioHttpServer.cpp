@@ -152,7 +152,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
     }
     bool CheckRead(boost::system::error_code error)
     {
-        if (closed)
+        if (closed || writing)
         {
             return false;
         }
@@ -275,6 +275,11 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
                     return;
                 }
                 self->interim.reset();
+                if (self->state->stopping)
+                {
+                    self->Error(503, "stopping", "Application stopping", true);
+                    return;
+                }
                 self->Body();
             }));
             return;
@@ -493,9 +498,16 @@ void AsioHttpServer::State::Stop()
     for (const auto& [key, session] : copy)
     {
         static_cast<void>(key);
-        if (!session->control && !session->writing)
+        if (!session->control && !session->writing && !session->interim)
         {
-            session->Close();
+            if (session->parser && session->parser->is_header_done())
+            {
+                session->Error(503, "stopping", "Application stopping", true);
+            }
+            else
+            {
+                session->Close();
+            }
         }
     }
 }

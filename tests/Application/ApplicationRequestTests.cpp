@@ -25,7 +25,7 @@ TEST_CASE("HTTP settings trim hosts and round trip with strict numeric bounds", 
     CHECK(copy.http.requestTimeoutMs == 100ms);
     for (const auto key : {"port", "requestTimeoutMs", "maxPendingRequests", "maxRequestBodyBytes", "maxOutputBytes"})
     {
-        for (const auto value : std::vector<Json>{-1, 0, 18446744073709551615ull, 1.5, "42", true, nullptr})
+        for (const auto& value : std::vector<Json>{-1, 0, 18446744073709551615ull, 1.5, "42", true, nullptr})
         {
             INFO(key << " = " << value.dump());
             CHECK_THROWS_AS(ConfigJson::ParseConfig(Json{{"http", {{key, value}}}}.dump()), ConfigError);
@@ -99,7 +99,9 @@ TEST_CASE("Processor dispatches builtins and snapshots only at safe points and r
     CHECK(logger->GetLevel() == LogLevel_e::Info);
     CHECK_FALSE(help->engineDone);
     while (bridge->HasIncoming())
+    {
         processor.Dispatch();
+    }
     processor.Finalize();
     const auto results = bridge->TakeCompleted();
     REQUIRE(results.size() == 3);
@@ -282,4 +284,40 @@ TEST_CASE("Request batches leave work queued between account scheduling passes",
     CHECK(bridge->HasIncoming());
     processor.Stop();
     CHECK_FALSE(bridge->HasIncoming());
+}
+
+TEST_CASE("Recipient aggregation distinguishes partial rejection failure and cancellation", "[Http][RequestProcessor]")
+{
+    auto runner = AccountRunner{std::make_shared<const Config_s>(), FakeGameServer::MakeCache(), {}, ScriptTestRuntime::Get()};
+    for (const auto& outcomes : std::vector<std::array<std::string, 3>>{
+             {"completed", "failed", "partial"}, {"failed", "failed", "failed"}, {"rejected", "rejected", "rejected"}, {"cancelled", "cancelled", "cancelled"}, {"completed", "completed", "completed"}})
+    {
+        INFO(outcomes[0] << ", " << outcomes[1]);
+        auto bridge = std::make_shared<ApplicationRequestBridge>(HttpSettings_s{});
+        auto processor = ApplicationRequestProcessor{runner, bridge, std::chrono::steady_clock::now()};
+        auto control = bridge->Reserve();
+        bridge->Commit({control, ExecuteConsoleCommand_s{"status"}});
+        while (bridge->HasIncoming())
+        {
+            processor.Dispatch();
+        }
+        REQUIRE(control->execution);
+        auto first = std::make_shared<CommandRecipient>(control->execution, "first");
+        auto second = std::make_shared<CommandRecipient>(control->execution, "second");
+        first->Finish(outcomes[0]);
+        processor.Finalize();
+        CHECK(bridge->TakeCompleted().empty());
+        second->Finish(outcomes[1]);
+        second->Finish("completed");
+        processor.Finalize();
+        const auto results = bridge->TakeCompleted();
+        REQUIRE(results.size() == 1);
+        CHECK(results[0].outcome == outcomes[2]);
+        if (outcomes[2] == "failed" || outcomes[2] == "rejected" || outcomes[2] == "cancelled")
+        {
+            CHECK_FALSE(results[0].errorCode.empty());
+        }
+        processor.Finalize();
+        CHECK(bridge->TakeCompleted().empty());
+    }
 }

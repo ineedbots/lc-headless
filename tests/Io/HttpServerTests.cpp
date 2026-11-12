@@ -603,3 +603,40 @@ TEST_CASE("Concurrent HTTP commands isolate output from each other and a local c
     CHECK(a.find("unknown_local_command") == std::string::npos);
     CHECK(b.find("unknown_local_command") == std::string::npos);
 }
+
+TEST_CASE("Shutdown returns unavailable to a validated upload before admission", "[Http][Integration]")
+{
+    auto fixture = HttpFixture{};
+    auto io = asio::io_context{};
+    auto socket = asio::ip::tcp::socket{io};
+    socket.connect({asio::ip::make_address("127.0.0.1"), fixture.server->GetPort()});
+    const auto headers = std::string{"POST /api/v1/console/commands HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 100\r\nExpect: 100-continue\r\n\r\n"};
+    asio::write(socket, asio::buffer(headers));
+    socket.non_blocking(true);
+    auto interim = std::string{};
+    const auto deadline = std::chrono::steady_clock::now() + 2s;
+    while (interim.find("\r\n\r\n") == std::string::npos && std::chrono::steady_clock::now() < deadline)
+    {
+        fixture.net->Wait(std::chrono::steady_clock::now() + 1ms);
+        auto bytes = std::array<char, 1024>{};
+        auto error = boost::system::error_code{};
+        const auto count = socket.read_some(asio::buffer(bytes), error);
+        interim.append(bytes.data(), count);
+    }
+    REQUIRE(interim.starts_with("HTTP/1.1 100"));
+    CHECK(fixture.bridge->Outstanding() == 0);
+    socket.non_blocking(false);
+    auto client = std::async(std::launch::async, [connection = std::move(socket)]() mutable
+    {
+        auto buffer = beast::flat_buffer{};
+        auto response = Response{};
+        http::read(connection, buffer, response);
+        auto results = Responses{};
+        results.push_back(std::move(response));
+        return results;
+    });
+    fixture.server->Stop();
+    const auto responses = fixture.Finish(client, false);
+    CHECK(responses[0].result_int() == 503);
+    CHECK_FALSE(responses[0].keep_alive());
+}
