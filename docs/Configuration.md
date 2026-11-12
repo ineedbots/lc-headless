@@ -115,6 +115,24 @@ All values below are integers except directory paths. Units are part of each key
 
 For a fixed retry delay, set the minimum and maximum equal. See [retry behavior](Running.md#retries-and-reconnects) for how these waits interact.
 
+## Fleet tracking settings
+
+These process-wide `scripting` settings write per-account JSON Lines journals. Paths are relative to
+the client's working directory; an empty directory disables that journal. They cannot be overridden
+in account files. Logging is enabled by default, including accounts without a script.
+
+| Key under `scripting` | Default | Range and behavior |
+|---|---|---|
+| `experienceDirectory` | `experience` | Skill samples and connection status changes. Empty disables logging. |
+| `experienceIntervalMinutes` | `1` | 0 to 1440 minutes; `0` disables experience logging, including status changes. |
+| `bankLogDirectory` | `bank` | Bank contents on open. Empty disables logging. |
+| `inventoryDirectory` | `inventory` | Backpack contents on change. Empty disables logging. |
+| `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds; minimum time between backpack samples; `0` records every change. |
+| `equipmentDirectory` | `equipment` | Worn equipment on change. Empty disables logging. |
+
+Directories are created when needed. Write failures are logged without stopping the account.
+See [Fleet tracking](FleetTracking.md) for record formats, the optional local page and log maintenance.
+
 ## Account reference
 
 The account file's stem is its log name: `accounts/main.jsonc` appears as `main`. To check a server without starting a bot, use:

@@ -44,7 +44,16 @@
         "minRetryDelaySeconds": 2,
         "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
-        "progressDirectory": "progress"
+        "progressDirectory": "progress",
+        // Per-account JSONL journals. An empty directory disables that journal.
+        "experienceDirectory": "experience",
+        // 0 disables experience logging; otherwise 1 to 1440 minutes.
+        "experienceIntervalMinutes": 1,
+        "bankLogDirectory": "bank",
+        "inventoryDirectory": "inventory",
+        // 0 records every backpack change; otherwise 1 to 86400 seconds.
+        "inventoryIntervalSeconds": 5,
+        "equipmentDirectory": "equipment"
     },
     "http": {
         // Empty disables the listener; use 127.0.0.1 for local operator access.

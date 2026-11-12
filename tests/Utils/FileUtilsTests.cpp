@@ -107,3 +107,16 @@ TEST_CASE("FileUtils::IsInsideFolder", "[FileUtils]")
     CHECK_FALSE(FileUtils::IsInsideFolder("C:main.py"));
 #endif
 }
+
+TEST_CASE("FileUtils::AppendText creates parents and retains previous records", "[FileUtils]")
+{
+    const auto folder = TempFolder{"rs2004-append-tests"};
+    const auto path = folder.GetPath() / "nested" / "records.jsonl";
+    FileUtils::AppendText(path, "first\n");
+    FileUtils::AppendText(path, "second\n");
+    CHECK(FileUtils::ReadText(path) == "first\nsecond\n");
+
+    CHECK_THROWS_AS(FileUtils::AppendText(folder.GetPath(), "text"), std::runtime_error);
+    folder.WriteFile("blocked", "file");
+    CHECK_THROWS_AS(FileUtils::AppendText(folder.GetPath() / "blocked" / "record", "text"), std::filesystem::filesystem_error);
+}

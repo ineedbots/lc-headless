@@ -1,8 +1,8 @@
 # Fleet tracking: experience, banks, inventories
 
 The client can write what each account is earning and holding, per account, as JSON Lines. A small local
-page reads those files. All of it is optional: each log writes to its own folder, and an empty folder turns
-that log off. Nothing here changes how a script runs.
+page reads those files. Logging is enabled by default. Each journal writes to its own folder; an empty
+folder turns that journal off. Nothing here changes how a script runs.
 
 The files are per **account**, named after the account (the account file's name without `.jsonc`), so
 several accounts in one process never collide and nothing depends on the world or the client's log file.
@@ -33,11 +33,16 @@ file is also its history.
 | Key | Default | Meaning |
 |---|---|---|
 | `experienceDirectory` | `experience` | The folder. Empty turns the log off |
-| `experienceIntervalMinutes` | `1` | Minutes between samples; `0` turns it off |
+| `experienceIntervalMinutes` | `1` | 0 to 1440 minutes between samples; `0` turns it off |
 | `bankLogDirectory` | `bank` | The folder. Empty turns the log off |
 | `inventoryDirectory` | `inventory` | The folder. Empty turns the log off |
-| `inventoryIntervalSeconds` | `5` | The least time between two lines; `0` records every change |
+| `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds between lines; `0` records every change |
 | `equipmentDirectory` | `equipment` | The folder. Empty turns the log off |
+
+These keys are also listed in the [configuration reference](Configuration.md#fleet-tracking-settings)
+and [sample config](../client.jsonc.sample). They apply to every account, including idle accounts.
+Paths are relative to the client's working directory. The page and compactor read the default folders
+under the repository root; they do not follow custom journal paths in client configs.
 
 ## Experience
 
@@ -73,9 +78,9 @@ file is also its history.
 {"time":"2026-10-27T13:18:49Z","account":"s18","used":0,"items":[]}
 ```
 
-- The backpack is rewritten when it changes, at most every `inventoryIntervalSeconds`, plus on the bank
-  open and close edges. `bankOpen` marks the samples taken while the bank is open: the game swaps in the
-  bank's own backpack then, and that is the one recorded. `free` comes from the cache's backpack size, so
+- The backpack is rewritten when it changes, at most every `inventoryIntervalSeconds`, including bank
+  open and close changes subject to that same interval. `bankOpen` marks samples taken while the bank is
+  open: the game swaps in the bank's own backpack then, and that is the one recorded. `free` comes from the cache's backpack size, so
   a packet holding only the filled slots can't report a full backpack.
 - Items are grouped by id, in id order.
 - Worn equipment is its own file and records only what is worn. It has no `free`: the equipment interface's
@@ -101,6 +106,10 @@ and starts or controls nothing.
   is open, and how old each snapshot is.
 
 The page refreshes every ten seconds, shows how old each file is, and has a Refresh button per tab.
+
+The server uses CPython 3 and its standard library. `--port` overrides `FLEET_PORT`, whose default is
+`8765`. `--config CLIENT_JSONC ...` enables the optional controls described below. Client control uses
+POSIX process groups and Linux `/proc` for adoption; use the page read-only on Windows.
 
 ## Starting and stopping the client
 
@@ -150,6 +159,19 @@ Without `--config` the page cannot start or stop anything: the bar is hidden, an
 | No equipment log | `"equipmentDirectory": ""` |
 | No page | don't run `tools/fleet/server.py` |
 
-The folders aren't in the repository's `.gitignore`. If you keep a fleet in a checkout, add
-`experience/`, `bank/`, `inventory/` and `equipment/` to `.git/info/exclude` (local only) so the data never
-ends up in a commit.
+The default journal folders, `logs/` (including `fleet.pid`) and Python `__pycache__/` folders are
+ignored by Git. If you choose custom output folders, add them to `.git/info/exclude` or `.gitignore`.
+
+## Log maintenance
+
+Journals append indefinitely. With all writers stopped, preview trimming with:
+
+```sh
+python3 tools/fleet/compact_logs.py --dry-run
+python3 tools/fleet/compact_logs.py --console-mb 20
+```
+
+`--dry-run` reports space savings without writing. `--console-mb` sets the number of MiB retained per
+`logs/*.log` file (default `20`). The tool retains the last 3000 lines per experience/backpack journal
+and 1000 per bank/equipment journal in the default folders. Older history is discarded. Stop writers
+before applying compaction so concurrent appends cannot be lost during the rewrite.

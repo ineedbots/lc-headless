@@ -3,65 +3,12 @@
 
 #include "../Game/State/GameStateQueries.hpp"
 
-#include <fstream>
-#include <map>
+#include "../Utils/FileUtils.hpp"
+#include "../Utils/JsonUtils.hpp"
 
 namespace
 {
     constexpr auto EXTENSION = ".jsonl"sv;
-
-    std::string Escape(std::string_view text)
-    {
-        auto out = std::string{};
-        out.reserve(text.size() + 2);
-        for (const auto character : text)
-        {
-            switch (character)
-            {
-            case '"':
-                out += "\\\"";
-                break;
-            case '\\':
-                out += "\\\\";
-                break;
-            case '\n':
-                out += "\\n";
-                break;
-            case '\t':
-                out += "\\t";
-                break;
-            default:
-                if (static_cast<unsigned char>(character) < 0x20)
-                {
-                    std::format_to(std::back_inserter(out), "\\u{:04x}", static_cast<unsigned>(character));
-                }
-                else
-                {
-                    out += character;
-                }
-                break;
-            }
-        }
-
-        return out;
-    }
-
-    void Append(const std::filesystem::path& path, std::string_view text)
-    {
-        auto error = std::error_code{};
-        if (!path.parent_path().empty())
-        {
-            std::filesystem::create_directories(path.parent_path(), error);
-        }
-
-        auto file = std::ofstream{path, std::ios::binary | std::ios::app};
-        file << text;
-        file.flush();
-        if (!file)
-        {
-            throw std::runtime_error{std::format("can't write {}", path.string())};
-        }
-    }
 }
 
 ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval)
@@ -175,7 +122,7 @@ void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
     {
         const auto& item = contents.items[i];
         std::format_to(std::back_inserter(items), "{}{{\"id\":{},\"name\":\"{}\",\"qty\":{}}}",
-                       i == 0 ? "" : ",", item.id, Escape(m_cache.FindObjName(item.id)), item.qty);
+                       i == 0 ? "" : ",", item.id, JsonUtils::EscapeString(m_cache.FindObjName(item.id)), item.qty);
     }
 
     const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
@@ -186,17 +133,17 @@ void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
     {
         // bankOpen says which backpack these are: while a bank is open the game swaps in its own.
         line = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"bankOpen\":{},\"used\":{},\"free\":{},\"items\":[{}]}}\n",
-                           time, Escape(m_accountName), contents.bankOpen, contents.used, free, items);
+                           time, JsonUtils::EscapeString(m_accountName), contents.bankOpen, contents.used, free, items);
     }
     else
     {
         line = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"used\":{},\"items\":[{}]}}\n",
-                           time, Escape(m_accountName), contents.used, items);
+                           time, JsonUtils::EscapeString(m_accountName), contents.used, items);
     }
 
     try
     {
-        Append(m_path, line);
+        FileUtils::AppendText(m_path, line);
 
         if (m_writeFailed)
         {

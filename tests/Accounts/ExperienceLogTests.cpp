@@ -6,6 +6,7 @@
 #include "Console/Type/LogLevel_e.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -298,4 +299,16 @@ TEST_CASE("ExperienceLog warns once when it can't write, and never throws", "[Ex
         return entry.level == LogLevel_e::Warning && entry.message.find("experience log wasn't saved") != std::string::npos;
     });
     CHECK(warnings == 1);
+}
+
+TEST_CASE("ExperienceLog escapes the account name in JSON records", "[ExperienceLog]")
+{
+    const auto folder = TempFolder{"rs2004-experience-escape-tests"};
+    auto capture = LogCapture{};
+    const auto name = "fleet\\worker"s;
+    auto log = ExperienceLog{folder.GetPath(), name, 1min, capture.GetLogger()};
+    log.Step(Clock::now(), GameState_s{}, ClientStatus_e::InGame, true);
+    const auto lines = ReadLines(log.GetPath());
+    REQUIRE(lines.size() == 1);
+    CHECK(nlohmann::json::parse(lines.front()).at("account").get<std::string>() == name);
 }

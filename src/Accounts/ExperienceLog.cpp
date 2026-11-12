@@ -1,9 +1,9 @@
 #include "pch.hpp"
 #include "ExperienceLog.hpp"
 
+#include "../Utils/FileUtils.hpp"
+#include "../Utils/JsonUtils.hpp"
 #include "../Utils/StringUtils.hpp"
-
-#include <fstream>
 
 namespace
 {
@@ -111,7 +111,7 @@ void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, cons
     auto line = std::string{};
     line.reserve(2048);
     std::format_to(std::back_inserter(line), "{{\"time\":\"{:%Y-%m-%dT%H:%M:%SZ}\",\"account\":\"{}\",\"state\":\"{}\",\"settled\":{},\"skills\":{{",
-                   std::chrono::floor<std::chrono::seconds>(time), m_accountName, statusName, settled);
+                   std::chrono::floor<std::chrono::seconds>(time), JsonUtils::EscapeString(m_accountName), statusName, settled);
 
     for (std::size_t i = 0; i < SKILL_NAMES.size() && i < GameState_s::STAT_COUNT; ++i)
     {
@@ -124,20 +124,7 @@ void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, cons
 
     try
     {
-        const auto folder = m_path.parent_path();
-        if (!folder.empty())
-        {
-            auto error = std::error_code{};
-            std::filesystem::create_directories(folder, error);
-        }
-
-        auto file = std::ofstream{m_path, std::ios::binary | std::ios::app};
-        file << line;
-        file.flush();
-        if (!file)
-        {
-            throw std::runtime_error{std::format("can't write {}", m_path.string())};
-        }
+        FileUtils::AppendText(m_path, line);
 
         if (m_writeFailed)
         {

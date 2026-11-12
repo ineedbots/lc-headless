@@ -2,67 +2,13 @@
 #include "BankLogger.hpp"
 
 #include "../Game/State/GameStateQueries.hpp"
+#include "../Utils/FileUtils.hpp"
+#include "../Utils/JsonUtils.hpp"
 #include "../Utils/StringUtils.hpp"
-
-#include <fstream>
-#include <map>
 
 namespace
 {
     constexpr auto EXTENSION = ".jsonl"sv;
-
-    std::string Escape(std::string_view text)
-    {
-        auto out = std::string{};
-        out.reserve(text.size() + 2);
-        for (const auto character : text)
-        {
-            switch (character)
-            {
-            case '"':
-                out += "\\\"";
-                break;
-            case '\\':
-                out += "\\\\";
-                break;
-            case '\n':
-                out += "\\n";
-                break;
-            case '\t':
-                out += "\\t";
-                break;
-            default:
-                if (static_cast<unsigned char>(character) < 0x20)
-                {
-                    std::format_to(std::back_inserter(out), "\\u{:04x}", static_cast<unsigned>(character));
-                }
-                else
-                {
-                    out += character;
-                }
-                break;
-            }
-        }
-
-        return out;
-    }
-
-    void Append(const std::filesystem::path& path, std::string_view text)
-    {
-        auto error = std::error_code{};
-        if (!path.parent_path().empty())
-        {
-            std::filesystem::create_directories(path.parent_path(), error);
-        }
-
-        auto file = std::ofstream{path, std::ios::binary | std::ios::app};
-        file << text;
-        file.flush();
-        if (!file)
-        {
-            throw std::runtime_error{std::format("can't write {}", path.string())};
-        }
-    }
 }
 
 BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory)
@@ -115,16 +61,16 @@ void BankLogger::Log(const GameState_s& state)
             items += ",";
         }
 
-        std::format_to(std::back_inserter(items), "{{\"id\":{},\"name\":\"{}\",\"qty\":{}}}", id, Escape(name), qty);
+        std::format_to(std::back_inserter(items), "{{\"id\":{},\"name\":\"{}\",\"qty\":{}}}", id, JsonUtils::EscapeString(name), qty);
         summary.push_back(std::format("{} x{}", name.empty() ? std::format("#{}", id) : std::string{name}, qty));
     }
 
     const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
-    const auto record = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"items\":[{}]}}\n", time, Escape(m_accountName), items);
+    const auto record = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"items\":[{}]}}\n", time, JsonUtils::EscapeString(m_accountName), items);
 
     try
     {
-        Append(m_directory / (m_accountName + std::string{EXTENSION}), record);
+        FileUtils::AppendText(m_directory / (m_accountName + std::string{EXTENSION}), record);
 
         if (m_writeFailed)
         {
