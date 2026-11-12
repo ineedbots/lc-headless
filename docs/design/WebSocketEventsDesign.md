@@ -162,5 +162,5 @@ filters, duplicate IDs, bounded fan-out and overload recovery. Real loopback tes
 cover upgrade, fragmented input, subscribe/live/unsubscribe/reconnect, protocol
 errors and shutdown retirement while keeping REST behavior covered. Platform and
 load-test results belong with implementation evidence; unrun checks must be stated.
-See [local validation evidence](WebSocketEventsValidation.md) for reproducible
-commands, workload measurements and remaining checks.
+See [PR #79](https://github.com/ineedbots/lc-headless/pull/79) for reproducible
+commands, workload measurements, live acceptance evidence and remaining checks.
