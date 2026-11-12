@@ -4,6 +4,7 @@
 #include "Type/ConnectionOptions_s.hpp"
 #include "Link.hpp"
 #include "NetLoop.hpp"
+#include "../Application/Events/ApplicationEventBridge.hpp"
 
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/io_context.hpp>
@@ -15,7 +16,7 @@ public:
 
     [[nodiscard]] std::shared_ptr<Link> Open(const ConnectionOptions_s& options, std::shared_ptr<Logger> logger) override;
     void Poll() override;
-    std::unique_ptr<HttpServer> ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge) override;
+    std::unique_ptr<HttpServer> ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge, std::shared_ptr<ApplicationEventBridge> events = {}) override;
     void Wait(Deadline deadline) override;
     void Settle(Clock::time_point deadline) override;
     bool IsSettled() const override

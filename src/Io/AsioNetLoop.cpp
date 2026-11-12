@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "AsioNetLoop.hpp"
 
+#include "../Http/HttpRouter.hpp"
+#include "../Application/Events/ApplicationEventBridge.hpp"
 #include "../Console/Logger.hpp"
 #include "AsioLink.hpp"
 #include "Type/ConnectionOptions_s.hpp"
@@ -92,12 +94,12 @@ void AsioNetLoop::RemoveLink() noexcept
     --m_linkCount;
 }
 
-std::unique_ptr<HttpServer> AsioNetLoop::ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge)
+std::unique_ptr<HttpServer> AsioNetLoop::ListenHttp(const HttpSettings_s& settings, std::shared_ptr<ApplicationRequestBridge> bridge, std::shared_ptr<ApplicationEventBridge> events)
 {
     if (settings.host.empty())
     {
         return {};
     }
 
-    return std::make_unique<AsioHttpServer>(m_io, settings, std::move(bridge));
+    return std::make_unique<AsioHttpServer>(m_io, settings, std::move(bridge), HttpRouter{}, std::move(events));
 }

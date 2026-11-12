@@ -14,7 +14,7 @@ public:
     using Clock = std::chrono::steady_clock;
 
     // A zero interval turns reports off.
-    ProgressReporter(std::chrono::minutes interval, std::filesystem::path file, std::shared_ptr<Logger> logger);
+    ProgressReporter(std::chrono::minutes interval, std::filesystem::path file, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport = {});
 
     void Step(Clock::time_point now, ScriptHost& script);
 
@@ -25,4 +25,5 @@ private:
     ProgressReportFile m_file;
     std::shared_ptr<Logger> m_logger;
     std::optional<Clock::time_point> m_nextReport;
+    std::function<void(const ProgressReport_s&)> m_onReport;
 };

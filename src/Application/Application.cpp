@@ -24,6 +24,9 @@
 #include "CommandLine.hpp"
 #include "InterruptSignal.hpp"
 #include "ApplicationRequestProcessor.hpp"
+#include "Events/ApplicationEventBridge.hpp"
+#include "Events/Type/ApplicationEvent_s.hpp"
+#include "../Accounts/Type/ProgressReport_s.hpp"
 #include "EntryPoint.hpp"
 
 Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
@@ -56,6 +59,17 @@ Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logg
 int Application::Run()
 {
     auto runtime = ScriptRuntime{};
+    auto accounts = LoadAccounts();
+    auto names = std::vector<std::string>{};
+    for (const auto& account : accounts)
+    {
+        if (!m_config->http.host.empty())
+        {
+            names.push_back(account.name);
+        }
+    }
+
+    auto events = std::make_shared<ApplicationEventBridge>(std::move(names));
     auto profileDirectory = std::filesystem::path{};
     if (m_commandLine.profile)
     {
@@ -93,11 +107,15 @@ int Application::Run()
         .profileDirectory = profileDirectory,
         .navigation = m_navigation,
         .reloginDelay = scripting.reloginDelaySeconds,
+        .onProgressReport = m_config->http.host.empty() ? std::function<void(std::string_view, const ProgressReport_s&)>{} : [events](std::string_view account, const ProgressReport_s& report)
+    {
+        events->PublishProgress(account, report);
+    },
     };
 
     auto net = NetLoop::Create();
     auto bridge = std::make_shared<ApplicationRequestBridge>(m_config->http);
-    auto runner = AccountRunner{m_config, m_cache, LoadAccounts(), runtime, m_logger, options, net};
+    auto runner = AccountRunner{m_config, m_cache, std::move(accounts), runtime, m_logger, options, net};
 
     if (m_commandLine.watch)
     {
@@ -119,7 +137,7 @@ int Application::Run()
     }
 
     auto processor = ApplicationRequestProcessor{runner, bridge, ApplicationEntryPoint::GetStartTime()};
-    auto http = m_config->http.host.empty() ? nullptr : net->ListenHttp(m_config->http, bridge);
+    auto http = m_config->http.host.empty() ? nullptr : net->ListenHttp(m_config->http, bridge, events);
     const auto drain = [&]
     {
         if (console)
@@ -128,6 +146,7 @@ int Application::Run()
         }
 
         processor.Stop();
+        events->Stop();
         runner.CloseNetwork();
 
         if (http)
@@ -171,6 +190,7 @@ int Application::Run()
             else
             {
                 processor.Finalize();
+                events->Service();
 
                 if (http)
                 {
@@ -180,7 +200,7 @@ int Application::Run()
             }
         }, [&]
         {
-            return bridge->HasIncoming();
+            return bridge->HasIncoming() || events->HasIncoming();
         }, [&]
         {
             processor.Stop();
@@ -199,6 +219,15 @@ int Application::Run()
     }
 
     drain();
+
+    if (http)
+    {
+        const auto diagnostics = events->GetDiagnostics();
+        m_logger->Info("Events: {} rejected subscriptions, {} publisher resets, {} overflow disconnects; peak journal {} items/{} bytes, peak client queue {} items/{} bytes, maximum queue lag {} ms",
+                       diagnostics.rejectedSubscriptions, diagnostics.publisherResets, diagnostics.overflowDisconnects,
+                       diagnostics.journalHighWaterItems, diagnostics.journalHighWaterBytes, diagnostics.clientHighWaterItems,
+                       diagnostics.clientHighWaterBytes, diagnostics.maxDeliveryLagMs);
+    }
 
     return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
 }

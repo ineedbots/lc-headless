@@ -18,6 +18,7 @@
 #include "../Utils/StringUtils.hpp"
 #include "IdleSummary.hpp"
 #include "ProgressReporter.hpp"
+#include "Type/ProgressReport_s.hpp"
 
 namespace
 {
@@ -31,7 +32,13 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     , m_options{options}
     , m_messenger{messenger}
     , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client, std::move(net)}
-    , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger}
+    , m_progress{m_account.script ? m_account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{m_config->scripting.progressDirectory} / (m_account.name + PROGRESS_EXTENSION), m_logger, [this](const ProgressReport_s& report)
+{
+    if (m_options.onProgressReport)
+    {
+        m_options.onProgressReport(m_account.name, report);
+    }
+}}
 {
     const auto& experience = m_config->scripting;
     if (!experience.experienceDirectory.empty() && experience.experienceIntervalMinutes > std::chrono::minutes::zero())

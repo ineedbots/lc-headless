@@ -25,6 +25,36 @@ adding its owned payload, producer, catalog serializer and snapshot policy, then
 focused tests. Generic session code has no event branches. HTTP route metadata
 declares upgrade endpoints alongside REST decoders.
 
+```mermaid
+stateDiagram-v2
+    [*] --> HttpHeaders
+    HttpHeaders --> Handshake: registered route, valid policy, reserve bridge identity
+    Handshake --> Open: Beast accepts
+    Handshake --> Cancelled: error or shutdown
+    Open --> Closing: peer close, overflow, or shutdown
+    Open --> Cancelled: I/O failure or write deadline
+    Closing --> Cancelled: close completion or drain cancellation
+    Cancelled --> Retired: all tracked callbacks complete
+    Retired --> [*]
+```
+
+The HTTP registry owns the connection until it transfers its socket and buffered
+bytes to `AsioWebSocketSession`. The WebSocket registry then owns the session;
+callbacks keep its state alive until retirement. Bridge connection IDs are never
+reused, so late completions cannot address a replacement connection.
+
+To extend the catalog:
+
+1. Add an owned payload to `Application/Events/Type/ApplicationEvent_s.hpp`.
+2. Register its name, bounded-size validation and serializer in `EventProtocol`.
+3. Supply a safe-point producer callback as `AccountOptions_s::onProgressReport`
+   does for progress. Validate before copying script-sized inputs.
+4. Review the latest-value snapshot policy and total snapshot bound for the new
+   type; add focused schema, filter, ordering and producer tests.
+5. Register new HTTP upgrade paths through endpoint `Route()` metadata when
+   needed. No changes to WebSocket read/write or HTTP socket handoff are needed
+   for another event in the existing subscription protocol.
+
 ## Version 1 protocol
 
 `GET /api/v1/events` upgrades HTTP/1.1 on the configured HTTP listener. Empty HTTP
@@ -83,6 +113,16 @@ the snapshot registry to 16 configured accounts. Maximum snapshot is 16 envelope
 plus framing, below the outbound byte limit. These conservative fixed protocol
 limits are not claims of measured fleet capacity.
 
+The receive buffer has 8192 bytes of bounded capacity so Beast can detect an
+oversized message and send its protocol close frame. Journal/outbox byte counts
+cover owned content; fixed container entries, allocator overhead, Beast internals
+and kernel socket buffers are additional bounded-per-connection costs. Aggregate
+outbound content is at most 32 MiB for 128 admitted connections.
+Journal event reservations include at least 8192 bytes each to cover conversion
+from typed payload to serialized in-flight fan-out, so the byte cap admits at
+most 128 queued ordinary reports. Smaller command entries can reach the 256-item
+cap. No conversion can increase journal reservation beyond the configured bound.
+
 One service pass processes at most 32 journal items and 256 recipient visits,
 continuing an event's fan-out before processing later journal entries. A single
 event is serialized once and shared immutably. With 128 connections, worst-case
@@ -98,6 +138,10 @@ disconnect and an overflow counter; report logging/file writing continue.
 Diagnostics include connections, subscriptions, journal items/bytes, rejected
 subscriptions, publisher resets and slow-consumer disconnects. Counters saturate
 at their integer maximum. No credentials or report bodies are automatically logged.
+The C++ diagnostics API also exposes outgoing occupancy, queue high-water marks
+and maximum publication-to-outbox lag in steady-clock milliseconds. Application
+shutdown logs the bounded summary. This lag excludes kernel/network transit;
+it is not a client-observed latency measurement.
 
 Beast handshake deadline 10 s, idle timeout 60 s with automatic heartbeat pings;
 write timeout 10 s. One serialized application write per connection; its payload
@@ -114,3 +158,5 @@ filters, duplicate IDs, bounded fan-out and overload recovery. Real loopback tes
 cover upgrade, fragmented input, subscribe/live/unsubscribe/reconnect, protocol
 errors and shutdown retirement while keeping REST behavior covered. Platform and
 load-test results belong with implementation evidence; unrun checks must be stated.
+See [local validation evidence](WebSocketEventsValidation.md) for reproducible
+commands, workload measurements and remaining checks.

@@ -56,7 +56,7 @@
         "equipmentDirectory": "equipment"
     },
     "http": {
-        // Empty disables the listener; use 127.0.0.1 for local operator access.
+        // Empty disables REST and WebSocket events; use 127.0.0.1 for local operator access.
         "host": "",
         "port": 8080,
         "requestTimeoutMs": 30000,

@@ -214,6 +214,11 @@ Reports require an `on_progress_report()` hook returning a dictionary. They are 
 
 ## HTTP operator API
 
+The same listener serves WebSocket progress subscriptions at `/api/v1/events`.
+Empty `http.host` disables both. WebSocket resource limits are fixed protocol
+limits in this version; there are no additional settings. See
+[live events](Running.md#live-progress-events) for use and deployment policy.
+
 The process-wide `http` section is optional and has no account overrides. Changes require a restart.
 A missing, empty, or whitespace-only `host` disables HTTP. `--raw-console` independently controls
 terminal input and formatting. The shipped sample leaves HTTP disabled.

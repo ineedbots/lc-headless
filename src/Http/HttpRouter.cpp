@@ -3,6 +3,7 @@
 
 #include "../Utils/StringUtils.hpp"
 #include "Endpoints/ApplicationStatusEndpoint.hpp"
+#include "Endpoints/ApplicationEventsEndpoint.hpp"
 #include "Endpoints/ConsoleCommandsEndpoint.hpp"
 #include "HttpResponses.hpp"
 #include "HttpUrl.hpp"
@@ -17,7 +18,7 @@ namespace
 }
 
 HttpRouter::HttpRouter()
-    : HttpRouter{{ConsoleCommandsEndpoint::Route(), ApplicationStatusEndpoint::Route()}}
+    : HttpRouter{{ConsoleCommandsEndpoint::Route(), ApplicationStatusEndpoint::Route(), ApplicationEventsEndpoint::Route()}}
 {
 }
 
@@ -30,7 +31,7 @@ HttpRouter::HttpRouter(std::vector<HttpRoute_s> routes)
         {
             return c < 0x20 || c == 0x7f;
         }) ||
-            !StringUtils::IsUtf8(route.path) || route.method.empty() || !route.decode)
+            !StringUtils::IsUtf8(route.path) || route.method.empty() || (!route.decode && !route.webSocket) || (route.decode && route.webSocket))
         {
             throw std::invalid_argument{"HTTP routes need a path template, method and decoder"};
         }

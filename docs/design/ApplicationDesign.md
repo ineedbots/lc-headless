@@ -1,5 +1,12 @@
 # Application design
 
+The HTTP listener also hosts [WebSocket progress subscriptions](WebSocketEventsDesign.md).
+`ProgressReporter` publishes owned reports through the application callback;
+`ApplicationEventBridge` applies subscriptions and snapshots after command
+finalization. Socket callbacks only enqueue or transport messages on the existing
+shared loop. The event catalog and protocol adapter own event-specific validation
+and serialization; adding events does not change session I/O.
+
 [Back to README](../../README.md) · [Running](../Running.md) · [Configuration](../Configuration.md)
 
 This document describes the application's end-to-end inputs, outputs,
