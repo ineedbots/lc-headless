@@ -517,3 +517,30 @@ def cosmic_trade_kit():
 
 
 test('Cosmic trade acceptance refuses to give away the retained Dramen staff', cosmic_trade_kit)
+
+
+def mule_trade_screen_gap():
+    clock = [0]
+    active = [True]
+    spy_on(trade, 'active', impl=lambda: active[0])
+    spy_on(_core, 'step_time', impl=lambda: clock[0])
+    for mode, task_class in [('Crafter', mc.CrafterTradeAtRuins), ('Mule', mc.MuleTradeExecute)]:
+        bot = Fake(get_mode=lambda: mode, has_partners=lambda: True)
+        task = task_class(bot)
+        active[0] = True
+        expect(task.validate()).to_be(True)
+        # Neither screen is visible during the swap. The active task must still
+        # outrank movement and a fresh request, which would decline the trade.
+        active[0] = False
+        expect(task.validate()).to_be(True)
+        clock[0] += 300
+        expect(task.validate()).to_be(True)
+        active[0] = True
+        expect(task.validate()).to_be(True)
+        active[0] = False
+        expect(task.validate()).to_be(True)
+        clock[0] += 601
+        expect(task.validate()).to_be(False)
+
+
+test('both MuleCrafter roles retain trade priority across the screen transition', mule_trade_screen_gap)
