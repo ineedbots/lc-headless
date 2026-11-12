@@ -328,6 +328,10 @@ def cult_cupboard():
     scene.loc('Cupboard', id=cult.CUPBOARD_OPEN)
     expect(run_wait(cult.open_cupboard(scene.log))).to_be(True)
     expect(run_wait(cult.drive_to_complete(scene.log))).to_be(False)
+    scene.chat.pages = ['continue']
+    expect(run_wait(cult.drive_to_complete(scene.log))).to_be(False)
+    expect(scene.chat.pages).to_equal([])
+    expect(scene.logged('the accusation stopped short')).to_be(True)
     surface = spy_on(cult, 'to_surface', impl=answer(False))
     expect(run_wait(cult.search_cupboard(scene.log))).to_be(False)
     surface.mock_implementation(answer(True))
