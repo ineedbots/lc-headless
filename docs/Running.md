@@ -141,7 +141,7 @@ The process returns 0 only when every account logged out cleanly and no script f
 ## Live progress events
 
 Native operator clients can connect to `ws://127.0.0.1:8080/api/v1/events` on the
-configured HTTP listener. The sole event is `account.progress`, emitted when
+configured HTTP listener. The `account.progress` event is emitted when
 ProgressReporter obtains an `on_progress_report()` result. The account must have
 `script.progressReportMinutes` enabled. File-write failures do not prevent events.
 
@@ -151,7 +151,29 @@ Send JSON text:
 {"version":1,"type":"subscribe","id":"progress","events":["account.progress"],"accounts":["bot1"]}
 ```
 
-The server acknowledges, sends a snapshot of the latest available report for each
+Subscribe to logout completion on the same endpoint:
+
+```json
+{"version":1,"type":"subscribe","id":"logout","events":["account.logout"],"accounts":["bot1"]}
+```
+
+`account.logout` carries `payload: {"confirmed": true}` when the client observes
+server logout completion, including temporary relogs and server-initiated logout.
+A timeout or forced closure during an in-progress logout emits `confirmed: false`.
+Requesting logout alone does not emit an event, and unrelated connection drops do
+not emit logout events. Each completion emits once. Logout events are live only;
+they are absent from snapshots and are not replayed after reconnect. They do not
+require progress reporting or a script. Both event names may share a subscription.
+
+To watch logout events with the [Python test client](../tools/events/logout.py),
+run `python -m pip install websockets`, then
+`python tools/events/logout.py --account bot1`. Omit `--account` to watch all
+accounts, use `--url` for another listener, or add `--progress` to watch reports too.
+After the subscription acknowledgement, interrupt an account or run a script that
+calls `stop_account()` or `relog()`. The client prints the received JSON envelopes.
+Press Ctrl+C in the Python terminal to stop watching.
+
+The server acknowledges, sends a snapshot of the latest available progress report for each
 matching account, then sends ordered live reports. Empty/omitted `accounts` means
 all configured accounts. Names are exact account config names. Empty snapshots
 are normal before the first report. Subscribing never invokes a script hook.

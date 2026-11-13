@@ -1,8 +1,9 @@
 # WebSocket application events
 
-Implementation scope for #76: reusable subscription plumbing and **only**
-`account.progress`, emitted when ProgressReporter obtains a report. Connection and
-script lifecycle events are deferred. No extra thread, context, or listener exists.
+The subscription plumbing from #76 supports `account.progress`, emitted when
+ProgressReporter obtains a report, and `account.logout` (#90), emitted on logout
+completion. Other connection and script lifecycle events are deferred. No extra
+thread, context, or listener exists.
 
 ## Ownership and extension
 
@@ -53,8 +54,9 @@ To extend the catalog:
 2. Register its name, bounded-size validation and serializer in `EventProtocol`.
 3. Supply a safe-point producer callback as `AccountOptions_s::onProgressReport`
    does for progress. Validate before copying script-sized inputs.
-4. Review the latest-value snapshot policy and total snapshot bound for the new
-   type; add focused schema, filter, ordering and producer tests.
+4. Declare its latest-value policy in `EventProtocol::RetainsLatest` and review
+   the total snapshot bound for the new type; add focused schema, filter, ordering
+   and producer tests.
 5. Register new HTTP upgrade paths through endpoint `Route()` metadata when
    needed. No changes to WebSocket read/write or HTTP socket handoff are needed
    for another event in the existing subscription protocol.
@@ -105,6 +107,29 @@ every accepted publication; gaps from filtering are normal. There is no replay,
 durable history or exactly-once guarantee. Reconnect makes fresh subscriptions;
 process instance is random per bridge/process run. UTC timestamps are public;
 internal deadlines use steady_clock.
+
+## Logout completion
+
+`account.logout` uses the standard event envelope with a payload containing exactly
+`{"confirmed": true}` or `{"confirmed": false}`. `AccountOptions_s::onLogout` publishes
+an owned `AccountLogout_s` at account safe points. Observe terminal client status
+before relog/recovery handling and in `UpdateFinished` for synchronous teardown.
+Compare observed status to suppress repeated notifications for the same completion.
+
+A transition to `LoggedOut` publishes confirmed completion (including server logout
+and temporary relog). A transition from `LoggingOut` to `Disconnected` publishes
+unconfirmed completion for timeout or forced closure. This follows GameClient's
+existing confirmation semantics, including connection closure while logging out;
+it does not introduce stronger server acknowledgement guarantees. An unrelated
+connection drop or abandoned login does not emit logout. Merely requesting logout
+does not emit completion.
+
+Logout events participate in the same journal, filtering, sequence and fan-out as
+progress. They are live only: `RetainsLatest` excludes them from `m_latest`, so
+snapshots still contain at most 16 progress envelopes. Subscribers receive no
+historical logout after reconnect, and shutdown delivery remains best effort under
+the existing bounded drain. Logout notifications require neither scripts nor
+progress-report configuration.
 
 ## Bounds and servicing
 

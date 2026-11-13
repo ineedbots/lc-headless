@@ -5,6 +5,7 @@
 #include "Application/Events/Type/ApplicationEvent_s.hpp"
 #include "Application/Events/Type/EventSubscription_s.hpp"
 #include "Accounts/Type/ProgressReport_s.hpp"
+#include "Accounts/Type/AccountLogout_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
@@ -229,4 +230,55 @@ TEST_CASE("Event disconnect retires queued commands and new sessions cannot inhe
     Drain(bridge);
     CHECK(bridge.GetDiagnostics().subscriptions == 16);
     CHECK(bridge.GetDiagnostics().rejectedSubscriptions == 1);
+}
+
+TEST_CASE("Logout events are ordered live notifications filtered by event and account", "[Events]")
+{
+    auto bridge = ApplicationEventBridge{{"bot1", "bot2"}};
+    const auto client = bridge.Connect();
+    const auto progress = bridge.Connect();
+    bridge.Enqueue(client, R"({"version":1,"type":"subscribe","id":"logout","events":["account.logout"],"accounts":["bot1"]})");
+    bridge.Enqueue(progress, Subscribe());
+    REQUIRE(bridge.Publish({"bot1", AccountLogout_s{true}}));
+    REQUIRE(bridge.Publish({"bot2", AccountLogout_s{true}}));
+    REQUIRE(bridge.PublishProgress("bot1", {60s, {}}));
+    REQUIRE(bridge.Publish({"bot1", AccountLogout_s{false}}));
+    Drain(bridge);
+
+    CHECK(Take(bridge, client)["type"] == "ack");
+    CHECK(Take(bridge, client)["events"].empty());
+    const auto confirmed = Take(bridge, client);
+    CHECK(confirmed["version"] == 1);
+    CHECK(confirmed["type"] == "event");
+    CHECK(confirmed["event"] == "account.logout");
+    CHECK(confirmed["account"] == "bot1");
+    CHECK_FALSE(confirmed["instance"].get<std::string>().empty());
+    CHECK_FALSE(confirmed["timestamp"].get<std::string>().empty());
+    CHECK(confirmed["sequence"] == 1);
+    CHECK(confirmed["payload"] == Json{{"confirmed", true}});
+    const auto forced = Take(bridge, client);
+    CHECK(forced["sequence"] == 4);
+    CHECK(forced["payload"] == Json{{"confirmed", false}});
+    CHECK_FALSE(bridge.Front(client));
+    Take(bridge, progress);
+    Take(bridge, progress);
+    CHECK(Take(bridge, progress)["event"] == "account.progress");
+    CHECK_FALSE(bridge.Front(progress));
+
+    // A mixed subscription sees the retained progress report, never an old logout.
+    const auto fresh = bridge.Connect();
+    bridge.Enqueue(fresh, R"({"version":1,"type":"subscribe","id":"both","events":["account.logout","account.progress"]})");
+    Drain(bridge);
+    CHECK(Take(bridge, fresh)["sequence"] == 4);
+    const auto snapshot = Take(bridge, fresh);
+    REQUIRE(snapshot["events"].size() == 1);
+    CHECK(snapshot["events"][0]["event"] == "account.progress");
+    CHECK(snapshot["events"][0]["sequence"] == 3);
+
+    bridge.Enqueue(client, R"({"version":1,"type":"unsubscribe","id":"logout"})");
+    REQUIRE(bridge.Publish({"bot1", AccountLogout_s{true}}));
+    Drain(bridge);
+    CHECK(Take(bridge, client)["action"] == "unsubscribe");
+    CHECK_FALSE(bridge.Front(client));
+    CHECK(Take(bridge, fresh)["event"] == "account.logout");
 }

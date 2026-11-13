@@ -21,6 +21,7 @@
 #include "AccountReporting.hpp"
 #include "Type/AccountPhase_e.hpp"
 #include "Type/ProgressReport_s.hpp"
+#include "Type/AccountLogout_s.hpp"
 
 Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger, std::shared_ptr<NetLoop> net)
     : m_config{ConfigOverrides::ForAccount(std::move(config), account)}
@@ -110,6 +111,7 @@ void Account::Start()
     try
     {
         m_client.BeginLogin();
+        ObserveLogout();
     }
     catch (const std::exception& e)
     {
@@ -156,6 +158,7 @@ void Account::Step(std::chrono::milliseconds maxWait)
 
     try
     {
+        ObserveLogout();
         const auto now = Clock::now();
         const auto status = m_client.GetStatus();
 
@@ -549,6 +552,7 @@ void Account::BeginRelog(std::chrono::seconds delay)
     m_logger->Info("Relogging: logging out, then back in {} s later", delay.count());
     m_lifecycle.BeginRelog(delay);
     m_client.RequestLogout(LOGOUT_TIMEOUT);
+    ObserveLogout();
 }
 
 bool Account::StepRelog(Clock::time_point now)
@@ -588,6 +592,7 @@ bool Account::StepRelog(Clock::time_point now)
     try
     {
         m_client.BeginLogin();
+        ObserveLogout();
     }
     catch (const std::exception& e)
     {
@@ -660,6 +665,7 @@ void Account::Fail(std::string_view reason)
 
 void Account::UpdateFinished()
 {
+    ObserveLogout();
     const auto status = m_client.GetStatus();
     if (status != ClientStatus_e::LoggedOut && status != ClientStatus_e::Disconnected)
     {
@@ -670,6 +676,22 @@ void Account::UpdateFinished()
     if (m_script)
     {
         m_script->CancelCommands("account_finished");
+    }
+}
+
+void Account::ObserveLogout()
+{
+    const auto status = m_client.GetStatus();
+    const auto previous = std::exchange(m_observedStatus, status);
+    if (status == previous)
+    {
+        return;
+    }
+
+    const auto confirmed = status == ClientStatus_e::LoggedOut;
+    if (m_options.onLogout && (confirmed || (previous == ClientStatus_e::LoggingOut && status == ClientStatus_e::Disconnected)))
+    {
+        m_options.onLogout(m_account.name, AccountLogout_s{confirmed});
     }
 }
 

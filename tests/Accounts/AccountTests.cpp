@@ -7,6 +7,7 @@
 #include "../Support/TempFolder.hpp"
 
 #include "Accounts/Account.hpp"
+#include "Accounts/Type/AccountLogout_s.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Config/Type/AccountConfig_s.hpp"
 #include "Config/Type/Config_s.hpp"
@@ -15,6 +16,7 @@
 #include "Console/Logger.hpp"
 #include "Game/GameClient.hpp"
 #include "Game/Protocol/ClientProt.hpp"
+#include "Game/Protocol/ServerProt.hpp"
 #include "Script/BotMessenger.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -510,4 +512,115 @@ TEST_CASE("An account connects through client.jsonc's proxy unless its file name
     CHECK(server.GetLoginOpcodes().size() == 1);
     CHECK(shared.GetRecord().accepted == (expectShared ? 1u : 0u));
     CHECK(own.GetRecord().accepted == (expectOwn ? 1u : 0u));
+}
+
+TEST_CASE("Account logout notifications describe completion once", "[Account][Events]")
+{
+    auto notifications = std::vector<std::pair<std::string, bool>>{};
+    const auto options = AccountOptions_s{
+        .client = {.connectAttempts = 0, .keepaliveInterval = 50ms},
+        .onLogout = [&](std::string_view account, const AccountLogout_s& logout)
+        {
+            notifications.emplace_back(account, logout.confirmed);
+        },
+    };
+    auto fixture = AccountFixture{std::nullopt, 30s, options};
+    fixture.StepFor(100ms);
+    REQUIRE(notifications.empty());
+
+    SECTION("confirmed logout")
+    {
+        fixture.account->Interrupt();
+        CHECK(notifications.empty());
+        REQUIRE(fixture.StepUntilFinished());
+        REQUIRE(notifications.size() == 1);
+        CHECK(notifications.front() == std::pair<std::string, bool>{"bot1", true});
+    }
+
+    SECTION("server logout")
+    {
+        fixture.server.Send(ServerProt_e::Logout);
+        REQUIRE(fixture.StepUntilFinished());
+        REQUIRE(notifications.size() == 1);
+        CHECK(notifications.front().second);
+    }
+
+    SECTION("forced close during logout")
+    {
+        fixture.server.SetIgnoreLogout(true);
+        fixture.account->Interrupt();
+        fixture.StepFor(100ms);
+        CHECK(notifications.empty());
+        fixture.account->Interrupt();
+        REQUIRE(notifications.size() == 1);
+        CHECK_FALSE(notifications.front().second);
+    }
+
+    SECTION("network teardown during logout")
+    {
+        fixture.server.SetIgnoreLogout(true);
+        fixture.account->Interrupt();
+        fixture.account->CloseNetwork();
+        REQUIRE(notifications.size() == 1);
+        CHECK_FALSE(notifications.front().second);
+    }
+
+    SECTION("unrelated disconnect")
+    {
+        fixture.server.Close();
+        REQUIRE(fixture.StepUntilFinished());
+        CHECK(notifications.empty());
+    }
+
+    const auto count = notifications.size();
+    fixture.account->Step(0ms);
+    fixture.account->Interrupt();
+    fixture.account->CloseNetwork();
+    CHECK(notifications.size() == count);
+}
+
+TEST_CASE("A timed out account logout notifies unconfirmed completion", "[Account][Events]")
+{
+    auto notifications = std::vector<bool>{};
+    const auto options = AccountOptions_s{.client = {.serverSilenceTimeout = 60s}, .onLogout = [&](std::string_view, const AccountLogout_s& logout)
+    {
+        notifications.push_back(logout.confirmed);
+    }};
+    auto fixture = AccountFixture{std::nullopt, 30s, options};
+    fixture.server.SetIgnoreLogout(true);
+    fixture.account->Interrupt();
+    REQUIRE(notifications.empty());
+    fixture.StepFor(Account::LOGOUT_TIMEOUT + 2s);
+    REQUIRE(fixture.account->IsFinished());
+    REQUIRE(notifications.size() == 1);
+    CHECK_FALSE(notifications.front());
+}
+
+TEST_CASE("Relog logout notifies before login and notifies again after the next session", "[Account][Events]")
+{
+    auto notifications = std::vector<bool>{};
+    const auto options = AccountOptions_s{.onLogout = [&](std::string_view, const AccountLogout_s& logout)
+    {
+        notifications.push_back(logout.confirmed);
+    }};
+    auto fixture = AccountFixture{"done = False\ndef loop():\n    global done\n    if not done:\n        done = True\n        relog(0)\n    return 100\n", 30s, options};
+    const auto deadline = Clock::now() + WAIT;
+    while (Clock::now() < deadline && notifications.empty())
+    {
+        fixture.account->Step(STEP);
+    }
+    REQUIRE(notifications == std::vector<bool>{true});
+    CHECK(fixture.server.GetLoginOpcodes().size() == 1);
+    CHECK(fixture.account->GetClient().GetStatus() == ClientStatus_e::LoggedOut);
+    const auto loginDeadline = Clock::now() + WAIT;
+    while (Clock::now() < loginDeadline && !fixture.account->GetClient().IsInGame())
+    {
+        fixture.account->Step(STEP);
+    }
+    REQUIRE(fixture.account->GetClient().IsInGame());
+    CHECK(fixture.server.GetLoginOpcodes().size() == 2);
+    CHECK(notifications.size() == 1);
+    fixture.account->Interrupt();
+    REQUIRE(fixture.StepUntilFinished());
+    CHECK(notifications == std::vector<bool>{true, true});
 }

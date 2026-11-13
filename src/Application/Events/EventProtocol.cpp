@@ -4,6 +4,7 @@
 #include "Type/ApplicationEvent_s.hpp"
 #include "Type/EventSubscription_s.hpp"
 #include "../../Accounts/Type/ProgressReport_s.hpp"
+#include "../../Accounts/Type/AccountLogout_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -111,15 +112,33 @@ std::variant<EventCommand_s, EventProtocolError_s> EventProtocol::Decode(std::st
 
 std::string_view EventProtocol::Name(const ApplicationEventPayload& payload)
 {
-    return std::visit([](const ProgressReport_s&) -> std::string_view
+    return std::visit([](const auto& value) -> std::string_view
     {
-        return "account.progress";
+        if constexpr (std::is_same_v<std::decay_t<decltype(value)>, ProgressReport_s>)
+        {
+            return "account.progress";
+        }
+        else
+        {
+            static_assert(std::is_same_v<std::decay_t<decltype(value)>, AccountLogout_s>);
+            return "account.logout";
+        }
     }, payload);
 }
 
 bool EventProtocol::IsKnown(std::string_view name)
 {
-    return name == "account.progress";
+    return name == "account.progress" || name == "account.logout";
+}
+
+bool EventProtocol::RetainsLatest(const ApplicationEventPayload& payload)
+{
+    return std::holds_alternative<ProgressReport_s>(payload);
+}
+
+std::optional<std::size_t> EventProtocol::Measure(const AccountLogout_s&)
+{
+    return sizeof(ApplicationEvent_s);
 }
 
 std::optional<std::size_t> EventProtocol::Measure(const ApplicationEventPayload& payload)
@@ -153,9 +172,17 @@ std::optional<std::size_t> EventProtocol::Measure(const ProgressReport_s& report
 
 std::string EventProtocol::Encode(const ApplicationEvent_s& event, std::string_view instance, u64 sequence)
 {
-    const auto payload = std::visit([](const ProgressReport_s& report)
+    const auto payload = std::visit([](const auto& value) -> nlohmann::json
     {
-        return nlohmann::json{{"runTimeSeconds", report.runTime.count()}, {"rows", report.rows}};
+        if constexpr (std::is_same_v<std::decay_t<decltype(value)>, ProgressReport_s>)
+        {
+            return {{"runTimeSeconds", value.runTime.count()}, {"rows", value.rows}};
+        }
+        else
+        {
+            static_assert(std::is_same_v<std::decay_t<decltype(value)>, AccountLogout_s>);
+            return {{"confirmed", value.confirmed}};
+        }
     }, event.payload);
 
     return nlohmann::json{{"version", 1}, {"type", "event"}, {"event", Name(event.payload)}, {"account", event.account}, {"instance", instance}, {"sequence", sequence}, {"timestamp", std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp))}, {"payload", payload}}.dump();
