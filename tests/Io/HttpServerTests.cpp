@@ -504,6 +504,14 @@ TEST_CASE("Main thread stalls delay HTTP timers but an expired handler result ca
     const auto body = Json::parse(responses[0].body());
     CHECK(body["executionStarted"] == true);
     CHECK(body["output"].get<std::string>().find("Console commands") != std::string::npos);
+
+    // The client can finish reading before the server's write completion retires admission.
+    const auto deadline = std::chrono::steady_clock::now() + 2s;
+    while (fixture.bridge->Outstanding() != 0 && std::chrono::steady_clock::now() < deadline)
+    {
+        fixture.net->Wait(std::chrono::steady_clock::now() + 1ms);
+    }
+
     CHECK(fixture.bridge->Outstanding() == 0);
 }
 

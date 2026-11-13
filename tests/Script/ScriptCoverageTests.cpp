@@ -11,20 +11,20 @@
 namespace
 {
     constexpr auto SOURCE =
-        "# ignored comment\n"                          // 1
-        "\n"                                           // 2
-        "value = 0\n"                                  // 3
-        "def used(flag):\n"                            // 4
-        "    if flag:\n"                               // 5
-        "        return 7\n"                           // 6
-        "    raise ValueError('fixture')\n"            // 7
-        "def outer():\n"                               // 8
-        "    def never():\n"                           // 9
-        "        return 123\n"                         // 10
-        "    return never\n"                           // 11
-        "class Example:\n"                             // 12
-        "    def method(self):\n"                      // 13
-        "        return 456\n"sv;                      // 14
+        "# ignored comment\n"               // 1
+        "\n"                                // 2
+        "value = 0\n"                       // 3
+        "def used(flag):\n"                 // 4
+        "    if flag:\n"                    // 5
+        "        return 7\n"                // 6
+        "    raise ValueError('fixture')\n" // 7
+        "def outer():\n"                    // 8
+        "    def never():\n"                // 9
+        "        return 123\n"              // 10
+        "    return never\n"                // 11
+        "class Example:\n"                  // 12
+        "    def method(self):\n"           // 13
+        "        return 456\n"sv;           // 14
     constexpr auto FIXTURE_FILE = "rs2004/__coverage_fixture__.py"sv;
 }
 
@@ -98,7 +98,7 @@ TEST_CASE("Write the stdlib coverage manifest", "[.][ScriptCoverageManifest]")
     {
         CAPTURE(file.path);
         files[std::string{file.path}] = {{"source", file.source},
-                                      {"lines", ScriptCoverage::ExecutableLines(file.source, file.path)}};
+                                         {"lines", ScriptCoverage::ExecutableLines(file.source, file.path)}};
     }
     auto output = std::ofstream{};
     output.exceptions(std::ios::failbit | std::ios::badbit);

@@ -90,8 +90,14 @@ namespace
         {
         }
 
-        [[nodiscard]] std::filesystem::path Path() const { return log.GetPath(); }
-        [[nodiscard]] std::vector<std::string> Lines() const { return ReadLines(Path()); }
+        [[nodiscard]] std::filesystem::path Path() const
+        {
+            return log.GetPath();
+        }
+        [[nodiscard]] std::vector<std::string> Lines() const
+        {
+            return ReadLines(Path());
+        }
 
         std::shared_ptr<const GameCache_s> cache;
         TempFolder folder;
@@ -123,14 +129,16 @@ TEST_CASE("ItemLog groups a backpack by item and records what changed", "[ItemLo
         auto state = GameState_s{};
         state.placed = true;
         // Ten filled slots and no padding, as the server sends it.
-        state.inventories[BACKPACK] = Inventory_s{.com = BACKPACK, .slots = [] {
+        state.inventories[BACKPACK] = Inventory_s{.com = BACKPACK, .slots = []
+        {
             auto slots = std::vector<Item_s>{};
             for (auto i = 0; i < 10; ++i)
             {
                 slots.push_back({.id = CAKE, .count = 1});
             }
             return slots;
-        }(), .tick = 1};
+        }(),
+                                                  .tick = 1};
 
         fixture.log.Step(Clock::now(), state);
 

@@ -487,11 +487,13 @@ if (first == std::string_view::npos)
 }
 ```
 
-Three files enforce the rest of this section. `.clang-format` handles C++ code, `.editorconfig` makes every editor use spaces and LF for every file type, and `.gitattributes` guarantees git stores and checks out LF regardless of anyone's `core.autocrlf` setting.
+`.clang-format` handles mechanical C++ formatting, `.editorconfig` asks editors to use spaces and LF, and `.gitattributes` controls Git's text normalization. These do not enforce every convention above; review naming, semantic rules and blank-line grouping separately. The [source quality checks](../Building.md#source-quality-checks) describe the pinned local/CI commands and their scope.
 
 ### `.clang-format`
 
-Requires clang-format 16 or newer for `LineEnding`.
+The local/CI check pins clang-format 19.1.5 (`LineEnding` requires 16 or newer).
+`InsertBraces` checks ordinary control bodies, but does not insert braces inside
+macros or around preprocessor directives and does not have full semantic context.
 
 ```yaml
 BasedOnStyle: Microsoft
@@ -509,6 +511,7 @@ NamespaceIndentation: All
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+InsertBraces: true
 SortIncludes: Never   # keeps pch.hpp and the own header first
 AlignOperands: DontAlign
 AccessModifierOffset: -4                    # public: and private: at the class's own indentation

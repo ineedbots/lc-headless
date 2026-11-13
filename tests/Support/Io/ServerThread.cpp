@@ -7,9 +7,9 @@
 ServerThread::ServerThread()
     : m_work{boost::asio::make_work_guard(m_io)}
     , m_thread{[this]
-      {
-          m_io.run();
-      }}
+{
+    m_io.run();
+}}
 {
 }
 

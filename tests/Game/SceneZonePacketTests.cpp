@@ -388,8 +388,8 @@ TEST_CASE("Zone updates beyond the build area consume their fields without chang
 {
     auto fixture = SceneFixture{};
     const auto prot = GENERATE(ServerProt_e::LocAddChange, ServerProt_e::LocDel,
-        ServerProt_e::LocAnim, ServerProt_e::ObjAdd, ServerProt_e::ObjDel,
-        ServerProt_e::ObjCount, ServerProt_e::ObjReveal, ServerProt_e::MapAnim);
+                               ServerProt_e::LocAnim, ServerProt_e::ObjAdd, ServerProt_e::ObjDel,
+                               ServerProt_e::ObjCount, ServerProt_e::ObjReveal, ServerProt_e::MapAnim);
     CAPTURE(static_cast<int>(prot));
     auto packet = Packet{};
     packet.P1(0x12);

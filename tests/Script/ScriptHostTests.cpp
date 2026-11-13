@@ -97,7 +97,11 @@ def on_start():
 def loop():
     log('>', 'running')
     return 1000
-)python", ScriptHostOptions_s{.onSettingSave = [&saves](const SettingSave_s& save) { saves.push_back(save); }}};
+)python",
+                               ScriptHostOptions_s{.onSettingSave = [&saves](const SettingSave_s& save)
+    {
+        saves.push_back(save);
+    }}};
     const auto start = ScriptHost::Clock::now();
     fixture.host->Step(start);
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Running);
@@ -152,7 +156,8 @@ def on_stop(reason):
 
 def loop():
     stop_script()
-)python", nlohmann::json{{"fail", failingHook}}.dump()};
+)python",
+                               nlohmann::json{{"fail", failingHook}}.dump()};
     fixture.host->Step(ScriptHost::Clock::now());
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Stopped);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"stop the script stopped", "finish the script stopped"});
@@ -1621,9 +1626,7 @@ TEST_CASE("The example scripts and the ported bots load without warnings", "[Scr
             CAPTURE(entry.path().string());
 
             const auto file = std::filesystem::relative(entry.path(), scripts);
-            CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client,
-                                   {.scriptsDirectory = scripts, .file = file, .callTimeout = ScriptCoverage::AdjustTimeout(10s)},
-                                   capture.GetLogger()});
+            CHECK_NOTHROW(ScriptHost{ScriptTestRuntime::Get(), client, {.scriptsDirectory = scripts, .file = file, .callTimeout = ScriptCoverage::AdjustTimeout(10s)}, capture.GetLogger()});
             ++loaded;
         }
     }

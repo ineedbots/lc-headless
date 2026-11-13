@@ -163,7 +163,9 @@ TEST_CASE("LineEditor buffers multibyte characters across every byte boundary", 
 TEST_CASE("LineEditor deletes multibyte characters without consuming adjacent text", "[LineEditor][ConsoleCoverage]")
 {
     auto editor = LineEditor{};
-    CHECK(editor.Feed("a\xE2\x82\xAC" "b\xF0\x9F\x98\x80").empty());
+    CHECK(editor.Feed("a\xE2\x82\xAC"
+                      "b\xF0\x9F\x98\x80")
+              .empty());
     CHECK(editor.Feed(Keys({HOME, RIGHT, DELETE_KEY})).empty());
     CHECK(editor.GetLine() == "ab\xF0\x9F\x98\x80");
     CHECK(editor.GetCursor() == 1);

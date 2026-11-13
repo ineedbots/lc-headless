@@ -32,7 +32,10 @@ public:
     // Called every step while in game.
     void Step(Clock::time_point now, const GameState_s& state);
 
-    [[nodiscard]] const std::filesystem::path& GetPath() const { return m_path; }
+    [[nodiscard]] const std::filesystem::path& GetPath() const
+    {
+        return m_path;
+    }
 
 private:
     // One item's worth of entries: the id, and how many are held across the slots.

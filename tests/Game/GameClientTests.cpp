@@ -97,8 +97,14 @@ TEST_CASE("GameClient abandons a login when its transport closes before the seed
     auto server = TestServer{[reset](ServerSession& session) -> boost::asio::awaitable<void>
     {
         static_cast<void>(co_await session.Receive());
-        if (reset) session.Reset();
-        else session.Drop();
+        if (reset)
+        {
+            session.Reset();
+        }
+        else
+        {
+            session.Drop();
+        }
     }, ServerMode_e::Tcp};
     auto config = Config_s{};
     config.server = {.transport = Transport_e::Tcp, .host = "127.0.0.1", .port = server.GetPort()};
@@ -115,8 +121,14 @@ TEST_CASE("GameClient abandons a login when its transport closes before the seed
             std::this_thread::sleep_for(1ms);
         }
     };
-    if (reset) CHECK_THROWS_AS(advance(), std::runtime_error);
-    else CHECK_THROWS_WITH(advance(), Catch::Matchers::ContainsSubstring("The connection closed during login"));
+    if (reset)
+    {
+        CHECK_THROWS_AS(advance(), std::runtime_error);
+    }
+    else
+    {
+        CHECK_THROWS_WITH(advance(), Catch::Matchers::ContainsSubstring("The connection closed during login"));
+    }
     CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
     CHECK(client.GetLoginCount() == 0);
     CHECK(server.GetRecord().accepted == 1);
@@ -129,9 +141,16 @@ TEST_CASE("GameClient disconnects and propagates a malformed server packet", "[G
     auto server = FakeGameServer{TestWorld::Send};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
-    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetState().IsSettled();
+    }));
     server.Send(ServerProt_e::PlayerInfo, {});
-    CHECK_THROWS_AS(PumpUntil(client, [] { return false; }), ProtocolError);
+    CHECK_THROWS_AS(PumpUntil(client, []
+    {
+        return false;
+    }),
+                    ProtocolError);
     CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
     CHECK(client.GetLoginCount() == 1);
     CHECK_NOTHROW(client.Pump());
@@ -148,8 +167,15 @@ TEST_CASE("GameClient detects a silent server while the transport remains open",
     options.serverSilenceTimeout = 100ms;
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), options};
     client.Login();
-    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
-    CHECK_THROWS_WITH(PumpUntil(client, [] { return false; }), Catch::Matchers::ContainsSubstring("nothing from the server for 100 ms"));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetState().IsSettled();
+    }));
+    CHECK_THROWS_WITH(PumpUntil(client, []
+    {
+        return false;
+    }),
+                      Catch::Matchers::ContainsSubstring("nothing from the server for 100 ms"));
     CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
     CHECK(client.GetLoginCount() == 1);
     CHECK(server.GetLoginOpcodes() == std::vector<u8>{16});
@@ -161,10 +187,17 @@ TEST_CASE("GameClient reports a permanent rejection during reconnect", "[GameCli
     auto server = FakeGameServer{TestWorld::Send};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
-    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetState().IsSettled();
+    }));
     server.SetLoginStatus(3);
     server.Close();
-    CHECK_THROWS_WITH(PumpUntil(client, [] { return false; }), Catch::Matchers::ContainsSubstring("and reconnecting failed"));
+    CHECK_THROWS_WITH(PumpUntil(client, []
+    {
+        return false;
+    }),
+                      Catch::Matchers::ContainsSubstring("and reconnecting failed"));
     CHECK(client.GetStatus() == ClientStatus_e::Disconnected);
     CHECK(client.GetLoginCount() == 1);
     CHECK(server.GetLoginOpcodes() == std::vector<u8>{16, 18});
@@ -178,12 +211,18 @@ TEST_CASE("GameClient treats a lost connection during logout as a completed sess
     server.SetIgnoreLogout(true);
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
-    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetState().IsSettled();
+    }));
     client.RequestLogout();
     client.Flush();
     REQUIRE(server.WaitForPacket(ClientProt_e::IfButton));
     server.Close();
-    REQUIRE(PumpUntil(client, [&] { return client.GetStatus() == ClientStatus_e::LoggedOut; }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetStatus() == ClientStatus_e::LoggedOut;
+    }));
     CHECK(client.GetLoginCount() == 1);
     CHECK(server.GetLoginOpcodes() == std::vector<u8>{16});
 }
@@ -194,7 +233,10 @@ TEST_CASE("GameClient logs each kind of incoming chat once with its sender", "[G
     auto server = FakeGameServer{TestWorld::Send};
     auto client = GameClient{MakeConfig(server), FakeGameServer::MakeCache(), FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
-    REQUIRE(PumpUntil(client, [&] { return client.GetState().IsSettled(); }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetState().IsSettled();
+    }));
     const auto before = client.GetState().messageCount;
     server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("Mule:tradereq:"));
     server.Send(ServerProt_e::MessageGame, Fixtures::MessageGame("Rival:duelreq:"));
@@ -216,7 +258,10 @@ TEST_CASE("GameClient logs each kind of incoming chat once with its sender", "[G
     extended.P1(static_cast<s32>(chat.size()));
     extended.PData(chat);
     server.Send(ServerProt_e::PlayerInfo, Fixtures::Concat(bits.GetBytes(), Fixtures::ToBytes(extended)));
-    REQUIRE(PumpUntil(client, [&] { return client.GetState().messageCount == before + 5; }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return client.GetState().messageCount == before + 5;
+    }));
     const auto messages = std::array{
         "[trade request] Mule: wishes to trade with you.",
         "[duel request] Rival: wishes to duel with you.",
@@ -228,7 +273,10 @@ TEST_CASE("GameClient logs each kind of incoming chat once with its sender", "[G
     for (const auto* message : messages)
     {
         INFO(message);
-        CHECK(std::ranges::count_if(capture.GetEntries(), [message](const auto& entry) { return entry.message == message; }) == 1);
+        CHECK(std::ranges::count_if(capture.GetEntries(), [message](const auto& entry)
+        {
+            return entry.message == message;
+        }) == 1);
     }
     CHECK(client.GetState().messageCount == before + 5);
 }
@@ -322,9 +370,15 @@ TEST_CASE("GameClient identifies which 225 map file differs from the server", "[
     cache->mapCrcs[u16{(50 << 8) | 50}] = {.land = landDiffers ? 99 : TestWorld::SQUARE_225.landCrc, .locs = landDiffers ? TestWorld::SQUARE_225.locCrc : 99};
     auto client = GameClient{MakeConfig(server), cache, FakeGameServer::MakeAccount(), capture.GetLogger(), FastOptions()};
     client.Login();
-    REQUIRE(PumpUntil(client, [&] { return !client.GetState().messages.empty(); }));
+    REQUIRE(PumpUntil(client, [&]
+    {
+        return !client.GetState().messages.empty();
+    }));
     const auto expected = std::format("Map square 50_50's {} from the server's; walks there may route through changed scenery", landDiffers ? "land differs" : "locs differ");
-    CHECK(std::ranges::any_of(capture.GetEntries(), [&](const CapturedLog_s& entry) { return entry.level == LogLevel_e::Warning && entry.message == expected; }));
+    CHECK(std::ranges::any_of(capture.GetEntries(), [&](const CapturedLog_s& entry)
+    {
+        return entry.level == LogLevel_e::Warning && entry.message == expected;
+    }));
     CHECK(client.IsInGame());
 }
 

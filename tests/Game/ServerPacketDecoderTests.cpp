@@ -374,8 +374,8 @@ TEST_CASE("Interface visibility and colour updates preserve other component fiel
 
     // Exercise each RGB555 channel separately, then together.
     const auto [packed, rgb] = GENERATE(std::pair{u16{0}, u32{0}},
-        std::pair{u16{0x7C00}, u32{0xF80000}}, std::pair{u16{0x03E0}, u32{0x00F800}},
-        std::pair{u16{0x001F}, u32{0x0000F8}}, std::pair{u16{0x7FFF}, u32{0xF8F8F8}});
+                                        std::pair{u16{0x7C00}, u32{0xF80000}}, std::pair{u16{0x03E0}, u32{0x00F800}},
+                                        std::pair{u16{0x001F}, u32{0x0000F8}}, std::pair{u16{0x7FFF}, u32{0xF8F8F8}});
     auto colour = Packet{};
     colour.P2(100);
     colour.P2(packed);
@@ -430,11 +430,10 @@ TEST_CASE("Interface tab packets reject out of range tabs without changing valid
 TEST_CASE("Interface model and position packets reject incomplete or trailing fields", "[ServerPacketDecoder][InterfacePackets]")
 {
     const auto prot = GENERATE(ServerProt_e::IfSetObject, ServerProt_e::IfSetModel,
-        ServerProt_e::IfSetNpcHead, ServerProt_e::IfSetPlayerHead,
-        ServerProt_e::IfSetPosition, ServerProt_e::IfSetAnim, ServerProt_e::IfSetScrollPos);
+                               ServerProt_e::IfSetNpcHead, ServerProt_e::IfSetPlayerHead,
+                               ServerProt_e::IfSetPosition, ServerProt_e::IfSetAnim, ServerProt_e::IfSetScrollPos);
     CAPTURE(static_cast<int>(prot));
-    const auto size = prot == ServerProt_e::IfSetPlayerHead ? 2u :
-        (prot == ServerProt_e::IfSetObject || prot == ServerProt_e::IfSetPosition ? 6u : 4u);
+    const auto size = prot == ServerProt_e::IfSetPlayerHead ? 2u : (prot == ServerProt_e::IfSetObject || prot == ServerProt_e::IfSetPosition ? 6u : 4u);
     for (auto length = 0u; length < size; ++length)
     {
         CAPTURE(length);
@@ -682,7 +681,10 @@ TEST_CASE("ServerPacketDecoder preserves player options when an invalid option s
     REQUIRE(fixture.state.playerOps[0].has_value());
     CHECK(fixture.state.playerOps[0]->text == "Trade with");
     CHECK(fixture.state.playerOps[0]->deprioritised);
-    for (auto i = std::size_t{1}; i < fixture.state.playerOps.size(); ++i) CHECK_FALSE(fixture.state.playerOps[i]);
+    for (auto i = std::size_t{1}; i < fixture.state.playerOps.size(); ++i)
+    {
+        CHECK_FALSE(fixture.state.playerOps[i]);
+    }
 }
 
 TEST_CASE("ServerPacketDecoder updates multiway and minimap state without disturbing the destination", "[ServerPacketDecoder][PlayerPacketBoundaryCoverage]")

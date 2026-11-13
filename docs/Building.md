@@ -93,6 +93,44 @@ Tests needing real cache data skip when their environment variable is absent. Se
 
 For example, in PowerShell use `$env:RS2004_CACHE_DIR = 'C:/servers/289/engine/data/pack'`; in a POSIX shell use `export RS2004_CACHE_DIR=/path/to/289/engine/data/pack`. Test caches are controlled by these variables, independently of `client.jsonc`.
 
+## Source quality checks
+
+CI uses Python 3.12 and clang-format **19.1.5**. Install that exact formatter in a
+virtual environment (activate it before running the checks):
+
+```sh
+python -m pip install -r tools/quality/requirements.txt
+python -B -m unittest discover -s tools/quality
+python -I tools/quality/format.py
+python -I tools/port/lint.py src/Script/Stdlib scripts tests/Stdlib
+python -B -m unittest discover -s tools/port
+```
+
+These commands are identical locally and in CI (`python3` can replace `python`
+on Linux). `format.py --clang-format <path>` selects a particular executable;
+the wrapper rejects versions other than 19.1.5. It checks every `.cpp` and `.hpp`
+under `src/` and `tests/`, with no legacy baseline or changed-file exemption.
+Dependencies, `ports/`, `thirdparty/`, and generated output under `build/` are
+outside that scope. CI checks without modifying files; locally,
+`python -I tools/quality/format.py --fix` applies the same configuration.
+
+`InsertBraces: true` makes ordinary unbraced control statements fail the format
+check, including the formerly unbraced lifecycle test loop. The probes check
+both rejection diagnostics and accepted corrected code. clang-format does not
+perform full semantic analysis and skips brace insertion in macros and when
+braces would enclose preprocessor directives. Review those cases and the other
+conventions (ownership, names, include correctness, blank-line grouping, etc.)
+separately. See [LLVM's InsertBraces documentation](https://releases.llvm.org/19.1.0/tools/clang/docs/ClangFormatStyleOptions.html#insertbraces).
+
+Dialect checking includes all application modules, runnable scripts, and
+pocketpy-executed Python specs/helpers under `tests/Stdlib/`. CPython-only tools
+under `tools/` and editor-only `.pyi` stubs are excluded. The linter's existing
+undefined-name rule deliberately skips runtime specs, whose fixtures inject
+names; its wildcard-import exemption also remains. Other dialect rules still
+apply to these files. Embedded Python string literals in C++ tests are exercised
+by native tests rather than scanned as Python files. A finding prints
+`file:line: message` and exits nonzero. Porting-tool self-tests remain in CI.
+
 ## Coverage
 
 Coverage uses dedicated presets and additional tools; normal build presets do not enable instrumentation. For account scripts' line timings, see [Script profiling](Running.md#script-profiling).

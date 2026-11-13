@@ -44,7 +44,10 @@ TEST_CASE("ConsoleInput callbacks can drain queued lines and replace themselves"
     input.SetOnArrived([&]
     {
         received = input.TakeLines();
-        input.SetOnArrived([&] { ++second; });
+        input.SetOnArrived([&]
+        {
+            ++second;
+        });
     });
     input.Push("first");
     CHECK(received == std::vector<std::string>{"first"});

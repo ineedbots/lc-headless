@@ -84,16 +84,16 @@ namespace
         TestCache::AddObj(*cache, TestWorld::LOGS, "Logs");
         TestCache::AddObj(*cache, TestWorld::COINS, "Coins");
         TestCache::AddComponents(*cache, {
-            {.id = PANEL, .root = PANEL, .width = 300, .height = 300, .children = {{901}, {.id = 902, .y = 40}, {903}, {904}, {905}, {ACCEPT}, {907}}},
-            {.id = 901, .root = PANEL, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 100, .height = 20, .text = "Confirm"},
-            {.id = 902, .root = PANEL, .type = ComponentType_e::Text, .width = 100, .height = 20, .text = "Plain label"},
-            {.id = 903, .root = PANEL, .buttonType = ButtonType_e::Target},
-            {.id = 904, .root = PANEL, .buttonType = ButtonType_e::Continue},
-            {.id = 905, .root = PANEL, .buttonType = ButtonType_e::Close},
-            {.id = ACCEPT, .root = PANEL, .buttonType = ButtonType_e::Ok, .clientCode = ClientCode_e::AcceptDesign},
-            {.id = 907, .root = PANEL, .buttonType = ButtonType_e::Ok, .hidden = true},
-            {.id = TestCache::RUN_ON_BUTTON, .root = 950, .buttonType = ButtonType_e::Select},
-        });
+                                             {.id = PANEL, .root = PANEL, .width = 300, .height = 300, .children = {{901}, {.id = 902, .y = 40}, {903}, {904}, {905}, {ACCEPT}, {907}}},
+                                             {.id = 901, .root = PANEL, .type = ComponentType_e::Text, .buttonType = ButtonType_e::Ok, .width = 100, .height = 20, .text = "Confirm"},
+                                             {.id = 902, .root = PANEL, .type = ComponentType_e::Text, .width = 100, .height = 20, .text = "Plain label"},
+                                             {.id = 903, .root = PANEL, .buttonType = ButtonType_e::Target},
+                                             {.id = 904, .root = PANEL, .buttonType = ButtonType_e::Continue},
+                                             {.id = 905, .root = PANEL, .buttonType = ButtonType_e::Close},
+                                             {.id = ACCEPT, .root = PANEL, .buttonType = ButtonType_e::Ok, .clientCode = ClientCode_e::AcceptDesign},
+                                             {.id = 907, .root = PANEL, .buttonType = ButtonType_e::Ok, .hidden = true},
+                                             {.id = TestCache::RUN_ON_BUTTON, .root = 950, .buttonType = ButtonType_e::Select},
+                                         });
         return cache;
     }
 

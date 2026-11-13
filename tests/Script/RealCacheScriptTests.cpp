@@ -272,81 +272,89 @@ assert reachability.flags(Tile(3209, 3213)) == 0x100 and seen((3209, 3215), (320
 
 namespace
 {
-void RunWalkerDataSpec(const std::string_view name, const std::optional<std::string_view> selectedSpec = std::nullopt)
-{
-    const auto cache = RealCache::RequireShared(Revision_e::Rev289);
-    const auto navigation = std::make_shared<const Navigation>(*cache, std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
-    const auto file = Rs2b0tSpecs::GetFolder() / "nav" / name;
-    REQUIRE(std::filesystem::is_regular_file(file));
+    void RunWalkerDataSpec(const std::string_view name, const std::optional<std::string_view> selectedSpec = std::nullopt)
+    {
+        const auto cache = RealCache::RequireShared(Revision_e::Rev289);
+        const auto navigation = std::make_shared<const Navigation>(*cache, std::filesystem::path{RS2004_SOURCE_DIR} / "data" / "nav");
+        const auto file = Rs2b0tSpecs::GetFolder() / "nav" / name;
+        REQUIRE(std::filesystem::is_regular_file(file));
 
-    auto capture = LogCapture{};
-    auto map = WorldMap{cache};
-    auto client = GameClient{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()};
-    auto actions = GameActions{client};
-    auto state = Fixtures::PlacedState();
-    auto api = ScriptContext{state, map, actions, nullptr, {}, navigation};
-    auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts", .callTimeout = 60s}, capture.GetLogger()};
-    ScriptBindings::Bind(vm, api);
-    Rs2b0tSpecs::Run(vm, file, selectedSpec);
-    ScriptBindings::Unbind(vm);
-}
+        auto capture = LogCapture{};
+        auto map = WorldMap{cache};
+        auto client = GameClient{std::make_shared<const Config_s>(), cache, FakeGameServer::MakeAccount(), capture.GetLogger()};
+        auto actions = GameActions{client};
+        auto state = Fixtures::PlacedState();
+        auto api = ScriptContext{state, map, actions, nullptr, {}, navigation};
+        auto vm = ScriptVm{ScriptTestRuntime::Get(), {.scriptsDirectory = std::filesystem::path{RS2004_SOURCE_DIR} / "scripts", .callTimeout = 60s}, capture.GetLogger()};
+        ScriptBindings::Bind(vm, api);
+        Rs2b0tSpecs::Run(vm, file, selectedSpec);
+        ScriptBindings::Unbind(vm);
+    }
 
-#define WALKER_DATA_SPEC(name) TEST_CASE("Walker data: " name, "[RealCache]") { RunWalkerDataSpec(name); }
-#define WALKER_ACCOUNT_LEVELER_SPEC(label, spec) TEST_CASE("Walker data: account leveler: " label, "[RealCache]") { RunWalkerDataSpec("test_account_leveler_cache.py", spec); }
+#define WALKER_DATA_SPEC(name)                     \
+    TEST_CASE("Walker data: " name, "[RealCache]") \
+    {                                              \
+        RunWalkerDataSpec(name);                   \
+    }
+#define WALKER_ACCOUNT_LEVELER_SPEC(label, spec)                     \
+    TEST_CASE("Walker data: account leveler: " label, "[RealCache]") \
+    {                                                                \
+        RunWalkerDataSpec("test_account_leveler_cache.py", spec);    \
+    }
 
-// Keep each cache-backed navigation spec as its own CTest case. The aggregate ran for over five minutes in Debug,
-// exceeding CTest's per-test timeout and obscuring which spec was slow.
-WALKER_ACCOUNT_LEVELER_SPEC("training camp targets and exact variants exist and are attackable in the cache", "training camp targets and exact variants exist and are attackable in the cache")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 0-5 route with their access requirements", "training camps 0-5 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 6-11 route with their access requirements", "training camps 6-11 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 12-17 route with their access requirements", "training camps 12-17 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 18-23 route with their access requirements", "training camps 18-23 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 24-29 route with their access requirements", "training camps 24-29 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 30-35 route with their access requirements", "training camps 30-35 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 36-41 route with their access requirements", "training camps 36-41 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 42-47 route with their access requirements", "training camps 42-47 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 48-53 route with their access requirements", "training camps 48-53 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("training camps 54-56 route with their access requirements", "training camps 54-56 route with their access requirements")
-WALKER_ACCOUNT_LEVELER_SPEC("tool, armour, rune and vial suppliers have reachable shopping stands", "tool, armour, rune and vial suppliers have reachable shopping stands")
-WALKER_ACCOUNT_LEVELER_SPEC("Zanaris stands connect on each side of the paid gate and offer the scripted operations", "Zanaris stands connect on each side of the paid gate and offer the scripted operations")
-WALKER_ACCOUNT_LEVELER_SPEC("Seers to Lowe avoids the deep Wilderness lever shortcut", "Seers to Lowe avoids the deep Wilderness lever shortcut")
-WALKER_DATA_SPEC("test_bank_bank_locations.py")
-WALKER_DATA_SPEC("test_bank_bank_quest_junk_cache.py")
-WALKER_DATA_SPEC("test_bank_mage_bank_gate.py")
-WALKER_DATA_SPEC("test_clue_altar_map.py")
-WALKER_DATA_SPEC("test_clue_bank_access.py")
-WALKER_DATA_SPEC("test_clue_initial_bank.py")
-WALKER_DATA_SPEC("test_clue_kharazi_band.py")
-WALKER_DATA_SPEC("test_clue_teleport_kit.py")
-WALKER_DATA_SPEC("test_deathplateau_scout_cache.py")
-WALKER_DATA_SPEC("test_dragonslayer_shieldofarrav_barcrawl_cache.py")
-WALKER_DATA_SPEC("test_elemental_workshop_exit_cache.py")
-WALKER_DATA_SPEC("test_heroquest_scavvo_cache.py")
-WALKER_DATA_SPEC("test_hunting_sites_teleports.py")
-WALKER_DATA_SPEC("test_ikov_tiles.py")
-WALKER_DATA_SPEC("test_jive_market_dumper_settings.py")
-WALKER_DATA_SPEC("test_lostcity_safespot_cache.py")
-WALKER_DATA_SPEC("test_market_tables_cache.py")
-WALKER_DATA_SPEC("test_mule_crafter_logic.py")
-WALKER_DATA_SPEC("test_quest_banks.py")
-WALKER_DATA_SPEC("test_quest_f2p_targets_cache.py")
-WALKER_DATA_SPEC("test_quest_members_gnomes_ogres_desert_cache.py")
-WALKER_DATA_SPEC("test_quest_members_heroes_ikov_fremennik_cache.py")
-WALKER_DATA_SPEC("test_quest_members_legends_cache.py")
-WALKER_DATA_SPEC("test_quest_members_mid_cache.py")
-WALKER_DATA_SPEC("test_quest_members_morytania_karamja_cache.py")
-WALKER_DATA_SPEC("test_quest_members_supplies_cache.py")
-WALKER_DATA_SPEC("test_quest_members_targets_cache.py")
-WALKER_DATA_SPEC("test_quest_members_trolls_cache.py")
-WALKER_DATA_SPEC("test_quest_members_upass_regicide_cache.py")
-WALKER_DATA_SPEC("test_quest_members_workshop_to_horror_cache.py")
-WALKER_DATA_SPEC("test_rogues_purse_logic.py")
-WALKER_DATA_SPEC("test_shieldofarrav_tiles.py")
-WALKER_DATA_SPEC("test_shilo_tomb_exit_cache.py")
-WALKER_DATA_SPEC("test_walk_bank_plan.py")
-WALKER_DATA_SPEC("test_walk_gate_items.py")
-WALKER_DATA_SPEC("test_walk_jewellery_catalog.py")
-WALKER_DATA_SPEC("test_waterfall_exit_route_cache.py")
+    // Keep each cache-backed navigation spec as its own CTest case. The aggregate ran for over five minutes in Debug,
+    // exceeding CTest's per-test timeout and obscuring which spec was slow.
+    WALKER_ACCOUNT_LEVELER_SPEC("training camp targets and exact variants exist and are attackable in the cache", "training camp targets and exact variants exist and are attackable in the cache")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 0-5 route with their access requirements", "training camps 0-5 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 6-11 route with their access requirements", "training camps 6-11 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 12-17 route with their access requirements", "training camps 12-17 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 18-23 route with their access requirements", "training camps 18-23 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 24-29 route with their access requirements", "training camps 24-29 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 30-35 route with their access requirements", "training camps 30-35 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 36-41 route with their access requirements", "training camps 36-41 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 42-47 route with their access requirements", "training camps 42-47 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 48-53 route with their access requirements", "training camps 48-53 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("training camps 54-56 route with their access requirements", "training camps 54-56 route with their access requirements")
+    WALKER_ACCOUNT_LEVELER_SPEC("tool, armour, rune and vial suppliers have reachable shopping stands", "tool, armour, rune and vial suppliers have reachable shopping stands")
+    WALKER_ACCOUNT_LEVELER_SPEC("Zanaris stands connect on each side of the paid gate and offer the scripted operations", "Zanaris stands connect on each side of the paid gate and offer the scripted operations")
+    WALKER_ACCOUNT_LEVELER_SPEC("Seers to Lowe avoids the deep Wilderness lever shortcut", "Seers to Lowe avoids the deep Wilderness lever shortcut")
+    WALKER_DATA_SPEC("test_bank_bank_locations.py")
+    WALKER_DATA_SPEC("test_bank_bank_quest_junk_cache.py")
+    WALKER_DATA_SPEC("test_bank_mage_bank_gate.py")
+    WALKER_DATA_SPEC("test_clue_altar_map.py")
+    WALKER_DATA_SPEC("test_clue_bank_access.py")
+    WALKER_DATA_SPEC("test_clue_initial_bank.py")
+    WALKER_DATA_SPEC("test_clue_kharazi_band.py")
+    WALKER_DATA_SPEC("test_clue_teleport_kit.py")
+    WALKER_DATA_SPEC("test_deathplateau_scout_cache.py")
+    WALKER_DATA_SPEC("test_dragonslayer_shieldofarrav_barcrawl_cache.py")
+    WALKER_DATA_SPEC("test_elemental_workshop_exit_cache.py")
+    WALKER_DATA_SPEC("test_heroquest_scavvo_cache.py")
+    WALKER_DATA_SPEC("test_hunting_sites_teleports.py")
+    WALKER_DATA_SPEC("test_ikov_tiles.py")
+    WALKER_DATA_SPEC("test_jive_market_dumper_settings.py")
+    WALKER_DATA_SPEC("test_lostcity_safespot_cache.py")
+    WALKER_DATA_SPEC("test_market_tables_cache.py")
+    WALKER_DATA_SPEC("test_mule_crafter_logic.py")
+    WALKER_DATA_SPEC("test_quest_banks.py")
+    WALKER_DATA_SPEC("test_quest_f2p_targets_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_gnomes_ogres_desert_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_heroes_ikov_fremennik_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_legends_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_mid_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_morytania_karamja_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_supplies_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_targets_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_trolls_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_upass_regicide_cache.py")
+    WALKER_DATA_SPEC("test_quest_members_workshop_to_horror_cache.py")
+    WALKER_DATA_SPEC("test_rogues_purse_logic.py")
+    WALKER_DATA_SPEC("test_shieldofarrav_tiles.py")
+    WALKER_DATA_SPEC("test_shilo_tomb_exit_cache.py")
+    WALKER_DATA_SPEC("test_walk_bank_plan.py")
+    WALKER_DATA_SPEC("test_walk_gate_items.py")
+    WALKER_DATA_SPEC("test_walk_jewellery_catalog.py")
+    WALKER_DATA_SPEC("test_waterfall_exit_route_cache.py")
 
 #undef WALKER_DATA_SPEC
 #undef WALKER_ACCOUNT_LEVELER_SPEC

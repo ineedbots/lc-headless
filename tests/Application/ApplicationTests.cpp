@@ -34,7 +34,9 @@ namespace
     class ApplicationFixture
     {
     public:
-        ApplicationFixture() : server{PlacePlayer}, config{server.MakeConfig()}
+        ApplicationFixture()
+            : server{PlacePlayer}
+            , config{server.MakeConfig()}
         {
             auto contents = StoreContents_s{};
             contents.varps = {CacheWriter::MakeDefinition("", {}, std::vector<u8>{5, 0, 7})};
@@ -66,7 +68,10 @@ namespace
         void WriteAccount(bool script = true)
         {
             auto account = nlohmann::json{{"username", "bot"}, {"password", "secret"}, {"randomEvents", false}, {"runAuto", false}, {"stallMinutes", 0}};
-            if (script) account["script"] = {{"file", "main.py"}};
+            if (script)
+            {
+                account["script"] = {{"file", "main.py"}};
+            }
             folder.WriteFile("accounts/bot.jsonc", account.dump());
         }
 
@@ -99,7 +104,10 @@ TEST_CASE("Application loads accounts and exits successfully after a script requ
     const auto explicitAccount = GENERATE(false, true);
     auto fixture = ApplicationFixture{};
     auto args = std::vector<std::string>{"--raw-console"};
-    if (explicitAccount) args.insert(args.end(), {"--account", "accounts/bot.jsonc"});
+    if (explicitAccount)
+    {
+        args.insert(args.end(), {"--account", "accounts/bot.jsonc"});
+    }
     const auto result = fixture.Run(args);
     INFO(result.output);
     CHECK(result.exitCode == EXIT_SUCCESS);
@@ -159,7 +167,10 @@ TEST_CASE("Application explains missing and empty account directories", "[Applic
     const auto missing = GENERATE(false, true);
     auto fixture = ApplicationFixture{};
     fixture.config.scripting.accountsDirectory = missing ? "absent" : "empty";
-    if (!missing) std::filesystem::create_directory(fixture.folder.GetPath() / "empty");
+    if (!missing)
+    {
+        std::filesystem::create_directory(fixture.folder.GetPath() / "empty");
+    }
     const auto result = fixture.Run();
     INFO(result.output);
     CHECK(result.exitCode == EXIT_FAILURE);
@@ -176,7 +187,10 @@ TEST_CASE("Application resumes a scripted account after debugger configuration",
     probe.open(Tcp::v4());
     auto error = boost::system::error_code{};
     probe.bind(endpoint, error);
-    if (error) SKIP("The debugger's fixed port is already in use");
+    if (error)
+    {
+        SKIP("The debugger's fixed port is already in use");
+    }
     probe.close();
     auto configured = false;
     auto response = std::string{};
@@ -188,23 +202,38 @@ TEST_CASE("Application resumes a scripted account after debugger configuration",
         while (!stop.stop_requested() && std::chrono::steady_clock::now() < deadline)
         {
             socket.connect(endpoint, ec);
-            if (!ec) break;
+            if (!ec)
+            {
+                break;
+            }
             socket.close(ec);
             std::this_thread::sleep_for(10ms);
         }
-        if (!socket.is_open()) return;
+        if (!socket.is_open())
+        {
+            return;
+        }
         const auto message = std::string{R"({"seq":1,"type":"request","command":"configurationDone","arguments":{}})"};
         const auto frame = std::format("Content-Length: {}\r\n\r\n{}", message.size(), message);
         boost::asio::write(socket, boost::asio::buffer(frame), ec);
-        if (ec) return;
+        if (ec)
+        {
+            return;
+        }
         configured = true;
         socket.non_blocking(true, ec);
         auto bytes = std::array<char, 4096>{};
         while (!ec && !stop.stop_requested())
         {
             const auto count = socket.read_some(boost::asio::buffer(bytes), ec);
-            if (!ec) response.append(bytes.data(), count);
-            else if (ec == boost::asio::error::would_block || ec == boost::asio::error::try_again) ec.clear();
+            if (!ec)
+            {
+                response.append(bytes.data(), count);
+            }
+            else if (ec == boost::asio::error::would_block || ec == boost::asio::error::try_again)
+            {
+                ec.clear();
+            }
             std::this_thread::sleep_for(1ms);
         }
     }};
@@ -242,7 +271,10 @@ TEST_CASE("Application creates profiles and enables script watching", "[Applicat
     auto reports = std::vector<std::filesystem::path>{};
     for (const auto& entry : std::filesystem::recursive_directory_iterator{fixture.folder.GetPath() / "profiles"})
     {
-        if (entry.path().filename() == "profiler_report.json") reports.push_back(entry.path());
+        if (entry.path().filename() == "profiler_report.json")
+        {
+            reports.push_back(entry.path());
+        }
     }
     REQUIRE(reports.size() == 1);
     const auto report = FileUtils::ReadText(reports.front());

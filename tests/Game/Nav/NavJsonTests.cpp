@@ -62,25 +62,44 @@ TEST_CASE("Navigation JSON reads explicit policy and state without losing false 
 TEST_CASE("Navigation JSON reports malformed nested fields as invalid requests", "[NavJson]")
 {
     auto json = Json{{"from", {1, 2, 0}}, {"to", {3, 4, 0}}};
-    SECTION("missing destination") { json.erase("to"); }
-    SECTION("wrong coordinate type") { json["from"][0] = "west"; }
-    SECTION("short door") { json["avoid_doors"] = Json::array({Json::array({1})}); }
-    SECTION("missing zone coordinate") { json["avoid_zones"] = Json::array({Json{{"min_x", 1}}}); }
-    SECTION("wrong optional boolean") { json["policy"]["use_ships"] = "yes"; }
-    SECTION("wrong skill count") { json["state"]["skills"]["Agility"] = "ten"; }
-    SECTION("wrong quest status") { json["state"]["quests"]["Cook's Assistant"] = 2; }
+    SECTION("missing destination")
+    {
+        json.erase("to");
+    }
+    SECTION("wrong coordinate type")
+    {
+        json["from"][0] = "west";
+    }
+    SECTION("short door")
+    {
+        json["avoid_doors"] = Json::array({Json::array({1})});
+    }
+    SECTION("missing zone coordinate")
+    {
+        json["avoid_zones"] = Json::array({Json{{"min_x", 1}}});
+    }
+    SECTION("wrong optional boolean")
+    {
+        json["policy"]["use_ships"] = "yes";
+    }
+    SECTION("wrong skill count")
+    {
+        json["state"]["skills"]["Agility"] = "ten";
+    }
+    SECTION("wrong quest status")
+    {
+        json["state"]["quests"]["Cook's Assistant"] = 2;
+    }
     CHECK_THROWS_WITH(NavJson::ParseRequest(json.dump()), ContainsSubstring("a route request is malformed:"));
     CHECK_THROWS_AS(NavJson::ParseRequest("{"), std::invalid_argument);
 }
 
 TEST_CASE("Navigation JSON serialises optional edge destinations and identifiers", "[NavJson]")
 {
-    auto edge = NavEdge_s{.kind = "door", .cost = 4, .locName = "Gate", .action = "Open",
-        .locX = 3200, .locZ = 3201, .locId = 10, .openLocId = 11,
-        .toLevel = 0, .toTile = std::pair{3202, 3203}, .acceptAnyLanding = true};
+    auto edge = NavEdge_s{.kind = "door", .cost = 4, .locName = "Gate", .action = "Open", .locX = 3200, .locZ = 3201, .locId = 10, .openLocId = 11, .toLevel = 0, .toTile = std::pair{3202, 3203}, .acceptAnyLanding = true};
     auto path = NavPath_s{.ok = true, .cost = 4, .expanded = 12};
     path.waypoints = {{.point = {.x = 3200, .z = 3201, .level = 0}},
-        {.point = {.x = 3202, .z = 3203, .level = 0}, .edge = &edge}};
+                      {.point = {.x = 3202, .z = 3203, .level = 0}, .edge = &edge}};
     const auto withIds = GENERATE(false, true);
     if (!withIds)
     {
@@ -119,8 +138,7 @@ TEST_CASE("Navigation JSON serialises optional edge destinations and identifiers
 TEST_CASE("Navigation JSON distinguishes spell and jewellery teleports", "[NavJson]")
 {
     const auto spell = GENERATE(false, true);
-    auto teleport = NavTeleport_s{.id = "test", .family = spell ? "spell" : "jewellery",
-        .label = "Destination", .to = {.x = 3200, .z = 3201, .level = 0}, .cost = 15};
+    auto teleport = NavTeleport_s{.id = "test", .family = spell ? "spell" : "jewellery", .label = "Destination", .to = {.x = 3200, .z = 3201, .level = 0}, .cost = 15};
     auto path = NavPath_s{.ok = true, .cost = 15};
     path.waypoints = {{.point = teleport.to, .teleport = &teleport}};
     const auto json = Json::parse(NavJson::ToJson(path));

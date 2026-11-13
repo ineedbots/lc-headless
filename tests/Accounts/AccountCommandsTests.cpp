@@ -172,9 +172,7 @@ TEST_CASE("AccountCommands truncates public chat before sending it", "[AccountCo
     const auto packets = fixture.server.GetPackets(ClientProt_e::MessagePublic);
     REQUIRE(packets.size() == 1);
     CHECK(WordPack::Unpack(std::span{packets.front().payload}.subspan(2)) == "A" + text.substr(1));
-    CHECK(fixture.Messages() == std::vector<std::string>{
-        std::format("Public chat holds {} characters; the rest is cut off", WordPack::MAX_PACK_LENGTH),
-        "target says: " + text});
+    CHECK(fixture.Messages() == std::vector<std::string>{std::format("Public chat holds {} characters; the rest is cut off", WordPack::MAX_PACK_LENGTH), "target says: " + text});
 }
 
 TEST_CASE("AccountCommands warns when a targeted script command queue is full", "[AccountCommandCoverage]")
