@@ -344,7 +344,7 @@ TEST_CASE("WebSocket fanout keeps REST progressing under a bounded multi-client 
     {
         ++passes;
         account.Step(0ms);
-        if (!published && fixture.events->GetDiagnostics().subscriptions == 32)
+        if (!published && fixture.events->GetDiagnostics().subscriptions == 32 && account.GetClient().IsInGame())
         {
             published = true;
             publishedAt = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
