@@ -19,7 +19,7 @@ SKIP_TICKS = 50
 POLL_TICKS = 1
 CHICKEN_NAME = 'Chicken'
 LOOT_EXTRA_DIST = 3
-RELOG_WHEN_NO_KILLS = 50
+RELOG_WHEN_NO_KILLS = 60
 
 class ChickenKiller(TaskBot):
     def on_reconnect(self):
@@ -96,7 +96,7 @@ class ChickenKiller(TaskBot):
         publish_event('no_kills')
 
         my_pid = players.local().index
-        lowest_pid_player = min(players.all(), key=lambda player: player.index)
+        lowest_pid_player = min(players.all(), key=lambda player: player.index, default=None)
         if lowest_pid_player is None or my_pid <= lowest_pid_player.index:
             return False
 
