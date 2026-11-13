@@ -148,3 +148,8 @@ Python scripts publish bounded live `script.event` values using
 `publish_event(name, data=None)`. `ScriptPublishedEvent` owns the limits, JSON
 validation and serializer, while the host supplies the account config identity.
 See [script publication](../scripting/console-and-messages.md#operator-events).
+
+Fleet journal definitions use `FleetLogEvent` to validate bounded owned JSON and
+serialize it as an object payload. Producers pass the same UTF-8-normalized JSON
+line they successfully appended. The four fleet event types are account-scoped
+and live only; they share validation without sharing a subscription name.

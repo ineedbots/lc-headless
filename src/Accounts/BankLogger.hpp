@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
@@ -14,7 +16,7 @@
 class BankLogger
 {
 public:
-    BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory);
+    BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     // Called every step while in game. Records on the closed -> open edge only.
     void Step(const GameState_s& state);
@@ -34,4 +36,5 @@ private:
     bool m_wasOpen = false;
     // So a folder that can't be written is reported once, not on every open.
     bool m_writeFailed = false;
+    std::shared_ptr<ApplicationEventPublisher> m_events;
 };

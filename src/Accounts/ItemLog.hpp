@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
@@ -27,7 +29,7 @@ public:
     };
 
     // A zero interval records every change.
-    ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval);
+    ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     // Called every step while in game.
     void Step(Clock::time_point now, const GameState_s& state);
@@ -74,4 +76,5 @@ private:
     std::optional<Contents_s> m_pending;
     std::optional<Clock::time_point> m_nextSample;
     bool m_writeFailed = false;
+    std::shared_ptr<ApplicationEventPublisher> m_events;
 };

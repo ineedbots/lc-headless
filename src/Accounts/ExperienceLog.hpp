@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
@@ -46,7 +48,7 @@ public:
     });
 
     // A zero interval turns the log off; the account doesn't build one.
-    ExperienceLog(std::filesystem::path directory, std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger);
+    ExperienceLog(std::filesystem::path directory, std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     // Called every step. The account's status is recorded on every change, and skills are sampled while it
     // is in game and settled; `settled` is the state's own test, since the stats arrive a tick after the
@@ -76,4 +78,5 @@ private:
     bool m_hasLastXp = false;
     // So a file that can't be written is reported once, not every sample.
     bool m_writeFailed = false;
+    std::shared_ptr<ApplicationEventPublisher> m_events;
 };
