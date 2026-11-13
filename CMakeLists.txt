@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)    # for clangd / tooling
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 include(cmake/Coverage.cmake)
+include(cmake/Sanitizers.cmake)
 
 find_package(boost_asio CONFIG REQUIRED)
 find_package(boost_beast CONFIG REQUIRED)
@@ -125,12 +126,14 @@ if(RS2004_ENABLE_SCRIPT_COVERAGE)
 endif()
 catch_discover_tests(${PROJECT_NAME}Tests
     DISCOVERY_MODE PRE_TEST
+    ADD_TAGS_AS_LABELS
     PROPERTIES TIMEOUT ${TEST_TIMEOUT})
 
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/test-runtime-$<CONFIG>.json" CONTENT
     "{\"tests\":\"$<TARGET_FILE:${PROJECT_NAME}Tests>\"}\n")
 
 configure_native_coverage(${PROJECT_NAME}Lib ${PROJECT_NAME} ${PROJECT_NAME}Tests ${PROJECT_NAME}Main)
+configure_project_sanitizers(${PROJECT_NAME}Lib ${PROJECT_NAME} ${PROJECT_NAME}Tests ${PROJECT_NAME}Main)
 
 # The release archive is one folder laid out like the repository, with the files the client loads from its working
 # directory, so it runs from inside the folder with the default paths in client.jsonc.sample. The tests aren't installed.
