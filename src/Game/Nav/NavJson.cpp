@@ -4,6 +4,7 @@
 #include "../../Utils/StringUtils.hpp"
 #include "Type/NavPoint_s.hpp"
 #include "Type/NavState_s.hpp"
+#include "NavPayloadJson.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -135,62 +136,5 @@ NavRequest_s NavJson::ParseRequest(std::string_view text)
 
 std::string NavJson::ToJson(const NavPath_s& path)
 {
-    auto json = Json{{"ok", path.ok}, {"reason", path.reason}, {"cost", path.cost}, {"expanded", path.expanded}};
-    auto waypoints = Json::array();
-    for (const auto& waypoint : path.waypoints)
-    {
-        auto entry = Json{{"x", waypoint.point.x}, {"z", waypoint.point.z}, {"level", waypoint.point.level}};
-        if (const auto* const edge = waypoint.edge)
-        {
-            auto transport = Json{
-                {"kind", edge->kind},
-                {"loc_name", edge->locName},
-                {"action", edge->action},
-                {"loc_x", edge->locX},
-                {"loc_z", edge->locZ},
-                {"accept_any_landing", edge->acceptAnyLanding},
-                {"edge_cost", edge->cost},
-            };
-
-            if (edge->locId)
-            {
-                transport["loc_id"] = *edge->locId;
-            }
-
-            if (edge->openLocId)
-            {
-                transport["open_loc_id"] = *edge->openLocId;
-            }
-
-            if (edge->toLevel)
-            {
-                transport["to_level"] = *edge->toLevel;
-            }
-
-            if (edge->toTile)
-            {
-                transport["to_tile"] = {edge->toTile->first, edge->toTile->second};
-            }
-
-            entry["transport"] = std::move(transport);
-        }
-        else if (const auto* const teleport = waypoint.teleport)
-        {
-            entry["transport"] = Json{
-                {"kind", "teleport"},
-                {"loc_name", teleport->label},
-                {"action", teleport->family == "spell" ? "Cast" : "Rub"},
-                {"teleport_id", teleport->id},
-                {"family", teleport->family},
-                {"to_tile", {teleport->to.x, teleport->to.z}},
-                {"accept_any_landing", true},
-                {"edge_cost", teleport->cost},
-            };
-        }
-
-        waypoints.push_back(std::move(entry));
-    }
-
-    json["waypoints"] = std::move(waypoints);
-    return json.dump();
+    return Json(path).dump();
 }

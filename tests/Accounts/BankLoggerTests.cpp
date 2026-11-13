@@ -8,6 +8,7 @@
 #include "Game/State/Type/GameState_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -28,7 +29,7 @@ namespace
     }
 
     // The cache needs a bank component, the interface that holds it, and the two items themselves.
-    std::shared_ptr<const GameCache_s> MakeBankCache()
+    std::shared_ptr<const GameCache_s> MakeBankCache(std::string_view coinName = "Coins")
     {
         auto cache = GameCache_s{};
         cache.bankComponent = BANK_ITEMS;
@@ -37,7 +38,7 @@ namespace
 
         // The object list is indexed by id, so every id below the highest needs an entry.
         cache.objs.resize(static_cast<std::size_t>(COINS) + 1);
-        cache.objs[COINS] = ObjType_s{.id = COINS, .name = "Coins"};
+        cache.objs[COINS] = ObjType_s{.id = COINS, .name = coinName};
         cache.objs[BONES] = ObjType_s{.id = BONES, .name = "Bones"};
         return std::make_shared<const GameCache_s>(std::move(cache));
     }
@@ -90,6 +91,30 @@ namespace
         LogCapture capture;
         BankLogger log;
     };
+}
+
+TEST_CASE("BankLogger writes escaped item names as one valid JSON line", "[BankLogger]")
+{
+    auto name = std::string{"Coins \"\\\xc3\xa9"};
+    for (auto value = 0; value < 32; ++value)
+    {
+        name += static_cast<char>(value);
+    }
+
+    name += '\xff';
+    const auto cache = MakeBankCache(name);
+    const auto folder = TempFolder{"rs2004-bank-json-tests"};
+    auto capture = LogCapture{};
+    auto log = BankLogger{*cache, capture.GetLogger(), "test", folder.GetPath()};
+    log.Step(OpenBank({{.id = COINS, .count = 2}, {.id = COINS, .count = 3}}));
+
+    const auto text = ReadFile(folder.GetPath() / "test.jsonl");
+    CHECK(CountLines(text) == 1);
+
+    const auto record = nlohmann::json::parse(text);
+    CHECK(record.size() == 3);
+    CHECK(record["account"] == "test");
+    CHECK(record["items"] == nlohmann::json::array({{{"id", COINS}, {"name", name.substr(0, name.size() - 1) + "\xef\xbf\xbd"}, {"qty", 5}}}));
 }
 
 TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLogger]")

@@ -3,8 +3,12 @@
 
 #include "../Game/State/GameStateQueries.hpp"
 #include "../Utils/FileUtils.hpp"
-#include "../Utils/JsonUtils.hpp"
 #include "../Utils/StringUtils.hpp"
+#include "FleetLogJson.hpp"
+#include "Type/FleetItem_s.hpp"
+#include "Type/FleetItemRecord_s.hpp"
+
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -51,26 +55,21 @@ void BankLogger::Log(const GameState_s& state)
         quantities[slot.id] += slot.count;
     }
 
-    auto items = std::string{};
+    auto record = FleetItemRecord_s{
+        .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())),
+        .account = m_accountName};
     auto summary = std::vector<std::string>{};
     for (const auto& [id, qty] : quantities)
     {
         const auto name = m_cache.FindObjName(id);
-        if (!items.empty())
-        {
-            items += ",";
-        }
-
-        std::format_to(std::back_inserter(items), "{{\"id\":{},\"name\":\"{}\",\"qty\":{}}}", id, JsonUtils::EscapeString(name), qty);
+        record.items.push_back({.id = id, .name = std::string{name}, .qty = qty});
         summary.push_back(std::format("{} x{}", name.empty() ? std::format("#{}", id) : std::string{name}, qty));
     }
 
-    const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
-    const auto record = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"items\":[{}]}}\n", time, JsonUtils::EscapeString(m_accountName), items);
-
     try
     {
-        FileUtils::AppendText(m_directory / (m_accountName + std::string{EXTENSION}), record);
+        const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
+        FileUtils::AppendText(m_directory / (m_accountName + std::string{EXTENSION}), line);
 
         if (m_writeFailed)
         {

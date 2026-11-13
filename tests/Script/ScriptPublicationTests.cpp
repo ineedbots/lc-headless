@@ -3,6 +3,8 @@
 #include "../Support/Script/HostFixture.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
 #include "Application/Events/Definitions/ScriptPublishedEvent.hpp"
+#include "Application/Events/EventProtocol.hpp"
+#include "Application/Events/Type/ApplicationEvent_s.hpp"
 #include "Application/Type/ApplicationStarted_s.hpp"
 #include "Script/Host/ScriptHost.hpp"
 #include "Script/Type/PublishedScriptEvent_s.hpp"
@@ -155,11 +157,33 @@ def loop():
 
 TEST_CASE("Script event definitions reject malformed and excessive JSON before admission", "[Events]")
 {
+    const auto serialize = [](std::string data)
+    {
+        const auto text = EventProtocol::Encode({.account = "public_name", .payload = PublishedScriptEvent_s{"valid", std::move(data)}}, "instance", 1);
+        return Json::parse(text).at("payload");
+    };
+
+    // This call crosses the library boundary with a JSON value; diagnostics must match.
+    CHECK(ScriptPublishedEvent::Serialize({"valid", "null"}) == serialize("null"));
+
     for (const auto json : {"{", "NaN", "[1,]", "", "{bad}"})
     {
         CHECK_FALSE(ScriptPublishedEvent::Measure({"valid", json}));
+        CHECK_THROWS_AS(serialize(json), std::invalid_argument);
     }
 
     CHECK(ScriptPublishedEvent::Measure({"valid", "null"}));
     CHECK(ScriptPublishedEvent::Measure({"valid", R"({"text":"hello","list":[1,true,null]})"}));
+
+    CHECK(serialize("null") == Json{{"name", "valid"}, {"data", nullptr}});
+    CHECK(serialize(R"({"text":"hello","list":[1,true,null]})") ==
+          Json{{"name", "valid"}, {"data", {{"text", "hello"}, {"list", {1, true, nullptr}}}}});
+
+    const auto oversized = std::string(ScriptPublishedEvent::MAX_DATA_BYTES + 1, ' ');
+    const auto tooDeep = std::string(ScriptPublishedEvent::MAX_DATA_DEPTH + 1, '[') + "0" + std::string(ScriptPublishedEvent::MAX_DATA_DEPTH + 1, ']');
+    for (const auto& text : {oversized, tooDeep})
+    {
+        CHECK_FALSE(ScriptPublishedEvent::Measure({"valid", text}));
+        CHECK_THROWS_AS(serialize(text), std::invalid_argument);
+    }
 }

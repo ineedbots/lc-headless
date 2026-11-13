@@ -17,6 +17,9 @@ several accounts in one process never collide and nothing depends on the world o
 Each line is a complete JSON object, and the **last line is the current state**. Lines are appended, so a
 file is also its history.
 
+Journal strings are JSON-escaped; invalid UTF-8 bytes are replaced with the Unicode
+replacement character so each record remains valid JSON.
+
 ## Configuration
 
 ```jsonc

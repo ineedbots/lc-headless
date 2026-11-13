@@ -24,6 +24,13 @@ TEST_CASE("Minimal navigation JSON preserves unset state and policy", "[NavJson]
     CHECK_FALSE(request.options.policy.useShortcuts.has_value());
 }
 
+TEST_CASE("Navigation output objects do not change the request tile array contract", "[NavJson]")
+{
+    CHECK(Json::parse(NavJson::ToJson(NavPath_s{})) ==
+          Json{{"ok", false}, {"reason", ""}, {"cost", 0}, {"expanded", 0}, {"waypoints", Json::array()}});
+    CHECK_THROWS_AS(NavJson::ParseRequest(R"({"from":{"x":1,"z":2,"level":0},"to":[3,4,0]})"), std::invalid_argument);
+}
+
 TEST_CASE("Navigation JSON reads explicit policy and state without losing false or zero", "[NavJson]")
 {
     const auto request = NavJson::ParseRequest(R"({

@@ -4,7 +4,11 @@
 #include "../Game/State/GameStateQueries.hpp"
 
 #include "../Utils/FileUtils.hpp"
-#include "../Utils/JsonUtils.hpp"
+#include "FleetLogJson.hpp"
+#include "Type/FleetItem_s.hpp"
+#include "Type/FleetItemRecord_s.hpp"
+
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -117,32 +121,25 @@ void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
         m_nextSample = now + m_interval;
     }
 
-    auto items = std::string{};
-    for (std::size_t i = 0; i < contents.items.size(); ++i)
-    {
-        const auto& item = contents.items[i];
-        std::format_to(std::back_inserter(items), "{}{{\"id\":{},\"name\":\"{}\",\"qty\":{}}}",
-                       i == 0 ? "" : ",", item.id, JsonUtils::EscapeString(m_cache.FindObjName(item.id)), item.qty);
-    }
-
-    const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
-    const auto free = contents.slots - std::min(contents.slots, contents.used);
-
-    auto line = std::string{};
+    auto record = FleetItemRecord_s{
+        .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())),
+        .account = m_accountName,
+        .used = contents.used};
     if (m_kind == Kind_e::Backpack)
     {
         // bankOpen says which backpack these are: while a bank is open the game swaps in its own.
-        line = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"bankOpen\":{},\"used\":{},\"free\":{},\"items\":[{}]}}\n",
-                           time, JsonUtils::EscapeString(m_accountName), contents.bankOpen, contents.used, free, items);
+        record.bankOpen = contents.bankOpen;
+        record.free = contents.slots - std::min(contents.slots, contents.used);
     }
-    else
+
+    for (const auto& item : contents.items)
     {
-        line = std::format("{{\"time\":\"{}\",\"account\":\"{}\",\"used\":{},\"items\":[{}]}}\n",
-                           time, JsonUtils::EscapeString(m_accountName), contents.used, items);
+        record.items.push_back({.id = item.id, .name = std::string{m_cache.FindObjName(item.id)}, .qty = item.qty});
     }
 
     try
     {
+        const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
         FileUtils::AppendText(m_path, line);
 
         if (m_writeFailed)

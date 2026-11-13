@@ -8,6 +8,7 @@
 #include "Game/State/Type/GameState_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -42,7 +43,7 @@ namespace
         return lines;
     }
 
-    std::shared_ptr<const GameCache_s> MakeCache()
+    std::shared_ptr<const GameCache_s> MakeCache(std::string_view coinName = "Coins")
     {
         auto cache = GameCache_s{};
         cache.inventoryComponent = BACKPACK;
@@ -53,7 +54,7 @@ namespace
         cache.components[BANK_ROOT] = IfComponent_s{.id = BANK_ROOT, .root = BANK_ROOT, .type = ComponentType_e::Layer};
         cache.components[BANK_BACKPACK] = IfComponent_s{.id = BANK_BACKPACK, .root = BANK_ROOT, .type = ComponentType_e::Inv};
         cache.objs.resize(static_cast<std::size_t>(CAKE) + 1);
-        cache.objs[COINS] = ObjType_s{.id = COINS, .name = "Coins"};
+        cache.objs[COINS] = ObjType_s{.id = COINS, .name = coinName};
         cache.objs[CAKE] = ObjType_s{.id = CAKE, .name = "Cake"};
         cache.objs[PLATEBODY] = ObjType_s{.id = PLATEBODY, .name = "Iron platebody"};
         return std::make_shared<const GameCache_s>(std::move(cache));
@@ -104,6 +105,45 @@ namespace
         LogCapture capture;
         ItemLog log;
     };
+}
+
+TEST_CASE("ItemLog preserves escaped names and container specific fields", "[ItemLog]")
+{
+    auto name = std::string{"Coins \"\\\xc3\xa9"};
+    for (auto value = 0; value < 32; ++value)
+    {
+        name += static_cast<char>(value);
+    }
+
+    name += '\xff';
+    const auto cache = MakeCache(name);
+    const auto folder = TempFolder{"rs2004-item-json-tests"};
+    auto capture = LogCapture{};
+    for (const auto kind : {ItemLog::Kind_e::Backpack, ItemLog::Kind_e::Equipment})
+    {
+        auto log = ItemLog{*cache, capture.GetLogger(), "test", folder.GetPath(), kind, 0s};
+        const auto items = std::vector<Item_s>{{.id = COINS, .count = 2}, {.id = COINS, .count = 3}};
+        log.Step(Clock::now(), kind == ItemLog::Kind_e::Backpack ? WithBackpack(items) : WithEquipment(items));
+
+        const auto lines = ReadLines(log.GetPath());
+        REQUIRE_FALSE(lines.empty());
+
+        const auto record = nlohmann::json::parse(lines.back());
+        CHECK(record["used"] == 2);
+        CHECK(record["items"] == nlohmann::json::array({{{"id", COINS}, {"name", name.substr(0, name.size() - 1) + "\xef\xbf\xbd"}, {"qty", 5}}}));
+        if (kind == ItemLog::Kind_e::Backpack)
+        {
+            CHECK(record.size() == 6);
+            CHECK(record["bankOpen"] == false);
+            CHECK(record["free"] == 26);
+        }
+        else
+        {
+            CHECK(record.size() == 4);
+            CHECK_FALSE(record.contains("bankOpen"));
+            CHECK_FALSE(record.contains("free"));
+        }
+    }
 }
 
 TEST_CASE("ItemLog groups a backpack by item and records what changed", "[ItemLog]")

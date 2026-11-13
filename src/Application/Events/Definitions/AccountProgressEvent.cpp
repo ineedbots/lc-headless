@@ -2,6 +2,7 @@
 #include "AccountProgressEvent.hpp"
 
 #include "../../../Accounts/Type/ProgressReport_s.hpp"
+#include "../EventPayloadJson.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -28,5 +29,5 @@ std::optional<std::size_t> AccountProgressEvent::Measure(const ProgressReport_s&
 
 nlohmann::json AccountProgressEvent::Serialize(const ProgressReport_s& payload)
 {
-    return {{"runTimeSeconds", payload.runTime.count()}, {"rows", payload.rows}};
+    return payload;
 }

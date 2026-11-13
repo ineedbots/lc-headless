@@ -125,6 +125,19 @@ TEST_CASE("Event protocol validates versions types fields identifiers and filter
     CHECK(Json::parse(EventProtocol::Error({}, "invalid_message"))["id"].is_null());
 }
 
+TEST_CASE("Event message serializers preserve envelopes and empty snapshots", "[Events]")
+{
+    const auto sequence = std::numeric_limits<u64>::max();
+    CHECK(Json::parse(EventProtocol::Ack("id", "subscribe", "instance", sequence)) ==
+          Json{{"version", 1}, {"type", "ack"}, {"id", "id"}, {"action", "subscribe"}, {"instance", "instance"}, {"sequence", sequence}});
+    CHECK(Json::parse(EventProtocol::Error("", "invalid_message")) ==
+          Json{{"version", 1}, {"type", "error"}, {"id", nullptr}, {"code", "invalid_message"}});
+    CHECK(Json::parse(EventProtocol::Error("id", "invalid_message")) ==
+          Json{{"version", 1}, {"type", "error"}, {"id", "id"}, {"code", "invalid_message"}});
+    CHECK(Json::parse(EventProtocol::Snapshot("id", "instance", sequence, {})) ==
+          Json{{"version", 1}, {"type", "snapshot"}, {"id", "id"}, {"instance", "instance"}, {"sequence", sequence}, {"events", Json::array()}});
+}
+
 TEST_CASE("Event queues disconnect slow consumers and reset snapshots on publisher overflow", "[Events]")
 {
     auto bridge = ApplicationEventBridge{{"bot1"}};
