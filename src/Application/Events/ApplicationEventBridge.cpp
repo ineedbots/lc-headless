@@ -294,7 +294,10 @@ void ApplicationEventBridge::Service()
 
         auto cached = CachedEvent_s{std::string{EventProtocol::Name(event.payload)}, std::make_shared<const std::string>(std::move(text))};
         ++m_sequence;
-        m_latest[{event.account, cached.name}] = cached;
+        if (EventProtocol::RetainsLatest(event.payload))
+        {
+            m_latest[{event.account, cached.name}] = cached;
+        }
         m_fanout = Fanout_s{std::move(event.account), std::move(cached), 0, entry.created};
     }
 }

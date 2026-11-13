@@ -9,6 +9,8 @@ is promoted to `master` and its CI checks pass.
 
 - Subscribe to live account progress reports over the optional HTTP listener's
   WebSocket endpoint, with snapshots, filters and bounded delivery.
+  Receive live logout completion events, including temporary relogs and
+  unconfirmed completion after a timeout or forced closure.
 
 - Support LostCity private servers using protocol revisions 289, 274 and 225,
   with WebSocket, secure WebSocket and raw TCP connections and optional SOCKS5

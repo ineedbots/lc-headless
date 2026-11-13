@@ -1,8 +1,9 @@
 #pragma once
 
 #include "../../../Accounts/Type/ProgressReport_s.hpp"
+#include "../../../Accounts/Type/AccountLogout_s.hpp"
 
-using ApplicationEventPayload = std::variant<ProgressReport_s>;
+using ApplicationEventPayload = std::variant<ProgressReport_s, AccountLogout_s>;
 
 struct ApplicationEvent_s
 {

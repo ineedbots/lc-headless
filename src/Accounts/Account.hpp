@@ -18,6 +18,7 @@
 #include "AccountLifecycle.hpp"
 #include "AccountReporting.hpp"
 #include "Type/ProgressReport_s.hpp"
+#include "Type/AccountLogout_s.hpp"
 
 struct AccountOptions_s
 {
@@ -31,6 +32,7 @@ struct AccountOptions_s
     std::shared_ptr<const Navigation> navigation;
     std::chrono::milliseconds reloginDelay = 60s;
     std::function<void(std::string_view, const ProgressReport_s&)> onProgressReport;
+    std::function<void(std::string_view, const AccountLogout_s&)> onLogout;
 };
 
 // Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is
@@ -95,6 +97,7 @@ private:
     [[nodiscard]] s64 GetReloginSeconds() const;
     void Fail(std::string_view reason);
     void UpdateFinished();
+    void ObserveLogout();
 
     std::shared_ptr<const Config_s> m_config;
     AccountConfig_s m_account;
@@ -105,5 +108,6 @@ private:
     AccountReporting m_reporting;
     std::optional<ScriptHost> m_script;
     AccountLifecycle m_lifecycle;
+    ClientStatus_e m_observedStatus = ClientStatus_e::Disconnected;
     Clock::time_point m_nextSummary;
 };

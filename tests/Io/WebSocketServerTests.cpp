@@ -3,6 +3,9 @@
 #include "Application/ApplicationRequestBridge.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
 #include "Accounts/Type/ProgressReport_s.hpp"
+#include "Accounts/Type/AccountLogout_s.hpp"
+#include "Application/Events/Type/ApplicationEvent_s.hpp"
+#include "Console/Logger.hpp"
 #include "Accounts/Account.hpp"
 #include "Config/Type/AccountConfig_s.hpp"
 #include "Config/Type/Config_s.hpp"
@@ -499,4 +502,57 @@ TEST_CASE("HTTP and WebSocket sessions share one connection admission limit", "[
         co_return std::vector<Json>{Json{{"rejected", error == asio::error::eof || error == asio::error::connection_reset}}};
     });
     CHECK(results[0]["rejected"] == true);
+}
+
+TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after reconnect", "[Account][Events][Http][WebSocket]")
+{
+    auto fixture = WebSocketFixture{};
+    auto game = FakeGameServer{TestWorld::Send};
+    const auto options = AccountOptions_s{.onLogout = [&](std::string_view name, const AccountLogout_s& logout)
+    {
+        fixture.events->Publish({std::string{name}, logout});
+    }};
+    auto account = Account{std::make_shared<const Config_s>(game.MakeConfig()), FakeGameServer::MakeCache(),
+        AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), Logger::GetDefault(), options};
+    account.Login();
+    auto interrupted = false;
+    for (const auto reconnect : {false, true})
+    {
+        const auto results = fixture.Run([reconnect](u16 port) -> asio::awaitable<std::vector<Json>>
+        {
+            auto stream = Stream{co_await asio::this_coro::executor};
+            beast::get_lowest_layer(stream).expires_after(5s);
+            co_await beast::get_lowest_layer(stream).async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
+            co_await stream.async_handshake("localhost", "/api/v1/events", asio::use_awaitable);
+            stream.text(true);
+            const auto subscribe = std::string{R"({"version":1,"type":"subscribe","id":"logout","events":["account.logout"],"accounts":["bot1"]})"};
+            co_await stream.async_write(asio::buffer(subscribe), asio::use_awaitable);
+            auto results = std::vector<Json>{};
+            results.push_back(co_await Read(stream));
+            results.push_back(co_await Read(stream));
+            if (!reconnect)
+            {
+                results.push_back(co_await Read(stream));
+            }
+            co_await stream.async_close(websocket::close_code::normal, asio::use_awaitable);
+            co_return results;
+        }, [&]
+        {
+            if (!interrupted && fixture.events->GetDiagnostics().subscriptions == 1)
+            {
+                interrupted = true;
+                account.Interrupt();
+            }
+            account.Step(0ms);
+        });
+        CHECK(results[0]["type"] == "ack");
+        CHECK(results[1]["events"].empty());
+        if (!reconnect)
+        {
+            CHECK(results[2]["event"] == "account.logout");
+            CHECK(results[2]["account"] == "bot1");
+            CHECK(results[2]["payload"] == Json{{"confirmed", true}});
+        }
+    }
+    CHECK(account.Succeeded());
 }
