@@ -98,6 +98,41 @@ jobs:
             build/linux-coverage/Testing/Temporary/
           if-no-files-found: warn
 
+  sanitizers:
+    name: ASan and UBSan (Linux x64 Debug)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-name: linux
+
+      - name: Install sanitizer runtime and symbolizer
+        run: sudo apt-get install -y --no-install-recommends libclang-rt-18-dev llvm-18
+
+      - name: Configure
+        run: cmake --preset linux-sanitizers -DCMAKE_CXX_COMPILER=clang++-18
+
+      - name: Build
+        run: cmake --build --preset linux-sanitizers --parallel
+
+      - name: Test packet, cache, transport and lifecycle code
+        env:
+          ASAN_SYMBOLIZER_PATH: /usr/bin/llvm-symbolizer-18
+        run: ctest --preset linux-sanitizers --parallel 4 --output-junit sanitizer-results.xml
+
+      - name: Upload sanitizer results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizers-linux-x64
+          path: |
+            build/linux-sanitizers/Testing/Temporary/
+            build/linux-sanitizers/sanitizer-results.xml
+            build/linux-sanitizers/vcpkg-manifest-install.log
+          if-no-files-found: warn
+
   build:
     name: ${{ matrix.platform }}-${{ matrix.config }}
     strategy:

@@ -172,6 +172,50 @@ reports from failed test runs are marked partial. The command also fails if any 
 CI reuses the native coverage build with `python3 tools/coverage/script.py --preset linux-coverage --no-build`
 and uploads a separate `stdlib-coverage-linux-x64` artifact. Native and script percentages stay separate.
 
+## Address and undefined-behavior sanitizers
+
+Use the separate Linux Clang Debug preset. On Ubuntu 24.04, install
+`clang-18 libclang-rt-18-dev llvm-18` in addition to the normal build tools, and
+keep `VCPKG_ROOT` set. CI uses this Clang 18 toolchain and the same commands:
+
+```sh
+cmake --preset linux-sanitizers -DCMAKE_CXX_COMPILER=clang++-18
+cmake --build --preset linux-sanitizers --parallel
+ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18 ctest --preset linux-sanitizers --parallel 4 --output-junit sanitizer-results.xml
+```
+
+Other supported Linux Clang versions can use `cmake --preset linux-sanitizers`
+with their matching sanitizer runtime and `llvm-symbolizer` on `PATH`.
+The preset enables `ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:symbolize=1:exitcode=86` and
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1:exitcode=87`. Distinct failure
+codes prevent child-process diagnostics being mistaken for an expected ordinary
+application failure. Compilation also disables
+sanitizer recovery, retains debug symbols/frame pointers, and disables sibling
+call optimization. Both executables link the sanitizer runtime; project library,
+entrypoint, generated stdlib source and test code are instrumented consistently.
+Diagnostics fail the tests; no suppressions are configured. See the upstream
+[ASan](https://clang.llvm.org/docs/AddressSanitizer.html) and
+[UBSan](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html) documentation.
+
+Catch2 tags are exposed as CTest labels. The test preset explicitly selects
+packet/ISAAC/receive-buffer tests, cache readers and decoders (including optional
+real-cache tests), entity/zone/server packet decoders, login/game clients,
+TCP/WebSocket/TLS/SOCKS5/HTTP transport, account lifecycle/runner and application
+startup/shutdown tests. The exact label list is in `CMakePresets.json`; inspect
+the selection with `ctest --preset linux-sanitizers --show-only`. Fake-server
+tests need no live server. Real-cache tests still skip without their cache
+variables. Tests outside the selected labels are left to the normal suite.
+
+CTest writes diagnostics to `build/linux-sanitizers/Testing/Temporary/` and the
+JUnit file to `build/linux-sanitizers/sanitizer-results.xml`; CI uploads both even
+on failure. Child application processes inherit the sanitizer environment.
+Third-party headers/templates compiled into project code are instrumented, but
+vcpkg/system libraries (including pocketpy, compression and TLS implementations)
+are not rebuilt with sanitizer flags. This does not provide full dependency
+instrumentation or replace normal platform/Release checks. The job reuses the
+Linux dependency binary cache. Coverage and sanitizer instrumentation are kept
+in separate build directories; enabling both is rejected at configure time.
+
 ## Package a release archive
 
 Build and test Release first, then run the matching CPack preset:
