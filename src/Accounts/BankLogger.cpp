@@ -1,12 +1,16 @@
 #include "pch.hpp"
 #include "BankLogger.hpp"
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Game/State/GameStateQueries.hpp"
 #include "../Utils/FileUtils.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "FleetLogJson.hpp"
 #include "Type/FleetItem_s.hpp"
 #include "Type/FleetItemRecord_s.hpp"
+
+#include "Type/FleetBankLog_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -15,11 +19,12 @@ namespace
     constexpr auto EXTENSION = ".jsonl"sv;
 }
 
-BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory)
+BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
     , m_logger{std::move(logger)}
     , m_accountName{std::move(accountName)}
     , m_directory{std::move(directory)}
+    , m_events{std::move(events)}
 {
 }
 
@@ -70,6 +75,11 @@ void BankLogger::Log(const GameState_s& state)
     {
         const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
         FileUtils::AppendText(m_directory / (m_accountName + std::string{EXTENSION}), line);
+
+        if (m_events)
+        {
+            m_events->Publish(m_accountName, FleetBankLog_s{line});
+        }
 
         if (m_writeFailed)
         {

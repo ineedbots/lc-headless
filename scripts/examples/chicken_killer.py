@@ -1,3 +1,9 @@
+import time
+import random
+
+from rs2004.catalogs import ContinueDialog
+TICKS_PER_MINUTE = 100
+
 # Account settings: script.settings["Chicken Killer"].
 SETTINGS = {
     'combat_style': SettingDef('string', 'strength', label='Combat style', options=COMBAT_STYLE_OPTIONS),
@@ -5,6 +11,7 @@ SETTINGS = {
     'radius': SettingDef('number', 8, min=0, label='Fight and loot radius (tiles)'),
     'bury_bones': SettingDef('boolean', False, label='Pick up and bury bones'),
     'kill_over_loot': SettingDef('boolean', False, label='Only loots when theres no targets'),
+    'bank_every_minutes': SettingDef('number', 60, 'Bank run every N minutes', 0, 999, help='also whenever the backpack fills; 0 for only then'),
 }
 
 GIVE_UP_TICKS = 15
@@ -12,8 +19,13 @@ SKIP_TICKS = 50
 POLL_TICKS = 1
 CHICKEN_NAME = 'Chicken'
 LOOT_EXTRA_DIST = 3
+RELOG_WHEN_NO_KILLS = 50
 
 class ChickenKiller(TaskBot):
+    def on_reconnect(self):
+        self.last_kill_time = time.time()
+        log('Killing', CHICKEN_NAME, 'around', self.settings.start_location, ', starting at', game.tile(), ', pid', players.local().index)
+
     def on_start(self):
         self.kills = 0
         self.buried = 0
@@ -24,17 +36,77 @@ class ChickenKiller(TaskBot):
         self.npc_spawns = {}
         self.npc_despawn_times = {}
         self.dying_targets = set()
-        log('Killing', CHICKEN_NAME, 'around', self.settings.start_location, ', starting at', game.tile(), ', pid', players.local().index)
+        self.pre_attack_id = None
+        self.last_bank_tick = game.tick()
+
+        self.on_reconnect()
 
         self.add(
+            ContinueDialog(),
             Task(self.is_fighting_target, lambda: execution.delay_ticks(POLL_TICKS), label='fight'),
+            Task(self.should_bank, self.do_bank, label='bank'),
             Task(lambda: not game.has_combat_style(self.settings.combat_style), self.set_style, label='style'),
             Task(self.away_from_start, self.walk_to_start, label='return'),
             Task(lambda: self.next_loot(True) is not None, lambda: self.pick_up(True), label='loot'), # prio feathers
+            Task(self.should_relog_due_to_comp, self.relog_due_to_comp, label='relog'),
             Task(lambda: self.settings.bury_bones and inventory.contains('Bones') and inventory.is_full(), self.bury, label='bury'),
             Task(lambda: self.next_loot() is not None and (not self.settings.kill_over_loot or self.next_target() is None), self.pick_up, label='loot'),
             Task(lambda: True, self.attack, label='attack'),
         )
+
+    def should_bank(self):
+        if inventory.used() <= 0:
+            return False
+
+        if inventory.is_full() and (not self.settings.bury_bones or not inventory.contains('Bones')):
+            return True
+
+        minutes = self.settings.bank_every_minutes
+        if minutes > 0 and game.tick() - self.last_bank_tick >= minutes * TICKS_PER_MINUTE:
+            return True
+
+        return False
+
+    def do_bank(self):
+        log('banking...')
+        publish_event('banking')
+        self.last_bank_tick = game.tick()
+
+        opened = yield from banking.open()
+        if not opened:
+            log('could not open the bank; trying again')
+            yield from execution.delay_ticks(3)
+            return
+
+        log('bank open, depositting', inventory.used())
+        yield from bank.deposit_inventory()
+
+        log('banking complete, items left', inventory.used())
+        publish_event('banking_complete')
+        yield from bank.close()
+        yield from self.walk_to_start()
+
+        self.last_bank_tick = game.tick()
+        self.on_reconnect()
+
+    def should_relog_due_to_comp(self):
+        if time.time() - self.last_kill_time < RELOG_WHEN_NO_KILLS:
+            return False
+
+        publish_event('no_kills')
+
+        my_pid = players.local().index
+        lowest_pid_player = min(players.all(), key=lambda player: player.index)
+        if lowest_pid_player is None or my_pid <= lowest_pid_player.index:
+            return False
+
+        log('My pid is', my_pid, ', lowest pid is', lowest_pid_player.index)
+        return True
+
+    def relog_due_to_comp(self):
+        secs = random.randint(1, 15)
+        log('relogging due to lower pid out killing us, will log in in', secs, 'secs')
+        relog(secs)
 
     def ensure_reachable(self, tile, force=False):
         if not force and direct_navigator.reachable(tile):
@@ -50,6 +122,7 @@ class ChickenKiller(TaskBot):
         return npc.index
 
     def is_fighting_target(self):
+        self.pre_attack_id = None
         if self.target is None:
             return False
 
@@ -206,15 +279,17 @@ class ChickenKiller(TaskBot):
 
                 spawn = self.npc_spawns[key]
                 if spawn.distance_to(self.settings.start_location) <= self.settings.radius and (next_spawn is None or despawn_tick < next_spawn[1]):
-                    next_spawn = (spawn, despawn_tick)
+                    next_spawn = (spawn, despawn_tick, key)
 
-            if next_spawn is not None and next_spawn[0].distance_to(game.tile()) > 1:
-                reachable = yield from self.ensure_reachable(next_spawn[0])
-                if not reachable:
-                    yield from execution.delay_ticks(POLL_TICKS)
-                    return
+            if next_spawn is not None:
+                self.pre_attack_id = next_spawn[2]
+                if next_spawn[0].distance_to(game.tile()) > 1:
+                    reachable = yield from self.ensure_reachable(next_spawn[0])
+                    if not reachable:
+                        yield from execution.delay_ticks(POLL_TICKS)
+                        return
 
-                yield from traversal.walk_to(next_spawn[0], radius=1, timeout_ms=20000)
+                    yield from traversal.walk_to(next_spawn[0], radius=1, timeout_ms=20000)
 
             yield from execution.delay_ticks(POLL_TICKS)
             return
@@ -244,6 +319,12 @@ class ChickenKiller(TaskBot):
 
         yield from execution.delay_until(finish_waiting_for_attack, 5000)
 
+    def on_tick(self, e):
+        if self.pre_attack_id is not None:
+            npc = npcs.get(int(self.pre_attack_id))
+            if npc is not None: # 2004scape patches pre attack by checking if the client's snapshot contains the npc
+                npc.interact('Attack')
+
     def on_npc_spawned(self, npc):
         if npc.name == CHICKEN_NAME:
             key = self.key_for_npc(npc)
@@ -261,6 +342,7 @@ class ChickenKiller(TaskBot):
             self.dying_targets.remove(npc.index)
             self.kills += 1
             log('Killed', npc, ', total:', self.kills)
+            self.last_kill_time = time.time()
 
     def on_server_message(self, msg):
         if msg.startswith("I can't reach"):
@@ -270,6 +352,7 @@ class ChickenKiller(TaskBot):
             self.walk_to_start()
         elif msg.startswith("Oh dear"):
             log('You have died')
+            publish_event('death')
 
     def on_progress_report(self):
         return {'Kills': self.kills, 'Feathers held': inventory.count('Feather'), 'Bones buried': self.buried}

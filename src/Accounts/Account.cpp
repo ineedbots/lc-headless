@@ -37,7 +37,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     {
         m_options.events->Publish(m_account.name, report);
     }
-}}
+}, m_options.events}
 {
     if (m_account.script)
     {

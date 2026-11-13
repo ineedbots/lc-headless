@@ -1,12 +1,16 @@
 #include "pch.hpp"
 #include "ExperienceLog.hpp"
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Utils/FileUtils.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "../Game/State/Type/Stat_s.hpp"
 #include "FleetLogJson.hpp"
 #include "Type/ExperienceLogRecord_s.hpp"
 #include "Type/FleetSkill_s.hpp"
+
+#include "Type/FleetExperienceLog_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -46,11 +50,12 @@ namespace
     }
 }
 
-ExperienceLog::ExperienceLog(std::filesystem::path directory, std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger)
+ExperienceLog::ExperienceLog(std::filesystem::path directory, std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger, std::shared_ptr<ApplicationEventPublisher> events)
     : m_path{std::move(directory) / (accountName + std::string{EXTENSION})}
     , m_accountName{std::move(accountName)}
     , m_interval{interval}
     , m_logger{std::move(logger)}
+    , m_events{std::move(events)}
 {
 }
 
@@ -129,6 +134,11 @@ void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, cons
     {
         const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
         FileUtils::AppendText(m_path, line);
+
+        if (m_events)
+        {
+            m_events->Publish(m_accountName, FleetExperienceLog_s{line});
+        }
 
         if (m_writeFailed)
         {

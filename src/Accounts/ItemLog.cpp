@@ -1,12 +1,17 @@
 #include "pch.hpp"
 #include "ItemLog.hpp"
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Game/State/GameStateQueries.hpp"
 
 #include "../Utils/FileUtils.hpp"
 #include "FleetLogJson.hpp"
 #include "Type/FleetItem_s.hpp"
 #include "Type/FleetItemRecord_s.hpp"
+
+#include "Type/FleetInventoryLog_s.hpp"
+#include "Type/FleetEquipmentLog_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -15,13 +20,14 @@ namespace
     constexpr auto EXTENSION = ".jsonl"sv;
 }
 
-ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval)
+ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
     , m_logger{std::move(logger)}
     , m_accountName{std::move(accountName)}
     , m_path{std::move(directory) / (m_accountName + std::string{EXTENSION})}
     , m_kind{kind}
     , m_interval{interval}
+    , m_events{std::move(events)}
 {
 }
 
@@ -141,6 +147,18 @@ void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
     {
         const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
         FileUtils::AppendText(m_path, line);
+
+        if (m_events)
+        {
+            if (m_kind == Kind_e::Backpack)
+            {
+                m_events->Publish(m_accountName, FleetInventoryLog_s{line});
+            }
+            else
+            {
+                m_events->Publish(m_accountName, FleetEquipmentLog_s{line});
+            }
+        }
 
         if (m_writeFailed)
         {

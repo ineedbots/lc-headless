@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Config/Type/AccountConfig_s.hpp"
 #include "../Config/Type/Config_s.hpp"
@@ -20,7 +22,7 @@ class AccountReporting
 public:
     using Clock = std::chrono::steady_clock;
 
-    AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport);
+    AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     void ObserveSession(Clock::time_point now, const GameState_s& state, ClientStatus_e status);
     void AfterScript(Clock::time_point now, ScriptHost& script);

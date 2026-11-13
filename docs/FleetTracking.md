@@ -89,6 +89,34 @@ under the repository root; they do not follow custom journal paths in client con
 - Worn equipment is its own file and records only what is worn. It has no `free`: the equipment interface's
   grid has decorative cells that can never hold anything.
 
+## WebSocket events
+
+The operator WebSocket endpoint `/api/v1/events` publishes a live event after each
+successfully appended fleet journal record:
+
+| Event | Journal |
+|---|---|
+| `fleet.experience` | Experience samples and account state changes |
+| `fleet.bank` | Bank snapshots on opening |
+| `fleet.inventory` | Backpack samples, with the configured interval |
+| `fleet.equipment` | Worn equipment changes |
+
+```json
+{"version":1,"type":"subscribe","id":"fleet","events":["fleet.experience","fleet.bank","fleet.inventory","fleet.equipment"],"accounts":["s18"]}
+```
+
+Each event's `payload` is the complete JSON object from the corresponding journal
+line, including its `time` and `account`. The envelope's `account` is the account
+config name. Omit `accounts` to receive all accounts. These events need no script,
+are live only, and are not retained in subscription snapshots or replayed after
+reconnect. Disabled journals and failed writes produce no events.
+
+The existing event size limit is 8192 bytes per envelope. Fleet records reserve
+1024 bytes for envelope metadata, so records exceeding 7168 bytes of JSON are
+omitted from the event stream; their full journal lines are still written.
+See [live events](Running.md#live-progress-events) for listener setup, acknowledgements,
+ordering and reconnect behavior.
+
 ## The local page
 
 ```sh
