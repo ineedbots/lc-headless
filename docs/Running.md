@@ -112,6 +112,14 @@ Profiling adds overhead and leaves `scripting.callTimeoutMs` unchanged, so an ac
 
 ## Logs and unattended runs
 
+The shared account loop logs a warning when an account step takes at least 100 ms,
+including the account name and elapsed milliseconds. Warnings are limited to once
+per account every 10 seconds. The measurement covers packet processing, script
+work and reporting within the step, including disk waits and time when the OS
+does not schedule the process. It does not identify the cause or interrupt the
+step; the warning appears after the step returns. Account scheduling and script
+watchdog limits are unchanged.
+
 Set `client.logFile` to append plain log lines to a file as well as console output. The sample config uses `rs2004-headless.log`; the built-in default is no file log. `client.logLevel` sets the initial verbosity, which the interactive `loglevel` command can change.
 
 Use `--raw-console` when a service or another program consumes stdout. It disables interactive commands, so configure the working directory and account files before launch and use the process's supported shutdown signal to stop it. Keep the extracted release's supporting folders available even if the executable is launched by an absolute path.

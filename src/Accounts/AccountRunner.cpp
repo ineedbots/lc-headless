@@ -21,6 +21,8 @@ namespace
     constexpr auto TARGET_PREFIX = ConsoleCommandParser::TARGET_PREFIX;
     // A little over AsioLink's close timeout, so a close the server never answers still finishes.
     constexpr auto SETTLE_TIMEOUT = 2s;
+    constexpr auto SLOW_STEP_THRESHOLD = 100ms;
+    constexpr auto SLOW_STEP_LOG_INTERVAL = 10s;
 
 }
 
@@ -47,6 +49,7 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console,
     m_nextLogin = m_accounts.empty() ? std::nullopt : std::optional{Clock::now()};
 
     auto handledInterrupts = interrupts();
+    auto nextSlowStepLogs = std::unordered_map<const Account*, Clock::time_point>{};
 
     m_logger->Info("Running {} account{}", m_accounts.size(), m_accounts.size() == 1 ? "" : "s");
 
@@ -82,7 +85,19 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console,
 
         for (const auto& account : m_accounts)
         {
+            const auto stepStarted = Clock::now();
             account->Step(0ms);
+            const auto stepFinished = Clock::now();
+            const auto elapsed = stepFinished - stepStarted;
+            if (elapsed >= SLOW_STEP_THRESHOLD)
+            {
+                auto& nextLog = nextSlowStepLogs[account.get()];
+                if (stepFinished >= nextLog)
+                {
+                    nextLog = stepFinished + SLOW_STEP_LOG_INTERVAL;
+                    m_logger->Warning("Account {} step took {} ms (warning threshold {} ms; warnings limited to once per account every {} s)", account->GetName(), std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), SLOW_STEP_THRESHOLD.count(), SLOW_STEP_LOG_INTERVAL.count());
+                }
+            }
         }
 
         for (const auto count = interrupts(); handledInterrupts < count; ++handledInterrupts)
