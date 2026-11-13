@@ -124,3 +124,8 @@ published once after the HTTP listener and accounts have initialized and before
 the runner loop starts. Its envelope timestamp records publication time. A fresh
 global subscription receives that original envelope in its snapshot; it does not
 trigger another startup event.
+
+Python scripts publish bounded live `script.event` values using
+`publish_event(name, data=None)`. `ScriptPublishedEvent` owns the limits, JSON
+validation and serializer, while the host supplies the account config identity.
+See [script publication](../scripting/console-and-messages.md#operator-events).

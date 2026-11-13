@@ -976,6 +976,10 @@ def send_bot_message(username: str, message: Any) -> bool:
     """Send to an account in this process, or '*' to every other account."""
     ...
 
+def publish_event(name: str, data: Any = None) -> bool:
+    """Publish a live script.event on the operator WebSocket for this account."""
+    ...
+
 # The side tabs
 
 class Quest:

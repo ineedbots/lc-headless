@@ -39,6 +39,7 @@ namespace
         "stop_account",
         "relog",
         "send_bot_message",
+        "publish_event",
     });
 
     constexpr auto SETTINGS_JSON = "_settings_json";

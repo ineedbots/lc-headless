@@ -1,6 +1,6 @@
 # Running
 
-[Back to README](../README.md) Ã‚Â· [Features](Features.md) Ã‚Â· [Requirements](Requirements.md) Ã‚Â· [Configuration](Configuration.md) Ã‚Â· [Building](Building.md)
+[Back to README](../README.md) Ãƒâ€šÃ‚Â· [Features](Features.md) Ãƒâ€šÃ‚Â· [Requirements](Requirements.md) Ãƒâ€šÃ‚Â· [Configuration](Configuration.md) Ãƒâ€šÃ‚Â· [Building](Building.md)
 
 ## First login
 
@@ -177,6 +177,13 @@ empty object payload. It is retained, so later subscriptions receive the origina
 envelope in their snapshot. Its timestamp records publication time. Global and
 account event names can share a subscription; a nonempty `accounts` filter excludes
 global events from both snapshots and live delivery.
+
+Python scripts can call `publish_event('bank.completed', {'items': 28})` to send
+a live `script.event`. Its payload is `{"name": "bank.completed", "data": {"items": 28}}`
+and its account is the script's account config name. Subscribe using the fixed
+`script.event` event name, optionally with an account filter. These events are not
+retained in snapshots. See [script publication](scripting/console-and-messages.md#operator-events)
+for argument limits and return semantics.
 
 To watch logout events with the [Python test client](../tools/events/logout.py),
 run `python -m pip install websockets`, then

@@ -69,6 +69,8 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
                 .runAuto = m_account.runAuto,
                 .runEnergyMin = m_account.runEnergyMin,
                 .world = m_config->server.world,
+                .events = m_options.events,
+                .accountName = m_account.name,
             },
             m_logger);
         // clang-format on

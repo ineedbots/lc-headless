@@ -17,6 +17,7 @@
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/Script/ScriptTestRuntime.hpp"
+#include "../Support/TempFolder.hpp"
 
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/redirect_error.hpp>
@@ -614,4 +615,54 @@ TEST_CASE("WebSocket global events retain a null account through snapshots live 
         CHECK(results[2]["payload"] == Json::object());
         CHECK(results[2]["sequence"] == connection + 2);
     }
+}
+
+TEST_CASE("Python account publication reaches an operator WebSocket subscriber", "[Account][ScriptHost][Events][Http][WebSocket]")
+{
+    auto fixture = WebSocketFixture{};
+    auto game = FakeGameServer{TestWorld::Send};
+    auto folder = TempFolder{"rs2004-script-events"};
+    folder.WriteFile("publish.py", "def on_start():\n    assert publish_event('ready', {'value': 42})\n\ndef loop():\n    return 600\n");
+
+    auto config = game.MakeConfig();
+    config.scripting.scriptsDirectory = folder.GetPath().string();
+
+    auto account = Account{std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(),
+                           AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount(), .script = ScriptConfig_s{.file = "publish.py"}},
+                           ScriptTestRuntime::Get(), Logger::GetDefault(), AccountOptions_s{.events = fixture.events}};
+    account.Login();
+
+    const auto results = fixture.Run([](u16 port) -> asio::awaitable<std::vector<Json>>
+    {
+        auto stream = Stream{co_await asio::this_coro::executor};
+        beast::get_lowest_layer(stream).expires_after(5s);
+        co_await beast::get_lowest_layer(stream).async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
+        co_await stream.async_handshake("localhost", "/api/v1/events", asio::use_awaitable);
+        stream.text(true);
+
+        const auto subscription = std::string{R"({"version":1,"type":"subscribe","id":"script","events":["script.event"],"accounts":["bot1"]})"};
+        co_await stream.async_write(asio::buffer(subscription), asio::use_awaitable);
+
+        auto envelopes = std::vector<Json>{};
+        for (int i = 0; i < 3; ++i)
+        {
+            envelopes.push_back(co_await Read(stream));
+        }
+
+        co_await stream.async_close(websocket::close_code::normal, asio::use_awaitable);
+        co_return envelopes;
+    }, [&]
+    {
+        if (fixture.events->GetDiagnostics().subscriptions == 1)
+        {
+            account.Step(0ms);
+        }
+    });
+    CHECK(results[0]["type"] == "ack");
+    CHECK(results[1]["events"].empty());
+    CHECK(results[2]["event"] == "script.event");
+    CHECK(results[2]["account"] == "bot1");
+    CHECK(results[2]["payload"] == Json{{"name", "ready"}, {"data", {{"value", 42}}}});
+    account.Interrupt();
+    account.CloseNetwork();
 }

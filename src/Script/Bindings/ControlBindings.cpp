@@ -92,6 +92,21 @@ namespace
         });
     }
 
+    bool PublishEvent(int, py_StackRef argv) noexcept
+    {
+        return BindingSupport::Guard([argv]
+        {
+            auto name = PyValue::ToString(py_arg(0), "name");
+            if (!py_json_dumps(py_arg(1), 0))
+            {
+                return false;
+            }
+
+            auto data = PyValue::ToString(py_retval(), "data");
+            return BindingSupport::ReturnBool(BindingSupport::GetContext().PublishEvent(std::move(name), std::move(data)));
+        });
+    }
+
     bool SendBotMessage(int, py_StackRef argv) noexcept
     {
         return BindingSupport::Guard([argv]
@@ -126,5 +141,6 @@ void ControlBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"stop_script()", StopScript},
                                           {"stop_account()", StopAccount},
                                           {"send_bot_message(username, message)", SendBotMessage},
+                                          {"publish_event(name, data=None)", PublishEvent},
                                       });
 }

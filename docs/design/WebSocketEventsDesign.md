@@ -125,6 +125,23 @@ envelope timestamp records publication time. Subscribers receive the original
 retained envelope, including its sequence and timestamp, on reconnect. It remains
 available until the existing publisher-reset or shutdown policy clears snapshots.
 
+## Script publications
+
+Python's `publish_event(name, data=None)` emits the live account-scoped
+`script.event` with payload `{"name": name, "data": data}`. The host injects the
+account config identity and shared publisher through `ScriptContext`; scripts
+cannot choose a different account for a publication. Custom names remain payload
+data under the fixed subscription catalog entry. The event is not retained.
+
+Data crosses the runtime boundary as owned serialized JSON, limited to 4096 bytes
+and 16 nested containers. Names are 1..64 ASCII letters, digits, dots, underscores
+or hyphens. Argument validation precedes publisher admission and raises Python
+TypeError/ValueError without resetting subscribers. Publication returns the
+journal admission result (False when disabled/stopping/overflowing), not delivery
+confirmation. Serialization uses the normal bounded event envelope and original
+account/global journal ordering. Startup, hook and loop calls only enqueue owned
+values; transport callbacks never enter a VM.
+
 ## Logout completion
 
 `account.logout` uses the standard event envelope with a payload containing exactly
