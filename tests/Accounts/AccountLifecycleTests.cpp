@@ -349,3 +349,108 @@ TEST_CASE("An account without a configuration file accepts setting saves in memo
         return entry.level >= LogLevel_e::Warning;
     }));
 }
+
+TEST_CASE("An interrupt during relog logout finishes without another login", "[AccountLifecycleCoverage]")
+{
+    const auto force = GENERATE(false, true);
+    auto fixture = LifecycleFixture{};
+    fixture.server.SetIgnoreLogout(true);
+    fixture.Make("def on_stop(reason):\n    log('stopped:', reason)\n\ndef loop():\n    relog(60)\n    return 100\n");
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&]
+    {
+        return fixture.account->GetClient().GetStatus() == ClientStatus_e::LoggingOut;
+    }));
+    CHECK(fixture.account->DescribeStatus().starts_with("relogging"));
+    fixture.account->Interrupt();
+    CHECK_FALSE(fixture.account->IsFinished());
+    CHECK(fixture.account->DescribeStatus().starts_with("logging out"));
+    CHECK(fixture.HasMessage("stopped: interrupted"));
+    if (force)
+    {
+        fixture.account->Interrupt();
+    }
+    else
+    {
+        fixture.server.Send(ServerProt_e::Logout);
+    }
+    REQUIRE(fixture.Until([&]
+    {
+        return fixture.account->IsFinished();
+    }));
+    CHECK(fixture.account->Succeeded() == !force);
+    CHECK(fixture.account->DescribeOutcome() == (force ? "disconnected without a confirmed logout" : "logged out"));
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16});
+}
+
+TEST_CASE("A third interrupt forces disconnection after kill grace and logout", "[AccountLifecycleCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    fixture.server.SetIgnoreLogout(true);
+    fixture.Make("def on_kill_signal():\n    pass\n\ndef loop():\n    return 100\n");
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&]
+    {
+        return fixture.account->GetClient().GetState().IsSettled();
+    }));
+    fixture.account->Interrupt();
+    CHECK(fixture.account->GetClient().IsInGame());
+    fixture.account->Interrupt();
+    CHECK(fixture.account->GetClient().GetStatus() == ClientStatus_e::LoggingOut);
+    fixture.account->Interrupt();
+    REQUIRE(fixture.account->IsFinished());
+    CHECK_FALSE(fixture.account->Succeeded());
+    CHECK(fixture.account->DescribeOutcome() == "disconnected without a confirmed logout");
+}
+
+TEST_CASE("An account logout timeout ends without reconnecting", "[AccountLifecycleCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    fixture.server.SetIgnoreLogout(true);
+    fixture.Make(std::nullopt, false, {.client = {.serverSilenceTimeout = 1min}});
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&]
+    {
+        return fixture.account->GetClient().GetState().IsSettled();
+    }));
+    fixture.account->Interrupt();
+    const auto deadline = Account::Clock::now() + Account::LOGOUT_TIMEOUT + 2s;
+    while (!fixture.account->IsFinished() && Account::Clock::now() < deadline)
+    {
+        fixture.account->Step(20ms);
+    }
+    REQUIRE(fixture.account->IsFinished());
+    CHECK_FALSE(fixture.account->Succeeded());
+    CHECK(fixture.account->DescribeOutcome() == "disconnected without a confirmed logout");
+    CHECK(fixture.server.GetLoginOpcodes() == std::vector<u8>{16});
+}
+
+TEST_CASE("Optional journal write failures leave an account healthy through shutdown", "[AccountLifecycleCoverage]")
+{
+    auto fixture = LifecycleFixture{};
+    fixture.folder.WriteFile("blocked", "keep this file");
+    const auto blocked = (fixture.folder.GetPath() / "blocked" / "reports").string();
+    fixture.config.scripting.experienceDirectory = blocked;
+    fixture.config.scripting.experienceIntervalMinutes = 1min;
+    fixture.config.scripting.bankLogDirectory = blocked;
+    fixture.config.scripting.inventoryDirectory = blocked;
+    fixture.config.scripting.equipmentDirectory = blocked;
+    fixture.Make();
+    fixture.account->Start();
+    REQUIRE(fixture.Until([&]
+    {
+        return fixture.account->GetClient().GetState().IsSettled();
+    }));
+    fixture.account->Step(0ms);
+    CHECK_FALSE(fixture.account->IsFinished());
+    CHECK(std::ranges::any_of(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.level == LogLevel_e::Warning;
+    }));
+    fixture.account->Interrupt();
+    REQUIRE(fixture.Until([&]
+    {
+        return fixture.account->IsFinished();
+    }));
+    CHECK(fixture.account->Succeeded());
+}

@@ -393,6 +393,54 @@ until every account has finished:
 
 `Account::Step` never throws, so one account's failure never reaches the others. An account stops only when it's interrupted (Ctrl+C, `quit` or `exit`), when its script calls `stop_account()` or fails with an error, or when a login or reconnect fails for good: refused for a reason no retry would change, such as wrong credentials, or after all `scripting.connectAttempts` (10). An account without a script also logs out once its `idleSeconds` are up. With `connectAttempts` set to `0`, an unexpected session end stops the account. Otherwise, when the session ends any other way, such as the server logging the player out or a desync, the account logs in afresh after `scripting.reloginDelaySeconds` (60), as `relog()` does: the script stays loaded, gets `on_disconnect`, and gets `on_reconnect` once the player is placed again. A send that fails in `GameClient::Flush` counts as a dropped connection, as it does in `Pump`. `AccountRunner::Run` returns true only when every account that started logged out cleanly, which `Application` turns into the exit code.
 
+### Account policy transitions
+
+`Account` remains the facade. `AccountLifecycle` owns account policy, deadline
+updates and final outcome interpretation; `GameClient` still owns wire status,
+login admission/retry timing and the logout confirmation deadline. `ScriptHost`
+owns script status, reloads, hooks and command execution. These are independent
+facts: `Active` includes login, reconnect and an online stopped/failed watched
+script. A failure flag is sticky but need not be terminal until logout completes.
+Interrupt count is independent of phase and suppresses recovery from the first
+interrupt onward. Admission history is retained even when teardown finishes an
+account that never started.
+
+| Current phase | Trigger | Next phase and deadline ownership |
+|---|---|---|
+| `Pending` | `Start` | `Active`; record admission before beginning login |
+| `Active` | First interrupt with kill hook | `Active`; establish kill grace deadline, signal and step script |
+| `Active` | Script `relog(delay)` | `RelogLogout`; establish delay to apply after logout |
+| `RelogLogout` | Client logged out/disconnected | `RelogWait`; consume delay, establish login deadline, step disconnect hook |
+| `Active` or either relog phase | Recoverable session failure, no interrupt/stop | `RelogWait`; replace relog timing with recovery login deadline, step disconnect hook |
+| `RelogWait` | Login deadline reached | `Active`; clear login deadline before beginning login |
+| `Active` | Stop request, idle expiry, kill grace expiry or escalated interrupt | `Stopping`; clear policy deadlines, finish script, request client logout |
+| Either relog phase | Interrupt | `Stopping`; clear policy deadlines and finish script; wait for ongoing logout or finish immediately if already waiting |
+| `Stopping` (client logging out) | Further interrupt | `Finished`; disconnect without confirmation |
+| Any admitted nonterminal phase | Permanent login/reconnect error or failure while stopping | `Finished`; mark failure, finish script, disconnect |
+| `Stopping` | Client logout confirmation or timeout/disconnection | `Finished`; clear policy deadlines and cancel commands |
+| Any phase | Application `CloseNetwork` | `Finished`; cancel application commands, disconnect, retain admission/failure facts |
+
+The idle deadline starts on the first idle step in game. Idle time and kill grace
+survive relog/recovery transitions, as before; kill grace is checked after script
+and item reporting, after relog early returns. Entering `Stopping` or `Finished`
+clears all policy deadlines. Assertions require the relog delay only in
+`RelogLogout`, and the login deadline only in `RelogWait`. Client retries and its
+30-second account logout deadline stay in `GameClient`. The idle summary interval
+is output scheduling, independent of lifecycle deadlines.
+
+`AccountReporting` owns progress, experience, bank, inventory and equipment
+writers and their schedules. It is destroyed before the client whose shared cache
+backs the bank/item references. Account calls it at three deliberately distinct
+points: observe experience/status after pumping and before relog/terminal early
+returns; request progress after stepping the script and before flushing/handling
+script control requests; sample bank, inventory and equipment afterward using the
+step's captured in-game status. This preserves final status samples, settled XP
+baselines, progress callbacks and WebSocket event ordering. Writers retain their
+existing optional enablement and file-error isolation; progress hook failures
+still follow script failure/watch policy. Settings persistence remains on Account.
+Terminal command cancellation and application request finalization retain their
+existing order; lifecycle transitions do not emit additional events.
+
 The 10 ms poll is simple and costs almost nothing next to 600 ms ticks. A shared wake signal across all sockets can replace it later if it ever matters.
 
 ---
