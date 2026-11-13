@@ -1,64 +1,9 @@
 #pragma once
 
-#include "../Console/CommandExecution.hpp"
+#include "Type/ApplicationRequest_s.hpp"
+#include "Type/CompletedApplicationRequest_s.hpp"
+#include "Type/RequestControl_s.hpp"
 #include "../Config/Type/HttpSettings_s.hpp"
-
-struct ExecuteConsoleCommand_s
-{
-    std::string command;
-};
-
-struct GetApplicationStatus_s
-{
-};
-
-struct AccountStatus_s
-{
-    std::string name;
-    bool started;
-    bool finished;
-    std::string status;
-};
-
-struct ApplicationStatus_s
-{
-    std::string state = "running";
-    s64 uptimeMs = 0;
-    std::vector<AccountStatus_s> accounts;
-};
-
-struct ConsoleCommandResult_s
-{
-    std::string output;
-    bool outputTruncated = false;
-    bool executionStarted = false;
-    std::vector<CommandRecipient_s> recipients;
-};
-
-struct RequestControl_s
-{
-    u64 id;
-    std::chrono::steady_clock::time_point deadline;
-    bool engineDone = false;
-    bool httpDone = false;
-    bool abandoned = false;
-    std::shared_ptr<CommandExecution> execution;
-};
-using ApplicationRequestPayload = std::variant<ExecuteConsoleCommand_s, GetApplicationStatus_s>;
-
-struct ApplicationRequest_s
-{
-    std::shared_ptr<RequestControl_s> control;
-    ApplicationRequestPayload payload;
-};
-
-struct CompletedApplicationRequest_s
-{
-    u64 id;
-    std::string outcome = "completed";
-    std::string errorCode;
-    std::variant<ConsoleCommandResult_s, ApplicationStatus_s> payload;
-};
 
 class ApplicationRequestBridge
 {

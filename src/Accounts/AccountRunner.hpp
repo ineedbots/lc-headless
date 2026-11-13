@@ -11,10 +11,11 @@
 #include "../Script/BotMessenger.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "Account.hpp"
+#include "AccountControl.hpp"
 #include "AccountCommands.hpp"
 
 // Every account's script loads on construction, so a broken script stops everything before the first login.
-class AccountRunner
+class AccountRunner : public AccountControl
 {
 public:
     using Clock = std::chrono::steady_clock;
@@ -31,10 +32,11 @@ public:
     // help, status, quit (or exit, which is a Ctrl+C), loglevel and say are the runner's own; any other command
     // goes to every running script that added it. "@<account> <command>" sends a line to one account, named by
     // its file or its username, in any case; quit then stops just that account.
-    void HandleCommand(std::string_view line, std::shared_ptr<CommandExecution> execution = {});
+    void HandleCommand(std::string_view line, std::shared_ptr<CommandExecution> execution = {}) override;
 
     void CloseNetwork();
-    [[nodiscard]] std::size_t GetAccountCount() const;
+    [[nodiscard]] std::size_t GetAccountCount() const override;
+    [[nodiscard]] AccountStatus_s GetAccountStatus(std::size_t index) const override;
     [[nodiscard]] const Account& GetAccount(std::size_t index) const;
 
 private:

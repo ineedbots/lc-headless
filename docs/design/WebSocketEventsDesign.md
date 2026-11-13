@@ -48,18 +48,13 @@ retains up to 16384 already-read bytes ahead of the TCP stream, preserving large
 coalesced frames without feeding headers back through Beast's smaller internal
 handshake buffer. Its teardown customization forwards to the owned TCP stream.
 
-To extend the catalog:
-
-1. Add an owned payload to `Application/Events/Type/ApplicationEvent_s.hpp`.
-2. Register its name, bounded-size validation and serializer in `EventProtocol`.
-3. Supply a safe-point producer callback as `AccountOptions_s::onProgressReport`
-   does for progress. Validate before copying script-sized inputs.
-4. Declare its latest-value policy in `EventProtocol::RetainsLatest` and review
-   the total snapshot bound for the new type; add focused schema, filter, ordering
-   and producer tests.
-5. Register new HTTP upgrade paths through endpoint `Route()` metadata when
-   needed. No changes to WebSocket read/write or HTTP socket handoff are needed
-   for another event in the existing subscription protocol.
+To extend the catalog, follow [Registering operator HTTP endpoints and events](OperatorRegistration.md).
+The typed catalog in `Type/ApplicationEvents_s.hpp` derives the payload variant,
+name validation, serializer and retention dispatch from per-event definitions.
+`AccountOptions_s::events` supplies one shared publisher for all account events;
+publication validates borrowed values before copying into the bounded journal.
+`EventLimits` centralizes shared limits, and bridge construction validates the
+aggregate snapshot budget for all retained event definitions.
 
 ## Version 1 protocol
 
@@ -111,7 +106,7 @@ internal deadlines use steady_clock.
 ## Logout completion
 
 `account.logout` uses the standard event envelope with a payload containing exactly
-`{"confirmed": true}` or `{"confirmed": false}`. `AccountOptions_s::onLogout` publishes
+`{"confirmed": true}` or `{"confirmed": false}`. `AccountOptions_s::events` publishes
 an owned `AccountLogout_s` at account safe points. Observe terminal client status
 before relog/recovery handling and in `UpdateFinished` for synchronous teardown.
 Compare observed status to suppress repeated notifications for the same completion.

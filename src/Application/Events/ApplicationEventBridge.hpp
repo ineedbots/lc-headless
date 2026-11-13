@@ -1,17 +1,19 @@
 #pragma once
 
 #include "Type/ApplicationEvent_s.hpp"
+#include "ApplicationEventPublisher.hpp"
+#include "EventLimits.hpp"
 #include "Type/EventSubscription_s.hpp"
 
-class ApplicationEventBridge
+class ApplicationEventBridge : public ApplicationEventPublisher
 {
 public:
-    static constexpr std::size_t MAX_MESSAGE_BYTES = 4096;
-    static constexpr std::size_t MAX_EVENT_BYTES = 8192;
-    static constexpr std::size_t MAX_OUTBOX_BYTES = 262144;
-    static constexpr std::size_t MAX_OUTBOX_ITEMS = 64;
-    static constexpr std::size_t MAX_JOURNAL_ITEMS = 256;
-    static constexpr std::size_t MAX_JOURNAL_BYTES = 1048576;
+    static constexpr std::size_t MAX_MESSAGE_BYTES = EventLimits::MAX_MESSAGE_BYTES;
+    static constexpr std::size_t MAX_EVENT_BYTES = EventLimits::MAX_EVENT_BYTES;
+    static constexpr std::size_t MAX_OUTBOX_BYTES = EventLimits::MAX_OUTBOX_BYTES;
+    static constexpr std::size_t MAX_OUTBOX_ITEMS = EventLimits::MAX_OUTBOX_ITEMS;
+    static constexpr std::size_t MAX_JOURNAL_ITEMS = EventLimits::MAX_JOURNAL_ITEMS;
+    static constexpr std::size_t MAX_JOURNAL_BYTES = EventLimits::MAX_JOURNAL_BYTES;
 
     struct Diagnostics_s
     {
@@ -36,13 +38,13 @@ public:
     void Disconnect(u64 client);
     void Enqueue(u64 client, std::string message);
     // Only producers and runner safe points call Publish/Service.
-    bool Publish(ApplicationEvent_s event);
-    bool PublishProgress(std::string_view account, const ProgressReport_s& report);
+    using ApplicationEventPublisher::Publish;
+    bool Publish(ApplicationEvent_s event) override;
     void Service();
     void Stop();
     bool HasIncoming() const;
     bool IsClosing(u64 client) const;
-    bool IsStopping() const;
+    bool IsStopping() const override;
     std::shared_ptr<const std::string> Front(u64 client) const;
     void Pop(u64 client);
     Diagnostics_s GetDiagnostics() const;
@@ -88,6 +90,7 @@ private:
     void Send(u64 client, std::shared_ptr<const std::string> text);
     void Overflow(u64 client);
     void ResetPublisher();
+    void RejectPublication() override;
     bool Append(JournalEntry_s entry);
 
     std::vector<std::string> m_accounts;

@@ -45,11 +45,11 @@ TEST_CASE("Event subscriptions take effect only at a safe point with coherent sn
     auto bridge = ApplicationEventBridge{{"bot1", "bot2"}};
     const auto client = bridge.Connect();
     auto report = ProgressReport_s{60s, {{"Reports", "1"}}};
-    REQUIRE(bridge.PublishProgress("bot1", report));
+    REQUIRE(bridge.Publish("bot1", report));
     bridge.Enqueue(client, Subscribe("s", {"bot1"}));
     report.rows[0].second = "2";
-    REQUIRE(bridge.PublishProgress("bot1", report));
-    REQUIRE(bridge.PublishProgress("bot2", report));
+    REQUIRE(bridge.Publish("bot1", report));
+    REQUIRE(bridge.Publish("bot2", report));
     CHECK_FALSE(bridge.Front(client));
     CHECK(bridge.GetDiagnostics().subscriptions == 0);
     Drain(bridge);
@@ -78,9 +78,9 @@ TEST_CASE("Event subscriptions reject changes atomically and deduplicate overlap
     bridge.Enqueue(client, Subscribe());
     bridge.Enqueue(client, Subscribe("unknown", {"BOT1"}));
     bridge.Enqueue(client, Subscribe("overlap"));
-    REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     bridge.Enqueue(client, R"({"version":1,"type":"unsubscribe","id":"s"})");
-    REQUIRE(bridge.PublishProgress("bot1", {2s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{2s, {}}));
     Drain(bridge);
     CHECK(Take(bridge, client)["type"] == "ack");
     CHECK(Take(bridge, client)["type"] == "snapshot");
@@ -136,7 +136,7 @@ TEST_CASE("Event queues disconnect slow consumers and reset snapshots on publish
 
     for (int i = 0; i < 70; ++i)
     {
-        REQUIRE(bridge.PublishProgress("bot1", {1s, {{"i", std::to_string(i)}}}));
+        REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {{"i", std::to_string(i)}}}));
         Drain(bridge);
         CHECK(Take(bridge, fast)["type"] == "event");
     }
@@ -144,7 +144,7 @@ TEST_CASE("Event queues disconnect slow consumers and reset snapshots on publish
     CHECK(bridge.IsClosing(slow));
     CHECK_FALSE(bridge.IsClosing(fast));
     CHECK(bridge.GetDiagnostics().overflowDisconnects == 1);
-    CHECK_FALSE(bridge.PublishProgress("bot1", {1s, {{"huge", std::string(4097, 'x')}}}));
+    CHECK_FALSE(bridge.Publish("bot1", ProgressReport_s{1s, {{"huge", std::string(4097, 'x')}}}));
     CHECK(bridge.IsClosing(fast));
     CHECK(bridge.GetDiagnostics().publisherResets == 1);
 
@@ -181,7 +181,7 @@ TEST_CASE("Event fanout continues across passes in order with bounded journal ad
 
     for (int i = 0; i < 4; ++i)
     {
-        REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+        REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     }
 
     bridge.Service();
@@ -197,10 +197,10 @@ TEST_CASE("Event fanout continues across passes in order with bounded journal ad
 
     for (std::size_t i = 0; i < ApplicationEventBridge::MAX_JOURNAL_BYTES / ApplicationEventBridge::MAX_EVENT_BYTES; ++i)
     {
-        REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+        REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     }
 
-    CHECK_FALSE(bridge.PublishProgress("bot1", {1s, {}}));
+    CHECK_FALSE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     CHECK(bridge.GetDiagnostics().journalBytes == 0);
     CHECK(bridge.GetDiagnostics().journalItems == 0);
     CHECK(bridge.GetDiagnostics().publisherResets == 1);
@@ -217,7 +217,7 @@ TEST_CASE("Event disconnect retires queued commands and new sessions cannot inhe
     const auto fresh = bridge.Connect();
     CHECK(fresh != old);
     bridge.Enqueue(old, Subscribe());
-    REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     Drain(bridge);
     CHECK_FALSE(bridge.Front(fresh));
     CHECK(bridge.GetDiagnostics().subscriptions == 0);
@@ -241,7 +241,7 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     bridge.Enqueue(progress, Subscribe());
     REQUIRE(bridge.Publish({"bot1", AccountLogout_s{true}}));
     REQUIRE(bridge.Publish({"bot2", AccountLogout_s{true}}));
-    REQUIRE(bridge.PublishProgress("bot1", {60s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{60s, {}}));
     REQUIRE(bridge.Publish({"bot1", AccountLogout_s{false}}));
     Drain(bridge);
 

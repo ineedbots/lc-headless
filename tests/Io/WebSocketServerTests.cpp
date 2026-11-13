@@ -136,7 +136,7 @@ TEST_CASE("WebSocket loopback subscribes snapshots streams unsubscribes and reco
             if (!published && fixture.events->GetDiagnostics().subscriptions == 1)
             {
                 published = true;
-                REQUIRE(fixture.events->PublishProgress("bot1", {60s, {{"Reports", "1"}}}));
+                REQUIRE(fixture.events->Publish("bot1", ProgressReport_s{60s, {{"Reports", "1"}}}));
             }
         });
         REQUIRE(results.size() == 4);
@@ -350,7 +350,7 @@ TEST_CASE("WebSocket fanout keeps REST progressing under a bounded multi-client 
             publishedAt = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
             for (int event = 0; event < 20; ++event)
             {
-                REQUIRE(fixture.events->PublishProgress("bot1", {60s, {{"Reports", std::to_string(event)}}}));
+                REQUIRE(fixture.events->Publish("bot1", ProgressReport_s{60s, {{"Reports", std::to_string(event)}}}));
             }
         }
 
@@ -418,7 +418,7 @@ TEST_CASE("WebSocket performs close handshakes for shutdown and subscriber overf
 
             for (int i = 0; i < 70; ++i)
             {
-                REQUIRE(fixture.events->PublishProgress("bot1", {1s, {}}));
+                REQUIRE(fixture.events->Publish("bot1", ProgressReport_s{1s, {}}));
             }
 
             while (fixture.events->HasIncoming())
@@ -508,10 +508,7 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
 {
     auto fixture = WebSocketFixture{};
     auto game = FakeGameServer{TestWorld::Send};
-    const auto options = AccountOptions_s{.onLogout = [&](std::string_view name, const AccountLogout_s& logout)
-    {
-        fixture.events->Publish({std::string{name}, logout});
-    }};
+    const auto options = AccountOptions_s{.events = fixture.events};
     auto account = Account{std::make_shared<const Config_s>(game.MakeConfig()), FakeGameServer::MakeCache(),
                            AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), Logger::GetDefault(), options};
     account.Login();

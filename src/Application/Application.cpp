@@ -25,9 +25,6 @@
 #include "InterruptSignal.hpp"
 #include "ApplicationRequestProcessor.hpp"
 #include "Events/ApplicationEventBridge.hpp"
-#include "Events/Type/ApplicationEvent_s.hpp"
-#include "../Accounts/Type/ProgressReport_s.hpp"
-#include "../Accounts/Type/AccountLogout_s.hpp"
 #include "EntryPoint.hpp"
 
 Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
@@ -108,14 +105,7 @@ int Application::Run()
         .profileDirectory = profileDirectory,
         .navigation = m_navigation,
         .reloginDelay = scripting.reloginDelaySeconds,
-        .onProgressReport = m_config->http.host.empty() ? std::function<void(std::string_view, const ProgressReport_s&)>{} : [events](std::string_view account, const ProgressReport_s& report)
-    {
-        events->PublishProgress(account, report);
-    },
-        .onLogout = m_config->http.host.empty() ? std::function<void(std::string_view, const AccountLogout_s&)>{} : [events](std::string_view account, const AccountLogout_s& logout)
-    {
-        events->Publish({std::string{account}, logout});
-    },
+        .events = m_config->http.host.empty() ? nullptr : events,
     };
 
     auto net = NetLoop::Create();

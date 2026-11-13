@@ -4,7 +4,8 @@
 #include "EventProtocol.hpp"
 #include "Type/ApplicationEvent_s.hpp"
 #include "Type/EventSubscription_s.hpp"
-#include "../../Accounts/Type/ProgressReport_s.hpp"
+#include "Type/ApplicationEvents_s.hpp"
+#include "EventLimits.hpp"
 
 namespace
 {
@@ -20,12 +21,17 @@ namespace
 ApplicationEventBridge::ApplicationEventBridge(std::vector<std::string> accounts)
     : m_accounts{std::move(accounts)}
 {
-    if (m_accounts.size() > 16 || std::ranges::any_of(m_accounts, [](const auto& name)
+    if (m_accounts.size() > EventLimits::MAX_ACCOUNTS || std::ranges::any_of(m_accounts, [](const auto& name)
     {
-        return name.empty() || name.size() > 128;
+        return name.empty() || name.size() > EventLimits::MAX_ACCOUNT_BYTES;
     }))
     {
-        throw std::invalid_argument{"Event accounts must contain at most 16 names of 1..128 bytes"};
+        throw std::invalid_argument{std::format("Event accounts must contain at most {} names of 1..{} bytes", EventLimits::MAX_ACCOUNTS, EventLimits::MAX_ACCOUNT_BYTES)};
+    }
+
+    if (!ApplicationEvents_s::FitsSnapshot(m_accounts.size()))
+    {
+        throw std::invalid_argument{"Retained event catalog exceeds the client snapshot budget"};
     }
 
     auto random = std::random_device{};
@@ -34,7 +40,7 @@ ApplicationEventBridge::ApplicationEventBridge(std::vector<std::string> accounts
 
 u64 ApplicationEventBridge::Connect()
 {
-    if (m_stopping || m_clients.size() >= 128 || m_nextClient == std::numeric_limits<u64>::max())
+    if (m_stopping || m_clients.size() >= EventLimits::MAX_CONNECTIONS || m_nextClient == std::numeric_limits<u64>::max())
     {
         return 0;
     }
@@ -111,22 +117,6 @@ bool ApplicationEventBridge::Publish(ApplicationEvent_s event)
     return true;
 }
 
-bool ApplicationEventBridge::PublishProgress(std::string_view account, const ProgressReport_s& report)
-{
-    if (m_stopping)
-    {
-        return false;
-    }
-
-    if (account.size() > 128 || !EventProtocol::Measure(report))
-    {
-        ResetPublisher();
-        return false;
-    }
-
-    return Publish({std::string{account}, report});
-}
-
 bool ApplicationEventBridge::Matches(const EventSubscription_s& subscription, std::string_view event, std::string_view account)
 {
     return std::ranges::find(subscription.events, event) != subscription.events.end() &&
@@ -191,7 +181,7 @@ void ApplicationEventBridge::Apply(Incoming_s incoming)
         return;
     }
 
-    if (existing != subscriptions.end() || subscriptions.size() >= 16 || std::ranges::any_of(command.subscription.accounts, [&](const auto& account)
+    if (existing != subscriptions.end() || subscriptions.size() >= EventLimits::MAX_SUBSCRIPTIONS || std::ranges::any_of(command.subscription.accounts, [&](const auto& account)
     {
         return std::ranges::find(m_accounts, account) == m_accounts.end();
     }))
@@ -286,7 +276,7 @@ void ApplicationEventBridge::Service()
             return;
         }
 
-        if (text.size() > MAX_EVENT_BYTES)
+        if (text.size() > EventProtocol::MaxSerializedBytes(event.payload))
         {
             ResetPublisher();
             return;
@@ -397,4 +387,9 @@ ApplicationEventBridge::Diagnostics_s ApplicationEventBridge::GetDiagnostics() c
     }
 
     return result;
+}
+
+void ApplicationEventBridge::RejectPublication()
+{
+    ResetPublisher();
 }

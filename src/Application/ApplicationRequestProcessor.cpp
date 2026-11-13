@@ -1,6 +1,16 @@
 #include "pch.hpp"
 #include "ApplicationRequestProcessor.hpp"
 
+#include "ApplicationRequestBridge.hpp"
+#include "Type/RequestControl_s.hpp"
+#include "Type/CompletedApplicationRequest_s.hpp"
+#include "Type/ApplicationRequest_s.hpp"
+#include "Type/ConsoleCommandResult_s.hpp"
+#include "../Console/CommandExecution.hpp"
+#include "../Console/ConsoleCapture.hpp"
+#include "Type/ApplicationOperations_s.hpp"
+#include "Type/ApplicationRequestContext_s.hpp"
+
 ApplicationRequestProcessor::ApplicationRequestProcessor(AccountRunner& runner, std::shared_ptr<ApplicationRequestBridge> bridge,
                                                          std::chrono::steady_clock::time_point started)
     : m_runner{runner}
@@ -29,42 +39,19 @@ void ApplicationRequestProcessor::Dispatch()
 
         std::visit([&](const auto& payload)
         {
-            Process(control, payload);
+            const auto context = ApplicationRequestContext_s{m_runner, m_started, static_cast<std::size_t>(m_bridge->GetSettings().maxOutputBytes)};
+            auto result = ApplicationOperations_s::Execute(context, control, payload);
+            if (result)
+            {
+                m_bridge->Complete({.id = control->id, .payload = std::move(*result)});
+            }
+            else
+            {
+                assert(control->execution && "Deferred operations must install command execution state");
+                m_executing.push_back(control);
+            }
         }, request->payload);
     }
-}
-
-void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s>& control, const ExecuteConsoleCommand_s& command)
-{
-    auto execution = std::make_shared<CommandExecution>(static_cast<std::size_t>(m_bridge->GetSettings().maxOutputBytes), control->deadline);
-    control->execution = execution;
-    m_executing.push_back(control);
-
-    try
-    {
-        const auto capture = ConsoleCaptureScope{&execution->capture};
-        m_runner.HandleCommand(command.command, execution);
-    }
-    catch (const std::exception&)
-    {
-        execution->errorCode = "internal_failure";
-    }
-
-    execution->dispatched = true;
-}
-
-void ApplicationRequestProcessor::Process(const std::shared_ptr<RequestControl_s>& control, const GetApplicationStatus_s&)
-{
-    auto status = ApplicationStatus_s{};
-    status.uptimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_started).count();
-
-    for (std::size_t i = 0; i < m_runner.GetAccountCount(); ++i)
-    {
-        const auto& account = m_runner.GetAccount(i);
-        status.accounts.push_back({account.GetName(), account.IsStarted(), account.IsFinished(), account.DescribeStatus()});
-    }
-
-    m_bridge->Complete({.id = control->id, .payload = std::move(status)});
 }
 
 void ApplicationRequestProcessor::Finalize()

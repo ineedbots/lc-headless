@@ -1,4 +1,7 @@
 #include "pch.hpp"
+#include "../Support/Application/EventCapture.hpp"
+#include "Application/Events/Type/ApplicationEvent_s.hpp"
+#include "Accounts/Type/AccountLogout_s.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/Io/FakeSocks5Proxy.hpp"
@@ -7,7 +10,6 @@
 #include "../Support/TempFolder.hpp"
 
 #include "Accounts/Account.hpp"
-#include "Accounts/Type/AccountLogout_s.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Config/Type/AccountConfig_s.hpp"
 #include "Config/Type/Config_s.hpp"
@@ -519,10 +521,13 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
     auto notifications = std::vector<std::pair<std::string, bool>>{};
     const auto options = AccountOptions_s{
         .client = {.connectAttempts = 0, .keepaliveInterval = 50ms},
-        .onLogout = [&](std::string_view account, const AccountLogout_s& logout)
+        .events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
     {
-        notifications.emplace_back(account, logout.confirmed);
-    },
+        if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
+        {
+            notifications.emplace_back(event.account, logout->confirmed);
+        }
+    }),
     };
     auto fixture = AccountFixture{std::nullopt, 30s, options};
     fixture.StepFor(100ms);
@@ -582,10 +587,13 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
 TEST_CASE("A timed out account logout notifies unconfirmed completion", "[Account][Events]")
 {
     auto notifications = std::vector<bool>{};
-    const auto options = AccountOptions_s{.client = {.serverSilenceTimeout = 60s}, .onLogout = [&](std::string_view, const AccountLogout_s& logout)
+    const auto options = AccountOptions_s{.client = {.serverSilenceTimeout = 60s}, .events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
     {
-        notifications.push_back(logout.confirmed);
-    }};
+        if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
+        {
+            notifications.push_back(logout->confirmed);
+        }
+    })};
     auto fixture = AccountFixture{std::nullopt, 30s, options};
     fixture.server.SetIgnoreLogout(true);
     fixture.account->Interrupt();
@@ -599,10 +607,13 @@ TEST_CASE("A timed out account logout notifies unconfirmed completion", "[Accoun
 TEST_CASE("Relog logout notifies before login and notifies again after the next session", "[Account][Events]")
 {
     auto notifications = std::vector<bool>{};
-    const auto options = AccountOptions_s{.onLogout = [&](std::string_view, const AccountLogout_s& logout)
+    const auto options = AccountOptions_s{.events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
     {
-        notifications.push_back(logout.confirmed);
-    }};
+        if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
+        {
+            notifications.push_back(logout->confirmed);
+        }
+    })};
     auto fixture = AccountFixture{"done = False\ndef loop():\n    global done\n    if not done:\n        done = True\n        relog(0)\n    return 100\n", 30s, options};
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && notifications.empty())

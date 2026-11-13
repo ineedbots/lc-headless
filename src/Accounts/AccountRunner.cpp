@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "AccountRunner.hpp"
 
+#include "Type/AccountStatus_s.hpp"
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Config/Type/AccountConfig_s.hpp"
 #include "../Config/Type/Config_s.hpp"
@@ -346,4 +347,10 @@ void AccountRunner::CloseNetwork()
     {
         account->CloseNetwork();
     }
+}
+
+AccountStatus_s AccountRunner::GetAccountStatus(std::size_t index) const
+{
+    const auto& account = GetAccount(index);
+    return {account.GetName(), account.IsStarted(), account.IsFinished(), account.DescribeStatus()};
 }

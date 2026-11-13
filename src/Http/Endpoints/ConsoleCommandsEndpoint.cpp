@@ -1,6 +1,14 @@
 #include "pch.hpp"
 #include "ConsoleCommandsEndpoint.hpp"
 
+#include "../../Application/Type/ConsoleCommandResult_s.hpp"
+#include "../../Application/Type/ExecuteConsoleCommand_s.hpp"
+#include "../../Console/CommandExecution.hpp"
+#include "../../Application/Type/CompletedApplicationRequest_s.hpp"
+#include "../../Application/Type/ApplicationOperations_s.hpp"
+#include "../Type/HttpRoute_s.hpp"
+#include "../Type/HttpEndpointRequest_s.hpp"
+#include "../Type/HttpResponse_s.hpp"
 #include "../../Utils/StringUtils.hpp"
 #include "../HttpJson.hpp"
 #include "../HttpResponses.hpp"
@@ -28,9 +36,9 @@ HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& re
     return ApplicationRequestPayload{ExecuteConsoleCommand_s{std::move(line)}};
 }
 
-HttpResponse_s ConsoleCommandsEndpoint::Respond(u64 id, std::string_view outcome, std::string_view errorCode, const ConsoleCommandResult_s& command)
+HttpResponse_s ConsoleCommandsEndpoint::Respond(const CompletedApplicationRequest_s& result, const ConsoleCommandResult_s& command)
 {
-    auto body = nlohmann::json{{"requestId", std::to_string(id)}, {"outcome", outcome}, {"output", command.output}, {"outputTruncated", command.outputTruncated}, {"executionStarted", command.executionStarted}, {"recipients", nlohmann::json::array()}};
+    auto body = nlohmann::json{{"requestId", std::to_string(result.id)}, {"outcome", result.outcome}, {"output", command.output}, {"outputTruncated", command.outputTruncated}, {"executionStarted", command.executionStarted}, {"recipients", nlohmann::json::array()}};
     for (const auto& recipient : command.recipients)
     {
         auto item = nlohmann::json{{"account", recipient.account}, {"outcome", recipient.outcome}};
@@ -43,22 +51,22 @@ HttpResponse_s ConsoleCommandsEndpoint::Respond(u64 id, std::string_view outcome
     }
 
     auto code = 200u;
-    if (outcome == "rejected")
+    if (result.outcome == "rejected")
     {
         code = 422;
     }
-    else if (outcome == "failed")
+    else if (result.outcome == "failed")
     {
         code = 500;
     }
-    else if (outcome == "cancelled")
+    else if (result.outcome == "cancelled")
     {
         code = 503;
     }
 
-    if (!errorCode.empty())
+    if (!result.errorCode.empty())
     {
-        body["error"] = {{"code", errorCode}, {"message", errorCode}};
+        body["error"] = {{"code", result.errorCode}, {"message", result.errorCode}};
     }
 
     return HttpJson::Response(code, body);

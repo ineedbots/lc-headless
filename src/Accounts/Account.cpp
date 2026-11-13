@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "Account.hpp"
 
+#include "../Application/Events/ApplicationEventPublisher.hpp"
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Config/Type/AccountConfig_s.hpp"
 #include "../Config/AccountFile.hpp"
@@ -32,9 +33,9 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     , m_client{m_config, std::move(cache), m_account.credentials, m_logger, m_options.client, std::move(net)}
     , m_reporting{*m_config, m_account, m_client.GetCache(), m_logger, [this](const ProgressReport_s& report)
 {
-    if (m_options.onProgressReport)
+    if (m_options.events)
     {
-        m_options.onProgressReport(m_account.name, report);
+        m_options.events->Publish(m_account.name, report);
     }
 }}
 {
@@ -689,9 +690,9 @@ void Account::ObserveLogout()
     }
 
     const auto confirmed = status == ClientStatus_e::LoggedOut;
-    if (m_options.onLogout && (confirmed || (previous == ClientStatus_e::LoggingOut && status == ClientStatus_e::Disconnected)))
+    if (m_options.events && (confirmed || (previous == ClientStatus_e::LoggingOut && status == ClientStatus_e::Disconnected)))
     {
-        m_options.onLogout(m_account.name, AccountLogout_s{confirmed});
+        m_options.events->Publish(m_account.name, AccountLogout_s{confirmed});
     }
 }
 
