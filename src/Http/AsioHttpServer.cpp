@@ -1,14 +1,17 @@
 #include "pch.hpp"
 #include "AsioHttpServer.hpp"
+
 #include "AsioWebSocketSession.hpp"
 #include "../Application/Events/ApplicationEventBridge.hpp"
+#include "HttpRouter.hpp"
+#include "../Application/Events/EventLimits.hpp"
+#include "HttpResponses.hpp"
+
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
-#include "HttpRouter.hpp"
-#include "HttpResponses.hpp"
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
@@ -455,6 +458,15 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
             return;
         }
 
+        if (route && route->route.respond)
+        {
+            if (auto encoded = route->route.respond(result))
+            {
+                Respond(std::move(*encoded));
+                return;
+            }
+        }
+
         Respond(HttpResponses::Complete(result));
     }
 };
@@ -468,7 +480,7 @@ void AsioHttpServer::State::Accept()
 
     acceptor.async_accept(Track([self = shared_from_this()](boost::system::error_code error, Tcp::socket socket)
     {
-        if (!error && !self->stopping && self->sessions.size() + self->webSockets.size() < 128)
+        if (!error && !self->stopping && self->sessions.size() + self->webSockets.size() < EventLimits::MAX_CONNECTIONS)
         {
             auto session = std::make_shared<Session>(self, std::move(socket));
             self->sessions.emplace(session.get(), session);

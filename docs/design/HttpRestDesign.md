@@ -1,5 +1,10 @@
 # HTTP REST design
 
+For current extension steps, see [Registering operator HTTP endpoints and events](OperatorRegistration.md).
+The application-operation and HTTP-endpoint catalogs derive payload variants,
+execution dispatch and response adapters; matched routes carry their own adapters.
+
+
 WebSocket upgrade metadata and the shared listener's progress-event integration
 are specified in [WebSocket events](WebSocketEventsDesign.md).
 

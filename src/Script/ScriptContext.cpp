@@ -18,12 +18,17 @@
 #include "BotMessenger.hpp"
 #include "ScriptActions.hpp"
 #include "ScriptControl.hpp"
+#include "Type/PublishedScriptEvent_s.hpp"
+#include "../Application/Events/ApplicationEventPublisher.hpp"
+#include "../Application/Events/Definitions/ScriptPublishedEvent.hpp"
 
-ScriptContext::ScriptContext(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username, std::shared_ptr<const Navigation> navigation)
+ScriptContext::ScriptContext(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username, std::shared_ptr<const Navigation> navigation, std::shared_ptr<ApplicationEventPublisher> events, std::string accountName)
     : m_state{state}
     , m_map{map}
     , m_messenger{messenger}
     , m_username{std::move(username)}
+    , m_events{std::move(events)}
+    , m_accountName{std::move(accountName)}
     , m_navigation{std::move(navigation)}
     , m_revision{actions.GetProtocol().GetRevision()}
     , m_actions{state, map, actions}
@@ -118,4 +123,15 @@ std::optional<bool> ScriptContext::SendBotMessage(std::string_view username, std
     }
 
     return m_messenger->Send(username, BotMessage_s{.sender = m_username, .json = std::move(json)});
+}
+
+bool ScriptContext::PublishEvent(std::string name, std::string dataJson)
+{
+    auto event = PublishedScriptEvent_s{std::move(name), std::move(dataJson)};
+    if (!ScriptPublishedEvent::Measure(event))
+    {
+        throw std::invalid_argument{std::format("Event name must be 1..{} ASCII letters, digits, dots, underscores or hyphens; data must be valid JSON up to {} bytes and {} container levels", ScriptPublishedEvent::MAX_NAME_BYTES, ScriptPublishedEvent::MAX_DATA_BYTES, ScriptPublishedEvent::MAX_DATA_DEPTH)};
+    }
+
+    return m_events && m_events->Publish(m_accountName, event);
 }

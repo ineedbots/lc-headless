@@ -3,8 +3,9 @@
 
 #include "Type/ApplicationEvent_s.hpp"
 #include "Type/EventSubscription_s.hpp"
-#include "../../Accounts/Type/ProgressReport_s.hpp"
-#include "../../Accounts/Type/AccountLogout_s.hpp"
+#include "Type/ApplicationEvents_s.hpp"
+#include "EventLimits.hpp"
+#include "Type/EventScope_e.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -20,7 +21,7 @@ namespace
 
     bool ReadList(const nlohmann::json& value, std::vector<std::string>& out)
     {
-        if (!value.is_array() || value.size() > 16)
+        if (!value.is_array() || value.size() > EventLimits::MAX_FILTER_ENTRIES)
         {
             return false;
         }
@@ -33,7 +34,7 @@ namespace
             }
 
             auto name = entry.get<std::string>();
-            if (name.empty() || name.size() > 128 || std::ranges::find(out, name) != out.end())
+            if (name.empty() || name.size() > EventLimits::MAX_FILTER_NAME_BYTES || std::ranges::find(out, name) != out.end())
             {
                 return false;
             }
@@ -114,31 +115,23 @@ std::string_view EventProtocol::Name(const ApplicationEventPayload& payload)
 {
     return std::visit([](const auto& value) -> std::string_view
     {
-        if constexpr (std::is_same_v<std::decay_t<decltype(value)>, ProgressReport_s>)
-        {
-            return "account.progress";
-        }
-        else
-        {
-            static_assert(std::is_same_v<std::decay_t<decltype(value)>, AccountLogout_s>);
-            return "account.logout";
-        }
+        using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
+        return Event::NAME;
     }, payload);
 }
 
 bool EventProtocol::IsKnown(std::string_view name)
 {
-    return name == "account.progress" || name == "account.logout";
+    return ApplicationEvents_s::IsKnown(name);
 }
 
 bool EventProtocol::RetainsLatest(const ApplicationEventPayload& payload)
 {
-    return std::holds_alternative<ProgressReport_s>(payload);
-}
-
-std::optional<std::size_t> EventProtocol::Measure(const AccountLogout_s&)
-{
-    return sizeof(ApplicationEvent_s);
+    return std::visit([](const auto& value)
+    {
+        using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
+        return Event::RETAINS_LATEST;
+    }, payload);
 }
 
 std::optional<std::size_t> EventProtocol::Measure(const ApplicationEventPayload& payload)
@@ -149,43 +142,15 @@ std::optional<std::size_t> EventProtocol::Measure(const ApplicationEventPayload&
     }, payload);
 }
 
-std::optional<std::size_t> EventProtocol::Measure(const ProgressReport_s& report)
-{
-    if (report.rows.size() > 64)
-    {
-        return {};
-    }
-
-    auto total = std::size_t{0};
-    for (const auto& [name, value] : report.rows)
-    {
-        if (name.size() > 4096 - total || value.size() > 4096 - total - name.size())
-        {
-            return {};
-        }
-
-        total += name.size() + value.size();
-    }
-
-    return total + report.rows.size() * sizeof(std::pair<std::string, std::string>) + sizeof(ApplicationEvent_s);
-}
-
 std::string EventProtocol::Encode(const ApplicationEvent_s& event, std::string_view instance, u64 sequence)
 {
     const auto payload = std::visit([](const auto& value) -> nlohmann::json
     {
-        if constexpr (std::is_same_v<std::decay_t<decltype(value)>, ProgressReport_s>)
-        {
-            return {{"runTimeSeconds", value.runTime.count()}, {"rows", value.rows}};
-        }
-        else
-        {
-            static_assert(std::is_same_v<std::decay_t<decltype(value)>, AccountLogout_s>);
-            return {{"confirmed", value.confirmed}};
-        }
+        using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
+        return Event::Serialize(value);
     }, event.payload);
 
-    return nlohmann::json{{"version", 1}, {"type", "event"}, {"event", Name(event.payload)}, {"account", event.account}, {"instance", instance}, {"sequence", sequence}, {"timestamp", std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp))}, {"payload", payload}}.dump();
+    return nlohmann::json{{"version", 1}, {"type", "event"}, {"event", Name(event.payload)}, {"account", event.account ? nlohmann::json(*event.account) : nlohmann::json(nullptr)}, {"instance", instance}, {"sequence", sequence}, {"timestamp", std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp))}, {"payload", payload}}.dump();
 }
 
 std::string EventProtocol::Ack(std::string_view id, std::string_view action, std::string_view instance, u64 sequence)
@@ -207,4 +172,22 @@ std::string EventProtocol::Snapshot(std::string_view id, std::string_view instan
     }
 
     return nlohmann::json{{"version", 1}, {"type", "snapshot"}, {"id", id}, {"instance", instance}, {"sequence", sequence}, {"events", values}}.dump();
+}
+
+std::size_t EventProtocol::MaxSerializedBytes(const ApplicationEventPayload& payload)
+{
+    return std::visit([](const auto& value)
+    {
+        using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
+        return Event::MAX_SERIALIZED_BYTES;
+    }, payload);
+}
+
+EventScope_e EventProtocol::Scope(const ApplicationEventPayload& payload)
+{
+    return std::visit([](const auto& value)
+    {
+        using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
+        return Event::SCOPE;
+    }, payload);
 }

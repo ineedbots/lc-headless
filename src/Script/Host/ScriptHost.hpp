@@ -5,6 +5,7 @@
 #include "../../Console/CommandExecution.hpp"
 
 #include "../../Accounts/Type/ProgressReport_s.hpp"
+#include "../../Application/Events/ApplicationEventPublisher.hpp"
 #include "../../Console/Type/ConsoleCommand_s.hpp"
 #include "../../Console/Logger.hpp"
 #include "../../Game/GameActions.hpp"
@@ -64,6 +65,8 @@ struct ScriptHostOptions_s
     bool runAuto = false;
     s32 runEnergyMin = 20;
     s32 world = 0;
+    std::shared_ptr<ApplicationEventPublisher> events;
+    std::string accountName;
 };
 
 // The script is loaded on construction, so a broken script fails before login.

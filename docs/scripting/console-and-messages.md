@@ -88,6 +88,49 @@ def on_bot_message(sender, message):
 - A username no account in the process has raises `ValueError`.
 - Messages arrive in the order sent, on the receiver's next pass, and wait while it logs in or reconnects. A script can message itself; a message sent while handling one arrives on the next pass.
 
+## Operator events
+
+### `publish_event(name, data=None)`
+
+Publishes a live `script.event` on the configured HTTP operator listener's
+WebSocket endpoint. The event uses this script's account config name, independently
+of its login username. For example:
+
+```python
+publish_event('bank.completed', {'items': 28, 'coins': 1200})
+```
+
+Operator clients subscribe to the fixed event name `script.event`:
+
+```json
+{"version":1,"type":"subscribe","id":"script","events":["script.event"],"accounts":["bot1"]}
+```
+
+The standard envelope has `"event": "script.event"`, `"account": "bot1"` and
+`"payload": {"name": "bank.completed", "data": {"items": 28, "coins": 1200}}`.
+Custom names are data within this event; they do not register new subscription
+names. Account filters and ordered delivery work as for other account events.
+
+- `name` is 1..64 ASCII letters, digits, dots, underscores or hyphens.
+- `data` is JSON-compatible: dictionaries with string keys, lists, strings, finite
+  numbers, booleans, or `None`. Tuples become arrays. Data is limited to 4096 bytes
+  as serialized JSON and at most 16 nested containers; `None` is the default.
+- The payload is copied during the call. Later changes to Python objects do not
+  change an already accepted event.
+- Returns `True` when admitted to the journal, even with no subscribers. It does
+  not acknowledge network delivery. Returns `False` if the operator listener is
+  disabled, the publisher is stopping, or the journal rejects publication.
+- Invalid types raise `TypeError`; invalid names, excessive size/depth, or invalid
+  serialized JSON raise `ValueError`, including when the listener is disabled.
+  Argument validation failures do not reset existing subscribers.
+- Events are live only and are absent from reconnect snapshots. Journal overflow
+  follows the shared reset/disconnect policy in the [operator event guide](../Running.md#live-progress-events).
+
+This function is available during script loading, hooks and `loop()`. It does not
+invoke another Python script's event hooks; use `send_bot_message` for messages
+between accounts' scripts. These publications join the same journal as account
+and global application events and are delivered at runner safe points.
+
 ## Progress reports
 
 Set `script.progressReportMinutes` in the account file (1 to 1440) and define `on_progress_report()`, returning a `dict`:

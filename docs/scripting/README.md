@@ -179,6 +179,7 @@ For working on a script, `--watch` reloads it whenever you save it, and `--debug
 | `log`, `debug`, `print` | [script-structure](script-structure.md#logging) |
 | `stop_script`, `stop_account`, `relog` | [script-structure](script-structure.md#stopping-and-relogging) |
 | `send_bot_message` | [console-and-messages](console-and-messages.md#messages-between-scripts) |
+| `publish_event` | [console-and-messages](console-and-messages.md#operator-events) |
 | `define_bot`, `resolve_loop_cadence` | [script-structure](script-structure.md) |
 | `world_state`, `bank_locations`, `bank_unlocked`, `nearest_bank`, `nearest_banks`, `nearest_bank_reachable`, `nearest_usable_bank`, `approach_of`, `locked_bank_at`, `nearest_walkable_bank`, `bank_cost_for_navigator` | [walking](walking.md#banks) |
 | `wilderness_level_at` | [walking](walking.md#the-wilderness) |

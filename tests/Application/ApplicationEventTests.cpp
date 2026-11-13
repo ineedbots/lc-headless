@@ -2,6 +2,8 @@
 
 #include "Application/Events/ApplicationEventBridge.hpp"
 #include "Application/Events/EventProtocol.hpp"
+#include "Application/Events/ApplicationEventPublisher.hpp"
+#include "Application/Type/ApplicationStarted_s.hpp"
 #include "Application/Events/Type/ApplicationEvent_s.hpp"
 #include "Application/Events/Type/EventSubscription_s.hpp"
 #include "Accounts/Type/ProgressReport_s.hpp"
@@ -45,11 +47,11 @@ TEST_CASE("Event subscriptions take effect only at a safe point with coherent sn
     auto bridge = ApplicationEventBridge{{"bot1", "bot2"}};
     const auto client = bridge.Connect();
     auto report = ProgressReport_s{60s, {{"Reports", "1"}}};
-    REQUIRE(bridge.PublishProgress("bot1", report));
+    REQUIRE(bridge.Publish("bot1", report));
     bridge.Enqueue(client, Subscribe("s", {"bot1"}));
     report.rows[0].second = "2";
-    REQUIRE(bridge.PublishProgress("bot1", report));
-    REQUIRE(bridge.PublishProgress("bot2", report));
+    REQUIRE(bridge.Publish("bot1", report));
+    REQUIRE(bridge.Publish("bot2", report));
     CHECK_FALSE(bridge.Front(client));
     CHECK(bridge.GetDiagnostics().subscriptions == 0);
     Drain(bridge);
@@ -78,9 +80,9 @@ TEST_CASE("Event subscriptions reject changes atomically and deduplicate overlap
     bridge.Enqueue(client, Subscribe());
     bridge.Enqueue(client, Subscribe("unknown", {"BOT1"}));
     bridge.Enqueue(client, Subscribe("overlap"));
-    REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     bridge.Enqueue(client, R"({"version":1,"type":"unsubscribe","id":"s"})");
-    REQUIRE(bridge.PublishProgress("bot1", {2s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{2s, {}}));
     Drain(bridge);
     CHECK(Take(bridge, client)["type"] == "ack");
     CHECK(Take(bridge, client)["type"] == "snapshot");
@@ -136,7 +138,7 @@ TEST_CASE("Event queues disconnect slow consumers and reset snapshots on publish
 
     for (int i = 0; i < 70; ++i)
     {
-        REQUIRE(bridge.PublishProgress("bot1", {1s, {{"i", std::to_string(i)}}}));
+        REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {{"i", std::to_string(i)}}}));
         Drain(bridge);
         CHECK(Take(bridge, fast)["type"] == "event");
     }
@@ -144,7 +146,7 @@ TEST_CASE("Event queues disconnect slow consumers and reset snapshots on publish
     CHECK(bridge.IsClosing(slow));
     CHECK_FALSE(bridge.IsClosing(fast));
     CHECK(bridge.GetDiagnostics().overflowDisconnects == 1);
-    CHECK_FALSE(bridge.PublishProgress("bot1", {1s, {{"huge", std::string(4097, 'x')}}}));
+    CHECK_FALSE(bridge.Publish("bot1", ProgressReport_s{1s, {{"huge", std::string(4097, 'x')}}}));
     CHECK(bridge.IsClosing(fast));
     CHECK(bridge.GetDiagnostics().publisherResets == 1);
 
@@ -181,7 +183,7 @@ TEST_CASE("Event fanout continues across passes in order with bounded journal ad
 
     for (int i = 0; i < 4; ++i)
     {
-        REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+        REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     }
 
     bridge.Service();
@@ -197,10 +199,10 @@ TEST_CASE("Event fanout continues across passes in order with bounded journal ad
 
     for (std::size_t i = 0; i < ApplicationEventBridge::MAX_JOURNAL_BYTES / ApplicationEventBridge::MAX_EVENT_BYTES; ++i)
     {
-        REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+        REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     }
 
-    CHECK_FALSE(bridge.PublishProgress("bot1", {1s, {}}));
+    CHECK_FALSE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     CHECK(bridge.GetDiagnostics().journalBytes == 0);
     CHECK(bridge.GetDiagnostics().journalItems == 0);
     CHECK(bridge.GetDiagnostics().publisherResets == 1);
@@ -217,7 +219,7 @@ TEST_CASE("Event disconnect retires queued commands and new sessions cannot inhe
     const auto fresh = bridge.Connect();
     CHECK(fresh != old);
     bridge.Enqueue(old, Subscribe());
-    REQUIRE(bridge.PublishProgress("bot1", {1s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     Drain(bridge);
     CHECK_FALSE(bridge.Front(fresh));
     CHECK(bridge.GetDiagnostics().subscriptions == 0);
@@ -241,12 +243,13 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     bridge.Enqueue(progress, Subscribe());
     REQUIRE(bridge.Publish({"bot1", AccountLogout_s{true}}));
     REQUIRE(bridge.Publish({"bot2", AccountLogout_s{true}}));
-    REQUIRE(bridge.PublishProgress("bot1", {60s, {}}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{60s, {}}));
     REQUIRE(bridge.Publish({"bot1", AccountLogout_s{false}}));
     Drain(bridge);
 
     CHECK(Take(bridge, client)["type"] == "ack");
     CHECK(Take(bridge, client)["events"].empty());
+
     const auto confirmed = Take(bridge, client);
     CHECK(confirmed["version"] == 1);
     CHECK(confirmed["type"] == "event");
@@ -256,6 +259,7 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     CHECK_FALSE(confirmed["timestamp"].get<std::string>().empty());
     CHECK(confirmed["sequence"] == 1);
     CHECK(confirmed["payload"] == Json{{"confirmed", true}});
+
     const auto forced = Take(bridge, client);
     CHECK(forced["sequence"] == 4);
     CHECK(forced["payload"] == Json{{"confirmed", false}});
@@ -270,6 +274,7 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     bridge.Enqueue(fresh, R"({"version":1,"type":"subscribe","id":"both","events":["account.logout","account.progress"]})");
     Drain(bridge);
     CHECK(Take(bridge, fresh)["sequence"] == 4);
+
     const auto snapshot = Take(bridge, fresh);
     REQUIRE(snapshot["events"].size() == 1);
     CHECK(snapshot["events"][0]["event"] == "account.progress");
@@ -281,4 +286,137 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     CHECK(Take(bridge, client)["action"] == "unsubscribe");
     CHECK_FALSE(bridge.Front(client));
     CHECK(Take(bridge, fresh)["event"] == "account.logout");
+}
+
+namespace
+{
+    template <typename T>
+    concept GlobalPublication = requires(ApplicationEventPublisher& publisher, const T& payload) {
+        publisher.Publish(payload);
+    };
+
+    template <typename T>
+    concept AccountPublication = requires(ApplicationEventPublisher& publisher, const T& payload) {
+        publisher.Publish("bot1", payload);
+    };
+}
+
+TEST_CASE("Typed publication requires the scope declared by each event", "[Events]")
+{
+    STATIC_REQUIRE(GlobalPublication<ApplicationStarted_s>);
+    STATIC_REQUIRE_FALSE(AccountPublication<ApplicationStarted_s>);
+    STATIC_REQUIRE(AccountPublication<ProgressReport_s>);
+    STATIC_REQUIRE_FALSE(GlobalPublication<ProgressReport_s>);
+    STATIC_REQUIRE_FALSE(GlobalPublication<AccountLogout_s>);
+}
+
+TEST_CASE("Global events share ordering and retention but never match account filters", "[Events]")
+{
+    auto bridge = ApplicationEventBridge{{"bot1", "bot2"}};
+    const auto all = bridge.Connect();
+    const auto filtered = bridge.Connect();
+    REQUIRE(bridge.Publish(ApplicationStarted_s{}));
+    REQUIRE(bridge.Publish("bot1", ProgressReport_s{60s, {}}));
+    bridge.Enqueue(all, R"({"version":1,"type":"subscribe","id":"all","events":["application.started","account.progress","account.logout"]})");
+    bridge.Enqueue(filtered, R"({"version":1,"type":"subscribe","id":"filtered","events":["application.started","account.progress","account.logout"],"accounts":["bot1"]})");
+    Drain(bridge);
+    CHECK(Take(bridge, all)["sequence"] == 2);
+
+    const auto initial = Take(bridge, all);
+    REQUIRE(initial["events"].size() == 2);
+    CHECK(initial["events"][0]["event"] == "application.started");
+    CHECK(initial["events"][0]["account"].is_null());
+    CHECK(initial["events"][0]["payload"] == Json::object());
+    CHECK(initial["events"][0]["sequence"] == 1);
+    CHECK(initial["events"][1]["account"] == "bot1");
+    Take(bridge, filtered);
+
+    const auto accountSnapshot = Take(bridge, filtered);
+    REQUIRE(accountSnapshot["events"].size() == 1);
+    CHECK(accountSnapshot["events"][0]["event"] == "account.progress");
+
+    // Overlapping global subscriptions must not duplicate a live envelope.
+    bridge.Enqueue(all, R"({"version":1,"type":"subscribe","id":"global","events":["application.started"],"accounts":[]})");
+    Drain(bridge);
+    Take(bridge, all);
+    CHECK(Take(bridge, all)["events"].size() == 1);
+    REQUIRE(bridge.Publish(ApplicationStarted_s{}));
+    REQUIRE(bridge.Publish("bot2", AccountLogout_s{true}));
+    REQUIRE(bridge.Publish("bot1", AccountLogout_s{true}));
+    Drain(bridge);
+
+    const auto global = Take(bridge, all);
+    CHECK(global["event"] == "application.started");
+    CHECK(global["account"].is_null());
+    CHECK(global["sequence"] == 3);
+    CHECK(Take(bridge, all)["sequence"] == 4);
+    CHECK(Take(bridge, all)["sequence"] == 5);
+    CHECK_FALSE(bridge.Front(all));
+    CHECK(Take(bridge, filtered)["sequence"] == 5);
+    CHECK_FALSE(bridge.Front(filtered));
+
+    bridge.Disconnect(all);
+    const auto reconnected = bridge.Connect();
+    bridge.Enqueue(reconnected, R"({"version":1,"type":"subscribe","id":"global","events":["application.started"]})");
+    Drain(bridge);
+    CHECK(Take(bridge, reconnected)["sequence"] == 5);
+
+    const auto retained = Take(bridge, reconnected);
+    REQUIRE(retained["events"].size() == 1);
+    CHECK(retained["events"][0] == global);
+}
+
+TEST_CASE("Global publication works with no configured accounts", "[Events]")
+{
+    auto bridge = ApplicationEventBridge{};
+    const auto client = bridge.Connect();
+    bridge.Enqueue(client, R"({"version":1,"type":"subscribe","id":"global","events":["application.started"]})");
+    REQUIRE(bridge.Publish(ApplicationStarted_s{}));
+    Drain(bridge);
+    CHECK(Take(bridge, client)["type"] == "ack");
+    CHECK(Take(bridge, client)["events"].empty());
+
+    const auto event = Take(bridge, client);
+    CHECK(event["account"].is_null());
+    CHECK(event["sequence"] == 1);
+    CHECK(event["payload"] == Json::object());
+    bridge.Stop();
+    CHECK_FALSE(bridge.Publish(ApplicationStarted_s{}));
+    CHECK(bridge.GetDiagnostics().publisherResets == 0);
+}
+
+TEST_CASE("Owned publications reject missing extra empty and unknown account identities", "[Events]")
+{
+    auto bridge = ApplicationEventBridge{{"bot1"}};
+    const auto client = bridge.Connect();
+    auto invalid = ApplicationEvent_s{.payload = AccountLogout_s{true}};
+
+    SECTION("account event missing its account")
+    {
+    }
+
+    SECTION("global event has an account")
+    {
+        invalid = {"bot1", ApplicationStarted_s{}};
+    }
+
+    SECTION("global event uses an empty account sentinel")
+    {
+        invalid = {"", ApplicationStarted_s{}};
+    }
+
+    SECTION("account event uses an empty account")
+    {
+        invalid = {"", AccountLogout_s{true}};
+    }
+
+    SECTION("account event has an unknown account")
+    {
+        invalid = {"unknown", AccountLogout_s{true}};
+    }
+
+    CHECK_FALSE(bridge.Publish(std::move(invalid)));
+    CHECK(bridge.GetDiagnostics().publisherResets == 1);
+    CHECK(bridge.IsClosing(client));
+    CHECK_FALSE(bridge.HasIncoming());
 }

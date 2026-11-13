@@ -50,6 +50,7 @@ release highlights.
 | [Building](docs/Building.md) | Toolchains, build presets, tests, coverage, packaging and project layout |
 | [Fleet tracking](docs/FleetTracking.md) | Per-account experience, bank, backpack and equipment logs, and the local fleet page |
 | [Live progress events](docs/Running.md#live-progress-events) | WebSocket subscriptions on the HTTP operator listener |
+| [Operator API registration](docs/design/OperatorRegistration.md) | Adding HTTP endpoints and WebSocket event definitions |
 | [Application design](docs/design/ApplicationDesign.md) | End-to-end I/O, source subsystems, ownership, execution flow and process lifecycle |
 | [Development workflow](docs/design/DevelopmentWorkflow.md) | Branch policy, release promotion and commit messages |
 | [Design documents](docs/design/) | Implementation plans, code conventions and protocol references |

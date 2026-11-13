@@ -17,8 +17,7 @@
 #include "../Script/ScriptRuntime.hpp"
 #include "AccountLifecycle.hpp"
 #include "AccountReporting.hpp"
-#include "Type/ProgressReport_s.hpp"
-#include "Type/AccountLogout_s.hpp"
+#include "../Application/Events/ApplicationEventPublisher.hpp"
 
 struct AccountOptions_s
 {
@@ -31,12 +30,11 @@ struct AccountOptions_s
     // Without it, scripts can't plan routes beyond the loaded area.
     std::shared_ptr<const Navigation> navigation;
     std::chrono::milliseconds reloginDelay = 60s;
-    std::function<void(std::string_view, const ProgressReport_s&)> onProgressReport;
-    std::function<void(std::string_view, const AccountLogout_s&)> onLogout;
+    std::shared_ptr<ApplicationEventPublisher> events;
 };
 
 // Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is
-// in docs/design/ScriptingDesign.md Â§8.
+// in docs/design/ScriptingDesign.md Ã‚Â§8.
 class Account
 {
 public:

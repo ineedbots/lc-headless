@@ -16,13 +16,14 @@
 #include "BotMessenger.hpp"
 #include "ScriptActions.hpp"
 #include "ScriptControl.hpp"
+#include "../Application/Events/ApplicationEventPublisher.hpp"
 
 // What one VM's bindings reach: the tracked state and map, read through the Game queries; the script's actions;
 // its requests to its host; and the other accounts' scripts. The bindings find it by the VM they run in.
 class ScriptContext
 {
 public:
-    ScriptContext(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {}, std::shared_ptr<const Navigation> navigation = nullptr);
+    ScriptContext(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger = nullptr, std::string username = {}, std::shared_ptr<const Navigation> navigation = nullptr, std::shared_ptr<ApplicationEventPublisher> events = {}, std::string accountName = {});
 
     ScriptContext(const ScriptContext&) = delete;
     ScriptContext& operator=(const ScriptContext&) = delete;
@@ -50,11 +51,15 @@ public:
     // Empty when no account in the process has that username; otherwise whether its script took the message.
     [[nodiscard]] std::optional<bool> SendBotMessage(std::string_view username, std::string json);
 
+    [[nodiscard]] bool PublishEvent(std::string name, std::string dataJson);
+
 private:
     const GameState_s& m_state;
     const WorldMap& m_map;
     BotMessenger* m_messenger;
     std::string m_username;
+    std::shared_ptr<ApplicationEventPublisher> m_events;
+    std::string m_accountName;
     std::shared_ptr<const Navigation> m_navigation;
     Revision_e m_revision;
     ScriptActions m_actions;

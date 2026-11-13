@@ -25,9 +25,7 @@
 #include "InterruptSignal.hpp"
 #include "ApplicationRequestProcessor.hpp"
 #include "Events/ApplicationEventBridge.hpp"
-#include "Events/Type/ApplicationEvent_s.hpp"
-#include "../Accounts/Type/ProgressReport_s.hpp"
-#include "../Accounts/Type/AccountLogout_s.hpp"
+#include "Type/ApplicationStarted_s.hpp"
 #include "EntryPoint.hpp"
 
 Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
@@ -94,8 +92,10 @@ int Application::Run()
                 break;
             }
         }
+
         m_logger->Info("Script profiling enabled: reports in {} (profiling adds execution overhead)", std::filesystem::absolute(profileDirectory).string());
     }
+
     const auto& scripting = m_config->scripting;
     const auto options = AccountOptions_s{
         .client = {
@@ -108,14 +108,7 @@ int Application::Run()
         .profileDirectory = profileDirectory,
         .navigation = m_navigation,
         .reloginDelay = scripting.reloginDelaySeconds,
-        .onProgressReport = m_config->http.host.empty() ? std::function<void(std::string_view, const ProgressReport_s&)>{} : [events](std::string_view account, const ProgressReport_s& report)
-    {
-        events->PublishProgress(account, report);
-    },
-        .onLogout = m_config->http.host.empty() ? std::function<void(std::string_view, const AccountLogout_s&)>{} : [events](std::string_view account, const AccountLogout_s& logout)
-    {
-        events->Publish({std::string{account}, logout});
-    },
+        .events = m_config->http.host.empty() ? nullptr : events,
     };
 
     auto net = NetLoop::Create();
@@ -186,6 +179,11 @@ int Application::Run()
 
     try
     {
+        if (http)
+        {
+            events->Publish(ApplicationStarted_s{});
+        }
+
         succeeded = runner.Run(InterruptSignal::GetCount, console.get(), [&](bool dispatch)
         {
             if (dispatch)

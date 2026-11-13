@@ -91,3 +91,9 @@ Hooks only: `start`, `stop`, `progress_report`.
 - Events report only what the server said. When the map rebuilds, or an area falls out of view, things vanish from the state without a despawn event. Query what's in view rather than keeping your own copy.
 - Events that arrive while the client completes Tutorial Island, before `on_start`, aren't delivered.
 - `in_combat` and chat `type` names differ from rs2b0t's webclient: see [Porting](python-dialect.md#porting-from-rs2b0t).
+
+## Publishing operator events
+
+Use [`publish_event(name, data=None)`](console-and-messages.md#operator-events) to
+send a live account-scoped `script.event` to external operator WebSocket clients.
+These publications do not dispatch the local Python hooks described on this page.

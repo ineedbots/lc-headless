@@ -747,7 +747,12 @@ TEST_CASE("Beast passes decoded template and query values to endpoint decoders o
                                                                  request.queryParameters.at("something").at(0) + ":" + request.body}};
     };
 
-    auto server = AsioHttpServer{io, settings, bridge, HttpRouter{{{.method = "POST", .path = "/api/v1/status/{id}", .decode = decode}}}};
+    const auto respond = +[](const CompletedApplicationRequest_s& result) -> std::optional<HttpResponse_s>
+    {
+        return HttpResponse_s{.status = 201, .body = std::get<ConsoleCommandResult_s>(result.payload).output};
+    };
+
+    auto server = AsioHttpServer{io, settings, bridge, HttpRouter{{{.method = "POST", .path = "/api/v1/status/{id}", .decode = decode, .respond = respond}}}};
     auto client = StartClient(server.GetPort(), Request("POST", "/api/v1/status/alice%20smith?something=a%2Bb+c", "body bytes"));
     const auto deadline = std::chrono::steady_clock::now() + 3s;
     while (!bridge->HasIncoming() && std::chrono::steady_clock::now() < deadline)
@@ -775,8 +780,8 @@ TEST_CASE("Beast passes decoded template and query values to endpoint decoders o
     REQUIRE(client.wait_for(0ms) == std::future_status::ready);
 
     const auto responses = client.get();
-    CHECK(responses[0].result_int() == 200);
-    CHECK(Json::parse(responses[0].body())["output"] == command);
+    CHECK(responses[0].result_int() == 201);
+    CHECK(responses[0].body() == command);
     server.Close();
 
     while (!server.IsDrained() && std::chrono::steady_clock::now() < deadline)

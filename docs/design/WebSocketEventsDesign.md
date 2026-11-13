@@ -2,7 +2,8 @@
 
 The subscription plumbing from #76 supports `account.progress`, emitted when
 ProgressReporter obtains a report, and `account.logout` (#90), emitted on logout
-completion. Other connection and script lifecycle events are deferred. No extra
+completion. The retained global `application.started` event marks application
+initialization. Other connection and script lifecycle events are deferred. No extra
 thread, context, or listener exists.
 
 ## Ownership and extension
@@ -48,18 +49,13 @@ retains up to 16384 already-read bytes ahead of the TCP stream, preserving large
 coalesced frames without feeding headers back through Beast's smaller internal
 handshake buffer. Its teardown customization forwards to the owned TCP stream.
 
-To extend the catalog:
-
-1. Add an owned payload to `Application/Events/Type/ApplicationEvent_s.hpp`.
-2. Register its name, bounded-size validation and serializer in `EventProtocol`.
-3. Supply a safe-point producer callback as `AccountOptions_s::onProgressReport`
-   does for progress. Validate before copying script-sized inputs.
-4. Declare its latest-value policy in `EventProtocol::RetainsLatest` and review
-   the total snapshot bound for the new type; add focused schema, filter, ordering
-   and producer tests.
-5. Register new HTTP upgrade paths through endpoint `Route()` metadata when
-   needed. No changes to WebSocket read/write or HTTP socket handoff are needed
-   for another event in the existing subscription protocol.
+To extend the catalog, follow [Registering operator HTTP endpoints and events](OperatorRegistration.md).
+The typed catalog in `Type/ApplicationEvents_s.hpp` derives the payload variant,
+name validation, serializer and retention dispatch from per-event definitions.
+`AccountOptions_s::events` supplies one shared publisher for all account events;
+publication validates borrowed values before copying into the bounded journal.
+`EventLimits` centralizes shared limits, and bridge construction validates the
+aggregate snapshot budget for all retained event definitions.
 
 ## Version 1 protocol
 
@@ -86,7 +82,10 @@ Subscribe IDs are connection-local subscription identities, 1..64 ASCII identifi
 characters (letters, digits, underscore, hyphen). Duplicate active IDs fail. Reuse
 after acknowledged unsubscribe is allowed. Unsubscribe unknown IDs fails. Accounts
 use exact, case-sensitive account config names, never credentials. An absent or
-empty accounts list means all configured accounts; literal `*` is not special.
+empty accounts list permits all configured accounts and global events, subject
+to the event-name filter; literal `*` is not special. A nonempty account filter
+excludes global events from snapshots and live delivery. Global event envelopes
+use `"account": null`, while account event envelopes use the account name string.
 Unknown accounts fail. Events must be a nonempty list of catalog names. Lists have
 at most 16 distinct entries; duplicates fail. Maximum 16 subscriptions per client.
 Overlapping subscriptions deliver each live envelope once per connection.
@@ -98,8 +97,9 @@ close behavior (1009/1007). Client ping/pong follows Beast's automatic handling.
 Subscription changes and report publications share a bounded ordered journal.
 At a safe point, process them in arrival/publication order. Subscribe sends ack
 then one snapshot at the same global sequence boundary, then later matching live
-events. Snapshot contains the last successfully published report per matching
-account, or no entry if none exists; it never invokes a script hook. It remains
+events. Snapshot contains the last successfully published retained event per matching
+account and event type, plus one value per matching retained global event type,
+or no entry if none exists; it never invokes a script hook. It remains
 the latest report across script reload and account completion. Unsubscribe ack
 follows all earlier queued deliveries; no later delivery uses that subscription.
 Snapshot reports retain original sequence/time. Global sequences advance for
@@ -108,10 +108,44 @@ durable history or exactly-once guarantee. Reconnect makes fresh subscriptions;
 process instance is random per bridge/process run. UTC timestamps are public;
 internal deadlines use steady_clock.
 
+## Global application events
+
+Definitions declare `EventScope_e::Global` or `EventScope_e::Account`. The typed
+publisher offers `Publish(payload)` for global events and `Publish(account,
+payload)` for account events. The owned-envelope path validates that the optional
+account matches the definition's scope; an empty account string is not a global
+sentinel. The journal, sequence, event-name filtering and overflow policy apply
+to both scopes. Retained global events use one registry entry per event type,
+independent of configured accounts.
+
+`application.started` has an empty object payload and a maximum full envelope size
+of 512 bytes. When the HTTP listener is enabled, `Application::Run` publishes it
+once after listener/account initialization and before running the main loop. Its
+envelope timestamp records publication time. Subscribers receive the original
+retained envelope, including its sequence and timestamp, on reconnect. It remains
+available until the existing publisher-reset or shutdown policy clears snapshots.
+
+## Script publications
+
+Python's `publish_event(name, data=None)` emits the live account-scoped
+`script.event` with payload `{"name": name, "data": data}`. The host injects the
+account config identity and shared publisher through `ScriptContext`; scripts
+cannot choose a different account for a publication. Custom names remain payload
+data under the fixed subscription catalog entry. The event is not retained.
+
+Data crosses the runtime boundary as owned serialized JSON, limited to 4096 bytes
+and 16 nested containers. Names are 1..64 ASCII letters, digits, dots, underscores
+or hyphens. Argument validation precedes publisher admission and raises Python
+TypeError/ValueError without resetting subscribers. Publication returns the
+journal admission result (False when disabled/stopping/overflowing), not delivery
+confirmation. Serialization uses the normal bounded event envelope and original
+account/global journal ordering. Startup, hook and loop calls only enqueue owned
+values; transport callbacks never enter a VM.
+
 ## Logout completion
 
 `account.logout` uses the standard event envelope with a payload containing exactly
-`{"confirmed": true}` or `{"confirmed": false}`. `AccountOptions_s::onLogout` publishes
+`{"confirmed": true}` or `{"confirmed": false}`. `AccountOptions_s::events` publishes
 an owned `AccountLogout_s` at account safe points. Observe terminal client status
 before relog/recovery handling and in `UpdateFinished` for synchronous teardown.
 Compare observed status to suppress repeated notifications for the same completion.
@@ -126,8 +160,8 @@ does not emit completion.
 
 Logout events participate in the same journal, filtering, sequence and fan-out as
 progress. They are live only: `RetainsLatest` excludes them from `m_latest`, so
-snapshots still contain at most 16 progress envelopes. Subscribers receive no
-historical logout after reconnect, and shutdown delivery remains best effort under
+snapshots contain at most 16 progress envelopes plus one global startup envelope.
+Subscribers receive no historical logout after reconnect, and shutdown delivery remains best effort under
 the existing bounded drain. Logout notifications require neither scripts nor
 progress-report configuration.
 
@@ -138,9 +172,11 @@ to 4096 bytes including fragmented messages; journal 256 items/1 MiB; outbound
 per connection 64 messages/256 KiB including the in-flight message. Each envelope
 is at most 8192 serialized bytes; reports are limited to 64 rows and 4096 total
 raw string bytes before copying. Account identities are bounded to 128 bytes and
-the snapshot registry to 16 configured accounts. Maximum snapshot is 16 envelopes
-plus framing, below the outbound byte limit. These conservative fixed protocol
-limits are not claims of measured fleet capacity.
+the snapshot registry to 16 configured accounts. The current catalog's maximum
+snapshot is 16 progress envelopes (8192 bytes each) and one global startup envelope
+(512 bytes), plus framing, below the outbound byte limit. Construction validates
+the combined per-account and global retained-event budget for the configured fleet.
+These conservative fixed protocol limits are not claims of measured fleet capacity.
 
 The receive buffer has 8192 bytes of bounded capacity so Beast can detect an
 oversized message and send its protocol close frame. Journal/outbox byte counts
@@ -156,7 +192,8 @@ One service pass processes at most 32 journal items and 256 recipient visits,
 continuing an event's fan-out before processing later journal entries. A single
 event is serialized once and shared immutably. With 128 connections, worst-case
 fan-out is 128 visits/event, with at most 16 filter checks/visit. Snapshot building
-visits at most 16 accounts and serializes one bounded frame. Pending journal work
+visits at most 16 retained account entries plus one global entry with the current
+catalog, and serializes one bounded frame. Pending journal work
 prevents the runner from sleeping.
 
 Slow consumers close with 1013 (`event overflow`); ordered events are never silently

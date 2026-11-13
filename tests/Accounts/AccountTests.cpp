@@ -1,4 +1,7 @@
 #include "pch.hpp"
+#include "../Support/Application/EventCapture.hpp"
+#include "Application/Events/Type/ApplicationEvent_s.hpp"
+#include "Accounts/Type/AccountLogout_s.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/Io/FakeSocks5Proxy.hpp"
@@ -7,7 +10,6 @@
 #include "../Support/TempFolder.hpp"
 
 #include "Accounts/Account.hpp"
-#include "Accounts/Type/AccountLogout_s.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Config/Type/AccountConfig_s.hpp"
 #include "Config/Type/Config_s.hpp"
@@ -153,6 +155,7 @@ TEST_CASE("An account adds its define_bot script's default settings to its file"
             .credentials = FakeGameServer::MakeAccount(),
             .script = ScriptConfig_s{.file = "main.py", .settings = R"json({"Miner": {"trips": 3}})json"},
         };
+
         return std::make_unique<Account>(std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger());
     };
 
@@ -191,6 +194,7 @@ TEST_CASE("An account warns when it asks for progress reports and its script mak
 
     auto config = server.MakeConfig();
     config.scripting.scriptsDirectory = folder.GetPath().string();
+
     auto settings = AccountConfig_s{
         .name = "bot1",
         .credentials = FakeGameServer::MakeAccount(),
@@ -488,6 +492,7 @@ TEST_CASE("An account connects through client.jsonc's proxy unless its file name
 
     auto config = server.MakeConfig();
     config.proxy = ProxySettings_s{.host = "127.0.0.1", .port = shared.GetPort()};
+
     auto settings = AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()};
 
     SECTION("no proxy in the account file")
@@ -519,11 +524,16 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
     auto notifications = std::vector<std::pair<std::string, bool>>{};
     const auto options = AccountOptions_s{
         .client = {.connectAttempts = 0, .keepaliveInterval = 50ms},
-        .onLogout = [&](std::string_view account, const AccountLogout_s& logout)
+        .events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
     {
-        notifications.emplace_back(account, logout.confirmed);
-    },
+        if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
+        {
+            REQUIRE(event.account);
+            notifications.emplace_back(*event.account, logout->confirmed);
+        }
+    }),
     };
+
     auto fixture = AccountFixture{std::nullopt, 30s, options};
     fixture.StepFor(100ms);
     REQUIRE(notifications.empty());
@@ -582,10 +592,13 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
 TEST_CASE("A timed out account logout notifies unconfirmed completion", "[Account][Events]")
 {
     auto notifications = std::vector<bool>{};
-    const auto options = AccountOptions_s{.client = {.serverSilenceTimeout = 60s}, .onLogout = [&](std::string_view, const AccountLogout_s& logout)
+    const auto options = AccountOptions_s{.client = {.serverSilenceTimeout = 60s}, .events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
     {
-        notifications.push_back(logout.confirmed);
-    }};
+        if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
+        {
+            notifications.push_back(logout->confirmed);
+        }
+    })};
     auto fixture = AccountFixture{std::nullopt, 30s, options};
     fixture.server.SetIgnoreLogout(true);
     fixture.account->Interrupt();
@@ -599,24 +612,30 @@ TEST_CASE("A timed out account logout notifies unconfirmed completion", "[Accoun
 TEST_CASE("Relog logout notifies before login and notifies again after the next session", "[Account][Events]")
 {
     auto notifications = std::vector<bool>{};
-    const auto options = AccountOptions_s{.onLogout = [&](std::string_view, const AccountLogout_s& logout)
+    const auto options = AccountOptions_s{.events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
     {
-        notifications.push_back(logout.confirmed);
-    }};
+        if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
+        {
+            notifications.push_back(logout->confirmed);
+        }
+    })};
     auto fixture = AccountFixture{"done = False\ndef loop():\n    global done\n    if not done:\n        done = True\n        relog(0)\n    return 100\n", 30s, options};
     const auto deadline = Clock::now() + WAIT;
     while (Clock::now() < deadline && notifications.empty())
     {
         fixture.account->Step(STEP);
     }
+
     REQUIRE(notifications == std::vector<bool>{true});
     CHECK(fixture.server.GetLoginOpcodes().size() == 1);
     CHECK(fixture.account->GetClient().GetStatus() == ClientStatus_e::LoggedOut);
+
     const auto loginDeadline = Clock::now() + WAIT;
     while (Clock::now() < loginDeadline && !fixture.account->GetClient().IsInGame())
     {
         fixture.account->Step(STEP);
     }
+
     REQUIRE(fixture.account->GetClient().IsInGame());
     CHECK(fixture.server.GetLoginOpcodes().size() == 2);
     CHECK(notifications.size() == 1);
