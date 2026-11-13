@@ -165,6 +165,14 @@ not emit logout events. Each completion emits once. Logout events are live only;
 they are absent from snapshots and are not replayed after reconnect. They do not
 require progress reporting or a script. Both event names may share a subscription.
 
+To watch logout events with the [Python test client](../tools/events/logout.py),
+run `python -m pip install websockets`, then
+`python tools/events/logout.py --account bot1`. Omit `--account` to watch all
+accounts, use `--url` for another listener, or add `--progress` to watch reports too.
+After the subscription acknowledgement, interrupt an account or run a script that
+calls `stop_account()` or `relog()`. The client prints the received JSON envelopes.
+Press Ctrl+C in the Python terminal to stop watching.
+
 The server acknowledges, sends a snapshot of the latest available progress report for each
 matching account, then sends ordered live reports. Empty/omitted `accounts` means
 all configured accounts. Names are exact account config names. Empty snapshots
