@@ -528,7 +528,8 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
     {
         if (const auto logout = std::get_if<AccountLogout_s>(&event.payload))
         {
-            notifications.emplace_back(event.account, logout->confirmed);
+            REQUIRE(event.account);
+            notifications.emplace_back(*event.account, logout->confirmed);
         }
     }),
     };

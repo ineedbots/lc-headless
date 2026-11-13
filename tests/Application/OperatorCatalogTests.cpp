@@ -5,6 +5,8 @@
 #include "Accounts/Type/ProgressReport_s.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
 #include "Application/Events/EventLimits.hpp"
+#include "Application/Events/Type/EventScope_e.hpp"
+#include "Application/Events/Definitions/ApplicationStartedEvent.hpp"
 #include "Application/Events/Type/EventCatalog_s.hpp"
 #include "Application/Events/Type/ApplicationEvent_s.hpp"
 #include "Application/Type/OperationCatalog_s.hpp"
@@ -115,6 +117,7 @@ namespace
     public:
         using Payload = int;
         static constexpr std::string_view NAME = "test.first";
+        static constexpr EventScope_e SCOPE = EventScope_e::Account;
         static constexpr bool RETAINS_LATEST = true;
         static constexpr std::size_t MAX_SERIALIZED_BYTES = EventLimits::MAX_EVENT_BYTES;
     };
@@ -124,6 +127,7 @@ namespace
     public:
         using Payload = bool;
         static constexpr std::string_view NAME = "test.second";
+        static constexpr EventScope_e SCOPE = EventScope_e::Account;
         static constexpr bool RETAINS_LATEST = true;
         static constexpr std::size_t MAX_SERIALIZED_BYTES = EventLimits::MAX_EVENT_BYTES;
     };
@@ -219,4 +223,19 @@ TEST_CASE("Typed publication validates borrowed payloads and journals an owned c
     bridge.Stop();
     CHECK_FALSE(bridge.Publish("bot", report));
     CHECK(bridge.GetDiagnostics().publisherResets == 1);
+}
+
+TEST_CASE("Global retained event budgets reserve one envelope independent of account count", "[Events]")
+{
+    using Globals = EventCatalog_s<ApplicationStartedEvent>;
+    constexpr auto globalBudget = EventLimits::SNAPSHOT_OVERHEAD_BYTES + ApplicationStartedEvent::MAX_SERIALIZED_BYTES + 1;
+    STATIC_REQUIRE(Globals::FitsSnapshot(0, globalBudget));
+    STATIC_REQUIRE(Globals::FitsSnapshot(EventLimits::MAX_ACCOUNTS, globalBudget));
+    STATIC_REQUIRE_FALSE(Globals::FitsSnapshot(0, globalBudget - 1));
+
+    using Mixed = EventCatalog_s<FirstEvent, ApplicationStartedEvent>;
+    constexpr auto mixedBudget = globalBudget + 2 * (FirstEvent::MAX_SERIALIZED_BYTES + 1);
+    STATIC_REQUIRE(Mixed::FitsSnapshot(2, mixedBudget));
+    STATIC_REQUIRE_FALSE(Mixed::FitsSnapshot(3, mixedBudget));
+    STATIC_REQUIRE_FALSE(Mixed::FitsSnapshot(2, mixedBudget - 1));
 }

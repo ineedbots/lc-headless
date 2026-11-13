@@ -25,6 +25,7 @@
 #include "InterruptSignal.hpp"
 #include "ApplicationRequestProcessor.hpp"
 #include "Events/ApplicationEventBridge.hpp"
+#include "Type/ApplicationStarted_s.hpp"
 #include "EntryPoint.hpp"
 
 Application::Application(CommandLine_s commandLine, std::shared_ptr<Logger> logger)
@@ -178,6 +179,11 @@ int Application::Run()
 
     try
     {
+        if (http)
+        {
+            events->Publish(ApplicationStarted_s{});
+        }
+
         succeeded = runner.Run(InterruptSignal::GetCount, console.get(), [&](bool dispatch)
         {
             if (dispatch)

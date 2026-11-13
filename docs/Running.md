@@ -1,6 +1,6 @@
 # Running
 
-[Back to README](../README.md) Â· [Features](Features.md) Â· [Requirements](Requirements.md) Â· [Configuration](Configuration.md) Â· [Building](Building.md)
+[Back to README](../README.md) Ã‚Â· [Features](Features.md) Ã‚Â· [Requirements](Requirements.md) Ã‚Â· [Configuration](Configuration.md) Ã‚Â· [Building](Building.md)
 
 ## First login
 
@@ -165,6 +165,19 @@ not emit logout events. Each completion emits once. Logout events are live only;
 they are absent from snapshots and are not replayed after reconnect. They do not
 require progress reporting or a script. Both event names may share a subscription.
 
+Global application events use the same endpoint. Subscribe without an account
+filter to receive `application.started`:
+
+```json
+{"version":1,"type":"subscribe","id":"application","events":["application.started"]}
+```
+
+This event is published once after initialization, with `"account": null` and an
+empty object payload. It is retained, so later subscriptions receive the original
+envelope in their snapshot. Its timestamp records publication time. Global and
+account event names can share a subscription; a nonempty `accounts` filter excludes
+global events from both snapshots and live delivery.
+
 To watch logout events with the [Python test client](../tools/events/logout.py),
 run `python -m pip install websockets`, then
 `python tools/events/logout.py --account bot1`. Omit `--account` to watch all
@@ -173,10 +186,12 @@ After the subscription acknowledgement, interrupt an account or run a script tha
 calls `stop_account()` or `relog()`. The client prints the received JSON envelopes.
 Press Ctrl+C in the Python terminal to stop watching.
 
-The server acknowledges, sends a snapshot of the latest available progress report for each
-matching account, then sends ordered live reports. Empty/omitted `accounts` means
-all configured accounts. Names are exact account config names. Empty snapshots
-are normal before the first report. Subscribing never invokes a script hook.
+The server acknowledges, sends a snapshot of matching retained events, then sends
+ordered live events. Progress reports retain one value per matching account;
+global events retain one value per event type. Empty/omitted `accounts` permits
+all configured accounts and global events, subject to the event-name filter.
+Names are exact account config names. An account-progress snapshot is normally
+empty before the first report. Subscribing never invokes a script hook.
 
 ```json
 {"version":1,"type":"unsubscribe","id":"progress"}

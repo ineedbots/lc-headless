@@ -2,12 +2,15 @@
 
 #include "../../../Utils/Type/TypeCatalog_s.hpp"
 #include "../EventLimits.hpp"
+#include "EventScope_e.hpp"
 
 template <typename... Events>
 struct EventCatalog_s : TypeCatalog_s<Events...>
 {
     static constexpr std::array NAMES = {Events::NAME...};
-    static constexpr std::size_t RETAINED_BYTES_PER_ACCOUNT = (std::size_t{0} + ... + (Events::RETAINS_LATEST ? Events::MAX_SERIALIZED_BYTES + 1 : 0));
+    static constexpr std::size_t RETAINED_BYTES_PER_ACCOUNT = (std::size_t{0} + ... + (Events::RETAINS_LATEST && Events::SCOPE == EventScope_e::Account ? Events::MAX_SERIALIZED_BYTES + 1 : 0));
+
+    static constexpr std::size_t RETAINED_GLOBAL_BYTES = (std::size_t{0} + ... + (Events::RETAINS_LATEST && Events::SCOPE == EventScope_e::Global ? Events::MAX_SERIALIZED_BYTES + 1 : 0));
 
     static constexpr bool IsValid()
     {
@@ -35,13 +38,18 @@ struct EventCatalog_s : TypeCatalog_s<Events...>
             }
         }
 
-        return ((Events::MAX_SERIALIZED_BYTES > 0 && Events::MAX_SERIALIZED_BYTES <= EventLimits::MAX_EVENT_BYTES) && ...);
+        return ((Events::MAX_SERIALIZED_BYTES > 0 && Events::MAX_SERIALIZED_BYTES <= EventLimits::MAX_EVENT_BYTES && (Events::SCOPE == EventScope_e::Account || Events::SCOPE == EventScope_e::Global)) && ...);
     }
 
     static constexpr bool FitsSnapshot(std::size_t accounts, std::size_t outboxBytes = EventLimits::MAX_OUTBOX_BYTES)
     {
-        return outboxBytes >= EventLimits::SNAPSHOT_OVERHEAD_BYTES &&
-            (RETAINED_BYTES_PER_ACCOUNT == 0 || accounts <= (outboxBytes - EventLimits::SNAPSHOT_OVERHEAD_BYTES) / RETAINED_BYTES_PER_ACCOUNT);
+        if (outboxBytes < EventLimits::SNAPSHOT_OVERHEAD_BYTES || RETAINED_GLOBAL_BYTES > outboxBytes - EventLimits::SNAPSHOT_OVERHEAD_BYTES)
+        {
+            return false;
+        }
+
+        const auto available = outboxBytes - EventLimits::SNAPSHOT_OVERHEAD_BYTES - RETAINED_GLOBAL_BYTES;
+        return RETAINED_BYTES_PER_ACCOUNT == 0 || accounts <= available / RETAINED_BYTES_PER_ACCOUNT;
     }
 
     static bool IsKnown(std::string_view name)

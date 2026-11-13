@@ -79,13 +79,13 @@ private:
 
     struct Fanout_s
     {
-        std::string account;
+        std::optional<std::string> account;
         CachedEvent_s event;
         u64 cursor = 0;
         std::chrono::steady_clock::time_point created;
     };
 
-    static bool Matches(const EventSubscription_s& subscription, std::string_view event, std::string_view account);
+    static bool Matches(const EventSubscription_s& subscription, std::string_view event, const std::optional<std::string>& account);
     void Apply(Incoming_s incoming);
     void Send(u64 client, std::shared_ptr<const std::string> text);
     void Overflow(u64 client);
@@ -101,7 +101,7 @@ private:
     std::map<u64, Client_s> m_clients;
     std::deque<JournalEntry_s> m_journal;
     std::size_t m_journalBytes = 0;
-    std::map<std::pair<std::string, std::string>, CachedEvent_s> m_latest;
+    std::map<std::pair<std::optional<std::string>, std::string>, CachedEvent_s> m_latest;
     std::optional<Fanout_s> m_fanout;
     Diagnostics_s m_diagnostics;
 };

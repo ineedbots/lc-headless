@@ -6,6 +6,7 @@
 #include "Type/EventSubscription_s.hpp"
 #include "Type/ApplicationEvents_s.hpp"
 #include "EventLimits.hpp"
+#include "Type/EventScope_e.hpp"
 
 namespace
 {
@@ -106,8 +107,9 @@ bool ApplicationEventBridge::Publish(ApplicationEvent_s event)
     }
 
     const auto bytes = EventProtocol::Measure(event.payload);
+    const auto validScope = EventProtocol::Scope(event.payload) == EventScope_e::Global ? !event.account : event.account && std::ranges::find(m_accounts, *event.account) != m_accounts.end();
 
-    if (std::ranges::find(m_accounts, event.account) == m_accounts.end() || !bytes || *bytes > MAX_JOURNAL_BYTES ||
+    if (!validScope || !bytes || *bytes > MAX_JOURNAL_BYTES ||
         !Append({std::move(event), std::max(*bytes, MAX_EVENT_BYTES)}))
     {
         ResetPublisher();
@@ -117,10 +119,10 @@ bool ApplicationEventBridge::Publish(ApplicationEvent_s event)
     return true;
 }
 
-bool ApplicationEventBridge::Matches(const EventSubscription_s& subscription, std::string_view event, std::string_view account)
+bool ApplicationEventBridge::Matches(const EventSubscription_s& subscription, std::string_view event, const std::optional<std::string>& account)
 {
     return std::ranges::find(subscription.events, event) != subscription.events.end() &&
-        (subscription.accounts.empty() || std::ranges::find(subscription.accounts, account) != subscription.accounts.end());
+        (subscription.accounts.empty() || (account && std::ranges::find(subscription.accounts, *account) != subscription.accounts.end()));
 }
 
 void ApplicationEventBridge::Send(u64 client, std::shared_ptr<const std::string> text)

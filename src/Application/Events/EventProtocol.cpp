@@ -5,6 +5,7 @@
 #include "Type/EventSubscription_s.hpp"
 #include "Type/ApplicationEvents_s.hpp"
 #include "EventLimits.hpp"
+#include "Type/EventScope_e.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -149,7 +150,7 @@ std::string EventProtocol::Encode(const ApplicationEvent_s& event, std::string_v
         return Event::Serialize(value);
     }, event.payload);
 
-    return nlohmann::json{{"version", 1}, {"type", "event"}, {"event", Name(event.payload)}, {"account", event.account}, {"instance", instance}, {"sequence", sequence}, {"timestamp", std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp))}, {"payload", payload}}.dump();
+    return nlohmann::json{{"version", 1}, {"type", "event"}, {"event", Name(event.payload)}, {"account", event.account ? nlohmann::json(*event.account) : nlohmann::json(nullptr)}, {"instance", instance}, {"sequence", sequence}, {"timestamp", std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp))}, {"payload", payload}}.dump();
 }
 
 std::string EventProtocol::Ack(std::string_view id, std::string_view action, std::string_view instance, u64 sequence)
@@ -179,5 +180,14 @@ std::size_t EventProtocol::MaxSerializedBytes(const ApplicationEventPayload& pay
     {
         using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
         return Event::MAX_SERIALIZED_BYTES;
+    }, payload);
+}
+
+EventScope_e EventProtocol::Scope(const ApplicationEventPayload& payload)
+{
+    return std::visit([](const auto& value)
+    {
+        using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
+        return Event::SCOPE;
     }, payload);
 }

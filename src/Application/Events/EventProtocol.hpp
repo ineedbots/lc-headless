@@ -3,6 +3,7 @@
 #include "Type/ApplicationEvent_s.hpp"
 #include "Type/EventSubscription_s.hpp"
 #include "Type/ApplicationEvents_s.hpp"
+#include "Type/EventScope_e.hpp"
 
 class EventProtocol
 {
@@ -11,6 +12,7 @@ public:
     static std::variant<EventCommand_s, EventProtocolError_s> Decode(std::string_view text);
     static std::string_view Name(const ApplicationEventPayload& payload);
     static bool IsKnown(std::string_view name);
+    static EventScope_e Scope(const ApplicationEventPayload& payload);
     static bool RetainsLatest(const ApplicationEventPayload& payload);
     static std::optional<std::size_t> Measure(const ApplicationEventPayload& payload);
     template <typename T>

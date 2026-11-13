@@ -4,7 +4,7 @@
 
 struct ApplicationEvent_s
 {
-    std::string account;
+    std::optional<std::string> account;
     ApplicationEventPayload payload;
     std::chrono::system_clock::time_point timestamp = std::chrono::system_clock::now();
 };

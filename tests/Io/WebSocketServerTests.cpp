@@ -2,6 +2,7 @@
 
 #include "Application/ApplicationRequestBridge.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
+#include "Application/Type/ApplicationStarted_s.hpp"
 #include "Accounts/Type/ProgressReport_s.hpp"
 #include "Accounts/Type/AccountLogout_s.hpp"
 #include "Application/Events/Type/ApplicationEvent_s.hpp"
@@ -567,4 +568,50 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
     }
 
     CHECK(account.Succeeded());
+}
+
+TEST_CASE("WebSocket global events retain a null account through snapshots live delivery and reconnect", "[Events][Http][WebSocket]")
+{
+    auto fixture = WebSocketFixture{};
+    REQUIRE(fixture.events->Publish(ApplicationStarted_s{}));
+
+    for (int connection = 0; connection < 2; ++connection)
+    {
+        auto published = false;
+        const auto results = fixture.Run([](u16 port) -> asio::awaitable<std::vector<Json>>
+        {
+            auto stream = Stream{co_await asio::this_coro::executor};
+            beast::get_lowest_layer(stream).expires_after(5s);
+            co_await beast::get_lowest_layer(stream).async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
+            co_await stream.async_handshake("localhost", "/api/v1/events", asio::use_awaitable);
+            stream.text(true);
+
+            const auto subscription = std::string{R"({"version":1,"type":"subscribe","id":"global","events":["application.started"]})"};
+            co_await stream.async_write(asio::buffer(subscription), asio::use_awaitable);
+
+            auto envelopes = std::vector<Json>{};
+            for (int i = 0; i < 3; ++i)
+            {
+                envelopes.push_back(co_await Read(stream));
+            }
+
+            co_await stream.async_close(websocket::close_code::normal, asio::use_awaitable);
+            co_return envelopes;
+        }, [&]
+        {
+            if (!published && fixture.events->GetDiagnostics().subscriptions == 1)
+            {
+                published = true;
+                REQUIRE(fixture.events->Publish(ApplicationStarted_s{}));
+            }
+        });
+        CHECK(results[0]["type"] == "ack");
+        REQUIRE(results[1]["events"].size() == 1);
+        CHECK(results[1]["events"][0]["account"].is_null());
+        CHECK(results[1]["events"][0]["sequence"] == connection + 1);
+        CHECK(results[2]["event"] == "application.started");
+        CHECK(results[2]["account"].is_null());
+        CHECK(results[2]["payload"] == Json::object());
+        CHECK(results[2]["sequence"] == connection + 2);
+    }
 }
