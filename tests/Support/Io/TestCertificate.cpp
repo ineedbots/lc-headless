@@ -105,13 +105,13 @@ namespace
 
         return {
             .certificatePem = ToPem([&](BIO* bio)
-            {
-                return PEM_write_bio_X509(bio, certificate.get());
-            }),
+        {
+            return PEM_write_bio_X509(bio, certificate.get());
+        }),
             .privateKeyPem = ToPem([&](BIO* bio)
-            {
-                return PEM_write_bio_PrivateKey(bio, key.get(), nullptr, nullptr, 0, nullptr, nullptr);
-            }),
+        {
+            return PEM_write_bio_PrivateKey(bio, key.get(), nullptr, nullptr, 0, nullptr, nullptr);
+        }),
         };
     }
 }

@@ -9,7 +9,10 @@ TEST_CASE("InterruptSignal counts successive interrupts across handler installat
     struct RestoreSignal
     {
         decltype(previous) handler;
-        ~RestoreSignal() { std::signal(SIGINT, handler); }
+        ~RestoreSignal()
+        {
+            std::signal(SIGINT, handler);
+        }
     } restore{previous};
     const auto before = InterruptSignal::GetCount();
     InterruptSignal::Install();

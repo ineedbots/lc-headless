@@ -30,19 +30,20 @@ namespace
             , actions{client}
             , context{world.state, world.map, actions}
             , vm{ScriptTestRuntime::Get(), {}, capture.GetLogger()}
-            , hooks{vm, [this] { return running; },
-                    [this](std::string_view where, std::string_view message)
-                    {
-                        errors.emplace_back(std::string{where} + ": " + std::string{message});
-                        running = false;
-                    },
-                    [this]
-                    {
-                        if (++calls == stopAfter)
-                        {
-                            running = false;
-                        }
-                    }}
+            , hooks{vm, [this]
+        {
+            return running;
+        }, [this](std::string_view where, std::string_view message)
+        {
+            errors.emplace_back(std::string{where} + ": " + std::string{message});
+            running = false;
+        }, [this]
+        {
+            if (++calls == stopAfter)
+            {
+                running = false;
+            }
+        }}
         {
             ScriptBindings::Bind(vm, context);
             ScriptBindings::SetSettings(vm, "{}");
@@ -392,7 +393,10 @@ def on_projectile(projectile):
     auto projectile = Projectile_s{.source = {.x = 3200, .z = 3201, .level = 1},
                                    .destination = {.x = 3205, .z = 3206, .level = 1},
                                    .target = EntityRef_s{.type = EntityType_e::Npc, .index = 10},
-                                   .spotAnim = 91, .startDelay = 3, .endDelay = 20, .tick = 100};
+                                   .spotAnim = 91,
+                                   .startDelay = 3,
+                                   .endDelay = 20,
+                                   .tick = 100};
     f.Add(ProjectileLaunched_s{projectile});
     projectile.target = EntityRef_s{.type = EntityType_e::Player, .index = 20};
     f.Add(ProjectileLaunched_s{projectile});

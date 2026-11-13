@@ -520,9 +520,9 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
     const auto options = AccountOptions_s{
         .client = {.connectAttempts = 0, .keepaliveInterval = 50ms},
         .onLogout = [&](std::string_view account, const AccountLogout_s& logout)
-        {
-            notifications.emplace_back(account, logout.confirmed);
-        },
+    {
+        notifications.emplace_back(account, logout.confirmed);
+    },
     };
     auto fixture = AccountFixture{std::nullopt, 30s, options};
     fixture.StepFor(100ms);

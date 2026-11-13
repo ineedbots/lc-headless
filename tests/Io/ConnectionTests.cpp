@@ -167,7 +167,10 @@ namespace
         while (received < expected)
         {
             const auto bytes = co_await session.Receive();
-            if (!bytes) co_return false;
+            if (!bytes)
+            {
+                co_return false;
+            }
             received += bytes->size();
         }
         co_return received == expected;
@@ -177,20 +180,41 @@ namespace
     // leaves the proxy session open, so the caller can either sever it or wait for client cancellation.
     Awaitable ReachProxyReply(ServerSession& session, int phase)
     {
-        if (!co_await ReceiveProxyRequest(session, 4)) co_return;
-        if (phase == 0) co_return;
+        if (!co_await ReceiveProxyRequest(session, 4))
+        {
+            co_return;
+        }
+        if (phase == 0)
+        {
+            co_return;
+        }
         auto reply = std::vector<u8>{5, 2};
         co_await session.Send(reply);
-        if (!co_await ReceiveProxyRequest(session, 8)) co_return;
-        if (phase == 1) co_return;
+        if (!co_await ReceiveProxyRequest(session, 8))
+        {
+            co_return;
+        }
+        if (phase == 1)
+        {
+            co_return;
+        }
         reply = {1, 0};
         co_await session.Send(reply);
         // example.invalid is 15 bytes: version, command, reserved, type, length, name, port.
-        if (!co_await ReceiveProxyRequest(session, 22)) co_return;
-        if (phase == 2) co_return;
+        if (!co_await ReceiveProxyRequest(session, 22))
+        {
+            co_return;
+        }
+        if (phase == 2)
+        {
+            co_return;
+        }
         reply = {5, 0, 0, 3};
         co_await session.Send(reply);
-        if (phase == 3) co_return;
+        if (phase == 3)
+        {
+            co_return;
+        }
         reply = {4};
         co_await session.Send(reply);
     }
@@ -210,7 +234,10 @@ TEST_CASE("Asio cancels each transport during hostname lookup and TCP connection
     const auto options = ConnectionOptions_s{.transport = transport, .host = LOOPBACK, .port = server.GetPort(), .tlsCaFile = "NONE"};
     auto link = std::make_shared<AsioLink>(loop, io, options, capture.GetLogger());
     link->Start();
-    for (auto count = 0; count < handlers; ++count) REQUIRE(io.run_one_for(WAIT) == 1);
+    for (auto count = 0; count < handlers; ++count)
+    {
+        REQUIRE(io.run_one_for(WAIT) == 1);
+    }
     REQUIRE(link->GetStatus().state == ConnectionState_e::Connecting);
     link->Close();
     io.run_for(WAIT);
@@ -226,8 +253,14 @@ TEST_CASE("Connection reports proxy EOF and reset at every reply stage", "[Conne
     auto proxy = TestServer{[phase, reset](ServerSession& session) -> Awaitable
     {
         co_await ReachProxyReply(session, phase);
-        if (reset) session.Reset();
-        else session.Drop();
+        if (reset)
+        {
+            session.Reset();
+        }
+        else
+        {
+            session.Drop();
+        }
     }, ServerMode_e::Tcp};
     auto capture = LogCapture{};
     const auto loop = NetLoop::Create();
@@ -235,12 +268,21 @@ TEST_CASE("Connection reports proxy EOF and reset at every reply stage", "[Conne
     options.host = "example.invalid";
     options.proxy = Socks5Proxy_s{.host = LOOPBACK, .port = proxy.GetPort(), .username = "usr", .password = "pw"};
     auto connection = Connection{*loop, options, capture.GetLogger()};
-    const auto failure = GetFailure([&] { static_cast<void>(connection.WaitOpen(WAIT)); });
+    const auto failure = GetFailure([&]
+    {
+        static_cast<void>(connection.WaitOpen(WAIT));
+    });
     INFO(failure);
     CHECK_THAT(failure, Catch::Matchers::ContainsSubstring(std::format("SOCKS5 proxy {}:{}:", LOOPBACK, proxy.GetPort())));
-    if (!reset) CHECK_THAT(failure, Catch::Matchers::ContainsSubstring("closed the connection during the exchange"));
+    if (!reset)
+    {
+        CHECK_THAT(failure, Catch::Matchers::ContainsSubstring("closed the connection during the exchange"));
+    }
     CHECK(failure.find("usr") == std::string::npos);
-    CHECK(GetOutcome([&] { static_cast<void>(connection.Pump()); }) == Outcome_e::Failed);
+    CHECK(GetOutcome([&]
+    {
+        static_cast<void>(connection.Pump());
+    }) == Outcome_e::Failed);
 }
 
 TEST_CASE("Connection cancels a pending proxy reply at every handshake stage", "[Connection][ProxyFailureCoverage]")
@@ -259,13 +301,19 @@ TEST_CASE("Connection cancels a pending proxy reply at every handshake stage", "
     options.proxy = Socks5Proxy_s{.host = LOOPBACK, .port = proxy.GetPort(), .username = "usr", .password = "pw"};
     auto connection = Connection{*loop, options, MakeConsoleLogger()};
     const auto deadline = Clock::now() + WAIT;
-    while (!reached->load() && Clock::now() < deadline) static_cast<void>(connection.WaitOpen(10ms));
+    while (!reached->load() && Clock::now() < deadline)
+    {
+        static_cast<void>(connection.WaitOpen(10ms));
+    }
     REQUIRE(reached->load());
     CHECK_FALSE(connection.WaitOpen(10ms));
     connection.Close();
     CHECK(connection.WaitClosed(WAIT));
     CHECK(connection.Pump() == ConnectionState_e::Closed);
-    CHECK(proxy.WaitFor([](const auto& record) { return record.ended == 1; }));
+    CHECK(proxy.WaitFor([](const auto& record)
+    {
+        return record.ended == 1;
+    }));
 }
 
 TEST_CASE("Connection rejects bad options before connecting", "[Connection]")
@@ -434,7 +482,10 @@ TEST_CASE("Connection blocking open reports connection failures", "[Connection][
 {
     const auto loop = NetLoop::Create();
     auto connection = Connection{*loop, MakeTcpOptions(TestServer::FindClosedPort()), MakeConsoleLogger()};
-    CHECK(GetOutcome([&] { connection.WaitOpen(); }) == Outcome_e::Failed);
+    CHECK(GetOutcome([&]
+    {
+        connection.WaitOpen();
+    }) == Outcome_e::Failed);
     connection.Close();
     CHECK_NOTHROW(connection.WaitClosed());
 }
@@ -1239,13 +1290,22 @@ TEST_CASE("Connection cancels a TLS handshake waiting for the server", "[Connect
     }
     REQUIRE_FALSE(server.GetRecord().messages.empty());
     CHECK_FALSE(connection.WaitOpen(0ms));
-    CHECK(Measure([&] { connection.Close(); }) < AT_ONCE);
+    CHECK(Measure([&]
+    {
+        connection.Close();
+    }) < AT_ONCE);
     REQUIRE(connection.WaitClosed(WAIT));
     loop->Settle(Clock::now() + WAIT);
     CHECK(connection.Pump() == ConnectionState_e::Closed);
     // Cancelling a TLS handshake may end the underlying TCP socket with FIN or reset.
-    CHECK(server.WaitFor([](const ServerRecord_s& record) { return record.ended == 1; }));
-    CHECK(GetOutcome([&] { connection.Send(std::array<u8, 1>{1}); }) == Outcome_e::Closed);
+    CHECK(server.WaitFor([](const ServerRecord_s& record)
+    {
+        return record.ended == 1;
+    }));
+    CHECK(GetOutcome([&]
+    {
+        connection.Send(std::array<u8, 1>{1});
+    }) == Outcome_e::Closed);
     CHECK(std::ranges::none_of(capture.GetEntries(), [](const auto& entry)
     {
         return entry.message.starts_with("Connection failed:");
@@ -1338,7 +1398,7 @@ TEST_CASE("Connection over TLS treats a truncated stream as a close", "[Connecti
         session.Drop();
         co_return;
     },
-        ServerMode_e::WebSocket, true};
+                                   ServerMode_e::WebSocket, true};
     const auto options = ConnectionOptions_s{.transport = Transport_e::Wss, .host = LOOPBACK, .port = server.GetPort(), .tlsCaFile = "NONE"};
     auto connection = Connection{*loop, options, MakeConsoleLogger()};
 
@@ -1382,12 +1442,18 @@ TEST_CASE("Connection drains queued TCP writes in their original order", "[Conne
     const auto server = TestServer{[&](ServerSession& session) -> Awaitable
     {
         const auto deadline = Clock::now() + WAIT;
-        while (!release && Clock::now() < deadline) co_await session.Delay(1ms);
+        while (!release && Clock::now() < deadline)
+        {
+            co_await session.Delay(1ms);
+        }
         auto received = std::size_t{0};
         while (received < size + 3)
         {
             const auto bytes = co_await session.Receive();
-            if (!bytes) co_return;
+            if (!bytes)
+            {
+                co_return;
+            }
             received += bytes->size();
         }
         co_await session.Send({1});
@@ -1402,7 +1468,10 @@ TEST_CASE("Connection drains queued TCP writes in their original order", "[Conne
     CHECK(ReadAll(connection) == std::vector<u8>{1});
     const auto received = GetStream(server);
     REQUIRE(received.size() == size + 3);
-    CHECK(std::ranges::all_of(std::span{received}.first(size), [](u8 byte) { return byte == 42; }));
+    CHECK(std::ranges::all_of(std::span{received}.first(size), [](u8 byte)
+    {
+        return byte == 42;
+    }));
     CHECK(std::vector<u8>(received.end() - 3, received.end()) == std::vector<u8>{1, 2, 3});
     connection.Close();
     CHECK(connection.WaitClosed(WAIT));

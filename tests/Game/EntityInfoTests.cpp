@@ -451,7 +451,10 @@ TEST_CASE("NPC_INFO rejects trailing bytes and duplicate tracked indexes", "[Npc
         state.npcs = {MakeNpc(100, 50, Offset(1, 0))};
         auto bits = BitWriter{};
         bits.Put(8, 1).Put(1, 0).Put(indexBits, 100).Put(11, 50).Put(5, 0).Put(5, 0);
-        if (revision != Revision_e::Rev225) bits.Put(1, 0);
+        if (revision != Revision_e::Rev225)
+        {
+            bits.Put(1, 0);
+        }
         bits.Put(1, 0);
         CHECK_THROWS_WITH(decoder.Decode(bits.GetBytes(), state), "NPC_INFO adds NPC 100, which is already tracked");
     }

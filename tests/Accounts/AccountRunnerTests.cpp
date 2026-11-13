@@ -269,7 +269,9 @@ TEST_CASE("AccountRunner cancels queued logins on interrupt", "[AccountRunner][N
     auto fixture = RunnerFixture{};
     fixture.config.scripting.loginIntervalSeconds = 60s;
     auto accounts = std::vector<AccountConfig_s>{MakeAccount("bot1", nullptr, std::nullopt), MakeAccount("bot2", &fixture.second, std::nullopt)};
-    SECTION("one waiting account") {}
+    SECTION("one waiting account")
+    {
+    }
     SECTION("two waiting accounts")
     {
         accounts.push_back(MakeAccount("bot3", &fixture.second, std::nullopt));

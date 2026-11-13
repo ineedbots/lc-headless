@@ -82,18 +82,28 @@ namespace
             : m_name{name}
         {
             if (const auto* old = std::getenv(name))
+            {
                 m_old = old;
+            }
             if (value)
+            {
                 setenv(name, value, 1);
+            }
             else
+            {
                 unsetenv(name);
+            }
         }
         ~EnvironmentValue()
         {
             if (m_old)
+            {
                 setenv(m_name, m_old->c_str(), 1);
+            }
             else
+            {
                 unsetenv(m_name);
+            }
         }
 
     private:
@@ -113,12 +123,16 @@ namespace
             {
                 master = posix_openpt(O_RDWR | O_NOCTTY);
                 if (master < 0 || grantpt(master) != 0 || unlockpt(master) != 0)
+                {
                     throw std::runtime_error{"Couldn't create pseudo-terminal"};
+                }
                 m_slave = open(ptsname(master), O_RDWR | O_NOCTTY);
                 m_input = dup(STDIN_FILENO);
                 m_output = dup(STDOUT_FILENO);
                 if (m_slave < 0 || m_input < 0 || m_output < 0 || dup2(m_slave, STDIN_FILENO) < 0 || dup2(m_slave, STDOUT_FILENO) < 0)
+                {
                     throw std::runtime_error{"Couldn't attach pseudo-terminal"};
+                }
             }
             catch (...)
             {
@@ -159,7 +173,9 @@ namespace
                 m_slave = -1;
             }
             if (master >= 0)
+            {
                 CloseMaster();
+            }
         }
         int m_slave = -1;
         int m_input = -1;
@@ -186,13 +202,17 @@ TEST_CASE("Terminal leaves input settings intact when raw mode setup fails and c
             const auto restore = Terminal::EnterRawMode();
             rejected = !restore;
             if (restore)
+            {
                 restore();
+            }
         }
         settingsRead = tcgetattr(STDIN_FILENO, &afterFailure) == 0 && settingsRead;
         const auto restore = Terminal::EnterRawMode();
         recovered = static_cast<bool>(restore);
         if (restore)
+        {
             restore();
+        }
         settingsRead = tcgetattr(STDIN_FILENO, &restored) == 0 && settingsRead;
     }
     REQUIRE(settingsRead);
@@ -219,7 +239,9 @@ TEST_CASE("Terminal retries an interrupted read without losing queued keys", "[T
             written = write(terminal.master, "keys", 4);
             const auto failure = TerminalFailure{TerminalCall::Read};
             if (written == 4)
+            {
                 received = Terminal::ReadKeys();
+            }
             retried = !failingCall;
             restore();
         }
@@ -254,7 +276,9 @@ TEST_CASE("Terminal raw mode reads keys and restores the original input settings
             success = tcgetattr(STDIN_FILENO, &raw) == 0 && success;
             written = write(terminal.master, keys.data(), keys.size());
             if (written == static_cast<ssize_t>(keys.size()))
+            {
                 received = Terminal::ReadKeys();
+            }
             restore();
             success = tcgetattr(STDIN_FILENO, &restored) == 0 && success;
         }
@@ -314,7 +338,9 @@ TEST_CASE("Terminal reports the end of a closed pseudo-terminal", "[Terminal][Te
         terminal.CloseMaster();
         result = Terminal::ReadKeys();
         if (restore)
+        {
             restore();
+        }
     }
     CHECK(entered);
     CHECK_FALSE(result.has_value());
@@ -377,13 +403,17 @@ TEST_CASE("ConsoleInput edits terminal lines, forwards interrupt keys and releas
         static_cast<void>(ignored);
         auto deadline = std::chrono::steady_clock::now() + 5s;
         while (!weak.expired() && std::chrono::steady_clock::now() < deadline)
+        {
             std::this_thread::sleep_for(1ms);
+        }
         if (!weak.expired())
         {
             terminal.CloseMaster();
             deadline = std::chrono::steady_clock::now() + 5s;
             while (!weak.expired() && std::chrono::steady_clock::now() < deadline)
+            {
                 std::this_thread::sleep_for(1ms);
+            }
         }
         released = weak.expired();
     }

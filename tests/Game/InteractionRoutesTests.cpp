@@ -128,8 +128,7 @@ TEST_CASE("InteractionRoutes uses the first reachable target and rejects an empt
     const auto first = W::Offset(0, 3);
     const auto second = W::Offset(-2, 0);
     const auto unreachable = W::Offset(3, 0);
-    CHECK(InteractionRoutes::FindRoute(world.map, start, {{.tile = unreachable}, {.tile = first}, {.tile = second}})
-          == std::vector<Tile_s>{first});
+    CHECK(InteractionRoutes::FindRoute(world.map, start, {{.tile = unreachable}, {.tile = first}, {.tile = second}}) == std::vector<Tile_s>{first});
     CHECK_FALSE(InteractionRoutes::FindRoute(world.map, start, {}).has_value());
     CHECK_FALSE(InteractionRoutes::FindRoute(world.map, start, {{.tile = unreachable}}).has_value());
 }

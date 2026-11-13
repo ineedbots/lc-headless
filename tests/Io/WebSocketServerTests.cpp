@@ -513,7 +513,7 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
         fixture.events->Publish({std::string{name}, logout});
     }};
     auto account = Account{std::make_shared<const Config_s>(game.MakeConfig()), FakeGameServer::MakeCache(),
-        AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), Logger::GetDefault(), options};
+                           AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), Logger::GetDefault(), options};
     account.Login();
     auto interrupted = false;
     for (const auto reconnect : {false, true})

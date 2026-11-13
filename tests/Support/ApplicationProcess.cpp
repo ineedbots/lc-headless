@@ -57,8 +57,14 @@ ApplicationResult_s RunApplication(const std::filesystem::path& directory, const
     const auto out = CreateFileW(outputPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &attributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (in == INVALID_HANDLE_VALUE || out == INVALID_HANDLE_VALUE)
     {
-        if (in != INVALID_HANDLE_VALUE) CloseHandle(in);
-        if (out != INVALID_HANDLE_VALUE) CloseHandle(out);
+        if (in != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(in);
+        }
+        if (out != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(out);
+        }
         throw std::runtime_error{"Couldn't redirect application streams"};
     }
     auto startup = STARTUPINFOW{};
@@ -120,7 +126,10 @@ ApplicationResult_s RunApplication(const std::filesystem::path& directory, const
     while (true)
     {
         const auto result = waitpid(child, &status, WNOHANG);
-        if (result == child) break;
+        if (result == child)
+        {
+            break;
+        }
         if (result < 0 && errno != EINTR)
         {
             throw std::runtime_error{"Couldn't wait for application"};
@@ -128,7 +137,9 @@ ApplicationResult_s RunApplication(const std::filesystem::path& directory, const
         if (std::chrono::steady_clock::now() >= deadline)
         {
             kill(child, SIGKILL);
-            while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
+            while (waitpid(child, &status, 0) < 0 && errno == EINTR)
+            {
+            }
             throw std::runtime_error{"Application timed out"};
         }
         std::this_thread::sleep_for(10ms);

@@ -119,7 +119,10 @@ TEST_CASE("Navigation names missing data files and distinguishes an unknown data
     const auto cache = MakeCache();
     const auto folder = TempFolder{"rs2004-navigation-missing-files"};
     folder.WriteFile("edges.json", "[]");
-    for (const auto name : Navigation::DATA_FILES) folder.WriteFile(std::format("{}.json", name), "[]");
+    for (const auto name : Navigation::DATA_FILES)
+    {
+        folder.WriteFile(std::format("{}.json", name), "[]");
+    }
     const auto missing = GENERATE("edges"sv, "teleports"sv, "crossings"sv, "banks"sv, "danger_zones"sv);
     const auto path = folder.GetPath() / std::format("{}.json", missing);
     std::filesystem::remove(path);
@@ -144,7 +147,8 @@ TEST_CASE("Navigation enforces free inventory slots on graph edges", "[Navigatio
     const auto navigation = Navigation{cache, R"json([
         {"kind":"stair", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3210,"z":3211,"level":1}, "cost":1,
          "requires":{"freeSlots":2}}
-    ])json", "[]"};
+    ])json",
+                                       "[]"};
     auto options = NavFindOptions_s{.maxExpansions = 5000, .state = NavState_s{}};
     options.state->freeSlots = 1;
     CHECK_FALSE(WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options).ok);
@@ -157,7 +161,8 @@ TEST_CASE("WorldPathFinder applies teleport policy to graph edges without a tele
     const auto cache = MakeCache();
     const auto navigation = Navigation{cache, R"json([
         {"kind":"teleport", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3210,"z":3211,"level":1}, "cost":1}
-    ])json", "[]"};
+    ])json",
+                                       "[]"};
     auto options = NavFindOptions_s{.maxExpansions = 5000, .useTeleportCatalog = false};
     const auto allowed = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options);
     REQUIRE(allowed.ok);
@@ -179,7 +184,8 @@ TEST_CASE("WorldPathFinder refuses a hop landing in an avoided zone and uses ano
     const auto navigation = Navigation{cache, R"json([
         {"kind":"stair", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3210,"z":3211,"level":1}, "cost":1},
         {"kind":"stair", "from":{"x":3210,"z":3210,"level":0}, "to":{"x":3220,"z":3211,"level":1}, "cost":20}
-    ])json", "[]"};
+    ])json",
+                                       "[]"};
     auto options = NavFindOptions_s{};
     const auto normal = WorldPathFinder::FindPath(navigation, At(10, 10), At(10, 20, 1), options);
     REQUIRE(normal.ok);
@@ -361,7 +367,10 @@ TEST_CASE("WorldPathFinder rejects teleport landings without a floor", "[WorldPa
     const auto path = WorldPathFinder::FindPath(navigation, At(1, 1), At(60, 1), {});
     REQUIRE(path.ok);
     CHECK(path.cost == 59);
-    CHECK(std::ranges::none_of(path.waypoints, [](const NavWaypoint_s& point) { return point.teleport != nullptr; }));
+    CHECK(std::ranges::none_of(path.waypoints, [](const NavWaypoint_s& point)
+    {
+        return point.teleport != nullptr;
+    }));
 }
 
 TEST_CASE("WorldPathFinder respects inclusive wilderness teleport limits", "[WorldPathFinder][WorldPathCoverage]")

@@ -98,7 +98,10 @@ TEST_CASE("MapDecoder accepts a loc file when the square has no land file", "[Ma
     CHECK(square.GetLocs()[0].GetX() == 12);
     CHECK(square.GetLocs()[0].GetZ() == 34);
     CHECK(square.GetLocs()[0].GetShape() == GROUND_DECOR);
-    for (auto level = 0; level < MapSquare::LEVELS; ++level) CHECK_FALSE(square.IsBlocked(level, 12, 34));
+    for (auto level = 0; level < MapSquare::LEVELS; ++level)
+    {
+        CHECK_FALSE(square.IsBlocked(level, 12, 34));
+    }
 }
 
 TEST_CASE("MapDecoder rejects loc levels outside the four-level map", "[MapDecoder][MapBoundaryCoverage]")

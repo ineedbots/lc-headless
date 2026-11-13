@@ -60,7 +60,10 @@ namespace
         {
         }
 
-        [[nodiscard]] std::filesystem::path Records() const { return folder.GetPath() / "bank" / "s18.jsonl"; }
+        [[nodiscard]] std::filesystem::path Records() const
+        {
+            return folder.GetPath() / "bank" / "s18.jsonl";
+        }
         // The bank as it is now: the last record.
         [[nodiscard]] std::string Latest() const
         {

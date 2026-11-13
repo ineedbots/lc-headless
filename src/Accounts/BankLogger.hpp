@@ -19,7 +19,10 @@ public:
     // Called every step while in game. Records on the closed -> open edge only.
     void Step(const GameState_s& state);
 
-    [[nodiscard]] const std::filesystem::path& GetDirectory() const { return m_directory; }
+    [[nodiscard]] const std::filesystem::path& GetDirectory() const
+    {
+        return m_directory;
+    }
 
 private:
     void Log(const GameState_s& state);

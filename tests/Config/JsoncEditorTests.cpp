@@ -270,7 +270,7 @@ TEST_CASE("JsoncEditor Set rejects non-object roots before attempting an edit", 
 {
     const auto root = GENERATE("[]", "null", "42", "\"text\"");
     CHECK_THROWS_MATCHES(JsoncEditor::Set(root, MINER_PATH, R"({"rock": "Iron rocks"})"), ConfigError,
-                        Catch::Matchers::Message("the top level must be an object"));
+                         Catch::Matchers::Message("the top level must be an object"));
 }
 
 TEST_CASE("JsoncEditor adds members to an object containing only an inline block comment", "[JsoncEditor][JsoncBoundaryCoverage]")

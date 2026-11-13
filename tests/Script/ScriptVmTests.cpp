@@ -286,7 +286,8 @@ class Broken:
 
 def answer():
     return 42
-)python", "log-error.py");
+)python",
+                 "log-error.py");
     CHECK_THROWS_WITH(vm.RunSource(std::string{function} + "('partial', Broken(), 'tail')\n", "log-error.py"), ContainsSubstring("ValueError: cannot format"));
     CHECK(GetLines(capture).empty());
     CHECK(py_toint(vm.Call("answer")) == 42);

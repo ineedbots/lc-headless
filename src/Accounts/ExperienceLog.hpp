@@ -24,9 +24,25 @@ public:
 
     // The 19 skills, in the game's stat order, as the state holds them.
     static constexpr auto SKILL_NAMES = std::to_array<std::string_view>({
-        "attack", "defence", "strength", "hitpoints", "ranged", "prayer", "magic",
-        "cooking", "woodcutting", "fletching", "fishing", "firemaking", "crafting",
-        "smithing", "mining", "herblore", "agility", "thieving", "runecraft",
+        "attack",
+        "defence",
+        "strength",
+        "hitpoints",
+        "ranged",
+        "prayer",
+        "magic",
+        "cooking",
+        "woodcutting",
+        "fletching",
+        "fishing",
+        "firemaking",
+        "crafting",
+        "smithing",
+        "mining",
+        "herblore",
+        "agility",
+        "thieving",
+        "runecraft",
     });
 
     // A zero interval turns the log off; the account doesn't build one.
@@ -37,7 +53,10 @@ public:
     // player is placed.
     void Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status, bool settled);
 
-    [[nodiscard]] const std::filesystem::path& GetPath() const { return m_path; }
+    [[nodiscard]] const std::filesystem::path& GetPath() const
+    {
+        return m_path;
+    }
 
 private:
     void WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled);

@@ -13,6 +13,7 @@ NamespaceIndentation: All
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+InsertBraces: true
 SortIncludes: Never
 AlignOperands: DontAlign
 AccessModifierOffset: -4

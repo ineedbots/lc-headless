@@ -430,11 +430,17 @@ TEST_CASE("Every type decoder rejects incomplete framing before reading definiti
     {
         auto text = TextPool{};
         if (kind == "loc")
+        {
             return LocTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        }
         if (kind == "npc")
+        {
             return NpcTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        }
         if (kind == "obj")
+        {
             return ObjTypeDecoder::Decode(files.dat, files.idx, text, Revision_e::Rev289).size();
+        }
         return VarpTypeDecoder::Decode(files.dat, files.idx, Revision_e::Rev289).size();
     };
     const auto complete = CacheWriter::MakeTypeFiles({std::vector<u8>{0}});

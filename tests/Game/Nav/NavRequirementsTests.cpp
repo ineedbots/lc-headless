@@ -9,17 +9,50 @@ TEST_CASE("Every navigation restriction marks an edge as gated", "[NavRequiremen
     auto requirement = NavRequires_s{};
     CHECK_FALSE(requirement.IsGated());
     CHECK_FALSE(requirement.Check(NavState_s{}).has_value());
-    SECTION("membership") { requirement.members = true; }
-    SECTION("free slots, even zero") { requirement.freeSlots = 0; }
-    SECTION("skills") { requirement.skills = {{"Agility", 10}}; }
-    SECTION("items") { requirement.items = {{"Rope", 1}}; }
-    SECTION("worn items") { requirement.worn = {{"Boots of lightness", 1}}; }
-    SECTION("currency") { requirement.currency = NavRequires_s::Amount_s{"Coins", 10}; }
-    SECTION("quest waiver") { requirement.questWaivesItems = "Prince Ali Rescue"; }
-    SECTION("quest status") { requirement.quests = {{"Cook's Assistant", "complete", {}}}; }
-    SECTION("Entrana gear") { requirement.forbidEntranaRestricted = true; }
-    SECTION("slash tool") { requirement.slashTool = true; }
-    SECTION("essence return") { requirement.essenceExitReturn = "aubury"; }
+    SECTION("membership")
+    {
+        requirement.members = true;
+    }
+    SECTION("free slots, even zero")
+    {
+        requirement.freeSlots = 0;
+    }
+    SECTION("skills")
+    {
+        requirement.skills = {{"Agility", 10}};
+    }
+    SECTION("items")
+    {
+        requirement.items = {{"Rope", 1}};
+    }
+    SECTION("worn items")
+    {
+        requirement.worn = {{"Boots of lightness", 1}};
+    }
+    SECTION("currency")
+    {
+        requirement.currency = NavRequires_s::Amount_s{"Coins", 10};
+    }
+    SECTION("quest waiver")
+    {
+        requirement.questWaivesItems = "Prince Ali Rescue";
+    }
+    SECTION("quest status")
+    {
+        requirement.quests = {{"Cook's Assistant", "complete", {}}};
+    }
+    SECTION("Entrana gear")
+    {
+        requirement.forbidEntranaRestricted = true;
+    }
+    SECTION("slash tool")
+    {
+        requirement.slashTool = true;
+    }
+    SECTION("essence return")
+    {
+        requirement.essenceExitReturn = "aubury";
+    }
     CHECK(requirement.IsGated());
 }
 
@@ -70,8 +103,7 @@ TEST_CASE("Navigation skills and supplies use case insensitive names and exact t
 TEST_CASE("Quest completion waives supplies but preserves equipment and skill requirements", "[NavRequirements]")
 {
     const auto requirement = NavRequires_s{
-        .skills = {{"Agility", 10}}, .items = {{"Rope", 1}}, .worn = {{"Boots", 1}},
-        .currency = NavRequires_s::Amount_s{"Coins", 30}, .questWaivesItems = "Prince Ali Rescue"};
+        .skills = {{"Agility", 10}}, .items = {{"Rope", 1}}, .worn = {{"Boots", 1}}, .currency = NavRequires_s::Amount_s{"Coins", 30}, .questWaivesItems = "Prince Ali Rescue"};
     auto state = NavState_s{};
     state.skills["agility"] = 10;
     CHECK(requirement.Check(state) == "need 30 Coins (have 0)");

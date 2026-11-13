@@ -195,7 +195,6 @@ TEST_CASE("ExperienceLog starts a new baseline after a logout", "[ExperienceLog]
     CHECK_FALSE(HasExperienceLog(fixture.capture));
 }
 
-
 TEST_CASE("ExperienceLog waits for the player's stats before taking its baseline", "[ExperienceLog]")
 {
     auto fixture = ExperienceFixture{};

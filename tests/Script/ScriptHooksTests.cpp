@@ -16,7 +16,14 @@ TEST_CASE("ScriptHooks restores the caller's VM and skips malformed console regi
     auto caller = ScriptVm{runtime, {}, capture.GetLogger()};
     owner.RunSource("_listening = {'tick': 1}\n_commands = {'zebra': 'last', 'alpha': 'first', 7: 'invalid name', 'bad_help': 42}\n",
                     "registries.py", owner.GetBuiltins());
-    auto hooks = ScriptHooks{owner, [] { return true; }, [](auto, auto) {}, [] {}};
+    auto hooks = ScriptHooks{owner, []
+    {
+        return true;
+    }, [](auto, auto)
+    {
+    }, []
+    {
+    }};
     caller.Activate();
     CHECK(&hooks.GetVm() == &owner);
     CHECK(hooks.Has("tick"));
@@ -38,7 +45,14 @@ TEST_CASE("ScriptHooks accepts absent registries and ignores a non-dictionary co
     auto capture = LogCapture{};
     auto vm = ScriptVm{ScriptTestRuntime::Get(), {}, capture.GetLogger()};
     vm.RunSource(source, "registries.py", vm.GetBuiltins());
-    auto hooks = ScriptHooks{vm, [] { return true; }, [](auto, auto) {}, [] {}};
+    auto hooks = ScriptHooks{vm, []
+    {
+        return true;
+    }, [](auto, auto)
+    {
+    }, []
+    {
+    }};
     CHECK_FALSE(hooks.Has("tick"));
     CHECK(hooks.GetCommands().empty());
     CHECK_NOTHROW(hooks.Call("tick"));
@@ -57,14 +71,21 @@ def _rt_dispatch(name, value=0):
     if name == 'broken':
         raise ValueError('hook failure')
     return value + 1
-)python", "dispatch.py", vm.GetBuiltins());
+)python",
+                 "dispatch.py", vm.GetBuiltins());
     auto running = true;
     auto after = 0;
     auto errors = std::vector<std::pair<std::string, std::string>>{};
-    auto hooks = ScriptHooks{vm, [&] { return running; }, [&](auto where, auto message)
+    auto hooks = ScriptHooks{vm, [&]
+    {
+        return running;
+    }, [&](auto where, auto message)
     {
         errors.emplace_back(where, message);
-    }, [&] { ++after; }};
+    }, [&]
+    {
+        ++after;
+    }};
     vm.Activate();
     py_newint(py_r0(), 42);
     const auto answer = hooks.Dispatch("tick", std::array{py_r0()});
