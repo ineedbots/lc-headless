@@ -88,6 +88,7 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console,
         {
             const auto stepStarted = Clock::now();
             account->Step(0ms);
+
             const auto stepFinished = Clock::now();
             const auto elapsed = stepFinished - stepStarted;
             if (elapsed >= SLOW_STEP_THRESHOLD)

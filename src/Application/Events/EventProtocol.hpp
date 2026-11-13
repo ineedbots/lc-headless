@@ -22,8 +22,10 @@ public:
         {
             return {};
         }
+
         return *bytes + sizeof(ApplicationEvent_s);
     }
+
     static std::size_t MaxSerializedBytes(const ApplicationEventPayload& payload);
     static std::string Encode(const ApplicationEvent_s& event, std::string_view instance, u64 sequence);
     static std::string Ack(std::string_view id, std::string_view action, std::string_view instance, u64 sequence);

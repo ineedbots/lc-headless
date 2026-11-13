@@ -155,6 +155,7 @@ TEST_CASE("An account adds its define_bot script's default settings to its file"
             .credentials = FakeGameServer::MakeAccount(),
             .script = ScriptConfig_s{.file = "main.py", .settings = R"json({"Miner": {"trips": 3}})json"},
         };
+
         return std::make_unique<Account>(std::make_shared<const Config_s>(config), FakeGameServer::MakeCache(), std::move(settings), ScriptTestRuntime::Get(), capture.GetLogger());
     };
 
@@ -193,6 +194,7 @@ TEST_CASE("An account warns when it asks for progress reports and its script mak
 
     auto config = server.MakeConfig();
     config.scripting.scriptsDirectory = folder.GetPath().string();
+
     auto settings = AccountConfig_s{
         .name = "bot1",
         .credentials = FakeGameServer::MakeAccount(),
@@ -490,6 +492,7 @@ TEST_CASE("An account connects through client.jsonc's proxy unless its file name
 
     auto config = server.MakeConfig();
     config.proxy = ProxySettings_s{.host = "127.0.0.1", .port = shared.GetPort()};
+
     auto settings = AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()};
 
     SECTION("no proxy in the account file")
@@ -529,6 +532,7 @@ TEST_CASE("Account logout notifications describe completion once", "[Account][Ev
         }
     }),
     };
+
     auto fixture = AccountFixture{std::nullopt, 30s, options};
     fixture.StepFor(100ms);
     REQUIRE(notifications.empty());
@@ -620,14 +624,17 @@ TEST_CASE("Relog logout notifies before login and notifies again after the next 
     {
         fixture.account->Step(STEP);
     }
+
     REQUIRE(notifications == std::vector<bool>{true});
     CHECK(fixture.server.GetLoginOpcodes().size() == 1);
     CHECK(fixture.account->GetClient().GetStatus() == ClientStatus_e::LoggedOut);
+
     const auto loginDeadline = Clock::now() + WAIT;
     while (Clock::now() < loginDeadline && !fixture.account->GetClient().IsInGame())
     {
         fixture.account->Step(STEP);
     }
+
     REQUIRE(fixture.account->GetClient().IsInGame());
     CHECK(fixture.server.GetLoginOpcodes().size() == 2);
     CHECK(notifications.size() == 1);

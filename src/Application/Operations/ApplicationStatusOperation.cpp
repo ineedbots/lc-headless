@@ -12,9 +12,11 @@ std::optional<ApplicationStatus_s> ApplicationStatusOperation::Execute(const App
 {
     auto status = ApplicationStatus_s{};
     status.uptimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - context.started).count();
+
     for (std::size_t i = 0; i < context.runner.GetAccountCount(); ++i)
     {
         status.accounts.push_back(context.runner.GetAccountStatus(i));
     }
+
     return status;
 }

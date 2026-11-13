@@ -16,11 +16,13 @@ public:
         {
             return false;
         }
+
         if (account.size() > EventLimits::MAX_ACCOUNT_BYTES || !EventProtocol::Measure(payload))
         {
             RejectPublication();
             return false;
         }
+
         return Publish({std::string{account}, payload});
     }
 

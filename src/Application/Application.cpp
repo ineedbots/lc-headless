@@ -91,8 +91,10 @@ int Application::Run()
                 break;
             }
         }
+
         m_logger->Info("Script profiling enabled: reports in {} (profiling adds execution overhead)", std::filesystem::absolute(profileDirectory).string());
     }
+
     const auto& scripting = m_config->scripting;
     const auto options = AccountOptions_s{
         .client = {

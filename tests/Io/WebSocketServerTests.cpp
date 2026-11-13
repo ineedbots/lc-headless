@@ -81,6 +81,7 @@ namespace
         ~WebSocketFixture()
         {
             server->Close();
+
             const auto deadline = std::chrono::steady_clock::now() + 1s;
             while (!server->IsDrained() && std::chrono::steady_clock::now() < deadline)
             {
@@ -151,6 +152,7 @@ TEST_CASE("WebSocket loopback subscribes snapshots streams unsubscribes and reco
     }
 
     fixture.server->Stop();
+
     const auto deadline = std::chrono::steady_clock::now() + 1s;
     while (!fixture.server->IsDrained() && std::chrono::steady_clock::now() < deadline)
     {
@@ -172,6 +174,7 @@ TEST_CASE("WebSocket rejects binary and oversized messages with protocol close c
             co_await beast::get_lowest_layer(stream).async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
             co_await stream.async_handshake("localhost", "/api/v1/events", asio::use_awaitable);
             stream.binary(binary);
+
             const auto message = binary ? std::string{"binary"} : std::string(4097, 'a');
             co_await stream.async_write(asio::buffer(message), asio::use_awaitable);
 
@@ -195,6 +198,7 @@ TEST_CASE("WebSocket validates Origin and upgrade policy on the existing HTTP li
             auto stream = beast::tcp_stream{co_await asio::this_coro::executor};
             stream.expires_after(5s);
             co_await stream.async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
+
             const auto request = "GET /api/v1/events HTTP/1.1\r\nHost: localhost\r\n" + headers + "\r\n";
             co_await asio::async_write(stream, asio::buffer(request), asio::use_awaitable);
 
@@ -244,6 +248,7 @@ TEST_CASE("WebSocket preserves a subscription coalesced with its HTTP upgrade", 
             auto buffer = beast::flat_buffer{};
             auto response = http::response<http::string_body>{};
             co_await http::async_read(stream, buffer, response, asio::use_awaitable);
+
             auto results = std::vector<Json>{Json{{"status", response.result_int()}}};
             for (int frame = 0; frame < 2; ++frame)
             {
@@ -294,6 +299,7 @@ TEST_CASE("WebSocket fanout keeps REST progressing under a bounded multi-client 
     auto game = FakeGameServer{TestWorld::Send};
     auto account = Account{std::make_shared<const Config_s>(game.MakeConfig()), FakeGameServer::MakeCache(), AccountConfig_s{.name = "bot1", .credentials = {.username = "bot1", .password = "secret"}}, ScriptTestRuntime::Get(), std::make_shared<Logger>(), {}, nullptr, fixture.net};
     account.Start();
+
     auto published = false;
     auto passes = 0;
     auto publishedAt = std::atomic<s64>{0};
@@ -317,12 +323,14 @@ TEST_CASE("WebSocket fanout keeps REST progressing under a bounded multi-client 
         auto rest = beast::tcp_stream{co_await asio::this_coro::executor};
         rest.expires_after(5s);
         co_await rest.async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
+
         const auto request = std::string{"GET /api/v1/status HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"};
         co_await asio::async_write(rest, asio::buffer(request), asio::use_awaitable);
 
         auto buffer = beast::flat_buffer{};
         auto response = http::response<http::string_body>{};
         co_await http::async_read(rest, buffer, response, asio::use_awaitable);
+
         auto ordered = true;
         auto count = 0;
         auto maxDeliveryMs = s64{0};
@@ -496,6 +504,7 @@ TEST_CASE("HTTP and WebSocket sessions share one connection admission limit", "[
         auto excess = beast::tcp_stream{executor};
         excess.expires_after(5s);
         co_await excess.async_connect(endpoint, asio::use_awaitable);
+
         auto byte = std::array<char, 1>{};
         auto error = boost::system::error_code{};
         co_await excess.async_read_some(asio::buffer(byte), asio::redirect_error(asio::use_awaitable, error));
@@ -512,6 +521,7 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
     auto account = Account{std::make_shared<const Config_s>(game.MakeConfig()), FakeGameServer::MakeCache(),
                            AccountConfig_s{.name = "bot1", .credentials = FakeGameServer::MakeAccount()}, ScriptTestRuntime::Get(), Logger::GetDefault(), options};
     account.Login();
+
     auto interrupted = false;
     for (const auto reconnect : {false, true})
     {
@@ -522,8 +532,10 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
             co_await beast::get_lowest_layer(stream).async_connect({asio::ip::make_address("127.0.0.1"), port}, asio::use_awaitable);
             co_await stream.async_handshake("localhost", "/api/v1/events", asio::use_awaitable);
             stream.text(true);
+
             const auto subscribe = std::string{R"({"version":1,"type":"subscribe","id":"logout","events":["account.logout"],"accounts":["bot1"]})"};
             co_await stream.async_write(asio::buffer(subscribe), asio::use_awaitable);
+
             auto results = std::vector<Json>{};
             results.push_back(co_await Read(stream));
             results.push_back(co_await Read(stream));
@@ -531,6 +543,7 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
             {
                 results.push_back(co_await Read(stream));
             }
+
             co_await stream.async_close(websocket::close_code::normal, asio::use_awaitable);
             co_return results;
         }, [&]
@@ -540,6 +553,7 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
                 interrupted = true;
                 account.Interrupt();
             }
+
             account.Step(0ms);
         });
         CHECK(results[0]["type"] == "ack");
@@ -551,5 +565,6 @@ TEST_CASE("Account logout reaches a WebSocket subscriber and is absent after rec
             CHECK(results[2]["payload"] == Json{{"confirmed", true}});
         }
     }
+
     CHECK(account.Succeeded());
 }

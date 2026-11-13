@@ -17,6 +17,7 @@ struct EventCatalog_s : TypeCatalog_s<Events...>
             {
                 return false;
             }
+
             for (const auto c : NAMES[i])
             {
                 if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
@@ -24,6 +25,7 @@ struct EventCatalog_s : TypeCatalog_s<Events...>
                     return false;
                 }
             }
+
             for (std::size_t j = 0; j < i; ++j)
             {
                 if (NAMES[i] == NAMES[j])
@@ -32,6 +34,7 @@ struct EventCatalog_s : TypeCatalog_s<Events...>
                 }
             }
         }
+
         return ((Events::MAX_SERIALIZED_BYTES > 0 && Events::MAX_SERIALIZED_BYTES <= EventLimits::MAX_EVENT_BYTES) && ...);
     }
 

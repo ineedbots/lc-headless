@@ -11,6 +11,7 @@ std::optional<std::size_t> AccountProgressEvent::Measure(const ProgressReport_s&
     {
         return {};
     }
+
     auto total = std::size_t{0};
     for (const auto& [name, value] : payload.rows)
     {
@@ -18,8 +19,10 @@ std::optional<std::size_t> AccountProgressEvent::Measure(const ProgressReport_s&
         {
             return {};
         }
+
         total += name.size() + value.size();
     }
+
     return total + payload.rows.size() * sizeof(std::pair<std::string, std::string>) + sizeof(ProgressReport_s);
 }
 

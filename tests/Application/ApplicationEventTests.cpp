@@ -247,6 +247,7 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
 
     CHECK(Take(bridge, client)["type"] == "ack");
     CHECK(Take(bridge, client)["events"].empty());
+
     const auto confirmed = Take(bridge, client);
     CHECK(confirmed["version"] == 1);
     CHECK(confirmed["type"] == "event");
@@ -256,6 +257,7 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     CHECK_FALSE(confirmed["timestamp"].get<std::string>().empty());
     CHECK(confirmed["sequence"] == 1);
     CHECK(confirmed["payload"] == Json{{"confirmed", true}});
+
     const auto forced = Take(bridge, client);
     CHECK(forced["sequence"] == 4);
     CHECK(forced["payload"] == Json{{"confirmed", false}});
@@ -270,6 +272,7 @@ TEST_CASE("Logout events are ordered live notifications filtered by event and ac
     bridge.Enqueue(fresh, R"({"version":1,"type":"subscribe","id":"both","events":["account.logout","account.progress"]})");
     Drain(bridge);
     CHECK(Take(bridge, fresh)["sequence"] == 4);
+
     const auto snapshot = Take(bridge, fresh);
     REQUIRE(snapshot["events"].size() == 1);
     CHECK(snapshot["events"][0]["event"] == "account.progress");

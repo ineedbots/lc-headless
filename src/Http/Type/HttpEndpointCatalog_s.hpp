@@ -18,6 +18,7 @@ struct HttpEndpointCatalog_s
     static HttpResponse_s Respond(const CompletedApplicationRequest_s& result, const T& payload)
     {
         static_assert((Handles<Endpoints, T>() || ...), "Application result needs an HTTP serializer");
+
         auto response = std::optional<HttpResponse_s>{};
         ([&]
         {
@@ -29,6 +30,7 @@ struct HttpEndpointCatalog_s
                 }
             }
         }(), ...);
+
         return std::move(*response);
     }
 
@@ -40,6 +42,7 @@ private:
         {
             return std::is_same_v<T, typename Endpoint::Payload>;
         }
+
         return false;
     }
 
@@ -55,9 +58,11 @@ private:
                 {
                     return Endpoint::Respond(result, *payload);
                 }
+
                 return {};
             };
         }
+
         return route;
     }
 };

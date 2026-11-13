@@ -160,6 +160,7 @@ void Account::Step(std::chrono::milliseconds maxWait)
     try
     {
         ObserveLogout();
+
         const auto now = Clock::now();
         const auto status = m_client.GetStatus();
 
@@ -327,6 +328,7 @@ std::string Account::DescribeStatus() const
             text = std::format("in game at ({}, {}, {})", tile.x, tile.z, tile.level);
             break;
         }
+
         case ClientStatus_e::LoggingOut:
             text = "logging out";
             break;
@@ -667,6 +669,7 @@ void Account::Fail(std::string_view reason)
 void Account::UpdateFinished()
 {
     ObserveLogout();
+
     const auto status = m_client.GetStatus();
     if (status != ClientStatus_e::LoggedOut && status != ClientStatus_e::Disconnected)
     {

@@ -288,6 +288,7 @@ void ApplicationEventBridge::Service()
         {
             m_latest[{event.account, cached.name}] = cached;
         }
+
         m_fanout = Fanout_s{std::move(event.account), std::move(cached), 0, entry.created};
     }
 }

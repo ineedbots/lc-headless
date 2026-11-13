@@ -34,10 +34,12 @@ namespace
         {
             FAIL("Query operation dispatched a command");
         }
+
         std::size_t GetAccountCount() const override
         {
             return 3;
         }
+
         AccountStatus_s GetAccountStatus(std::size_t) const override
         {
             return {"bot", true, false, "in game"};
@@ -73,10 +75,12 @@ namespace
         {
             return {.method = "GET", .path = "/future/{name}", .decode = Decode};
         }
+
         static HttpDecodeResult Decode(const HttpEndpointRequest_s&)
         {
             return ApplicationRequestPayload{GetApplicationStatus_s{}};
         }
+
         static HttpResponse_s Respond(const CompletedApplicationRequest_s& result, const Payload& payload)
         {
             return {.status = 201, .body = std::to_string(result.id) + ":" + std::to_string(payload.accounts.size())};
@@ -90,6 +94,7 @@ namespace
         {
             return {.method = "GET", .path = "/alternate", .decode = Decode};
         }
+
         static HttpResponse_s Respond(const CompletedApplicationRequest_s&, const Payload&)
         {
             return {.status = 202, .body = "alternate"};
@@ -146,6 +151,7 @@ TEST_CASE("Operation catalogs admit unrelated typed operations through the commo
     {
         return *Catalog::Execute(context, std::make_shared<RequestControl_s>(), payload);
     }, request);
+
     CHECK(std::get<CountResult_s>(result).count == 21);
 }
 
@@ -156,8 +162,10 @@ TEST_CASE("Endpoint catalogs register REST and upgrade routes with their result 
     auto match = router.Match("GET", "/future/alice", "");
     REQUIRE(std::holds_alternative<HttpRouteMatch_s>(match));
     CHECK(std::get<HttpRouteMatch_s>(match).request.pathParameters.at("name") == "alice");
+
     const auto decoded = std::get<HttpRouteMatch_s>(match).Decode("");
     CHECK(std::holds_alternative<GetApplicationStatus_s>(std::get<ApplicationRequestPayload>(decoded)));
+
     const auto upgrade = router.Match("GET", "/future/events", "");
     REQUIRE(std::holds_alternative<HttpRouteMatch_s>(upgrade));
     CHECK(std::get<HttpRouteMatch_s>(upgrade).route.webSocket);
@@ -165,9 +173,11 @@ TEST_CASE("Endpoint catalogs register REST and upgrade routes with their result 
     const auto response = Catalog::Respond(CompletedApplicationRequest_s{.id = 91}, ApplicationStatus_s{});
     CHECK(response.status == 201);
     CHECK(response.body == "91:0");
+
     const auto alternate = router.Match("GET", "/alternate", "");
     const auto& route = std::get<HttpRouteMatch_s>(alternate).route;
     REQUIRE(route.respond);
+
     const auto ownResponse = route.respond({.id = 91, .payload = ApplicationStatus_s{}});
     REQUIRE(ownResponse);
     CHECK(ownResponse->status == 202);
@@ -201,6 +211,7 @@ TEST_CASE("Typed publication validates borrowed payloads and journals an owned c
     REQUIRE(bridge.Front(client));
     bridge.Pop(client);
     REQUIRE(bridge.Front(client));
+
     const auto snapshot = nlohmann::json::parse(*bridge.Front(client));
     CHECK(snapshot["events"][0]["payload"]["rows"][0][1] == "original");
     CHECK_FALSE(bridge.Publish("bot", ProgressReport_s{1s, {{"oversized", std::string(4097, 'x')}}}));

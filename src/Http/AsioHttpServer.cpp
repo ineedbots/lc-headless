@@ -466,6 +466,7 @@ struct AsioHttpServer::State::Session : std::enable_shared_from_this<Session>
                 return;
             }
         }
+
         Respond(HttpResponses::Complete(result));
     }
 };

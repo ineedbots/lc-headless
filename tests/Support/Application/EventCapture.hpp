@@ -17,6 +17,7 @@ public:
         m_capture(event);
         return true;
     }
+
     bool IsStopping() const override
     {
         return false;

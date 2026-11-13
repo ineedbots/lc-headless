@@ -751,6 +751,7 @@ TEST_CASE("Beast passes decoded template and query values to endpoint decoders o
     {
         return HttpResponse_s{.status = 201, .body = std::get<ConsoleCommandResult_s>(result.payload).output};
     };
+
     auto server = AsioHttpServer{io, settings, bridge, HttpRouter{{{.method = "POST", .path = "/api/v1/status/{id}", .decode = decode, .respond = respond}}}};
     auto client = StartClient(server.GetPort(), Request("POST", "/api/v1/status/alice%20smith?something=a%2Bb+c", "body bytes"));
     const auto deadline = std::chrono::steady_clock::now() + 3s;
