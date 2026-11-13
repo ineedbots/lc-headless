@@ -54,6 +54,15 @@
             }
         },
         {
+            "name": "linux-sanitizers",
+            "inherits": "linux-clang",
+            "cacheVariables": {
+                "RS2004_ENABLE_SANITIZERS": "ON",
+                "RS2004_ENABLE_COVERAGE": "OFF",
+                "RS2004_ENABLE_SCRIPT_COVERAGE": "OFF"
+            }
+        },
+        {
             "name": "linux-script-coverage",
             "inherits": "linux-clang",
             "cacheVariables": { "RS2004_ENABLE_SCRIPT_COVERAGE": "ON" }
@@ -65,6 +74,7 @@
         }
     ],
     "buildPresets": [
+        { "name": "linux-sanitizers", "configurePreset": "linux-sanitizers", "configuration": "Debug" },
         { "name": "linux-script-coverage", "configurePreset": "linux-script-coverage", "configuration": "Debug" },
         { "name": "windows-script-coverage", "configurePreset": "windows-script-coverage", "configuration": "Debug" },
         { "name": "linux-coverage", "configurePreset": "linux-coverage", "configuration": "Debug" },
@@ -76,6 +86,22 @@
         { "name": "linux-release",   "configurePreset": "linux-clang",  "configuration": "Release" }
     ],
     "testPresets": [
+        {
+            "name": "linux-sanitizers",
+            "configurePreset": "linux-sanitizers",
+            "configuration": "Debug",
+            "environment": {
+                "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1:symbolize=1:exitcode=86",
+                "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1:exitcode=87"
+            },
+            "filter": {
+                "include": {
+                    "label": "^(Packet|Isaac|ReceiveBuffer|CacheLoader|CacheStore|Compression|GameCache|InterfaceDecoder|JagArchive|MapDecoder|RealCache|SeqDecoder|TextPool|TypeDecoder|Connection|Socks5|TrustStore|Http|Account|AccountRunner|AccountLifecycleCoverage|AccountRecoveryCoverage|Application|GameClient|ClientPackets|PacketFields|PlayerInfoDecoder|NpcInfoDecoder|SceneZonePackets|ServerPacketDecoder)$"
+                }
+            },
+            "execution": { "noTestsAction": "error" },
+            "output": { "outputOnFailure": true }
+        },
         { "name": "linux-script-coverage", "configurePreset": "linux-script-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
         { "name": "windows-script-coverage", "configurePreset": "windows-script-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
         { "name": "linux-coverage", "configurePreset": "linux-coverage", "configuration": "Debug", "output": { "outputOnFailure": true } },
