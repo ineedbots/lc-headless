@@ -2,6 +2,7 @@
 #include "ScriptPublishedEvent.hpp"
 
 #include "../../../Script/Type/PublishedScriptEvent_s.hpp"
+#include "../EventPayloadJson.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -49,7 +50,7 @@ std::optional<std::size_t> ScriptPublishedEvent::Measure(const PublishedScriptEv
     return sizeof(PublishedScriptEvent_s) + payload.name.size() + payload.dataJson.size();
 }
 
-nlohmann::json ScriptPublishedEvent::Serialize(const PublishedScriptEvent_s& payload)
+void to_json(nlohmann::json& value, const PublishedScriptEvent_s& payload)
 {
     auto data = ReadData(payload.dataJson);
     if (!data)
@@ -57,5 +58,10 @@ nlohmann::json ScriptPublishedEvent::Serialize(const PublishedScriptEvent_s& pay
         throw std::invalid_argument{"Invalid script event JSON"};
     }
 
-    return {{"name", payload.name}, {"data", std::move(*data)}};
+    value = {{"name", payload.name}, {"data", std::move(*data)}};
+}
+
+nlohmann::json ScriptPublishedEvent::Serialize(const PublishedScriptEvent_s& payload)
+{
+    return payload;
 }

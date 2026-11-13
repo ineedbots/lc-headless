@@ -106,18 +106,13 @@ TEST_CASE("HTTP result serialization dispatches by payload type and preserves er
         CHECK(response.status == expected);
 
         const auto body = nlohmann::json::parse(response.body);
-        CHECK(body["requestId"] == "42");
-        CHECK(body["outcome"] == outcome);
-        CHECK(body["recipients"][0]["errorCode"] == "handler_failed");
-        CHECK(body["error"]["code"] == "test_error");
+        CHECK(body == nlohmann::json{{"requestId", "42"}, {"outcome", outcome}, {"output", "line\n"}, {"outputTruncated", false}, {"executionStarted", false}, {"recipients", {{{"account", "main"}, {"outcome", "failed"}, {"errorCode", "handler_failed"}}}}, {"error", {{"code", "test_error"}, {"message", "test_error"}}}});
     }
 
     const auto status = HttpResponses::Complete({.id = 43, .payload = ApplicationStatus_s{.uptimeMs = 123, .accounts = {{"main", true, false, "in game"}}}});
     const auto body = nlohmann::json::parse(status.body);
     CHECK(status.status == 200);
-    CHECK(body["application"]["uptimeMs"] == 123);
-    CHECK(body["accounts"][0]["name"] == "main");
-    CHECK_FALSE(body.contains("output"));
+    CHECK(body == nlohmann::json{{"requestId", "43"}, {"application", {{"state", "running"}, {"uptimeMs", 123}}}, {"accounts", {{{"name", "main"}, {"started", true}, {"finished", false}, {"status", "in game"}}}}});
 
     const auto result = CompletedApplicationRequest_s{.id = 44, .payload = ConsoleCommandResult_s{.output = "final output", .outputTruncated = true}};
     const auto expired = HttpResponses::Timeout(44, true, &result);
@@ -126,6 +121,26 @@ TEST_CASE("HTTP result serialization dispatches by payload type and preserves er
     CHECK(error["executionStarted"] == true);
     CHECK(error["output"] == "final output");
     CHECK(error["outputTruncated"] == true);
+}
+
+TEST_CASE("HTTP payload serialization preserves empty arrays and omits absent errors", "[Http][HttpRouter]")
+{
+    const auto status = HttpResponses::Complete({.id = 1, .payload = ApplicationStatus_s{}});
+    CHECK(nlohmann::json::parse(status.body) == nlohmann::json{{"requestId", "1"}, {"application", {{"state", "running"}, {"uptimeMs", 0}}}, {"accounts", nlohmann::json::array()}});
+
+    const auto command = HttpResponses::Complete({.id = 2, .payload = ConsoleCommandResult_s{}});
+    CHECK(nlohmann::json::parse(command.body) == nlohmann::json{{"requestId", "2"}, {"outcome", "completed"}, {"output", ""}, {"outputTruncated", false}, {"executionStarted", false}, {"recipients", nlohmann::json::array()}});
+
+    const auto text = std::string{"quoted \"name\"\n"};
+    const auto recipients = HttpResponses::Complete({.id = 3, .payload = ConsoleCommandResult_s{.output = text, .outputTruncated = true, .executionStarted = true, .recipients = {{text, "completed", ""}, {"other", "failed", "handler_failed"}}}});
+    const auto body = nlohmann::json::parse(recipients.body);
+    CHECK(body["output"] == text);
+    CHECK(body["outputTruncated"] == true);
+    CHECK(body["executionStarted"] == true);
+    REQUIRE(body["recipients"].size() == 2);
+    CHECK(body["recipients"][0] == nlohmann::json{{"account", text}, {"outcome", "completed"}});
+    CHECK(body["recipients"][1] == nlohmann::json{{"account", "other"}, {"outcome", "failed"}, {"errorCode", "handler_failed"}});
+    CHECK_FALSE(body.contains("error"));
 }
 
 TEST_CASE("HTTP templates extract multiple path parameters and decoded query values", "[Http][HttpRouter]")

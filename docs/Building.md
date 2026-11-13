@@ -59,6 +59,10 @@ CMake reads the vcpkg toolchain from `$VCPKG_ROOT/scripts/buildsystems/vcpkg.cma
 | pocketpy | Embedded Python interpreter. |
 | Catch2 | Native test runner. |
 
+The library exports nlohmann/json and `JSON_DIAGNOSTICS=1` to its consumers because
+public headers expose JSON types. Applications and tests must use the same setting
+to keep those types and their ABI consistent.
+
 [vcpkg-configuration.json](../vcpkg-configuration.json) enables the [pocketpy overlay port](../ports/pocketpy), which supplies version 2.2.0 rather than the registry's older 1.x versions. Keep the overlay and manifest with the source tree. CPython is not needed for the normal build: CMake embeds the project's Python standard library using [EmbedStdlib.cmake](../cmake/EmbedStdlib.cmake).
 
 ## Configure, build and test

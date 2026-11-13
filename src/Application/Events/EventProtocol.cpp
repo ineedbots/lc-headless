@@ -6,6 +6,11 @@
 #include "Type/ApplicationEvents_s.hpp"
 #include "EventLimits.hpp"
 #include "Type/EventScope_e.hpp"
+#include "Type/EventAck_s.hpp"
+#include "Type/EventEnvelope_s.hpp"
+#include "Type/EventError_s.hpp"
+#include "Type/EventSnapshot_s.hpp"
+#include "EventMessageJson.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -144,34 +149,42 @@ std::optional<std::size_t> EventProtocol::Measure(const ApplicationEventPayload&
 
 std::string EventProtocol::Encode(const ApplicationEvent_s& event, std::string_view instance, u64 sequence)
 {
-    const auto payload = std::visit([](const auto& value) -> nlohmann::json
+    auto payload = std::visit([](const auto& value) -> nlohmann::json
     {
         using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
         return Event::Serialize(value);
     }, event.payload);
 
-    return nlohmann::json{{"version", 1}, {"type", "event"}, {"event", Name(event.payload)}, {"account", event.account ? nlohmann::json(*event.account) : nlohmann::json(nullptr)}, {"instance", instance}, {"sequence", sequence}, {"timestamp", std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp))}, {"payload", payload}}.dump();
+    return nlohmann::json(EventEnvelope_s{
+                              .event = std::string{Name(event.payload)},
+                              .account = event.account,
+                              .instance = std::string{instance},
+                              .sequence = sequence,
+                              .timestamp = std::format("{:%FT%T}Z", std::chrono::floor<std::chrono::seconds>(event.timestamp)),
+                              .payload = std::move(payload)})
+        .dump();
 }
 
 std::string EventProtocol::Ack(std::string_view id, std::string_view action, std::string_view instance, u64 sequence)
 {
-    return nlohmann::json{{"version", 1}, {"type", "ack"}, {"id", id}, {"action", action}, {"instance", instance}, {"sequence", sequence}}.dump();
+    return nlohmann::json(EventAck_s{.id = std::string{id}, .action = std::string{action}, .instance = std::string{instance}, .sequence = sequence}).dump();
 }
 
 std::string EventProtocol::Error(std::string_view id, std::string_view code)
 {
-    return nlohmann::json{{"version", 1}, {"type", "error"}, {"id", id.empty() ? nlohmann::json(nullptr) : nlohmann::json(id)}, {"code", code}}.dump();
+    return nlohmann::json(EventError_s{.id = id.empty() ? std::nullopt : std::optional{std::string{id}}, .code = std::string{code}}).dump();
 }
 
 std::string EventProtocol::Snapshot(std::string_view id, std::string_view instance, u64 sequence, const std::vector<std::shared_ptr<const std::string>>& events)
 {
-    auto values = nlohmann::json::array();
+    auto snapshot = EventSnapshot_s{.id = std::string{id}, .instance = std::string{instance}, .sequence = sequence};
+    snapshot.events.reserve(events.size());
     for (const auto& event : events)
     {
-        values.push_back(nlohmann::json::parse(*event));
+        snapshot.events.push_back(nlohmann::json::parse(*event));
     }
 
-    return nlohmann::json{{"version", 1}, {"type", "snapshot"}, {"id", id}, {"instance", instance}, {"sequence", sequence}, {"events", values}}.dump();
+    return nlohmann::json(snapshot).dump();
 }
 
 std::size_t EventProtocol::MaxSerializedBytes(const ApplicationEventPayload& payload)

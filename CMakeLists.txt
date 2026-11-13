@@ -60,10 +60,10 @@ endfunction()
 add_library(${PROJECT_NAME}Lib STATIC)
 target_sources(${PROJECT_NAME}Lib PRIVATE ${LIBRARY_SOURCES})
 configure_project_target(${PROJECT_NAME}Lib)
-target_compile_definitions(${PROJECT_NAME}Lib PRIVATE JSON_DIAGNOSTICS=1)
+target_compile_definitions(${PROJECT_NAME}Lib PUBLIC JSON_DIAGNOSTICS=1)
 target_link_libraries(${PROJECT_NAME}Lib
-    PUBLIC pocketpy::pocketpy
-    PRIVATE Boost::asio Boost::beast OpenSSL::SSL OpenSSL::Crypto nlohmann_json::nlohmann_json BZip2::BZip2 ZLIB::ZLIB
+    PUBLIC pocketpy::pocketpy nlohmann_json::nlohmann_json
+    PRIVATE Boost::asio Boost::beast OpenSSL::SSL OpenSSL::Crypto BZip2::BZip2 ZLIB::ZLIB
             $<$<PLATFORM_ID:Windows>:crypt32>)
 
 # The Python standard library is embedded in the library, regenerated whenever a .py file changes.
@@ -112,7 +112,6 @@ target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     Boost::beast
     OpenSSL::SSL
     OpenSSL::Crypto
-    nlohmann_json::nlohmann_json
     BZip2::BZip2
     ZLIB::ZLIB
     Catch2::Catch2WithMain)

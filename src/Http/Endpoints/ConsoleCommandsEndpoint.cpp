@@ -3,7 +3,6 @@
 
 #include "../../Application/Type/ConsoleCommandResult_s.hpp"
 #include "../../Application/Type/ExecuteConsoleCommand_s.hpp"
-#include "../../Console/CommandExecution.hpp"
 #include "../../Application/Type/CompletedApplicationRequest_s.hpp"
 #include "../../Application/Type/ApplicationOperations_s.hpp"
 #include "../Type/HttpRoute_s.hpp"
@@ -12,6 +11,10 @@
 #include "../../Utils/StringUtils.hpp"
 #include "../HttpJson.hpp"
 #include "../HttpResponses.hpp"
+#include "../HttpPayloadJson.hpp"
+#include "../Type/HttpError_s.hpp"
+
+#include <nlohmann/json.hpp>
 
 HttpRoute_s ConsoleCommandsEndpoint::Route()
 {
@@ -38,17 +41,9 @@ HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& re
 
 HttpResponse_s ConsoleCommandsEndpoint::Respond(const CompletedApplicationRequest_s& result, const ConsoleCommandResult_s& command)
 {
-    auto body = nlohmann::json{{"requestId", std::to_string(result.id)}, {"outcome", result.outcome}, {"output", command.output}, {"outputTruncated", command.outputTruncated}, {"executionStarted", command.executionStarted}, {"recipients", nlohmann::json::array()}};
-    for (const auto& recipient : command.recipients)
-    {
-        auto item = nlohmann::json{{"account", recipient.account}, {"outcome", recipient.outcome}};
-        if (!recipient.errorCode.empty())
-        {
-            item["errorCode"] = recipient.errorCode;
-        }
-
-        body["recipients"].push_back(std::move(item));
-    }
+    auto body = nlohmann::json(command);
+    body["requestId"] = std::to_string(result.id);
+    body["outcome"] = result.outcome;
 
     auto code = 200u;
     if (result.outcome == "rejected")
@@ -66,7 +61,7 @@ HttpResponse_s ConsoleCommandsEndpoint::Respond(const CompletedApplicationReques
 
     if (!result.errorCode.empty())
     {
-        body["error"] = {{"code", result.errorCode}, {"message", result.errorCode}};
+        body["error"] = HttpError_s{result.errorCode, result.errorCode};
     }
 
     return HttpJson::Response(code, body);

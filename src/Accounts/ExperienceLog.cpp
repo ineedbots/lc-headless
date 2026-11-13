@@ -2,8 +2,13 @@
 #include "ExperienceLog.hpp"
 
 #include "../Utils/FileUtils.hpp"
-#include "../Utils/JsonUtils.hpp"
 #include "../Utils/StringUtils.hpp"
+#include "../Game/State/Type/Stat_s.hpp"
+#include "FleetLogJson.hpp"
+#include "Type/ExperienceLogRecord_s.hpp"
+#include "Type/FleetSkill_s.hpp"
+
+#include <nlohmann/json.hpp>
 
 namespace
 {
@@ -108,22 +113,21 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
 
 void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled)
 {
-    auto line = std::string{};
-    line.reserve(2048);
-    std::format_to(std::back_inserter(line), "{{\"time\":\"{:%Y-%m-%dT%H:%M:%SZ}\",\"account\":\"{}\",\"state\":\"{}\",\"settled\":{},\"skills\":{{",
-                   std::chrono::floor<std::chrono::seconds>(time), JsonUtils::EscapeString(m_accountName), statusName, settled);
+    auto record = ExperienceLogRecord_s{
+        .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(time)),
+        .account = m_accountName,
+        .state = std::string{statusName},
+        .settled = settled};
 
     for (std::size_t i = 0; i < SKILL_NAMES.size() && i < GameState_s::STAT_COUNT; ++i)
     {
         const auto& stat = state.stats[i];
-        std::format_to(std::back_inserter(line), "{}\"{}\":{{\"level\":{},\"base\":{},\"xp\":{}}}",
-                       i == 0 ? "" : ",", SKILL_NAMES[i], stat.level, stat.baseLevel, stat.xp);
+        record.skills.emplace_back(std::string{SKILL_NAMES[i]}, FleetSkill_s{.level = stat.level, .base = stat.baseLevel, .xp = stat.xp});
     }
-
-    line += "}}\n";
 
     try
     {
+        const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
         FileUtils::AppendText(m_path, line);
 
         if (m_writeFailed)
