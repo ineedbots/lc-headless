@@ -20,6 +20,3 @@ optional edge metadata is decoded. Graph points use objects with an optional
 intentionally separate.
 
 rs2b0t derives its stair edges from its own engine's content. Where the 289 engine's differs, the exporter applies `STAIR_FIXES`, and `CROSSING_ADDITIONS` adds the crossings its table lacks. Each was found and checked live.
-
-For live refused-crossing reroute evidence and a repeatable development-engine
-harness, see [issue #37 acceptance](../../tools/live/README.md).
