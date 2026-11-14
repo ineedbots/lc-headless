@@ -1,0 +1,5 @@
+11/13/2026 6:51:42 PM	 INFO	 Starting world
+11/13/2026 6:51:42 PM	 DEBUG	 Loading game map
+11/13/2026 6:51:43 PM	 DEBUG	 8141/16383 static NPCs added
+11/13/2026 6:51:43 PM	 INFO	 World ready: Visit http://localhost:18037/rs2.cgi
+ISSUE37_REFUSAL {"username":"navprobe37","x":3217,"z":3218,"locId":1516,"op":1,"playerX":3217,"playerZ":3218,"time":1794617542605}

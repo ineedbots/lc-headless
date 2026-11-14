@@ -781,3 +781,53 @@ def test_a_roaming_captain_can_be_found_near_the_player_instead_of_the_baked_sta
         captain.on_interact = world.sail
         assert world.take(ship(), Tile(3000, 3000, 1)) == 'crossed'
         assert world.interactions == [('Captain', 'Pay-fare')]
+
+
+class RefusedCrossingWorld(TransportWorld):
+    def find_world_path(self, text):
+        request = json.loads(text)
+        self.requests.append(request)
+        first = {'kind': 'door', 'loc_id': 1516, 'loc_name': 'Large door', 'action': 'Open', 'loc_x': 3217, 'loc_z': 3218}
+        second = {'kind': 'door', 'loc_id': 1519, 'loc_name': 'Large door', 'action': 'Open', 'loc_x': 3217, 'loc_z': 3219}
+        points = [{'x': 3217, 'z': 3218, 'level': 0}]
+        if [3217, 3218] in request['avoid_doors']:
+            points.append({'x': 3217, 'z': 3219, 'level': 0})
+            points.append({'x': 3216, 'z': 3219, 'level': 0, 'transport': second})
+            points.append({'x': 3216, 'z': 3218, 'level': 0})
+        else:
+            points.append({'x': 3216, 'z': 3218, 'level': 0, 'transport': first})
+        return json.dumps({'ok': True, 'cost': 6 if len(points) == 4 else 4, 'expanded': 20, 'waypoints': points})
+
+
+def test_walk_replans_around_a_refused_crossing_and_arrives_via_the_alternate():
+    with RefusedCrossingWorld() as world:
+        world.here = Tile(3217, 3218)
+        primary = Entity(world, 'Large door', ['Open'], Tile(3217, 3218), id=1516)
+        alternate = Entity(world, 'Large door', ['Open'], Tile(3217, 3219), id=1519)
+        world.loc_items = [primary, alternate]
+        attempted = []
+
+        def refuse(action):
+            attempted.append(1516)
+            world.events.append(('message', 'The door is locked.'))
+            return True
+
+        def open_alternate(action):
+            attempted.append(1519)
+            world.events.append(('open', alternate))
+            return True
+
+        primary.on_interact = refuse
+        alternate.on_interact = open_alternate
+        walk = walker._Traversal()
+        assert world.run(walk.walk_to(Tile(3216, 3218), radius=0, timeout_ms=30000,
+                                      use_teleport_catalog=False, bank_item_counts={}, log=world.logs.append))
+        assert walk.last_outcome == 'arrived'
+        assert world.here == Tile(3216, 3218)
+        assert attempted == [1516, 1519]
+        assert len(world.requests) == 2
+        assert world.requests[0]['avoid_doors'] == []
+        assert world.requests[1]['avoid_doors'] == [[3217, 3218]]
+        assert walk._avoid_doors == [[3217, 3218]]
+        assert primary.ops == ['Open']
+        assert alternate.ops == ['Close']
