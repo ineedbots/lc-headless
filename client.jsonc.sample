@@ -53,7 +53,10 @@
         "inventoryDirectory": "inventory",
         // 0 records every backpack change; otherwise 1 to 86400 seconds.
         "inventoryIntervalSeconds": 5,
-        "equipmentDirectory": "equipment"
+        "equipmentDirectory": "equipment",
+        "accountDataDirectory": "account-data",
+        // 0 records every account data change; otherwise 1 to 86400 seconds.
+        "accountDataIntervalSeconds": 5
     },
     "http": {
         // Empty disables REST and WebSocket events; use 127.0.0.1 for local operator access.

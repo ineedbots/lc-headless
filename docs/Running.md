@@ -186,7 +186,7 @@ retained in snapshots. See [script publication](scripting/console-and-messages.m
 for argument limits and return semantics.
 
 Fleet journals publish `fleet.experience`, `fleet.bank`, `fleet.inventory` and
-`fleet.equipment` after a successful record write. Each payload matches its JSONL
+`fleet.equipment`, plus `fleet.account-data`, after a successful record write. Each payload matches its JSONL
 record. These events are live only and follow the journal's enablement and sampling
 settings. See [fleet events](FleetTracking.md#websocket-events) for subscriptions,
 record formats and size limits.

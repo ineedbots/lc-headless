@@ -9,6 +9,7 @@
 #include "../Game/GameClient.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
 #include "../Script/Host/ScriptHost.hpp"
+#include "AccountDataLog.hpp"
 #include "BankLogger.hpp"
 #include "ExperienceLog.hpp"
 #include "ItemLog.hpp"
@@ -30,6 +31,7 @@ public:
 
 private:
     ProgressReporter m_progress;
+    std::optional<AccountDataLog> m_accountData;
     std::optional<ExperienceLog> m_experience;
     std::optional<BankLogger> m_bankLog;
     std::optional<ItemLog> m_inventory;

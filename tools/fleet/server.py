@@ -4,7 +4,8 @@
     python3 tools/fleet/server.py                          # http://127.0.0.1:8765, read-only
     python3 tools/fleet/server.py --config client.jsonc    # ... with Launch and Stop client
 
-Reads experience/, bank/, inventory/ and equipment/ from the repository root, and binds to loopback only.
+Reads account-data/, experience/, bank/, inventory/ and equipment/ from the repository root,
+and binds to loopback only.
 Without --config it starts and stops nothing; with it, the page launches one client process per config and
 stops the ones it launched. Ctrl+C ends the page, not the clients.
 
@@ -30,6 +31,7 @@ EXPERIENCE_DIR = os.path.join(ROOT, 'experience')
 BANK_DIR = os.path.join(ROOT, 'bank')
 INVENTORY_DIR = os.path.join(ROOT, 'inventory')
 EQUIPMENT_DIR = os.path.join(ROOT, 'equipment')
+ACCOUNT_DATA_DIR = os.path.join(ROOT, 'account-data')
 LOGS_DIR = os.path.join(ROOT, 'logs')
 LOG_FILE = os.path.join(LOGS_DIR, 'fleet.log')
 PID_FILE = os.path.join(LOGS_DIR, 'fleet.pid')
@@ -181,6 +183,11 @@ def experience():
         }
 
     return {'accounts': accounts, 'skills': SKILLS}
+
+
+def account_data():
+    """The latest account data, including session changes that clear gameplay fields."""
+    return {'accounts': _latest(ACCOUNT_DATA_DIR)}
 
 
 def banks():
@@ -534,6 +541,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, handle.read(), 'text/html; charset=utf-8')
         elif path == '/api/experience':
             self._send(200, experience())
+        elif path == '/api/account-data':
+            self._send(200, account_data())
         elif path == '/api/bank':
             self._send(200, banks())
         elif path == '/api/inventory':

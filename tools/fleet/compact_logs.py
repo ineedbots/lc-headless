@@ -19,6 +19,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 # directory -> lines to keep per account file
 JOURNALS = {
     'experience': 3000,
+    'account-data': 3000,
     'inventory': 3000,
     'bank': 1000,
     'equipment': 1000,

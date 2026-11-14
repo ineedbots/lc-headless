@@ -53,6 +53,7 @@
 <header>
   <h1>Fleet</h1>
   <nav>
+    <button data-view="accounts">Accounts</button>
     <button data-view="experience" class="active">Experience</button>
     <button data-view="bank">Bank</button>
     <button data-view="inventory">Inventory</button>
@@ -67,6 +68,19 @@
 </section>
 
 <main>
+  <section id="view-accounts" class="hide">
+    <div class="row">
+      <span id="accounts-summary" class="pill">…</span>
+      <input id="accounts-filter" aria-label="Filter accounts" placeholder="filter by account" style="min-width:240px">
+      <button id="refresh-accounts" class="tool">Refresh</button>
+      <span class="msg">Latest recorded state · special attack energy is 0–1000</span>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th>Account</th><th>Status</th><th class="num">PID</th><th>Tile (x, z, level)</th><th>Destination</th><th>Facing target</th><th class="num">HP</th><th class="num">Energy</th><th class="num">Prayer</th><th class="num">Special</th><th>Running</th><th>Moving</th><th>In combat</th><th class="num">Weight</th><th class="num">Tick</th><th>Recorded</th></tr></thead>
+      <tbody id="accounts-body"><tr><td colspan="16" class="empty">loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
   <section id="view-experience">
     <div class="row">
       <span id="experience-summary" class="pill">…</span>
@@ -127,6 +141,8 @@ const SKILL_LABELS = { attack:'Atk', defence:'Def', strength:'Str', hitpoints:'H
 
 let view = 'experience';
 let experience = { accounts:{}, skills:[] };
+let accountData = { accounts:{} };
+let accountsFilter = '';
 let bank = { accounts:0, items:[] };
 let account = localStorage.getItem('fleet.account') || '';
 let metric = localStorage.getItem('fleet.metric') || 'level';
@@ -156,6 +172,52 @@ const age = text => {
   if (seconds < 5400) return `${Math.round(seconds/60)}m ago`;
   return `${(seconds/3600).toFixed(1)}h ago`;
 };
+
+const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
+const tileText = tile => tile ? `${fmt(tile.x)}, ${fmt(tile.z)}, ${fmt(tile.level)}` : '–';
+const statText = stat => stat ? `${fmt(stat.current)} / ${fmt(stat.base)}` : '–';
+const boolText = value => value === true ? 'Yes' : value === false ? 'No' : '–';
+
+function targetText(target) {
+  if (!target) return '–';
+  if (target.kind === 'tile') return `Tile (${tileText(target.tile)})`;
+  if (target.kind === 'npc') return `NPC #${fmt(target.index)}`;
+  if (target.kind === 'player') return `Player #${fmt(target.index)}`;
+  return '–';
+}
+
+function renderAccounts() {
+  const names = Object.keys(accountData.accounts).sort();
+  const inGame = names.filter(name => accountData.accounts[name].state === 'ingame').length;
+  const filtered = names.filter(name => name.toLowerCase().includes(accountsFilter.trim().toLowerCase()));
+  $('accounts-summary').textContent = `${names.length} accounts · ${inGame} in game${accountsFilter.trim() ? ` · ${filtered.length} shown` : ''}`;
+  if (!filtered.length) {
+    $('accounts-body').innerHTML = `<tr><td colspan="16" class="empty">${names.length ? 'no matching accounts' : 'no account data snapshots yet'}</td></tr>`;
+    return;
+  }
+  $('accounts-body').innerHTML = filtered.map(name => {
+    const entry = accountData.accounts[name];
+    const state = entry.state || 'unknown';
+    const ready = state === 'ingame' && entry.settled === true;
+    const css = ready ? 'good' : (state === 'connecting' || state === 'logging out' || state === 'ingame' ? 'warn' : 'off');
+    const status = state === 'ingame' && !ready ? 'ingame (settling)' : state;
+    // Hide gameplay values from any unsettled or offline record, including older journal formats.
+    const data = ready ? entry : {};
+    const special = data.specialAttack;
+    return `<tr><td class="name">${escapeHTML(name)}</td>
+      <td><span class="badge ${css}">${escapeHTML(status)}</span></td>
+      <td class="num">${fmt(data.pid)}</td><td>${tileText(data.tile)}</td><td>${tileText(data.destination)}</td><td>${targetText(data.target)}</td>
+      <td class="num">${statText(data.hp)}</td><td class="num">${data.energy == null ? '–' : `${fmt(data.energy)}%`}</td><td class="num">${statText(data.prayer)}</td>
+      <td class="num">${special ? `${fmt(special.energy)} / 1,000${special.armed ? ' · armed' : ''}` : '–'}</td>
+      <td>${boolText(data.running)}</td><td>${boolText(data.moving)}</td><td>${boolText(data.inCombat)}</td><td class="num">${fmt(data.weight)}</td>
+      <td class="num">${fmt(entry.tick)}</td><td class="age" title="${escapeHTML(entry.time || '')}">${age(entry.time) || '–'}</td></tr>`;
+  }).join('');
+}
+
+async function loadAccountData() {
+  try { accountData = await getJSON('/api/account-data'); renderAccounts(); }
+  catch (error) { $('accounts-body').innerHTML = `<tr><td colspan="16" class="empty error">${escapeHTML(error.message)}</td></tr>`; }
+}
 
 function renderExperience() {
   const accounts = Object.keys(experience.accounts).sort();
@@ -260,8 +322,9 @@ function show(name) {
   view = name;
   if (location.hash !== `#${name}`) history.replaceState(null, '', `#${name}`);
   for (const tab of document.querySelectorAll('nav button')) tab.classList.toggle('active', tab.dataset.view === name);
-  for (const section of ['experience','bank','inventory']) $(`view-${section}`).classList.toggle('hide', section !== name);
+  for (const section of ['accounts','experience','bank','inventory']) $(`view-${section}`).classList.toggle('hide', section !== name);
   localStorage.setItem('fleet.view', name);
+  if (name === 'accounts') loadAccountData();
   if (name === 'experience') loadExperience();
   if (name === 'bank') loadBank();
   if (name === 'inventory') { loadAccounts().then(renderInventory); }
@@ -273,6 +336,8 @@ $('metric').onchange = () => { metric = $('metric').value; localStorage.setItem(
 $('bank-filter').oninput = (event) => { bankFilter = event.target.value; renderBank(); };
 $('account').onchange = (event) => { account = event.target.value; localStorage.setItem('fleet.account', account); renderInventory(); };
 $('refresh-experience').onclick = loadExperience;
+$('refresh-accounts').onclick = loadAccountData;
+$('accounts-filter').oninput = event => { accountsFilter = event.target.value; renderAccounts(); };
 $('refresh-bank').onclick = loadBank;
 $('refresh-inventory').onclick = () => loadAccounts().then(renderInventory);
 $('bank-body').onclick = (event) => {
@@ -350,13 +415,16 @@ $('stop-client').onclick = async () => {
   }
 };
 
-const initialView = ['experience', 'bank', 'inventory'].includes(location.hash.slice(1)) ? location.hash.slice(1) : (localStorage.getItem('fleet.view') || 'experience');
+const views = ['accounts', 'experience', 'bank', 'inventory'];
+const savedView = location.hash.slice(1) || localStorage.getItem('fleet.view');
+const initialView = views.includes(savedView) ? savedView : 'experience';
 show(initialView);
 loadControl();
 setInterval(() => { if (document.hidden) return; if (control.control) loadControl(); }, 2000);
 
 setInterval(() => {
   if (document.hidden) return;
+  if (view === 'accounts') loadAccountData();
   if (view === 'experience') loadExperience();
   if (view === 'bank') loadBank();
   if (view === 'inventory') loadAccounts().then(renderInventory);

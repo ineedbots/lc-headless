@@ -127,7 +127,9 @@ namespace
         "bankLogDirectory": "bank",
         "inventoryDirectory": "inventory",
         "inventoryIntervalSeconds": 5,
-        "equipmentDirectory": "equipment"
+        "equipmentDirectory": "equipment",
+        "accountDataDirectory": "account-data",
+        "accountDataIntervalSeconds": 5
     },
     "http": {
         "host": "",
@@ -1119,10 +1121,33 @@ TEST_CASE("The shipped sample includes every fleet setting with its default", "[
     const auto sample = ParseJsonWithComments(*text);
     const auto defaults = nlohmann::json::parse(ConfigFile::Serialize(Config_s{}));
     for (const auto key : {"experienceDirectory", "experienceIntervalMinutes", "bankLogDirectory",
-                           "inventoryDirectory", "inventoryIntervalSeconds", "equipmentDirectory"})
+                           "inventoryDirectory", "inventoryIntervalSeconds", "equipmentDirectory", "accountDataDirectory", "accountDataIntervalSeconds"})
     {
         CAPTURE(key);
         REQUIRE(sample.at("scripting").contains(key));
         CHECK(sample.at("scripting").at(key) == defaults.at("scripting").at(key));
+    }
+}
+
+TEST_CASE("Account data settings round trip and validate intervals", "[ConfigFile]")
+{
+    const auto defaults = ConfigFile::Parse(EXAMPLE);
+    CHECK(defaults.scripting.accountDataDirectory == "account-data");
+    CHECK(defaults.scripting.accountDataIntervalSeconds == 5s);
+    for (const auto interval : {0, 86400})
+    {
+        auto json = ParseJsonWithComments(EXAMPLE);
+        json["scripting"]["accountDataDirectory"] = "";
+        json["scripting"]["accountDataIntervalSeconds"] = interval;
+        const auto config = ConfigFile::Parse(json.dump());
+        const auto roundTrip = ConfigFile::Parse(ConfigFile::Serialize(config));
+        CHECK(roundTrip.scripting.accountDataDirectory.empty());
+        CHECK(roundTrip.scripting.accountDataIntervalSeconds.count() == interval);
+    }
+    for (const auto interval : {-1, 86401})
+    {
+        auto json = ParseJsonWithComments(EXAMPLE);
+        json["scripting"]["accountDataIntervalSeconds"] = interval;
+        CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("scripting.accountDataIntervalSeconds"));
     }
 }
