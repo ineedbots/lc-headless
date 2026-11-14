@@ -117,6 +117,11 @@ When a route still needs what the backpack lacks, the walk doesn't set off: it e
 
 ### Crossings that refuse
 
+A teleport that cannot be cast or does not acknowledge a landing within 8 seconds is excluded from subsequent
+route searches, including repaths of the current walk. The walker can then choose another teleport or a walking
+route. These exclusions are combined with the caller's `deny_teleport_ids` and last until the bot starts a new
+session. The 8-second landing wait is unchanged, so delayed acknowledgements within that window can still succeed.
+
 A door or gate that answers with a lock phrase, such as "The door won't open - you need at least 32 Quest Points." or "You need a key", in the dialogue or the chatbox, is left out of the rest of the walk, and the walk plans again. Some crossings open only after a talk the quest journal can't show, such as the Salve barrier after Priest in Peril: when one refuses, the walker talks the NPC through it once a session, and tries again.
 
 A walk under attack that isn't moving turns auto retaliate off until it ends. On this server a hit makes a retaliating player attack back unless it's busy, and walking isn't busy, so otherwise every hit cancels the walk.
