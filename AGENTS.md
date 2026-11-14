@@ -12,6 +12,12 @@ guides for detailed rules and read the design documents relevant to the task.
    ownership, error handling, includes and project layout. Standalone `_s` and `_e`
    types and their companion implementations live in subsystem `Type/` folders;
    exception types live in `Error/` folders.
+   Explicitly read the [Blank lines clause](docs/design/CONVENTIONS.md#blank-lines)
+   before editing C++. Review every changed function and class for block and
+   declaration spacing before finishing: separate blocks with blank lines,
+   following the clause's setup and `else`/`catch`/closing-brace exceptions, and
+   separate declarations that follow other statements. Check this manually;
+   clang-format does not enforce all blank-line grouping rules.
 3. Follow [DevelopmentWorkflow.md](docs/design/DevelopmentWorkflow.md) for issue
    tracking, feature branches, pull requests, commit messages and release policy.
    Feature branches start from `develop` and target `develop`; authored commit

@@ -35,6 +35,7 @@ namespace
         case ClientStatus_e::LoggedOut:
             return "logged out";
         }
+
         return "unknown";
     }
 
@@ -70,10 +71,12 @@ nlohmann::ordered_json AccountDataLog::Read(const GameState_s& state, ClientStat
 
     sample["pid"] = state.pid;
     sample["tile"] = Tile(state.localPlayer.tile);
+
     if (state.walkDestination)
     {
         sample["destination"] = Tile(*state.walkDestination);
     }
+
     if (state.localPlayer.faceEntity)
     {
         const auto& target = *state.localPlayer.faceEntity;
@@ -85,15 +88,18 @@ nlohmann::ordered_json AccountDataLog::Read(const GameState_s& state, ClientStat
         const auto& target = *state.localPlayer.faceCoord;
         sample["target"] = {{"kind", "tile"}, {"tile", Tile({.x = target.x / 2, .z = target.z / 2, .level = state.localPlayer.tile.level})}};
     }
+
     sample["hp"] = Stat(state.GetStat(Stat_e::Hitpoints));
     sample["energy"] = state.runEnergy;
     sample["prayer"] = Stat(state.GetStat(Stat_e::Prayer));
+
     const auto energy = state.varps.find(SPECIAL_ENERGY_VARP);
     // Missing on revisions/servers without a special bar; do not invent an empty bar.
     if (energy != state.varps.end())
     {
         sample["specialAttack"] = {{"energy", energy->second}, {"armed", state.GetVarp(SPECIAL_ARMED_VARP) == 1}};
     }
+
     const auto player = PlayerQuery{state, m_cache};
     sample["running"] = player.IsRunning();
     sample["moving"] = player.IsMoving();
@@ -111,27 +117,34 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
         {
             return;
         }
+
         const auto sessionChanged = !m_lastSample || sample["state"] != (*m_lastSample)["state"] || sample["settled"] != (*m_lastSample)["settled"];
         if (!sessionChanged && m_nextSample && now < *m_nextSample)
         {
             return;
         }
+
         // Retry failed writes on the interval, including the first sample and session changes.
         if (m_writeFailed && m_nextSample && now < *m_nextSample)
         {
             return;
         }
+
         m_nextSample = now + m_interval;
+
         auto record = nlohmann::ordered_json{{"time", std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()))}, {"account", m_accountName}};
         record.update(sample);
         record["tick"] = state.tick;
+
         const auto line = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
         FileUtils::AppendText(m_path, line);
         m_lastSample = std::move(sample);
+
         if (m_events)
         {
             m_events->Publish(m_accountName, FleetAccountDataLog_s{line});
         }
+
         if (m_writeFailed)
         {
             m_logger->Info("Writing account data to {} again", m_path.string());
