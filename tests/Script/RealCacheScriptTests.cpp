@@ -336,6 +336,7 @@ namespace
     WALKER_DATA_SPEC("test_lostcity_safespot_cache.py")
     WALKER_DATA_SPEC("test_market_tables_cache.py")
     WALKER_DATA_SPEC("test_mule_crafter_logic.py")
+    WALKER_DATA_SPEC("test_observatory_ladder_cache.py")
     WALKER_DATA_SPEC("test_quest_banks.py")
     WALKER_DATA_SPEC("test_quest_f2p_targets_cache.py")
     WALKER_DATA_SPEC("test_quest_members_gnomes_ogres_desert_cache.py")

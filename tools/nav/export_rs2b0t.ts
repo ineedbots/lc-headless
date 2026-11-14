@@ -102,6 +102,10 @@ for (const edge of activateTransportRows([...allTransportRows(), ...stairs])) {
 
 // Edges rs2b0t's data lacks, found live on the 289 engine.
 const EDGE_ADDITIONS = [
+    // Observatory: the reception ladder is disabled upstream as "behind a runtime guard", but 289 only asks the
+    // assistant's goblin warning before `oploc1,obs_dungeonladderdown` jumps to 0_37_147_52_51. Pair it with the
+    // dialogue crossing below so a world walk can reach the cavern and telescope, as checked live for issue #56.
+    { kind: 'dungeon', from: { x: 2444, z: 3192, level: 0 }, to: { x: 2420, z: 9459, level: 0 }, cost: edgeCostForKind('dungeon'), locName: 'Ladder', action: 'Climb-down', locX: 2444, locZ: 3191, locId: 2187, toTile: { x: 2420, z: 9459 } },
     // Shilo Village: the quest ends at the dolmen in Bervirius' tomb, whose only way out is the climbing rocks
     // (`oploc1,zqhandholds` teleports a climber to 0_43_46_12_32 and steps them east), so the retreat to a bank and
     // the next quest in the queue had no route out of it (phase 17d's live run).
@@ -128,6 +132,8 @@ write('edges.json', edges);
 write('teleports.json', [...SPELL_TELEPORTS, ...JEWELLERY_TELEPORTS]);
 // Crossings rs2b0t's table lacks, found live on the 289 engine.
 const CROSSING_ADDITIONS = [
+    // Continue the assistant's warning while descending; completed quests skip it and land at the same tile.
+    { x: 2444, z: 3192, level: 0, locName: 'Ladder', action: 'Climb-down', dialogue: { choose: [] }, toTile: { x: 2420, z: 9459, level: 0 }, label: 'Observatory reception ladder' },
     // Black Knights' Fortress: a fortress guard stops anyone entering the knights' banquet hall from the west, and only
     // lets them through on this answer. The hall is the only way to the ladder up to the hole (phase 16a's live run).
     { x: 3020, z: 3515, level: 0, locName: 'Door', action: 'Open', dialogue: { choose: ["I don't care. I'm going in anyway."] }, label: "Black Knights' Fortress banquet hall" },
