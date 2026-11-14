@@ -524,6 +524,14 @@ class _Traversal:
         self._force_repath = True
 
     def _request(self, me, dest, max_expansions, policy, use_teleports, zones, state=None):
+        # A hop can fail after a walk's policy was built; every search needs the latest suppression.
+        if self._suppressed_teleports:
+            policy = {key: value for key, value in policy.items()}
+            denied = list(policy.get('deny_teleport_ids', []))
+            for teleport in self._suppressed_teleports:
+                if teleport not in denied:
+                    denied.append(teleport)
+            policy['deny_teleport_ids'] = denied
         request = {
             'from': [me.x, me.z, me.level],
             'to': [dest.x, dest.z, dest.level],
@@ -585,7 +593,7 @@ class _Traversal:
         dest = Tile.from_tile(dest) if not isinstance(dest, Tile) else dest
         timeout = DEFAULT_TIMEOUT_MS if timeout_ms is None else timeout_ms
         use_teleports = self.teleports_enabled() if use_teleport_catalog is None else use_teleport_catalog
-        walk_policy = {'use_teleports': use_teleports, 'deny_teleport_ids': list(self._suppressed_teleports)}
+        walk_policy = {'use_teleports': use_teleports, 'deny_teleport_ids': []}
         if policy is not None:
             for key, value in policy.items():
                 walk_policy[key] = value
