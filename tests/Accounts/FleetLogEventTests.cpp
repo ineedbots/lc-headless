@@ -59,6 +59,7 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     const auto folder = TempFolder{"rs2004-fleet-events"};
     auto capture = LogCapture{};
     auto config = Config_s{};
+    config.scripting.accountDataDirectory.clear();
     config.scripting.experienceDirectory = (folder.GetPath() / "experience").string();
     config.scripting.experienceIntervalMinutes = 1min;
     config.scripting.bankLogDirectory = (folder.GetPath() / "bank").string();
@@ -161,6 +162,7 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     const auto folder = TempFolder{"rs2004-fleet-events-failure"};
     auto capture = LogCapture{};
     auto config = Config_s{};
+    config.scripting.accountDataDirectory.clear();
     config.scripting.experienceDirectory.clear();
     config.scripting.bankLogDirectory.clear();
     config.scripting.inventoryDirectory.clear();

@@ -10,6 +10,7 @@
 #include "../Game/GameClient.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
 #include "../Script/Host/ScriptHost.hpp"
+#include "AccountDataLog.hpp"
 #include "BankLogger.hpp"
 #include "ExperienceLog.hpp"
 #include "ItemLog.hpp"
@@ -19,6 +20,11 @@
 AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events)
     : m_progress{account.script ? account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{config.scripting.progressDirectory} / (account.name + ".txt"), logger, std::move(onReport)}
 {
+    if (!config.scripting.accountDataDirectory.empty())
+    {
+        m_accountData.emplace(cache, logger, account.name, std::filesystem::path{config.scripting.accountDataDirectory}, config.scripting.accountDataIntervalSeconds, events);
+    }
+
     const auto& experience = config.scripting;
     if (!experience.experienceDirectory.empty() && experience.experienceIntervalMinutes > std::chrono::minutes::zero())
     {
@@ -47,6 +53,11 @@ AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s
 
 void AccountReporting::ObserveSession(Clock::time_point now, const GameState_s& state, ClientStatus_e status)
 {
+    if (m_accountData)
+    {
+        m_accountData->Step(now, state, status);
+    }
+
     if (m_experience)
     {
         m_experience->Step(now, state, status, state.IsSettled());

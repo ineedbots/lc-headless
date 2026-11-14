@@ -1,4 +1,4 @@
-# Fleet tracking: experience, banks, inventories
+# Fleet tracking: account data, experience, banks, inventories
 
 The client can write what each account is earning and holding, per account, as JSON Lines. A small local
 page reads those files. Logging is enabled by default. Each journal writes to its own folder; an empty
@@ -9,6 +9,7 @@ several accounts in one process never collide and nothing depends on the world o
 
 | Folder | One line per |
 |---|---|
+| `account-data/<account>.jsonl` | account data change, at most every `accountDataIntervalSeconds`; session changes immediately |
 | `experience/<account>.jsonl` | skill sample, every `experienceIntervalMinutes` |
 | `bank/<account>.jsonl` | bank open, listing what the bank held |
 | `inventory/<account>.jsonl` | backpack change, at most every `inventoryIntervalSeconds` |
@@ -29,7 +30,9 @@ replacement character so each record remains valid JSON.
     "bankLogDirectory": "bank",
     "inventoryDirectory": "inventory",
     "inventoryIntervalSeconds": 5,
-    "equipmentDirectory": "equipment"
+    "equipmentDirectory": "equipment",
+    "accountDataDirectory": "account-data",
+    "accountDataIntervalSeconds": 5
 }
 ```
 
@@ -41,11 +44,36 @@ replacement character so each record remains valid JSON.
 | `inventoryDirectory` | `inventory` | The folder. Empty turns the log off |
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds between lines; `0` records every change |
 | `equipmentDirectory` | `equipment` | The folder. Empty turns the log off |
+| `accountDataDirectory` | `account-data` | The folder. Empty turns the log off |
+| `accountDataIntervalSeconds` | `5` | 0 to 86400 seconds between changes; `0` records every observed change |
 
 These keys are also listed in the [configuration reference](Configuration.md#fleet-tracking-settings)
 and [sample config](../client.jsonc.sample). They apply to every account, including idle accounts.
 Paths are relative to the client's working directory. The page and compactor read the default folders
 under the repository root; they do not follow custom journal paths in client configs.
+
+## Account data
+
+```json
+{"time":"2026-11-14T13:20:26Z","account":"s18","state":"ingame","settled":true,"pid":42,"tile":{"x":3200,"z":3201,"level":0},"destination":null,"target":{"kind":"npc","index":17},"hp":{"current":25,"base":30},"energy":80,"prayer":{"current":12,"base":20},"specialAttack":{"energy":750,"armed":false},"running":true,"moving":false,"inCombat":false,"weight":5,"tick":123}
+```
+
+- Records changed account data, including idle accounts without a script. Changes during the interval
+  are coalesced into the latest observed state. An unchanged account writes no extra lines.
+- Session state and settled changes bypass the interval. Gameplay fields are null until settled in
+  game, and become null on logout or disconnection, so old positions and targets aren't reported as current.
+- Tiles use absolute `x`, `z`, and `level`. `destination` is the client's outstanding walk destination,
+  or null when none remains.
+- `target` is the **server facing target**, not the last requested interaction. It is null, an `npc` or
+  `player` with its entity `index`, or a `tile` with its tile. Entity facing takes priority over coordinate
+  facing. Coordinate facing is rounded down from half-tile coordinates; the server provides no object ID.
+  Facing can persist after an interaction has ended.
+- HP and prayer include current and base levels. Run `energy` is 0–100; special attack energy uses
+  0–1000, matching the scripting API. `specialAttack` is null until its energy varp has arrived
+  (including servers/revisions without that bar). `weight` uses the game's run-weight units.
+- `pid` is the current server player index. `tick` is the client tick count at observation; changes to
+  the tick alone do not trigger a record.
+- Failed writes warn once, retry at the configured interval, and publish no event until a write succeeds.
 
 ## Experience
 
@@ -96,13 +124,14 @@ successfully appended fleet journal record:
 
 | Event | Journal |
 |---|---|
+| `fleet.account-data` | Account data and session changes |
 | `fleet.experience` | Experience samples and account state changes |
 | `fleet.bank` | Bank snapshots on opening |
 | `fleet.inventory` | Backpack samples, with the configured interval |
 | `fleet.equipment` | Worn equipment changes |
 
 ```json
-{"version":1,"type":"subscribe","id":"fleet","events":["fleet.experience","fleet.bank","fleet.inventory","fleet.equipment"],"accounts":["s18"]}
+{"version":1,"type":"subscribe","id":"fleet","events":["fleet.account-data","fleet.experience","fleet.bank","fleet.inventory","fleet.equipment"],"accounts":["s18"]}
 ```
 
 Each event's `payload` is the complete JSON object from the corresponding journal
@@ -124,9 +153,15 @@ python3 tools/fleet/server.py                  # http://127.0.0.1:8765
 python3 tools/fleet/server.py --port 9000
 ```
 
-Read-only, loopback only, and never started by the client. Ctrl+C ends it. It only reads the four folders
+Read-only, loopback only, and never started by the client. Ctrl+C ends it. It reads the account-data,
+experience, bank, inventory and equipment folders
 and starts or controls nothing.
 
+- **Accounts** — the latest state of each account: session status, PID, tile, destination, server facing
+  target, HP and prayer (current/base), run energy, special attack energy and armed state, running,
+  moving, combat, weight and tick. Filter by account name. Gameplay values are blank while unsettled
+  or offline. Recorded age is the last journal change, not a connection heartbeat.
+  The server exposes these latest records at `/api/account-data` as an `accounts` object keyed by account.
 - **Experience** — accounts down the side, skills across the top. Each cell shows the level and, beneath,
   the XP an hour. The rate is the newest sample minus the oldest sample of the newest continuous run (at
   most 15 minutes back); a relogin rewinds XP, so the run stops there rather than producing a negative
@@ -184,6 +219,7 @@ Without `--config` the page cannot start or stop anything: the bar is hidden, an
 
 | Want | Set |
 |---|---|
+| No account data log | `"accountDataDirectory": ""` |
 | No experience log | `"experienceDirectory": ""` or `"experienceIntervalMinutes": 0` |
 | No bank log | `"bankLogDirectory": ""` |
 | No inventory log | `"inventoryDirectory": ""` |
@@ -203,6 +239,6 @@ python3 tools/fleet/compact_logs.py --console-mb 20
 ```
 
 `--dry-run` reports space savings without writing. `--console-mb` sets the number of MiB retained per
-`logs/*.log` file (default `20`). The tool retains the last 3000 lines per experience/backpack journal
+`logs/*.log` file (default `20`). The tool retains the last 3000 lines per account-data/experience/backpack journal
 and 1000 per bank/equipment journal in the default folders. Older history is discarded. Stop writers
 before applying compaction so concurrent appends cannot be lost during the rewrite.

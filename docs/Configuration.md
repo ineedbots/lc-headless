@@ -129,6 +129,8 @@ in account files. Logging is enabled by default, including accounts without a sc
 | `inventoryDirectory` | `inventory` | Backpack contents on change. Empty disables logging. |
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds; minimum time between backpack samples; `0` records every change. |
 | `equipmentDirectory` | `equipment` | Worn equipment on change. Empty disables logging. |
+| `accountDataDirectory` | `account-data` | Account state journal. Empty disables logging. |
+| `accountDataIntervalSeconds` | `5` | Minimum seconds between account data changes, 0 to 86400; 0 records every observed change. Session changes are immediate. |
 
 Directories are created when needed. Write failures are logged without stopping the account.
 See [Fleet tracking](FleetTracking.md) for record formats, the optional local page and log maintenance.

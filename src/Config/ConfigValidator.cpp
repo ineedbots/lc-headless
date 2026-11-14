@@ -156,9 +156,11 @@ void ConfigValidator::Validate(const Config_s& config)
     Check(scripting.maxRetryDelaySeconds >= scripting.minRetryDelaySeconds, "scripting.maxRetryDelaySeconds", "must be at least scripting.minRetryDelaySeconds");
     Check(scripting.reloginDelaySeconds >= 0s && scripting.reloginDelaySeconds <= MAX_RELOGIN_DELAY, "scripting.reloginDelaySeconds", std::format("must be from 0 to {}", MAX_RELOGIN_DELAY.count()));
     Check(!scripting.progressDirectory.empty(), "scripting.progressDirectory", "must be a folder path");
-    // experienceDirectory, bankLogDirectory, inventoryDirectory and equipmentDirectory may be empty: each
+    // Journal directories may be empty: each
     // turns its log off.
     Check(scripting.inventoryIntervalSeconds >= std::chrono::seconds{0} && scripting.inventoryIntervalSeconds <= MAX_INVENTORY_INTERVAL, "scripting.inventoryIntervalSeconds",
+          std::format("must be from 0 (every change) to {}", MAX_INVENTORY_INTERVAL.count()));
+    Check(scripting.accountDataIntervalSeconds >= 0s && scripting.accountDataIntervalSeconds <= MAX_INVENTORY_INTERVAL, "scripting.accountDataIntervalSeconds",
           std::format("must be from 0 (every change) to {}", MAX_INVENTORY_INTERVAL.count()));
     Check(scripting.experienceIntervalMinutes >= std::chrono::minutes{0} && scripting.experienceIntervalMinutes <= MAX_EXPERIENCE_INTERVAL, "scripting.experienceIntervalMinutes",
           std::format("must be from 0 (off) to {}", MAX_EXPERIENCE_INTERVAL.count()));

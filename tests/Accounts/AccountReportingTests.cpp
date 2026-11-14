@@ -17,6 +17,7 @@ TEST_CASE("Account reporting preserves progress callbacks despite file failures 
     auto fixture = HostFixture{"def on_progress_report():\n    return {'Trips': 7}\n\ndef loop():\n    return 600\n"};
     fixture.folder.WriteFile("blocked", "keep this file");
     auto config = Config_s{};
+    config.scripting.accountDataDirectory.clear();
     config.scripting.progressDirectory = (fixture.folder.GetPath() / "blocked").string();
     config.scripting.experienceDirectory.clear();
     config.scripting.bankLogDirectory.clear();

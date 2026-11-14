@@ -56,6 +56,9 @@ struct ScriptingSettings_s
     std::chrono::seconds inventoryIntervalSeconds = 5s;
     // Where an account's worn equipment is written when it changes: equipment/<account>.jsonl. Empty turns it off.
     std::string equipmentDirectory = "equipment";
+    // Account state changes; 0 records every change. Empty directory disables logging.
+    std::string accountDataDirectory = "account-data";
+    std::chrono::seconds accountDataIntervalSeconds = 5s;
 };
 
 // client.jsonc.

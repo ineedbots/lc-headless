@@ -109,6 +109,7 @@ Config_s FakeGameServer::MakeConfig() const
     config.scripting.bankLogDirectory.clear();
     config.scripting.inventoryDirectory.clear();
     config.scripting.equipmentDirectory.clear();
+    config.scripting.accountDataDirectory.clear();
     return config;
 }
 
