@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 // A SOCKS5 proxy. An empty host connects directly.
 struct ProxySettings_s
 {
@@ -10,3 +12,5 @@ struct ProxySettings_s
     std::string username;
     std::string password;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ProxySettings_s, host, port, username, password)

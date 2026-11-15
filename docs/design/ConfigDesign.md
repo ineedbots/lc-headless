@@ -23,7 +23,7 @@ Reference sources:
 | Sample | `client.jsonc.sample` is committed next to it. When the file doesn't exist, `Load` throws a `ConfigError` that says to copy the sample there and fill it in. Nothing is written |
 | Shape | `ConfigFile` is a non-instantiable class with static `Load`, `Parse` and `Serialize`, like `StringUtils` in CONVENTIONS §5. `Load` and `Parse` return a `Config_s`: plain data, one struct per section. Values come out already converted to the types the client uses (`BigUInt`, `LogLevel_e`, `std::chrono::seconds`), so no code downstream parses or validates anything |
 | Ownership | `Application` holds the loaded config in a `std::shared_ptr<const Config_s>` and passes it to any class that needs it. A class that keeps it stores its own copy of the pointer, so ownership is genuinely shared (CONVENTIONS §8) and no class can outlive the config it reads. The `const` keeps the settings read-only after loading, for every holder |
-| Conversion | `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` generates `from_json` and `to_json` for `Config_s` and the four section structs. Each type nlohmann can't convert by itself (`BigUInt`, `LogLevel_e` and `std::chrono::seconds`) gets an `nlohmann::adl_serializer` specialization with both directions. All of it lives in `ConfigJson.cpp` |
+| Conversion | Config types define their nlohmann mappings beside their structs. `BigUInt`, the log-level and transport names, and config durations provide their own serializer specializations. `ConfigJson.cpp` handles JSONC parsing, conversion errors and ordered serialization |
 | Macros | A deliberate exception to CONVENTIONS §6. The macros generate a `from_json` and a `to_json` per struct that would otherwise have to be written, and kept in step with the struct, by hand |
 | Keys | The JSON keys are the C++ member names, because the macro uses each member's name as its key. They are camelCase (CONVENTIONS §6), and a key's path in the file is its path in code: `login.rsaModulus` in the file is `config.login.rsaModulus` |
 | Key order | Reading uses `nlohmann::json`. Writing uses `nlohmann::ordered_json`, so a written file lists sections and keys in declaration order, the order of §3, instead of alphabetically |
@@ -34,7 +34,7 @@ Reference sources:
 | Errors | Everything `ConfigFile` throws for a missing, unreadable or invalid file is a `ConfigError`, the type in CONVENTIONS §8. Messages start with the dotted path of the key (`scripting.callTimeoutMs: ...`), and `Load` puts the file path in front. `JSON_DIAGNOSTICS` makes nlohmann's own conversion errors carry the path |
 | Secrets | No message or log line contains a value from the file. Syntax errors give a line and a column, but no excerpt. nlohmann's conversion errors name types and keys, never values |
 | Logging | A warning when TLS verification is turned off, logged through the `Logger&` that `Load` and `Parse` take. Loading logs nothing else |
-| Dependency | For the config, nlohmann/json is used only in `ConfigJson.cpp`, and by the JSONC editor that adds settings to account files. No header exposes it |
+| Dependency | Config type headers expose nlohmann/json for their conversions; `ConfigJson.cpp` uses it for parsing and ordered serialization, and the JSONC editor uses it to add settings to account files |
 | Threading | `ConfigFile` has no state. A loaded `Config_s` is `const` behind its `shared_ptr`, so any thread can read it, and copying or releasing the pointer is thread-safe |
 
 Rejected:
@@ -75,7 +75,8 @@ rs2004-headless/
 │       ├── ConfigFile.hpp / .cpp        client.jsonc: Load, Parse, Serialize
 │       ├── AccountFile.hpp / .cpp       an account file: Load, Parse, AddScriptSettings
 │       ├── AccountDirectory.hpp / .cpp  every enabled account in the accounts folder
-│       ├── ConfigJson.hpp / .cpp        every nlohmann conversion
+│       ├── ConfigJson.hpp / .cpp        JSONC parsing, conversion errors and serialization
+│       ├── Type/ConfigDurationJson.hpp  config duration conversions
 │       ├── ConfigValidator.hpp / .cpp   every rule and limit
 │       └── ConfigOverrides.hpp / .cpp   an account's server and proxy over client.jsonc's
 └── tests/
@@ -87,13 +88,13 @@ rs2004-headless/
 The single `ConfigFile` this section first described was split by job (see the current ownership below); the rules and messages below are unchanged.
 
 - `Config_s` and its section structs live in `Config_s.hpp`, the account's structs in `AccountConfig_s.hpp`, and `ServerSettings_s`, which both use, in a header of its own.
-- `Config_s.hpp` includes `../Utils/BigUInt.hpp`, because `BigUInt` is a member of `LoginSettings_s`, and `../Console/LogLevel_e.hpp`, because `LogLevel_e` is a member of `ClientSettings_s`. `ConfigFile.hpp` includes `../Console/Logger.hpp`, because `Logger` appears in `Load`'s and `Parse`'s prototypes.
+- `Config_s.hpp` includes `../Utils/BigUInt.hpp`, because `BigUInt` is a member of `LoginSettings_s`, and `../Console/LogLevelNames.hpp`, because `LogLevel_e` is a member of `ClientSettings_s`. Config type headers own their nlohmann mappings; `ConfigFile.hpp` includes `../Console/Logger.hpp`, because `Logger` appears in `Load`'s and `Parse`'s prototypes.
 - `ConfigError.hpp` is header-only, exactly as in CONVENTIONS §8, and sits in `Config/Error/`. No header includes it, because no prototype uses it. The files that throw it include it, as does any code that catches it.
-- `ConfigJson.cpp` is the only file that includes `<nlohmann/json.hpp>` for the config. `Transport_e` and `TransportNames`, which name `server.transport`'s values, live in `Config/` too.
+- `ConfigDurationJson.hpp`, `BigUInt.hpp`, `LogLevelNames.hpp` and `TransportNames.hpp` define the custom conversions needed by config fields. `ConfigJson.cpp` owns the JSONC parse and error-reporting flow.
 - `vcpkg.json` gains `"nlohmann-json"`.
 - CMake:
-    - `find_package(nlohmann_json CONFIG REQUIRED)`. The library target links `nlohmann_json::nlohmann_json` privately, because no public header includes it. The test executable links it too, because the tests build their inputs with it (§6.1).
-    - The library target gets `JSON_DIAGNOSTICS=1` as a private compile definition, so nlohmann's exceptions name the path of the value that failed. Since nlohmann 3.11 the setting is part of its ABI namespace, so the test executable, which doesn't set it, can't clash with the library.
+    - `find_package(nlohmann_json CONFIG REQUIRED)`. The library target links `nlohmann_json::nlohmann_json` publicly because its config type headers expose nlohmann conversions; the test executable uses the same dependency to build inputs (§6.1).
+    - The library target exports `JSON_DIAGNOSTICS=1`, so nlohmann's exceptions name the path of the value that failed. Since nlohmann 3.11 the setting is part of its ABI namespace, and the public definition keeps the test executable consistent with the library.
 - `pch.hpp` gains `<iterator>` for reading the file.
 - `.gitignore` gains `client.jsonc`. No example file is committed: the first run writes one (§3).
 

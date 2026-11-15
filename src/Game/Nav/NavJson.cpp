@@ -4,7 +4,7 @@
 #include "../../Utils/StringUtils.hpp"
 #include "Type/NavPoint_s.hpp"
 #include "Type/NavState_s.hpp"
-#include "NavPayloadJson.hpp"
+#include "WorldPathFinder.hpp"
 
 #include <nlohmann/json.hpp>
 

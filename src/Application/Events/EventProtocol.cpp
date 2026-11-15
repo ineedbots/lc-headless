@@ -10,7 +10,6 @@
 #include "Type/EventEnvelope_s.hpp"
 #include "Type/EventError_s.hpp"
 #include "Type/EventSnapshot_s.hpp"
-#include "EventMessageJson.hpp"
 
 #include <nlohmann/json.hpp>
 

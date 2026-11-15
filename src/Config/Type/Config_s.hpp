@@ -1,11 +1,14 @@
 #pragma once
 
-#include "../../Console/Type/LogLevel_e.hpp"
+#include "../../Console/LogLevelNames.hpp"
 #include "../../Utils/BigUInt.hpp"
+#include "ConfigDurationJson.hpp"
 #include "ProxySettings_s.hpp"
 #include "HttpSettings_s.hpp"
 #include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
+
+#include <nlohmann/json.hpp>
 
 struct LoginSettings_s
 {
@@ -17,6 +20,8 @@ struct LoginSettings_s
     Revision_e revision = Revision_e::Rev289;
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
+
 struct ClientSettings_s
 {
     LogLevel_e logLevel = LogLevel_e::Info;
@@ -26,6 +31,8 @@ struct ClientSettings_s
     // Empty for no file.
     std::string logFile;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
 
 struct ScriptingSettings_s
 {
@@ -56,6 +63,8 @@ struct ScriptingSettings_s
     std::chrono::seconds accountDataIntervalSeconds = 5s;
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, minRetryDelaySeconds, maxRetryDelaySeconds, reloginDelaySeconds, progressDirectory, fleetDatabasePath, accountDataLogEnabled, experienceLogEnabled, bankLogEnabled, inventoryLogEnabled, equipmentLogEnabled, experienceIntervalMinutes, inventoryIntervalSeconds, accountDataIntervalSeconds)
+
 // client.jsonc.
 struct Config_s
 {
@@ -66,3 +75,5 @@ struct Config_s
     ScriptingSettings_s scripting;
     HttpSettings_s http;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, proxy, login, client, scripting, http)

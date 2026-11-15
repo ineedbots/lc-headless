@@ -7,10 +7,4 @@ accounts/*.jsonc
 /data/cache/
 /data/fleet.sqlite*
 *.log
-/account-data/
-/equipment/
-/experience/
-/inventory/
-/bank/
-/logs/
 __pycache__/

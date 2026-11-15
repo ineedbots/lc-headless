@@ -9,7 +9,6 @@
 #include "../Type/HttpEndpointRequest_s.hpp"
 #include "../Type/HttpResponse_s.hpp"
 #include "../HttpJson.hpp"
-#include "../HttpPayloadJson.hpp"
 #include "../Type/HttpError_s.hpp"
 
 #include <nlohmann/json.hpp>

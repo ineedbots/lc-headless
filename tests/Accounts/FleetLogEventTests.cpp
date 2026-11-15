@@ -7,6 +7,7 @@
 #include "Accounts/Type/FleetBankLog_s.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
 #include "Application/Events/ApplicationEventPublisher.hpp"
+#include "Application/Events/Definitions/FleetBankEvent.hpp"
 #include "Application/Events/EventProtocol.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Cache/Type/IfComponent_s.hpp"
@@ -134,7 +135,8 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     Drain(*bridge);
     CHECK(Take(*bridge, client)["payload"]["state"] == "logged out");
 
-    REQUIRE(bridge->Publish("bot2", FleetBankLog_s{R"({"items":[]})"}));
+    const auto bankRecord = FleetBankLog_s{.time = "2026-01-01T00:00:00Z", .account = "bot2"};
+    REQUIRE(bridge->Publish("bot2", bankRecord));
     Drain(*bridge);
     CHECK_FALSE(bridge->Front(client));
 
@@ -143,7 +145,7 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     Drain(*bridge);
     Take(*bridge, client);
     CHECK(Take(*bridge, client)["events"].empty());
-    REQUIRE(bridge->Publish("bot2", FleetBankLog_s{R"({"items":[]})"}));
+    REQUIRE(bridge->Publish("bot2", bankRecord));
     Drain(*bridge);
     // The later subscription has no account filter.
     CHECK(Take(*bridge, client)["account"] == "bot2");
@@ -194,12 +196,18 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     CHECK_FALSE(bridge->HasIncoming());
 }
 
-TEST_CASE("Fleet events validate bounded JSON before journal admission", "[FleetEvents][Events]")
+TEST_CASE("Fleet events bound typed payloads and replace invalid UTF-8", "[FleetEvents][Events]")
 {
-    auto bridge = ApplicationEventBridge{{"bot1"}};
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{"{"}));
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{"[]"}));
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{Json{{"name", std::string(8192, 'x')}}.dump()}));
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{Json{{"name", std::string(2000, '\x01')}}.dump()}));
-    CHECK_FALSE(bridge.HasIncoming());
+    const auto tooLarge = FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 1, .name = std::string(8192, 'x'), .qty = 1}}};
+    CHECK_FALSE(FleetBankEvent::Measure(tooLarge));
+
+    const auto invalidUtf8 = FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 1, .name = std::string{"bad\xff"}, .qty = 1}}};
+    const auto serialized = FleetBankEvent::Serialize(invalidUtf8);
+    CHECK(serialized["items"][0]["name"] == "bad\xef\xbf\xbd");
 }

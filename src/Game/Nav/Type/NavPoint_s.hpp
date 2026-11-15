@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 struct NavPoint_s
 {
     s32 x = 0;
@@ -8,3 +10,5 @@ struct NavPoint_s
 
     bool operator==(const NavPoint_s&) const = default;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(NavPoint_s, x, z, level)

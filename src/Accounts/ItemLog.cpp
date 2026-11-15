@@ -5,14 +5,8 @@
 
 #include "../Game/State/GameStateQueries.hpp"
 
-#include "FleetLogJson.hpp"
-#include "Type/FleetItem_s.hpp"
-#include "Type/FleetItemRecord_s.hpp"
-
 #include "Type/FleetInventoryLog_s.hpp"
 #include "Type/FleetEquipmentLog_s.hpp"
-
-#include <nlohmann/json.hpp>
 
 ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
@@ -143,43 +137,51 @@ void ItemLog::Step(Clock::time_point now, const GameState_s& state)
 
 bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
 {
-    auto record = FleetItemRecord_s{
-        .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())),
-        .account = m_accountName,
-        .used = contents.used};
-    if (m_kind == Kind_e::Backpack)
-    {
-        // bankOpen says which backpack these are: while a bank is open the game swaps in its own.
-        record.bankOpen = contents.bankOpen;
-        record.free = contents.slots - std::min(contents.slots, contents.used);
-    }
-
-    for (const auto& item : contents.items)
-    {
-        record.items.push_back({.id = item.id, .name = std::string{m_cache.FindObjName(item.id)}, .qty = item.qty});
-    }
-
     try
     {
-        const auto payload = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-        const auto stream = m_kind == Kind_e::Backpack ? FleetStream_e::Inventory : FleetStream_e::Equipment;
-        m_database->Append(stream, m_accountName, record.time, payload);
+        const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+        const auto append = [this](const auto& record)
+        {
+            m_database->Append(record);
+            if (m_events)
+            {
+                m_events->Publish(m_accountName, record);
+            }
+        };
+
+        if (m_kind == Kind_e::Backpack)
+        {
+            auto record = FleetInventoryLog_s{
+                .time = time,
+                .account = m_accountName,
+                .bankOpen = contents.bankOpen,
+                .used = contents.used,
+                .free = contents.slots - std::min(contents.slots, contents.used)};
+            for (const auto& item : contents.items)
+            {
+                record.items.push_back({.id = item.id, .name = std::string{m_cache.FindObjName(item.id)}, .qty = item.qty});
+            }
+
+            append(record);
+        }
+        else
+        {
+            auto record = FleetEquipmentLog_s{
+                .time = time,
+                .account = m_accountName,
+                .used = contents.used};
+            for (const auto& item : contents.items)
+            {
+                record.items.push_back({.id = item.id, .name = std::string{m_cache.FindObjName(item.id)}, .qty = item.qty});
+            }
+
+            append(record);
+        }
+
         m_retryAt.reset();
         if (m_interval > std::chrono::seconds::zero())
         {
             m_nextSample = now + m_interval;
-        }
-
-        if (m_events)
-        {
-            if (m_kind == Kind_e::Backpack)
-            {
-                m_events->Publish(m_accountName, FleetInventoryLog_s{payload});
-            }
-            else
-            {
-                m_events->Publish(m_accountName, FleetEquipmentLog_s{payload});
-            }
         }
 
         if (m_writeFailed)

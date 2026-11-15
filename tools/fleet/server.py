@@ -61,10 +61,99 @@ def _accounts(stream):
         connection = connect_readonly(path)
         try:
             accounts.update(row[0] for row in connection.execute(
-                'SELECT DISTINCT account FROM fleet_records WHERE stream = ?', (stream,)))
+                'SELECT DISTINCT accounts.name FROM fleet_records AS records '
+                'JOIN fleet_accounts AS accounts ON accounts.id = records.account_id '
+                'WHERE records.stream = ?', (stream,)))
         finally:
             connection.close()
     return sorted(accounts)
+
+
+def _items(connection, table, record_id):
+    return [
+        {'id': item_id, 'name': name, 'qty': quantity}
+        for item_id, name, quantity in connection.execute(
+            f'SELECT item_id, name, quantity FROM {table} WHERE record_id = ? ORDER BY item_id',
+            (record_id,))
+    ]
+
+
+def _record(connection, stream, account, sequence, recorded_at):
+    """Rebuild the stable public JSON record from its normalized database rows."""
+    record = {'time': recorded_at, 'account': account}
+
+    if stream == 'account-data':
+        row = connection.execute(
+            'SELECT state, settled, pid, tile_x, tile_z, tile_level, destination_x, destination_z, destination_level, '
+            'target_kind, target_index, target_x, target_z, target_level, hp_current, hp_base, energy, '
+            'prayer_current, prayer_base, special_attack_energy, special_attack_armed, running, moving, '
+            'in_combat, weight, tick FROM fleet_account_data WHERE record_id = ?',
+            (sequence,)).fetchone()
+        if row is None:
+            raise sqlite3.DatabaseError(f'account-data record {sequence} has no typed data row')
+
+        def tile(x, z, level):
+            return None if x is None else {'x': x, 'z': z, 'level': level}
+
+        target_kind, target_index, target_x, target_z, target_level = row[9:14]
+        target = None
+        if target_kind in ('npc', 'player'):
+            target = {'kind': target_kind, 'index': target_index}
+        elif target_kind == 'tile':
+            target = {'kind': target_kind, 'tile': tile(target_x, target_z, target_level)}
+
+        record.update({
+            'state': row[0],
+            'settled': bool(row[1]),
+            'pid': row[2],
+            'tile': tile(*row[3:6]),
+            'destination': tile(*row[6:9]),
+            'target': target,
+            'hp': None if row[14] is None else {'current': row[14], 'base': row[15]},
+            'energy': row[16],
+            'prayer': None if row[17] is None else {'current': row[17], 'base': row[18]},
+            'specialAttack': None if row[19] is None else {'energy': row[19], 'armed': bool(row[20])},
+            'running': None if row[21] is None else bool(row[21]),
+            'moving': None if row[22] is None else bool(row[22]),
+            'inCombat': None if row[23] is None else bool(row[23]),
+            'weight': row[24],
+            'tick': row[25],
+        })
+    elif stream == 'experience':
+        row = connection.execute(
+            'SELECT state, settled FROM fleet_experience WHERE record_id = ?', (sequence,)).fetchone()
+        if row is None:
+            raise sqlite3.DatabaseError(f'experience record {sequence} has no typed data row')
+        skills = {
+            skill: {'level': level, 'base': base, 'xp': xp}
+            for skill, level, base, xp in connection.execute(
+                'SELECT skill, level, base, xp FROM fleet_experience_skills WHERE record_id = ? ORDER BY ordinal',
+                (sequence,))
+        }
+        record.update({'state': row[0], 'settled': bool(row[1]), 'skills': skills})
+    elif stream == 'bank':
+        exists = connection.execute('SELECT 1 FROM fleet_bank WHERE record_id = ?', (sequence,)).fetchone()
+        if exists is None:
+            raise sqlite3.DatabaseError(f'bank record {sequence} has no typed data row')
+        record['items'] = _items(connection, 'fleet_bank_items', sequence)
+    elif stream == 'inventory':
+        row = connection.execute(
+            'SELECT bank_open, used, free FROM fleet_inventory WHERE record_id = ?', (sequence,)).fetchone()
+        if row is None:
+            raise sqlite3.DatabaseError(f'inventory record {sequence} has no typed data row')
+        record.update({'bankOpen': bool(row[0]), 'used': row[1], 'free': row[2]})
+        record['items'] = _items(connection, 'fleet_inventory_items', sequence)
+    elif stream == 'equipment':
+        row = connection.execute(
+            'SELECT used FROM fleet_equipment WHERE record_id = ?', (sequence,)).fetchone()
+        if row is None:
+            raise sqlite3.DatabaseError(f'equipment record {sequence} has no typed data row')
+        record['used'] = row[0]
+        record['items'] = _items(connection, 'fleet_equipment_items', sequence)
+    else:
+        raise ValueError(f'unknown fleet stream: {stream}')
+
+    return record
 
 
 def _latest(stream):
@@ -77,15 +166,16 @@ def _latest(stream):
         connection = connect_readonly(path)
         try:
             rows = connection.execute(
-                'SELECT accounts.account, records.recorded_at, records.payload '
-                'FROM (SELECT DISTINCT account FROM fleet_records WHERE stream = ?) AS accounts '
-                'JOIN fleet_records AS records ON records.sequence = ('
-                'SELECT MAX(sequence) FROM fleet_records '
-                'WHERE stream = ? AND account = accounts.account)',
-                (stream, stream))
-            for account, recorded_at, payload in rows:
+                'SELECT accounts.name, records.sequence, records.recorded_at '
+                'FROM fleet_records AS records '
+                'JOIN fleet_accounts AS accounts ON accounts.id = records.account_id '
+                'WHERE records.stream = ? AND records.sequence = ('
+                'SELECT MAX(latest.sequence) FROM fleet_records AS latest '
+                'WHERE latest.stream = records.stream AND latest.account_id = records.account_id)',
+                (stream,))
+            for account, sequence, recorded_at in rows:
                 if account not in latest_times or recorded_at > latest_times[account]:
-                    latest[account] = json.loads(payload)
+                    latest[account] = _record(connection, stream, account, sequence, recorded_at)
                     latest_times[account] = recorded_at
         finally:
             connection.close()
@@ -101,10 +191,13 @@ def _history(stream, account, limit):
         connection = connect_readonly(path)
         try:
             rows = connection.execute(
-                'SELECT recorded_at, sequence, payload FROM fleet_records '
-                'WHERE stream = ? AND account = ? ORDER BY sequence DESC LIMIT ?',
+                'SELECT records.recorded_at, records.sequence FROM fleet_records AS records '
+                'JOIN fleet_accounts AS accounts ON accounts.id = records.account_id '
+                'WHERE records.stream = ? AND accounts.name = ? ORDER BY records.sequence DESC LIMIT ?',
                 (stream, account, limit)).fetchall()
-            records.extend((row[0], path_order, row[1], json.loads(row[2])) for row in reversed(rows))
+            records.extend(
+                (row[0], path_order, row[1], _record(connection, stream, account, row[1], row[0]))
+                for row in reversed(rows))
         finally:
             connection.close()
 

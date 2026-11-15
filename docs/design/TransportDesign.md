@@ -99,7 +99,7 @@ Not included:
 
 - **The port is an `s32`**, as ProxyDesign decided for `proxy.port`, and becomes a `u16` only in `ConnectionOptions_s`. A `u16` member would wrap ([ConfigDesign.md](ConfigDesign.md) §3, Rules), so `70000` would read as port 4464 and pass.
 - **`Transport_e`** lives in `Config/Transport_e.hpp`, because it is a setting that `Io/` reads, as `Revision_e` is for `Game/Protocol`. `TransportNames`, beside it, mirrors `LogLevelNames`: `CHOICES` (`"ws or wss"`, then `"ws, wss or tcp"`), `Find(std::string_view)` and `GetName(Transport_e)`.
-- **It is read through an `adl_serializer<Transport_e>`** in `ConfigJson.cpp`, like `LogLevel_e`'s. An unknown name throws `must be ws or wss`, which `ConfigFile` reports as `server.transport: must be ws or wss`. `NLOHMANN_JSON_SERIALIZE_ENUM` isn't used: it turns an unknown string into the enum's first value without a word, so `"wws"` would quietly connect over `ws`.
+- **It is read through an `adl_serializer<Transport_e>`** in `TransportNames.hpp`, like `LogLevel_e`'s. An unknown name throws `must be ws or wss`, which `ConfigFile` reports as `server.transport: must be ws or wss`. `NLOHMANN_JSON_SERIALIZE_ENUM` isn't used: it turns an unknown string into the enum's first value without a word, so `"wws"` would quietly connect over `ws`.
 - **`ValidateServer`** checks `host` with `IsHost`, a helper in `ConfigValidator`'s anonymous namespace that phase 3's `proxy.host` reuses, and `port` against `MAX_PORT = 65535`. `MAX_HOST_LENGTH = 253`, the longest DNS name.
 - **Keys that don't apply are still checked** and then ignored: `origin` with `tcp`, and `tlsCaFile` with anything but `wss`. That matches how `tlsCaFile` already works with a `ws` URL.
 - **`ConfigValidator::Warn`** warns when `transport` is `wss` and `tlsCaFile` is `NONE`, with the same message as today.
@@ -129,7 +129,7 @@ rs2004-headless/
 │   │   ├── Transport_e.hpp               new
 │   │   ├── TransportNames.hpp / .cpp     new
 │   │   ├── ServerSettings_s.hpp          transport, host, port in place of url
-│   │   ├── ConfigJson.cpp                the Transport_e serializer, the macro
+│   │   ├── TransportNames.hpp            the Transport_e serializer
 │   │   └── ConfigValidator.cpp           the server rules
 │   ├── Console/ConsoleInput.hpp / .cpp   SetOnArrived in place of WaitUntil (§7)
 │   ├── Game/

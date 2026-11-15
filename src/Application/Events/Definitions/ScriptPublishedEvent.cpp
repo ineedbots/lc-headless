@@ -2,7 +2,6 @@
 #include "ScriptPublishedEvent.hpp"
 
 #include "../../../Script/Type/PublishedScriptEvent_s.hpp"
-#include "../EventPayloadJson.hpp"
 
 #include <nlohmann/json.hpp>
 

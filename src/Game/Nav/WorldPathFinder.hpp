@@ -7,6 +7,8 @@
 #include "Type/NavTeleport_s.hpp"
 #include "Navigation.hpp"
 
+#include <nlohmann/json.hpp>
+
 // rs2b0t's PathPolicy: which kinds of hop a route may use.
 struct NavPolicy_s
 {
@@ -54,6 +56,63 @@ struct NavPath_s
     s32 cost = 0;
     s32 expanded = 0;
 };
+
+inline void to_json(nlohmann::json& value, const NavWaypoint_s& waypoint)
+{
+    auto entry = nlohmann::json(waypoint.point);
+
+    if (const auto* const edge = waypoint.edge)
+    {
+        auto transport = nlohmann::json{
+            {"kind", edge->kind},
+            {"loc_name", edge->locName},
+            {"action", edge->action},
+            {"loc_x", edge->locX},
+            {"loc_z", edge->locZ},
+            {"accept_any_landing", edge->acceptAnyLanding},
+            {"edge_cost", edge->cost},
+        };
+
+        if (edge->locId)
+        {
+            transport["loc_id"] = *edge->locId;
+        }
+
+        if (edge->openLocId)
+        {
+            transport["open_loc_id"] = *edge->openLocId;
+        }
+
+        if (edge->toLevel)
+        {
+            transport["to_level"] = *edge->toLevel;
+        }
+
+        if (edge->toTile)
+        {
+            transport["to_tile"] = {edge->toTile->first, edge->toTile->second};
+        }
+
+        entry["transport"] = std::move(transport);
+    }
+    else if (const auto* const teleport = waypoint.teleport)
+    {
+        entry["transport"] = nlohmann::json{
+            {"kind", "teleport"},
+            {"loc_name", teleport->label},
+            {"action", teleport->family == "spell" ? "Cast" : "Rub"},
+            {"teleport_id", teleport->id},
+            {"family", teleport->family},
+            {"to_tile", {teleport->to.x, teleport->to.z}},
+            {"accept_any_landing", true},
+            {"edge_cost", teleport->cost},
+        };
+    }
+
+    value = std::move(entry);
+}
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(NavPath_s, ok, reason, cost, expanded, waypoints)
 
 // A* by Chebyshev distance with the graph's hops as extra moves, falling back to Dijkstra when long hops would
 // make the heuristic overestimate. A route's waypoints are its turns, the tiles either side of each hop, and its end.

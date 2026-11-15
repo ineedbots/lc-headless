@@ -4,19 +4,29 @@ The client stores all five fleet streams in a local SQLite database. The default
 `data/fleet.sqlite`; logging is enabled by default, including for accounts without scripts. No script
 behavior changes. Setting `fleetDatabasePath` to an empty string disables all fleet streams.
 
-Each row contains an account name, stream, UTC timestamp, an auto-incremented sequence and the complete
-JSON record as its payload. The sequence orders records deterministically when timestamps share a second.
-The `(account name, stream)` pair is the storage identity. Client processes sharing one database must use
-unique account names unless they intentionally represent the same logical account. SQLite indexes support
-latest-state lookups and bounded per-account history. A whole snapshot is one transaction and one payload
-row, so it cannot be partially written.
+The database stores account identity and stream/timestamp/sequence metadata separately from typed stream
+tables. Account data and experience have explicit columns; bank, backpack and equipment snapshots use
+child item rows, and experience snapshots use child skill rows. The sequence orders records
+deterministically when timestamps share a second. Client processes sharing one database must use unique
+account names unless they intentionally represent the same logical account. SQLite indexes support
+latest-state lookups and bounded per-account history. A snapshot and all its child rows commit in one
+transaction, so it cannot be partially written.
+
+`fleet_accounts` stores account names; `fleet_records` stores only the sequence, account reference, stream,
+and timestamp. The stream data lives in `fleet_account_data`, `fleet_experience`, `fleet_bank`,
+`fleet_inventory`, and `fleet_equipment`. Skills and items live in `fleet_experience_skills` and the
+corresponding `*_items` child tables. There is no generic JSON payload column.
+
+Schema version 3 is a fresh schema. Existing generic-payload databases and JSONL files are not migrated or
+imported. Back up any history you need, configure a new database path, and keep the old files separately.
+An existing database with an unsupported or unversioned schema is rejected without being modified.
 
 The database uses WAL mode, `synchronous=NORMAL`, and a 25 ms busy timeout. Reads can proceed while clients
 write. A failed write is reported once, retried with the stream's pending/coalescing policy, and does not
 advance successful sampling state or publish an event. SQLite is intended for a local filesystem, not a
 network share. WAL is checkpointed automatically; see [maintenance](#log-maintenance).
 
-Records keep the existing JSON shape:
+The five streams keep their existing live-event JSON shape:
 
 | Stream | Record trigger |
 |---|---|
@@ -26,8 +36,8 @@ Records keep the existing JSON shape:
 | `inventory` | Backpack change, at most every `inventoryIntervalSeconds` |
 | `equipment` | Worn equipment change |
 
-Invalid UTF-8 bytes in item names are replaced with the Unicode replacement character so each payload
-remains valid JSON.
+Invalid UTF-8 bytes in item names are replaced with the Unicode replacement character before storage and
+event publication.
 
 ## Configuration
 
@@ -63,15 +73,7 @@ are relative to the client's working directory. The fleet page reads the default
 paths in `--config` files, or explicit `--database` paths.
 
 Legacy `*Directory` settings are ignored; set `fleetDatabasePath` and the desired `*LogEnabled` options
-explicitly. To preserve old history, keep the JSONL folders and run the explicit importer:
-
-```sh
-python3 tools/fleet/import_jsonl.py --database data/fleet.sqlite
-```
-
-The importer skips malformed/truncated records with file/line diagnostics and uses stable source keys so
-re-running it does not duplicate imported rows. It never removes or edits the original JSONL files. Records
-without an `account` field use the filename stem; malformed records without a string `time` are skipped.
+explicitly. Existing JSONL history remains untouched and is not read by the new fleet page.
 
 ## Account data
 
@@ -155,9 +157,11 @@ successfully committed fleet record:
 {"version":1,"type":"subscribe","id":"fleet","events":["fleet.account-data","fleet.experience","fleet.bank","fleet.inventory","fleet.equipment"],"accounts":["s18"]}
 ```
 
-Each event's `payload` is the complete JSON object from the corresponding database
-record, including its `time` and `account`. The envelope's `account` is the account
-config name. Omit `accounts` to receive all accounts. These events need no script,
+Each event's `payload` is the complete JSON object from the corresponding typed
+record, including its `time` and `account`; it is serialized only for event
+publication, not stored as a database payload. Events are published only after the
+typed snapshot transaction commits. The envelope's `account` is the account config
+name. Omit `accounts` to receive all accounts. These events need no script,
 are live only, and are not retained in subscription snapshots or replayed after
 reconnect. Disabled streams and failed commits produce no events.
 
@@ -276,24 +280,9 @@ WAL plus `synchronous=NORMAL` favors concurrent readers and lower write latency;
 committed transactions on sudden power loss, while preserving database consistency. `synchronous=FULL` can
 be selected only by changing the storage implementation and measuring the tradeoff.
 
-On this Windows x64 development machine (NTFS, CPython 3.14.7 with SQLite 3.50.4), the reproducible
-synthetic run `python -B tools/fleet/benchmark_storage.py --records 500 --queries 30` used 45 accounts,
-five stream-specific payloads and 112,500 writes per format. Payload serialization was outside the
-timed write interval; JSONL opened/appended/closed one file per record, while SQLite committed one
-transaction per record through one connection per account. The benchmark's query timings include the
-production fleet-server query functions; the legacy comparison reads the tail of each JSONL file.
-The client uses the vcpkg SQLite 3.53.4 build, so the [benchmark](../tools/fleet/benchmark_storage.py)
-is not an end-to-end measurement of the C++ writer.
-
-| Operation | JSONL | SQLite |
-|---|---:|---:|
-| Write latency, median / p95 | 311 / 765 us | 183 / 493 us |
-| Latest record for all accounts and streams, median / p95 | 40.2 / 60.8 ms | 32.1 / 48.2 ms |
-| 200-record experience history, median / p95 | 3.0 / 8.3 ms | 6.4 / 12.0 ms |
-| Storage after writes (SQLite after WAL checkpoint, decimal MB) | 148.2 MB | 199.8 MB |
-
-This run shows faster isolated commits and latest-state queries, slower bounded XP-history reads, and
-about 35% more on-disk storage. SQLite is adopted for centralized transactional persistence and
-indexed query capability, not as a blanket performance win. Results are workload-, filesystem- and
-runtime-specific. The benchmark is a Python storage-path comparison, not a live-client or SQLiteCpp
-end-to-end benchmark. Run it on the target machine before making deployment-specific performance claims.
+The [synthetic benchmark](../tools/fleet/benchmark_storage.py) compares JSONL with the normalized schema
+and production fleet-server query functions. Earlier numbers measured the generic payload schema and no
+longer apply. For a repeatable local comparison, run
+`python -B tools/fleet/benchmark_storage.py --accounts 45 --records 20 --queries 10`.
+It measures the Python storage path, not the live C++/SQLiteCpp writer; use results only for the tested
+workload, filesystem and runtime.

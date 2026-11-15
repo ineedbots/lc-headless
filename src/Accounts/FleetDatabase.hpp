@@ -1,5 +1,10 @@
 #pragma once
 
+#include "Type/FleetAccountDataLog_s.hpp"
+#include "Type/FleetBankLog_s.hpp"
+#include "Type/FleetEquipmentLog_s.hpp"
+#include "Type/FleetExperienceLog_s.hpp"
+#include "Type/FleetInventoryLog_s.hpp"
 #include "Type/FleetStream_e.hpp"
 
 #include <SQLiteCpp/SQLiteCpp.h>
@@ -9,7 +14,11 @@ class FleetDatabase
 public:
     explicit FleetDatabase(std::filesystem::path path);
 
-    void Append(FleetStream_e stream, std::string_view account, std::string_view time, std::string_view payload);
+    void Append(const FleetAccountDataLog_s& record);
+    void Append(const FleetExperienceLog_s& record);
+    void Append(const FleetBankLog_s& record);
+    void Append(const FleetInventoryLog_s& record);
+    void Append(const FleetEquipmentLog_s& record);
 
     [[nodiscard]] const std::filesystem::path& GetPath() const
     {

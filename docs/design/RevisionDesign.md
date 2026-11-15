@@ -167,7 +167,7 @@ struct LoginSettings_s
 };
 ```
 
-nlohmann converts a scoped enum to and from its underlying integer, so `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` in `ConfigJson.cpp` keeps working and the file still says `"revision": 289`. `ConfigValidator::Validate` checks the value is in `SUPPORTED_REVISIONS` and otherwise fails with `login.revision: must be 225 or 289`, built from the list. A string, a boolean or a number outside `u16` fails as it does today.
+nlohmann converts a scoped enum to and from its underlying integer, so `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT` beside `LoginSettings_s` keeps working and the file still says `"revision": 289`. `ConfigValidator::Validate` checks the value is in `SUPPORTED_REVISIONS` and otherwise fails with `login.revision: must be 225 or 289`, built from the list. A string, a boolean or a number outside `u16` fails as it does today.
 
 That's the finished list. Until phase 4 it holds only `Rev289`, so a half-built 225 can't be selected.
 

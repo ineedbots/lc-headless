@@ -5,13 +5,8 @@
 
 #include "../Utils/StringUtils.hpp"
 #include "../Game/State/Type/Stat_s.hpp"
-#include "FleetLogJson.hpp"
-#include "Type/ExperienceLogRecord_s.hpp"
-#include "Type/FleetSkill_s.hpp"
-
 #include "Type/FleetExperienceLog_s.hpp"
-
-#include <nlohmann/json.hpp>
+#include "Type/FleetSkill_s.hpp"
 
 namespace
 {
@@ -120,7 +115,7 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
 
 bool ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled)
 {
-    auto record = ExperienceLogRecord_s{
+    auto record = FleetExperienceLog_s{
         .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(time)),
         .account = m_accountName,
         .state = std::string{statusName},
@@ -134,12 +129,11 @@ bool ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, cons
 
     try
     {
-        const auto payload = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-        m_database->Append(FleetStream_e::Experience, m_accountName, record.time, payload);
+        m_database->Append(record);
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, FleetExperienceLog_s{payload});
+            m_events->Publish(m_accountName, record);
         }
 
         if (m_writeFailed)

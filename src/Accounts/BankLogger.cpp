@@ -5,13 +5,7 @@
 
 #include "../Game/State/GameStateQueries.hpp"
 #include "../Utils/StringUtils.hpp"
-#include "FleetLogJson.hpp"
-#include "Type/FleetItem_s.hpp"
-#include "Type/FleetItemRecord_s.hpp"
-
 #include "Type/FleetBankLog_s.hpp"
-
-#include <nlohmann/json.hpp>
 
 BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
@@ -60,7 +54,7 @@ bool BankLogger::Log(Clock::time_point now, const GameState_s& state)
         quantities[slot.id] += slot.count;
     }
 
-    auto record = FleetItemRecord_s{
+    auto record = FleetBankLog_s{
         .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())),
         .account = m_accountName};
     auto summary = std::vector<std::string>{};
@@ -73,14 +67,13 @@ bool BankLogger::Log(Clock::time_point now, const GameState_s& state)
 
     try
     {
-        const auto payload = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-        m_database->Append(FleetStream_e::Bank, m_accountName, record.time, payload);
+        m_database->Append(record);
         m_pending = false;
         m_retryAt.reset();
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, FleetBankLog_s{payload});
+            m_events->Publish(m_accountName, record);
         }
 
         if (m_writeFailed)

@@ -51,6 +51,7 @@ def _payload(stream, account, index):
             ],
         })
     elif stream == 'equipment':
+        record['used'] = 12
         record['items'] = [
             {'id': item_id, 'name': f'Item {item_id}', 'qty': 1}
             for item_id in range(12)
@@ -71,7 +72,61 @@ def _payload(stream, account, index):
             'weight': 5,
             'tick': index,
         })
-    return json.dumps(record, separators=(',', ':')).encode('utf-8')
+    return record
+
+
+def _insert_sqlite(database, stream, account, timestamp, record):
+    database.execute('INSERT INTO fleet_accounts (name) VALUES (?) ON CONFLICT (name) DO NOTHING', (account,))
+    account_id = database.execute('SELECT id FROM fleet_accounts WHERE name = ?', (account,)).fetchone()[0]
+    cursor = database.execute(
+        'INSERT INTO fleet_records (account_id, stream, recorded_at) VALUES (?, ?, ?)',
+        (account_id, stream, timestamp))
+    record_id = cursor.lastrowid
+
+    if stream == 'account-data':
+        tile = record.get('tile')
+        destination = record.get('destination')
+        target = record.get('target')
+        target_tile = target.get('tile') if target else None
+        hp = record.get('hp')
+        prayer = record.get('prayer')
+        special = record.get('specialAttack')
+        values = (
+            record_id, record['state'], record['settled'], record.get('pid'),
+            *(tile.values() if tile else (None, None, None)),
+            *(destination.values() if destination else (None, None, None)),
+            target.get('kind') if target else None, target.get('index') if target else None,
+            *(target_tile.values() if target_tile else (None, None, None)),
+            hp.get('current') if hp else None, hp.get('base') if hp else None, record.get('energy'),
+            prayer.get('current') if prayer else None, prayer.get('base') if prayer else None,
+            special.get('energy') if special else None, special.get('armed') if special else None,
+            record.get('running'), record.get('moving'), record.get('inCombat'), record.get('weight'), record['tick'])
+        database.execute('INSERT INTO fleet_account_data VALUES (' + ', '.join('?' for _ in values) + ')', values)
+    elif stream == 'experience':
+        database.execute(
+            'INSERT INTO fleet_experience (record_id, state, settled) VALUES (?, ?, ?)',
+            (record_id, record['state'], record['settled']))
+        database.executemany(
+            'INSERT INTO fleet_experience_skills (record_id, skill, ordinal, level, base, xp) VALUES (?, ?, ?, ?, ?, ?)',
+            ((record_id, skill, ordinal, values['level'], values['base'], values['xp'])
+             for ordinal, (skill, values) in enumerate(record['skills'].items())))
+    elif stream == 'bank':
+        database.execute('INSERT INTO fleet_bank (record_id) VALUES (?)', (record_id,))
+        database.executemany(
+            'INSERT INTO fleet_bank_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+    elif stream == 'inventory':
+        database.execute(
+            'INSERT INTO fleet_inventory (record_id, bank_open, used, free) VALUES (?, ?, ?, ?)',
+            (record_id, record['bankOpen'], record['used'], record['free']))
+        database.executemany(
+            'INSERT INTO fleet_inventory_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+    else:
+        database.execute('INSERT INTO fleet_equipment (record_id, used) VALUES (?, ?)', (record_id, record['used']))
+        database.executemany(
+            'INSERT INTO fleet_equipment_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
 
 
 def _legacy_tail(path, count):
@@ -131,6 +186,7 @@ def _run(args):
         for database in writers.values():
             database.execute('PRAGMA busy_timeout = 25')
             database.execute('PRAGMA synchronous = NORMAL')
+            database.execute('PRAGMA foreign_keys = ON')
 
         durations = {'JSONL': [], 'SQLite': []}
         for index in range(args.records):
@@ -138,7 +194,8 @@ def _run(args):
             for account in accounts:
                 database = writers[account]
                 for stream in STREAMS:
-                    payload = _payload(stream, account, index)
+                    record = _payload(stream, account, index)
+                    payload = json.dumps(record, separators=(',', ':')).encode('utf-8')
                     start = time.perf_counter_ns()
                     with open(legacy_paths[stream, account], 'ab') as handle:
                         handle.write(payload + b'\n')
@@ -146,9 +203,7 @@ def _run(args):
 
                     start = time.perf_counter_ns()
                     database.execute('BEGIN IMMEDIATE')
-                    database.execute(
-                        'INSERT INTO fleet_records (account, stream, recorded_at, payload) VALUES (?, ?, ?, ?)',
-                        (account, stream, timestamp, payload.decode('utf-8')))
+                    _insert_sqlite(database, stream, account, timestamp, record)
                     database.commit()
                     durations['SQLite'].append(time.perf_counter_ns() - start)
 
@@ -203,7 +258,7 @@ def _run(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--accounts', type=int, default=45)
-    parser.add_argument('--records', type=int, default=100, help='records per account and stream')
+    parser.add_argument('--records', type=int, default=20, help='records per account and stream')
     parser.add_argument('--queries', type=int, default=10)
     args = parser.parse_args()
     if args.accounts < 1 or args.records < 1 or args.queries < 1:

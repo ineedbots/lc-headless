@@ -13,3 +13,8 @@ struct EventEnvelope_s
     std::string timestamp;
     nlohmann::json payload;
 };
+
+inline void to_json(nlohmann::json& value, const EventEnvelope_s& event)
+{
+    value = {{"version", event.version}, {"type", event.type}, {"event", event.event}, {"account", event.account ? nlohmann::json(*event.account) : nlohmann::json(nullptr)}, {"instance", event.instance}, {"sequence", event.sequence}, {"timestamp", event.timestamp}, {"payload", event.payload}};
+}
