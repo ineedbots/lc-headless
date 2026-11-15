@@ -12,7 +12,7 @@ import tempfile
 import time
 
 import server
-from storage import create_schema
+from storage import create_schema, item_name_id
 
 STREAMS = ('account-data', 'experience', 'bank', 'inventory', 'equipment')
 SKILLS = (
@@ -75,7 +75,7 @@ def _payload(stream, account, index):
     return record
 
 
-def _insert_sqlite(database, stream, account, timestamp, record):
+def _insert_sqlite(database, stream, account, timestamp, record, item_name_ids):
     database.execute('INSERT INTO fleet_accounts (name) VALUES (?) ON CONFLICT (name) DO NOTHING', (account,))
     account_id = database.execute('SELECT id FROM fleet_accounts WHERE name = ?', (account,)).fetchone()[0]
     cursor = database.execute(
@@ -113,20 +113,23 @@ def _insert_sqlite(database, stream, account, timestamp, record):
     elif stream == 'bank':
         database.execute('INSERT INTO fleet_bank (record_id) VALUES (?)', (record_id,))
         database.executemany(
-            'INSERT INTO fleet_bank_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+            'INSERT INTO fleet_bank_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item_name_id(database, item['name'], item_name_ids), item['qty'])
+             for item in record['items']))
     elif stream == 'inventory':
         database.execute(
             'INSERT INTO fleet_inventory (record_id, bank_open, used, free) VALUES (?, ?, ?, ?)',
             (record_id, record['bankOpen'], record['used'], record['free']))
         database.executemany(
-            'INSERT INTO fleet_inventory_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+            'INSERT INTO fleet_inventory_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item_name_id(database, item['name'], item_name_ids), item['qty'])
+             for item in record['items']))
     else:
         database.execute('INSERT INTO fleet_equipment (record_id, used) VALUES (?, ?)', (record_id, record['used']))
         database.executemany(
-            'INSERT INTO fleet_equipment_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+            'INSERT INTO fleet_equipment_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item_name_id(database, item['name'], item_name_ids), item['qty'])
+             for item in record['items']))
 
 
 def _legacy_tail(path, count):
@@ -189,6 +192,7 @@ def _run(args):
             database.execute('PRAGMA foreign_keys = ON')
 
         durations = {'JSONL': [], 'SQLite': []}
+        item_name_ids = {}
         for index in range(args.records):
             timestamp = (datetime.datetime(2026, 1, 1) + datetime.timedelta(seconds=index)).strftime('%Y-%m-%dT%H:%M:%SZ')
             for account in accounts:
@@ -203,7 +207,7 @@ def _run(args):
 
                     start = time.perf_counter_ns()
                     database.execute('BEGIN IMMEDIATE')
-                    _insert_sqlite(database, stream, account, timestamp, record)
+                    _insert_sqlite(database, stream, account, timestamp, record, item_name_ids)
                     database.commit()
                     durations['SQLite'].append(time.perf_counter_ns() - start)
 

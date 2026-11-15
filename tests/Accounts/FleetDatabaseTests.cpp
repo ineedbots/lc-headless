@@ -43,7 +43,7 @@ TEST_CASE("FleetDatabase creates typed stream tables and preserves insertion ord
         auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
         auto version = SQLite::Statement{database, "PRAGMA user_version"};
         REQUIRE(version.executeStep());
-        CHECK(version.getColumn(0).getInt() == 3);
+        CHECK(version.getColumn(0).getInt() == 4);
         CHECK(RecordCount(database) == 2);
 
         auto columns = SQLite::Statement{database, "PRAGMA table_info(fleet_records)"};
@@ -54,6 +54,13 @@ TEST_CASE("FleetDatabase creates typed stream tables and preserves insertion ord
         }
 
         CHECK_FALSE(hasPayload);
+        auto optimizedTables = SQLite::Statement{
+            database,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND sql LIKE '%WITHOUT ROWID%' "
+            "AND name IN ('fleet_experience_skills', 'fleet_bank_items', 'fleet_inventory_items', 'fleet_equipment_items')"};
+        REQUIRE(optimizedTables.executeStep());
+        CHECK(optimizedTables.getColumn(0).getInt() == 4);
+
         auto rows = SQLite::Statement{database,
                                       "SELECT records.sequence, accounts.name, skills.xp FROM fleet_records AS records "
                                       "JOIN fleet_accounts AS accounts ON accounts.id = records.account_id "
@@ -72,6 +79,149 @@ TEST_CASE("FleetDatabase creates typed stream tables and preserves insertion ord
     reopened.Append(Record("bot1", "2026-01-01T00:00:00Z", 3));
     auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
     CHECK(RecordCount(database) == 3);
+}
+
+TEST_CASE("FleetDatabase migrates version 3 composite-key tables without losing records", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-migration"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    {
+        auto prior = SQLite::Database{path.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE};
+        prior.exec("PRAGMA foreign_keys = ON");
+        prior.exec("CREATE TABLE fleet_accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
+        prior.exec(
+            "CREATE TABLE fleet_records ("
+            "sequence INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES fleet_accounts(id), "
+            "stream TEXT NOT NULL, recorded_at TEXT NOT NULL)");
+        prior.exec(
+            "CREATE TABLE fleet_experience ("
+            "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
+            "state TEXT NOT NULL, settled INTEGER NOT NULL)");
+        prior.exec(
+            "CREATE TABLE fleet_experience_skills ("
+            "record_id INTEGER NOT NULL REFERENCES fleet_experience(record_id) ON DELETE CASCADE, "
+            "skill TEXT NOT NULL, ordinal INTEGER NOT NULL, level INTEGER NOT NULL, base INTEGER NOT NULL, xp INTEGER NOT NULL, "
+            "PRIMARY KEY (record_id, skill), UNIQUE (record_id, ordinal))");
+        prior.exec("CREATE TABLE fleet_bank (record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE)");
+        prior.exec(
+            "CREATE TABLE fleet_bank_items ("
+            "record_id INTEGER NOT NULL REFERENCES fleet_bank(record_id) ON DELETE CASCADE, "
+            "item_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL, PRIMARY KEY (record_id, item_id))");
+        prior.exec("CREATE TABLE fleet_inventory (record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE)");
+        prior.exec(
+            "CREATE TABLE fleet_inventory_items ("
+            "record_id INTEGER NOT NULL REFERENCES fleet_inventory(record_id) ON DELETE CASCADE, "
+            "item_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL, PRIMARY KEY (record_id, item_id))");
+        prior.exec("CREATE TABLE fleet_equipment (record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE)");
+        prior.exec(
+            "CREATE TABLE fleet_equipment_items ("
+            "record_id INTEGER NOT NULL REFERENCES fleet_equipment(record_id) ON DELETE CASCADE, "
+            "item_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL, PRIMARY KEY (record_id, item_id))");
+        prior.exec("INSERT INTO fleet_accounts VALUES (1, 'oldbot')");
+        prior.exec(
+            "INSERT INTO fleet_records (sequence, account_id, stream, recorded_at) VALUES "
+            "(1, 1, 'experience', '2026-01-01T00:00:00Z'), "
+            "(2, 1, 'bank', '2026-01-01T00:00:01Z'), "
+            "(3, 1, 'inventory', '2026-01-01T00:00:02Z'), "
+            "(4, 1, 'equipment', '2026-01-01T00:00:03Z')");
+        prior.exec("INSERT INTO fleet_experience VALUES (1, 'ingame', 1)");
+        prior.exec("INSERT INTO fleet_experience_skills VALUES (1, 'attack', 0, 10, 9, 1000)");
+        prior.exec("INSERT INTO fleet_bank VALUES (2)");
+        prior.exec("INSERT INTO fleet_bank_items VALUES (2, 995, 'Coins', 109)");
+        prior.exec("INSERT INTO fleet_inventory VALUES (3)");
+        prior.exec("INSERT INTO fleet_inventory_items VALUES (3, 1891, 'Cake', 4)");
+        prior.exec("INSERT INTO fleet_equipment VALUES (4)");
+        prior.exec("INSERT INTO fleet_equipment_items VALUES (4, 1277, 'Bronze sword', 1)");
+        prior.exec("PRAGMA user_version = 3");
+    }
+
+    auto migrated = FleetDatabase{path, FleetDatabase::Mode_e::Inline};
+    migrated.Append(Record("newbot", "2026-01-01T00:00:04Z", 2000));
+
+    auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    auto version = SQLite::Statement{database, "PRAGMA user_version"};
+    REQUIRE(version.executeStep());
+    CHECK(version.getColumn(0).getInt() == 4);
+    CHECK(RecordCount(database) == 5);
+
+    auto oldSkill = SQLite::Statement{database, "SELECT skill, level, base, xp FROM fleet_experience_skills WHERE record_id = 1"};
+    REQUIRE(oldSkill.executeStep());
+    CHECK(oldSkill.getColumn(0).getString() == "attack");
+    CHECK(oldSkill.getColumn(1).getInt() == 10);
+    CHECK(oldSkill.getColumn(2).getInt() == 9);
+    CHECK(oldSkill.getColumn(3).getInt() == 1000);
+
+    auto oldItems = SQLite::Statement{
+        database,
+        "SELECT items.item_id, names.name, items.quantity FROM fleet_bank_items AS items "
+        "JOIN fleet_item_names AS names ON names.id = items.name_id WHERE items.record_id = 2"};
+    REQUIRE(oldItems.executeStep());
+    CHECK(oldItems.getColumn(0).getInt() == 995);
+    CHECK(oldItems.getColumn(1).getString() == "Coins");
+    CHECK(oldItems.getColumn(2).getInt() == 109);
+
+    auto migratedItemCount = SQLite::Statement{
+        database,
+        "SELECT (SELECT COUNT(*) FROM fleet_bank_items) + "
+        "(SELECT COUNT(*) FROM fleet_inventory_items) + (SELECT COUNT(*) FROM fleet_equipment_items)"};
+    REQUIRE(migratedItemCount.executeStep());
+    CHECK(migratedItemCount.getColumn(0).getInt() == 3);
+
+    auto optimizedTables = SQLite::Statement{
+        database,
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND sql LIKE '%WITHOUT ROWID%' "
+        "AND name IN ('fleet_experience_skills', 'fleet_bank_items', 'fleet_inventory_items', 'fleet_equipment_items')"};
+    REQUIRE(optimizedTables.executeStep());
+    CHECK(optimizedTables.getColumn(0).getInt() == 4);
+
+    auto foreignKeys = SQLite::Statement{database, "PRAGMA foreign_key_check"};
+    CHECK_FALSE(foreignKeys.executeStep());
+}
+
+TEST_CASE("FleetDatabase stores item names once across snapshots", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-item-names"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline};
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 109}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:01Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 100}, {.id = 996, .name = "Coins", .qty = 9}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:02Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins (alternate)", .qty = 99}}});
+
+    auto reader = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    auto names = SQLite::Statement{reader, "SELECT COUNT(*) FROM fleet_item_names"};
+    REQUIRE(names.executeStep());
+    CHECK(names.getColumn(0).getInt() == 2);
+
+    auto items = SQLite::Statement{
+        reader,
+        "SELECT items.item_id, names.name, items.quantity FROM fleet_bank_items AS items "
+        "JOIN fleet_item_names AS names ON names.id = items.name_id ORDER BY items.record_id, items.item_id"};
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 995);
+    CHECK(items.getColumn(1).getString() == "Coins");
+    CHECK(items.getColumn(2).getInt() == 109);
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 995);
+    CHECK(items.getColumn(1).getString() == "Coins");
+    CHECK(items.getColumn(2).getInt() == 100);
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 996);
+    CHECK(items.getColumn(1).getString() == "Coins");
+    CHECK(items.getColumn(2).getInt() == 9);
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 995);
+    CHECK(items.getColumn(1).getString() == "Coins (alternate)");
+    CHECK(items.getColumn(2).getInt() == 99);
+    CHECK_FALSE(items.executeStep());
 }
 
 TEST_CASE("FleetDatabase rolls back a snapshot when child rows fail", "[FleetDatabase]")
@@ -97,6 +247,24 @@ TEST_CASE("FleetDatabase rolls back a snapshot when child rows fail", "[FleetDat
     external.exec("DROP TRIGGER reject_skill");
     database.Append(Record("bot2", "2026-01-01T00:02:00Z", 3));
     CHECK(RecordCount(external) == 2);
+
+    external.exec(
+        "CREATE TRIGGER reject_bank_item BEFORE INSERT ON fleet_bank_items "
+        "BEGIN SELECT RAISE(ABORT, 'test rejection'); END");
+    const auto bankRecord = FleetBankLog_s{
+        .time = "2026-01-01T00:03:00Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 109}}};
+    CHECK_THROWS(database.Append(bankRecord));
+    external.exec("DROP TRIGGER reject_bank_item");
+    CHECK_NOTHROW(database.Append(bankRecord));
+
+    auto item = SQLite::Statement{
+        external,
+        "SELECT names.name FROM fleet_bank_items AS items "
+        "JOIN fleet_item_names AS names ON names.id = items.name_id"};
+    REQUIRE(item.executeStep());
+    CHECK(item.getColumn(0).getString() == "Coins");
 }
 
 TEST_CASE("FleetDatabase bounds write lock waits and accepts a later retry", "[FleetDatabase]")

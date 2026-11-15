@@ -21,7 +21,11 @@ namespace FleetDatabaseReader
 
     inline nlohmann::ordered_json Items(SQLite::Database& database, std::string_view table, s64 recordId)
     {
-        const auto query = std::format("SELECT item_id, name, quantity FROM {} WHERE record_id = ? ORDER BY item_id", table);
+        const auto query = std::format(
+            "SELECT items.item_id, names.name, items.quantity FROM {} AS items "
+            "JOIN fleet_item_names AS names ON names.id = items.name_id "
+            "WHERE items.record_id = ? ORDER BY items.item_id",
+            table);
         auto statement = SQLite::Statement{database, query};
         statement.bind(1, recordId);
 

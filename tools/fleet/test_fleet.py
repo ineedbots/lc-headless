@@ -5,7 +5,7 @@ import unittest
 from contextlib import closing
 
 import server
-from storage import SCHEMA_VERSION, create_schema
+from storage import SCHEMA_VERSION, create_schema, item_name_id
 
 
 def insert_record(database, stream, account, timestamp, record):
@@ -27,20 +27,23 @@ def insert_record(database, stream, account, timestamp, record):
     elif stream == 'bank':
         database.execute('INSERT INTO fleet_bank (record_id) VALUES (?)', (record_id,))
         database.executemany(
-            'INSERT INTO fleet_bank_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record.get('items', [])))
+            'INSERT INTO fleet_bank_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item_name_id(database, item['name']), item['qty'])
+             for item in record.get('items', [])))
     elif stream == 'inventory':
         database.execute(
             'INSERT INTO fleet_inventory (record_id, bank_open, used, free) VALUES (?, ?, ?, ?)',
             (record_id, record['bankOpen'], record['used'], record['free']))
         database.executemany(
-            'INSERT INTO fleet_inventory_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record.get('items', [])))
+            'INSERT INTO fleet_inventory_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item_name_id(database, item['name']), item['qty'])
+             for item in record.get('items', [])))
     elif stream == 'equipment':
         database.execute('INSERT INTO fleet_equipment (record_id, used) VALUES (?, ?)', (record_id, record['used']))
         database.executemany(
-            'INSERT INTO fleet_equipment_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record.get('items', [])))
+            'INSERT INTO fleet_equipment_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], item_name_id(database, item['name']), item['qty'])
+             for item in record.get('items', [])))
     elif stream == 'account-data':
         tile = record.get('tile')
         destination = record.get('destination')
@@ -140,10 +143,26 @@ class FleetDatabaseTests(unittest.TestCase):
             create_schema(database)
             for stream, record in records.items():
                 insert_record(database, stream, 'worker', '2026-01-01T00:00:00Z', record)
+            self.assertEqual(database.execute('SELECT COUNT(*) FROM fleet_item_names').fetchone()[0], 1)
 
         for stream, expected in records.items():
             actual = server._latest(stream)['worker']
             self.assertEqual({key: value for key, value in actual.items() if key not in ('time', 'account')}, expected)
+
+    def test_composite_key_tables_use_without_rowid(self):
+        with closing(sqlite3.connect(self.database_path)) as database, database:
+            create_schema(database)
+            rowid_tables = {
+                row[0] for row in database.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND sql LIKE '%WITHOUT ROWID%'")
+            }
+
+        self.assertTrue({
+            'fleet_experience_skills',
+            'fleet_bank_items',
+            'fleet_inventory_items',
+            'fleet_equipment_items',
+        }.issubset(rowid_tables))
 
     def test_schema_rejects_existing_generic_database_without_migration(self):
         with closing(sqlite3.connect(self.database_path)) as database, database:

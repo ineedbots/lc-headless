@@ -3,7 +3,7 @@
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 STREAMS = ('account-data', 'experience', 'bank', 'inventory', 'equipment')
 
 CREATE_SCHEMA = (
@@ -16,6 +16,7 @@ CREATE_SCHEMA = (
     "CREATE INDEX fleet_records_latest ON fleet_records (account_id, stream, sequence DESC)",
     "CREATE INDEX fleet_records_history ON fleet_records (account_id, stream, recorded_at, sequence)",
     "CREATE INDEX fleet_records_stream_latest ON fleet_records (stream, account_id, sequence DESC)",
+    "CREATE TABLE fleet_item_names (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)",
     "CREATE TABLE fleet_account_data ("
     "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
     "state TEXT NOT NULL, settled INTEGER NOT NULL CHECK (settled IN (0, 1)), pid INTEGER, "
@@ -47,27 +48,30 @@ CREATE_SCHEMA = (
     "record_id INTEGER NOT NULL REFERENCES fleet_experience(record_id) ON DELETE CASCADE, "
     "skill TEXT NOT NULL, ordinal INTEGER NOT NULL CHECK (ordinal >= 0), "
     "level INTEGER NOT NULL, base INTEGER NOT NULL, xp INTEGER NOT NULL CHECK (xp >= 0), "
-    "PRIMARY KEY (record_id, skill), UNIQUE (record_id, ordinal))",
+    "PRIMARY KEY (record_id, skill), UNIQUE (record_id, ordinal)) WITHOUT ROWID",
     "CREATE TABLE fleet_bank (record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE)",
     "CREATE TABLE fleet_bank_items ("
     "record_id INTEGER NOT NULL REFERENCES fleet_bank(record_id) ON DELETE CASCADE, "
-    "item_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), "
-    "PRIMARY KEY (record_id, item_id))",
+    "item_id INTEGER NOT NULL, name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
+    "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+    "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID",
     "CREATE TABLE fleet_inventory ("
     "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
     "bank_open INTEGER NOT NULL CHECK (bank_open IN (0, 1)), "
     "used INTEGER NOT NULL CHECK (used >= 0), free INTEGER NOT NULL CHECK (free >= 0))",
     "CREATE TABLE fleet_inventory_items ("
     "record_id INTEGER NOT NULL REFERENCES fleet_inventory(record_id) ON DELETE CASCADE, "
-    "item_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), "
-    "PRIMARY KEY (record_id, item_id))",
+    "item_id INTEGER NOT NULL, name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
+    "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+    "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID",
     "CREATE TABLE fleet_equipment ("
     "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
     "used INTEGER NOT NULL CHECK (used >= 0))",
     "CREATE TABLE fleet_equipment_items ("
     "record_id INTEGER NOT NULL REFERENCES fleet_equipment(record_id) ON DELETE CASCADE, "
-    "item_id INTEGER NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), "
-    "PRIMARY KEY (record_id, item_id))",
+    "item_id INTEGER NOT NULL, name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
+    "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+    "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID",
 )
 
 
@@ -105,3 +109,19 @@ def create_schema(connection):
         for statement in CREATE_SCHEMA:
             connection.execute(statement)
         connection.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
+
+
+def item_name_id(connection, name, cache=None):
+    """Return the shared dictionary ID for an item name, creating it if needed."""
+    if cache is not None and name in cache:
+        return cache[name]
+
+    connection.execute(
+        'INSERT INTO fleet_item_names (name) VALUES (?) ON CONFLICT (name) DO NOTHING', (name,))
+    row = connection.execute('SELECT id FROM fleet_item_names WHERE name = ?', (name,)).fetchone()
+    if row is None:
+        raise sqlite3.DatabaseError('could not find fleet item name after insert')
+    name_id = row[0]
+    if cache is not None:
+        cache[name] = name_id
+    return name_id

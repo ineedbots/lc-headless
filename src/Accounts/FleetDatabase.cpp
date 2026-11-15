@@ -6,7 +6,7 @@
 
 namespace
 {
-    constexpr auto SCHEMA_VERSION = 3;
+    constexpr auto SCHEMA_VERSION = 4;
     constexpr auto BUSY_TIMEOUT_MS = 25;
     constexpr auto BATCH_DELAY = 5ms;
 
@@ -123,19 +123,61 @@ namespace
         }
     }
 
-    void InsertItems(SQLite::Database& database, std::string_view table, s64 recordId, const std::vector<FleetItem_s>& items)
+    void InsertItems(
+        SQLite::Database& database,
+        std::unordered_map<std::string, s64>& itemNameIds,
+        std::string_view table,
+        s64 recordId,
+        const std::vector<FleetItem_s>& items)
     {
-        const auto query = std::format("INSERT INTO {} (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)", table);
-        auto statement = SQLite::Statement{database, query};
+        const auto query = std::format("INSERT INTO {} (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)", table);
+        auto itemStatement = SQLite::Statement{database, query};
+        auto insertNameStatement = SQLite::Statement{
+            database,
+            "INSERT INTO fleet_item_names (name) VALUES (?) ON CONFLICT (name) DO NOTHING"};
+        auto findNameStatement = SQLite::Statement{database, "SELECT id FROM fleet_item_names WHERE name = ?"};
+
         for (const auto& item : items)
         {
-            statement.bind(1, recordId);
-            statement.bind(2, static_cast<s64>(item.id));
-            statement.bind(3, SanitizeUtf8(item.name));
-            statement.bind(4, static_cast<s64>(item.qty));
-            statement.exec();
-            statement.reset();
+            auto name = SanitizeUtf8(item.name);
+            auto nameId = itemNameIds.find(name);
+            if (nameId == itemNameIds.end())
+            {
+                insertNameStatement.bind(1, name);
+                insertNameStatement.exec();
+                insertNameStatement.reset();
+
+                findNameStatement.bind(1, name);
+                if (!findNameStatement.executeStep())
+                {
+                    throw std::runtime_error{"could not find fleet item name after insert"};
+                }
+
+                nameId = itemNameIds.emplace(std::move(name), findNameStatement.getColumn(0).getInt64()).first;
+                findNameStatement.reset();
+            }
+
+            itemStatement.bind(1, recordId);
+            itemStatement.bind(2, static_cast<s64>(item.id));
+            itemStatement.bind(3, nameId->second);
+            itemStatement.bind(4, static_cast<s64>(item.qty));
+            itemStatement.exec();
+            itemStatement.reset();
         }
+    }
+
+    void MigrateTableWithoutRowid(
+        SQLite::Database& database,
+        std::string_view table,
+        std::string_view definition,
+        std::string_view columns,
+        std::string_view selection)
+    {
+        const auto temporaryTable = std::format("fleet_migration_{}", table);
+        database.exec(std::format("CREATE TABLE {} {}", temporaryTable, definition));
+        database.exec(std::format("INSERT INTO {} ({}) {}", temporaryTable, columns, selection));
+        database.exec(std::format("DROP TABLE {}", table));
+        database.exec(std::format("ALTER TABLE {} RENAME TO {}", temporaryTable, table));
     }
 
     template <typename TRecord>
@@ -327,6 +369,8 @@ void FleetDatabase::WriteBatch(std::vector<PendingWrite_s> writes)
     }
     catch (...)
     {
+        // Cached IDs may refer to dictionary rows rolled back with this batch.
+        m_itemNameIds.clear();
         error = std::current_exception();
     }
 
@@ -438,7 +482,7 @@ void FleetDatabase::Write(const FleetBankLog_s& record)
         statement.exec();
     }
 
-    InsertItems(*m_database, "fleet_bank_items", recordId, record.items);
+    InsertItems(*m_database, m_itemNameIds, "fleet_bank_items", recordId, record.items);
 }
 
 void FleetDatabase::Write(const FleetInventoryLog_s& record)
@@ -453,7 +497,7 @@ void FleetDatabase::Write(const FleetInventoryLog_s& record)
         statement.exec();
     }
 
-    InsertItems(*m_database, "fleet_inventory_items", recordId, record.items);
+    InsertItems(*m_database, m_itemNameIds, "fleet_inventory_items", recordId, record.items);
 }
 
 void FleetDatabase::Write(const FleetEquipmentLog_s& record)
@@ -466,7 +510,7 @@ void FleetDatabase::Write(const FleetEquipmentLog_s& record)
         statement.exec();
     }
 
-    InsertItems(*m_database, "fleet_equipment_items", recordId, record.items);
+    InsertItems(*m_database, m_itemNameIds, "fleet_equipment_items", recordId, record.items);
 }
 
 void FleetDatabase::EnsureOpen()
@@ -501,7 +545,7 @@ void FleetDatabase::EnsureOpen()
         throw std::runtime_error{std::format("fleet database schema version {} is newer than supported version {}", version, SCHEMA_VERSION)};
     }
 
-    if (version != 0 && version != SCHEMA_VERSION)
+    if (version != 0 && version != 3 && version != SCHEMA_VERSION)
     {
         throw std::runtime_error{std::format("fleet database schema version {} is unsupported; use a new database file", version)};
     }
@@ -540,6 +584,7 @@ void FleetDatabase::EnsureOpen()
         database->exec("CREATE INDEX fleet_records_latest ON fleet_records (account_id, stream, sequence DESC)");
         database->exec("CREATE INDEX fleet_records_history ON fleet_records (account_id, stream, recorded_at, sequence)");
         database->exec("CREATE INDEX fleet_records_stream_latest ON fleet_records (stream, account_id, sequence DESC)");
+        database->exec("CREATE TABLE fleet_item_names (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
         database->exec(
             "CREATE TABLE fleet_account_data ("
             "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
@@ -582,7 +627,7 @@ void FleetDatabase::EnsureOpen()
             "base INTEGER NOT NULL, "
             "xp INTEGER NOT NULL CHECK (xp >= 0), "
             "PRIMARY KEY (record_id, skill), "
-            "UNIQUE (record_id, ordinal))");
+            "UNIQUE (record_id, ordinal)) WITHOUT ROWID");
         database->exec(
             "CREATE TABLE fleet_bank ("
             "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE)");
@@ -590,9 +635,9 @@ void FleetDatabase::EnsureOpen()
             "CREATE TABLE fleet_bank_items ("
             "record_id INTEGER NOT NULL REFERENCES fleet_bank(record_id) ON DELETE CASCADE, "
             "item_id INTEGER NOT NULL, "
-            "name TEXT NOT NULL, "
+            "name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
             "quantity INTEGER NOT NULL CHECK (quantity > 0), "
-            "PRIMARY KEY (record_id, item_id))");
+            "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID");
         database->exec(
             "CREATE TABLE fleet_inventory ("
             "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
@@ -603,9 +648,9 @@ void FleetDatabase::EnsureOpen()
             "CREATE TABLE fleet_inventory_items ("
             "record_id INTEGER NOT NULL REFERENCES fleet_inventory(record_id) ON DELETE CASCADE, "
             "item_id INTEGER NOT NULL, "
-            "name TEXT NOT NULL, "
+            "name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
             "quantity INTEGER NOT NULL CHECK (quantity > 0), "
-            "PRIMARY KEY (record_id, item_id))");
+            "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID");
         database->exec(
             "CREATE TABLE fleet_equipment ("
             "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
@@ -614,9 +659,58 @@ void FleetDatabase::EnsureOpen()
             "CREATE TABLE fleet_equipment_items ("
             "record_id INTEGER NOT NULL REFERENCES fleet_equipment(record_id) ON DELETE CASCADE, "
             "item_id INTEGER NOT NULL, "
-            "name TEXT NOT NULL, "
+            "name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
             "quantity INTEGER NOT NULL CHECK (quantity > 0), "
-            "PRIMARY KEY (record_id, item_id))");
+            "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID");
+        database->exec(std::format("PRAGMA user_version = {}", SCHEMA_VERSION));
+        transaction.commit();
+    }
+    else if (version == 3)
+    {
+        auto transaction = SQLite::Transaction{*database};
+        database->exec("CREATE TABLE fleet_item_names (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
+        database->exec(
+            "INSERT INTO fleet_item_names (name) "
+            "SELECT name FROM fleet_bank_items UNION SELECT name FROM fleet_inventory_items UNION SELECT name FROM fleet_equipment_items");
+        MigrateTableWithoutRowid(
+            *database,
+            "fleet_experience_skills",
+            "(record_id INTEGER NOT NULL REFERENCES fleet_experience(record_id) ON DELETE CASCADE, "
+            "skill TEXT NOT NULL, ordinal INTEGER NOT NULL CHECK (ordinal >= 0), "
+            "level INTEGER NOT NULL, base INTEGER NOT NULL, xp INTEGER NOT NULL CHECK (xp >= 0), "
+            "PRIMARY KEY (record_id, skill), UNIQUE (record_id, ordinal)) WITHOUT ROWID",
+            "record_id, skill, ordinal, level, base, xp",
+            "SELECT record_id, skill, ordinal, level, base, xp FROM fleet_experience_skills");
+        MigrateTableWithoutRowid(
+            *database,
+            "fleet_bank_items",
+            "(record_id INTEGER NOT NULL REFERENCES fleet_bank(record_id) ON DELETE CASCADE, "
+            "item_id INTEGER NOT NULL, name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
+            "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+            "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID",
+            "record_id, item_id, name_id, quantity",
+            "SELECT items.record_id, items.item_id, names.id, items.quantity "
+            "FROM fleet_bank_items AS items JOIN fleet_item_names AS names ON names.name = items.name");
+        MigrateTableWithoutRowid(
+            *database,
+            "fleet_inventory_items",
+            "(record_id INTEGER NOT NULL REFERENCES fleet_inventory(record_id) ON DELETE CASCADE, "
+            "item_id INTEGER NOT NULL, name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
+            "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+            "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID",
+            "record_id, item_id, name_id, quantity",
+            "SELECT items.record_id, items.item_id, names.id, items.quantity "
+            "FROM fleet_inventory_items AS items JOIN fleet_item_names AS names ON names.name = items.name");
+        MigrateTableWithoutRowid(
+            *database,
+            "fleet_equipment_items",
+            "(record_id INTEGER NOT NULL REFERENCES fleet_equipment(record_id) ON DELETE CASCADE, "
+            "item_id INTEGER NOT NULL, name_id INTEGER NOT NULL REFERENCES fleet_item_names(id), "
+            "quantity INTEGER NOT NULL CHECK (quantity > 0), "
+            "PRIMARY KEY (record_id, item_id)) WITHOUT ROWID",
+            "record_id, item_id, name_id, quantity",
+            "SELECT items.record_id, items.item_id, names.id, items.quantity "
+            "FROM fleet_equipment_items AS items JOIN fleet_item_names AS names ON names.name = items.name");
         database->exec(std::format("PRAGMA user_version = {}", SCHEMA_VERSION));
         transaction.commit();
     }

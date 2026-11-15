@@ -73,7 +73,9 @@ def _items(connection, table, record_id):
     return [
         {'id': item_id, 'name': name, 'qty': quantity}
         for item_id, name, quantity in connection.execute(
-            f'SELECT item_id, name, quantity FROM {table} WHERE record_id = ? ORDER BY item_id',
+            f'SELECT items.item_id, names.name, items.quantity FROM {table} AS items '
+            'JOIN fleet_item_names AS names ON names.id = items.name_id '
+            'WHERE items.record_id = ? ORDER BY items.item_id',
             (record_id,))
     ]
 
