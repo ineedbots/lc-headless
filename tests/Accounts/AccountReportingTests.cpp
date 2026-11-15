@@ -17,12 +17,12 @@ TEST_CASE("Account reporting preserves progress callbacks despite file failures 
     auto fixture = HostFixture{"def on_progress_report():\n    return {'Trips': 7}\n\ndef loop():\n    return 600\n"};
     fixture.folder.WriteFile("blocked", "keep this file");
     auto config = Config_s{};
-    config.scripting.accountDataDirectory.clear();
+    config.scripting.accountDataLogEnabled = false;
     config.scripting.progressDirectory = (fixture.folder.GetPath() / "blocked").string();
-    config.scripting.experienceDirectory.clear();
-    config.scripting.bankLogDirectory.clear();
-    config.scripting.inventoryDirectory.clear();
-    config.scripting.equipmentDirectory.clear();
+    config.scripting.experienceLogEnabled = false;
+    config.scripting.bankLogEnabled = false;
+    config.scripting.inventoryLogEnabled = false;
+    config.scripting.equipmentLogEnabled = false;
     auto settings = AccountConfig_s{.name = "bot1", .script = ScriptConfig_s{.file = "main.py", .progressReportMinutes = 1min}};
     auto reports = std::vector<ProgressReport_s>{};
     auto reporting = AccountReporting{config, settings, fixture.client.GetCache(), fixture.capture.GetLogger(), [&](const ProgressReport_s& report)
@@ -44,4 +44,18 @@ TEST_CASE("Account reporting preserves progress callbacks despite file failures 
     reporting.AfterScript(start + 2min, *fixture.host);
     CHECK(reports.size() == 1);
     CHECK(FileUtils::ReadText(fixture.folder.GetPath() / "blocked") == "keep this file");
+}
+
+TEST_CASE("A blank fleet database path disables fleet journals", "[AccountReporting]")
+{
+    auto fixture = HostFixture{"def loop():\n    return 600\n"};
+    auto config = Config_s{};
+    config.scripting.fleetDatabasePath.clear();
+    auto settings = AccountConfig_s{.name = "bot1"};
+    auto reporting = AccountReporting{config, settings, fixture.client.GetCache(), fixture.capture.GetLogger(), {}};
+    const auto now = AccountReporting::Clock::now();
+
+    reporting.ObserveSession(now, GameState_s{}, ClientStatus_e::Connecting);
+    CHECK_FALSE(fixture.HasLog(LogLevel_e::Warning, "The account data log wasn't saved"));
+    CHECK_FALSE(fixture.HasLog(LogLevel_e::Warning, "The experience log wasn't saved"));
 }

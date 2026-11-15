@@ -5,14 +5,9 @@
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
+#include "FleetDatabase.hpp"
 
-#include <chrono>
-#include <filesystem>
-#include <memory>
-#include <string>
-
-// Writes one of an account's item containers to <directory>/<account>.jsonl whenever its contents change,
-// grouped by item id. The last line is what it holds now, and the earlier lines are its history.
+// Writes one of an account's item containers whenever its contents change, grouped by item id.
 //
 // Backpack samples follow the bank: while one is open the game swaps in the bank's own backpack, so the
 // sample is of that, and bankOpen says so. Changes closer together than the interval are held until it
@@ -29,14 +24,14 @@ public:
     };
 
     // A zero interval records every change.
-    ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events = {});
+    ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     // Called every step while in game.
     void Step(Clock::time_point now, const GameState_s& state);
 
-    [[nodiscard]] const std::filesystem::path& GetPath() const
+    [[nodiscard]] const std::filesystem::path& GetDatabasePath() const
     {
-        return m_path;
+        return m_database->GetPath();
     }
 
 private:
@@ -63,12 +58,12 @@ private:
     };
 
     [[nodiscard]] Contents_s Read(const GameState_s& state) const;
-    void WriteSample(Clock::time_point now, const Contents_s& contents);
+    bool WriteSample(Clock::time_point now, const Contents_s& contents);
 
     const GameCache_s& m_cache;
     std::shared_ptr<Logger> m_logger;
     std::string m_accountName;
-    std::filesystem::path m_path;
+    std::shared_ptr<FleetDatabase> m_database;
     Kind_e m_kind;
     std::chrono::seconds m_interval;
     std::optional<Contents_s> m_lastSample;
@@ -76,5 +71,6 @@ private:
     std::optional<Contents_s> m_pending;
     std::optional<Clock::time_point> m_nextSample;
     bool m_writeFailed = false;
+    std::optional<Clock::time_point> m_retryAt;
     std::shared_ptr<ApplicationEventPublisher> m_events;
 };

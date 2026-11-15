@@ -4,7 +4,6 @@
 #include "../Application/Events/ApplicationEventPublisher.hpp"
 
 #include "../Game/State/GameStateQueries.hpp"
-#include "../Utils/FileUtils.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "FleetLogJson.hpp"
 #include "Type/FleetItem_s.hpp"
@@ -14,38 +13,39 @@
 
 #include <nlohmann/json.hpp>
 
-namespace
-{
-    constexpr auto EXTENSION = ".jsonl"sv;
-}
-
-BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::shared_ptr<ApplicationEventPublisher> events)
+BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
     , m_logger{std::move(logger)}
     , m_accountName{std::move(accountName)}
-    , m_directory{std::move(directory)}
+    , m_database{std::move(database)}
     , m_events{std::move(events)}
 {
 }
 
-void BankLogger::Step(const GameState_s& state)
+void BankLogger::Step(Clock::time_point now, const GameState_s& state)
 {
     const auto open = GameStateQueries::IsBankOpen(m_cache, state);
-    if (open && !m_wasOpen)
+    if (open && (!m_wasOpen || m_pending) && (!m_retryAt || now >= *m_retryAt))
     {
-        Log(state);
+        Log(now, state);
+    }
+
+    if (!open)
+    {
+        m_pending = false;
+        m_retryAt.reset();
     }
 
     m_wasOpen = open;
 }
 
-void BankLogger::Log(const GameState_s& state)
+bool BankLogger::Log(Clock::time_point now, const GameState_s& state)
 {
     const auto* const bank = state.FindInventory(m_cache.bankComponent);
     if (bank == nullptr)
     {
         // Open, but the items haven't arrived: the next open records the bank instead.
-        return;
+        return false;
     }
 
     // Grouped by id, in id order, so the same bank always reads the same way.
@@ -73,18 +73,20 @@ void BankLogger::Log(const GameState_s& state)
 
     try
     {
-        const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
-        FileUtils::AppendText(m_directory / (m_accountName + std::string{EXTENSION}), line);
+        const auto payload = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+        m_database->Append(FleetStream_e::Bank, m_accountName, record.time, payload);
+        m_pending = false;
+        m_retryAt.reset();
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, FleetBankLog_s{line});
+            m_events->Publish(m_accountName, FleetBankLog_s{payload});
         }
 
         if (m_writeFailed)
         {
             m_writeFailed = false;
-            m_logger->Info("Writing the bank to {} again", m_directory.string());
+            m_logger->Info("Writing the bank to {} again", m_database->GetPath().string());
         }
     }
     catch (const std::exception& e)
@@ -93,9 +95,15 @@ void BankLogger::Log(const GameState_s& state)
         if (!m_writeFailed)
         {
             m_writeFailed = true;
-            m_logger->Warning("The bank wasn't saved: {}", e.what());
+            m_logger->Warning("The bank wasn't saved to {}; it will retry: {}", m_database->GetPath().string(), e.what());
         }
+
+        m_pending = true;
+        m_retryAt = now + 1s;
+
+        return false;
     }
 
     m_logger->Info("Bank ({}): {}", summary.empty() ? "empty" : "open", summary.empty() ? "empty" : StringUtils::Join(summary, ", "));
+    return true;
 }

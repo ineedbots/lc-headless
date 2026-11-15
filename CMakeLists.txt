@@ -18,6 +18,7 @@ find_package(Threads REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(pocketpy CONFIG REQUIRED)
+find_package(SQLiteCpp CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 
 file(GLOB_RECURSE LIBRARY_SOURCES CONFIGURE_DEPENDS
@@ -62,7 +63,7 @@ target_sources(${PROJECT_NAME}Lib PRIVATE ${LIBRARY_SOURCES})
 configure_project_target(${PROJECT_NAME}Lib)
 target_compile_definitions(${PROJECT_NAME}Lib PUBLIC JSON_DIAGNOSTICS=1)
 target_link_libraries(${PROJECT_NAME}Lib
-    PUBLIC pocketpy::pocketpy nlohmann_json::nlohmann_json
+    PUBLIC pocketpy::pocketpy nlohmann_json::nlohmann_json SQLiteCpp
     PRIVATE Boost::asio Boost::beast OpenSSL::SSL OpenSSL::Crypto BZip2::BZip2 ZLIB::ZLIB
             $<$<PLATFORM_ID:Windows>:crypt32>)
 
@@ -113,6 +114,7 @@ target_link_libraries(${PROJECT_NAME}Tests PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
     BZip2::BZip2
+    SQLiteCpp
     ZLIB::ZLIB
     Catch2::Catch2WithMain)
 
@@ -142,6 +144,12 @@ install(FILES accounts/example.jsonc.sample DESTINATION accounts)
 install(FILES data/cache/.gitkeep DESTINATION data/cache)
 install(DIRECTORY data/nav DESTINATION data)
 install(DIRECTORY scripts/examples scripts/typings DESTINATION scripts)
+if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+    install(FILES "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/sqlitecpp/copyright"
+        DESTINATION thirdparty/sqlitecpp)
+    install(FILES "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/sqlite3/copyright"
+        DESTINATION thirdparty/sqlite3)
+endif()
 file(GLOB THIRDPARTY_LICENSES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS thirdparty/*/LICENSE)
 foreach(license IN LISTS THIRDPARTY_LICENSES)
     cmake_path(GET license PARENT_PATH folder)

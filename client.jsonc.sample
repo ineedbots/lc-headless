@@ -45,16 +45,17 @@
         "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
         "progressDirectory": "progress",
-        // Per-account JSONL journals. An empty directory disables that journal.
-        "experienceDirectory": "experience",
+        // Fleet history is stored in this shared SQLite database; paths are relative to the working directory.
+        "fleetDatabasePath": "data/fleet.sqlite",
+        "accountDataLogEnabled": true,
+        "experienceLogEnabled": true,
+        "bankLogEnabled": true,
+        "inventoryLogEnabled": true,
+        "equipmentLogEnabled": true,
         // 0 disables experience logging; otherwise 1 to 1440 minutes.
         "experienceIntervalMinutes": 1,
-        "bankLogDirectory": "bank",
-        "inventoryDirectory": "inventory",
         // 0 records every backpack change; otherwise 1 to 86400 seconds.
         "inventoryIntervalSeconds": 5,
-        "equipmentDirectory": "equipment",
-        "accountDataDirectory": "account-data",
         // 0 records every account data change; otherwise 1 to 86400 seconds.
         "accountDataIntervalSeconds": 5
     },

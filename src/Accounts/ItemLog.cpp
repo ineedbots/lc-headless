@@ -5,7 +5,6 @@
 
 #include "../Game/State/GameStateQueries.hpp"
 
-#include "../Utils/FileUtils.hpp"
 #include "FleetLogJson.hpp"
 #include "Type/FleetItem_s.hpp"
 #include "Type/FleetItemRecord_s.hpp"
@@ -15,16 +14,11 @@
 
 #include <nlohmann/json.hpp>
 
-namespace
-{
-    constexpr auto EXTENSION = ".jsonl"sv;
-}
-
-ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
+ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
     , m_logger{std::move(logger)}
     , m_accountName{std::move(accountName)}
-    , m_path{std::move(directory) / (m_accountName + std::string{EXTENSION})}
+    , m_database{std::move(database)}
     , m_kind{kind}
     , m_interval{interval}
     , m_events{std::move(events)}
@@ -95,10 +89,31 @@ void ItemLog::Step(Clock::time_point now, const GameState_s& state)
         return;
     }
 
+    if (m_retryAt && now < *m_retryAt)
+    {
+        if (m_lastSample && contents == *m_lastSample)
+        {
+            m_pending.reset();
+        }
+        else
+        {
+            m_pending = contents;
+        }
+
+        return;
+    }
+
     if (!m_lastSample)
     {
-        WriteSample(now, contents);
-        m_lastSample = contents;
+        if (WriteSample(now, contents))
+        {
+            m_lastSample = contents;
+        }
+        else
+        {
+            m_pending = contents;
+        }
+
         return;
     }
 
@@ -115,18 +130,19 @@ void ItemLog::Step(Clock::time_point now, const GameState_s& state)
         return;
     }
 
-    WriteSample(now, contents);
-    m_lastSample = contents;
-    m_pending.reset();
+    if (WriteSample(now, contents))
+    {
+        m_lastSample = contents;
+        m_pending.reset();
+    }
+    else
+    {
+        m_pending = contents;
+    }
 }
 
-void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
+bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
 {
-    if (m_interval > std::chrono::seconds::zero())
-    {
-        m_nextSample = now + m_interval;
-    }
-
     auto record = FleetItemRecord_s{
         .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())),
         .account = m_accountName,
@@ -145,26 +161,34 @@ void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
 
     try
     {
-        const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
-        FileUtils::AppendText(m_path, line);
+        const auto payload = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+        const auto stream = m_kind == Kind_e::Backpack ? FleetStream_e::Inventory : FleetStream_e::Equipment;
+        m_database->Append(stream, m_accountName, record.time, payload);
+        m_retryAt.reset();
+        if (m_interval > std::chrono::seconds::zero())
+        {
+            m_nextSample = now + m_interval;
+        }
 
         if (m_events)
         {
             if (m_kind == Kind_e::Backpack)
             {
-                m_events->Publish(m_accountName, FleetInventoryLog_s{line});
+                m_events->Publish(m_accountName, FleetInventoryLog_s{payload});
             }
             else
             {
-                m_events->Publish(m_accountName, FleetEquipmentLog_s{line});
+                m_events->Publish(m_accountName, FleetEquipmentLog_s{payload});
             }
         }
 
         if (m_writeFailed)
         {
             m_writeFailed = false;
-            m_logger->Info("Writing {} to {} again", m_kind == Kind_e::Backpack ? "the backpack" : "the worn equipment", m_path.string());
+            m_logger->Info("Writing {} to {} again", m_kind == Kind_e::Backpack ? "the backpack" : "the worn equipment", m_database->GetPath().string());
         }
+
+        return true;
     }
     catch (const std::exception& e)
     {
@@ -172,7 +196,10 @@ void ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
         if (!m_writeFailed)
         {
             m_writeFailed = true;
-            m_logger->Warning("{} wasn't saved: {}", m_kind == Kind_e::Backpack ? "The backpack" : "The worn equipment", e.what());
+            m_logger->Warning("{} wasn't saved to {}; it will retry: {}", m_kind == Kind_e::Backpack ? "The backpack" : "The worn equipment", m_database->GetPath().string(), e.what());
         }
+
+        m_retryAt = now + (m_interval > std::chrono::seconds::zero() ? m_interval : 1s);
+        return false;
     }
 }

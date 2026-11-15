@@ -13,23 +13,16 @@
 #include "Game/State/Type/GameState_s.hpp"
 #include "Game/State/Type/Stat_e.hpp"
 #include "Game/Type/Tile_s.hpp"
-#include "Utils/FileUtils.hpp"
+#include "../Support/FleetDatabaseReader.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
 namespace
 {
-    std::vector<nlohmann::json> Records(const std::filesystem::path& path)
+    std::vector<nlohmann::json> Records(const std::filesystem::path& path, std::string_view account = "bot1")
     {
-        auto file = std::ifstream{path};
-        auto records = std::vector<nlohmann::json>{};
-        auto line = std::string{};
-        while (std::getline(file, line))
-        {
-            records.push_back(nlohmann::json::parse(line));
-        }
-        return records;
+        return ReadFleetRecords(path, "account-data", account);
     }
 
     GameState_s SettledState()
@@ -52,11 +45,12 @@ TEST_CASE("Account data records settled values and server facing targets", "[Acc
     const auto folder = TempFolder{"rs2004-account-data"};
     auto capture = LogCapture{};
     const auto cache = GameCache_s{};
-    auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", folder.GetPath(), 0s};
+    auto database = std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite");
+    auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", database, 0s};
     auto state = SettledState();
     const auto now = AccountDataLog::Clock::now();
     log.Step(now, state, ClientStatus_e::InGame);
-    auto first = Records(log.GetPath()).back();
+    auto first = Records(log.GetDatabasePath()).back();
     CHECK(first["account"] == "bot1");
     CHECK(first["pid"] == 42);
     CHECK(first["tile"] == nlohmann::json{{"x", 3200}, {"z", 3201}, {"level", 2}});
@@ -73,7 +67,7 @@ TEST_CASE("Account data records settled values and server facing targets", "[Acc
     state.varps[300] = 750;
     state.varps[301] = 1;
     log.Step(now, state, ClientStatus_e::InGame);
-    auto record = Records(log.GetPath()).back();
+    auto record = Records(log.GetDatabasePath()).back();
     CHECK(record["target"] == nlohmann::json{{"kind", "npc"}, {"index", 17}});
     CHECK(record["destination"]["x"] == 3210);
     CHECK(record["moving"] == true);
@@ -81,15 +75,15 @@ TEST_CASE("Account data records settled values and server facing targets", "[Acc
 
     state.localPlayer.faceEntity->type = EntityType_e::Player;
     log.Step(now, state, ClientStatus_e::InGame);
-    CHECK(Records(log.GetPath()).back()["target"]["kind"] == "player");
+    CHECK(Records(log.GetDatabasePath()).back()["target"]["kind"] == "player");
     state.localPlayer.faceEntity.reset();
     log.Step(now, state, ClientStatus_e::InGame);
-    CHECK(Records(log.GetPath()).back()["target"] == nlohmann::json{{"kind", "tile"}, {"tile", {{"x", 3201}, {"z", 3202}, {"level", 2}}}});
+    CHECK(Records(log.GetDatabasePath()).back()["target"] == nlohmann::json{{"kind", "tile"}, {"tile", {{"x", 3201}, {"z", 3202}, {"level", 2}}}});
     state.localPlayer.faceCoord.reset();
     state.walkDestination.reset();
     log.Step(now, state, ClientStatus_e::InGame);
-    CHECK(Records(log.GetPath()).back()["target"].is_null());
-    CHECK(Records(log.GetPath()).back()["destination"].is_null());
+    CHECK(Records(log.GetDatabasePath()).back()["target"].is_null());
+    CHECK(Records(log.GetDatabasePath()).back()["destination"].is_null());
 }
 
 TEST_CASE("Account data coalesces changes and clears stale state across sessions", "[AccountDataLog]")
@@ -97,23 +91,24 @@ TEST_CASE("Account data coalesces changes and clears stale state across sessions
     const auto folder = TempFolder{"rs2004-account-data-interval"};
     auto capture = LogCapture{};
     const auto cache = GameCache_s{};
-    auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", folder.GetPath(), 5s};
+    auto database = std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite");
+    auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", database, 5s};
     auto state = SettledState();
     const auto now = AccountDataLog::Clock::now();
     log.Step(now, state, ClientStatus_e::InGame);
     ++state.tick;
     log.Step(now + 5s, state, ClientStatus_e::InGame);
-    REQUIRE(Records(log.GetPath()).size() == 1);
+    REQUIRE(Records(log.GetDatabasePath()).size() == 1);
     state.runEnergy = 70;
     log.Step(now + 6s, state, ClientStatus_e::InGame);
     state.runEnergy = 60;
     log.Step(now + 7s, state, ClientStatus_e::InGame);
-    REQUIRE(Records(log.GetPath()).size() == 2);
+    REQUIRE(Records(log.GetDatabasePath()).size() == 2);
     log.Step(now + 11s, state, ClientStatus_e::InGame);
-    REQUIRE(Records(log.GetPath()).size() == 3);
-    CHECK(Records(log.GetPath()).back()["energy"] == 60);
+    REQUIRE(Records(log.GetDatabasePath()).size() == 3);
+    CHECK(Records(log.GetDatabasePath()).back()["energy"] == 60);
     log.Step(now + 12s, state, ClientStatus_e::Disconnected);
-    auto record = Records(log.GetPath()).back();
+    auto record = Records(log.GetDatabasePath()).back();
     CHECK(record["state"] == "disconnected");
     CHECK(record["tile"].is_null());
     CHECK(record["pid"].is_null());
@@ -121,11 +116,11 @@ TEST_CASE("Account data coalesces changes and clears stale state across sessions
     CHECK(record["settled"] == false);
     state.placedTick = state.tick;
     log.Step(now + 13s, state, ClientStatus_e::InGame);
-    CHECK(Records(log.GetPath()).back()["hp"].is_null());
+    CHECK(Records(log.GetDatabasePath()).back()["hp"].is_null());
     ++state.tick;
     state.pid = 99;
     log.Step(now + 14s, state, ClientStatus_e::InGame);
-    CHECK(Records(log.GetPath()).back()["pid"] == 99);
+    CHECK(Records(log.GetDatabasePath()).back()["pid"] == 99);
 }
 
 TEST_CASE("Account reporting publishes account data only after successful writes and retries failures", "[AccountDataLog][FleetEvents]")
@@ -133,14 +128,14 @@ TEST_CASE("Account reporting publishes account data only after successful writes
     const auto folder = TempFolder{"rs2004-account-data-events"};
     auto capture = LogCapture{};
     const auto cache = GameCache_s{};
-    const auto path = folder.GetPath() / "account-data";
-    folder.WriteFile("account-data", "blocked");
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    folder.WriteFile("fleet.sqlite", "blocked");
     auto config = Config_s{};
-    config.scripting.accountDataDirectory = path.string();
-    config.scripting.experienceDirectory.clear();
-    config.scripting.bankLogDirectory.clear();
-    config.scripting.inventoryDirectory.clear();
-    config.scripting.equipmentDirectory.clear();
+    config.scripting.fleetDatabasePath = path.string();
+    config.scripting.experienceLogEnabled = false;
+    config.scripting.bankLogEnabled = false;
+    config.scripting.inventoryLogEnabled = false;
+    config.scripting.equipmentLogEnabled = false;
     auto bridge = std::make_shared<ApplicationEventBridge>(std::vector<std::string>{"bot1"});
     const auto client = bridge->Connect();
     bridge->Enqueue(client, R"({"version":1,"type":"subscribe","id":"data","events":["fleet.account-data"],"accounts":["bot1"]})");
@@ -169,8 +164,8 @@ TEST_CASE("Account reporting publishes account data only after successful writes
     const auto event = nlohmann::json::parse(*bridge->Front(client));
     CHECK(event["event"] == "fleet.account-data");
     CHECK(event["account"] == "bot1");
-    CHECK(event["payload"] == Records(path / "bot1.jsonl").back());
-    config.scripting.accountDataDirectory.clear();
+    CHECK(event["payload"] == Records(path).back());
+    config.scripting.accountDataLogEnabled = false;
     auto disabled = AccountReporting{config, AccountConfig_s{.name = "bot1"}, cache, capture.GetLogger(), {}, bridge};
     bridge->Pop(client);
     disabled.ObserveSession(now + 10s, state, ClientStatus_e::Disconnected);

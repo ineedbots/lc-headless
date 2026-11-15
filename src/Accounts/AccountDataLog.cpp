@@ -12,7 +12,6 @@
 #include "../Game/State/Type/Stat_e.hpp"
 #include "../Game/State/Type/Stat_s.hpp"
 #include "../Game/Type/Tile_s.hpp"
-#include "../Utils/FileUtils.hpp"
 #include "Type/FleetAccountDataLog_s.hpp"
 
 namespace
@@ -50,11 +49,11 @@ namespace
     }
 }
 
-AccountDataLog::AccountDataLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
+AccountDataLog::AccountDataLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
     , m_logger{std::move(logger)}
     , m_accountName{std::move(accountName)}
-    , m_path{std::move(directory) / (m_accountName + ".jsonl")}
+    , m_database{std::move(database)}
     , m_interval{interval}
     , m_events{std::move(events)}
 {
@@ -132,22 +131,23 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
 
         m_nextSample = now + m_interval;
 
-        auto record = nlohmann::ordered_json{{"time", std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()))}, {"account", m_accountName}};
+        const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+        auto record = nlohmann::ordered_json{{"time", time}, {"account", m_accountName}};
         record.update(sample);
         record["tick"] = state.tick;
 
-        const auto line = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
-        FileUtils::AppendText(m_path, line);
+        const auto payload = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+        m_database->Append(FleetStream_e::AccountData, m_accountName, time, payload);
         m_lastSample = std::move(sample);
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, FleetAccountDataLog_s{line});
+            m_events->Publish(m_accountName, FleetAccountDataLog_s{payload});
         }
 
         if (m_writeFailed)
         {
-            m_logger->Info("Writing account data to {} again", m_path.string());
+            m_logger->Info("Writing account data to {} again", m_database->GetPath().string());
             m_writeFailed = false;
         }
     }

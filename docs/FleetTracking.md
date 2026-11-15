@@ -1,56 +1,77 @@
 # Fleet tracking: account data, experience, banks, inventories
 
-The client can write what each account is earning and holding, per account, as JSON Lines. A small local
-page reads those files. Logging is enabled by default. Each journal writes to its own folder; an empty
-folder turns that journal off. Nothing here changes how a script runs.
+The client stores all five fleet streams in a local SQLite database. The default is
+`data/fleet.sqlite`; logging is enabled by default, including for accounts without scripts. No script
+behavior changes. Setting `fleetDatabasePath` to an empty string disables all fleet streams.
 
-The files are per **account**, named after the account (the account file's name without `.jsonc`), so
-several accounts in one process never collide and nothing depends on the world or the client's log file.
+Each row contains an account name, stream, UTC timestamp, an auto-incremented sequence and the complete
+JSON record as its payload. The sequence orders records deterministically when timestamps share a second.
+The `(account name, stream)` pair is the storage identity. Client processes sharing one database must use
+unique account names unless they intentionally represent the same logical account. SQLite indexes support
+latest-state lookups and bounded per-account history. A whole snapshot is one transaction and one payload
+row, so it cannot be partially written.
 
-| Folder | One line per |
+The database uses WAL mode, `synchronous=NORMAL`, and a 25 ms busy timeout. Reads can proceed while clients
+write. A failed write is reported once, retried with the stream's pending/coalescing policy, and does not
+advance successful sampling state or publish an event. SQLite is intended for a local filesystem, not a
+network share. WAL is checkpointed automatically; see [maintenance](#log-maintenance).
+
+Records keep the existing JSON shape:
+
+| Stream | Record trigger |
 |---|---|
-| `account-data/<account>.jsonl` | account data change, at most every `accountDataIntervalSeconds`; session changes immediately |
-| `experience/<account>.jsonl` | skill sample, every `experienceIntervalMinutes` |
-| `bank/<account>.jsonl` | bank open, listing what the bank held |
-| `inventory/<account>.jsonl` | backpack change, at most every `inventoryIntervalSeconds` |
-| `equipment/<account>.jsonl` | worn equipment change |
+| `account-data` | Account data change, at most every `accountDataIntervalSeconds`; session changes immediately |
+| `experience` | Settled skill sample every `experienceIntervalMinutes`, plus status changes |
+| `bank` | Bank open, listing what the bank held |
+| `inventory` | Backpack change, at most every `inventoryIntervalSeconds` |
+| `equipment` | Worn equipment change |
 
-Each line is a complete JSON object, and the **last line is the current state**. Lines are appended, so a
-file is also its history.
-
-Journal strings are JSON-escaped; invalid UTF-8 bytes are replaced with the Unicode
-replacement character so each record remains valid JSON.
+Invalid UTF-8 bytes in item names are replaced with the Unicode replacement character so each payload
+remains valid JSON.
 
 ## Configuration
 
 ```jsonc
 "scripting": {
-    "experienceDirectory": "experience",
+    "fleetDatabasePath": "data/fleet.sqlite",
+    "accountDataLogEnabled": true,
+    "experienceLogEnabled": true,
+    "bankLogEnabled": true,
+    "inventoryLogEnabled": true,
+    "equipmentLogEnabled": true,
     "experienceIntervalMinutes": 1,
-    "bankLogDirectory": "bank",
-    "inventoryDirectory": "inventory",
     "inventoryIntervalSeconds": 5,
-    "equipmentDirectory": "equipment",
-    "accountDataDirectory": "account-data",
     "accountDataIntervalSeconds": 5
 }
 ```
 
 | Key | Default | Meaning |
 |---|---|---|
-| `experienceDirectory` | `experience` | The folder. Empty turns the log off |
-| `experienceIntervalMinutes` | `1` | 0 to 1440 minutes between samples; `0` turns it off |
-| `bankLogDirectory` | `bank` | The folder. Empty turns the log off |
-| `inventoryDirectory` | `inventory` | The folder. Empty turns the log off |
+| `fleetDatabasePath` | `data/fleet.sqlite` | One database file for all enabled streams; empty disables fleet logging |
+| `accountDataLogEnabled` | `true` | Store account state/session changes |
+| `experienceLogEnabled` | `true` | Store skill samples and status changes |
+| `experienceIntervalMinutes` | `1` | 0 to 1440 minutes between samples; `0` turns experience logging off |
+| `bankLogEnabled` | `true` | Store bank snapshots |
+| `inventoryLogEnabled` | `true` | Store backpack changes |
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds between lines; `0` records every change |
-| `equipmentDirectory` | `equipment` | The folder. Empty turns the log off |
-| `accountDataDirectory` | `account-data` | The folder. Empty turns the log off |
+| `equipmentLogEnabled` | `true` | Store worn equipment changes |
 | `accountDataIntervalSeconds` | `5` | 0 to 86400 seconds between changes; `0` records every observed change |
 
 These keys are also listed in the [configuration reference](Configuration.md#fleet-tracking-settings)
-and [sample config](../client.jsonc.sample). They apply to every account, including idle accounts.
-Paths are relative to the client's working directory. The page and compactor read the default folders
-under the repository root; they do not follow custom journal paths in client configs.
+and [sample config](../client.jsonc.sample). They apply to every account, including idle accounts. Paths
+are relative to the client's working directory. The fleet page reads the default database, or the database
+paths in `--config` files, or explicit `--database` paths.
+
+Legacy `*Directory` settings are ignored; set `fleetDatabasePath` and the desired `*LogEnabled` options
+explicitly. To preserve old history, keep the JSONL folders and run the explicit importer:
+
+```sh
+python3 tools/fleet/import_jsonl.py --database data/fleet.sqlite
+```
+
+The importer skips malformed/truncated records with file/line diagnostics and uses stable source keys so
+re-running it does not duplicate imported rows. It never removes or edits the original JSONL files. Records
+without an `account` field use the filename stem; malformed records without a string `time` are skipped.
 
 ## Account data
 
@@ -59,7 +80,7 @@ under the repository root; they do not follow custom journal paths in client con
 ```
 
 - Records changed account data, including idle accounts without a script. Changes during the interval
-  are coalesced into the latest observed state. An unchanged account writes no extra lines.
+  are coalesced into the latest observed state. An unchanged account writes no extra records.
 - Session state and settled changes bypass the interval. Gameplay fields are null until settled in
   game, and become null on logout or disconnection, so old positions and targets aren't reported as current.
 - Tiles use absolute `x`, `z`, and `level`. `destination` is the client's outstanding walk destination,
@@ -73,7 +94,7 @@ under the repository root; they do not follow custom journal paths in client con
   (including servers/revisions without that bar). `weight` uses the game's run-weight units.
 - `pid` is the current server player index. `tick` is the client tick count at observation; changes to
   the tick alone do not trigger a record.
-- Failed writes warn once, retry at the configured interval, and publish no event until a write succeeds.
+- Failed writes warn once, retry at the configured interval, and publish no event until a transaction commits.
 
 ## Experience
 
@@ -82,7 +103,7 @@ under the repository root; they do not follow custom journal paths in client con
 ```
 
 - `state` is the client's own: `connecting`, `ingame`, `logging out`, `logged out` or `disconnected`.
-  A line is written whenever it changes, so the last line always says where the account is.
+  A record is written whenever it changes, so the latest record says where the account is.
 - `settled` is true once the player is placed and the stats for that tick have arrived. Only settled
   in-game lines are used for rates; a status line or a logged-out one has no XP run.
 - All 19 skills, in the game's stat order, with the current level, base level and XP.
@@ -99,7 +120,7 @@ under the repository root; they do not follow custom journal paths in client con
 ```
 
 - Written on the **closed → open** edge only. Deposits and withdrawals made while the bank stays open
-  aren't re-recorded, so each line is the bank as it was when it opened, and the next open catches up.
+  aren't re-recorded, so each record is the bank as it was when it opened, and the next open catches up.
 - Items are grouped by id, in id order.
 
 ## Inventory and equipment
@@ -114,13 +135,13 @@ under the repository root; they do not follow custom journal paths in client con
   open: the game swaps in the bank's own backpack then, and that is the one recorded. `free` comes from the cache's backpack size, so
   a packet holding only the filled slots can't report a full backpack.
 - Items are grouped by id, in id order.
-- Worn equipment is its own file and records only what is worn. It has no `free`: the equipment interface's
+- Worn equipment records only what is worn. It has no `free`: the equipment interface's
   grid has decorative cells that can never hold anything.
 
 ## WebSocket events
 
 The operator WebSocket endpoint `/api/v1/events` publishes a live event after each
-successfully appended fleet journal record:
+successfully committed fleet record:
 
 | Event | Journal |
 |---|---|
@@ -134,15 +155,15 @@ successfully appended fleet journal record:
 {"version":1,"type":"subscribe","id":"fleet","events":["fleet.account-data","fleet.experience","fleet.bank","fleet.inventory","fleet.equipment"],"accounts":["s18"]}
 ```
 
-Each event's `payload` is the complete JSON object from the corresponding journal
-line, including its `time` and `account`. The envelope's `account` is the account
+Each event's `payload` is the complete JSON object from the corresponding database
+record, including its `time` and `account`. The envelope's `account` is the account
 config name. Omit `accounts` to receive all accounts. These events need no script,
 are live only, and are not retained in subscription snapshots or replayed after
-reconnect. Disabled journals and failed writes produce no events.
+reconnect. Disabled streams and failed commits produce no events.
 
 The existing event size limit is 8192 bytes per envelope. Fleet records reserve
 1024 bytes for envelope metadata, so records exceeding 7168 bytes of JSON are
-omitted from the event stream; their full journal lines are still written.
+omitted from the event stream; their full payloads are still stored.
 See [live events](Running.md#live-progress-events) for listener setup, acknowledgements,
 ordering and reconnect behavior.
 
@@ -151,16 +172,17 @@ ordering and reconnect behavior.
 ```sh
 python3 tools/fleet/server.py                  # http://127.0.0.1:8765
 python3 tools/fleet/server.py --port 9000
+python3 tools/fleet/server.py --database data/fleet.sqlite
 ```
 
-Read-only, loopback only, and never started by the client. Ctrl+C ends it. It reads the account-data,
-experience, bank, inventory and equipment folders
-and starts or controls nothing.
+Read-only, loopback only, and never started by the client. Ctrl+C ends it. By default it reads
+`data/fleet.sqlite`; repeat `--database PATH` to combine databases. With `--config`, it reads the
+database paths in those client configurations and enables client control.
 
 - **Accounts** — the latest state of each account: session status, PID, tile, destination, server facing
   target, HP and prayer (current/base), run energy, special attack energy and armed state, running,
   moving, combat, weight and tick. Filter by account name. Gameplay values are blank while unsettled
-  or offline. Recorded age is the last journal change, not a connection heartbeat.
+  or offline. Recorded age is the last account-data change, not a connection heartbeat.
   The server exposes these latest records at `/api/account-data` as an `accounts` object keyed by account.
 - **Experience** — accounts down the side, skills across the top. Each cell shows the level and, beneath,
   the XP an hour. The rate is the newest sample minus the oldest sample of the newest continuous run (at
@@ -171,7 +193,7 @@ and starts or controls nothing.
 - **Inventory** — choose an account to see its backpack and worn equipment, the slot counts, whether a bank
   is open, and how old each snapshot is.
 
-The page refreshes every ten seconds, shows how old each file is, and has a Refresh button per tab.
+The page refreshes every ten seconds, shows how old each record is, and has a Refresh button per tab.
 
 The server uses CPython 3 and its standard library. `--port` overrides `FLEET_PORT`, whose default is
 `8765`. `--config CLIENT_JSONC ...` enables the optional controls described below. Client control uses
@@ -204,7 +226,7 @@ A bar above the tabs then has **Launch client** and **Stop client**:
   then accounts log out. A second SIGINT follows after ten seconds to log every account out at once if the
   server is refusing a logout in combat, and SIGKILL only for a process that outlives both (forty seconds).
 - The status line shows the clients and the accounts: `running · 3/3 clients · 45/45 in game`. The account
-  count is the latest status line of the experience logs, so it follows logins and logouts without polling
+  count is the latest status record in the experience stream, so it follows logins and logouts without polling
   the clients.
 - The running pids are written to `logs/fleet.pid`, so restarting the page adopts the clients it launched and
   Stop still works. A client started any other way is not adopted and is never signalled.
@@ -219,26 +241,59 @@ Without `--config` the page cannot start or stop anything: the bar is hidden, an
 
 | Want | Set |
 |---|---|
-| No account data log | `"accountDataDirectory": ""` |
-| No experience log | `"experienceDirectory": ""` or `"experienceIntervalMinutes": 0` |
-| No bank log | `"bankLogDirectory": ""` |
-| No inventory log | `"inventoryDirectory": ""` |
-| No equipment log | `"equipmentDirectory": ""` |
+| No account data log | `"accountDataLogEnabled": false` |
+| No experience log | `"experienceLogEnabled": false` or `"experienceIntervalMinutes": 0` |
+| No bank log | `"bankLogEnabled": false` |
+| No inventory log | `"inventoryLogEnabled": false` |
+| No equipment log | `"equipmentLogEnabled": false` |
 | No page | don't run `tools/fleet/server.py` |
 
-The default journal folders, `logs/` (including `fleet.pid`) and Python `__pycache__/` folders are
-ignored by Git. If you choose custom output folders, add them to `.git/info/exclude` or `.gitignore`.
+The default database and its WAL sidecars, `logs/` (including `fleet.pid`) and Python `__pycache__/`
+folders are ignored by Git. If you choose a custom database path, add it to `.git/info/exclude` or `.gitignore`.
 
 ## Log maintenance
 
-Journals append indefinitely. With all writers stopped, preview trimming with:
+History is retained indefinitely; there is no automatic row-retention policy. The compactor still trims
+console logs and can checkpoint a fleet database. Stop all writers before maintenance:
 
 ```sh
-python3 tools/fleet/compact_logs.py --dry-run
-python3 tools/fleet/compact_logs.py --console-mb 20
+python3 tools/fleet/compact_logs.py --database data/fleet.sqlite --dry-run
+python3 tools/fleet/compact_logs.py --database data/fleet.sqlite --console-mb 20
+python3 tools/fleet/compact_logs.py --database data/fleet.sqlite --vacuum
 ```
 
-`--dry-run` reports space savings without writing. `--console-mb` sets the number of MiB retained per
-`logs/*.log` file (default `20`). The tool retains the last 3000 lines per account-data/experience/backpack journal
-and 1000 per bank/equipment journal in the default folders. Older history is discarded. Stop writers
-before applying compaction so concurrent appends cannot be lost during the rewrite.
+`--dry-run` reports the database action without writing. Checkpointing truncates the WAL file after
+committed records are copied into the database. `--vacuum` additionally reclaims free pages in the main
+database; it may take time and needs temporary disk space. `--console-mb` sets the number of MiB retained
+per `logs/*.log` file (default `20`). Back up the database together with any active `-wal` sidecar, or use
+SQLite's online backup API; do not copy only the main file while a client is writing.
+
+## Performance and storage behavior
+
+The database is written synchronously from the account loop; no background queue is used. Each transaction
+stores one complete snapshot, with a 25 ms SQLite busy timeout and retry on the next eligible sampling step.
+WAL plus `synchronous=NORMAL` favors concurrent readers and lower write latency; it can lose the newest
+committed transactions on sudden power loss, while preserving database consistency. `synchronous=FULL` can
+be selected only by changing the storage implementation and measuring the tradeoff.
+
+On this Windows x64 development machine (NTFS, CPython 3.14.7 with SQLite 3.50.4), the reproducible
+synthetic run `python -B tools/fleet/benchmark_storage.py --records 500 --queries 30` used 45 accounts,
+five stream-specific payloads and 112,500 writes per format. Payload serialization was outside the
+timed write interval; JSONL opened/appended/closed one file per record, while SQLite committed one
+transaction per record through one connection per account. The benchmark's query timings include the
+production fleet-server query functions; the legacy comparison reads the tail of each JSONL file.
+The client uses the vcpkg SQLite 3.53.4 build, so the [benchmark](../tools/fleet/benchmark_storage.py)
+is not an end-to-end measurement of the C++ writer.
+
+| Operation | JSONL | SQLite |
+|---|---:|---:|
+| Write latency, median / p95 | 311 / 765 us | 183 / 493 us |
+| Latest record for all accounts and streams, median / p95 | 40.2 / 60.8 ms | 32.1 / 48.2 ms |
+| 200-record experience history, median / p95 | 3.0 / 8.3 ms | 6.4 / 12.0 ms |
+| Storage after writes (SQLite after WAL checkpoint, decimal MB) | 148.2 MB | 199.8 MB |
+
+This run shows faster isolated commits and latest-state queries, slower bounded XP-history reads, and
+about 35% more on-disk storage. SQLite is adopted for centralized transactional persistence and
+indexed query capability, not as a blanket performance win. Results are workload-, filesystem- and
+runtime-specific. The benchmark is a Python storage-path comparison, not a live-client or SQLiteCpp
+end-to-end benchmark. Run it on the target machine before making deployment-specific performance claims.

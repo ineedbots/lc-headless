@@ -19,8 +19,8 @@ is promoted to `master` and its CI checks pass.
   interpreter, script, settings and logs.
 - Provide cache-backed game state, collision-aware navigation, reusable bot
   APIs, script reload, VS Code debugging, profiling and editor type stubs.
-- Add fleet tracking with experience, bank, backpack and equipment logs and a
-  local fleet view.
+- Add SQLite-backed fleet tracking with account data, experience, bank,
+  backpack and equipment history and a local fleet view.
 - Expand the standard library with account leveling, quest coverage and
   recovery improvements, additional upstream rs2b0t features, and Tutorial
   Island completion before script startup.

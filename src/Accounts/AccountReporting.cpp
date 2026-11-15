@@ -20,34 +20,38 @@
 AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events)
     : m_progress{account.script ? account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{config.scripting.progressDirectory} / (account.name + ".txt"), logger, std::move(onReport)}
 {
-    if (!config.scripting.accountDataDirectory.empty())
+    const auto& scripting = config.scripting;
+    const auto experienceEnabled = scripting.experienceLogEnabled && scripting.experienceIntervalMinutes > std::chrono::minutes::zero();
+    if (scripting.accountDataLogEnabled || experienceEnabled || scripting.bankLogEnabled || scripting.inventoryLogEnabled || scripting.equipmentLogEnabled)
     {
-        m_accountData.emplace(cache, logger, account.name, std::filesystem::path{config.scripting.accountDataDirectory}, config.scripting.accountDataIntervalSeconds, events);
+        m_fleetDatabase = std::make_shared<FleetDatabase>(scripting.fleetDatabasePath);
     }
 
-    const auto& experience = config.scripting;
-    if (!experience.experienceDirectory.empty() && experience.experienceIntervalMinutes > std::chrono::minutes::zero())
+    if (m_fleetDatabase && scripting.accountDataLogEnabled)
     {
-        m_experience.emplace(std::filesystem::path{experience.experienceDirectory}, account.name, experience.experienceIntervalMinutes, logger, events);
+        m_accountData.emplace(cache, logger, account.name, m_fleetDatabase, scripting.accountDataIntervalSeconds, events);
     }
 
-    if (!config.scripting.bankLogDirectory.empty())
+    if (m_fleetDatabase && experienceEnabled)
+    {
+        m_experience.emplace(account.name, scripting.experienceIntervalMinutes, logger, m_fleetDatabase, events);
+    }
+
+    if (m_fleetDatabase && scripting.bankLogEnabled)
     {
         // The bank is the cache's, so this needs no script and works for every bot.
-        m_bankLog.emplace(cache, logger, account.name, std::filesystem::path{config.scripting.bankLogDirectory}, events);
+        m_bankLog.emplace(cache, logger, account.name, m_fleetDatabase, events);
     }
 
-    if (!config.scripting.inventoryDirectory.empty())
+    if (m_fleetDatabase && scripting.inventoryLogEnabled)
     {
-        m_inventory.emplace(cache, logger, account.name, std::filesystem::path{config.scripting.inventoryDirectory},
-                            ItemLog::Kind_e::Backpack, config.scripting.inventoryIntervalSeconds, events);
+        m_inventory.emplace(cache, logger, account.name, m_fleetDatabase, ItemLog::Kind_e::Backpack, scripting.inventoryIntervalSeconds, events);
     }
 
-    if (!config.scripting.equipmentDirectory.empty())
+    if (m_fleetDatabase && scripting.equipmentLogEnabled)
     {
-        // Worn equipment changes rarely, so every change is worth a line.
-        m_equipment.emplace(cache, logger, account.name, std::filesystem::path{config.scripting.equipmentDirectory},
-                            ItemLog::Kind_e::Equipment, 0s, events);
+        // Worn equipment changes rarely, so every change is worth a record.
+        m_equipment.emplace(cache, logger, account.name, m_fleetDatabase, ItemLog::Kind_e::Equipment, 0s, events);
     }
 }
 
@@ -73,7 +77,7 @@ void AccountReporting::SampleItems(Clock::time_point now, const GameState_s& sta
 {
     if (m_bankLog)
     {
-        m_bankLog->Step(state);
+        m_bankLog->Step(now, state);
     }
 
     if (m_inventory)

@@ -2,6 +2,7 @@
 
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
+#include "../Support/FleetDatabaseReader.hpp"
 #include "Accounts/AccountReporting.hpp"
 #include "Accounts/Type/FleetBankLog_s.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
@@ -41,16 +42,11 @@ namespace
         return value;
     }
 
-    Json LastRecord(const std::filesystem::path& path)
+    Json LastRecord(const std::filesystem::path& path, std::string_view stream, std::string_view account)
     {
-        auto file = std::ifstream{path};
-        auto line = std::string{};
-        auto last = std::string{};
-        while (std::getline(file, line))
-        {
-            last = line;
-        }
-        return Json::parse(last);
+        const auto records = ReadFleetRecords(path, stream, account);
+        REQUIRE_FALSE(records.empty());
+        return records.back();
     }
 }
 
@@ -59,13 +55,10 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     const auto folder = TempFolder{"rs2004-fleet-events"};
     auto capture = LogCapture{};
     auto config = Config_s{};
-    config.scripting.accountDataDirectory.clear();
-    config.scripting.experienceDirectory = (folder.GetPath() / "experience").string();
+    config.scripting.fleetDatabasePath = (folder.GetPath() / "fleet.sqlite").string();
+    config.scripting.accountDataLogEnabled = false;
     config.scripting.experienceIntervalMinutes = 1min;
-    config.scripting.bankLogDirectory = (folder.GetPath() / "bank").string();
-    config.scripting.inventoryDirectory = (folder.GetPath() / "inventory").string();
     config.scripting.inventoryIntervalSeconds = 5s;
-    config.scripting.equipmentDirectory = (folder.GetPath() / "equipment").string();
     auto cache = GameCache_s{};
     cache.bankComponent = 2;
     cache.inventoryComponent = 3;
@@ -102,7 +95,7 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
         CHECK(event["account"] == "bot1");
         CHECK(event["sequence"].get<u64>() > previous);
         previous = event["sequence"].get<u64>();
-        CHECK(event["payload"] == LastRecord(folder.GetPath() / name / "bot1.jsonl"));
+        CHECK(event["payload"] == LastRecord(folder.GetPath() / "fleet.sqlite", name, "bot1"));
     }
     reporting.ObserveSession(now, state, ClientStatus_e::InGame);
     reporting.SampleItems(now, state);
@@ -162,11 +155,11 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     const auto folder = TempFolder{"rs2004-fleet-events-failure"};
     auto capture = LogCapture{};
     auto config = Config_s{};
-    config.scripting.accountDataDirectory.clear();
-    config.scripting.experienceDirectory.clear();
-    config.scripting.bankLogDirectory.clear();
-    config.scripting.inventoryDirectory.clear();
-    config.scripting.equipmentDirectory.clear();
+    config.scripting.accountDataLogEnabled = false;
+    config.scripting.experienceLogEnabled = false;
+    config.scripting.bankLogEnabled = false;
+    config.scripting.inventoryLogEnabled = false;
+    config.scripting.equipmentLogEnabled = false;
     SECTION("disabled")
     {
     }
@@ -174,10 +167,11 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     {
         const auto blocker = folder.GetPath() / "file";
         FileUtils::AppendText(blocker, "not a directory");
-        config.scripting.experienceDirectory = blocker.string();
-        config.scripting.inventoryDirectory = blocker.string();
-        config.scripting.equipmentDirectory = blocker.string();
-        config.scripting.bankLogDirectory = blocker.string();
+        config.scripting.fleetDatabasePath = blocker.string();
+        config.scripting.experienceLogEnabled = true;
+        config.scripting.inventoryLogEnabled = true;
+        config.scripting.equipmentLogEnabled = true;
+        config.scripting.bankLogEnabled = true;
     }
     auto bridge = std::make_shared<ApplicationEventBridge>(std::vector<std::string>{"bot1"});
     auto cache = GameCache_s{};

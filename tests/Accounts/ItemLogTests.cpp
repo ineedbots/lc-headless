@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
+#include "../Support/FleetDatabaseReader.hpp"
 
 #include "Accounts/ItemLog.hpp"
 #include "Cache/Type/GameCache_s.hpp"
@@ -22,25 +23,9 @@ namespace
     constexpr auto CAKE = s32{1891};
     constexpr auto PLATEBODY = s32{1127};
 
-    std::vector<std::string> ReadLines(const std::filesystem::path& path)
+    std::vector<std::string> ReadLines(const std::filesystem::path& path, std::string_view stream, std::string_view account)
     {
-        auto lines = std::vector<std::string>{};
-        auto file = std::ifstream{path, std::ios::binary};
-        auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
-        auto start = std::size_t{0};
-        while (start < text.size())
-        {
-            const auto end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                break;
-            }
-
-            lines.push_back(text.substr(start, end - start));
-            start = end + 1;
-        }
-
-        return lines;
+        return ReadFleetPayloads(path, stream, account);
     }
 
     std::shared_ptr<const GameCache_s> MakeCache(std::string_view coinName = "Coins")
@@ -87,22 +72,26 @@ namespace
         explicit ItemFixture(ItemLog::Kind_e kind = ItemLog::Kind_e::Backpack, std::chrono::seconds interval = 5s)
             : cache{MakeCache()}
             , folder{"rs2004-item-log-tests"}
-            , log{*cache, capture.GetLogger(), "s18", folder.GetPath() / (kind == ItemLog::Kind_e::Backpack ? "inventory" : "equipment"), kind, interval}
+            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite")}
+            , kind{kind}
+            , log{*cache, capture.GetLogger(), "s18", database, kind, interval}
         {
         }
 
         [[nodiscard]] std::filesystem::path Path() const
         {
-            return log.GetPath();
+            return log.GetDatabasePath();
         }
         [[nodiscard]] std::vector<std::string> Lines() const
         {
-            return ReadLines(Path());
+            return ReadLines(Path(), kind == ItemLog::Kind_e::Backpack ? "inventory" : "equipment", "s18");
         }
 
         std::shared_ptr<const GameCache_s> cache;
         TempFolder folder;
+        std::shared_ptr<FleetDatabase> database;
         LogCapture capture;
+        ItemLog::Kind_e kind;
         ItemLog log;
     };
 }
@@ -119,13 +108,15 @@ TEST_CASE("ItemLog preserves escaped names and container specific fields", "[Ite
     const auto cache = MakeCache(name);
     const auto folder = TempFolder{"rs2004-item-json-tests"};
     auto capture = LogCapture{};
+    const auto databasePath = folder.GetPath() / "fleet.sqlite";
+    auto database = std::make_shared<FleetDatabase>(databasePath);
     for (const auto kind : {ItemLog::Kind_e::Backpack, ItemLog::Kind_e::Equipment})
     {
-        auto log = ItemLog{*cache, capture.GetLogger(), "test", folder.GetPath(), kind, 0s};
+        auto log = ItemLog{*cache, capture.GetLogger(), "test", database, kind, 0s};
         const auto items = std::vector<Item_s>{{.id = COINS, .count = 2}, {.id = COINS, .count = 3}};
         log.Step(Clock::now(), kind == ItemLog::Kind_e::Backpack ? WithBackpack(items) : WithEquipment(items));
 
-        const auto lines = ReadLines(log.GetPath());
+        const auto lines = ReadLines(databasePath, kind == ItemLog::Kind_e::Backpack ? "inventory" : "equipment", "test");
         REQUIRE_FALSE(lines.empty());
 
         const auto record = nlohmann::json::parse(lines.back());
@@ -253,8 +244,7 @@ TEST_CASE("ItemLog records worn equipment in its own file", "[ItemLog][Equipment
         fixture.log.Step(Clock::now(), WithEquipment({{.id = PLATEBODY, .count = 1}}));
 
         REQUIRE(fixture.Lines().size() == 1);
-        CHECK(fixture.Path().filename() == "s18.jsonl");
-        CHECK(fixture.Path().parent_path().filename() == "equipment");
+        CHECK(fixture.Path().filename() == "fleet.sqlite");
         CHECK(fixture.Lines().front().find(R"("used":1)") != std::string::npos);
         CHECK(fixture.Lines().front().find(R"("name":"Iron platebody")") != std::string::npos);
         // No bankOpen and no free: equipment has neither.
@@ -287,8 +277,9 @@ TEST_CASE("ItemLog records worn equipment in its own file", "[ItemLog][Equipment
     SECTION("a folder that can't be written warns once, and never throws")
     {
         auto fixture = ItemFixture{ItemLog::Kind_e::Equipment, 0s};
-        std::ofstream{fixture.folder.GetPath() / "equipment"} << "not a folder";
-        auto blocked = ItemLog{*fixture.cache, fixture.capture.GetLogger(), "s18", fixture.folder.GetPath() / "equipment", ItemLog::Kind_e::Equipment, 0s};
+        const auto blockedPath = fixture.folder.GetPath() / "blocked.sqlite";
+        std::ofstream{blockedPath} << "not a database";
+        auto blocked = ItemLog{*fixture.cache, fixture.capture.GetLogger(), "s18", std::make_shared<FleetDatabase>(blockedPath), ItemLog::Kind_e::Equipment, 0s};
 
         CHECK_NOTHROW(blocked.Step(Clock::now(), WithEquipment({{.id = PLATEBODY, .count = 1}})));
         CHECK_NOTHROW(blocked.Step(Clock::now(), WithEquipment({{.id = PLATEBODY, .count = 2}})));

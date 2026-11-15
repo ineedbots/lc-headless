@@ -186,10 +186,11 @@ retained in snapshots. See [script publication](scripting/console-and-messages.m
 for argument limits and return semantics.
 
 Fleet journals publish `fleet.experience`, `fleet.bank`, `fleet.inventory` and
-`fleet.equipment`, plus `fleet.account-data`, after a successful record write. Each payload matches its JSONL
-record. These events are live only and follow the journal's enablement and sampling
-settings. See [fleet events](FleetTracking.md#websocket-events) for subscriptions,
-record formats and size limits.
+`fleet.equipment`, plus `fleet.account-data`, after a successful database commit.
+Each payload matches the complete JSON record stored for that stream. These events
+are live only and follow the journal's enablement and sampling settings. See
+[fleet events](FleetTracking.md#websocket-events) for subscriptions, record formats
+and size limits.
 
 To watch logout events with the [Python test client](../tools/events/logout.py),
 run `python -m pip install websockets`, then

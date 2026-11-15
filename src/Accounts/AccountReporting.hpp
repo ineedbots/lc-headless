@@ -12,6 +12,7 @@
 #include "AccountDataLog.hpp"
 #include "BankLogger.hpp"
 #include "ExperienceLog.hpp"
+#include "FleetDatabase.hpp"
 #include "ItemLog.hpp"
 #include "ProgressReporter.hpp"
 #include "Type/ProgressReport_s.hpp"
@@ -31,6 +32,7 @@ public:
 
 private:
     ProgressReporter m_progress;
+    std::shared_ptr<FleetDatabase> m_fleetDatabase;
     std::optional<AccountDataLog> m_accountData;
     std::optional<ExperienceLog> m_experience;
     std::optional<BankLogger> m_bankLog;

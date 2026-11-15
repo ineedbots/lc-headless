@@ -4,8 +4,7 @@
     python3 tools/fleet/server.py                          # http://127.0.0.1:8765, read-only
     python3 tools/fleet/server.py --config client.jsonc    # ... with Launch and Stop client
 
-Reads account-data/, experience/, bank/, inventory/ and equipment/ from the repository root,
-and binds to loopback only.
+Reads the SQLite database from the repository root, and binds to loopback only.
 Without --config it starts and stops nothing; with it, the page launches one client process per config and
 stops the ones it launched. Ctrl+C ends the page, not the clients.
 
@@ -18,20 +17,19 @@ import json
 import os
 import shutil
 import signal
+import sqlite3
 import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from storage import connect_readonly
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 GUI_DIR = os.path.dirname(os.path.abspath(__file__))
-
-EXPERIENCE_DIR = os.path.join(ROOT, 'experience')
-BANK_DIR = os.path.join(ROOT, 'bank')
-INVENTORY_DIR = os.path.join(ROOT, 'inventory')
-EQUIPMENT_DIR = os.path.join(ROOT, 'equipment')
-ACCOUNT_DATA_DIR = os.path.join(ROOT, 'account-data')
+DEFAULT_DATABASE = os.path.join(ROOT, 'data', 'fleet.sqlite')
+DATABASE_PATHS = [DEFAULT_DATABASE]
 LOGS_DIR = os.path.join(ROOT, 'logs')
 LOG_FILE = os.path.join(LOGS_DIR, 'fleet.log')
 PID_FILE = os.path.join(LOGS_DIR, 'fleet.pid')
@@ -54,65 +52,64 @@ RATE_WINDOW_MINUTES = 15
 MIN_RATE_SECONDS = 60
 
 
-def _read_jsonl_tail(path, count):
-    """The last count complete records, read backwards from the end.
-
-    Why: some of these files are megabytes and a page refresh only needs the newest record per account."""
-    try:
-        with open(path, 'rb') as handle:
-            handle.seek(0, 2)
-            pos = handle.tell()
-            block = b''
-            while pos > 0 and block.count(b'\n') <= count:
-                step = min(65536, pos)
-                pos -= step
-                handle.seek(pos)
-                block = handle.read(step) + block
-            lines = [line for line in block.split(b'\n') if line.strip()]
-            records = []
-            for line in lines[-count:]:
-                try:
-                    records.append(json.loads(line.decode('utf-8', 'replace')))
-                except ValueError:
-                    continue
-            return records
-    except OSError:
-        return []
+def _accounts(stream):
+    """Every account with at least one record in the selected stream."""
+    accounts = set()
+    for path in DATABASE_PATHS:
+        if not os.path.isfile(path):
+            continue
+        connection = connect_readonly(path)
+        try:
+            accounts.update(row[0] for row in connection.execute(
+                'SELECT DISTINCT account FROM fleet_records WHERE stream = ?', (stream,)))
+        finally:
+            connection.close()
+    return sorted(accounts)
 
 
-def _read_jsonl(path, limit=None):
-    """Every complete line of a JSONL file, newest last. A line being written is skipped."""
-    if limit is not None:
-        # Why: the tail read is what keeps a page refresh cheap once a journal reaches megabytes, and the
-        # experience view asks for 200 records, so the old 100-record cutoff sent it through the whole file.
-        tail = _read_jsonl_tail(path, limit)
-        if tail:
-            return tail
-    records = []
-    try:
-        with open(path, encoding='utf-8', errors='replace') as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    records.append(json.loads(line))
-                except ValueError:
-                    continue
-    except OSError:
-        return []
-    return records[-limit:] if limit else records
-
-
-def _latest(directory):
-    """The last record in each <account>.jsonl in a directory, by account."""
+def _latest(stream):
+    """The latest record in each account/stream, ordered by sequence within each database."""
     latest = {}
-    for path in sorted(glob.glob(os.path.join(directory, '*.jsonl'))):
-        account = os.path.basename(path)[:-len('.jsonl')]
-        records = _read_jsonl(path, limit=1)
-        if records:
-            latest[account] = records[-1]
+    latest_times = {}
+    for path in DATABASE_PATHS:
+        if not os.path.isfile(path):
+            continue
+        connection = connect_readonly(path)
+        try:
+            rows = connection.execute(
+                'SELECT accounts.account, records.recorded_at, records.payload '
+                'FROM (SELECT DISTINCT account FROM fleet_records WHERE stream = ?) AS accounts '
+                'JOIN fleet_records AS records ON records.sequence = ('
+                'SELECT MAX(sequence) FROM fleet_records '
+                'WHERE stream = ? AND account = accounts.account)',
+                (stream, stream))
+            for account, recorded_at, payload in rows:
+                if account not in latest_times or recorded_at > latest_times[account]:
+                    latest[account] = json.loads(payload)
+                    latest_times[account] = recorded_at
+        finally:
+            connection.close()
     return latest
+
+
+def _history(stream, account, limit):
+    """Recent records in stable order, including ties at the same second."""
+    records = []
+    for path_order, path in enumerate(DATABASE_PATHS):
+        if not os.path.isfile(path):
+            continue
+        connection = connect_readonly(path)
+        try:
+            rows = connection.execute(
+                'SELECT recorded_at, sequence, payload FROM fleet_records '
+                'WHERE stream = ? AND account = ? ORDER BY sequence DESC LIMIT ?',
+                (stream, account, limit)).fetchall()
+            records.extend((row[0], path_order, row[1], json.loads(row[2])) for row in reversed(rows))
+        finally:
+            connection.close()
+
+    records.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
+    return [entry[3] for entry in records[-limit:]]
 
 
 def _parse_time(text):
@@ -160,10 +157,9 @@ def _rate(history):
 def experience():
     """Every account's status and skills, and what it is earning an hour from its settled in-game samples."""
     accounts = {}
-    for path in sorted(glob.glob(os.path.join(EXPERIENCE_DIR, '*.jsonl'))):
-        account = os.path.basename(path)[:-len('.jsonl')]
+    for account in _accounts('experience'):
         # Status lines are written on login, logout and so on, so the window needs room for them too.
-        history = _read_jsonl(path, limit=200)
+        history = _history('experience', account, 200)
         if not history:
             continue
 
@@ -187,14 +183,14 @@ def experience():
 
 def account_data():
     """The latest account data, including session changes that clear gameplay fields."""
-    return {'accounts': _latest(ACCOUNT_DATA_DIR)}
+    return {'accounts': _latest('account-data')}
 
 
 def banks():
     """Every item across the accounts' latest bank snapshot, with how many each account holds."""
     items = {}
     accounts = 0
-    for account, record in _latest(BANK_DIR).items():
+    for account, record in _latest('bank').items():
         accounts += 1
         for item in record.get('items', []):
             item_id = item.get('id')
@@ -210,14 +206,12 @@ def banks():
 def inventory(account=None):
     """The backpack, and the worn equipment, for one account (or the names of the accounts there are)."""
     if not account:
-        names = [os.path.basename(path)[:-len('.jsonl')] for path in sorted(glob.glob(os.path.join(INVENTORY_DIR, '*.jsonl')))]
-        return {'accounts': names}
+        return {'accounts': _accounts('inventory')}
 
-    def read(directory):
-        records = _read_jsonl(os.path.join(directory, account + '.jsonl'), limit=1)
-        return records[-1] if records else None
+    inventory_record = _latest('inventory').get(account)
+    equipment_record = _latest('equipment').get(account)
 
-    return {'account': account, 'inventory': read(INVENTORY_DIR), 'equipment': read(EQUIPMENT_DIR)}
+    return {'account': account, 'inventory': inventory_record, 'equipment': equipment_record}
 
 
 
@@ -364,12 +358,63 @@ def _accounts_total():
 
 def _in_game():
     """Accounts whose latest status line says they are in game."""
-    count = 0
-    for path in glob.glob(os.path.join(EXPERIENCE_DIR, '*.jsonl')):
-        latest = _read_jsonl(path, limit=1)
-        if latest and latest[-1].get('state') == 'ingame':
-            count += 1
-    return count
+    return sum(record.get('state') == 'ingame' for record in _latest('experience').values())
+
+
+def _strip_json_comments(text):
+    """Remove JSONC comments without treating comment markers inside strings as syntax."""
+    output = []
+    index = 0
+    in_string = False
+    escaped = False
+    while index < len(text):
+        character = text[index]
+        if in_string:
+            output.append(character)
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == '"':
+                in_string = False
+            index += 1
+            continue
+
+        if character == '"':
+            in_string = True
+            output.append(character)
+            index += 1
+            continue
+        if text.startswith('//', index):
+            newline = text.find('\n', index)
+            if newline == -1:
+                break
+            output.append('\n')
+            index = newline + 1
+            continue
+        if text.startswith('/*', index):
+            end = text.find('*/', index + 2)
+            if end == -1:
+                raise ValueError('unterminated block comment')
+            output.extend('\n' for character in text[index:end + 2] if character == '\n')
+            index = end + 2
+            continue
+
+        output.append(character)
+        index += 1
+
+    return ''.join(output)
+
+
+def _database_for_config(config_path):
+    with open(config_path, encoding='utf-8') as config_file:
+        config = json.loads(_strip_json_comments(config_file.read()))
+    if not isinstance(config, dict) or not isinstance(config.get('scripting', {}), dict):
+        raise ValueError(f'{config_path}: expected a scripting object')
+    path = config.get('scripting', {}).get('fleetDatabasePath', 'data/fleet.sqlite')
+    if not isinstance(path, str) or not path:
+        raise ValueError(f'{config_path}: scripting.fleetDatabasePath must be a nonempty file path')
+    return os.path.abspath(os.path.join(ROOT, path))
 
 
 def control_state():
@@ -536,21 +581,24 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         query = parse_qs(parsed.query)
 
-        if path in ('/', '/index.html'):
-            with open(os.path.join(GUI_DIR, 'index.html'), 'rb') as handle:
-                self._send(200, handle.read(), 'text/html; charset=utf-8')
-        elif path == '/api/experience':
-            self._send(200, experience())
-        elif path == '/api/account-data':
-            self._send(200, account_data())
-        elif path == '/api/bank':
-            self._send(200, banks())
-        elif path == '/api/inventory':
-            self._send(200, inventory(query.get('account', [None])[0]))
-        elif path == '/api/control':
-            self._send(200, control_state())
-        else:
-            self._send(404, {'error': 'not found'})
+        try:
+            if path in ('/', '/index.html'):
+                with open(os.path.join(GUI_DIR, 'index.html'), 'rb') as handle:
+                    self._send(200, handle.read(), 'text/html; charset=utf-8')
+            elif path == '/api/experience':
+                self._send(200, experience())
+            elif path == '/api/account-data':
+                self._send(200, account_data())
+            elif path == '/api/bank':
+                self._send(200, banks())
+            elif path == '/api/inventory':
+                self._send(200, inventory(query.get('account', [None])[0]))
+            elif path == '/api/control':
+                self._send(200, control_state())
+            else:
+                self._send(404, {'error': 'not found'})
+        except (sqlite3.Error, json.JSONDecodeError, OSError) as error:
+            self._send(500, {'error': f'fleet database read failed: {error}'})
 
     def do_POST(self):
         path = urlparse(self.path).path
@@ -569,12 +617,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global CONTROL_CONFIGS
-    parser = argparse.ArgumentParser(description='Local view of the fleet-tracking files, with optional client control.')
+    global CONTROL_CONFIGS, DATABASE_PATHS
+    parser = argparse.ArgumentParser(description='Local SQLite fleet view, with optional client control.')
     parser.add_argument('--port', type=int, default=int(os.environ.get('FLEET_PORT', '8765')))
+    parser.add_argument('--database', action='append', metavar='PATH',
+                        help='SQLite database to read (repeatable; defaults to data/fleet.sqlite)')
     parser.add_argument('--config', nargs='+', metavar='CLIENT_JSONC',
-                        help='client configs; Launch runs one process per config, Stop stops them all')
+                        help='client configs; reads their configured databases, and Launch runs one process per config')
     args = parser.parse_args()
+
+    if args.config or args.database:
+        DATABASE_PATHS = []
 
     if args.config:
         for name in args.config:
@@ -582,7 +635,18 @@ def main():
             if not os.path.isfile(config):
                 parser.error(f'{name}: no such client config')
             CONTROL_CONFIGS.append(config)
+            try:
+                DATABASE_PATHS.append(_database_for_config(config))
+            except (OSError, ValueError, json.JSONDecodeError) as error:
+                parser.error(str(error))
         _adopt()
+
+    if args.database:
+        DATABASE_PATHS.extend(os.path.abspath(path) for path in args.database)
+    if not args.config and not args.database:
+        DATABASE_PATHS = [DEFAULT_DATABASE]
+    else:
+        DATABASE_PATHS = list(dict.fromkeys(DATABASE_PATHS))
 
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     mode = f'control: {", ".join(os.path.basename(c) for c in CONTROL_CONFIGS)}' if CONTROL_CONFIGS else 'read-only'

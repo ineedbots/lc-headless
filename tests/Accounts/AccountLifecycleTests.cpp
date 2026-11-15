@@ -506,12 +506,10 @@ TEST_CASE("Optional journal write failures leave an account healthy through shut
 {
     auto fixture = LifecycleFixture{};
     fixture.folder.WriteFile("blocked", "keep this file");
-    const auto blocked = (fixture.folder.GetPath() / "blocked" / "reports").string();
-    fixture.config.scripting.experienceDirectory = blocked;
+    const auto blocked = (fixture.folder.GetPath() / "blocked").string();
+    fixture.config.scripting.fleetDatabasePath = blocked;
+    fixture.config.scripting.experienceLogEnabled = true;
     fixture.config.scripting.experienceIntervalMinutes = 1min;
-    fixture.config.scripting.bankLogDirectory = blocked;
-    fixture.config.scripting.inventoryDirectory = blocked;
-    fixture.config.scripting.equipmentDirectory = blocked;
     fixture.Make();
     fixture.account->Start();
     REQUIRE(fixture.Until([&]

@@ -3,7 +3,6 @@
 
 #include "../Application/Events/ApplicationEventPublisher.hpp"
 
-#include "../Utils/FileUtils.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "../Game/State/Type/Stat_s.hpp"
 #include "FleetLogJson.hpp"
@@ -16,8 +15,6 @@
 
 namespace
 {
-    constexpr auto EXTENSION = ".jsonl"sv;
-
     std::string_view StatusName(ClientStatus_e status)
     {
         switch (status)
@@ -50,11 +47,11 @@ namespace
     }
 }
 
-ExperienceLog::ExperienceLog(std::filesystem::path directory, std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger, std::shared_ptr<ApplicationEventPublisher> events)
-    : m_path{std::move(directory) / (accountName + std::string{EXTENSION})}
-    , m_accountName{std::move(accountName)}
+ExperienceLog::ExperienceLog(std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger, std::shared_ptr<FleetDatabase> database, std::shared_ptr<ApplicationEventPublisher> events)
+    : m_accountName{std::move(accountName)}
     , m_interval{interval}
     , m_logger{std::move(logger)}
+    , m_database{std::move(database)}
     , m_events{std::move(events)}
 {
 }
@@ -62,6 +59,11 @@ ExperienceLog::ExperienceLog(std::filesystem::path directory, std::string accoun
 void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status, bool settled)
 {
     if (m_interval <= std::chrono::minutes::zero())
+    {
+        return;
+    }
+
+    if (m_retryAt && now < *m_retryAt)
     {
         return;
     }
@@ -77,20 +79,20 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
         return;
     }
 
-    auto periodic = false;
-    if (firstBaseline)
+    if (!WriteSample(std::chrono::system_clock::now(), state, statusName, inGame && settled))
+    {
+        m_retryAt = now + std::min(m_interval, std::chrono::minutes{1});
+        return;
+    }
+
+    m_retryAt.reset();
+    m_lastStatus = std::string{statusName};
+    const auto periodic = due;
+    if (firstBaseline || due)
     {
         m_hasBaseline = true;
         m_nextSample = now + m_interval;
     }
-    else if (due)
-    {
-        periodic = true;
-        m_nextSample = now + m_interval;
-    }
-
-    WriteSample(std::chrono::system_clock::now(), state, statusName, inGame && settled);
-    m_lastStatus = std::string{statusName};
 
     // A sample with no gain has nothing to say; a status line and a baseline have no window to compare.
     if (periodic && m_hasLastXp)
@@ -116,7 +118,7 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
     }
 }
 
-void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled)
+bool ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled)
 {
     auto record = ExperienceLogRecord_s{
         .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(time)),
@@ -132,19 +134,21 @@ void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, cons
 
     try
     {
-        const auto line = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
-        FileUtils::AppendText(m_path, line);
+        const auto payload = nlohmann::ordered_json(record).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+        m_database->Append(FleetStream_e::Experience, m_accountName, record.time, payload);
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, FleetExperienceLog_s{line});
+            m_events->Publish(m_accountName, FleetExperienceLog_s{payload});
         }
 
         if (m_writeFailed)
         {
             m_writeFailed = false;
-            m_logger->Info("Writing experience to {} again", m_path.string());
+            m_logger->Info("Writing experience to {} again", m_database->GetPath().string());
         }
+
+        return true;
     }
     catch (const std::exception& e)
     {
@@ -152,8 +156,10 @@ void ExperienceLog::WriteSample(std::chrono::system_clock::time_point time, cons
         if (!m_writeFailed)
         {
             m_writeFailed = true;
-            m_logger->Warning("The experience log wasn't saved; it won't be tried again until one works: {}", e.what());
+            m_logger->Warning("The experience log wasn't saved to {}; it will retry: {}", m_database->GetPath().string(), e.what());
         }
+
+        return false;
     }
 }
 

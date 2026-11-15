@@ -1,29 +1,19 @@
 #!/usr/bin/env python3
-"""Trim the fleet-tracking journals and client console logs in place.
+"""Maintain SQLite fleet databases and trim client console logs.
 
-Stop journal writers and clients before applying compaction: an append between the
-read and rewrite can be lost. The fleet page can stay open to read the retained lines.
+Stop clients before maintenance. Database history is not automatically trimmed;
+the tool checkpoints WAL files and can optionally reclaim unused database pages.
 
-    python3 tools/fleet/compact_logs.py --dry-run
-    python3 tools/fleet/compact_logs.py
-
-The experience/inventory views only read the last few hundred records, so keeping a
-couple of days of lines is plenty.
+    python3 tools/fleet/compact_logs.py --database data/fleet.sqlite --dry-run
+    python3 tools/fleet/compact_logs.py --database data/fleet.sqlite --vacuum
 """
 
 import argparse
 import os
+import sqlite3
+from contextlib import closing
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-# directory -> lines to keep per account file
-JOURNALS = {
-    'experience': 3000,
-    'account-data': 3000,
-    'inventory': 3000,
-    'bank': 1000,
-    'equipment': 1000,
-}
 
 # Console logs: keep the last N bytes, cut on a line boundary.
 CONSOLE_KEEP_BYTES = 20 * 1024 * 1024
@@ -34,20 +24,6 @@ def _size(path):
         return os.path.getsize(path)
     except OSError:
         return 0
-
-
-def keep_tail_lines(path, keep, dry_run):
-    data = open(path, 'rb').read()
-    lines = data.splitlines(keepends=True)
-    if len(lines) <= keep:
-        return 0
-    out = b''.join(lines[-keep:])
-    if not dry_run:
-        with open(path, 'r+b') as handle:
-            handle.seek(0)
-            handle.write(out)
-            handle.truncate(len(out))
-    return len(data) - len(out)
 
 
 def keep_tail_bytes(path, keep, dry_run):
@@ -79,21 +55,35 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--console-mb', type=int, default=20, help='megabytes of console log to keep')
+    parser.add_argument('--database', action='append', metavar='PATH',
+                        help='SQLite fleet database to checkpoint (repeatable; default: data/fleet.sqlite)')
+    parser.add_argument('--vacuum', action='store_true', help='reclaim free pages after checkpointing')
     args = parser.parse_args()
     keep_bytes = args.console_mb * 1024 * 1024
 
     total = 0
-    for directory, keep in JOURNALS.items():
-        base = os.path.join(ROOT, directory)
-        if not os.path.isdir(base):
+    databases = args.database or [os.path.join(ROOT, 'data', 'fleet.sqlite')]
+    for path in databases:
+        path = os.path.abspath(path)
+        if not os.path.isfile(path):
+            print(f'{path}: database not found; skipped')
             continue
-        saved = 0
-        for name in sorted(os.listdir(base)):
-            if not name.endswith('.jsonl'):
-                continue
-            saved += keep_tail_lines(os.path.join(base, name), keep, args.dry_run)
+        before = _size(path) + _size(path + '-wal')
+        if args.dry_run:
+            print(f'{path}: would checkpoint WAL' + (' and vacuum' if args.vacuum else ''))
+            continue
+
+        with closing(sqlite3.connect(path, timeout=1.0)) as database:
+            database.execute('PRAGMA busy_timeout = 1000')
+            checkpoint = database.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+            if checkpoint[0] != 0:
+                raise RuntimeError(f'{path}: WAL checkpoint is busy; stop all clients and retry')
+            if args.vacuum:
+                database.execute('VACUUM')
+        after = _size(path) + _size(path + '-wal')
+        saved = max(0, before - after)
         total += saved
-        print(f'{directory:11} kept {keep:5} lines/file   freed {human(saved)}')
+        print(f'{path}: checkpointed' + (', vacuumed' if args.vacuum else '') + f'; freed {human(saved)}')
 
     logs = os.path.join(ROOT, 'logs')
     if os.path.isdir(logs):

@@ -5,6 +5,7 @@ accounts/*.jsonc
 /progress/
 /profiles/
 /data/cache/
+/data/fleet.sqlite*
 *.log
 /account-data/
 /equipment/

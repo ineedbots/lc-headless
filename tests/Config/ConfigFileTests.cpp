@@ -73,12 +73,14 @@ namespace
         "maxRetryDelaySeconds": 45,
         "reloginDelaySeconds": 120,
         "progressDirectory": "reports",
-        "experienceDirectory": "xp",
+        "fleetDatabasePath": "data/fleet.sqlite",
+        "accountDataLogEnabled": true,
+        "experienceLogEnabled": true,
+        "bankLogEnabled": true,
+        "inventoryLogEnabled": true,
+        "equipmentLogEnabled": true,
         "experienceIntervalMinutes": 15,
-        "bankLogDirectory": "banks",
-        "inventoryDirectory": "bags",
-        "inventoryIntervalSeconds": 0,
-        "equipmentDirectory": "worn"
+        "inventoryIntervalSeconds": 0
     }
 }
 )json"sv;
@@ -122,13 +124,14 @@ namespace
         "maxRetryDelaySeconds": 30,
         "reloginDelaySeconds": 60,
         "progressDirectory": "progress",
-        "experienceDirectory": "experience",
+        "fleetDatabasePath": "data/fleet.sqlite",
+        "accountDataLogEnabled": true,
+        "experienceLogEnabled": true,
+        "bankLogEnabled": true,
+        "inventoryLogEnabled": true,
+        "equipmentLogEnabled": true,
         "experienceIntervalMinutes": 1,
-        "bankLogDirectory": "bank",
-        "inventoryDirectory": "inventory",
         "inventoryIntervalSeconds": 5,
-        "equipmentDirectory": "equipment",
-        "accountDataDirectory": "account-data",
         "accountDataIntervalSeconds": 5
     },
     "http": {
@@ -212,7 +215,7 @@ namespace
         {"scripting", "maxRetryDelaySeconds"},
         {"scripting", "reloginDelaySeconds"},
         {"scripting", "progressDirectory"},
-        {"scripting", "experienceDirectory"},
+        {"scripting", "fleetDatabasePath"},
     };
 
     nlohmann::json ParseJsonWithComments(std::string_view text)
@@ -1120,8 +1123,9 @@ TEST_CASE("The shipped sample includes every fleet setting with its default", "[
     REQUIRE(text.has_value());
     const auto sample = ParseJsonWithComments(*text);
     const auto defaults = nlohmann::json::parse(ConfigFile::Serialize(Config_s{}));
-    for (const auto key : {"experienceDirectory", "experienceIntervalMinutes", "bankLogDirectory",
-                           "inventoryDirectory", "inventoryIntervalSeconds", "equipmentDirectory", "accountDataDirectory", "accountDataIntervalSeconds"})
+    for (const auto key : {"fleetDatabasePath", "accountDataLogEnabled", "experienceLogEnabled", "bankLogEnabled",
+                           "inventoryLogEnabled", "equipmentLogEnabled", "experienceIntervalMinutes",
+                           "inventoryIntervalSeconds", "accountDataIntervalSeconds"})
     {
         CAPTURE(key);
         REQUIRE(sample.at("scripting").contains(key));
@@ -1132,22 +1136,40 @@ TEST_CASE("The shipped sample includes every fleet setting with its default", "[
 TEST_CASE("Account data settings round trip and validate intervals", "[ConfigFile]")
 {
     const auto defaults = ConfigFile::Parse(EXAMPLE);
-    CHECK(defaults.scripting.accountDataDirectory == "account-data");
+    CHECK(defaults.scripting.fleetDatabasePath == "data/fleet.sqlite");
+    CHECK(defaults.scripting.accountDataLogEnabled);
     CHECK(defaults.scripting.accountDataIntervalSeconds == 5s);
     for (const auto interval : {0, 86400})
     {
         auto json = ParseJsonWithComments(EXAMPLE);
-        json["scripting"]["accountDataDirectory"] = "";
+        json["scripting"]["accountDataLogEnabled"] = false;
         json["scripting"]["accountDataIntervalSeconds"] = interval;
         const auto config = ConfigFile::Parse(json.dump());
         const auto roundTrip = ConfigFile::Parse(ConfigFile::Serialize(config));
-        CHECK(roundTrip.scripting.accountDataDirectory.empty());
+        CHECK_FALSE(roundTrip.scripting.accountDataLogEnabled);
         CHECK(roundTrip.scripting.accountDataIntervalSeconds.count() == interval);
     }
+
     for (const auto interval : {-1, 86401})
     {
         auto json = ParseJsonWithComments(EXAMPLE);
         json["scripting"]["accountDataIntervalSeconds"] = interval;
         CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("scripting.accountDataIntervalSeconds"));
     }
+}
+
+TEST_CASE("Legacy fleet directory settings are ignored", "[ConfigFile]")
+{
+    for (const auto key : {"accountDataDirectory", "experienceDirectory", "bankLogDirectory", "inventoryDirectory", "equipmentDirectory"})
+    {
+        const auto text = EditBase([&](nlohmann::json& json)
+        {
+            json["scripting"][key] = "old-folder";
+        });
+        CHECK_NOTHROW(ConfigFile::Parse(text));
+    }
+
+    auto json = ParseJsonWithComments(EXAMPLE);
+    json["scripting"]["fleetDatabasePath"] = "";
+    CHECK(ConfigFile::Parse(json.dump()).scripting.fleetDatabasePath.empty());
 }

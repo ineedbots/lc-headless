@@ -55,6 +55,7 @@ CMake reads the vcpkg toolchain from `$VCPKG_ROOT/scripts/buildsystems/vcpkg.cma
 | Boost.Asio and Boost.Beast | TCP, WebSocket and asynchronous networking. |
 | OpenSSL | TLS for `wss`. |
 | bzip2 and zlib | Compressed game-cache archives and maps. |
+| SQLiteCpp and SQLite | SQLite-backed fleet history and query storage. |
 | nlohmann/json | Configuration and JSON data. |
 | pocketpy | Embedded Python interpreter. |
 | Catch2 | Native test runner. |
@@ -105,6 +106,7 @@ virtual environment (activate it before running the checks):
 ```sh
 python -m pip install -r tools/quality/requirements.txt
 python -B -m unittest discover -s tools/quality
+python -B -m unittest discover -s tools/fleet
 python -I tools/quality/format.py
 python -I tools/port/lint.py src/Script/Stdlib scripts tests/Stdlib
 python -B -m unittest discover -s tools/port

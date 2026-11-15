@@ -5,6 +5,7 @@
 #include "../Console/Logger.hpp"
 #include "../Game/GameClient.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
+#include "FleetDatabase.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -13,12 +14,12 @@ class AccountDataLog
 public:
     using Clock = std::chrono::steady_clock;
 
-    AccountDataLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events = {});
+    AccountDataLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events = {});
     void Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status);
 
-    [[nodiscard]] const std::filesystem::path& GetPath() const
+    [[nodiscard]] const std::filesystem::path& GetDatabasePath() const
     {
-        return m_path;
+        return m_database->GetPath();
     }
 
 private:
@@ -27,7 +28,7 @@ private:
     const GameCache_s& m_cache;
     std::shared_ptr<Logger> m_logger;
     std::string m_accountName;
-    std::filesystem::path m_path;
+    std::shared_ptr<FleetDatabase> m_database;
     std::chrono::seconds m_interval;
     std::shared_ptr<ApplicationEventPublisher> m_events;
     std::optional<nlohmann::ordered_json> m_lastSample;
