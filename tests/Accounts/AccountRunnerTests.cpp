@@ -147,9 +147,11 @@ TEST_CASE("AccountRunner flushes final fleet logs before stopping", "[AccountRun
     {
         auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
         auto state = SQLite::Statement{database,
-                                       "SELECT account_data.state FROM fleet_records AS records "
+                                       "SELECT states.name FROM fleet_records AS records "
                                        "JOIN fleet_account_data AS account_data ON account_data.record_id = records.sequence "
-                                       "WHERE records.stream = 'account-data' ORDER BY records.sequence DESC LIMIT 1"};
+                                       "JOIN fleet_states AS states ON states.id = account_data.state_id "
+                                       "JOIN fleet_streams AS streams ON streams.id = records.stream_id "
+                                       "WHERE streams.name = 'account-data' ORDER BY records.sequence DESC LIMIT 1"};
         if (state.executeStep())
         {
             finalState = state.getColumn(0).getString();

@@ -12,7 +12,7 @@ import tempfile
 import time
 
 import server
-from storage import create_schema
+from storage import create_schema, dictionary_id, timestamp_to_unix_seconds
 
 STREAMS = ('account-data', 'experience', 'bank', 'inventory', 'equipment')
 SKILLS = (
@@ -75,12 +75,13 @@ def _payload(stream, account, index):
     return record
 
 
-def _insert_sqlite(database, stream, account, timestamp, record):
+def _insert_sqlite(database, stream, account, timestamp, record, dictionary_ids):
     database.execute('INSERT INTO fleet_accounts (name) VALUES (?) ON CONFLICT (name) DO NOTHING', (account,))
     account_id = database.execute('SELECT id FROM fleet_accounts WHERE name = ?', (account,)).fetchone()[0]
     cursor = database.execute(
-        'INSERT INTO fleet_records (account_id, stream, recorded_at) VALUES (?, ?, ?)',
-        (account_id, stream, timestamp))
+        'INSERT INTO fleet_records (account_id, stream_id, recorded_at) VALUES (?, ?, ?)',
+        (account_id, dictionary_id(database, 'fleet_streams', stream, dictionary_ids['fleet_streams']),
+         timestamp_to_unix_seconds(timestamp)))
     record_id = cursor.lastrowid
 
     if stream == 'account-data':
@@ -92,10 +93,12 @@ def _insert_sqlite(database, stream, account, timestamp, record):
         prayer = record.get('prayer')
         special = record.get('specialAttack')
         values = (
-            record_id, record['state'], record['settled'], record.get('pid'),
+            record_id, dictionary_id(database, 'fleet_states', record['state'], dictionary_ids['fleet_states']),
+            record['settled'], record.get('pid'),
             *(tile.values() if tile else (None, None, None)),
             *(destination.values() if destination else (None, None, None)),
-            target.get('kind') if target else None, target.get('index') if target else None,
+            dictionary_id(database, 'fleet_target_kinds', target['kind'], dictionary_ids['fleet_target_kinds']) if target else None,
+            target.get('index') if target else None,
             *(target_tile.values() if target_tile else (None, None, None)),
             hp.get('current') if hp else None, hp.get('base') if hp else None, record.get('energy'),
             prayer.get('current') if prayer else None, prayer.get('base') if prayer else None,
@@ -104,29 +107,33 @@ def _insert_sqlite(database, stream, account, timestamp, record):
         database.execute('INSERT INTO fleet_account_data VALUES (' + ', '.join('?' for _ in values) + ')', values)
     elif stream == 'experience':
         database.execute(
-            'INSERT INTO fleet_experience (record_id, state, settled) VALUES (?, ?, ?)',
-            (record_id, record['state'], record['settled']))
+            'INSERT INTO fleet_experience (record_id, state_id, settled) VALUES (?, ?, ?)',
+            (record_id, dictionary_id(database, 'fleet_states', record['state'], dictionary_ids['fleet_states']), record['settled']))
         database.executemany(
-            'INSERT INTO fleet_experience_skills (record_id, skill, ordinal, level, base, xp) VALUES (?, ?, ?, ?, ?, ?)',
-            ((record_id, skill, ordinal, values['level'], values['base'], values['xp'])
+            'INSERT INTO fleet_experience_skills (record_id, skill_id, ordinal, level, base, xp) VALUES (?, ?, ?, ?, ?, ?)',
+            ((record_id, dictionary_id(database, 'fleet_skills', skill, dictionary_ids['fleet_skills']),
+              ordinal, values['level'], values['base'], values['xp'])
              for ordinal, (skill, values) in enumerate(record['skills'].items())))
     elif stream == 'bank':
         database.execute('INSERT INTO fleet_bank (record_id) VALUES (?)', (record_id,))
         database.executemany(
-            'INSERT INTO fleet_bank_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+            'INSERT INTO fleet_bank_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], dictionary_id(database, 'fleet_item_names', item['name'], dictionary_ids['fleet_item_names']), item['qty'])
+             for item in record['items']))
     elif stream == 'inventory':
         database.execute(
             'INSERT INTO fleet_inventory (record_id, bank_open, used, free) VALUES (?, ?, ?, ?)',
             (record_id, record['bankOpen'], record['used'], record['free']))
         database.executemany(
-            'INSERT INTO fleet_inventory_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+            'INSERT INTO fleet_inventory_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], dictionary_id(database, 'fleet_item_names', item['name'], dictionary_ids['fleet_item_names']), item['qty'])
+             for item in record['items']))
     else:
         database.execute('INSERT INTO fleet_equipment (record_id, used) VALUES (?, ?)', (record_id, record['used']))
         database.executemany(
-            'INSERT INTO fleet_equipment_items (record_id, item_id, name, quantity) VALUES (?, ?, ?, ?)',
-            ((record_id, item['id'], item['name'], item['qty']) for item in record['items']))
+            'INSERT INTO fleet_equipment_items (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)',
+            ((record_id, item['id'], dictionary_id(database, 'fleet_item_names', item['name'], dictionary_ids['fleet_item_names']), item['qty'])
+             for item in record['items']))
 
 
 def _legacy_tail(path, count):
@@ -189,6 +196,8 @@ def _run(args):
             database.execute('PRAGMA foreign_keys = ON')
 
         durations = {'JSONL': [], 'SQLite': []}
+        dictionary_ids = {table: {} for table in (
+            'fleet_streams', 'fleet_states', 'fleet_target_kinds', 'fleet_skills', 'fleet_item_names')}
         for index in range(args.records):
             timestamp = (datetime.datetime(2026, 1, 1) + datetime.timedelta(seconds=index)).strftime('%Y-%m-%dT%H:%M:%SZ')
             for account in accounts:
@@ -203,7 +212,7 @@ def _run(args):
 
                     start = time.perf_counter_ns()
                     database.execute('BEGIN IMMEDIATE')
-                    _insert_sqlite(database, stream, account, timestamp, record)
+                    _insert_sqlite(database, stream, account, timestamp, record, dictionary_ids)
                     database.commit()
                     durations['SQLite'].append(time.perf_counter_ns() - start)
 

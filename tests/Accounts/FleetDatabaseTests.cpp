@@ -43,7 +43,7 @@ TEST_CASE("FleetDatabase creates typed stream tables and preserves insertion ord
         auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
         auto version = SQLite::Statement{database, "PRAGMA user_version"};
         REQUIRE(version.executeStep());
-        CHECK(version.getColumn(0).getInt() == 3);
+        CHECK(version.getColumn(0).getInt() == 5);
         CHECK(RecordCount(database) == 2);
 
         auto columns = SQLite::Statement{database, "PRAGMA table_info(fleet_records)"};
@@ -54,6 +54,13 @@ TEST_CASE("FleetDatabase creates typed stream tables and preserves insertion ord
         }
 
         CHECK_FALSE(hasPayload);
+        auto optimizedTables = SQLite::Statement{
+            database,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND sql LIKE '%WITHOUT ROWID%' "
+            "AND name IN ('fleet_experience_skills', 'fleet_bank_items', 'fleet_inventory_items', 'fleet_equipment_items')"};
+        REQUIRE(optimizedTables.executeStep());
+        CHECK(optimizedTables.getColumn(0).getInt() == 4);
+
         auto rows = SQLite::Statement{database,
                                       "SELECT records.sequence, accounts.name, skills.xp FROM fleet_records AS records "
                                       "JOIN fleet_accounts AS accounts ON accounts.id = records.account_id "
@@ -72,6 +79,104 @@ TEST_CASE("FleetDatabase creates typed stream tables and preserves insertion ord
     reopened.Append(Record("bot1", "2026-01-01T00:00:00Z", 3));
     auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
     CHECK(RecordCount(database) == 3);
+}
+
+TEST_CASE("FleetDatabase normalizes stream values and stores UTC Unix seconds", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-dictionaries"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline};
+    database.Append(FleetAccountDataLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .state = "ingame",
+        .target = FleetLogTarget_s{.kind = "npc", .index = 17}});
+    database.Append(Record("bot1", "2026-01-01T00:00:01Z", 1));
+
+    auto reader = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    CHECK_THROWS(database.Append(Record("bot1", "2026-02-30T00:00:02Z", 2)));
+    CHECK(RecordCount(reader) == 2);
+
+    auto accountData = SQLite::Statement{
+        reader,
+        "SELECT typeof(records.recorded_at), records.recorded_at, typeof(records.stream_id), streams.name, "
+        "typeof(account_data.state_id), states.name, typeof(account_data.target_kind_id), target_kinds.name "
+        "FROM fleet_records AS records "
+        "JOIN fleet_streams AS streams ON streams.id = records.stream_id "
+        "JOIN fleet_account_data AS account_data ON account_data.record_id = records.sequence "
+        "JOIN fleet_states AS states ON states.id = account_data.state_id "
+        "JOIN fleet_target_kinds AS target_kinds ON target_kinds.id = account_data.target_kind_id"};
+    REQUIRE(accountData.executeStep());
+    CHECK(accountData.getColumn(0).getString() == "integer");
+    CHECK(accountData.getColumn(1).getInt64() == 1767225600);
+    CHECK(accountData.getColumn(2).getString() == "integer");
+    CHECK(accountData.getColumn(3).getString() == "account-data");
+    CHECK(accountData.getColumn(4).getString() == "integer");
+    CHECK(accountData.getColumn(5).getString() == "ingame");
+    CHECK(accountData.getColumn(6).getString() == "integer");
+    CHECK(accountData.getColumn(7).getString() == "npc");
+
+    auto experience = SQLite::Statement{
+        reader,
+        "SELECT typeof(records.recorded_at), records.recorded_at, typeof(experience.state_id), states.name, "
+        "typeof(skills.skill_id), skill_names.name FROM fleet_records AS records "
+        "JOIN fleet_experience AS experience ON experience.record_id = records.sequence "
+        "JOIN fleet_states AS states ON states.id = experience.state_id "
+        "JOIN fleet_experience_skills AS skills ON skills.record_id = records.sequence "
+        "JOIN fleet_skills AS skill_names ON skill_names.id = skills.skill_id"};
+    REQUIRE(experience.executeStep());
+    CHECK(experience.getColumn(0).getString() == "integer");
+    CHECK(experience.getColumn(1).getInt64() == 1767225601);
+    CHECK(experience.getColumn(2).getString() == "integer");
+    CHECK(experience.getColumn(3).getString() == "ingame");
+    CHECK(experience.getColumn(4).getString() == "integer");
+    CHECK(experience.getColumn(5).getString() == "attack");
+}
+
+TEST_CASE("FleetDatabase stores item names once across snapshots", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-item-names"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline};
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 109}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:01Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 100}, {.id = 996, .name = "Coins", .qty = 9}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:02Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins (alternate)", .qty = 99}}});
+
+    auto reader = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    auto names = SQLite::Statement{reader, "SELECT COUNT(*) FROM fleet_item_names"};
+    REQUIRE(names.executeStep());
+    CHECK(names.getColumn(0).getInt() == 2);
+
+    auto items = SQLite::Statement{
+        reader,
+        "SELECT items.item_id, names.name, items.quantity FROM fleet_bank_items AS items "
+        "JOIN fleet_item_names AS names ON names.id = items.name_id ORDER BY items.record_id, items.item_id"};
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 995);
+    CHECK(items.getColumn(1).getString() == "Coins");
+    CHECK(items.getColumn(2).getInt() == 109);
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 995);
+    CHECK(items.getColumn(1).getString() == "Coins");
+    CHECK(items.getColumn(2).getInt() == 100);
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 996);
+    CHECK(items.getColumn(1).getString() == "Coins");
+    CHECK(items.getColumn(2).getInt() == 9);
+    REQUIRE(items.executeStep());
+    CHECK(items.getColumn(0).getInt() == 995);
+    CHECK(items.getColumn(1).getString() == "Coins (alternate)");
+    CHECK(items.getColumn(2).getInt() == 99);
+    CHECK_FALSE(items.executeStep());
 }
 
 TEST_CASE("FleetDatabase rolls back a snapshot when child rows fail", "[FleetDatabase]")
@@ -97,6 +202,24 @@ TEST_CASE("FleetDatabase rolls back a snapshot when child rows fail", "[FleetDat
     external.exec("DROP TRIGGER reject_skill");
     database.Append(Record("bot2", "2026-01-01T00:02:00Z", 3));
     CHECK(RecordCount(external) == 2);
+
+    external.exec(
+        "CREATE TRIGGER reject_bank_item BEFORE INSERT ON fleet_bank_items "
+        "BEGIN SELECT RAISE(ABORT, 'test rejection'); END");
+    const auto bankRecord = FleetBankLog_s{
+        .time = "2026-01-01T00:03:00Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 109}}};
+    CHECK_THROWS(database.Append(bankRecord));
+    external.exec("DROP TRIGGER reject_bank_item");
+    CHECK_NOTHROW(database.Append(bankRecord));
+
+    auto item = SQLite::Statement{
+        external,
+        "SELECT names.name FROM fleet_bank_items AS items "
+        "JOIN fleet_item_names AS names ON names.id = items.name_id"};
+    REQUIRE(item.executeStep());
+    CHECK(item.getColumn(0).getString() == "Coins");
 }
 
 TEST_CASE("FleetDatabase bounds write lock waits and accepts a later retry", "[FleetDatabase]")
@@ -342,7 +465,7 @@ TEST_CASE("Independent FleetDatabase connections share records by commit sequenc
     CHECK(records.getColumn(1).getInt() == 2);
 }
 
-TEST_CASE("FleetDatabase rejects existing generic and newer schemas without changing them", "[FleetDatabase]")
+TEST_CASE("FleetDatabase rejects prior and newer schemas without changing them", "[FleetDatabase]")
 {
     const auto folder = TempFolder{"rs2004-fleet-database-version"};
     const auto path = folder.GetPath() / "prior.sqlite";
@@ -350,13 +473,16 @@ TEST_CASE("FleetDatabase rejects existing generic and newer schemas without chan
         auto prior = SQLite::Database{path.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE};
         prior.exec("CREATE TABLE fleet_records (sequence INTEGER PRIMARY KEY, payload TEXT NOT NULL)");
         prior.exec("INSERT INTO fleet_records VALUES (1, 'keep me')");
-        prior.exec("PRAGMA user_version = 2");
+        prior.exec("PRAGMA user_version = 4");
     }
 
     auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline};
     CHECK_THROWS_WITH(database.Append(Record("bot1", "2026-01-01T00:00:00Z", 1)), Catch::Matchers::ContainsSubstring("unsupported"));
     {
         auto prior = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+        auto version = SQLite::Statement{prior, "PRAGMA user_version"};
+        REQUIRE(version.executeStep());
+        CHECK(version.getColumn(0).getInt() == 4);
         auto payload = SQLite::Statement{prior, "SELECT payload FROM fleet_records"};
         REQUIRE(payload.executeStep());
         CHECK(payload.getColumn(0).getString() == "keep me");

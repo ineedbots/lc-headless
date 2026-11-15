@@ -12,14 +12,21 @@ account names unless they intentionally represent the same logical account. SQLi
 latest-state lookups and bounded per-account history. A snapshot and all its child rows commit in one
 transaction, so it cannot be partially written.
 
-`fleet_accounts` stores account names; `fleet_records` stores only the sequence, account reference, stream,
-and timestamp. The stream data lives in `fleet_account_data`, `fleet_experience`, `fleet_bank`,
-`fleet_inventory`, and `fleet_equipment`. Skills and items live in `fleet_experience_skills` and the
-corresponding `*_items` child tables. There is no generic JSON payload column.
+`fleet_accounts` stores account names; `fleet_records` stores the sequence, account reference, stream
+reference, and `recorded_at` as whole Unix seconds. The stream name is stored once in `fleet_streams`.
+State, target-kind, and skill names are likewise stored once in `fleet_states`, `fleet_target_kinds`, and
+`fleet_skills`, with integer references in the typed rows. The stream data lives in `fleet_account_data`,
+`fleet_experience`, `fleet_bank`, `fleet_inventory`, and `fleet_equipment`. Skills and items live in
+`fleet_experience_skills` and the corresponding `*_items` child tables. Item names are stored once in
+`fleet_item_names`; each snapshot keeps its item ID and a reference to the name used by that snapshot.
+The experience-skill and item child tables use their composite primary keys without a separate rowid.
+Public records still expose UTC timestamps in the existing `YYYY-MM-DDTHH:MM:SSZ` format. There is no
+generic JSON payload column.
 
-Schema version 3 is a fresh schema. Existing generic-payload databases and JSONL files are not migrated or
-imported. Back up any history you need, configure a new database path, and keep the old files separately.
-An existing database with an unsupported or unversioned schema is rejected without being modified.
+Schema version 5 is created for new databases. Earlier database schemas, including pre-release version 4,
+are not migrated; the client rejects them without modifying them. Back up any history you need and configure a new
+database path. Existing generic-payload databases and JSONL files are not migrated or imported.
+Unversioned databases are also rejected without being modified.
 
 The database uses WAL mode, `synchronous=NORMAL`, and a 25 ms busy timeout. Reads can proceed while clients
 write. Within a client process, `AccountRunner` shares one background writer per normalized database path.

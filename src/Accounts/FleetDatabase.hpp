@@ -9,6 +9,8 @@
 
 #include <SQLiteCpp/SQLiteCpp.h>
 
+#include <unordered_map>
+
 class FleetDatabase
 {
 public:
@@ -73,6 +75,11 @@ private:
     std::filesystem::path m_path;
     Mode_e m_mode;
     std::unique_ptr<SQLite::Database> m_database;
+    std::unordered_map<std::string, s64> m_streamIds;
+    std::unordered_map<std::string, s64> m_stateIds;
+    std::unordered_map<std::string, s64> m_targetKindIds;
+    std::unordered_map<std::string, s64> m_skillIds;
+    std::unordered_map<std::string, s64> m_itemNameIds;
     std::mutex m_writeMutex;
     std::mutex m_mutex;
     std::condition_variable m_wake;
