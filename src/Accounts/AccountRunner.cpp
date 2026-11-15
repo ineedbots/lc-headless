@@ -170,7 +170,7 @@ std::shared_ptr<FleetDatabase> AccountRunner::GetFleetDatabase(const std::filesy
         return found->second;
     }
 
-    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background);
+    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background, m_config->scripting.fleetRetention);
     m_fleetDatabases.emplace(key, database);
     return database;
 }

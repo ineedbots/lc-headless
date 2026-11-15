@@ -34,6 +34,25 @@ struct ClientSettings_s
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
 
+struct FleetRecordRetention_s
+{
+    s64 maxRecords = 0;
+    s64 pruneRecords = 0;
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(FleetRecordRetention_s, maxRecords, pruneRecords)
+
+struct FleetRetentionSettings_s
+{
+    FleetRecordRetention_s accountData{10000, 1000};
+    FleetRecordRetention_s experience{10000, 1000};
+    FleetRecordRetention_s bank{1000, 100};
+    FleetRecordRetention_s inventory{5000, 500};
+    FleetRecordRetention_s equipment{1000, 100};
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(FleetRetentionSettings_s, accountData, experience, bank, inventory, equipment)
+
 struct ScriptingSettings_s
 {
     static constexpr auto MAX_CONNECT_ATTEMPTS = 100;
@@ -61,9 +80,10 @@ struct ScriptingSettings_s
     // The least time between two lines; 0 records every change.
     std::chrono::seconds inventoryIntervalSeconds = 5s;
     std::chrono::seconds accountDataIntervalSeconds = 5s;
+    FleetRetentionSettings_s fleetRetention;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, minRetryDelaySeconds, maxRetryDelaySeconds, reloginDelaySeconds, progressDirectory, fleetDatabasePath, accountDataLogEnabled, experienceLogEnabled, bankLogEnabled, inventoryLogEnabled, equipmentLogEnabled, experienceIntervalMinutes, inventoryIntervalSeconds, accountDataIntervalSeconds)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, minRetryDelaySeconds, maxRetryDelaySeconds, reloginDelaySeconds, progressDirectory, fleetDatabasePath, accountDataLogEnabled, experienceLogEnabled, bankLogEnabled, inventoryLogEnabled, equipmentLogEnabled, experienceIntervalMinutes, inventoryIntervalSeconds, accountDataIntervalSeconds, fleetRetention)
 
 // client.jsonc.
 struct Config_s

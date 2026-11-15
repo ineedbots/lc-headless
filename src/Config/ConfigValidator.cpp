@@ -162,6 +162,19 @@ void ConfigValidator::Validate(const Config_s& config)
           std::format("must be from 0 (every change) to {}", MAX_INVENTORY_INTERVAL.count()));
     Check(scripting.experienceIntervalMinutes >= std::chrono::minutes{0} && scripting.experienceIntervalMinutes <= MAX_EXPERIENCE_INTERVAL, "scripting.experienceIntervalMinutes",
           std::format("must be from 0 (off) to {}", MAX_EXPERIENCE_INTERVAL.count()));
+
+    const auto validateRetention = [](const FleetRecordRetention_s& retention, std::string_view path)
+    {
+        const auto valid = retention.maxRecords >= 0 && retention.pruneRecords >= 0 &&
+            ((retention.maxRecords == 0 && retention.pruneRecords == 0) ||
+             (retention.maxRecords > 0 && retention.pruneRecords > 0 && retention.pruneRecords < retention.maxRecords));
+        Check(valid, path, "maxRecords and pruneRecords must both be zero to disable pruning, or pruneRecords must be less than a positive maxRecords");
+    };
+    validateRetention(scripting.fleetRetention.accountData, "scripting.fleetRetention.accountData");
+    validateRetention(scripting.fleetRetention.experience, "scripting.fleetRetention.experience");
+    validateRetention(scripting.fleetRetention.bank, "scripting.fleetRetention.bank");
+    validateRetention(scripting.fleetRetention.inventory, "scripting.fleetRetention.inventory");
+    validateRetention(scripting.fleetRetention.equipment, "scripting.fleetRetention.equipment");
 }
 
 void ConfigValidator::ValidateAccount(const AccountConfig_s& account)

@@ -132,7 +132,29 @@ namespace
         "equipmentLogEnabled": true,
         "experienceIntervalMinutes": 1,
         "inventoryIntervalSeconds": 5,
-        "accountDataIntervalSeconds": 5
+        "accountDataIntervalSeconds": 5,
+        "fleetRetention": {
+            "accountData": {
+                "maxRecords": 10000,
+                "pruneRecords": 1000
+            },
+            "experience": {
+                "maxRecords": 10000,
+                "pruneRecords": 1000
+            },
+            "bank": {
+                "maxRecords": 1000,
+                "pruneRecords": 100
+            },
+            "inventory": {
+                "maxRecords": 5000,
+                "pruneRecords": 500
+            },
+            "equipment": {
+                "maxRecords": 1000,
+                "pruneRecords": 100
+            }
+        }
     },
     "http": {
         "host": "",
@@ -1125,7 +1147,7 @@ TEST_CASE("The shipped sample includes every fleet setting with its default", "[
     const auto defaults = nlohmann::json::parse(ConfigFile::Serialize(Config_s{}));
     for (const auto key : {"fleetDatabasePath", "accountDataLogEnabled", "experienceLogEnabled", "bankLogEnabled",
                            "inventoryLogEnabled", "equipmentLogEnabled", "experienceIntervalMinutes",
-                           "inventoryIntervalSeconds", "accountDataIntervalSeconds"})
+                           "inventoryIntervalSeconds", "accountDataIntervalSeconds", "fleetRetention"})
     {
         CAPTURE(key);
         REQUIRE(sample.at("scripting").contains(key));
@@ -1155,6 +1177,37 @@ TEST_CASE("Account data settings round trip and validate intervals", "[ConfigFil
         auto json = ParseJsonWithComments(EXAMPLE);
         json["scripting"]["accountDataIntervalSeconds"] = interval;
         CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("scripting.accountDataIntervalSeconds"));
+    }
+}
+
+TEST_CASE("Fleet retention settings round trip and validate pruning limits", "[ConfigFile]")
+{
+    const auto defaults = ConfigFile::Parse(EXAMPLE);
+    CHECK(defaults.scripting.fleetRetention.accountData.maxRecords == 10000);
+    CHECK(defaults.scripting.fleetRetention.accountData.pruneRecords == 1000);
+    CHECK(defaults.scripting.fleetRetention.experience.maxRecords == 10000);
+    CHECK(defaults.scripting.fleetRetention.bank.maxRecords == 1000);
+    CHECK(defaults.scripting.fleetRetention.inventory.maxRecords == 5000);
+    CHECK(defaults.scripting.fleetRetention.equipment.maxRecords == 1000);
+
+    auto json = ParseJsonWithComments(EXAMPLE);
+    json["scripting"]["fleetRetention"]["bank"]["maxRecords"] = 250;
+    json["scripting"]["fleetRetention"]["bank"]["pruneRecords"] = 25;
+    json["scripting"]["fleetRetention"]["inventory"]["maxRecords"] = 0;
+    json["scripting"]["fleetRetention"]["inventory"]["pruneRecords"] = 0;
+    const auto configured = ConfigFile::Parse(json.dump());
+    const auto roundTrip = ConfigFile::Parse(ConfigFile::Serialize(configured));
+    CHECK(roundTrip.scripting.fleetRetention.bank.maxRecords == 250);
+    CHECK(roundTrip.scripting.fleetRetention.bank.pruneRecords == 25);
+    CHECK(roundTrip.scripting.fleetRetention.inventory.maxRecords == 0);
+    CHECK(roundTrip.scripting.fleetRetention.inventory.pruneRecords == 0);
+
+    for (const auto [maxRecords, pruneRecords] : {std::pair{0, 1}, std::pair{10, 0}, std::pair{10, 10}, std::pair{-1, 1}, std::pair{10, -1}})
+    {
+        json = ParseJsonWithComments(EXAMPLE);
+        json["scripting"]["fleetRetention"]["bank"]["maxRecords"] = maxRecords;
+        json["scripting"]["fleetRetention"]["bank"]["pruneRecords"] = pruneRecords;
+        CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("scripting.fleetRetention.bank"));
     }
 }
 

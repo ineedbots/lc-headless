@@ -6,6 +6,7 @@
 #include "Type/FleetExperienceLog_s.hpp"
 #include "Type/FleetInventoryLog_s.hpp"
 #include "Type/FleetStream_e.hpp"
+#include "../Config/Type/Config_s.hpp"
 
 #include <SQLiteCpp/SQLiteCpp.h>
 
@@ -23,7 +24,7 @@ public:
     static constexpr std::size_t MAX_PENDING_WRITES = 256;
     static constexpr std::size_t MAX_BATCH_WRITES = 64;
 
-    explicit FleetDatabase(std::filesystem::path path, Mode_e mode = Mode_e::Background);
+    explicit FleetDatabase(std::filesystem::path path, Mode_e mode = Mode_e::Background, FleetRetentionSettings_s retention = {});
     ~FleetDatabase();
 
     FleetDatabase(const FleetDatabase&) = delete;
@@ -70,10 +71,12 @@ private:
     void Write(const FleetBankLog_s& record);
     void Write(const FleetInventoryLog_s& record);
     void Write(const FleetEquipmentLog_s& record);
+    void Prune(std::string_view account, FleetStream_e stream);
     void EnsureOpen();
 
     std::filesystem::path m_path;
     Mode_e m_mode;
+    FleetRetentionSettings_s m_retention;
     std::unique_ptr<SQLite::Database> m_database;
     std::unordered_map<std::string, s64> m_streamIds;
     std::unordered_map<std::string, s64> m_stateIds;
