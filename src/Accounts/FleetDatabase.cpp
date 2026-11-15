@@ -4,9 +4,11 @@
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <nlohmann/json.hpp>
 
+#include <charconv>
+
 namespace
 {
-    constexpr auto SCHEMA_VERSION = 4;
+    constexpr auto SCHEMA_VERSION = 5;
     constexpr auto BUSY_TIMEOUT_MS = 25;
     constexpr auto BATCH_DELAY = 5ms;
 
@@ -41,7 +43,88 @@ namespace
         return nlohmann::json::parse(encoded).get<std::string>();
     }
 
-    s64 InsertRecord(SQLite::Database& database, std::string_view account, FleetStream_e stream, std::string_view time)
+    s64 StringId(
+        SQLite::Database& database,
+        std::unordered_map<std::string, s64>& ids,
+        std::string_view table,
+        std::string_view value)
+    {
+        auto name = std::string{value};
+        const auto found = ids.find(name);
+        if (found != ids.end())
+        {
+            return found->second;
+        }
+
+        const auto insertQuery = std::format("INSERT INTO {} (name) VALUES (?) ON CONFLICT (name) DO NOTHING", table);
+        auto insertStatement = SQLite::Statement{database, insertQuery};
+        insertStatement.bind(1, name);
+        insertStatement.exec();
+
+        const auto selectQuery = std::format("SELECT id FROM {} WHERE name = ?", table);
+        auto selectStatement = SQLite::Statement{database, selectQuery};
+        selectStatement.bind(1, name);
+        if (!selectStatement.executeStep())
+        {
+            throw std::runtime_error{std::format("could not find value in {} after insert", table)};
+        }
+
+        const auto id = selectStatement.getColumn(0).getInt64();
+        ids.emplace(std::move(name), id);
+        return id;
+    }
+
+    s64 UnixTimestamp(std::string_view text)
+    {
+        if (text.size() != 20 || text[4] != '-' || text[7] != '-' || text[10] != 'T' || text[13] != ':' || text[16] != ':' || text[19] != 'Z')
+        {
+            throw std::invalid_argument{"fleet record time must use UTC format YYYY-MM-DDTHH:MM:SSZ"};
+        }
+
+        const auto parsePart = [text](std::size_t offset, std::size_t length)
+        {
+            for (const auto character : text.substr(offset, length))
+            {
+                if (character < '0' || character > '9')
+                {
+                    throw std::invalid_argument{"fleet record time contains a non-numeric date or time component"};
+                }
+            }
+
+            auto value = int{};
+            const auto first = text.data() + offset;
+            const auto last = first + length;
+            const auto [end, error] = std::from_chars(first, last, value);
+            if (error != std::errc{} || end != last)
+            {
+                throw std::invalid_argument{"fleet record time contains a non-numeric date or time component"};
+            }
+
+            return value;
+        };
+
+        const auto date = std::chrono::year_month_day{
+            std::chrono::year{parsePart(0, 4)},
+            std::chrono::month{static_cast<unsigned int>(parsePart(5, 2))},
+            std::chrono::day{static_cast<unsigned int>(parsePart(8, 2))}};
+        const auto hours = parsePart(11, 2);
+        const auto minutes = parsePart(14, 2);
+        const auto seconds = parsePart(17, 2);
+        if (!date.ok() || hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59)
+        {
+            throw std::invalid_argument{"fleet record time contains an invalid date or time"};
+        }
+
+        const auto timestamp = std::chrono::sys_days{date} + std::chrono::hours{hours} + std::chrono::minutes{minutes} + std::chrono::seconds{seconds};
+        return std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();
+    }
+
+    s64 InsertRecord(
+        SQLite::Database& database,
+        std::unordered_map<std::string, s64>& streamIds,
+        std::string_view account,
+        FleetStream_e stream,
+        std::string_view time)
     {
         {
             auto statement = SQLite::Statement{database, "INSERT INTO fleet_accounts (name) VALUES (?) ON CONFLICT (name) DO NOTHING"};
@@ -61,10 +144,10 @@ namespace
             accountId = statement.getColumn(0).getInt64();
         }
 
-        auto statement = SQLite::Statement{database, "INSERT INTO fleet_records (account_id, stream, recorded_at) VALUES (?, ?, ?)"};
+        auto statement = SQLite::Statement{database, "INSERT INTO fleet_records (account_id, stream_id, recorded_at) VALUES (?, ?, ?)"};
         statement.bind(1, accountId);
-        statement.bind(2, std::string{StreamName(stream)});
-        statement.bind(3, std::string{time});
+        statement.bind(2, StringId(database, streamIds, "fleet_streams", StreamName(stream)));
+        statement.bind(3, UnixTimestamp(time));
         statement.exec();
         return database.getLastInsertRowid();
     }
@@ -132,34 +215,12 @@ namespace
     {
         const auto query = std::format("INSERT INTO {} (record_id, item_id, name_id, quantity) VALUES (?, ?, ?, ?)", table);
         auto itemStatement = SQLite::Statement{database, query};
-        auto insertNameStatement = SQLite::Statement{
-            database,
-            "INSERT INTO fleet_item_names (name) VALUES (?) ON CONFLICT (name) DO NOTHING"};
-        auto findNameStatement = SQLite::Statement{database, "SELECT id FROM fleet_item_names WHERE name = ?"};
 
         for (const auto& item : items)
         {
-            auto name = SanitizeUtf8(item.name);
-            auto nameId = itemNameIds.find(name);
-            if (nameId == itemNameIds.end())
-            {
-                insertNameStatement.bind(1, name);
-                insertNameStatement.exec();
-                insertNameStatement.reset();
-
-                findNameStatement.bind(1, name);
-                if (!findNameStatement.executeStep())
-                {
-                    throw std::runtime_error{"could not find fleet item name after insert"};
-                }
-
-                nameId = itemNameIds.emplace(std::move(name), findNameStatement.getColumn(0).getInt64()).first;
-                findNameStatement.reset();
-            }
-
             itemStatement.bind(1, recordId);
             itemStatement.bind(2, static_cast<s64>(item.id));
-            itemStatement.bind(3, nameId->second);
+            itemStatement.bind(3, StringId(database, itemNameIds, "fleet_item_names", SanitizeUtf8(item.name)));
             itemStatement.bind(4, static_cast<s64>(item.qty));
             itemStatement.exec();
             itemStatement.reset();
@@ -356,6 +417,10 @@ void FleetDatabase::WriteBatch(std::vector<PendingWrite_s> writes)
     catch (...)
     {
         // Cached IDs may refer to dictionary rows rolled back with this batch.
+        m_streamIds.clear();
+        m_stateIds.clear();
+        m_targetKindIds.clear();
+        m_skillIds.clear();
         m_itemNameIds.clear();
         error = std::current_exception();
     }
@@ -383,22 +448,22 @@ void FleetDatabase::WriteBatch(std::vector<PendingWrite_s> writes)
 
 void FleetDatabase::Write(const FleetAccountDataLog_s& record)
 {
-    const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::AccountData, record.time);
+    const auto recordId = InsertRecord(*m_database, m_streamIds, record.account, FleetStream_e::AccountData, record.time);
     auto statement = SQLite::Statement{*m_database,
                                        "INSERT INTO fleet_account_data ("
-                                       "record_id, state, settled, pid, tile_x, tile_z, tile_level, destination_x, destination_z, destination_level, "
-                                       "target_kind, target_index, target_x, target_z, target_level, hp_current, hp_base, energy, prayer_current, prayer_base, "
+                                       "record_id, state_id, settled, pid, tile_x, tile_z, tile_level, destination_x, destination_z, destination_level, "
+                                       "target_kind_id, target_index, target_x, target_z, target_level, hp_current, hp_base, energy, prayer_current, prayer_base, "
                                        "special_attack_energy, special_attack_armed, running, moving, in_combat, weight, tick) "
                                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"};
     statement.bind(1, recordId);
-    statement.bind(2, record.state);
+    statement.bind(2, StringId(*m_database, m_stateIds, "fleet_states", record.state));
     statement.bind(3, static_cast<s32>(record.settled));
     BindOptionalInteger(statement, 4, record.pid);
     BindTile(statement, 5, record.tile);
     BindTile(statement, 8, record.destination);
     if (record.target)
     {
-        statement.bind(11, record.target->kind);
+        statement.bind(11, StringId(*m_database, m_targetKindIds, "fleet_target_kinds", record.target->kind));
         BindOptionalInteger(statement, 12, record.target->index);
         BindTile(statement, 13, record.target->tile);
     }
@@ -435,21 +500,21 @@ void FleetDatabase::Write(const FleetAccountDataLog_s& record)
 
 void FleetDatabase::Write(const FleetExperienceLog_s& record)
 {
-    const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Experience, record.time);
+    const auto recordId = InsertRecord(*m_database, m_streamIds, record.account, FleetStream_e::Experience, record.time);
     {
-        auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_experience (record_id, state, settled) VALUES (?, ?, ?)"};
+        auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_experience (record_id, state_id, settled) VALUES (?, ?, ?)"};
         statement.bind(1, recordId);
-        statement.bind(2, record.state);
+        statement.bind(2, StringId(*m_database, m_stateIds, "fleet_states", record.state));
         statement.bind(3, static_cast<s32>(record.settled));
         statement.exec();
     }
 
-    auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_experience_skills (record_id, skill, ordinal, level, base, xp) VALUES (?, ?, ?, ?, ?, ?)"};
+    auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_experience_skills (record_id, skill_id, ordinal, level, base, xp) VALUES (?, ?, ?, ?, ?, ?)"};
     for (std::size_t i = 0; i < record.skills.size(); ++i)
     {
         const auto& [name, skill] = record.skills[i];
         statement.bind(1, recordId);
-        statement.bind(2, name);
+        statement.bind(2, StringId(*m_database, m_skillIds, "fleet_skills", name));
         statement.bind(3, static_cast<s64>(i));
         statement.bind(4, static_cast<s32>(skill.level));
         statement.bind(5, static_cast<s32>(skill.base));
@@ -461,7 +526,7 @@ void FleetDatabase::Write(const FleetExperienceLog_s& record)
 
 void FleetDatabase::Write(const FleetBankLog_s& record)
 {
-    const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Bank, record.time);
+    const auto recordId = InsertRecord(*m_database, m_streamIds, record.account, FleetStream_e::Bank, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_bank (record_id) VALUES (?)"};
         statement.bind(1, recordId);
@@ -473,7 +538,7 @@ void FleetDatabase::Write(const FleetBankLog_s& record)
 
 void FleetDatabase::Write(const FleetInventoryLog_s& record)
 {
-    const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Inventory, record.time);
+    const auto recordId = InsertRecord(*m_database, m_streamIds, record.account, FleetStream_e::Inventory, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_inventory (record_id, bank_open, used, free) VALUES (?, ?, ?, ?)"};
         statement.bind(1, recordId);
@@ -488,7 +553,7 @@ void FleetDatabase::Write(const FleetInventoryLog_s& record)
 
 void FleetDatabase::Write(const FleetEquipmentLog_s& record)
 {
-    const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Equipment, record.time);
+    const auto recordId = InsertRecord(*m_database, m_streamIds, record.account, FleetStream_e::Equipment, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_equipment (record_id, used) VALUES (?, ?)"};
         statement.bind(1, recordId);
@@ -561,25 +626,30 @@ void FleetDatabase::EnsureOpen()
             "CREATE TABLE fleet_accounts ("
             "id INTEGER PRIMARY KEY, "
             "name TEXT NOT NULL UNIQUE)");
+        database->exec("CREATE TABLE fleet_streams (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
         database->exec(
             "CREATE TABLE fleet_records ("
             "sequence INTEGER PRIMARY KEY AUTOINCREMENT, "
             "account_id INTEGER NOT NULL REFERENCES fleet_accounts(id), "
-            "stream TEXT NOT NULL CHECK (stream IN ('account-data', 'experience', 'bank', 'inventory', 'equipment')), "
-            "recorded_at TEXT NOT NULL)");
-        database->exec("CREATE INDEX fleet_records_latest ON fleet_records (account_id, stream, sequence DESC)");
-        database->exec("CREATE INDEX fleet_records_history ON fleet_records (account_id, stream, recorded_at, sequence)");
-        database->exec("CREATE INDEX fleet_records_stream_latest ON fleet_records (stream, account_id, sequence DESC)");
+            "stream_id INTEGER NOT NULL REFERENCES fleet_streams(id), "
+            "recorded_at INTEGER NOT NULL)");
+        database->exec("CREATE INDEX fleet_records_latest ON fleet_records (account_id, stream_id, sequence DESC)");
+        database->exec("CREATE INDEX fleet_records_history ON fleet_records (account_id, stream_id, recorded_at, sequence)");
+        database->exec("CREATE INDEX fleet_records_stream_latest ON fleet_records (stream_id, account_id, sequence DESC)");
         database->exec("CREATE TABLE fleet_item_names (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
+        database->exec("CREATE TABLE fleet_states (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
+        database->exec("CREATE TABLE fleet_target_kinds (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
+        database->exec("INSERT INTO fleet_target_kinds (id, name) VALUES (1, 'npc'), (2, 'player'), (3, 'tile')");
+        database->exec("CREATE TABLE fleet_skills (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)");
         database->exec(
             "CREATE TABLE fleet_account_data ("
             "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
-            "state TEXT NOT NULL, "
+            "state_id INTEGER NOT NULL REFERENCES fleet_states(id), "
             "settled INTEGER NOT NULL CHECK (settled IN (0, 1)), "
             "pid INTEGER, "
             "tile_x INTEGER, tile_z INTEGER, tile_level INTEGER, "
             "destination_x INTEGER, destination_z INTEGER, destination_level INTEGER, "
-            "target_kind TEXT, target_index INTEGER, target_x INTEGER, target_z INTEGER, target_level INTEGER, "
+            "target_kind_id INTEGER REFERENCES fleet_target_kinds(id), target_index INTEGER, target_x INTEGER, target_z INTEGER, target_level INTEGER, "
             "hp_current INTEGER, hp_base INTEGER, "
             "energy INTEGER CHECK (energy BETWEEN 0 AND 100), "
             "prayer_current INTEGER, prayer_base INTEGER, "
@@ -596,23 +666,23 @@ void FleetDatabase::EnsureOpen()
             "CHECK ((prayer_current IS NULL AND prayer_base IS NULL) OR (prayer_current IS NOT NULL AND prayer_base IS NOT NULL)), "
             "CHECK ((special_attack_energy IS NULL AND special_attack_armed IS NULL) OR "
             "(special_attack_energy IS NOT NULL AND special_attack_armed IS NOT NULL)), "
-            "CHECK ((target_kind IS NULL AND target_index IS NULL AND target_x IS NULL AND target_z IS NULL AND target_level IS NULL) OR "
-            "(target_kind IS NOT NULL AND target_kind IN ('npc', 'player') AND target_index IS NOT NULL AND target_x IS NULL AND target_z IS NULL AND target_level IS NULL) OR "
-            "(target_kind IS NOT NULL AND target_kind = 'tile' AND target_index IS NULL AND target_x IS NOT NULL AND target_z IS NOT NULL AND target_level IS NOT NULL)))");
+            "CHECK ((target_kind_id IS NULL AND target_index IS NULL AND target_x IS NULL AND target_z IS NULL AND target_level IS NULL) OR "
+            "(target_kind_id IS NOT NULL AND target_kind_id IN (1, 2) AND target_index IS NOT NULL AND target_x IS NULL AND target_z IS NULL AND target_level IS NULL) OR "
+            "(target_kind_id IS NOT NULL AND target_kind_id = 3 AND target_index IS NULL AND target_x IS NOT NULL AND target_z IS NOT NULL AND target_level IS NOT NULL)))");
         database->exec(
             "CREATE TABLE fleet_experience ("
             "record_id INTEGER PRIMARY KEY REFERENCES fleet_records(sequence) ON DELETE CASCADE, "
-            "state TEXT NOT NULL, "
+            "state_id INTEGER NOT NULL REFERENCES fleet_states(id), "
             "settled INTEGER NOT NULL CHECK (settled IN (0, 1)))");
         database->exec(
             "CREATE TABLE fleet_experience_skills ("
             "record_id INTEGER NOT NULL REFERENCES fleet_experience(record_id) ON DELETE CASCADE, "
-            "skill TEXT NOT NULL, "
+            "skill_id INTEGER NOT NULL REFERENCES fleet_skills(id), "
             "ordinal INTEGER NOT NULL CHECK (ordinal >= 0), "
             "level INTEGER NOT NULL, "
             "base INTEGER NOT NULL, "
             "xp INTEGER NOT NULL CHECK (xp >= 0), "
-            "PRIMARY KEY (record_id, skill), "
+            "PRIMARY KEY (record_id, skill_id), "
             "UNIQUE (record_id, ordinal)) WITHOUT ROWID");
         database->exec(
             "CREATE TABLE fleet_bank ("

@@ -5,6 +5,12 @@
 
 namespace FleetDatabaseReader
 {
+    inline std::string Timestamp(s64 unixSeconds)
+    {
+        const auto timestamp = std::chrono::sys_seconds{std::chrono::seconds{unixSeconds}};
+        return std::format("{:%Y-%m-%dT%H:%M:%SZ}", timestamp);
+    }
+
     inline nlohmann::ordered_json Tile(SQLite::Statement& statement, int xIndex)
     {
         const auto x = statement.getColumn(xIndex);
@@ -47,10 +53,16 @@ namespace FleetDatabaseReader
         if (stream == "account-data")
         {
             auto statement = SQLite::Statement{database,
-                                               "SELECT state, settled, pid, tile_x, tile_z, tile_level, destination_x, destination_z, destination_level, "
-                                               "target_kind, target_index, target_x, target_z, target_level, hp_current, hp_base, energy, "
-                                               "prayer_current, prayer_base, special_attack_energy, special_attack_armed, running, moving, "
-                                               "in_combat, weight, tick FROM fleet_account_data WHERE record_id = ?"};
+                                               "SELECT states.name, account_data.settled, account_data.pid, account_data.tile_x, account_data.tile_z, account_data.tile_level, "
+                                               "account_data.destination_x, account_data.destination_z, account_data.destination_level, target_kinds.name, "
+                                               "account_data.target_index, account_data.target_x, account_data.target_z, account_data.target_level, "
+                                               "account_data.hp_current, account_data.hp_base, account_data.energy, account_data.prayer_current, account_data.prayer_base, "
+                                               "account_data.special_attack_energy, account_data.special_attack_armed, account_data.running, account_data.moving, "
+                                               "account_data.in_combat, account_data.weight, account_data.tick "
+                                               "FROM fleet_account_data AS account_data "
+                                               "JOIN fleet_states AS states ON states.id = account_data.state_id "
+                                               "LEFT JOIN fleet_target_kinds AS target_kinds ON target_kinds.id = account_data.target_kind_id "
+                                               "WHERE account_data.record_id = ?"};
             statement.bind(1, sequence);
             if (!statement.executeStep())
             {
@@ -103,7 +115,10 @@ namespace FleetDatabaseReader
         }
         else if (stream == "experience")
         {
-            auto header = SQLite::Statement{database, "SELECT state, settled FROM fleet_experience WHERE record_id = ?"};
+            auto header = SQLite::Statement{database,
+                                            "SELECT states.name, experience.settled FROM fleet_experience AS experience "
+                                            "JOIN fleet_states AS states ON states.id = experience.state_id "
+                                            "WHERE experience.record_id = ?"};
             header.bind(1, sequence);
             if (!header.executeStep())
             {
@@ -111,7 +126,11 @@ namespace FleetDatabaseReader
             }
 
             auto skills = nlohmann::ordered_json::object();
-            auto statement = SQLite::Statement{database, "SELECT skill, level, base, xp FROM fleet_experience_skills WHERE record_id = ? ORDER BY ordinal"};
+            auto statement = SQLite::Statement{database,
+                                               "SELECT skills.name, experience_skills.level, experience_skills.base, experience_skills.xp "
+                                               "FROM fleet_experience_skills AS experience_skills "
+                                               "JOIN fleet_skills AS skills ON skills.id = experience_skills.skill_id "
+                                               "WHERE experience_skills.record_id = ? ORDER BY experience_skills.ordinal"};
             statement.bind(1, sequence);
             while (statement.executeStep())
             {
@@ -170,7 +189,8 @@ inline std::vector<nlohmann::ordered_json> ReadOrderedFleetRecords(const std::fi
     auto statement = SQLite::Statement{database,
                                        "SELECT records.sequence, accounts.name, records.recorded_at FROM fleet_records AS records "
                                        "JOIN fleet_accounts AS accounts ON accounts.id = records.account_id "
-                                       "WHERE records.stream = ? AND accounts.name = ? ORDER BY records.sequence"};
+                                       "JOIN fleet_streams AS streams ON streams.id = records.stream_id "
+                                       "WHERE streams.name = ? AND accounts.name = ? ORDER BY records.sequence"};
     statement.bind(1, std::string{stream});
     statement.bind(2, std::string{account});
 
@@ -178,7 +198,11 @@ inline std::vector<nlohmann::ordered_json> ReadOrderedFleetRecords(const std::fi
     while (statement.executeStep())
     {
         records.push_back(FleetDatabaseReader::Read(
-            database, stream, statement.getColumn(0).getInt64(), statement.getColumn(1).getString(), statement.getColumn(2).getString()));
+            database,
+            stream,
+            statement.getColumn(0).getInt64(),
+            statement.getColumn(1).getString(),
+            FleetDatabaseReader::Timestamp(statement.getColumn(2).getInt64())));
     }
 
     return records;

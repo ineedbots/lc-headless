@@ -24,7 +24,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from storage import connect_readonly
+from storage import connect_readonly, timestamp_from_unix_seconds
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 GUI_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -63,7 +63,8 @@ def _accounts(stream):
             accounts.update(row[0] for row in connection.execute(
                 'SELECT DISTINCT accounts.name FROM fleet_records AS records '
                 'JOIN fleet_accounts AS accounts ON accounts.id = records.account_id '
-                'WHERE records.stream = ?', (stream,)))
+                'JOIN fleet_streams AS streams ON streams.id = records.stream_id '
+                'WHERE streams.name = ?', (stream,)))
         finally:
             connection.close()
     return sorted(accounts)
@@ -82,14 +83,20 @@ def _items(connection, table, record_id):
 
 def _record(connection, stream, account, sequence, recorded_at):
     """Rebuild the stable public JSON record from its normalized database rows."""
-    record = {'time': recorded_at, 'account': account}
+    record = {'time': timestamp_from_unix_seconds(recorded_at), 'account': account}
 
     if stream == 'account-data':
         row = connection.execute(
-            'SELECT state, settled, pid, tile_x, tile_z, tile_level, destination_x, destination_z, destination_level, '
-            'target_kind, target_index, target_x, target_z, target_level, hp_current, hp_base, energy, '
-            'prayer_current, prayer_base, special_attack_energy, special_attack_armed, running, moving, '
-            'in_combat, weight, tick FROM fleet_account_data WHERE record_id = ?',
+            'SELECT states.name, account_data.settled, account_data.pid, account_data.tile_x, account_data.tile_z, account_data.tile_level, '
+            'account_data.destination_x, account_data.destination_z, account_data.destination_level, target_kinds.name, '
+            'account_data.target_index, account_data.target_x, account_data.target_z, account_data.target_level, '
+            'account_data.hp_current, account_data.hp_base, account_data.energy, account_data.prayer_current, account_data.prayer_base, '
+            'account_data.special_attack_energy, account_data.special_attack_armed, account_data.running, account_data.moving, '
+            'account_data.in_combat, account_data.weight, account_data.tick '
+            'FROM fleet_account_data AS account_data '
+            'JOIN fleet_states AS states ON states.id = account_data.state_id '
+            'LEFT JOIN fleet_target_kinds AS target_kinds ON target_kinds.id = account_data.target_kind_id '
+            'WHERE account_data.record_id = ?',
             (sequence,)).fetchone()
         if row is None:
             raise sqlite3.DatabaseError(f'account-data record {sequence} has no typed data row')
@@ -123,13 +130,18 @@ def _record(connection, stream, account, sequence, recorded_at):
         })
     elif stream == 'experience':
         row = connection.execute(
-            'SELECT state, settled FROM fleet_experience WHERE record_id = ?', (sequence,)).fetchone()
+            'SELECT states.name, experience.settled FROM fleet_experience AS experience '
+            'JOIN fleet_states AS states ON states.id = experience.state_id WHERE experience.record_id = ?',
+            (sequence,)).fetchone()
         if row is None:
             raise sqlite3.DatabaseError(f'experience record {sequence} has no typed data row')
         skills = {
             skill: {'level': level, 'base': base, 'xp': xp}
             for skill, level, base, xp in connection.execute(
-                'SELECT skill, level, base, xp FROM fleet_experience_skills WHERE record_id = ? ORDER BY ordinal',
+                'SELECT skills.name, experience_skills.level, experience_skills.base, experience_skills.xp '
+                'FROM fleet_experience_skills AS experience_skills '
+                'JOIN fleet_skills AS skills ON skills.id = experience_skills.skill_id '
+                'WHERE experience_skills.record_id = ? ORDER BY experience_skills.ordinal',
                 (sequence,))
         }
         record.update({'state': row[0], 'settled': bool(row[1]), 'skills': skills})
@@ -171,9 +183,10 @@ def _latest(stream):
                 'SELECT accounts.name, records.sequence, records.recorded_at '
                 'FROM fleet_records AS records '
                 'JOIN fleet_accounts AS accounts ON accounts.id = records.account_id '
-                'WHERE records.stream = ? AND records.sequence = ('
+                'JOIN fleet_streams AS streams ON streams.id = records.stream_id '
+                'WHERE streams.name = ? AND records.sequence = ('
                 'SELECT MAX(latest.sequence) FROM fleet_records AS latest '
-                'WHERE latest.stream = records.stream AND latest.account_id = records.account_id)',
+                'WHERE latest.stream_id = records.stream_id AND latest.account_id = records.account_id)',
                 (stream,))
             for account, sequence, recorded_at in rows:
                 if account not in latest_times or recorded_at > latest_times[account]:
@@ -195,7 +208,8 @@ def _history(stream, account, limit):
             rows = connection.execute(
                 'SELECT records.recorded_at, records.sequence FROM fleet_records AS records '
                 'JOIN fleet_accounts AS accounts ON accounts.id = records.account_id '
-                'WHERE records.stream = ? AND accounts.name = ? ORDER BY records.sequence DESC LIMIT ?',
+                'JOIN fleet_streams AS streams ON streams.id = records.stream_id '
+                'WHERE streams.name = ? AND accounts.name = ? ORDER BY records.sequence DESC LIMIT ?',
                 (stream, account, limit)).fetchall()
             records.extend(
                 (row[0], path_order, row[1], _record(connection, stream, account, row[1], row[0]))
