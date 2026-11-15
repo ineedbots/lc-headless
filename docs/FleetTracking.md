@@ -19,12 +19,10 @@ corresponding `*_items` child tables. Item names are stored once in `fleet_item_
 its item ID and a reference to the name used by that snapshot. The experience-skill and item child tables
 use their composite primary keys without a separate rowid. There is no generic JSON payload column.
 
-Schema version 4 is created for new databases. Version 3 databases are upgraded transactionally when the
-client first writes to them, preserving their records while deduplicating item names and rebuilding the
-composite-key child tables without SQLite's redundant rowid. The migration temporarily needs additional
-disk space for the rebuilt tables. Existing generic-payload databases and JSONL files are not migrated or
-imported. Back up any history you need, configure a new database path, and keep the old files separately.
-An existing database with an unsupported or unversioned schema is rejected without being modified.
+Schema version 4 is created for new databases. Earlier database schemas, including version 3, are not
+migrated; the client rejects them without modifying them. Back up any history you need and configure a new
+database path. Existing generic-payload databases and JSONL files are not migrated or imported.
+Unversioned databases are also rejected without being modified.
 
 The database uses WAL mode, `synchronous=NORMAL`, and a 25 ms busy timeout. Reads can proceed while clients
 write. Within a client process, `AccountRunner` shares one background writer per normalized database path.
