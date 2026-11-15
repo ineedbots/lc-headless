@@ -37,7 +37,7 @@ Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const G
     {
         m_options.events->Publish(m_account.name, report);
     }
-}, m_options.events}
+}, m_options.events, m_options.fleetDatabaseProvider}
 {
     if (m_account.script)
     {
@@ -134,6 +134,8 @@ void Account::Login()
 
 void Account::Step(std::chrono::milliseconds maxWait)
 {
+    m_reporting.Poll(Clock::now());
+
     if (!m_lifecycle.IsStarted() || m_lifecycle.IsFinished())
     {
         return;
@@ -710,4 +712,27 @@ void Account::CloseNetwork()
 
     m_client.Disconnect();
     UpdateFinished();
+}
+
+void Account::FlushFleetLogs()
+{
+    if (!m_lifecycle.IsStarted())
+    {
+        m_reporting.Flush();
+        return;
+    }
+
+    for (auto attempt = 0; attempt < 2; ++attempt)
+    {
+        const auto now = Clock::now();
+        const auto status = m_client.GetStatus();
+        const auto& state = m_client.GetState();
+        m_reporting.ObserveSession(now, state, status);
+        if (status == ClientStatus_e::InGame)
+        {
+            m_reporting.SampleItems(now, state);
+        }
+
+        m_reporting.Flush();
+    }
 }

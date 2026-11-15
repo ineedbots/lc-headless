@@ -22,9 +22,21 @@ imported. Back up any history you need, configure a new database path, and keep 
 An existing database with an unsupported or unversioned schema is rejected without being modified.
 
 The database uses WAL mode, `synchronous=NORMAL`, and a 25 ms busy timeout. Reads can proceed while clients
-write. A failed write is reported once, retried with the stream's pending/coalescing policy, and does not
-advance successful sampling state or publish an event. SQLite is intended for a local filesystem, not a
-network share. WAL is checkpointed automatically; see [maintenance](#log-maintenance).
+write. Within a client process, `AccountRunner` shares one background writer per normalized database path.
+The account loop enqueues records and observes their completion without waiting on SQLite. The writer
+collects up to 64 records for a transaction, waiting at most 5 ms to fill a batch; it accepts at most 256
+outstanding writes per database. A full queue rejects the new write, which the stream reports and retries
+using its existing pending/coalescing policy. Each batch is one transaction, so all of its records commit
+together or all fail; a snapshot and its child rows remain atomic. A failed write is reported once, retried
+with the stream's pending/coalescing policy, and does not advance successful sampling state or publish an
+event. Each logger retains up to 256 deferred session transitions or bank-open snapshots; a new event
+that exceeds that limit is explicitly warned and rejected. Deferred session/status transitions are written
+in order, while coalescible gameplay and inventory changes keep their existing latest-sample policies.
+Completion handling and event publication stay on the account loop and happen only after commit.
+On normal runner shutdown, each started account's final state is sampled and accepted writes are drained
+before the event publisher stops. SQLite still serializes writers across client processes, so a busy batch
+can fail after the 25 ms wait and rely on the stream retry policy. SQLite is intended for a local
+filesystem, not a network share. WAL is checkpointed automatically; see [maintenance](#log-maintenance).
 
 The five streams keep their existing live-event JSON shape:
 

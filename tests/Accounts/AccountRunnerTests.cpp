@@ -18,6 +18,7 @@
 #include "Game/Protocol/WordPack.hpp"
 #include "Script/Error/ScriptError.hpp"
 
+#include <SQLiteCpp/SQLiteCpp.h>
 #include <catch2/catch_test_macros.hpp>
 
 namespace
@@ -123,6 +124,88 @@ TEST_CASE("AccountRunner runs accounts side by side and logs them all out on an 
     CHECK(runner->GetAccount(1).DescribeOutcome() == "logged out");
     CHECK(fixture.first.GetPackets(ClientProt_e::IfButton).size() == 1);
     CHECK(fixture.second.GetPackets(ClientProt_e::IfButton).size() == 1);
+}
+
+TEST_CASE("AccountRunner flushes final fleet logs before stopping", "[AccountRunner][FleetDatabase]")
+{
+    auto fixture = RunnerFixture{};
+    const auto folder = TempFolder{"rs2004-runner-fleet-shutdown"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    fixture.config.scripting.fleetDatabasePath = path.string();
+    fixture.config.scripting.accountDataLogEnabled = true;
+    fixture.config.scripting.experienceLogEnabled = false;
+    fixture.config.scripting.bankLogEnabled = false;
+    fixture.config.scripting.inventoryLogEnabled = false;
+    fixture.config.scripting.equipmentLogEnabled = false;
+
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py")});
+    auto finalState = std::optional<std::string>{};
+    const auto succeeded = runner->Run([&fixture]
+    {
+        return CountLines(fixture.capture, "bot1", "loop") >= 3 || fixture.TimedOut() ? 1u : 0u;
+    }, nullptr, {}, {}, [&]
+    {
+        auto database = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+        auto state = SQLite::Statement{database,
+                                       "SELECT account_data.state FROM fleet_records AS records "
+                                       "JOIN fleet_account_data AS account_data ON account_data.record_id = records.sequence "
+                                       "WHERE records.stream = 'account-data' ORDER BY records.sequence DESC LIMIT 1"};
+        if (state.executeStep())
+        {
+            finalState = state.getColumn(0).getString();
+        }
+    });
+    fixture.ReportProblems();
+
+    CHECK(succeeded);
+    CHECK(finalState == "logged out");
+}
+
+TEST_CASE("AccountRunner keeps account steps below the slow-step threshold under fleet lock contention", "[AccountRunner][FleetDatabase]")
+{
+    auto fixture = RunnerFixture{};
+    const auto folder = TempFolder{"rs2004-runner-fleet-contention"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    {
+        auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline};
+        database.Append(FleetAccountDataLog_s{
+            .time = "2026-01-01T00:00:00Z",
+            .account = "seed",
+            .state = "connecting"});
+    }
+
+    fixture.config.scripting.fleetDatabasePath = path.string();
+    fixture.config.scripting.accountDataLogEnabled = true;
+    fixture.config.scripting.experienceLogEnabled = false;
+    fixture.config.scripting.bankLogEnabled = false;
+    fixture.config.scripting.inventoryLogEnabled = false;
+    fixture.config.scripting.equipmentLogEnabled = false;
+    auto runner = fixture.MakeRunner({MakeAccount("bot1", nullptr, "looper.py")});
+    auto blocker = SQLite::Database{path.string(), SQLite::OPEN_READWRITE};
+    blocker.exec("BEGIN IMMEDIATE");
+
+    auto lockHeld = true;
+    const auto succeeded = runner->Run([&fixture, &blocker, &lockHeld]
+    {
+        const auto stop = CountLines(fixture.capture, "bot1", "loop") >= 3 || fixture.TimedOut();
+        if (stop && lockHeld)
+        {
+            blocker.exec("ROLLBACK");
+            lockHeld = false;
+        }
+
+        return stop ? 1u : 0u;
+    });
+    fixture.ReportProblems();
+
+    const auto slowStep = std::ranges::any_of(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.message.starts_with("Account bot1 step took");
+    });
+    CHECK(succeeded);
+    CHECK(CountLines(fixture.capture, "bot1", "loop") >= 3);
+    CHECK_FALSE(lockHeld);
+    CHECK_FALSE(slowStep);
 }
 
 TEST_CASE("AccountRunner keeps scripts running while another account's login stalls", "[AccountRunner]")

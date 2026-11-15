@@ -38,6 +38,11 @@ AccountRunner::AccountRunner(std::shared_ptr<const Config_s> config, std::shared
     assert(m_cache && "AccountRunner needs a cache");
 
     options.client.loginQueue = m_loginQueue;
+    options.fleetDatabaseProvider = [this](const std::filesystem::path& path)
+    {
+        return GetFleetDatabase(path);
+    };
+
     for (auto& account : accounts)
     {
         m_accounts.push_back(std::make_unique<Account>(m_config, m_cache, std::move(account), runtime, m_logger, options, &m_messenger, m_net));
@@ -137,6 +142,11 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console,
         console->SetOnArrived({});
     }
 
+    for (const auto& account : m_accounts)
+    {
+        account->FlushFleetLogs();
+    }
+
     if (onStopping)
     {
         onStopping();
@@ -149,6 +159,20 @@ bool AccountRunner::Run(const InterruptCount& interrupts, ConsoleInput* console,
     }
 
     return LogOutcomes();
+}
+
+std::shared_ptr<FleetDatabase> AccountRunner::GetFleetDatabase(const std::filesystem::path& path)
+{
+    const auto key = std::filesystem::absolute(path).lexically_normal();
+    const auto found = m_fleetDatabases.find(key);
+    if (found != m_fleetDatabases.end())
+    {
+        return found->second;
+    }
+
+    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background);
+    m_fleetDatabases.emplace(key, database);
+    return database;
 }
 
 void AccountRunner::HandleCommand(std::string_view line, std::shared_ptr<CommandExecution> execution)

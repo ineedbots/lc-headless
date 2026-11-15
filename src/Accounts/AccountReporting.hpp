@@ -23,9 +23,12 @@ class AccountReporting
 {
 public:
     using Clock = std::chrono::steady_clock;
+    using FleetDatabaseProvider_t = std::function<std::shared_ptr<FleetDatabase>(const std::filesystem::path&)>;
 
-    AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events = {});
+    AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events = {}, FleetDatabaseProvider_t databaseProvider = {});
 
+    void Poll(Clock::time_point now);
+    void Flush();
     void ObserveSession(Clock::time_point now, const GameState_s& state, ClientStatus_e status);
     void AfterScript(Clock::time_point now, ScriptHost& script);
     void SampleItems(Clock::time_point now, const GameState_s& state);

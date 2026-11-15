@@ -33,7 +33,7 @@ namespace
     {
         explicit ExperienceFixture(std::chrono::minutes interval = 5min)
             : folder{"rs2004-experience-tests"}
-            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite")}
+            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite", FleetDatabase::Mode_e::Inline)}
             , log{"s18", interval, capture.GetLogger(), database}
         {
         }
@@ -233,7 +233,7 @@ TEST_CASE("ExperienceLog names the file after the account", "[ExperienceLog]")
     auto folder = TempFolder{"rs2004-experience-tests"};
     auto capture = LogCapture{};
     const auto databasePath = folder.GetPath() / "fleet.sqlite";
-    auto database = std::make_shared<FleetDatabase>(databasePath);
+    auto database = std::make_shared<FleetDatabase>(databasePath, FleetDatabase::Mode_e::Inline);
 
     for (const auto& name : {"s18", "s40", "s60"})
     {
@@ -254,10 +254,39 @@ TEST_CASE("ExperienceLog appends across runs rather than truncating", "[Experien
     fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
 
     // A fresh log, as a restarted client makes: the earlier samples are kept.
-    auto restarted = ExperienceLog{"s18", 5min, fixture.capture.GetLogger(), std::make_shared<FleetDatabase>(fixture.log.GetDatabasePath())};
+    auto restarted = ExperienceLog{"s18", 5min, fixture.capture.GetLogger(), std::make_shared<FleetDatabase>(fixture.log.GetDatabasePath(), FleetDatabase::Mode_e::Inline)};
     restarted.Step(start + 10min, state, ClientStatus_e::InGame, true);
 
     CHECK(ReadLines(fixture.log.GetDatabasePath()).size() == 3);
+}
+
+TEST_CASE("ExperienceLog preserves status transitions while a write is pending", "[ExperienceLog]")
+{
+    const auto folder = TempFolder{"rs2004-experience-pending-transitions"};
+    auto capture = LogCapture{};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background);
+    database->Append(FleetExperienceLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "init",
+        .state = "connecting"});
+
+    auto blocker = SQLite::Database{path.string(), SQLite::OPEN_READWRITE};
+    blocker.exec("BEGIN IMMEDIATE");
+    auto log = ExperienceLog{"s18", 5min, capture.GetLogger(), database};
+    auto state = GameState_s{};
+    const auto start = Clock::now();
+    log.Step(start, state, ClientStatus_e::Connecting, false);
+    log.Step(start + 1ms, state, ClientStatus_e::LoggingOut, false);
+    log.Step(start + 2ms, state, ClientStatus_e::LoggedOut, false);
+    blocker.exec("ROLLBACK");
+    log.Flush();
+
+    const auto lines = ReadLines(path);
+    REQUIRE(lines.size() == 3);
+    CHECK(lines[0].find("\"state\":\"connecting\"") != std::string::npos);
+    CHECK(lines[1].find("\"state\":\"logging out\"") != std::string::npos);
+    CHECK(lines[2].find("\"state\":\"logged out\"") != std::string::npos);
 }
 
 TEST_CASE("ExperienceLog warns once when it can't write, and never throws", "[ExperienceLog]")
@@ -268,7 +297,7 @@ TEST_CASE("ExperienceLog warns once when it can't write, and never throws", "[Ex
     const auto blocked = folder.GetPath() / "fleet.sqlite";
     std::ofstream{blocked} << "not a database";
 
-    auto log = ExperienceLog{"s18", 1min, capture.GetLogger(), std::make_shared<FleetDatabase>(blocked)};
+    auto log = ExperienceLog{"s18", 1min, capture.GetLogger(), std::make_shared<FleetDatabase>(blocked, FleetDatabase::Mode_e::Inline)};
     auto state = GameState_s{};
     const auto start = Clock::now();
 
@@ -289,7 +318,7 @@ TEST_CASE("ExperienceLog escapes the account name in JSON records", "[Experience
     auto capture = LogCapture{};
     const auto name = "fleet\\worker"s;
     const auto databasePath = folder.GetPath() / "fleet.sqlite";
-    auto log = ExperienceLog{name, 1min, capture.GetLogger(), std::make_shared<FleetDatabase>(databasePath)};
+    auto log = ExperienceLog{name, 1min, capture.GetLogger(), std::make_shared<FleetDatabase>(databasePath, FleetDatabase::Mode_e::Inline)};
     log.Step(Clock::now(), GameState_s{}, ClientStatus_e::InGame, true);
     const auto lines = ReadLines(databasePath, name);
     REQUIRE(lines.size() == 1);
