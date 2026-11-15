@@ -1,6 +1,8 @@
 #pragma once
 
-#include "Transport_e.hpp"
+#include "../TransportNames.hpp"
+
+#include <nlohmann/json.hpp>
 
 struct ServerSettings_s
 {
@@ -12,3 +14,5 @@ struct ServerSettings_s
     std::string origin;
     std::string tlsCaFile = "SYSTEM";
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ServerSettings_s, transport, host, port, world, origin, tlsCaFile)

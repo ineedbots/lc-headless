@@ -21,12 +21,13 @@ public:
 
     static std::optional<std::size_t> Measure(const Payload& payload)
     {
-        const auto bytes = FleetLogEvent::Measure(payload.recordJson);
+        const auto record = nlohmann::ordered_json(payload);
+        const auto bytes = FleetLogEvent::Measure(record);
         return bytes ? std::optional{*bytes + sizeof(Payload)} : std::nullopt;
     }
 
     static nlohmann::json Serialize(const Payload& payload)
     {
-        return FleetLogEvent::Serialize(payload.recordJson);
+        return FleetLogEvent::Serialize(nlohmann::ordered_json(payload));
     }
 };

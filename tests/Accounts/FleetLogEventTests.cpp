@@ -2,10 +2,12 @@
 
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
+#include "../Support/FleetDatabaseReader.hpp"
 #include "Accounts/AccountReporting.hpp"
 #include "Accounts/Type/FleetBankLog_s.hpp"
 #include "Application/Events/ApplicationEventBridge.hpp"
 #include "Application/Events/ApplicationEventPublisher.hpp"
+#include "Application/Events/Definitions/FleetBankEvent.hpp"
 #include "Application/Events/EventProtocol.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Cache/Type/IfComponent_s.hpp"
@@ -41,16 +43,11 @@ namespace
         return value;
     }
 
-    Json LastRecord(const std::filesystem::path& path)
+    Json LastRecord(const std::filesystem::path& path, std::string_view stream, std::string_view account)
     {
-        auto file = std::ifstream{path};
-        auto line = std::string{};
-        auto last = std::string{};
-        while (std::getline(file, line))
-        {
-            last = line;
-        }
-        return Json::parse(last);
+        const auto records = ReadFleetRecords(path, stream, account);
+        REQUIRE_FALSE(records.empty());
+        return records.back();
     }
 }
 
@@ -59,13 +56,10 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     const auto folder = TempFolder{"rs2004-fleet-events"};
     auto capture = LogCapture{};
     auto config = Config_s{};
-    config.scripting.accountDataDirectory.clear();
-    config.scripting.experienceDirectory = (folder.GetPath() / "experience").string();
+    config.scripting.fleetDatabasePath = (folder.GetPath() / "fleet.sqlite").string();
+    config.scripting.accountDataLogEnabled = false;
     config.scripting.experienceIntervalMinutes = 1min;
-    config.scripting.bankLogDirectory = (folder.GetPath() / "bank").string();
-    config.scripting.inventoryDirectory = (folder.GetPath() / "inventory").string();
     config.scripting.inventoryIntervalSeconds = 5s;
-    config.scripting.equipmentDirectory = (folder.GetPath() / "equipment").string();
     auto cache = GameCache_s{};
     cache.bankComponent = 2;
     cache.inventoryComponent = 3;
@@ -102,7 +96,7 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
         CHECK(event["account"] == "bot1");
         CHECK(event["sequence"].get<u64>() > previous);
         previous = event["sequence"].get<u64>();
-        CHECK(event["payload"] == LastRecord(folder.GetPath() / name / "bot1.jsonl"));
+        CHECK(event["payload"] == LastRecord(folder.GetPath() / "fleet.sqlite", name, "bot1"));
     }
     reporting.ObserveSession(now, state, ClientStatus_e::InGame);
     reporting.SampleItems(now, state);
@@ -141,7 +135,8 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     Drain(*bridge);
     CHECK(Take(*bridge, client)["payload"]["state"] == "logged out");
 
-    REQUIRE(bridge->Publish("bot2", FleetBankLog_s{R"({"items":[]})"}));
+    const auto bankRecord = FleetBankLog_s{.time = "2026-01-01T00:00:00Z", .account = "bot2"};
+    REQUIRE(bridge->Publish("bot2", bankRecord));
     Drain(*bridge);
     CHECK_FALSE(bridge->Front(client));
 
@@ -150,7 +145,7 @@ TEST_CASE("Fleet journal writes publish matching live events through account rep
     Drain(*bridge);
     Take(*bridge, client);
     CHECK(Take(*bridge, client)["events"].empty());
-    REQUIRE(bridge->Publish("bot2", FleetBankLog_s{R"({"items":[]})"}));
+    REQUIRE(bridge->Publish("bot2", bankRecord));
     Drain(*bridge);
     // The later subscription has no account filter.
     CHECK(Take(*bridge, client)["account"] == "bot2");
@@ -162,11 +157,11 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     const auto folder = TempFolder{"rs2004-fleet-events-failure"};
     auto capture = LogCapture{};
     auto config = Config_s{};
-    config.scripting.accountDataDirectory.clear();
-    config.scripting.experienceDirectory.clear();
-    config.scripting.bankLogDirectory.clear();
-    config.scripting.inventoryDirectory.clear();
-    config.scripting.equipmentDirectory.clear();
+    config.scripting.accountDataLogEnabled = false;
+    config.scripting.experienceLogEnabled = false;
+    config.scripting.bankLogEnabled = false;
+    config.scripting.inventoryLogEnabled = false;
+    config.scripting.equipmentLogEnabled = false;
     SECTION("disabled")
     {
     }
@@ -174,10 +169,11 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     {
         const auto blocker = folder.GetPath() / "file";
         FileUtils::AppendText(blocker, "not a directory");
-        config.scripting.experienceDirectory = blocker.string();
-        config.scripting.inventoryDirectory = blocker.string();
-        config.scripting.equipmentDirectory = blocker.string();
-        config.scripting.bankLogDirectory = blocker.string();
+        config.scripting.fleetDatabasePath = blocker.string();
+        config.scripting.experienceLogEnabled = true;
+        config.scripting.inventoryLogEnabled = true;
+        config.scripting.equipmentLogEnabled = true;
+        config.scripting.bankLogEnabled = true;
     }
     auto bridge = std::make_shared<ApplicationEventBridge>(std::vector<std::string>{"bot1"});
     auto cache = GameCache_s{};
@@ -200,12 +196,18 @@ TEST_CASE("Failed or disabled fleet journals do not publish events", "[FleetEven
     CHECK_FALSE(bridge->HasIncoming());
 }
 
-TEST_CASE("Fleet events validate bounded JSON before journal admission", "[FleetEvents][Events]")
+TEST_CASE("Fleet events bound typed payloads and replace invalid UTF-8", "[FleetEvents][Events]")
 {
-    auto bridge = ApplicationEventBridge{{"bot1"}};
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{"{"}));
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{"[]"}));
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{Json{{"name", std::string(8192, 'x')}}.dump()}));
-    CHECK_FALSE(bridge.Publish("bot1", FleetBankLog_s{Json{{"name", std::string(2000, '\x01')}}.dump()}));
-    CHECK_FALSE(bridge.HasIncoming());
+    const auto tooLarge = FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 1, .name = std::string(8192, 'x'), .qty = 1}}};
+    CHECK_FALSE(FleetBankEvent::Measure(tooLarge));
+
+    const auto invalidUtf8 = FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 1, .name = std::string{"bad\xff"}, .qty = 1}}};
+    const auto serialized = FleetBankEvent::Serialize(invalidUtf8);
+    CHECK(serialized["items"][0]["name"] == "bad\xef\xbf\xbd");
 }

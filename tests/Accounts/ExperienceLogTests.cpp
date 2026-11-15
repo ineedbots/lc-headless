@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
+#include "../Support/FleetDatabaseReader.hpp"
 
 #include "Accounts/ExperienceLog.hpp"
 #include "Console/Type/LogLevel_e.hpp"
@@ -23,47 +24,28 @@ namespace
         state.stats[index].baseLevel = level;
     }
 
-    std::string ReadFile(const std::filesystem::path& path)
+    std::vector<std::string> ReadLines(const std::filesystem::path& path, std::string_view account = "s18")
     {
-        auto file = std::ifstream{path, std::ios::binary};
-        return std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
-    }
-
-    std::vector<std::string> ReadLines(const std::filesystem::path& path)
-    {
-        auto lines = std::vector<std::string>{};
-        auto text = ReadFile(path);
-        auto start = std::size_t{0};
-        while (start < text.size())
-        {
-            const auto end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                break;
-            }
-
-            lines.push_back(text.substr(start, end - start));
-            start = end + 1;
-        }
-
-        return lines;
+        return ReadFleetPayloads(path, "experience", account);
     }
 
     struct ExperienceFixture
     {
         explicit ExperienceFixture(std::chrono::minutes interval = 5min)
             : folder{"rs2004-experience-tests"}
-            , log{folder.GetPath() / "experience", "s18", interval, capture.GetLogger()}
+            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite")}
+            , log{"s18", interval, capture.GetLogger(), database}
         {
         }
 
         [[nodiscard]] std::vector<std::string> Lines() const
         {
-            return ReadLines(log.GetPath());
+            return ReadLines(log.GetDatabasePath());
         }
 
         TempFolder folder;
         LogCapture capture{LogLevel_e::Verbose};
+        std::shared_ptr<FleetDatabase> database;
         ExperienceLog log;
     };
 
@@ -86,7 +68,7 @@ TEST_CASE("ExperienceLog writes a baseline, then a sample each interval", "[Expe
     const auto start = Clock::now();
     fixture.log.Step(start, state, ClientStatus_e::InGame, true);
 
-    const auto path = fixture.folder.GetPath() / "experience" / "s18.jsonl";
+    const auto path = fixture.log.GetDatabasePath();
     REQUIRE(std::filesystem::exists(path));
     REQUIRE(ReadLines(path).size() == 1);
 
@@ -138,7 +120,7 @@ TEST_CASE("ExperienceLog says nothing for a sample with no gain", "[ExperienceLo
     fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
 
     CHECK_FALSE(HasExperienceLog(fixture.capture));
-    CHECK(ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").size() == 2);
+    CHECK(ReadLines(fixture.log.GetDatabasePath()).size() == 2);
 }
 
 TEST_CASE("ExperienceLog records the status while out of game, and samples once settled", "[ExperienceLog]")
@@ -152,7 +134,7 @@ TEST_CASE("ExperienceLog records the status while out of game, and samples once 
     fixture.log.Step(start + 5min, state, ClientStatus_e::Connecting, false);
 
     // A status change is written once; repeating it is not.
-    const auto path = fixture.folder.GetPath() / "experience" / "s18.jsonl";
+    const auto path = fixture.log.GetDatabasePath();
     REQUIRE(ReadLines(path).size() == 1);
     CHECK(ReadLines(path).front().find("\"state\":\"connecting\",\"settled\":false") != std::string::npos);
 
@@ -205,7 +187,7 @@ TEST_CASE("ExperienceLog waits for the player's stats before taking its baseline
     CHECK_FALSE(state.IsSettled());
     // In game, but not settled: only the status is recorded, with no XP baseline yet.
     fixture.log.Step(start, state, ClientStatus_e::InGame, false);
-    const auto status = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl");
+    const auto status = ReadLines(fixture.log.GetDatabasePath());
     REQUIRE(status.size() == 1);
     CHECK(status.front().find("\"state\":\"ingame\",\"settled\":false") != std::string::npos);
 
@@ -217,7 +199,7 @@ TEST_CASE("ExperienceLog waits for the player's stats before taking its baseline
     SetXp(state, "thieving", 496);
     fixture.log.Step(start + 1min, state, ClientStatus_e::InGame, true);
 
-    const auto line = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").back();
+    const auto line = ReadLines(fixture.log.GetDatabasePath()).back();
     CHECK(line.find("\"thieving\":{\"level\":1,\"base\":1,\"xp\":496}") != std::string::npos);
     CHECK(line.find("\"state\":\"ingame\",\"settled\":true") != std::string::npos);
 }
@@ -235,7 +217,7 @@ TEST_CASE("ExperienceLog writes every skill, in the game's order", "[ExperienceL
 
     fixture.log.Step(Clock::now(), state, ClientStatus_e::InGame, true);
 
-    const auto line = ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").front();
+    const auto line = ReadLines(fixture.log.GetDatabasePath()).front();
     auto previous = std::size_t{0};
     for (const auto& skill : ExperienceLog::SKILL_NAMES)
     {
@@ -250,13 +232,14 @@ TEST_CASE("ExperienceLog names the file after the account", "[ExperienceLog]")
 {
     auto folder = TempFolder{"rs2004-experience-tests"};
     auto capture = LogCapture{};
+    const auto databasePath = folder.GetPath() / "fleet.sqlite";
+    auto database = std::make_shared<FleetDatabase>(databasePath);
 
     for (const auto& name : {"s18", "s40", "s60"})
     {
-        auto log = ExperienceLog{folder.GetPath() / "experience", name, 5min, capture.GetLogger()};
+        auto log = ExperienceLog{name, 5min, capture.GetLogger(), database};
         log.Step(Clock::now(), GameState_s{}, ClientStatus_e::InGame, true);
-        CHECK(std::filesystem::exists(folder.GetPath() / "experience" / (std::string{name} + ".jsonl")));
-        CHECK(log.GetPath().filename() == (std::string{name} + ".jsonl"));
+        CHECK(ReadLines(databasePath, name).size() == 1);
     }
 }
 
@@ -271,10 +254,10 @@ TEST_CASE("ExperienceLog appends across runs rather than truncating", "[Experien
     fixture.log.Step(start + 5min, state, ClientStatus_e::InGame, true);
 
     // A fresh log, as a restarted client makes: the earlier samples are kept.
-    auto restarted = ExperienceLog{fixture.folder.GetPath() / "experience", "s18", 5min, fixture.capture.GetLogger()};
+    auto restarted = ExperienceLog{"s18", 5min, fixture.capture.GetLogger(), std::make_shared<FleetDatabase>(fixture.log.GetDatabasePath())};
     restarted.Step(start + 10min, state, ClientStatus_e::InGame, true);
 
-    CHECK(ReadLines(fixture.folder.GetPath() / "experience" / "s18.jsonl").size() == 3);
+    CHECK(ReadLines(fixture.log.GetDatabasePath()).size() == 3);
 }
 
 TEST_CASE("ExperienceLog warns once when it can't write, and never throws", "[ExperienceLog]")
@@ -282,10 +265,10 @@ TEST_CASE("ExperienceLog warns once when it can't write, and never throws", "[Ex
     auto folder = TempFolder{"rs2004-experience-tests"};
     auto capture = LogCapture{};
     // A file where the folder should be, so creating the folder fails.
-    const auto blocked = folder.GetPath() / "experience";
-    std::ofstream{blocked} << "not a folder";
+    const auto blocked = folder.GetPath() / "fleet.sqlite";
+    std::ofstream{blocked} << "not a database";
 
-    auto log = ExperienceLog{blocked, "s18", 1min, capture.GetLogger()};
+    auto log = ExperienceLog{"s18", 1min, capture.GetLogger(), std::make_shared<FleetDatabase>(blocked)};
     auto state = GameState_s{};
     const auto start = Clock::now();
 
@@ -305,9 +288,10 @@ TEST_CASE("ExperienceLog escapes the account name in JSON records", "[Experience
     const auto folder = TempFolder{"rs2004-experience-escape-tests"};
     auto capture = LogCapture{};
     const auto name = "fleet\\worker"s;
-    auto log = ExperienceLog{folder.GetPath(), name, 1min, capture.GetLogger()};
+    const auto databasePath = folder.GetPath() / "fleet.sqlite";
+    auto log = ExperienceLog{name, 1min, capture.GetLogger(), std::make_shared<FleetDatabase>(databasePath)};
     log.Step(Clock::now(), GameState_s{}, ClientStatus_e::InGame, true);
-    const auto lines = ReadLines(log.GetPath());
+    const auto lines = ReadLines(databasePath, name);
     REQUIRE(lines.size() == 1);
     CHECK(nlohmann::json::parse(lines.front()).at("account").get<std::string>() == name);
 }

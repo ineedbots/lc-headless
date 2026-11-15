@@ -36,6 +36,9 @@ jobs:
       - name: Verify quality checks
         run: python -B -m unittest discover -s tools/quality
 
+      - name: Verify fleet tooling
+        run: python -B -m unittest discover -s tools/fleet
+
       - name: Check authored C++ formatting
         run: python -I tools/quality/format.py
 

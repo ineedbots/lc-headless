@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 class BigUInt
 {
 public:
@@ -33,3 +35,27 @@ private:
 
     std::vector<u32> m_limbs;
 };
+
+namespace nlohmann
+{
+    template <>
+    struct adl_serializer<BigUInt>
+    {
+        static void from_json(const json& value, BigUInt& result)
+        {
+            try
+            {
+                result = BigUInt::Parse(value.get<std::string>());
+            }
+            catch (const std::invalid_argument&)
+            {
+                throw json::type_error::create(302, "must be a decimal or 0x-hex number", &value);
+            }
+        }
+
+        static void to_json(ordered_json& value, const BigUInt& source)
+        {
+            value = source.ToHexString();
+        }
+    };
+}

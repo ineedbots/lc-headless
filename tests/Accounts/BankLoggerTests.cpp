@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
+#include "../Support/FleetDatabaseReader.hpp"
 
 #include "Accounts/BankLogger.hpp"
 #include "Cache/Type/GameCache_s.hpp"
@@ -17,15 +18,9 @@ namespace
     constexpr auto COINS = s32{995};
     constexpr auto BONES = s32{526};
 
-    std::string ReadFile(const std::filesystem::path& path)
+    std::size_t CountRecords(const std::filesystem::path& path, std::string_view account = "s18")
     {
-        auto file = std::ifstream{path, std::ios::binary};
-        return std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
-    }
-
-    std::size_t CountLines(std::string_view text)
-    {
-        return static_cast<std::size_t>(std::ranges::count(text, '\n'));
+        return ReadFleetRecords(path, "bank", account).size();
     }
 
     // The cache needs a bank component, the interface that holds it, and the two items themselves.
@@ -57,37 +52,25 @@ namespace
         BankFixture()
             : cache{MakeBankCache()}
             , folder{"rs2004-bank-logger-tests"}
-            , log{*cache, capture.GetLogger(), "s18", folder.GetPath() / "bank"}
+            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite")}
+            , log{*cache, capture.GetLogger(), "s18", database}
         {
         }
 
         [[nodiscard]] std::filesystem::path Records() const
         {
-            return folder.GetPath() / "bank" / "s18.jsonl";
+            return database->GetPath();
         }
         // The bank as it is now: the last record.
         [[nodiscard]] std::string Latest() const
         {
-            auto lines = std::vector<std::string>{};
-            auto text = ReadFile(Records());
-            auto start = std::size_t{0};
-            while (start < text.size())
-            {
-                const auto end = text.find('\n', start);
-                if (end == std::string::npos)
-                {
-                    break;
-                }
-
-                lines.push_back(text.substr(start, end - start));
-                start = end + 1;
-            }
-
-            return lines.empty() ? std::string{} : lines.back();
+            const auto records = ReadFleetPayloads(Records(), "bank", "s18");
+            return records.empty() ? std::string{} : records.back();
         }
 
         std::shared_ptr<const GameCache_s> cache;
         TempFolder folder;
+        std::shared_ptr<FleetDatabase> database;
         LogCapture capture;
         BankLogger log;
     };
@@ -105,13 +88,14 @@ TEST_CASE("BankLogger writes escaped item names as one valid JSON line", "[BankL
     const auto cache = MakeBankCache(name);
     const auto folder = TempFolder{"rs2004-bank-json-tests"};
     auto capture = LogCapture{};
-    auto log = BankLogger{*cache, capture.GetLogger(), "test", folder.GetPath()};
+    const auto databasePath = folder.GetPath() / "fleet.sqlite";
+    auto log = BankLogger{*cache, capture.GetLogger(), "test", std::make_shared<FleetDatabase>(databasePath)};
     log.Step(OpenBank({{.id = COINS, .count = 2}, {.id = COINS, .count = 3}}));
 
-    const auto text = ReadFile(folder.GetPath() / "test.jsonl");
-    CHECK(CountLines(text) == 1);
+    const auto records = ReadFleetPayloads(databasePath, "bank", "test");
+    REQUIRE(records.size() == 1);
 
-    const auto record = nlohmann::json::parse(text);
+    const auto record = nlohmann::json::parse(records.front());
     CHECK(record.size() == 3);
     CHECK(record["account"] == "test");
     CHECK(record["items"] == nlohmann::json::array({{{"id", COINS}, {"name", name.substr(0, name.size() - 1) + "\xef\xbf\xbd"}, {"qty", 5}}}));
@@ -127,7 +111,6 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         fixture.log.Step(state);
 
         CHECK_FALSE(std::filesystem::exists(fixture.Records()));
-        CHECK_FALSE(std::filesystem::exists(fixture.folder.GetPath() / "bank" / "s18.json"));
     }
 
     SECTION("each item is written with its id, name and count, and empty slots are left out")
@@ -148,7 +131,7 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         fixture.log.Step(OpenBank({{.id = COINS, .count = 10}}));
         fixture.log.Step(OpenBank({{.id = COINS, .count = 99}}));
 
-        CHECK(CountLines(ReadFile(fixture.Records())) == 1);
+        CHECK(CountRecords(fixture.Records()) == 1);
         // Still open: a deposit doesn't rewrite the record.
         CHECK(fixture.Latest().find(R"("qty":10)") != std::string::npos);
 
@@ -157,7 +140,7 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         fixture.log.Step(closed);
         fixture.log.Step(OpenBank({{.id = COINS, .count = 20}}));
 
-        CHECK(CountLines(ReadFile(fixture.Records())) == 2);
+        CHECK(CountRecords(fixture.Records()) == 2);
         CHECK(fixture.Latest().find(R"("qty":20)") != std::string::npos);
     }
 
@@ -166,7 +149,7 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         auto fixture = BankFixture{};
         fixture.log.Step(OpenBank({{.id = COINS, .count = 10}, {.id = COINS, .count = 5}}));
 
-        CHECK(CountLines(ReadFile(fixture.Records())) == 1);
+        CHECK(CountRecords(fixture.Records()) == 1);
         CHECK(fixture.Latest().find(R"({"id":995,"name":"Coins","qty":15})") != std::string::npos);
         CHECK(fixture.Latest().find(R"("qty":10)") == std::string::npos);
     }
@@ -202,8 +185,9 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
     {
         auto fixture = BankFixture{};
         // A file where the folder should be.
-        std::ofstream{fixture.folder.GetPath() / "bank"} << "not a folder";
-        auto blocked = BankLogger{*fixture.cache, fixture.capture.GetLogger(), "s18", fixture.folder.GetPath() / "bank"};
+        const auto blockedPath = fixture.folder.GetPath() / "blocked.sqlite";
+        std::ofstream{blockedPath} << "not a database";
+        auto blocked = BankLogger{*fixture.cache, fixture.capture.GetLogger(), "s18", std::make_shared<FleetDatabase>(blockedPath)};
 
         CHECK_NOTHROW(blocked.Step(OpenBank({{.id = COINS, .count = 1}})));
         auto closed = GameState_s{};

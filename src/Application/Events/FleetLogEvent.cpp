@@ -5,24 +5,25 @@
 
 #include <nlohmann/json.hpp>
 
-std::optional<std::size_t> FleetLogEvent::Measure(std::string_view recordJson)
+std::optional<std::size_t> FleetLogEvent::Measure(const nlohmann::ordered_json& record)
 {
     // Leave room for the envelope, including a maximally escaped account name.
-    if (recordJson.size() > EventLimits::MAX_EVENT_BYTES - 1024)
+    if (!record.is_object())
     {
         return {};
     }
 
-    const auto record = nlohmann::json::parse(recordJson, nullptr, false);
-    if (!record.is_object() || record.dump().size() > EventLimits::MAX_EVENT_BYTES - 1024)
+    const auto serialized = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    if (serialized.size() > EventLimits::MAX_EVENT_BYTES - 1024)
     {
         return {};
     }
 
-    return recordJson.size();
+    return serialized.size();
 }
 
-nlohmann::json FleetLogEvent::Serialize(std::string_view recordJson)
+nlohmann::json FleetLogEvent::Serialize(const nlohmann::ordered_json& record)
 {
-    return nlohmann::json::parse(recordJson);
+    const auto serialized = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    return nlohmann::json::parse(serialized);
 }

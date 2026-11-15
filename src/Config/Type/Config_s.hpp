@@ -1,11 +1,14 @@
 #pragma once
 
-#include "../../Console/Type/LogLevel_e.hpp"
+#include "../../Console/LogLevelNames.hpp"
 #include "../../Utils/BigUInt.hpp"
+#include "ConfigDurationJson.hpp"
 #include "ProxySettings_s.hpp"
 #include "HttpSettings_s.hpp"
 #include "Revision_e.hpp"
 #include "ServerSettings_s.hpp"
+
+#include <nlohmann/json.hpp>
 
 struct LoginSettings_s
 {
@@ -17,6 +20,8 @@ struct LoginSettings_s
     Revision_e revision = Revision_e::Rev289;
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LoginSettings_s, rsaModulus, rsaExponent, lowMemory, revision)
+
 struct ClientSettings_s
 {
     LogLevel_e logLevel = LogLevel_e::Info;
@@ -26,6 +31,8 @@ struct ClientSettings_s
     // Empty for no file.
     std::string logFile;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientSettings_s, logLevel, cacheDirectory, navDirectory, logFile)
 
 struct ScriptingSettings_s
 {
@@ -44,22 +51,19 @@ struct ScriptingSettings_s
     std::chrono::seconds maxRetryDelaySeconds = 30s;
     std::chrono::seconds reloginDelaySeconds = 60s;
     std::string progressDirectory = "progress";
-    // Where each account's skill experience is logged: experience/<account>.jsonl, one sample per line.
-    // Empty, or an interval of 0, turns it off.
-    std::string experienceDirectory = "experience";
+    std::string fleetDatabasePath = "data/fleet.sqlite";
+    bool accountDataLogEnabled = true;
+    bool experienceLogEnabled = true;
+    bool bankLogEnabled = true;
+    bool inventoryLogEnabled = true;
+    bool equipmentLogEnabled = true;
     std::chrono::minutes experienceIntervalMinutes = 1min;
-    // Where a bank's contents are written when one opens: bank/<account>.jsonl and .json. Empty turns it off.
-    std::string bankLogDirectory = "bank";
-    // Where an account's backpack is written when it changes: inventory/<account>.jsonl. Empty turns it off.
-    std::string inventoryDirectory = "inventory";
     // The least time between two lines; 0 records every change.
     std::chrono::seconds inventoryIntervalSeconds = 5s;
-    // Where an account's worn equipment is written when it changes: equipment/<account>.jsonl. Empty turns it off.
-    std::string equipmentDirectory = "equipment";
-    // Account state changes; 0 records every change. Empty directory disables logging.
-    std::string accountDataDirectory = "account-data";
     std::chrono::seconds accountDataIntervalSeconds = 5s;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ScriptingSettings_s, accountsDirectory, scriptsDirectory, callTimeoutMs, pollIntervalMs, loginIntervalSeconds, killGraceSeconds, connectAttempts, minRetryDelaySeconds, maxRetryDelaySeconds, reloginDelaySeconds, progressDirectory, fleetDatabasePath, accountDataLogEnabled, experienceLogEnabled, bankLogEnabled, inventoryLogEnabled, equipmentLogEnabled, experienceIntervalMinutes, inventoryIntervalSeconds, accountDataIntervalSeconds)
 
 // client.jsonc.
 struct Config_s
@@ -71,3 +75,5 @@ struct Config_s
     ScriptingSettings_s scripting;
     HttpSettings_s http;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Config_s, server, proxy, login, client, scripting, http)

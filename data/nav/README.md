@@ -18,7 +18,7 @@ Use that revision when regenerating a local engine correction without an upstrea
 required fields, contextual teleport costs, and the walkability check before
 optional edge metadata is decoded. Graph points use objects with an optional
 `level` defaulting to zero. Route requests instead require `[x, z, level]` arrays;
-`NavPayloadJson.hpp` serializes route results as objects. These formats are
+the navigation types serialize route results as objects. These formats are
 intentionally separate.
 
 rs2b0t derives its stair edges from its own engine's content. Where the 289 engine's differs, the exporter applies `STAIR_FIXES`, `EDGE_ADDITIONS` and `CROSSING_ADDITIONS`. Each was found and checked live.

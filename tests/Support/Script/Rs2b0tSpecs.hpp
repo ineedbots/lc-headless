@@ -1,10 +1,5 @@
 #pragma once
 
-#include <filesystem>
-#include <optional>
-#include <string_view>
-#include <vector>
-
 class ScriptVm;
 
 // rs2b0t's own tests, kept in its describe/test/expect form on tests/Stdlib/rs2b0t/spec.py.

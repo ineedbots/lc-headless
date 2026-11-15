@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 struct EventAck_s
 {
     s32 version = 1;
@@ -9,3 +11,5 @@ struct EventAck_s
     std::string instance;
     u64 sequence = 0;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(EventAck_s, version, type, id, action, instance, sequence)

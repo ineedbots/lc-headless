@@ -5,36 +5,41 @@
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Console/Logger.hpp"
 #include "../Game/State/Type/GameState_s.hpp"
+#include "FleetDatabase.hpp"
 
-#include <filesystem>
-#include <memory>
-#include <string>
-
-// Writes a bank's contents whenever one opens: <directory>/<account>.jsonl gains a line. Deliberately
+// Writes a bank's contents whenever one opens. Deliberately
 // open-only: deposits and withdrawals made while the bank stays open aren't re-read, so each entry is the
 // bank as it was when it opened. The last line is the bank's current contents.
 class BankLogger
 {
 public:
-    BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::shared_ptr<ApplicationEventPublisher> events = {});
+    using Clock = std::chrono::steady_clock;
+
+    BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     // Called every step while in game. Records on the closed -> open edge only.
-    void Step(const GameState_s& state);
-
-    [[nodiscard]] const std::filesystem::path& GetDirectory() const
+    void Step(Clock::time_point now, const GameState_s& state);
+    void Step(const GameState_s& state)
     {
-        return m_directory;
+        Step(Clock::now(), state);
+    }
+
+    [[nodiscard]] const std::filesystem::path& GetDatabasePath() const
+    {
+        return m_database->GetPath();
     }
 
 private:
-    void Log(const GameState_s& state);
+    bool Log(Clock::time_point now, const GameState_s& state);
 
     const GameCache_s& m_cache;
     std::shared_ptr<Logger> m_logger;
     std::string m_accountName;
-    std::filesystem::path m_directory;
+    std::shared_ptr<FleetDatabase> m_database;
     bool m_wasOpen = false;
     // So a folder that can't be written is reported once, not on every open.
     bool m_writeFailed = false;
+    bool m_pending = false;
+    std::optional<Clock::time_point> m_retryAt;
     std::shared_ptr<ApplicationEventPublisher> m_events;
 };

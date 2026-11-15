@@ -2,7 +2,6 @@
 #include "AccountLogoutEvent.hpp"
 
 #include "../../../Accounts/Type/AccountLogout_s.hpp"
-#include "../EventPayloadJson.hpp"
 
 #include <nlohmann/json.hpp>
 

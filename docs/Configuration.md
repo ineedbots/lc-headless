@@ -117,22 +117,26 @@ For a fixed retry delay, set the minimum and maximum equal. See [retry behavior]
 
 ## Fleet tracking settings
 
-These process-wide `scripting` settings write per-account JSON Lines journals. Paths are relative to
-the client's working directory; an empty directory disables that journal. They cannot be overridden
-in account files. Logging is enabled by default, including accounts without a script.
+These process-wide `scripting` settings write per-account records to a shared SQLite database.
+Paths are relative to the client's working directory. They cannot be overridden in account files.
+Logging is enabled by default, including accounts without a script.
 
 | Key under `scripting` | Default | Range and behavior |
 |---|---|---|
-| `experienceDirectory` | `experience` | Skill samples and connection status changes. Empty disables logging. |
+| `fleetDatabasePath` | `data/fleet.sqlite` | SQLite database file shared by configured client processes; empty disables all fleet logging. |
+| `accountDataLogEnabled` | `true` | Store account state/session changes. |
+| `experienceLogEnabled` | `true` | Store skill samples and connection status changes. |
 | `experienceIntervalMinutes` | `1` | 0 to 1440 minutes; `0` disables experience logging, including status changes. |
-| `bankLogDirectory` | `bank` | Bank contents on open. Empty disables logging. |
-| `inventoryDirectory` | `inventory` | Backpack contents on change. Empty disables logging. |
+| `bankLogEnabled` | `true` | Store bank contents on open. |
+| `inventoryLogEnabled` | `true` | Store backpack contents on change. |
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds; minimum time between backpack samples; `0` records every change. |
-| `equipmentDirectory` | `equipment` | Worn equipment on change. Empty disables logging. |
-| `accountDataDirectory` | `account-data` | Account state journal. Empty disables logging. |
+| `equipmentLogEnabled` | `true` | Store worn equipment changes. |
 | `accountDataIntervalSeconds` | `5` | Minimum seconds between account data changes, 0 to 86400; 0 records every observed change. Session changes are immediate. |
 
-Directories are created when needed. Write failures are logged without stopping the account.
+The database and its parent directory are created when needed. Use distinct account names when separate
+clients write to the same database; `(account name, stream)` is the storage identity. Database write
+failures are logged without stopping the account. An empty `fleetDatabasePath` disables all fleet
+logging without requiring changes to the per-stream flags.
 See [Fleet tracking](FleetTracking.md) for record formats, the optional local page and log maintenance.
 
 ## Account reference
@@ -239,11 +243,11 @@ terminal input and formatting. The shipped sample leaves HTTP disabled.
 | Setting | Accepted values |
 |---|---|
 | `host` | Empty, an IPv4/IPv6 bind address, or `localhost` (IPv4 loopback) |
-| `port` | Integer 1–65535 |
-| `requestTimeoutMs` | Integer 100–120000 milliseconds |
-| `maxPendingRequests` | Integer 1–1024 |
-| `maxRequestBodyBytes` | Integer 1–1048576 bytes |
-| `maxOutputBytes` | Integer 1–16777216 bytes per request |
+| `port` | Integer 1ï¿½65535 |
+| `requestTimeoutMs` | Integer 100ï¿½120000 milliseconds |
+| `maxPendingRequests` | Integer 1ï¿½1024 |
+| `maxRequestBodyBytes` | Integer 1ï¿½1048576 bytes |
+| `maxOutputBytes` | Integer 1ï¿½16777216 bytes per request |
 
 All numeric settings are validated even when HTTP is disabled. Schemes, paths, embedded ports,
 and other hostnames are rejected. Bind failure fails startup. An enabled listener shares the

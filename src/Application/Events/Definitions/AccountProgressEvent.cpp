@@ -2,7 +2,6 @@
 #include "AccountProgressEvent.hpp"
 
 #include "../../../Accounts/Type/ProgressReport_s.hpp"
-#include "../EventPayloadJson.hpp"
 
 #include <nlohmann/json.hpp>
 

@@ -57,18 +57,18 @@ Test decoding/encoding and behavior at safe points. Transport tests should verif
 that a route's custom response survives asynchronous completion. Keep public wire
 contracts and examples in the relevant operator guides current.
 
-`HttpPayloadJson.hpp` holds the existing HTTP result mappings as nlohmann
-`to_json` serializers. Use `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE`
-for direct member mappings; use explicit `to_json` overloads for nesting or
-omitted fields. Keep request IDs, completion outcomes, errors and HTTP status
-selection in the endpoint adapter. `_WITH_DEFAULT` also generates input parsing
-with defaults for missing members, so reserve it for types that need that input
-contract, such as configuration sections. Request validation remains explicit.
+HTTP payload types keep their nlohmann mappings beside their definitions. Use
+`NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE` for direct member mappings;
+use explicit `to_json` overloads for nesting or omitted fields. Keep request IDs,
+completion outcomes, errors and HTTP status selection in the endpoint adapter.
+`_WITH_DEFAULT` also generates input parsing with defaults for missing members,
+so reserve it for types that need that input contract, such as configuration
+sections. Request validation remains explicit.
 
 `HttpError_s` supplies the shared code/message shape for endpoint and transport
-errors. `EventMessageJson.hpp` maps the event, acknowledgement, error and snapshot
-envelopes separately from their payloads. Missing event accounts and error IDs
-remain explicit JSON nulls; empty collections remain arrays.
+errors. Event message types keep their mappings beside their definitions.
+Acknowledgement and snapshot collections remain arrays; missing event accounts
+and error IDs remain explicit JSON nulls.
 
 ## WebSocket application events
 
@@ -86,11 +86,11 @@ definition under `Events/Definitions/` provides:
   storage; the generic adapter adds envelope storage.
 - `Serialize(const Payload&)`: payload JSON; the protocol supplies the envelope.
 
-`EventPayloadJson.hpp` declares nlohmann `to_json` mappings for logout, progress
-and script-published payloads. Their definitions' `Serialize` methods delegate to
-these mappings. Direct member mappings use the serialization-only macro; progress
-converts runtime to seconds, and script data uses the same bounded JSON parser as
-admission validation. Keep `Measure` checks in the event definition.
+Event payload types keep their nlohmann mappings beside their definitions. Their
+definitions' `Serialize` methods delegate to these mappings. Direct member
+mappings use the serialization-only macro; progress converts runtime to seconds,
+and script data uses the same bounded JSON parser as admission validation. Keep
+`Measure` checks in the event definition.
 
 Add the definition to `ApplicationEvents_s`. Its payload variant, known-name
 validation, name lookup, encoding and retention dispatch derive from that list.

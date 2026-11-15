@@ -11,3 +11,5 @@ struct EventSnapshot_s
     u64 sequence = 0;
     std::vector<nlohmann::json> events;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(EventSnapshot_s, version, type, id, instance, sequence, events)

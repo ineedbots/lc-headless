@@ -12,7 +12,6 @@
 #include "../Game/State/Type/Stat_e.hpp"
 #include "../Game/State/Type/Stat_s.hpp"
 #include "../Game/Type/Tile_s.hpp"
-#include "../Utils/FileUtils.hpp"
 #include "Type/FleetAccountDataLog_s.hpp"
 
 namespace
@@ -39,72 +38,80 @@ namespace
         return "unknown";
     }
 
-    nlohmann::ordered_json Tile(const Tile_s& tile)
+    FleetLogTile_s Tile(const Tile_s& tile)
     {
-        return {{"x", tile.x}, {"z", tile.z}, {"level", tile.level}};
+        return {.x = tile.x, .z = tile.z, .level = tile.level};
     }
 
-    nlohmann::ordered_json Stat(const Stat_s& stat)
+    FleetLogStat_s Stat(const Stat_s& stat)
     {
-        return {{"current", stat.level}, {"base", stat.baseLevel}};
+        return {.current = stat.level, .base = stat.baseLevel};
     }
 }
 
-AccountDataLog::AccountDataLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::filesystem::path directory, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
+AccountDataLog::AccountDataLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}
     , m_logger{std::move(logger)}
     , m_accountName{std::move(accountName)}
-    , m_path{std::move(directory) / (m_accountName + ".jsonl")}
+    , m_database{std::move(database)}
     , m_interval{interval}
     , m_events{std::move(events)}
 {
 }
 
-nlohmann::ordered_json AccountDataLog::Read(const GameState_s& state, ClientStatus_e status) const
+FleetAccountDataLog_s AccountDataLog::Read(const GameState_s& state, ClientStatus_e status) const
 {
     const auto settled = status == ClientStatus_e::InGame && state.IsSettled();
-    auto sample = nlohmann::ordered_json{{"state", StatusName(status)}, {"settled", settled}, {"pid", nullptr}, {"tile", nullptr}, {"destination", nullptr}, {"target", nullptr}, {"hp", nullptr}, {"energy", nullptr}, {"prayer", nullptr}, {"specialAttack", nullptr}, {"running", nullptr}, {"moving", nullptr}, {"inCombat", nullptr}, {"weight", nullptr}};
+    auto sample = FleetAccountDataLog_s{
+        .account = m_accountName,
+        .state = std::string{StatusName(status)},
+        .settled = settled,
+        .tick = state.tick};
     if (!settled)
     {
         return sample;
     }
 
-    sample["pid"] = state.pid;
-    sample["tile"] = Tile(state.localPlayer.tile);
+    sample.pid = state.pid;
+    sample.tile = Tile(state.localPlayer.tile);
 
     if (state.walkDestination)
     {
-        sample["destination"] = Tile(*state.walkDestination);
+        sample.destination = Tile(*state.walkDestination);
     }
 
     if (state.localPlayer.faceEntity)
     {
         const auto& target = *state.localPlayer.faceEntity;
-        sample["target"] = {{"kind", target.type == EntityType_e::Npc ? "npc" : "player"}, {"index", target.index}};
+        sample.target = FleetLogTarget_s{
+            .kind = target.type == EntityType_e::Npc ? "npc" : "player",
+            .index = target.index};
     }
     else if (state.localPlayer.faceCoord)
     {
         // Facing coordinates have half-tile precision and no object identity.
         const auto& target = *state.localPlayer.faceCoord;
-        sample["target"] = {{"kind", "tile"}, {"tile", Tile({.x = target.x / 2, .z = target.z / 2, .level = state.localPlayer.tile.level})}};
+        sample.target = FleetLogTarget_s{
+            .kind = "tile",
+            .tile = Tile({.x = target.x / 2, .z = target.z / 2, .level = state.localPlayer.tile.level})};
     }
 
-    sample["hp"] = Stat(state.GetStat(Stat_e::Hitpoints));
-    sample["energy"] = state.runEnergy;
-    sample["prayer"] = Stat(state.GetStat(Stat_e::Prayer));
+    sample.hp = Stat(state.GetStat(Stat_e::Hitpoints));
+    sample.energy = state.runEnergy;
+    sample.prayer = Stat(state.GetStat(Stat_e::Prayer));
 
     const auto energy = state.varps.find(SPECIAL_ENERGY_VARP);
     // Missing on revisions/servers without a special bar; do not invent an empty bar.
     if (energy != state.varps.end())
     {
-        sample["specialAttack"] = {{"energy", energy->second}, {"armed", state.GetVarp(SPECIAL_ARMED_VARP) == 1}};
+        sample.specialAttack = FleetLogSpecialAttack_s{.energy = energy->second, .armed = state.GetVarp(SPECIAL_ARMED_VARP) == 1};
     }
 
     const auto player = PlayerQuery{state, m_cache};
-    sample["running"] = player.IsRunning();
-    sample["moving"] = player.IsMoving();
-    sample["inCombat"] = player.InCombat();
-    sample["weight"] = state.runWeight;
+    sample.running = player.IsRunning();
+    sample.moving = player.IsMoving();
+    sample.inCombat = player.InCombat();
+    sample.weight = state.runWeight;
     return sample;
 }
 
@@ -118,7 +125,7 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
             return;
         }
 
-        const auto sessionChanged = !m_lastSample || sample["state"] != (*m_lastSample)["state"] || sample["settled"] != (*m_lastSample)["settled"];
+        const auto sessionChanged = !m_lastSample || sample.state != m_lastSample->state || sample.settled != m_lastSample->settled;
         if (!sessionChanged && m_nextSample && now < *m_nextSample)
         {
             return;
@@ -132,22 +139,18 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
 
         m_nextSample = now + m_interval;
 
-        auto record = nlohmann::ordered_json{{"time", std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()))}, {"account", m_accountName}};
-        record.update(sample);
-        record["tick"] = state.tick;
-
-        const auto line = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
-        FileUtils::AppendText(m_path, line);
-        m_lastSample = std::move(sample);
+        sample.time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+        m_database->Append(sample);
+        m_lastSample = sample;
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, FleetAccountDataLog_s{line});
+            m_events->Publish(m_accountName, sample);
         }
 
         if (m_writeFailed)
         {
-            m_logger->Info("Writing account data to {} again", m_path.string());
+            m_logger->Info("Writing account data to {} again", m_database->GetPath().string());
             m_writeFailed = false;
         }
     }

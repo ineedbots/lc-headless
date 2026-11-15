@@ -6,6 +6,6 @@ class FleetLogEvent
 {
 public:
     FleetLogEvent() = delete;
-    static std::optional<std::size_t> Measure(std::string_view recordJson);
-    static nlohmann::json Serialize(std::string_view recordJson);
+    static std::optional<std::size_t> Measure(const nlohmann::ordered_json& record);
+    static nlohmann::json Serialize(const nlohmann::ordered_json& record);
 };
