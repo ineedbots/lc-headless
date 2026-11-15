@@ -76,10 +76,26 @@ ItemLog::Contents_s ItemLog::Read(const GameState_s& state) const
 
 void ItemLog::Step(Clock::time_point now, const GameState_s& state)
 {
+    Poll(now);
+
     const auto contents = Read(state);
     // Before the container's contents have arrived there is nothing to say.
     if (contents.com == 0 || !state.FindInventory(contents.com))
     {
+        return;
+    }
+
+    if (m_write)
+    {
+        if (contents == m_write->contents)
+        {
+            m_pending.reset();
+        }
+        else
+        {
+            m_pending = contents;
+        }
+
         return;
     }
 
@@ -99,11 +115,7 @@ void ItemLog::Step(Clock::time_point now, const GameState_s& state)
 
     if (!m_lastSample)
     {
-        if (WriteSample(now, contents))
-        {
-            m_lastSample = contents;
-        }
-        else
+        if (!WriteSample(now, contents))
         {
             m_pending = contents;
         }
@@ -126,7 +138,6 @@ void ItemLog::Step(Clock::time_point now, const GameState_s& state)
 
     if (WriteSample(now, contents))
     {
-        m_lastSample = contents;
         m_pending.reset();
     }
     else
@@ -135,19 +146,22 @@ void ItemLog::Step(Clock::time_point now, const GameState_s& state)
     }
 }
 
+void ItemLog::Flush()
+{
+    if (!m_write)
+    {
+        return;
+    }
+
+    m_write->completion.wait();
+    Poll(Clock::now());
+}
+
 bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
 {
     try
     {
         const auto time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
-        const auto append = [this](const auto& record)
-        {
-            m_database->Append(record);
-            if (m_events)
-            {
-                m_events->Publish(m_accountName, record);
-            }
-        };
 
         if (m_kind == Kind_e::Backpack)
         {
@@ -162,7 +176,18 @@ bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
                 record.items.push_back({.id = item.id, .name = std::string{m_cache.FindObjName(item.id)}, .qty = item.qty});
             }
 
-            append(record);
+            auto completion = m_database->Enqueue(record);
+            if (!completion)
+            {
+                throw std::runtime_error{"fleet database write queue is full"};
+            }
+
+            m_write.emplace(PendingWrite_s{
+                .record = std::move(record),
+                .completion = std::move(*completion),
+                .contents = contents,
+                .sampledAt = now});
+            Poll(now);
         }
         else
         {
@@ -175,19 +200,18 @@ bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
                 record.items.push_back({.id = item.id, .name = std::string{m_cache.FindObjName(item.id)}, .qty = item.qty});
             }
 
-            append(record);
-        }
+            auto completion = m_database->Enqueue(record);
+            if (!completion)
+            {
+                throw std::runtime_error{"fleet database write queue is full"};
+            }
 
-        m_retryAt.reset();
-        if (m_interval > std::chrono::seconds::zero())
-        {
-            m_nextSample = now + m_interval;
-        }
-
-        if (m_writeFailed)
-        {
-            m_writeFailed = false;
-            m_logger->Info("Writing {} to {} again", m_kind == Kind_e::Backpack ? "the backpack" : "the worn equipment", m_database->GetPath().string());
+            m_write.emplace(PendingWrite_s{
+                .record = std::move(record),
+                .completion = std::move(*completion),
+                .contents = contents,
+                .sampledAt = now});
+            Poll(now);
         }
 
         return true;
@@ -203,5 +227,56 @@ bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
 
         m_retryAt = now + (m_interval > std::chrono::seconds::zero() ? m_interval : 1s);
         return false;
+    }
+}
+
+void ItemLog::Poll(Clock::time_point now)
+{
+    if (!m_write || m_write->completion.wait_for(0ms) != std::future_status::ready)
+    {
+        return;
+    }
+
+    auto write = std::move(*m_write);
+    m_write.reset();
+
+    try
+    {
+        write.completion.get();
+        m_lastSample = write.contents;
+        m_retryAt.reset();
+        if (m_interval > std::chrono::seconds::zero())
+        {
+            m_nextSample = write.sampledAt + m_interval;
+        }
+
+        std::visit([this](const auto& record)
+        {
+            if (m_events)
+            {
+                m_events->Publish(m_accountName, record);
+            }
+        }, write.record);
+
+        if (m_writeFailed)
+        {
+            m_writeFailed = false;
+            m_logger->Info("Writing {} to {} again", m_kind == Kind_e::Backpack ? "the backpack" : "the worn equipment", m_database->GetPath().string());
+        }
+    }
+    catch (const std::exception& e)
+    {
+        if (!m_writeFailed)
+        {
+            m_writeFailed = true;
+            m_logger->Warning("{} wasn't saved to {}; it will retry: {}", m_kind == Kind_e::Backpack ? "The backpack" : "The worn equipment", m_database->GetPath().string(), e.what());
+        }
+
+        if (!m_pending)
+        {
+            m_pending = write.contents;
+        }
+
+        m_retryAt = now + (m_interval > std::chrono::seconds::zero() ? m_interval : 1s);
     }
 }

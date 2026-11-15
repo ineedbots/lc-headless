@@ -52,7 +52,7 @@ namespace
         BankFixture()
             : cache{MakeBankCache()}
             , folder{"rs2004-bank-logger-tests"}
-            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite")}
+            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite", FleetDatabase::Mode_e::Inline)}
             , log{*cache, capture.GetLogger(), "s18", database}
         {
         }
@@ -89,7 +89,7 @@ TEST_CASE("BankLogger writes escaped item names as one valid JSON line", "[BankL
     const auto folder = TempFolder{"rs2004-bank-json-tests"};
     auto capture = LogCapture{};
     const auto databasePath = folder.GetPath() / "fleet.sqlite";
-    auto log = BankLogger{*cache, capture.GetLogger(), "test", std::make_shared<FleetDatabase>(databasePath)};
+    auto log = BankLogger{*cache, capture.GetLogger(), "test", std::make_shared<FleetDatabase>(databasePath, FleetDatabase::Mode_e::Inline)};
     log.Step(OpenBank({{.id = COINS, .count = 2}, {.id = COINS, .count = 3}}));
 
     const auto records = ReadFleetPayloads(databasePath, "bank", "test");
@@ -187,7 +187,7 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         // A file where the folder should be.
         const auto blockedPath = fixture.folder.GetPath() / "blocked.sqlite";
         std::ofstream{blockedPath} << "not a database";
-        auto blocked = BankLogger{*fixture.cache, fixture.capture.GetLogger(), "s18", std::make_shared<FleetDatabase>(blockedPath)};
+        auto blocked = BankLogger{*fixture.cache, fixture.capture.GetLogger(), "s18", std::make_shared<FleetDatabase>(blockedPath, FleetDatabase::Mode_e::Inline)};
 
         CHECK_NOTHROW(blocked.Step(OpenBank({{.id = COINS, .count = 1}})));
         auto closed = GameState_s{};
@@ -201,4 +201,34 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         });
         CHECK(warnings == 1);
     }
+}
+
+TEST_CASE("BankLogger preserves each open snapshot while a write is pending", "[BankLogger]")
+{
+    const auto folder = TempFolder{"rs2004-bank-pending-snapshots"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background);
+    database->Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "init"});
+
+    auto blocker = SQLite::Database{path.string(), SQLite::OPEN_READWRITE};
+    blocker.exec("BEGIN IMMEDIATE");
+    const auto cache = MakeBankCache();
+    auto capture = LogCapture{};
+    auto log = BankLogger{*cache, capture.GetLogger(), "s18", database};
+    log.Step(OpenBank({{.id = COINS, .count = 10}}));
+
+    auto closed = GameState_s{};
+    closed.placed = true;
+    log.Step(closed);
+    log.Step(OpenBank({{.id = COINS, .count = 20}}));
+    log.Step(closed);
+    blocker.exec("ROLLBACK");
+    log.Flush();
+
+    const auto records = ReadFleetPayloads(path, "bank", "s18");
+    REQUIRE(records.size() == 2);
+    CHECK(nlohmann::json::parse(records[0])["items"][0]["qty"] == 10);
+    CHECK(nlohmann::json::parse(records[1])["items"][0]["qty"] == 20);
 }

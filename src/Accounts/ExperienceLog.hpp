@@ -44,6 +44,8 @@ public:
     // is in game and settled; `settled` is the state's own test, since the stats arrive a tick after the
     // player is placed.
     void Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status, bool settled);
+    void Poll(Clock::time_point now);
+    void Flush();
 
     [[nodiscard]] const std::filesystem::path& GetDatabasePath() const
     {
@@ -51,16 +53,34 @@ public:
     }
 
 private:
-    bool WriteSample(std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled);
-    void LogGains(const GameState_s& state, double hours);
+    struct Sample_s
+    {
+        FleetExperienceLog_s record;
+        std::array<s32, GameState_s::STAT_COUNT> xp{};
+        Clock::time_point sampledAt;
+        bool inGame = false;
+        bool startsBaseline = false;
+        bool periodic = false;
+        bool statusTransition = false;
+    };
+
+    struct PendingWrite_s
+    {
+        Sample_s sample;
+        std::future<void> completion;
+    };
+
+    [[nodiscard]] Sample_s MakeSample(Clock::time_point now, std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled, bool startsBaseline, bool periodic, bool statusTransition) const;
+    bool WriteSample(Sample_s sample);
+    void LogGains(const std::array<s32, GameState_s::STAT_COUNT>& xp, double hours);
 
     std::string m_accountName;
     std::chrono::minutes m_interval;
     std::shared_ptr<Logger> m_logger;
     std::shared_ptr<FleetDatabase> m_database;
     std::optional<Clock::time_point> m_nextSample;
-    // The status last written, so a change writes at once; a logout also ends the sampling run.
-    std::string m_lastStatus;
+    std::string m_lastObservedStatus;
+    std::deque<Sample_s> m_deferredStatuses;
     // Whether a settled baseline has been written for the current run.
     bool m_hasBaseline = false;
     // What the last sample held, for the log line's gains.
@@ -70,4 +90,5 @@ private:
     bool m_writeFailed = false;
     std::optional<Clock::time_point> m_retryAt;
     std::shared_ptr<ApplicationEventPublisher> m_events;
+    std::optional<PendingWrite_s> m_write;
 };

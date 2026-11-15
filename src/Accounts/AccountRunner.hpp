@@ -40,6 +40,7 @@ public:
     [[nodiscard]] const Account& GetAccount(std::size_t index) const;
 
 private:
+    [[nodiscard]] std::shared_ptr<FleetDatabase> GetFleetDatabase(const std::filesystem::path& path);
     void StartNextLogin(Clock::time_point now);
     void InterruptAll();
     void Quit(Account* target);
@@ -54,6 +55,8 @@ private:
     // Every account's login attempts take turns on it, so reconnects and relogins are spaced out as the first
     // logins are.
     std::shared_ptr<LoginQueue> m_loginQueue;
+    // Shared by accounts that use the same normalized database path; destroyed after the accounts.
+    std::map<std::filesystem::path, std::shared_ptr<FleetDatabase>> m_fleetDatabases;
     // Declared before the accounts, which unregister from it as they go.
     BotMessenger m_messenger;
     std::vector<std::unique_ptr<Account>> m_accounts;

@@ -72,7 +72,7 @@ namespace
         explicit ItemFixture(ItemLog::Kind_e kind = ItemLog::Kind_e::Backpack, std::chrono::seconds interval = 5s)
             : cache{MakeCache()}
             , folder{"rs2004-item-log-tests"}
-            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite")}
+            , database{std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite", FleetDatabase::Mode_e::Inline)}
             , kind{kind}
             , log{*cache, capture.GetLogger(), "s18", database, kind, interval}
         {
@@ -109,7 +109,7 @@ TEST_CASE("ItemLog preserves escaped names and container specific fields", "[Ite
     const auto folder = TempFolder{"rs2004-item-json-tests"};
     auto capture = LogCapture{};
     const auto databasePath = folder.GetPath() / "fleet.sqlite";
-    auto database = std::make_shared<FleetDatabase>(databasePath);
+    auto database = std::make_shared<FleetDatabase>(databasePath, FleetDatabase::Mode_e::Inline);
     for (const auto kind : {ItemLog::Kind_e::Backpack, ItemLog::Kind_e::Equipment})
     {
         auto log = ItemLog{*cache, capture.GetLogger(), "test", database, kind, 0s};
@@ -279,7 +279,7 @@ TEST_CASE("ItemLog records worn equipment in its own file", "[ItemLog][Equipment
         auto fixture = ItemFixture{ItemLog::Kind_e::Equipment, 0s};
         const auto blockedPath = fixture.folder.GetPath() / "blocked.sqlite";
         std::ofstream{blockedPath} << "not a database";
-        auto blocked = ItemLog{*fixture.cache, fixture.capture.GetLogger(), "s18", std::make_shared<FleetDatabase>(blockedPath), ItemLog::Kind_e::Equipment, 0s};
+        auto blocked = ItemLog{*fixture.cache, fixture.capture.GetLogger(), "s18", std::make_shared<FleetDatabase>(blockedPath, FleetDatabase::Mode_e::Inline), ItemLog::Kind_e::Equipment, 0s};
 
         CHECK_NOTHROW(blocked.Step(Clock::now(), WithEquipment({{.id = PLATEBODY, .count = 1}})));
         CHECK_NOTHROW(blocked.Step(Clock::now(), WithEquipment({{.id = PLATEBODY, .count = 2}})));

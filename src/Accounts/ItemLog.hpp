@@ -28,6 +28,8 @@ public:
 
     // Called every step while in game.
     void Step(Clock::time_point now, const GameState_s& state);
+    void Poll(Clock::time_point now);
+    void Flush();
 
     [[nodiscard]] const std::filesystem::path& GetDatabasePath() const
     {
@@ -57,6 +59,14 @@ private:
         [[nodiscard]] bool operator==(const Contents_s&) const = default;
     };
 
+    struct PendingWrite_s
+    {
+        std::variant<FleetInventoryLog_s, FleetEquipmentLog_s> record;
+        std::future<void> completion;
+        Contents_s contents;
+        Clock::time_point sampledAt;
+    };
+
     [[nodiscard]] Contents_s Read(const GameState_s& state) const;
     bool WriteSample(Clock::time_point now, const Contents_s& contents);
 
@@ -73,4 +83,5 @@ private:
     bool m_writeFailed = false;
     std::optional<Clock::time_point> m_retryAt;
     std::shared_ptr<ApplicationEventPublisher> m_events;
+    std::optional<PendingWrite_s> m_write;
 };

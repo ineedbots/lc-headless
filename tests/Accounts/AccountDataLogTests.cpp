@@ -45,7 +45,7 @@ TEST_CASE("Account data records settled values and server facing targets", "[Acc
     const auto folder = TempFolder{"rs2004-account-data"};
     auto capture = LogCapture{};
     const auto cache = GameCache_s{};
-    auto database = std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite");
+    auto database = std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite", FleetDatabase::Mode_e::Inline);
     auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", database, 0s};
     auto state = SettledState();
     const auto now = AccountDataLog::Clock::now();
@@ -91,7 +91,7 @@ TEST_CASE("Account data coalesces changes and clears stale state across sessions
     const auto folder = TempFolder{"rs2004-account-data-interval"};
     auto capture = LogCapture{};
     const auto cache = GameCache_s{};
-    auto database = std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite");
+    auto database = std::make_shared<FleetDatabase>(folder.GetPath() / "fleet.sqlite", FleetDatabase::Mode_e::Inline);
     auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", database, 5s};
     auto state = SettledState();
     const auto now = AccountDataLog::Clock::now();
@@ -171,4 +171,83 @@ TEST_CASE("Account reporting publishes account data only after successful writes
     disabled.ObserveSession(now + 10s, state, ClientStatus_e::Disconnected);
     drain();
     CHECK_FALSE(bridge->Front(client));
+}
+
+TEST_CASE("Account data logging enqueues without waiting and publishes after a successful retry", "[AccountDataLog][FleetEvents]")
+{
+    const auto folder = TempFolder{"rs2004-account-data-async"};
+    auto capture = LogCapture{};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background);
+    database->Append(FleetAccountDataLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .state = "connecting"});
+
+    auto blocker = SQLite::Database{path.string(), SQLite::OPEN_READWRITE};
+    blocker.exec("BEGIN IMMEDIATE");
+    auto bridge = std::make_shared<ApplicationEventBridge>(std::vector<std::string>{"bot1"});
+    const auto client = bridge->Connect();
+    bridge->Enqueue(client, R"({"version":1,"type":"subscribe","id":"data","events":["fleet.account-data"],"accounts":["bot1"]})");
+    const auto drain = [&]
+    {
+        while (bridge->HasIncoming())
+        {
+            bridge->Service();
+        }
+    };
+    drain();
+    bridge->Pop(client);
+    bridge->Pop(client);
+
+    const auto cache = GameCache_s{};
+    auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", database, 1s, bridge};
+    auto state = SettledState();
+    const auto start = AccountDataLog::Clock::now();
+    log.Step(start, state, ClientStatus_e::InGame);
+    CHECK(AccountDataLog::Clock::now() - start < 100ms);
+    CHECK_FALSE(bridge->Front(client));
+
+    log.Flush();
+    CHECK_FALSE(bridge->Front(client));
+    blocker.exec("ROLLBACK");
+
+    log.Step(start + 2s, state, ClientStatus_e::InGame);
+    log.Flush();
+    drain();
+    REQUIRE(bridge->Front(client));
+    const auto event = nlohmann::json::parse(*bridge->Front(client));
+    CHECK(event["event"] == "fleet.account-data");
+    CHECK(event["payload"]["state"] == "ingame");
+    CHECK(event["payload"] == Records(path).back());
+}
+
+TEST_CASE("Account data logging preserves session transitions while a write is pending", "[AccountDataLog]")
+{
+    const auto folder = TempFolder{"rs2004-account-data-pending-transitions"};
+    auto capture = LogCapture{};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto database = std::make_shared<FleetDatabase>(path, FleetDatabase::Mode_e::Background);
+    database->Append(FleetAccountDataLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "init",
+        .state = "connecting"});
+
+    auto blocker = SQLite::Database{path.string(), SQLite::OPEN_READWRITE};
+    blocker.exec("BEGIN IMMEDIATE");
+    const auto cache = GameCache_s{};
+    auto log = AccountDataLog{cache, capture.GetLogger(), "bot1", database, 1s};
+    auto state = SettledState();
+    const auto start = AccountDataLog::Clock::now();
+    log.Step(start, state, ClientStatus_e::Connecting);
+    log.Step(start + 1ms, state, ClientStatus_e::LoggingOut);
+    log.Step(start + 2ms, state, ClientStatus_e::LoggedOut);
+    blocker.exec("ROLLBACK");
+    log.Flush();
+
+    const auto records = Records(path);
+    REQUIRE(records.size() == 3);
+    CHECK(records[0]["state"] == "connecting");
+    CHECK(records[1]["state"] == "logging out");
+    CHECK(records[2]["state"] == "logged out");
 }

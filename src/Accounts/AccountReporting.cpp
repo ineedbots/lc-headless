@@ -17,14 +17,14 @@
 #include "ProgressReporter.hpp"
 #include "Type/ProgressReport_s.hpp"
 
-AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events)
+AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s& account, const GameCache_s& cache, std::shared_ptr<Logger> logger, std::function<void(const ProgressReport_s&)> onReport, std::shared_ptr<ApplicationEventPublisher> events, FleetDatabaseProvider_t databaseProvider)
     : m_progress{account.script ? account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{config.scripting.progressDirectory} / (account.name + ".txt"), logger, std::move(onReport)}
 {
     const auto& scripting = config.scripting;
     const auto experienceEnabled = scripting.experienceLogEnabled && scripting.experienceIntervalMinutes > std::chrono::minutes::zero();
-    if (scripting.accountDataLogEnabled || experienceEnabled || scripting.bankLogEnabled || scripting.inventoryLogEnabled || scripting.equipmentLogEnabled)
+    if (!scripting.fleetDatabasePath.empty() && (scripting.accountDataLogEnabled || experienceEnabled || scripting.bankLogEnabled || scripting.inventoryLogEnabled || scripting.equipmentLogEnabled))
     {
-        m_fleetDatabase = std::make_shared<FleetDatabase>(scripting.fleetDatabasePath);
+        m_fleetDatabase = databaseProvider ? databaseProvider(scripting.fleetDatabasePath) : std::make_shared<FleetDatabase>(scripting.fleetDatabasePath, FleetDatabase::Mode_e::Inline);
     }
 
     if (m_fleetDatabase && scripting.accountDataLogEnabled)
@@ -52,6 +52,62 @@ AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s
     {
         // Worn equipment changes rarely, so every change is worth a record.
         m_equipment.emplace(cache, logger, account.name, m_fleetDatabase, ItemLog::Kind_e::Equipment, 0s, events);
+    }
+}
+
+void AccountReporting::Poll(Clock::time_point now)
+{
+    if (m_accountData)
+    {
+        m_accountData->Poll(now);
+    }
+
+    if (m_experience)
+    {
+        m_experience->Poll(now);
+    }
+
+    if (m_bankLog)
+    {
+        m_bankLog->Poll(now);
+    }
+
+    if (m_inventory)
+    {
+        m_inventory->Poll(now);
+    }
+
+    if (m_equipment)
+    {
+        m_equipment->Poll(now);
+    }
+}
+
+void AccountReporting::Flush()
+{
+    if (m_accountData)
+    {
+        m_accountData->Flush();
+    }
+
+    if (m_experience)
+    {
+        m_experience->Flush();
+    }
+
+    if (m_bankLog)
+    {
+        m_bankLog->Flush();
+    }
+
+    if (m_inventory)
+    {
+        m_inventory->Flush();
+    }
+
+    if (m_equipment)
+    {
+        m_equipment->Flush();
     }
 }
 

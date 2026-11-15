@@ -120,6 +120,7 @@ flowchart LR
         end
 
         NET["NetLoop and transport<br/>Connection and Link<br/>TCP, WebSocket, TLS and SOCKS5"]
+        FLEET["Fleet database writer<br/>Worker thread, bounded batches"]
         LOG["Logger and LogSinks<br/>Terminal and log file output"]
 
         APP -->|"Load"| CONFIG
@@ -129,6 +130,9 @@ flowchart LR
         APP -->|"Create shared loop"| NET
         APP -->|"Install sinks"| LOG
         RUNNER -->|"Own and step accounts"| LIFE
+        RUNNER -->|"Own per-path writers"| FLEET
+        REPORTS -->|"Enqueue records"| FLEET
+        FLEET -->|"Commit results"| REPORTS
         RUNNER -->|"Poll or wait"| NET
         RUNTIME -.->|"Supply VM slots"| SCRIPT
         CACHE -.->|"Definitions and map data"| GAME
@@ -147,8 +151,9 @@ flowchart LR
 ```
 
 Configuration and logging serve several subsystems; their individual consumer
-arrows are omitted to keep the diagram readable. Account reporting writes its
-own files, separately from the logger's terminal and log-file sinks.
+arrows are omitted to keep the diagram readable. Account reporting uses the
+process-owned fleet writer for SQLite journals, separately from the logger's
+terminal and log-file sinks.
 
 ### Subsystem responsibilities and design references
 
@@ -182,6 +187,12 @@ own files, separately from the logger's terminal and log-file sinks.
   work before polling or waiting on the shared network loop. `Account::Step()`
   pumps its game client before stepping its script and reporting. Accounts take
   turns; they do not have individual execution threads.
+- **Fleet persistence:** `AccountRunner` shares one worker per normalized
+  database path. Account loggers enqueue immutable records without waiting for
+  SQLite; the worker batches and commits them. The account loop observes
+  completions, updates successful sample state and publishes events only after
+  commit. Each started account's final state is sampled and accepted writes are
+  drained before shutdown stops event publication.
 - **I/O boundary:** game transport callbacks and HTTP I/O run on the thread
   driving `NetLoop`. HTTP queues separate network callbacks from application
   command execution. Console input has a reader thread which queues lines and

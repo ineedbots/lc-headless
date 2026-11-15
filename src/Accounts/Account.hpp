@@ -31,6 +31,7 @@ struct AccountOptions_s
     std::shared_ptr<const Navigation> navigation;
     std::chrono::milliseconds reloginDelay = 60s;
     std::shared_ptr<ApplicationEventPublisher> events;
+    AccountReporting::FleetDatabaseProvider_t fleetDatabaseProvider;
 };
 
 // Never throws, and never waits beyond Step's maxWait, so many accounts can share one loop. Its lifecycle is
@@ -53,6 +54,7 @@ public:
     // Step does the rest.
     void Start();
     void CloseNetwork();
+    void FlushFleetLogs();
     // For callers that run a single account.
     void Login();
     void Step(std::chrono::milliseconds maxWait);

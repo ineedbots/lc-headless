@@ -117,22 +117,63 @@ FleetAccountDataLog_s AccountDataLog::Read(const GameState_s& state, ClientStatu
 
 void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status)
 {
+    Poll(now);
+
     try
     {
         auto sample = Read(state, status);
+        const auto session = std::pair{sample.state, sample.settled};
+        const auto sessionChanged = !m_lastObservedSession || *m_lastObservedSession != session;
+        m_lastObservedSession = session;
+        if (sessionChanged)
+        {
+            if (m_deferredSessions.size() >= FleetDatabase::MAX_PENDING_WRITES)
+            {
+                if (!m_writeFailed)
+                {
+                    m_writeFailed = true;
+                    m_logger->Warning("The account data log's pending session-transition queue is full; the transition wasn't saved");
+                }
+            }
+            else
+            {
+                sample.time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+                m_deferredSessions.push_back(std::move(sample));
+            }
+        }
+
+        if (m_write)
+        {
+            return;
+        }
+
+        if (!m_deferredSessions.empty())
+        {
+            if (m_writeFailed && m_nextSample && now < *m_nextSample)
+            {
+                return;
+            }
+
+            auto transition = m_deferredSessions.front();
+            auto completion = m_database->Enqueue(transition);
+            if (!completion)
+            {
+                throw std::runtime_error{"fleet database write queue is full"};
+            }
+
+            m_nextSample = now + m_interval;
+            m_write.emplace(PendingWrite_s{std::move(transition), std::move(*completion), true});
+            m_deferredSessions.pop_front();
+            Poll(now);
+            return;
+        }
+
         if (m_lastSample && sample == *m_lastSample)
         {
             return;
         }
 
-        const auto sessionChanged = !m_lastSample || sample.state != m_lastSample->state || sample.settled != m_lastSample->settled;
-        if (!sessionChanged && m_nextSample && now < *m_nextSample)
-        {
-            return;
-        }
-
-        // Retry failed writes on the interval, including the first sample and session changes.
-        if (m_writeFailed && m_nextSample && now < *m_nextSample)
+        if (m_nextSample && now < *m_nextSample)
         {
             return;
         }
@@ -140,12 +181,46 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
         m_nextSample = now + m_interval;
 
         sample.time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
-        m_database->Append(sample);
-        m_lastSample = sample;
+        auto completion = m_database->Enqueue(sample);
+        if (!completion)
+        {
+            throw std::runtime_error{"fleet database write queue is full"};
+        }
+
+        m_write.emplace(PendingWrite_s{std::move(sample), std::move(*completion), false});
+        m_nextSample = now + m_interval;
+        Poll(now);
+    }
+    catch (const std::exception& e)
+    {
+        if (!m_writeFailed)
+        {
+            m_writeFailed = true;
+            m_logger->Warning("The account data log wasn't saved: {}", e.what());
+        }
+
+        m_nextSample = now + m_interval;
+    }
+}
+
+void AccountDataLog::Poll(Clock::time_point now)
+{
+    if (!m_write || m_write->completion.wait_for(0ms) != std::future_status::ready)
+    {
+        return;
+    }
+
+    auto write = std::move(*m_write);
+    m_write.reset();
+
+    try
+    {
+        write.completion.get();
+        m_lastSample = write.record;
 
         if (m_events)
         {
-            m_events->Publish(m_accountName, sample);
+            m_events->Publish(m_accountName, write.record);
         }
 
         if (m_writeFailed)
@@ -156,10 +231,58 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
     }
     catch (const std::exception& e)
     {
+        if (write.sessionTransition)
+        {
+            m_deferredSessions.push_front(std::move(write.record));
+        }
+
         if (!m_writeFailed)
         {
             m_writeFailed = true;
             m_logger->Warning("The account data log wasn't saved: {}", e.what());
+        }
+
+        m_nextSample = now + m_interval;
+    }
+}
+
+void AccountDataLog::Flush()
+{
+    if (m_write)
+    {
+        m_write->completion.wait();
+        Poll(Clock::now());
+    }
+
+    const auto attempts = m_deferredSessions.size();
+    for (auto i = std::size_t{}; i < attempts && !m_deferredSessions.empty(); ++i)
+    {
+        auto transition = m_deferredSessions.front();
+        auto completion = m_database->Enqueue(transition);
+        if (!completion)
+        {
+            m_database->Flush();
+            completion = m_database->Enqueue(transition);
+        }
+
+        if (!completion)
+        {
+            if (!m_writeFailed)
+            {
+                m_writeFailed = true;
+                m_logger->Warning("The account data log wasn't saved: fleet database write queue is full");
+            }
+
+            return;
+        }
+
+        m_write.emplace(PendingWrite_s{std::move(transition), std::move(*completion), true});
+        m_deferredSessions.pop_front();
+        m_write->completion.wait();
+        Poll(Clock::now());
+        if (m_writeFailed)
+        {
+            return;
         }
     }
 }

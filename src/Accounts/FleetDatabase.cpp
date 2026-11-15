@@ -8,6 +8,7 @@ namespace
 {
     constexpr auto SCHEMA_VERSION = 3;
     constexpr auto BUSY_TIMEOUT_MS = 25;
+    constexpr auto BATCH_DELAY = 5ms;
 
     std::string PathToUtf8(const std::filesystem::path& path)
     {
@@ -136,18 +137,222 @@ namespace
             statement.reset();
         }
     }
+
+    template <typename TRecord>
+    void AppendAndWait(FleetDatabase& database, const TRecord& record)
+    {
+        auto completion = database.Enqueue(record);
+        if (!completion)
+        {
+            throw std::runtime_error{"fleet database write queue is full"};
+        }
+
+        completion->get();
+    }
 }
 
-FleetDatabase::FleetDatabase(std::filesystem::path path)
+FleetDatabase::FleetDatabase(std::filesystem::path path, Mode_e mode)
     : m_path{std::move(path)}
+    , m_mode{mode}
 {
+    if (m_mode == Mode_e::Background)
+    {
+        m_worker = std::thread{[this]
+        {
+            Run();
+        }};
+    }
+}
+
+FleetDatabase::~FleetDatabase()
+{
+    if (!m_worker.joinable())
+    {
+        return;
+    }
+
+    {
+        const auto lock = std::lock_guard{m_mutex};
+        m_stopping = true;
+    }
+
+    m_wake.notify_one();
+    m_worker.join();
 }
 
 void FleetDatabase::Append(const FleetAccountDataLog_s& record)
 {
-    EnsureOpen();
+    AppendAndWait(*this, record);
+}
 
-    auto transaction = SQLite::Transaction{*m_database};
+void FleetDatabase::Append(const FleetExperienceLog_s& record)
+{
+    AppendAndWait(*this, record);
+}
+
+void FleetDatabase::Append(const FleetBankLog_s& record)
+{
+    AppendAndWait(*this, record);
+}
+
+void FleetDatabase::Append(const FleetInventoryLog_s& record)
+{
+    AppendAndWait(*this, record);
+}
+
+void FleetDatabase::Append(const FleetEquipmentLog_s& record)
+{
+    AppendAndWait(*this, record);
+}
+
+std::optional<std::future<void>> FleetDatabase::Enqueue(const FleetAccountDataLog_s& record)
+{
+    return Enqueue(Record_t{record});
+}
+
+std::optional<std::future<void>> FleetDatabase::Enqueue(const FleetExperienceLog_s& record)
+{
+    return Enqueue(Record_t{record});
+}
+
+std::optional<std::future<void>> FleetDatabase::Enqueue(const FleetBankLog_s& record)
+{
+    return Enqueue(Record_t{record});
+}
+
+std::optional<std::future<void>> FleetDatabase::Enqueue(const FleetInventoryLog_s& record)
+{
+    return Enqueue(Record_t{record});
+}
+
+std::optional<std::future<void>> FleetDatabase::Enqueue(const FleetEquipmentLog_s& record)
+{
+    return Enqueue(Record_t{record});
+}
+
+std::optional<std::future<void>> FleetDatabase::Enqueue(Record_t record)
+{
+    auto write = PendingWrite_s{.record = std::move(record)};
+    auto completion = write.completion.get_future();
+
+    if (m_mode == Mode_e::Inline)
+    {
+        auto writes = std::vector<PendingWrite_s>{};
+        writes.push_back(std::move(write));
+        WriteBatch(std::move(writes));
+        return std::optional{std::move(completion)};
+    }
+
+    {
+        const auto lock = std::lock_guard{m_mutex};
+        if (m_stopping || m_pendingWrites >= MAX_PENDING_WRITES)
+        {
+            return std::nullopt;
+        }
+
+        m_queue.push_back(std::move(write));
+        ++m_pendingWrites;
+    }
+
+    m_wake.notify_one();
+    return std::optional{std::move(completion)};
+}
+
+void FleetDatabase::Flush()
+{
+    auto lock = std::unique_lock{m_mutex};
+    m_idle.wait(lock, [this]
+    {
+        return m_pendingWrites == 0;
+    });
+}
+
+void FleetDatabase::Run()
+{
+    while (true)
+    {
+        auto batch = std::vector<PendingWrite_s>{};
+        {
+            auto lock = std::unique_lock{m_mutex};
+            m_wake.wait(lock, [this]
+            {
+                return m_stopping || !m_queue.empty();
+            });
+
+            if (m_queue.empty() && m_stopping)
+            {
+                return;
+            }
+
+            if (!m_stopping && m_queue.size() < MAX_BATCH_WRITES)
+            {
+                m_wake.wait_for(lock, BATCH_DELAY, [this]
+                {
+                    return m_stopping || m_queue.size() >= MAX_BATCH_WRITES;
+                });
+            }
+
+            const auto count = std::min(m_queue.size(), MAX_BATCH_WRITES);
+            batch.reserve(count);
+            for (auto i = std::size_t{}; i < count; ++i)
+            {
+                batch.push_back(std::move(m_queue.front()));
+                m_queue.pop_front();
+            }
+        }
+
+        WriteBatch(std::move(batch));
+    }
+}
+
+void FleetDatabase::WriteBatch(std::vector<PendingWrite_s> writes)
+{
+    const auto writeLock = std::lock_guard{m_writeMutex};
+    auto error = std::exception_ptr{};
+
+    try
+    {
+        EnsureOpen();
+        auto transaction = SQLite::Transaction{*m_database};
+        for (const auto& write : writes)
+        {
+            std::visit([this](const auto& record)
+            {
+                Write(record);
+            }, write.record);
+        }
+
+        transaction.commit();
+        ++m_committedBatchCount;
+    }
+    catch (...)
+    {
+        error = std::current_exception();
+    }
+
+    for (auto& write : writes)
+    {
+        if (error)
+        {
+            write.completion.set_exception(error);
+        }
+        else
+        {
+            write.completion.set_value();
+        }
+    }
+
+    if (m_mode == Mode_e::Background)
+    {
+        const auto lock = std::lock_guard{m_mutex};
+        m_pendingWrites -= writes.size();
+    }
+
+    m_idle.notify_all();
+}
+
+void FleetDatabase::Write(const FleetAccountDataLog_s& record)
+{
     const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::AccountData, record.time);
     auto statement = SQLite::Statement{*m_database,
                                        "INSERT INTO fleet_account_data ("
@@ -196,14 +401,10 @@ void FleetDatabase::Append(const FleetAccountDataLog_s& record)
     BindOptionalInteger(statement, 26, record.weight);
     statement.bind(27, static_cast<s64>(record.tick));
     statement.exec();
-    transaction.commit();
 }
 
-void FleetDatabase::Append(const FleetExperienceLog_s& record)
+void FleetDatabase::Write(const FleetExperienceLog_s& record)
 {
-    EnsureOpen();
-
-    auto transaction = SQLite::Transaction{*m_database};
     const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Experience, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_experience (record_id, state, settled) VALUES (?, ?, ?)"};
@@ -226,15 +427,10 @@ void FleetDatabase::Append(const FleetExperienceLog_s& record)
         statement.exec();
         statement.reset();
     }
-
-    transaction.commit();
 }
 
-void FleetDatabase::Append(const FleetBankLog_s& record)
+void FleetDatabase::Write(const FleetBankLog_s& record)
 {
-    EnsureOpen();
-
-    auto transaction = SQLite::Transaction{*m_database};
     const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Bank, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_bank (record_id) VALUES (?)"};
@@ -243,14 +439,10 @@ void FleetDatabase::Append(const FleetBankLog_s& record)
     }
 
     InsertItems(*m_database, "fleet_bank_items", recordId, record.items);
-    transaction.commit();
 }
 
-void FleetDatabase::Append(const FleetInventoryLog_s& record)
+void FleetDatabase::Write(const FleetInventoryLog_s& record)
 {
-    EnsureOpen();
-
-    auto transaction = SQLite::Transaction{*m_database};
     const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Inventory, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_inventory (record_id, bank_open, used, free) VALUES (?, ?, ?, ?)"};
@@ -262,14 +454,10 @@ void FleetDatabase::Append(const FleetInventoryLog_s& record)
     }
 
     InsertItems(*m_database, "fleet_inventory_items", recordId, record.items);
-    transaction.commit();
 }
 
-void FleetDatabase::Append(const FleetEquipmentLog_s& record)
+void FleetDatabase::Write(const FleetEquipmentLog_s& record)
 {
-    EnsureOpen();
-
-    auto transaction = SQLite::Transaction{*m_database};
     const auto recordId = InsertRecord(*m_database, record.account, FleetStream_e::Equipment, record.time);
     {
         auto statement = SQLite::Statement{*m_database, "INSERT INTO fleet_equipment (record_id, used) VALUES (?, ?)"};
@@ -279,7 +467,6 @@ void FleetDatabase::Append(const FleetEquipmentLog_s& record)
     }
 
     InsertItems(*m_database, "fleet_equipment_items", recordId, record.items);
-    transaction.commit();
 }
 
 void FleetDatabase::EnsureOpen()
