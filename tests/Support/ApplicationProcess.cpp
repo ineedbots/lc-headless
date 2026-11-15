@@ -3,8 +3,6 @@
 
 #include "Utils/FileUtils.hpp"
 
-#include <fstream>
-
 #ifdef _WIN32
 #include <Windows.h>
 #else
