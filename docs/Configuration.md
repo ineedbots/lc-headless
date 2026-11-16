@@ -132,6 +132,14 @@ Logging is enabled by default, including accounts without a script.
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds; minimum time between backpack samples; `0` records every change. |
 | `equipmentLogEnabled` | `true` | Store worn equipment changes. |
 | `accountDataIntervalSeconds` | `5` | Minimum seconds between account data changes, 0 to 86400; 0 records every observed change. Session changes are immediate. |
+| `fleetRetention` | Per-stream defaults | Per-account record limits. When a stream reaches `maxRecords`, the oldest `pruneRecords` are deleted. Set both to 0 for a stream to disable pruning. |
+
+`fleetRetention` contains `accountData`, `experience`, `bank`, `inventory` and `equipment`
+objects, each with `maxRecords` and `pruneRecords`. The default maximum/prune pairs are
+10,000/1,000 for account data and experience, 1,000/100 for bank and equipment, and
+5,000/500 for inventory. `maxRecords` must be positive with `0 < pruneRecords < maxRecords`,
+or both values must be 0 to disable pruning. Counts are per account and stream, not global
+across the database. Client processes sharing a database should use the same retention settings.
 
 The database and its parent directory are created when needed. Use distinct account names when separate
 clients write to the same database; `(account name, stream)` is the storage identity. Database write

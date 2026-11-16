@@ -179,6 +179,174 @@ TEST_CASE("FleetDatabase stores item names once across snapshots", "[FleetDataba
     CHECK_FALSE(items.executeStep());
 }
 
+TEST_CASE("FleetDatabase prunes oldest records per account and stream", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-retention"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto retention = FleetRetentionSettings_s{};
+    retention.experience = FleetRecordRetention_s{3, 1};
+    retention.bank = FleetRecordRetention_s{2, 1};
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline, retention};
+
+    database.Append(Record("bot1", "2026-01-01T00:00:00Z", 1));
+    database.Append(Record("bot1", "2026-01-01T00:00:01Z", 2));
+    database.Append(Record("bot1", "2026-01-01T00:00:02Z", 3));
+    database.Append(Record("bot1", "2026-01-01T00:00:03Z", 4));
+    database.Append(Record("bot2", "2026-01-01T00:00:00Z", 5));
+
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 1}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot2",
+        .items = {{.id = 995, .name = "Coins", .qty = 2}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:01Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 3}}});
+    database.Append(FleetBankLog_s{
+        .time = "2026-01-01T00:00:02Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 4}}});
+
+    auto reader = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    auto experiences = SQLite::Statement{
+        reader,
+        "SELECT accounts.name, skills.xp FROM fleet_records AS records "
+        "JOIN fleet_accounts AS accounts ON accounts.id = records.account_id "
+        "JOIN fleet_experience_skills AS skills ON skills.record_id = records.sequence "
+        "ORDER BY accounts.name, records.sequence"};
+    REQUIRE(experiences.executeStep());
+    CHECK(experiences.getColumn(0).getString() == "bot1");
+    CHECK(experiences.getColumn(1).getInt() == 3);
+    REQUIRE(experiences.executeStep());
+    CHECK(experiences.getColumn(1).getInt() == 4);
+    REQUIRE(experiences.executeStep());
+    CHECK(experiences.getColumn(0).getString() == "bot2");
+    CHECK(experiences.getColumn(1).getInt() == 5);
+    CHECK_FALSE(experiences.executeStep());
+
+    auto bank = SQLite::Statement{
+        reader,
+        "SELECT accounts.name, items.quantity FROM fleet_bank_items AS items "
+        "JOIN fleet_records AS records ON records.sequence = items.record_id "
+        "JOIN fleet_accounts AS accounts ON accounts.id = records.account_id "
+        "ORDER BY accounts.name, records.sequence"};
+    REQUIRE(bank.executeStep());
+    CHECK(bank.getColumn(0).getString() == "bot1");
+    CHECK(bank.getColumn(1).getInt() == 4);
+    REQUIRE(bank.executeStep());
+    CHECK(bank.getColumn(0).getString() == "bot2");
+    CHECK(bank.getColumn(1).getInt() == 2);
+    CHECK_FALSE(bank.executeStep());
+
+    auto counts = SQLite::Statement{
+        reader,
+        "SELECT "
+        "(SELECT COUNT(*) FROM fleet_bank), "
+        "(SELECT COUNT(*) FROM fleet_bank_items), "
+        "(SELECT COUNT(*) FROM fleet_records)"};
+    REQUIRE(counts.executeStep());
+    CHECK(counts.getColumn(0).getInt() == 2);
+    CHECK(counts.getColumn(1).getInt() == 2);
+    CHECK(counts.getColumn(2).getInt() == 5);
+}
+
+TEST_CASE("FleetDatabase handles pruning multiple chunks after a batched write", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-retention-batch"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto retention = FleetRetentionSettings_s{};
+    retention.experience = FleetRecordRetention_s{3, 1};
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Background, retention};
+    auto completions = std::vector<std::future<void>>{};
+
+    for (auto i = 1; i <= 20; ++i)
+    {
+        auto completion = database.Enqueue(Record("bot1", std::format("2026-01-01T00:00:{:02}Z", i), i));
+        REQUIRE(completion);
+        completions.push_back(std::move(*completion));
+    }
+
+    database.Flush();
+    for (auto& completion : completions)
+    {
+        CHECK_NOTHROW(completion.get());
+    }
+
+    auto reader = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    CHECK(RecordCount(reader) == 2);
+    auto latest = SQLite::Statement{
+        reader,
+        "SELECT skills.xp FROM fleet_records AS records "
+        "JOIN fleet_experience_skills AS skills ON skills.record_id = records.sequence "
+        "ORDER BY records.sequence"};
+    REQUIRE(latest.executeStep());
+    CHECK(latest.getColumn(0).getInt() == 19);
+    REQUIRE(latest.executeStep());
+    CHECK(latest.getColumn(0).getInt() == 20);
+    CHECK_FALSE(latest.executeStep());
+}
+
+TEST_CASE("FleetDatabase retention can be disabled for an individual stream", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-retention-disabled"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto retention = FleetRetentionSettings_s{};
+    retention.experience = FleetRecordRetention_s{0, 0};
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline, retention};
+
+    for (auto i = 1; i <= 5; ++i)
+    {
+        database.Append(Record("bot1", std::format("2026-01-01T00:00:0{}Z", i), i));
+    }
+
+    auto reader = SQLite::Database{path.string(), SQLite::OPEN_READONLY};
+    CHECK(RecordCount(reader) == 5);
+}
+
+TEST_CASE("FleetDatabase rolls back a write when pruning fails", "[FleetDatabase]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-database-retention-rollback"};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    auto retention = FleetRetentionSettings_s{};
+    retention.bank = FleetRecordRetention_s{2, 1};
+    auto database = FleetDatabase{path, FleetDatabase::Mode_e::Inline, retention};
+    const auto first = FleetBankLog_s{
+        .time = "2026-01-01T00:00:00Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 1}}};
+    const auto second = FleetBankLog_s{
+        .time = "2026-01-01T00:00:01Z",
+        .account = "bot1",
+        .items = {{.id = 995, .name = "Coins", .qty = 2}}};
+    database.Append(first);
+
+    auto external = SQLite::Database{path.string(), SQLite::OPEN_READWRITE};
+    external.exec(
+        "CREATE TRIGGER reject_record_delete BEFORE DELETE ON fleet_records "
+        "BEGIN SELECT RAISE(ABORT, 'test rejection'); END");
+    CHECK_THROWS(database.Append(second));
+    CHECK(RecordCount(external) == 1);
+    {
+        auto items = SQLite::Statement{external, "SELECT COUNT(*) FROM fleet_bank_items"};
+        REQUIRE(items.executeStep());
+        CHECK(items.getColumn(0).getInt() == 1);
+    }
+
+    external.exec("DROP TRIGGER reject_record_delete");
+    database.Append(second);
+    auto retained = SQLite::Statement{
+        external,
+        "SELECT items.quantity FROM fleet_bank_items AS items "
+        "JOIN fleet_records AS records ON records.sequence = items.record_id"};
+    REQUIRE(retained.executeStep());
+    CHECK(retained.getColumn(0).getInt() == 2);
+    CHECK_FALSE(retained.executeStep());
+}
+
 TEST_CASE("FleetDatabase rolls back a snapshot when child rows fail", "[FleetDatabase]")
 {
     const auto folder = TempFolder{"rs2004-fleet-database-rollback"};

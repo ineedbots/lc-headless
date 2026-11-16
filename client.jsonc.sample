@@ -57,7 +57,16 @@
         // 0 records every backpack change; otherwise 1 to 86400 seconds.
         "inventoryIntervalSeconds": 5,
         // 0 records every account data change; otherwise 1 to 86400 seconds.
-        "accountDataIntervalSeconds": 5
+        "accountDataIntervalSeconds": 5,
+        // Per-account, per-stream record retention. Once maxRecords is reached,
+        // prune the oldest pruneRecords rows. Set both values to 0 to disable pruning.
+        "fleetRetention": {
+            "accountData": { "maxRecords": 10000, "pruneRecords": 1000 },
+            "experience": { "maxRecords": 10000, "pruneRecords": 1000 },
+            "bank": { "maxRecords": 1000, "pruneRecords": 100 },
+            "inventory": { "maxRecords": 5000, "pruneRecords": 500 },
+            "equipment": { "maxRecords": 1000, "pruneRecords": 100 }
+        }
     },
     "http": {
         // Empty disables REST and WebSocket events; use 127.0.0.1 for local operator access.

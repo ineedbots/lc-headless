@@ -37,6 +37,31 @@ namespace
         throw std::invalid_argument{"unknown fleet stream"};
     }
 
+    FleetStream_e StreamForRecord(const FleetAccountDataLog_s&)
+    {
+        return FleetStream_e::AccountData;
+    }
+
+    FleetStream_e StreamForRecord(const FleetExperienceLog_s&)
+    {
+        return FleetStream_e::Experience;
+    }
+
+    FleetStream_e StreamForRecord(const FleetBankLog_s&)
+    {
+        return FleetStream_e::Bank;
+    }
+
+    FleetStream_e StreamForRecord(const FleetInventoryLog_s&)
+    {
+        return FleetStream_e::Inventory;
+    }
+
+    FleetStream_e StreamForRecord(const FleetEquipmentLog_s&)
+    {
+        return FleetStream_e::Equipment;
+    }
+
     std::string SanitizeUtf8(std::string_view text)
     {
         const auto encoded = nlohmann::json(std::string{text}).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
@@ -240,10 +265,26 @@ namespace
     }
 }
 
-FleetDatabase::FleetDatabase(std::filesystem::path path, Mode_e mode)
+FleetDatabase::FleetDatabase(std::filesystem::path path, Mode_e mode, FleetRetentionSettings_s retention)
     : m_path{std::move(path)}
     , m_mode{mode}
+    , m_retention{std::move(retention)}
 {
+    const auto validateRetention = [](const FleetRecordRetention_s& retention)
+    {
+        return retention.maxRecords >= 0 && retention.pruneRecords >= 0 &&
+            ((retention.maxRecords == 0 && retention.pruneRecords == 0) ||
+             (retention.maxRecords > 0 && retention.pruneRecords > 0 && retention.pruneRecords < retention.maxRecords));
+    };
+    if (!validateRetention(m_retention.accountData) ||
+        !validateRetention(m_retention.experience) ||
+        !validateRetention(m_retention.bank) ||
+        !validateRetention(m_retention.inventory) ||
+        !validateRetention(m_retention.equipment))
+    {
+        throw std::invalid_argument{"fleet retention limits must both be zero to disable pruning, or pruneRecords must be less than a positive maxRecords"};
+    }
+
     if (m_mode == Mode_e::Background)
     {
         m_worker = std::thread{[this]
@@ -403,12 +444,25 @@ void FleetDatabase::WriteBatch(std::vector<PendingWrite_s> writes)
     {
         EnsureOpen();
         auto transaction = SQLite::Transaction{*m_database};
+
+        auto touchedStreams = std::vector<std::pair<std::string, FleetStream_e>>{};
         for (const auto& write : writes)
         {
-            std::visit([this](const auto& record)
+            std::visit([this, &touchedStreams](const auto& record)
             {
                 Write(record);
+
+                const auto touched = std::pair{record.account, StreamForRecord(record)};
+                if (std::ranges::find(touchedStreams, touched) == touchedStreams.end())
+                {
+                    touchedStreams.push_back(touched);
+                }
             }, write.record);
+        }
+
+        for (const auto& [account, stream] : touchedStreams)
+        {
+            Prune(account, stream);
         }
 
         transaction.commit();
@@ -562,6 +616,75 @@ void FleetDatabase::Write(const FleetEquipmentLog_s& record)
     }
 
     InsertItems(*m_database, m_itemNameIds, "fleet_equipment_items", recordId, record.items);
+}
+
+void FleetDatabase::Prune(std::string_view account, FleetStream_e stream)
+{
+    const auto& retention = [&]() -> const FleetRecordRetention_s&
+    {
+        switch (stream)
+        {
+        case FleetStream_e::AccountData:
+            return m_retention.accountData;
+        case FleetStream_e::Experience:
+            return m_retention.experience;
+        case FleetStream_e::Bank:
+            return m_retention.bank;
+        case FleetStream_e::Inventory:
+            return m_retention.inventory;
+        case FleetStream_e::Equipment:
+            return m_retention.equipment;
+        }
+
+        throw std::invalid_argument{"unknown fleet stream"};
+    }();
+    if (retention.maxRecords == 0)
+    {
+        return;
+    }
+
+    auto accountId = s64{};
+    {
+        auto statement = SQLite::Statement{*m_database, "SELECT id FROM fleet_accounts WHERE name = ?"};
+        statement.bind(1, std::string{account});
+        if (!statement.executeStep())
+        {
+            throw std::runtime_error{"could not find fleet account while pruning records"};
+        }
+
+        accountId = statement.getColumn(0).getInt64();
+    }
+
+    const auto streamId = StringId(*m_database, m_streamIds, "fleet_streams", StreamName(stream));
+    auto count = s64{};
+    {
+        auto statement = SQLite::Statement{*m_database, "SELECT COUNT(*) FROM fleet_records WHERE account_id = ? AND stream_id = ?"};
+        statement.bind(1, accountId);
+        statement.bind(2, streamId);
+        if (!statement.executeStep())
+        {
+            throw std::runtime_error{"could not count fleet records while pruning"};
+        }
+
+        count = statement.getColumn(0).getInt64();
+    }
+
+    if (count < retention.maxRecords)
+    {
+        return;
+    }
+
+    const auto pruneRounds = (count - retention.maxRecords) / retention.pruneRecords + 1;
+    const auto deleteCount = pruneRounds * retention.pruneRecords;
+    auto deleteStatement = SQLite::Statement{
+        *m_database,
+        "DELETE FROM fleet_records WHERE sequence IN ("
+        "SELECT sequence FROM fleet_records WHERE account_id = ? AND stream_id = ? "
+        "ORDER BY sequence ASC LIMIT ?)"};
+    deleteStatement.bind(1, accountId);
+    deleteStatement.bind(2, streamId);
+    deleteStatement.bind(3, deleteCount);
+    deleteStatement.exec();
 }
 
 void FleetDatabase::EnsureOpen()

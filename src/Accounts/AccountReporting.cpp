@@ -24,7 +24,7 @@ AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s
     const auto experienceEnabled = scripting.experienceLogEnabled && scripting.experienceIntervalMinutes > std::chrono::minutes::zero();
     if (!scripting.fleetDatabasePath.empty() && (scripting.accountDataLogEnabled || experienceEnabled || scripting.bankLogEnabled || scripting.inventoryLogEnabled || scripting.equipmentLogEnabled))
     {
-        m_fleetDatabase = databaseProvider ? databaseProvider(scripting.fleetDatabasePath) : std::make_shared<FleetDatabase>(scripting.fleetDatabasePath, FleetDatabase::Mode_e::Inline);
+        m_fleetDatabase = databaseProvider ? databaseProvider(scripting.fleetDatabasePath) : std::make_shared<FleetDatabase>(scripting.fleetDatabasePath, FleetDatabase::Mode_e::Inline, scripting.fleetRetention);
     }
 
     if (m_fleetDatabase && scripting.accountDataLogEnabled)

@@ -276,8 +276,26 @@ folders are ignored by Git. If you choose a custom database path, add it to `.gi
 
 ## Log maintenance
 
-History is retained indefinitely; there is no automatic row-retention policy. The compactor still trims
-console logs and can checkpoint a fleet database. Stop all writers before maintenance:
+Fleet history is pruned automatically per account and stream according to the
+`scripting.fleetRetention` limits. After each write batch, once an account's
+stream reaches its configured maximum, the oldest records by insertion sequence
+are deleted in prune-sized batches. If a batch overshoots the maximum by more
+than one prune amount, enough oldest records are removed to bring the count below
+the maximum. Related snapshot and child rows are removed by foreign-key cascade
+in the same transaction as the write.
+The defaults retain up to 10,000 account-data and experience records, 1,000 bank
+and equipment records, and 5,000 inventory records per account. Each pruning
+amount is 10% of its stream's maximum. Set both `maxRecords` and
+`pruneRecords` to `0` for a stream to disable pruning.
+Limits count parent records, not child rows or bytes, so snapshots of different
+sizes still consume different amounts of storage. The writer checks only the
+account/stream pairs touched by a write batch; a changed limit takes effect the
+next time that account writes to the stream.
+
+Pruning limits retained rows but does not necessarily shrink the SQLite file
+immediately: SQLite can reuse the freed pages. The compactor can checkpoint the
+WAL and optionally run `VACUUM` to reclaim free pages from the main database.
+Stop all writers before manual maintenance:
 
 ```sh
 python3 tools/fleet/compact_logs.py --database data/fleet.sqlite --dry-run
