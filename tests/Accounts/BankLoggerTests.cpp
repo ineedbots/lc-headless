@@ -133,6 +133,18 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         state.interfaces.mainModal = BANK_ROOT;
         fixture.log.Step(state);
         CHECK_FALSE(std::filesystem::exists(fixture.Records()));
+        CHECK(std::ranges::count_if(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+        {
+            return entry.level == LogLevel_e::Info &&
+                entry.message == "Bank opened before its inventory arrived; waiting for inventory data";
+        }) == 1);
+
+        fixture.log.Step(state);
+        CHECK(std::ranges::count_if(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+        {
+            return entry.level == LogLevel_e::Info &&
+                entry.message == "Bank opened before its inventory arrived; waiting for inventory data";
+        }) == 1);
 
         state.inventories[BANK_ITEMS] = Inventory_s{.com = BANK_ITEMS, .slots = {{.id = COINS, .count = 7}}};
         fixture.log.Step(state);

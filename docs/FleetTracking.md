@@ -141,9 +141,10 @@ explicitly. Existing JSONL history remains untouched and is not read by the new 
 ```
 
 - Captured on the **closed → open** edge, once the bank inventory has arrived. If the interface opens
-  first, the logger waits for its inventory while it stays open. Deposits and withdrawals made after
-  that snapshot aren't re-recorded; the next open catches them. Failed database writes retry from the
-  pending snapshot on later account steps and don't require another bank opening.
+  first, an info log notes that the logger is waiting for its inventory while it stays open. Deposits
+  and withdrawals made after that snapshot aren't re-recorded; the next open catches them. Failed
+  database writes retry from the pending snapshot on later account steps and don't require another
+  bank opening.
 - Items are grouped by id, in id order.
 
 ## Inventory and equipment

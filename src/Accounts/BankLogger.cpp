@@ -21,12 +21,13 @@ void BankLogger::Step(Clock::time_point now, const GameState_s& state)
     Poll(now);
 
     const auto open = GameStateQueries::IsBankOpen(m_cache, state);
+    const auto justOpened = open && !m_wasOpen;
     if (!open)
     {
         m_waitingForBankInventory = false;
     }
 
-    if (open && !m_wasOpen)
+    if (justOpened)
     {
         m_waitingForBankInventory = true;
     }
@@ -51,6 +52,10 @@ void BankLogger::Step(Clock::time_point now, const GameState_s& state)
                 }
 
                 m_waitingForBankInventory = false;
+            }
+            else if (justOpened)
+            {
+                m_logger->Info("Bank opened before its inventory arrived; waiting for inventory data");
             }
         }
         catch (const std::exception& e)
