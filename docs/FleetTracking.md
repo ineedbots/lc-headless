@@ -140,8 +140,10 @@ explicitly. Existing JSONL history remains untouched and is not read by the new 
 {"time":"2026-10-27T13:20:26Z","account":"s18","items":[{"id":995,"name":"Coins","qty":109},{"id":1891,"name":"Cake","qty":4856},…]}
 ```
 
-- Written on the **closed → open** edge only. Deposits and withdrawals made while the bank stays open
-  aren't re-recorded, so each record is the bank as it was when it opened, and the next open catches up.
+- Captured on the **closed → open** edge, once the bank inventory has arrived. If the interface opens
+  first, the logger waits for its inventory while it stays open. Deposits and withdrawals made after
+  that snapshot aren't re-recorded; the next open catches them. Failed database writes retry from the
+  pending snapshot on later account steps and don't require another bank opening.
 - Items are grouped by id, in id order.
 
 ## Inventory and equipment

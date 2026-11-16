@@ -21,7 +21,17 @@ void BankLogger::Step(Clock::time_point now, const GameState_s& state)
     Poll(now);
 
     const auto open = GameStateQueries::IsBankOpen(m_cache, state);
+    if (!open)
+    {
+        m_waitingForBankInventory = false;
+    }
+
     if (open && !m_wasOpen)
+    {
+        m_waitingForBankInventory = true;
+    }
+
+    if (open && m_waitingForBankInventory)
     {
         try
         {
@@ -39,6 +49,8 @@ void BankLogger::Step(Clock::time_point now, const GameState_s& state)
                 {
                     m_pendingSnapshots.push_back(std::move(*snapshot));
                 }
+
+                m_waitingForBankInventory = false;
             }
         }
         catch (const std::exception& e)

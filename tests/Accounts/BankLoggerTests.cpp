@@ -125,6 +125,22 @@ TEST_CASE("BankLogger writes the bank's contents each time one opens", "[BankLog
         CHECK(latest.find(R"("id":-1)") == std::string::npos);
     }
 
+    SECTION("waits for the bank inventory after the bank opens")
+    {
+        auto fixture = BankFixture{};
+        auto state = GameState_s{};
+        state.placed = true;
+        state.interfaces.mainModal = BANK_ROOT;
+        fixture.log.Step(state);
+        CHECK_FALSE(std::filesystem::exists(fixture.Records()));
+
+        state.inventories[BANK_ITEMS] = Inventory_s{.com = BANK_ITEMS, .slots = {{.id = COINS, .count = 7}}};
+        fixture.log.Step(state);
+
+        CHECK(CountRecords(fixture.Records()) == 1);
+        CHECK(fixture.Latest().find(R"("qty":7)") != std::string::npos);
+    }
+
     SECTION("staying open records once, and a reopen records again")
     {
         auto fixture = BankFixture{};
