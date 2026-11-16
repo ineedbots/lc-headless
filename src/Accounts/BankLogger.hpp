@@ -52,6 +52,7 @@ private:
     std::string m_accountName;
     std::shared_ptr<FleetDatabase> m_database;
     bool m_wasOpen = false;
+    bool m_waitingForBankInventory = false;
     // So a folder that can't be written is reported once, not on every open.
     bool m_writeFailed = false;
     std::optional<Clock::time_point> m_retryAt;
