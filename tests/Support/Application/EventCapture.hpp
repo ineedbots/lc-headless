@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Application/Events/ApplicationEventPublisher.hpp"
-#include "Application/Events/Type/ApplicationEvent_s.hpp"
+#include "Websockets/Events/ApplicationEventPublisher.hpp"
+#include "Websockets/Events/Type/ApplicationEvent_s.hpp"
 
 class EventCapture : public ApplicationEventPublisher
 {

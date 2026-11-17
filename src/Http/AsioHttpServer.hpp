@@ -2,7 +2,7 @@
 
 #include "HttpServer.hpp"
 #include "HttpRouter.hpp"
-#include "../Application/Events/ApplicationEventBridge.hpp"
+#include "Websockets/Events/ApplicationEventBridge.hpp"
 #include <boost/asio/io_context.hpp>
 
 class AsioHttpServer : public HttpServer

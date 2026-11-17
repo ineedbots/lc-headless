@@ -87,8 +87,9 @@ rs2004-headless/
 │   ├── Accounts/
 │   │   ├── Account.hpp/.cpp        GameClient + ScriptHost + named logger, and its lifecycle
 │   │   ├── AccountRunner.hpp/.cpp  the main loop over every account, and Ctrl+C
-│   │   ├── ProgressReporter.hpp/.cpp  when a progress report is due (§12)
-│   │   └── ProgressReportFile.hpp/.cpp  writes progress reports (§12)
+│   │   └── Reporting/
+│   │       ├── ProgressReporter.hpp/.cpp  when a progress report is due (§12)
+│   │       └── ProgressReportFile.hpp/.cpp  writes progress reports (§12)
 │   └── Game/State/
 │       └── GameEvent_s.hpp         new: the event variant
 └── tests/
@@ -637,7 +638,7 @@ validates script arguments. `ScriptHooks` handles hook calls; `EventDispatcher` 
 backpack delivery. The host retains loading/reloading, login synchronization, upkeep, ticks and loops.
 `ScriptContext` constructs query views on demand rather than maintaining a forwarding `ScriptApi` facade.
 
-`Accounts/ProgressReporter` owns report scheduling, formatting and file output. `Account::StepScript`
+`Accounts/Reporting/ProgressReporter` owns report scheduling, formatting and file output. `Account::StepScript`
 requests a due report after the complete `ScriptHost::Step` and before network flush, so it includes that
 loop's counters and its packets leave in the same pass. A zero interval disables reporting. The first
 report is due one interval after script start; a due report waits until the script is active/in game,

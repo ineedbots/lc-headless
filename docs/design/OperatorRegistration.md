@@ -72,8 +72,8 @@ and error IDs remain explicit JSON nulls.
 
 ## WebSocket application events
 
-`src/Application/Events/Type/ApplicationEvents_s.hpp` is the event list. An event
-definition under `Events/Definitions/` provides:
+`src/Websockets/Events/Type/ApplicationEvents_s.hpp` is the event list. An event
+definition under `src/Websockets/Events/Definitions/` provides:
 
 - `Payload`: its owned application value type.
 - `NAME`: unique public subscription name.

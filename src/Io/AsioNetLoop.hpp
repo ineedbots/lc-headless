@@ -4,7 +4,7 @@
 #include "Type/ConnectionOptions_s.hpp"
 #include "Link.hpp"
 #include "NetLoop.hpp"
-#include "../Application/Events/ApplicationEventBridge.hpp"
+#include "Websockets/Events/ApplicationEventBridge.hpp"
 
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/io_context.hpp>

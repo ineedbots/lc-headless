@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "ScriptHost.hpp"
 
-#include "../../Accounts/Type/ProgressReport_s.hpp"
+#include "Accounts/Reporting/Type/ProgressReport_s.hpp"
 #include "../../Cache/Type/GameCache_s.hpp"
 #include "../../Console/Logger.hpp"
 #include "../../Game/GameClient.hpp"

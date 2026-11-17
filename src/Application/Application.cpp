@@ -24,7 +24,7 @@
 #include "CommandLine.hpp"
 #include "InterruptSignal.hpp"
 #include "ApplicationRequestProcessor.hpp"
-#include "Events/ApplicationEventBridge.hpp"
+#include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "Type/ApplicationStarted_s.hpp"
 #include "EntryPoint.hpp"
 

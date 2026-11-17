@@ -8,6 +8,13 @@ thread, context, or listener exists.
 
 ## Ownership and extension
 
+`src/Websockets/` groups the operator WebSocket session and its buffered upgrade
+stream. `Events/` contains the publisher, bridge, subscription protocol, event
+definitions and types. The HTTP listener and upgrade route remain under
+`src/Http/`; game-server WebSocket transports remain under `src/Io/` alongside
+TCP, TLS and proxy handling. Game-state and script hook events stay in their
+respective subsystems.
+
 ```mermaid
 flowchart LR
     Reporter[ProgressReporter: owned report] --> Bridge[ApplicationEventBridge: bounded journal]
@@ -50,7 +57,7 @@ coalesced frames without feeding headers back through Beast's smaller internal
 handshake buffer. Its teardown customization forwards to the owned TCP stream.
 
 To extend the catalog, follow [Registering operator HTTP endpoints and events](OperatorRegistration.md).
-The typed catalog in `Type/ApplicationEvents_s.hpp` derives the payload variant,
+The typed catalog in `src/Websockets/Events/Type/ApplicationEvents_s.hpp` derives the payload variant,
 name validation, serializer and retention dispatch from per-event definitions.
 `AccountOptions_s::events` supplies one shared publisher for all account events;
 publication validates borrowed values before copying into the bounded journal.

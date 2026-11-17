@@ -4,7 +4,7 @@
 #include "Type/ConnectionOptions_s.hpp"
 #include "Link.hpp"
 #include "../Http/HttpServer.hpp"
-#include "../Application/Events/ApplicationEventBridge.hpp"
+#include "Websockets/Events/ApplicationEventBridge.hpp"
 
 // Every link a loop opens does its I/O on the thread that runs the loop: in Poll, Wait and Settle, and so in a
 // Connection's Pump and waits. Wake is the only member another thread may call. Abstract so that no shared header

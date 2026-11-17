@@ -16,8 +16,8 @@
 #include "../Script/Type/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "AccountLifecycle.hpp"
-#include "AccountReporting.hpp"
-#include "../Application/Events/ApplicationEventPublisher.hpp"
+#include "Accounts/Reporting/AccountReporting.hpp"
+#include "Websockets/Events/ApplicationEventPublisher.hpp"
 
 struct AccountOptions_s
 {

@@ -16,7 +16,7 @@
 #include "BotMessenger.hpp"
 #include "ScriptActions.hpp"
 #include "ScriptControl.hpp"
-#include "../Application/Events/ApplicationEventPublisher.hpp"
+#include "Websockets/Events/ApplicationEventPublisher.hpp"
 
 // What one VM's bindings reach: the tracked state and map, read through the Game queries; the script's actions;
 // its requests to its host; and the other accounts' scripts. The bindings find it by the VM they run in.
