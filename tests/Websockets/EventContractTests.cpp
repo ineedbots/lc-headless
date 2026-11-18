@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
 #include "Accounts/Reporting/Type/ProgressReport_s.hpp"
+#include "Accounts/Reporting/Type/IdleSummary_s.hpp"
 #include "Accounts/Type/AccountLogout_s.hpp"
 #include "Application/Type/ApplicationStarted_s.hpp"
 #include "Database/Type/FleetAccountDataLog_s.hpp"
@@ -36,6 +37,7 @@ TEST_CASE("Registered event envelopes preserve each public payload schema and em
 {
     const auto contracts = std::vector<EventContract_s>{
         {ProgressReport_s{60s, {}}, "account.progress", {{"runTimeSeconds", 60}, {"rows", Json::array()}}},
+        {IdleSummary_s{}, "account.idle-summary", {{"tick", 0}, {"pid", 0}, {"tile", {{"x", 0}, {"z", 0}, {"level", 0}}}, {"hitpoints", {{"current", 0}, {"base", 0}}}, {"runEnergy", 0}, {"weight", 0}, {"inView", {{"players", 0}, {"npcs", 0}, {"groundItems", 0}, {"changedLocs", 0}, {"inventories", 0}, {"varps", 0}}}, {"nearestNpcs", Json::array()}, {"interfaces", {{"main", -1}, {"side", -1}, {"chat", -1}, {"overlay", -1}}}}},
         {AccountLogout_s{false}, "account.logout", {{"confirmed", false}}},
         {ApplicationStarted_s{}, "application.started", Json::object()},
         {PublishedScriptEvent_s{"custom", "null"}, "script.event", {{"name", "custom"}, {"data", nullptr}}},

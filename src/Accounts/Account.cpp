@@ -18,6 +18,7 @@
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
 #include "Accounts/Reporting/IdleSummary.hpp"
+#include "Accounts/Reporting/Type/IdleSummary_s.hpp"
 #include "AccountLifecycle.hpp"
 #include "Accounts/Reporting/AccountReporting.hpp"
 #include "Type/AccountPhase_e.hpp"
@@ -483,8 +484,14 @@ void Account::StepIdle(Clock::time_point now)
         return;
     }
 
-    IdleSummary::Log(*m_logger, m_client.GetState());
+    const auto summary = IdleSummary::Capture(m_client.GetState());
+    IdleSummary::Log(*m_logger, summary);
     m_nextSummary = now + SUMMARY_INTERVAL;
+
+    if (m_options.events)
+    {
+        m_options.events->Publish(m_account.name, summary);
+    }
 }
 
 void Account::AddSettingDefaults(std::string_view botName, std::string_view settingsJson)

@@ -1,6 +1,6 @@
 # Running
 
-[Back to README](../README.md) Ãƒâ€šÃ‚Â· [Features](Features.md) Ãƒâ€šÃ‚Â· [Requirements](Requirements.md) Ãƒâ€šÃ‚Â· [Configuration](Configuration.md) Ãƒâ€šÃ‚Â· [Building](Building.md)
+[Back to README](../README.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Features](Features.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Requirements](Requirements.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Configuration](Configuration.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Building](Building.md)
 
 ## First login
 
@@ -150,6 +150,23 @@ Send JSON text:
 ```json
 {"version":1,"type":"subscribe","id":"progress","events":["account.progress"],"accounts":["bot1"]}
 ```
+
+Accounts without a script also publish `account.idle-summary` on the same ten-second
+schedule as their console summaries, while in game and before idle logout. Subscribe with:
+
+```json
+{"version":1,"type":"subscribe","id":"idle","events":["account.idle-summary"],"accounts":["bot1"]}
+```
+
+The payload contains `tick`, `pid`, `tile: {x, z, level}`,
+`hitpoints: {current, base}`, `runEnergy` (percent), `weight` (kg),
+`inView: {players, npcs, groundItems, changedLocs, inventories, varps}`,
+`nearestNpcs` (up to five `{index, type, distance}` entries, nearest first;
+distance is in tiles), and `interfaces: {main, side, chat, overlay}`.
+Absent interfaces use `-1`; no nearby NPCs produces an empty array.
+The latest sample per account is retained for snapshots. Its timestamp is the original
+publication time: a retained sample can predate logout or reconnect and does not imply
+the account is currently online. No script, progress-report setting or database is required.
 
 Subscribe to logout completion on the same endpoint:
 

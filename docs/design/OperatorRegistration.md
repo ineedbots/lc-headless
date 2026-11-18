@@ -178,3 +178,9 @@ serialize it as an object payload. Producers publish typed records only after
 database commit. Item names use the same UTF-8 replacement policy for storage
 and event serialization. The four fleet event types are account-scoped
 and live only; they share validation without sharing a subscription name.
+
+`account.idle-summary` uses the reporting-owned `IdleSummary_s` value. The account
+captures it once for both console output and event publication on the existing
+idle-summary schedule. Its definition bounds the nearest-NPC vector to five entries,
+retains the latest sample per account and reserves a 4096-byte full envelope.
+Retained samples preserve publication timestamps and can outlive the active session.
