@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Type/IdleSummary_s.hpp"
 #include "Console/Logger.hpp"
 #include "Game/State/Type/GameState_s.hpp"
 
@@ -9,5 +10,6 @@ class IdleSummary
 public:
     IdleSummary() = delete;
 
-    static void Log(Logger& logger, const GameState_s& state);
+    static IdleSummary_s Capture(const GameState_s& state);
+    static void Log(Logger& logger, const IdleSummary_s& summary);
 };

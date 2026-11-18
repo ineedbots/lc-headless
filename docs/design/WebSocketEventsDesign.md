@@ -189,10 +189,28 @@ does not emit completion.
 
 Logout events participate in the same journal, filtering, sequence and fan-out as
 progress. They are live only: `RetainsLatest` excludes them from `m_latest`, so
-snapshots contain at most 16 progress envelopes plus one global startup envelope.
+snapshots contain at most 16 progress envelopes, 16 idle-summary envelopes and one global startup envelope.
 Subscribers receive no historical logout after reconnect, and shutdown delivery remains best effort under
 the existing bounded drain. Logout notifications require neither scripts nor
 progress-report configuration.
+
+## Idle summaries
+
+`account.idle-summary` carries an owned `Accounts/Reporting/Type/IdleSummary_s`
+captured at `Account::StepIdle`'s existing ten-second safe point. `IdleSummary::Capture`
+selects at most five nearest NPCs, and both console logging and publication use that
+same captured value. It runs only for in-game accounts without scripts, after the
+idle-expiry check. There is no database or progress-report dependency, and the
+existing console text and scheduling remain unchanged.
+
+The payload mirrors all four console lines as structured values; see
+[Running](../Running.md#live-progress-events) for fields and units. The definition
+validates the NPC count before copying, accounts for the bounded vector storage,
+and allows a 4096-byte full envelope. Numeric-only fields and at most five NPCs
+bound serialization independently of world population. It retains the latest
+sample per account through the normal journal, filters and snapshot mechanism.
+Retention is historical: no clearing or new sample is implied by logout, reconnect
+or script activity; clients should use the envelope timestamp to judge freshness.
 
 ## Bounds and servicing
 
@@ -202,8 +220,9 @@ per connection 64 messages/256 KiB including the in-flight message. Each envelop
 is at most 8192 serialized bytes; reports are limited to 64 rows and 4096 total
 raw string bytes before copying. Account identities are bounded to 128 bytes and
 the snapshot registry to 16 configured accounts. The current catalog's maximum
-snapshot is 16 progress envelopes (8192 bytes each) and one global startup envelope
-(512 bytes), plus framing, below the outbound byte limit. Construction validates
+snapshot is 16 progress envelopes (8192 bytes each), 16 idle-summary envelopes
+(4096 bytes each) and one global startup envelope (512 bytes), plus framing, below
+the outbound byte limit. Construction validates
 the combined per-account and global retained-event budget for the configured fleet.
 These conservative fixed protocol limits are not claims of measured fleet capacity.
 
@@ -221,7 +240,7 @@ One service pass processes at most 32 journal items and 256 recipient visits,
 continuing an event's fan-out before processing later journal entries. A single
 event is serialized once and shared immutably. With 128 connections, worst-case
 fan-out is 128 visits/event, with at most 16 filter checks/visit. Snapshot building
-visits at most 16 retained account entries plus one global entry with the current
+visits at most 32 retained account entries plus one global entry with the current
 catalog, and serializes one bounded frame. Pending journal work
 prevents the runner from sleeping.
 

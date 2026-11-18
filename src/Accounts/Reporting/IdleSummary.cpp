@@ -1,56 +1,75 @@
 #include "pch.hpp"
 #include "IdleSummary.hpp"
 
+#include "Type/IdleSummaryNpc_s.hpp"
+#include "Type/IdleSummary_s.hpp"
 #include "Console/Logger.hpp"
 #include "Game/State/Type/GameState_s.hpp"
+#include "Game/State/Type/Interfaces_s.hpp"
 #include "Game/State/Type/Npc_s.hpp"
 #include "Game/State/Type/Stat_e.hpp"
 #include "Game/State/Type/Stat_s.hpp"
 #include "Game/Type/Tile_s.hpp"
 
-namespace
+IdleSummary_s IdleSummary::Capture(const GameState_s& state)
 {
-    constexpr auto NEAREST_NPC_COUNT = std::size_t{5};
-
-    std::string DescribeNearestNpcs(const GameState_s& state)
+    const auto& hitpoints = state.GetStat(Stat_e::Hitpoints);
+    const auto& interfaces = state.interfaces;
+    auto summary = IdleSummary_s{
+        .tick = state.tick,
+        .pid = state.pid,
+        .tile = state.localPlayer.tile,
+        .hitpoints = hitpoints.level,
+        .baseHitpoints = hitpoints.baseLevel,
+        .runEnergy = state.runEnergy,
+        .weight = state.runWeight,
+        .players = state.players.size(),
+        .npcs = state.npcs.size(),
+        .groundItems = state.groundItems.size(),
+        .changedLocs = state.locChanges.size(),
+        .inventories = state.inventories.size(),
+        .varps = state.varps.size(),
+        .mainInterface = interfaces.mainModal,
+        .sideInterface = interfaces.sideModal,
+        .chatInterface = interfaces.chatModal,
+        .overlayInterface = interfaces.overlay};
+    auto npcs = std::vector<const Npc_s*>{};
+    for (const auto& npc : state.npcs)
     {
-        auto npcs = std::vector<const Npc_s*>{};
-        for (const auto& npc : state.npcs)
-        {
-            npcs.push_back(&npc);
-        }
-
-        const auto& here = state.localPlayer.tile;
-        std::ranges::sort(npcs, {}, [&here](const Npc_s* npc)
-        {
-            return npc->tile.GetDistance(here);
-        });
-
-        auto text = std::string{};
-        for (const auto* const npc : npcs | std::views::take(NEAREST_NPC_COUNT))
-        {
-            if (!text.empty())
-            {
-                text += ", ";
-            }
-
-            std::format_to(std::back_inserter(text), "#{} type {} at {} tiles", npc->index, npc->type, npc->tile.GetDistance(here));
-        }
-
-        return text.empty() ? "none" : text;
+        npcs.push_back(&npc);
     }
+
+    const auto& here = summary.tile;
+    std::ranges::sort(npcs, {}, [&here](const Npc_s* npc)
+    {
+        return npc->tile.GetDistance(here);
+    });
+
+    for (const auto* const npc : npcs | std::views::take(IdleSummary_s::MAX_NEAREST_NPCS))
+    {
+        summary.nearestNpcs.push_back({npc->index, npc->type, npc->tile.GetDistance(here)});
+    }
+
+    return summary;
 }
 
-void IdleSummary::Log(Logger& logger, const GameState_s& state)
+void IdleSummary::Log(Logger& logger, const IdleSummary_s& summary)
 {
-    const auto& tile = state.localPlayer.tile;
-    const auto& hitpoints = state.GetStat(Stat_e::Hitpoints);
-    logger.Info("Tick {}: player {} at ({}, {}, {}), hitpoints {}/{}, run energy {}%, weight {} kg",
-                state.tick, state.pid, tile.x, tile.z, tile.level, hitpoints.level, hitpoints.baseLevel, state.runEnergy, state.runWeight);
-    logger.Info("In view: {} players, {} NPCs, {} ground items, {} changed locs; {} inventories, {} varps",
-                state.players.size(), state.npcs.size(), state.groundItems.size(), state.locChanges.size(), state.inventories.size(), state.varps.size());
-    logger.Info("Nearest NPCs: {}", DescribeNearestNpcs(state));
+    auto nearestNpcs = std::string{};
+    for (const auto& npc : summary.nearestNpcs)
+    {
+        if (!nearestNpcs.empty())
+        {
+            nearestNpcs += ", ";
+        }
 
-    const auto& interfaces = state.interfaces;
-    logger.Info("Interfaces: main {}, side {}, chat {}, overlay {}", interfaces.mainModal, interfaces.sideModal, interfaces.chatModal, interfaces.overlay);
+        std::format_to(std::back_inserter(nearestNpcs), "#{} type {} at {} tiles", npc.index, npc.type, npc.distance);
+    }
+
+    logger.Info("Tick {}: player {} at ({}, {}, {}), hitpoints {}/{}, run energy {}%, weight {} kg",
+                summary.tick, summary.pid, summary.tile.x, summary.tile.z, summary.tile.level, summary.hitpoints, summary.baseHitpoints, summary.runEnergy, summary.weight);
+    logger.Info("In view: {} players, {} NPCs, {} ground items, {} changed locs; {} inventories, {} varps",
+                summary.players, summary.npcs, summary.groundItems, summary.changedLocs, summary.inventories, summary.varps);
+    logger.Info("Nearest NPCs: {}", nearestNpcs.empty() ? "none" : nearestNpcs);
+    logger.Info("Interfaces: main {}, side {}, chat {}, overlay {}", summary.mainInterface, summary.sideInterface, summary.chatInterface, summary.overlayInterface);
 }

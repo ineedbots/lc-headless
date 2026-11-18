@@ -2,6 +2,7 @@
 #include "../Support/Application/EventCapture.hpp"
 #include "Websockets/Events/Type/ApplicationEvent_s.hpp"
 #include "Accounts/Type/AccountLogout_s.hpp"
+#include "Accounts/Reporting/Type/IdleSummary_s.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"
 #include "../Support/Io/FakeSocks5Proxy.hpp"
@@ -107,6 +108,34 @@ TEST_CASE("An account without a script idles until interrupted", "[Account]")
     const auto entries = fixture.capture.GetEntries();
     REQUIRE_FALSE(entries.empty());
     CHECK(entries.front().source == "bot1");
+}
+
+TEST_CASE("Idle accounts publish a summary only when the console summary is due", "[Account][Events][IdleSummary]")
+{
+    auto summaries = std::vector<IdleSummary_s>{};
+    auto events = std::make_shared<EventCapture>([&](const ApplicationEvent_s& event)
+    {
+        if (const auto* summary = std::get_if<IdleSummary_s>(&event.payload))
+        {
+            CHECK(event.account == "bot1");
+            summaries.push_back(*summary);
+        }
+    });
+    auto fixture = AccountFixture{std::nullopt, 30s, {.events = events}};
+    fixture.StepFor(200ms);
+    CHECK(summaries.empty());
+    fixture.StepFor(Account::SUMMARY_INTERVAL);
+    REQUIRE(summaries.size() == 1);
+    CHECK(summaries.front().pid == fixture.account->GetClient().GetState().pid);
+    CHECK(std::ranges::count_if(fixture.capture.GetEntries(), [](const CapturedLog_s& entry)
+    {
+        return entry.message.starts_with("Tick ");
+    }) == 1);
+    fixture.StepFor(100ms);
+    CHECK(summaries.size() == 1);
+    fixture.account->Interrupt();
+    REQUIRE(fixture.StepUntilFinished());
+    CHECK(summaries.size() == 1);
 }
 
 TEST_CASE("An account without a script logs out once its idleSeconds are up", "[Account]")
