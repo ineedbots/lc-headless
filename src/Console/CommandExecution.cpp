@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "CommandExecution.hpp"
 
+#include "Type/CommandRecipient_s.hpp"
+
 bool CommandExecution::CanExecute() const
 {
     return !abandoned && std::chrono::steady_clock::now() < deadline;

@@ -1,13 +1,13 @@
 #include "pch.hpp"
-#include "Application/ApplicationRequestProcessor.hpp"
+#include "Application/Requests/ApplicationRequestProcessor.hpp"
 #include "Config/ConfigJson.hpp"
 #include "Config/ConfigValidator.hpp"
 #include "Config/Error/ConfigError.hpp"
 #include "Console/LogSinks.hpp"
 #include "Io/AsioNetLoop.hpp"
-#include "../Support/Game/FakeGameServer.hpp"
-#include "../Support/Script/ScriptTestRuntime.hpp"
-#include "../Support/Script/HostFixture.hpp"
+#include "../../Support/Game/FakeGameServer.hpp"
+#include "../../Support/Script/ScriptTestRuntime.hpp"
+#include "../../Support/Script/HostFixture.hpp"
 #include <boost/asio/post.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>

@@ -4,7 +4,7 @@
 #include "Type/ApplicationRequest_s.hpp"
 #include "Type/CompletedApplicationRequest_s.hpp"
 #include "Type/RequestControl_s.hpp"
-#include "../Config/Type/HttpSettings_s.hpp"
+#include "../../Config/Type/HttpSettings_s.hpp"
 
 ApplicationRequestBridge::ApplicationRequestBridge(HttpSettings_s settings)
     : m_settings{std::move(settings)}

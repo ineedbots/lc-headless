@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Application/ApplicationRequestBridge.hpp"
+#include "Application/Requests/ApplicationRequestBridge.hpp"
 #include "Config/Type/HttpSettings_s.hpp"
 #include "Http/HttpRouter.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"

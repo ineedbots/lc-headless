@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Type/HttpResponse_s.hpp"
-#include "Application/Type/CompletedApplicationRequest_s.hpp"
+#include "Application/Requests/Type/CompletedApplicationRequest_s.hpp"
 #include <nlohmann/json.hpp>
 
 // Kept in the HTTP adapter; application and transport interfaces use owned values.

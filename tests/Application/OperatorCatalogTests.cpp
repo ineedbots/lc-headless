@@ -10,9 +10,9 @@
 #include "Websockets/Events/Definitions/ApplicationStartedEvent.hpp"
 #include "Websockets/Events/Type/EventCatalog_s.hpp"
 #include "Websockets/Events/Type/ApplicationEvent_s.hpp"
-#include "Application/Type/OperationCatalog_s.hpp"
-#include "Application/Type/ApplicationRequestContext_s.hpp"
-#include "Application/Type/RequestControl_s.hpp"
+#include "Application/Requests/Type/OperationCatalog_s.hpp"
+#include "Application/Requests/Type/ApplicationRequestContext_s.hpp"
+#include "Application/Requests/Type/RequestControl_s.hpp"
 #include "Console/CommandExecution.hpp"
 #include "Http/HttpRouter.hpp"
 #include "Http/HttpEndpointConcepts.hpp"
@@ -22,10 +22,10 @@
 #include "Http/Type/HttpRouteMatch_s.hpp"
 #include "Http/Type/HttpEndpointRequest_s.hpp"
 #include "Http/Type/HttpResponse_s.hpp"
-#include "Application/Type/ApplicationStatus_s.hpp"
-#include "Application/Type/GetApplicationStatus_s.hpp"
-#include "Application/Type/CompletedApplicationRequest_s.hpp"
-#include "Application/Type/ApplicationOperations_s.hpp"
+#include "Application/Requests/Type/ApplicationStatus_s.hpp"
+#include "Application/Requests/Type/GetApplicationStatus_s.hpp"
+#include "Application/Requests/Type/CompletedApplicationRequest_s.hpp"
+#include "Application/Requests/Type/ApplicationOperations_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>

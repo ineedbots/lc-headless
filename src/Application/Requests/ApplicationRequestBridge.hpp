@@ -3,7 +3,7 @@
 #include "Type/ApplicationRequest_s.hpp"
 #include "Type/CompletedApplicationRequest_s.hpp"
 #include "Type/RequestControl_s.hpp"
-#include "../Config/Type/HttpSettings_s.hpp"
+#include "../../Config/Type/HttpSettings_s.hpp"
 
 class ApplicationRequestBridge
 {

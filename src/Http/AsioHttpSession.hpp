@@ -4,8 +4,8 @@
 #include "OperatorListenerPolicy.hpp"
 #include "Type/HttpRouteMatch_s.hpp"
 #include "Type/HttpResponse_s.hpp"
-#include "Application/Type/CompletedApplicationRequest_s.hpp"
-#include "Application/Type/RequestControl_s.hpp"
+#include "Application/Requests/Type/CompletedApplicationRequest_s.hpp"
+#include "Application/Requests/Type/RequestControl_s.hpp"
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/steady_timer.hpp>

@@ -4,9 +4,9 @@
 #include "Http/Endpoints/ConsoleCommandsEndpoint.hpp"
 #include "Http/Type/HttpEndpointRequest_s.hpp"
 #include "Http/Type/HttpResponse_s.hpp"
-#include "Application/Type/ApplicationStatus_s.hpp"
-#include "Application/Type/CompletedApplicationRequest_s.hpp"
-#include "Application/Type/ConsoleCommandResult_s.hpp"
+#include "Application/Requests/Type/ApplicationStatus_s.hpp"
+#include "Application/Requests/Type/CompletedApplicationRequest_s.hpp"
+#include "Application/Requests/Type/ConsoleCommandResult_s.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
