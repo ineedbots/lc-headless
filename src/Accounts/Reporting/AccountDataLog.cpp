@@ -15,7 +15,7 @@
 #include "Game/State/Type/Stat_e.hpp"
 #include "Game/State/Type/Stat_s.hpp"
 #include "Game/Type/Tile_s.hpp"
-#include "Database/Type/FleetAccountDataLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetAccountDataLog_s.hpp"
 
 namespace
 {

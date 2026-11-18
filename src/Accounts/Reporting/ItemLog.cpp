@@ -7,8 +7,8 @@
 
 #include "Game/State/GameStateQueries.hpp"
 
-#include "Database/Type/FleetInventoryLog_s.hpp"
-#include "Database/Type/FleetEquipmentLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetInventoryLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetEquipmentLog_s.hpp"
 
 ItemLog::ItemLog(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, Kind_e kind, std::chrono::seconds interval, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}

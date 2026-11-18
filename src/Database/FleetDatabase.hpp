@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Database/Type/FleetAccountDataLog_s.hpp"
-#include "Database/Type/FleetBankLog_s.hpp"
-#include "Database/Type/FleetEquipmentLog_s.hpp"
-#include "Database/Type/FleetExperienceLog_s.hpp"
-#include "Database/Type/FleetInventoryLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetAccountDataLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetBankLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetEquipmentLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetExperienceLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetInventoryLog_s.hpp"
 #include "Database/Type/FleetStream_e.hpp"
 #include "Config/Type/Config_s.hpp"
 

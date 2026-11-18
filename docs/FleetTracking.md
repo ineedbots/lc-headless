@@ -4,8 +4,10 @@ The client stores all five fleet streams in a local SQLite database. The default
 `data/fleet.sqlite`; logging is enabled by default, including for accounts without scripts. No script
 behavior changes. Setting `fleetDatabasePath` to an empty string disables all fleet streams.
 
-In the source tree, `src/Database/` owns SQLite persistence and `Type/` holds the
-fleet records shared by persistence and live events. `FleetDatabaseSchema` opens
+In the source tree, `src/Accounts/Reporting/Type/` owns the fleet record payloads
+shared by account samplers, persistence and live events. `src/Database/` owns
+SQLite persistence; its `Type/` holds `FleetStream_e` and the `FleetRecord` variant
+over those reporting payloads. `FleetDatabaseSchema` opens
 and configures each connection, checks schema compatibility and creates new
 schemas. `FleetDatabase` owns queuing, batching and completion promises;
 `FleetRecordStore` owns SQL writes, transactions, retention and dictionary caches.
