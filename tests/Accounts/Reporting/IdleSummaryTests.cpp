@@ -80,6 +80,6 @@ TEST_CASE("IdleSummary captures owned values and only the five nearest NPCs", "[
     {
         CHECK(summary.nearestNpcs[i].index == i + 1);
         CHECK(summary.nearestNpcs[i].type == 81);
-        CHECK(summary.nearestNpcs[i].distance == i + 1);
+        CHECK(summary.nearestNpcs[i].distance == static_cast<s32>(i + 1));
     }
 }
