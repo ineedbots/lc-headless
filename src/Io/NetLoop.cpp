@@ -2,7 +2,7 @@
 #include "NetLoop.hpp"
 
 #include "AsioNetLoop.hpp"
-#include "../Application/Events/ApplicationEventBridge.hpp"
+#include "Websockets/Events/ApplicationEventBridge.hpp"
 
 std::shared_ptr<NetLoop> NetLoop::Create()
 {

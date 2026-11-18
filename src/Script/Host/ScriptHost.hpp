@@ -4,8 +4,8 @@
 #include "../../Console/Type/QueuedCommand_s.hpp"
 #include "../../Console/CommandExecution.hpp"
 
-#include "../../Accounts/Type/ProgressReport_s.hpp"
-#include "../../Application/Events/ApplicationEventPublisher.hpp"
+#include "Accounts/Reporting/Type/ProgressReport_s.hpp"
+#include "Websockets/Events/ApplicationEventPublisher.hpp"
 #include "../../Console/Type/ConsoleCommand_s.hpp"
 #include "../../Console/Logger.hpp"
 #include "../../Game/GameActions.hpp"

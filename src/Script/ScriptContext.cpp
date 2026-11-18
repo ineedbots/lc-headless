@@ -19,8 +19,8 @@
 #include "ScriptActions.hpp"
 #include "ScriptControl.hpp"
 #include "Type/PublishedScriptEvent_s.hpp"
-#include "../Application/Events/ApplicationEventPublisher.hpp"
-#include "../Application/Events/Definitions/ScriptPublishedEvent.hpp"
+#include "Websockets/Events/ApplicationEventPublisher.hpp"
+#include "Websockets/Events/Definitions/ScriptPublishedEvent.hpp"
 
 ScriptContext::ScriptContext(const GameState_s& state, const WorldMap& map, GameActions& actions, BotMessenger* messenger, std::string username, std::shared_ptr<const Navigation> navigation, std::shared_ptr<ApplicationEventPublisher> events, std::string accountName)
     : m_state{state}

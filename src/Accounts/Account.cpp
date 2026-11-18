@@ -1,7 +1,7 @@
 #include "pch.hpp"
 #include "Account.hpp"
 
-#include "../Application/Events/ApplicationEventPublisher.hpp"
+#include "Websockets/Events/ApplicationEventPublisher.hpp"
 #include "../Cache/Type/GameCache_s.hpp"
 #include "../Config/Type/AccountConfig_s.hpp"
 #include "../Config/AccountFile.hpp"
@@ -17,11 +17,11 @@
 #include "../Script/Type/ScriptCommand_s.hpp"
 #include "../Script/ScriptRuntime.hpp"
 #include "../Utils/StringUtils.hpp"
-#include "IdleSummary.hpp"
+#include "Accounts/Reporting/IdleSummary.hpp"
 #include "AccountLifecycle.hpp"
-#include "AccountReporting.hpp"
+#include "Accounts/Reporting/AccountReporting.hpp"
 #include "Type/AccountPhase_e.hpp"
-#include "Type/ProgressReport_s.hpp"
+#include "Accounts/Reporting/Type/ProgressReport_s.hpp"
 #include "Type/AccountLogout_s.hpp"
 
 Account::Account(std::shared_ptr<const Config_s> config, std::shared_ptr<const GameCache_s> cache, AccountConfig_s account, ScriptRuntime& runtime, std::shared_ptr<Logger> logger, AccountOptions_s options, BotMessenger* messenger, std::shared_ptr<NetLoop> net)

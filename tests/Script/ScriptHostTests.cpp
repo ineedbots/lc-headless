@@ -10,7 +10,7 @@
 #include "../Support/Script/ScriptTestRuntime.hpp"
 #include "../Support/TempFolder.hpp"
 
-#include "Accounts/Type/ProgressReport_s.hpp"
+#include "Accounts/Reporting/Type/ProgressReport_s.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Config/Type/Config_s.hpp"
 #include "Console/Type/ConsoleCommand_s.hpp"

@@ -4,6 +4,13 @@ The client stores all five fleet streams in a local SQLite database. The default
 `data/fleet.sqlite`; logging is enabled by default, including for accounts without scripts. No script
 behavior changes. Setting `fleetDatabasePath` to an empty string disables all fleet streams.
 
+In the source tree, `src/Database/` owns SQLite persistence and `Type/` holds the
+fleet records shared by persistence and live events. `FleetDatabaseSchema` opens
+and configures each connection, checks schema compatibility and creates new
+schemas; `FleetDatabase` owns queuing, batching, writes and retention. Account
+sampling and retry policies live in `src/Accounts/Reporting/`; live event definitions live in
+`src/Websockets/Events/Definitions/`.
+
 The database stores account identity and stream/timestamp/sequence metadata separately from typed stream
 tables. Account data and experience have explicit columns; bank, backpack and equipment snapshots use
 child item rows, and experience snapshots use child skill rows. The sequence orders records

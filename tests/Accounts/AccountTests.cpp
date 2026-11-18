@@ -1,6 +1,6 @@
 #include "pch.hpp"
 #include "../Support/Application/EventCapture.hpp"
-#include "Application/Events/Type/ApplicationEvent_s.hpp"
+#include "Websockets/Events/Type/ApplicationEvent_s.hpp"
 #include "Accounts/Type/AccountLogout_s.hpp"
 #include "../Support/Game/FakeGameServer.hpp"
 #include "../Support/Game/TestWorld.hpp"

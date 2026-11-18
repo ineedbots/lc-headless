@@ -60,7 +60,13 @@ features. Use those pages for the current script-facing contract.
 
 - `src/Application/`, `src/Accounts/`: process startup, account lifecycles and the
   main loop.
+- `src/Accounts/Reporting/`: account sampling, progress reports, file output and
+  idle summaries; reporting value types live in its `Type/` folder.
 - `src/Config/`, `src/Console/`, `src/Http/`: settings, logging, console and HTTP.
+- `src/Database/`: SQLite fleet persistence, background writes and record types;
+  `FleetDatabaseSchema` opens and configures connections and initializes the schema.
+- `src/Websockets/`: operator WebSocket sessions, event publishing, subscriptions
+  and event definitions. HTTP upgrade routes remain in `src/Http/Endpoints/`.
 - `src/Io/`: transport, packet buffers and ISAAC.
 - `src/Cache/`: cache stores, archives, definitions and map decoding.
 - `src/Game/`: game state, protocol, packet decoding, queries, interactions,

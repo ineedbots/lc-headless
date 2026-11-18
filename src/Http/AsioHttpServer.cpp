@@ -1,10 +1,10 @@
 #include "pch.hpp"
 #include "AsioHttpServer.hpp"
 
-#include "AsioWebSocketSession.hpp"
-#include "../Application/Events/ApplicationEventBridge.hpp"
+#include "Websockets/AsioWebSocketSession.hpp"
+#include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "HttpRouter.hpp"
-#include "../Application/Events/EventLimits.hpp"
+#include "Websockets/Events/EventLimits.hpp"
 #include "HttpResponses.hpp"
 
 #include <boost/asio/ip/tcp.hpp>
