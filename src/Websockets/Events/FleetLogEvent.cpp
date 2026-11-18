@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-std::optional<std::size_t> FleetLogEvent::Measure(const nlohmann::ordered_json& record)
+std::optional<std::size_t> FleetLogEvent::ValidateAndMeasureJsonBytes(const nlohmann::ordered_json& record)
 {
     // Leave room for the envelope, including a maximally escaped account name.
     if (!record.is_object())
@@ -14,7 +14,7 @@ std::optional<std::size_t> FleetLogEvent::Measure(const nlohmann::ordered_json& 
     }
 
     const auto serialized = record.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-    if (serialized.size() > EventLimits::MAX_EVENT_BYTES - 1024)
+    if (serialized.size() > EventLimits::MAX_EVENT_ENVELOPE_BYTES - ENVELOPE_RESERVE_BYTES)
     {
         return {};
     }

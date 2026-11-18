@@ -6,6 +6,8 @@ class FleetLogEvent
 {
 public:
     FleetLogEvent() = delete;
-    static std::optional<std::size_t> Measure(const nlohmann::ordered_json& record);
+
+    static constexpr std::size_t ENVELOPE_RESERVE_BYTES = 1024;
+    static std::optional<std::size_t> ValidateAndMeasureJsonBytes(const nlohmann::ordered_json& record);
     static nlohmann::json Serialize(const nlohmann::ordered_json& record);
 };

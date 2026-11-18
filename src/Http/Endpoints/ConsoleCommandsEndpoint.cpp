@@ -11,7 +11,6 @@
 #include "../../Utils/StringUtils.hpp"
 #include "../HttpJson.hpp"
 #include "../HttpResponses.hpp"
-#include "../Type/HttpError_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -41,7 +40,6 @@ HttpDecodeResult ConsoleCommandsEndpoint::Decode(const HttpEndpointRequest_s& re
 HttpResponse_s ConsoleCommandsEndpoint::Respond(const CompletedApplicationRequest_s& result, const ConsoleCommandResult_s& command)
 {
     auto body = nlohmann::json(command);
-    body["requestId"] = std::to_string(result.id);
     body["outcome"] = result.outcome;
 
     auto code = 200u;
@@ -58,10 +56,5 @@ HttpResponse_s ConsoleCommandsEndpoint::Respond(const CompletedApplicationReques
         code = 503;
     }
 
-    if (!result.errorCode.empty())
-    {
-        body["error"] = HttpError_s{result.errorCode, result.errorCode};
-    }
-
-    return HttpJson::Response(code, body);
+    return HttpJson::CompletedResponse(code, std::move(body), result);
 }

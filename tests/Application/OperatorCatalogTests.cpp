@@ -5,6 +5,7 @@
 #include "Accounts/Reporting/Type/ProgressReport_s.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "Websockets/Events/EventLimits.hpp"
+#include "Websockets/Events/WebSocketEventDefinition.hpp"
 #include "Websockets/Events/Type/EventScope_e.hpp"
 #include "Websockets/Events/Definitions/ApplicationStartedEvent.hpp"
 #include "Websockets/Events/Type/EventCatalog_s.hpp"
@@ -14,6 +15,8 @@
 #include "Application/Type/RequestControl_s.hpp"
 #include "Console/CommandExecution.hpp"
 #include "Http/HttpRouter.hpp"
+#include "Http/HttpEndpointConcepts.hpp"
+#include "Http/Type/HttpEndpointKind_e.hpp"
 #include "Http/Type/HttpEndpointCatalog_s.hpp"
 #include "Http/Type/HttpRoute_s.hpp"
 #include "Http/Type/HttpRouteMatch_s.hpp"
@@ -72,7 +75,10 @@ namespace
     class FutureEndpoint
     {
     public:
-        using Payload = ApplicationStatus_s;
+        static constexpr auto KIND = HttpEndpointKind_e::Rest;
+        static constexpr bool IS_DEFAULT_RESPONSE = true;
+
+        using ResponsePayload = ApplicationStatus_s;
         static HttpRoute_s Route()
         {
             return {.method = "GET", .path = "/future/{name}", .decode = Decode};
@@ -83,7 +89,7 @@ namespace
             return ApplicationRequestPayload{GetApplicationStatus_s{}};
         }
 
-        static HttpResponse_s Respond(const CompletedApplicationRequest_s& result, const Payload& payload)
+        static HttpResponse_s Respond(const CompletedApplicationRequest_s& result, const ResponsePayload& payload)
         {
             return {.status = 201, .body = std::to_string(result.id) + ":" + std::to_string(payload.accounts.size())};
         }
@@ -92,12 +98,14 @@ namespace
     class AlternateEndpoint : public FutureEndpoint
     {
     public:
+        static constexpr bool IS_DEFAULT_RESPONSE = false;
+
         static HttpRoute_s Route()
         {
             return {.method = "GET", .path = "/alternate", .decode = Decode};
         }
 
-        static HttpResponse_s Respond(const CompletedApplicationRequest_s&, const Payload&)
+        static HttpResponse_s Respond(const CompletedApplicationRequest_s&, const ResponsePayload&)
         {
             return {.status = 202, .body = "alternate"};
         }
@@ -106,6 +114,8 @@ namespace
     class UpgradeEndpoint
     {
     public:
+        static constexpr auto KIND = HttpEndpointKind_e::WebSocketUpgrade;
+
         static HttpRoute_s Route()
         {
             return {.method = "GET", .path = "/future/events", .webSocket = true};
@@ -119,7 +129,17 @@ namespace
         static constexpr std::string_view NAME = "test.first";
         static constexpr EventScope_e SCOPE = EventScope_e::Account;
         static constexpr bool RETAINS_LATEST = true;
-        static constexpr std::size_t MAX_SERIALIZED_BYTES = EventLimits::MAX_EVENT_BYTES;
+        static constexpr std::size_t MAX_ENVELOPE_BYTES = EventLimits::MAX_EVENT_ENVELOPE_BYTES;
+
+        static std::optional<std::size_t> ValidateAndMeasureOwnedBytes(const Payload&)
+        {
+            return sizeof(Payload);
+        }
+
+        static nlohmann::json Serialize(const Payload& payload)
+        {
+            return payload;
+        }
     };
 
     class SecondEvent
@@ -129,7 +149,17 @@ namespace
         static constexpr std::string_view NAME = "test.second";
         static constexpr EventScope_e SCOPE = EventScope_e::Account;
         static constexpr bool RETAINS_LATEST = true;
-        static constexpr std::size_t MAX_SERIALIZED_BYTES = EventLimits::MAX_EVENT_BYTES;
+        static constexpr std::size_t MAX_ENVELOPE_BYTES = EventLimits::MAX_EVENT_ENVELOPE_BYTES;
+
+        static std::optional<std::size_t> ValidateAndMeasureOwnedBytes(const Payload&)
+        {
+            return sizeof(Payload);
+        }
+
+        static nlohmann::json Serialize(const Payload& payload)
+        {
+            return payload;
+        }
     };
 
     class DuplicateEvent : public SecondEvent
@@ -141,8 +171,61 @@ namespace
     class OversizedEvent : public FirstEvent
     {
     public:
-        static constexpr std::size_t MAX_SERIALIZED_BYTES = EventLimits::MAX_EVENT_BYTES + 1;
+        static constexpr std::size_t MAX_ENVELOPE_BYTES = EventLimits::MAX_EVENT_ENVELOPE_BYTES + 1;
     };
+
+    class DuplicateDefaultEndpoint : public AlternateEndpoint
+    {
+    public:
+        static constexpr bool IS_DEFAULT_RESPONSE = true;
+    };
+
+    class WrongResponseEndpoint : public FutureEndpoint
+    {
+    public:
+        static int Respond(const CompletedApplicationRequest_s&, const ResponsePayload&)
+        {
+            return 0;
+        }
+    };
+
+    class UnmarkedUpgradeEndpoint
+    {
+    public:
+        static HttpRoute_s Route()
+        {
+            return UpgradeEndpoint::Route();
+        }
+    };
+
+    class WrongTransportEndpoint : public UpgradeEndpoint
+    {
+    public:
+        static HttpRoute_s Route()
+        {
+            return FutureEndpoint::Route();
+        }
+    };
+
+    class IncompleteEvent
+    {
+    public:
+        using Payload = int;
+        static constexpr std::string_view NAME = "test.incomplete";
+        static constexpr EventScope_e SCOPE = EventScope_e::Account;
+        static constexpr bool RETAINS_LATEST = false;
+        static constexpr std::size_t MAX_ENVELOPE_BYTES = 512;
+    };
+
+    class WrongEventSerializer : public FirstEvent
+    {
+    public:
+        static std::string Serialize(const Payload&)
+        {
+            return "wrong return type";
+        }
+    };
+
 }
 
 TEST_CASE("Operation catalogs admit unrelated typed operations through the common execution adapter", "[Http][RequestProcessor]")
@@ -228,14 +311,53 @@ TEST_CASE("Typed publication validates borrowed payloads and journals an owned c
 TEST_CASE("Global retained event budgets reserve one envelope independent of account count", "[Events]")
 {
     using Globals = EventCatalog_s<ApplicationStartedEvent>;
-    constexpr auto globalBudget = EventLimits::SNAPSHOT_OVERHEAD_BYTES + ApplicationStartedEvent::MAX_SERIALIZED_BYTES + 1;
+    constexpr auto globalBudget = EventLimits::SNAPSHOT_OVERHEAD_BYTES + ApplicationStartedEvent::MAX_ENVELOPE_BYTES + 1;
     STATIC_REQUIRE(Globals::FitsSnapshot(0, globalBudget));
     STATIC_REQUIRE(Globals::FitsSnapshot(EventLimits::MAX_ACCOUNTS, globalBudget));
     STATIC_REQUIRE_FALSE(Globals::FitsSnapshot(0, globalBudget - 1));
 
     using Mixed = EventCatalog_s<FirstEvent, ApplicationStartedEvent>;
-    constexpr auto mixedBudget = globalBudget + 2 * (FirstEvent::MAX_SERIALIZED_BYTES + 1);
+    constexpr auto mixedBudget = globalBudget + 2 * (FirstEvent::MAX_ENVELOPE_BYTES + 1);
     STATIC_REQUIRE(Mixed::FitsSnapshot(2, mixedBudget));
     STATIC_REQUIRE_FALSE(Mixed::FitsSnapshot(3, mixedBudget));
     STATIC_REQUIRE_FALSE(Mixed::FitsSnapshot(2, mixedBudget - 1));
+}
+
+TEST_CASE("Operator adapter contracts reject incomplete definitions and ambiguous defaults", "[Http][Events]")
+{
+    STATIC_REQUIRE(HttpRestEndpoint<FutureEndpoint>);
+    STATIC_REQUIRE_FALSE(HttpRestEndpoint<WrongResponseEndpoint>);
+    STATIC_REQUIRE_FALSE(HttpRestEndpoint<UpgradeEndpoint>);
+    STATIC_REQUIRE(HttpUpgradeEndpoint<UpgradeEndpoint>);
+    STATIC_REQUIRE_FALSE(HttpUpgradeEndpoint<UnmarkedUpgradeEndpoint>);
+    STATIC_REQUIRE_FALSE(HttpUpgradeEndpoint<FutureEndpoint>);
+    STATIC_REQUIRE(WebSocketEventDefinition<FirstEvent>);
+    STATIC_REQUIRE_FALSE(WebSocketEventDefinition<IncompleteEvent>);
+    STATIC_REQUIRE_FALSE(WebSocketEventDefinition<WrongEventSerializer>);
+
+    using MissingDefault = HttpEndpointCatalog_s<AlternateEndpoint>;
+    using DuplicateDefaults = HttpEndpointCatalog_s<FutureEndpoint, DuplicateDefaultEndpoint>;
+    STATIC_REQUIRE_FALSE(MissingDefault::HasValidDefaults());
+    STATIC_REQUIRE_FALSE(DuplicateDefaults::HasValidDefaults());
+
+    using WrongTransport = HttpEndpointCatalog_s<WrongTransportEndpoint>;
+    CHECK_THROWS_AS(WrongTransport::Routes(), std::invalid_argument);
+}
+
+TEST_CASE("HTTP fallback serializers remain stable when endpoint registration is reordered", "[Http]")
+{
+    using Catalog = HttpEndpointCatalog_s<AlternateEndpoint, UpgradeEndpoint, FutureEndpoint>;
+    STATIC_REQUIRE(Catalog::HasValidDefaults());
+    const auto result = CompletedApplicationRequest_s{.id = 91, .payload = ApplicationStatus_s{}};
+    const auto response = Catalog::Respond(result, ApplicationStatus_s{});
+    CHECK(response.status == 201);
+    CHECK(response.body == "91:0");
+
+    const auto router = HttpRouter{Catalog::Routes()};
+    const auto match = router.Match("GET", "/alternate", "");
+    REQUIRE(std::holds_alternative<HttpRouteMatch_s>(match));
+    const auto matched = std::get<HttpRouteMatch_s>(match).route.respond(result);
+    REQUIRE(matched);
+    CHECK(matched->status == 202);
+    CHECK(matched->body == "alternate");
 }

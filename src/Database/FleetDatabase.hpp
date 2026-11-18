@@ -8,9 +8,8 @@
 #include "Database/Type/FleetStream_e.hpp"
 #include "Config/Type/Config_s.hpp"
 
-#include <SQLiteCpp/SQLiteCpp.h>
-
-#include <unordered_map>
+#include "FleetRecordStore.hpp"
+#include "Type/FleetRecord.hpp"
 
 class FleetDatabase
 {
@@ -51,38 +50,22 @@ public:
 
     [[nodiscard]] const std::filesystem::path& GetPath() const
     {
-        return m_path;
+        return m_store.GetPath();
     }
 
 private:
-    using Record_t = std::variant<FleetAccountDataLog_s, FleetExperienceLog_s, FleetBankLog_s, FleetInventoryLog_s, FleetEquipmentLog_s>;
-
     struct PendingWrite_s
     {
-        Record_t record;
+        FleetRecord record;
         std::promise<void> completion;
     };
 
-    [[nodiscard]] std::optional<std::future<void>> Enqueue(Record_t record);
+    [[nodiscard]] std::optional<std::future<void>> Enqueue(FleetRecord record);
     void Run();
     void WriteBatch(std::vector<PendingWrite_s> writes);
-    void Write(const FleetAccountDataLog_s& record);
-    void Write(const FleetExperienceLog_s& record);
-    void Write(const FleetBankLog_s& record);
-    void Write(const FleetInventoryLog_s& record);
-    void Write(const FleetEquipmentLog_s& record);
-    void Prune(std::string_view account, FleetStream_e stream);
-    void EnsureOpen();
 
-    std::filesystem::path m_path;
+    FleetRecordStore m_store;
     Mode_e m_mode;
-    FleetRetentionSettings_s m_retention;
-    std::unique_ptr<SQLite::Database> m_database;
-    std::unordered_map<std::string, s64> m_streamIds;
-    std::unordered_map<std::string, s64> m_stateIds;
-    std::unordered_map<std::string, s64> m_targetKindIds;
-    std::unordered_map<std::string, s64> m_skillIds;
-    std::unordered_map<std::string, s64> m_itemNameIds;
     std::mutex m_writeMutex;
     std::mutex m_mutex;
     std::condition_variable m_wake;

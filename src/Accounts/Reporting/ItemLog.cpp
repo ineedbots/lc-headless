@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "ItemLog.hpp"
 
+#include "ReportWriteCompletion.hpp"
+
 #include "Websockets/Events/ApplicationEventPublisher.hpp"
 
 #include "Game/State/GameStateQueries.hpp"
@@ -232,19 +234,11 @@ bool ItemLog::WriteSample(Clock::time_point now, const Contents_s& contents)
 
 void ItemLog::Poll(Clock::time_point now)
 {
-    if (!m_write || m_write->completion.wait_for(0ms) != std::future_status::ready)
+    ReportWriteCompletion::Poll(m_write, [this](auto& write)
     {
-        return;
-    }
-
-    auto write = std::move(*m_write);
-    m_write.reset();
-
-    try
-    {
-        write.completion.get();
         m_lastSample = write.contents;
         m_retryAt.reset();
+
         if (m_interval > std::chrono::seconds::zero())
         {
             m_nextSample = write.sampledAt + m_interval;
@@ -252,10 +246,7 @@ void ItemLog::Poll(Clock::time_point now)
 
         std::visit([this](const auto& record)
         {
-            if (m_events)
-            {
-                m_events->Publish(m_accountName, record);
-            }
+            ReportWriteCompletion::Publish(m_events, *m_logger, m_accountName, record);
         }, write.record);
 
         if (m_writeFailed)
@@ -263,8 +254,7 @@ void ItemLog::Poll(Clock::time_point now)
             m_writeFailed = false;
             m_logger->Info("Writing {} to {} again", m_kind == Kind_e::Backpack ? "the backpack" : "the worn equipment", m_database->GetPath().string());
         }
-    }
-    catch (const std::exception& e)
+    }, [this, now](auto& write, const std::exception& e)
     {
         if (!m_writeFailed)
         {
@@ -278,5 +268,5 @@ void ItemLog::Poll(Clock::time_point now)
         }
 
         m_retryAt = now + (m_interval > std::chrono::seconds::zero() ? m_interval : 1s);
-    }
+    });
 }

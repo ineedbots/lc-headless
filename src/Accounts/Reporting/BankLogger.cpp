@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "BankLogger.hpp"
 
+#include "ReportWriteCompletion.hpp"
+
 #include "Websockets/Events/ApplicationEventPublisher.hpp"
 
 #include "Game/State/GameStateQueries.hpp"
@@ -186,30 +188,18 @@ bool BankLogger::WriteSample(Clock::time_point now, Snapshot_s snapshot)
 
 void BankLogger::Poll(Clock::time_point now)
 {
-    if (!m_write || m_write->completion.wait_for(0ms) != std::future_status::ready)
+    ReportWriteCompletion::Poll(m_write, [this](auto& write)
     {
-        return;
-    }
-
-    auto write = std::move(*m_write);
-    m_write.reset();
-
-    try
-    {
-        write.completion.get();
-
-        if (m_events)
-        {
-            m_events->Publish(m_accountName, write.snapshot.record);
-        }
+        ReportWriteCompletion::Publish(m_events, *m_logger, m_accountName, write.snapshot.record);
 
         if (m_writeFailed)
         {
             m_writeFailed = false;
             m_logger->Info("Writing the bank to {} again", m_database->GetPath().string());
         }
-    }
-    catch (const std::exception& e)
+
+        m_logger->Info("Bank ({}): {}", write.snapshot.summary == "empty" ? "empty" : "open", write.snapshot.summary);
+    }, [this, now](auto& write, const std::exception& e)
     {
         m_pendingSnapshots.push_front(std::move(write.snapshot));
 
@@ -221,7 +211,5 @@ void BankLogger::Poll(Clock::time_point now)
 
         m_retryAt = now + 1s;
         return;
-    }
-
-    m_logger->Info("Bank ({}): {}", write.snapshot.summary == "empty" ? "empty" : "open", write.snapshot.summary);
+    });
 }

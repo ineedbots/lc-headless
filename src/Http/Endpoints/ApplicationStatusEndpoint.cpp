@@ -9,7 +9,6 @@
 #include "../Type/HttpEndpointRequest_s.hpp"
 #include "../Type/HttpResponse_s.hpp"
 #include "../HttpJson.hpp"
-#include "../Type/HttpError_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -25,13 +24,5 @@ HttpDecodeResult ApplicationStatusEndpoint::Decode(const HttpEndpointRequest_s&)
 
 HttpResponse_s ApplicationStatusEndpoint::Respond(const CompletedApplicationRequest_s& result, const ApplicationStatus_s& status)
 {
-    auto body = nlohmann::json(status);
-    body["requestId"] = std::to_string(result.id);
-
-    if (!result.errorCode.empty())
-    {
-        body["error"] = HttpError_s{result.errorCode, result.errorCode};
-    }
-
-    return HttpJson::Response(200, body);
+    return HttpJson::CompletedResponse(200, status, result);
 }

@@ -2,6 +2,9 @@
 #include "ApplicationEventBridge.hpp"
 
 #include "EventProtocol.hpp"
+#include "EventOutbox.hpp"
+#include "Type/EventAction_e.hpp"
+#include "Http/OperatorListenerPolicy.hpp"
 #include "Websockets/Events/Type/ApplicationEvent_s.hpp"
 #include "Websockets/Events/Type/EventSubscription_s.hpp"
 #include "Websockets/Events/Type/ApplicationEvents_s.hpp"
@@ -41,7 +44,7 @@ ApplicationEventBridge::ApplicationEventBridge(std::vector<std::string> accounts
 
 u64 ApplicationEventBridge::Connect()
 {
-    if (m_stopping || m_clients.size() >= EventLimits::MAX_CONNECTIONS || m_nextClient == std::numeric_limits<u64>::max())
+    if (m_stopping || m_clients.size() >= OperatorListenerPolicy::MAX_CONNECTIONS || m_nextClient == std::numeric_limits<u64>::max())
     {
         return 0;
     }
@@ -106,11 +109,11 @@ bool ApplicationEventBridge::Publish(ApplicationEvent_s event)
         return false;
     }
 
-    const auto bytes = EventProtocol::Measure(event.payload);
+    const auto bytes = EventProtocol::ValidateAndMeasureOwnedBytes(event.payload);
     const auto validScope = EventProtocol::Scope(event.payload) == EventScope_e::Global ? !event.account : event.account && std::ranges::find(m_accounts, *event.account) != m_accounts.end();
 
     if (!validScope || !bytes || *bytes > MAX_JOURNAL_BYTES ||
-        !Append({std::move(event), std::max(*bytes, MAX_EVENT_BYTES)}))
+        !Append({std::move(event), std::max(*bytes, MAX_EVENT_ENVELOPE_BYTES)}))
     {
         ResetPublisher();
         return false;
@@ -134,16 +137,14 @@ void ApplicationEventBridge::Send(u64 client, std::shared_ptr<const std::string>
     }
 
     auto& state = it->second;
-    if (state.outbox.size() >= MAX_OUTBOX_ITEMS || text->size() > MAX_OUTBOX_BYTES - state.bytes)
+    if (!state.outbox.TryPush(std::move(text)))
     {
         Overflow(client);
         return;
     }
 
-    state.bytes += text->size();
-    state.outbox.push_back(std::move(text));
-    m_diagnostics.clientHighWaterItems = std::max(m_diagnostics.clientHighWaterItems, state.outbox.size());
-    m_diagnostics.clientHighWaterBytes = std::max(m_diagnostics.clientHighWaterBytes, state.bytes);
+    m_diagnostics.clientHighWaterItems = std::max(m_diagnostics.clientHighWaterItems, state.outbox.Size());
+    m_diagnostics.clientHighWaterBytes = std::max(m_diagnostics.clientHighWaterBytes, state.outbox.Bytes());
 }
 
 void ApplicationEventBridge::Apply(Incoming_s incoming)
@@ -170,7 +171,7 @@ void ApplicationEventBridge::Apply(Incoming_s incoming)
     auto& subscriptions = m_clients.at(incoming.client).subscriptions;
     const auto existing = std::ranges::find(subscriptions, command.subscription.id, &EventSubscription_s::id);
 
-    if (command.action == "unsubscribe")
+    if (command.action == EventAction_e::Unsubscribe)
     {
         if (existing == subscriptions.end())
         {
@@ -212,12 +213,12 @@ void ApplicationEventBridge::Service()
 {
     auto visits = std::size_t{0};
     auto items = std::size_t{0};
-    while (!m_stopping && items < 32)
+    while (!m_stopping && items < EventLimits::MAX_SERVICE_ITEMS)
     {
         if (m_fanout)
         {
             auto it = m_clients.upper_bound(m_fanout->cursor);
-            while (it != m_clients.end() && visits < 256)
+            while (it != m_clients.end() && visits < EventLimits::MAX_SERVICE_CLIENT_VISITS)
             {
                 const auto id = it->first;
                 const auto& subscriptions = it->second.subscriptions;
@@ -278,7 +279,7 @@ void ApplicationEventBridge::Service()
             return;
         }
 
-        if (text.size() > EventProtocol::MaxSerializedBytes(event.payload))
+        if (text.size() > EventProtocol::MaxEnvelopeBytes(event.payload))
         {
             ResetPublisher();
             return;
@@ -356,21 +357,20 @@ bool ApplicationEventBridge::IsStopping() const
 std::shared_ptr<const std::string> ApplicationEventBridge::Front(u64 client) const
 {
     const auto it = m_clients.find(client);
-    if (it == m_clients.end() || it->second.outbox.empty())
+    if (it == m_clients.end())
     {
         return {};
     }
 
-    return it->second.outbox.front();
+    return it->second.outbox.Front();
 }
 
 void ApplicationEventBridge::Pop(u64 client)
 {
     const auto it = m_clients.find(client);
-    if (it != m_clients.end() && !it->second.outbox.empty())
+    if (it != m_clients.end())
     {
-        it->second.bytes -= it->second.outbox.front()->size();
-        it->second.outbox.pop_front();
+        it->second.outbox.Pop();
     }
 }
 
@@ -385,8 +385,8 @@ ApplicationEventBridge::Diagnostics_s ApplicationEventBridge::GetDiagnostics() c
     {
         static_cast<void>(id);
         result.subscriptions += client.subscriptions.size();
-        result.outgoingItems += client.outbox.size();
-        result.outgoingBytes += client.bytes;
+        result.outgoingItems += client.outbox.Size();
+        result.outgoingBytes += client.outbox.Bytes();
     }
 
     return result;

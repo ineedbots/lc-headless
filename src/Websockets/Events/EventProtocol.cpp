@@ -3,6 +3,7 @@
 
 #include "Websockets/Events/Type/ApplicationEvent_s.hpp"
 #include "Websockets/Events/Type/EventSubscription_s.hpp"
+#include "Type/EventAction_e.hpp"
 #include "Websockets/Events/Type/ApplicationEvents_s.hpp"
 #include "EventLimits.hpp"
 #include "Websockets/Events/Type/EventScope_e.hpp"
@@ -17,7 +18,7 @@ namespace
 {
     bool IsId(std::string_view id)
     {
-        return !id.empty() && id.size() <= 64 && std::ranges::all_of(id, [](unsigned char c)
+        return !id.empty() && id.size() <= EventLimits::MAX_ID_BYTES && std::ranges::all_of(id, [](unsigned char c)
         {
             return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
         });
@@ -76,16 +77,18 @@ std::variant<EventCommand_s, EventProtocolError_s> EventProtocol::Decode(std::st
             return EventProtocolError_s{id, "invalid_message"};
         }
 
-        auto command = EventCommand_s{value["type"].get<std::string>(), {.id = id}};
-        if (command.action != "subscribe" && command.action != "unsubscribe")
+        const auto action = value["type"].get<std::string>();
+        if (action != "subscribe" && action != "unsubscribe")
         {
             return EventProtocolError_s{id, "unsupported_type"};
         }
 
+        auto command = EventCommand_s{action == "subscribe" ? EventAction_e::Subscribe : EventAction_e::Unsubscribe, {.id = id}};
+
         for (const auto& [key, field] : value.items())
         {
             static_cast<void>(field);
-            if (key != "version" && key != "type" && key != "id" && !(command.action == "subscribe" && (key == "events" || key == "accounts")))
+            if (key != "version" && key != "type" && key != "id" && !(command.action == EventAction_e::Subscribe && (key == "events" || key == "accounts")))
             {
                 return EventProtocolError_s{id, "unknown_field"};
             }
@@ -96,7 +99,7 @@ std::variant<EventCommand_s, EventProtocolError_s> EventProtocol::Decode(std::st
             return EventProtocolError_s{id, "invalid_id"};
         }
 
-        if (command.action == "subscribe")
+        if (command.action == EventAction_e::Subscribe)
         {
             auto& subscription = command.subscription;
             if (!value.contains("events") || !ReadList(value["events"], subscription.events) || subscription.events.empty() ||
@@ -138,11 +141,11 @@ bool EventProtocol::RetainsLatest(const ApplicationEventPayload& payload)
     }, payload);
 }
 
-std::optional<std::size_t> EventProtocol::Measure(const ApplicationEventPayload& payload)
+std::optional<std::size_t> EventProtocol::ValidateAndMeasureOwnedBytes(const ApplicationEventPayload& payload)
 {
     return std::visit([](const auto& value)
     {
-        return Measure(value);
+        return ValidateAndMeasureOwnedBytes(value);
     }, payload);
 }
 
@@ -164,9 +167,9 @@ std::string EventProtocol::Encode(const ApplicationEvent_s& event, std::string_v
         .dump();
 }
 
-std::string EventProtocol::Ack(std::string_view id, std::string_view action, std::string_view instance, u64 sequence)
+std::string EventProtocol::Ack(std::string_view id, EventAction_e action, std::string_view instance, u64 sequence)
 {
-    return nlohmann::json(EventAck_s{.id = std::string{id}, .action = std::string{action}, .instance = std::string{instance}, .sequence = sequence}).dump();
+    return nlohmann::json(EventAck_s{.id = std::string{id}, .action = action == EventAction_e::Subscribe ? "subscribe" : "unsubscribe", .instance = std::string{instance}, .sequence = sequence}).dump();
 }
 
 std::string EventProtocol::Error(std::string_view id, std::string_view code)
@@ -186,12 +189,12 @@ std::string EventProtocol::Snapshot(std::string_view id, std::string_view instan
     return nlohmann::json(snapshot).dump();
 }
 
-std::size_t EventProtocol::MaxSerializedBytes(const ApplicationEventPayload& payload)
+std::size_t EventProtocol::MaxEnvelopeBytes(const ApplicationEventPayload& payload)
 {
     return std::visit([](const auto& value)
     {
         using Event = ApplicationEvents_s::Definition<std::decay_t<decltype(value)>>;
-        return Event::MAX_SERIALIZED_BYTES;
+        return Event::MAX_ENVELOPE_BYTES;
     }, payload);
 }
 

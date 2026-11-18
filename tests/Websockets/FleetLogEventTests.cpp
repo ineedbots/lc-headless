@@ -3,6 +3,7 @@
 #include "../Support/LogCapture.hpp"
 #include "../Support/TempFolder.hpp"
 #include "../Support/FleetDatabaseReader.hpp"
+#include "../Support/Application/EventCapture.hpp"
 #include "Accounts/Reporting/AccountReporting.hpp"
 #include "Database/Type/FleetBankLog_s.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"
@@ -202,7 +203,7 @@ TEST_CASE("Fleet events bound typed payloads and replace invalid UTF-8", "[Fleet
         .time = "2026-01-01T00:00:00Z",
         .account = "bot1",
         .items = {{.id = 1, .name = std::string(8192, 'x'), .qty = 1}}};
-    CHECK_FALSE(FleetBankEvent::Measure(tooLarge));
+    CHECK_FALSE(FleetBankEvent::ValidateAndMeasureOwnedBytes(tooLarge));
 
     const auto invalidUtf8 = FleetBankLog_s{
         .time = "2026-01-01T00:00:00Z",
@@ -210,4 +211,65 @@ TEST_CASE("Fleet events bound typed payloads and replace invalid UTF-8", "[Fleet
         .items = {{.id = 1, .name = std::string{"bad\xff"}, .qty = 1}}};
     const auto serialized = FleetBankEvent::Serialize(invalidUtf8);
     CHECK(serialized["items"][0]["name"] == "bad\xef\xbf\xbd");
+}
+
+TEST_CASE("Failed live event publication does not retry committed fleet records", "[FleetEvents][Events][Reporting]")
+{
+    const auto folder = TempFolder{"rs2004-fleet-events-committed"};
+    auto capture = LogCapture{};
+    auto config = Config_s{};
+    const auto path = folder.GetPath() / "fleet.sqlite";
+    config.scripting.fleetDatabasePath = path.string();
+
+    auto publications = 0;
+    auto publisher = std::make_shared<EventCapture>([&](const ApplicationEvent_s&)
+    {
+        ++publications;
+        throw std::runtime_error{"publisher failed"};
+    });
+    auto cache = GameCache_s{};
+    cache.bankComponent = 2;
+    cache.inventoryComponent = 3;
+    cache.equipmentComponent = 4;
+    cache.inventorySize = 28;
+    cache.components[1] = IfComponent_s{.id = 1, .root = 1, .type = ComponentType_e::Layer};
+    cache.components[2] = IfComponent_s{.id = 2, .root = 1, .type = ComponentType_e::Inv};
+
+    auto reporting = AccountReporting{config, AccountConfig_s{.name = "bot1"}, cache, capture.GetLogger(), {}, publisher};
+    auto state = GameState_s{};
+    state.placed = true;
+    state.tick = 1;
+    state.interfaces.mainModal = 1;
+
+    for (const auto com : {u16{2}, u16{3}, u16{4}})
+    {
+        state.inventories[com] = Inventory_s{.com = com};
+    }
+
+    const auto now = AccountReporting::Clock::now();
+    for (const auto elapsed : {0s, 1s, 10s})
+    {
+        reporting.ObserveSession(now + elapsed, state, ClientStatus_e::InGame);
+        reporting.SampleItems(now + elapsed, state);
+        reporting.Poll(now + elapsed);
+        reporting.Flush();
+    }
+
+    CHECK(publications == 5);
+
+    for (const auto stream : {"account-data", "experience", "bank", "inventory", "equipment"})
+    {
+        INFO(stream);
+        CHECK(ReadFleetRecords(path, stream, "bot1").size() == 1);
+    }
+
+    const auto entries = capture.GetEntries();
+    CHECK(std::ranges::count_if(entries, [](const auto& entry)
+    {
+        return entry.message.find("was saved, but its live event wasn't published") != std::string::npos;
+    }) == 5);
+    CHECK(std::ranges::none_of(entries, [](const auto& entry)
+    {
+        return entry.message.find("wasn't saved") != std::string::npos;
+    }));
 }

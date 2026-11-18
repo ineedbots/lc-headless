@@ -287,7 +287,7 @@ src/
 │   └── Reporting/            fleet samplers, progress reports, file output, idle summaries and Type/
 ├── Config/                   client.jsonc and the account files: the structs, parsing, rules, the JSONC editor
 ├── Console/                  the logger, log files and console output, console input and its commands
-├── Database/                 FleetDatabaseSchema for connection/schema setup; FleetDatabase for background writes and retention; Type/ for records
+├── Database/                 FleetDatabaseSchema for setup; FleetRecordStore for SQL/retention; FleetDatabase for queuing; Type/ for records
 ├── Http/                     operator HTTP listener, routing and endpoints, including WebSocket upgrades
 ├── Websockets/
 │   ├── (root)                operator WebSocket session and buffered upgrade stream

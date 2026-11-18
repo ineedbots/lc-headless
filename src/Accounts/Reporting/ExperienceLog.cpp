@@ -1,6 +1,9 @@
 #include "pch.hpp"
 #include "ExperienceLog.hpp"
 
+#include "ReportWriteCompletion.hpp"
+#include "ReportingStatus.hpp"
+
 #include "Websockets/Events/ApplicationEventPublisher.hpp"
 
 #include "Utils/StringUtils.hpp"
@@ -10,25 +13,6 @@
 
 namespace
 {
-    std::string_view StatusName(ClientStatus_e status)
-    {
-        switch (status)
-        {
-        case ClientStatus_e::Disconnected:
-            return "disconnected";
-        case ClientStatus_e::Connecting:
-            return "connecting";
-        case ClientStatus_e::InGame:
-            return "ingame";
-        case ClientStatus_e::LoggingOut:
-            return "logging out";
-        case ClientStatus_e::LoggedOut:
-            return "logged out";
-        }
-
-        return "unknown";
-    }
-
     // A skill's name, in the log line, as a sentence would start it.
     std::string Title(std::string_view name)
     {
@@ -59,7 +43,7 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
         return;
     }
 
-    const auto statusName = StatusName(status);
+    const auto statusName = ReportingStatus::Name(status);
     const auto inGame = status == ClientStatus_e::InGame && settled;
     if (m_lastObservedStatus != statusName)
     {
@@ -74,7 +58,7 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
         }
         else
         {
-            m_deferredStatuses.push_back(MakeSample(now, std::chrono::system_clock::now(), state, statusName, inGame, false, false, true));
+            m_deferredStatuses.push_back(MakeSample(now, std::chrono::system_clock::now(), state, statusName, {.settled = inGame, .statusTransition = true}));
         }
     }
 
@@ -110,26 +94,26 @@ void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, Client
         return;
     }
 
-    auto sample = MakeSample(now, std::chrono::system_clock::now(), state, statusName, inGame, firstBaseline || due, due, false);
+    auto sample = MakeSample(now, std::chrono::system_clock::now(), state, statusName, {.settled = inGame, .startsBaseline = firstBaseline || due, .periodic = due});
     if (!WriteSample(std::move(sample)))
     {
         m_retryAt = now + std::min(m_interval, std::chrono::minutes{1});
     }
 }
 
-ExperienceLog::Sample_s ExperienceLog::MakeSample(Clock::time_point now, std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled, bool startsBaseline, bool periodic, bool statusTransition) const
+ExperienceLog::Sample_s ExperienceLog::MakeSample(Clock::time_point now, std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, SampleOptions_s options) const
 {
     auto sample = Sample_s{
         .record = FleetExperienceLog_s{
             .time = std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::floor<std::chrono::seconds>(time)),
             .account = m_accountName,
             .state = std::string{statusName},
-            .settled = settled},
+            .settled = options.settled},
         .sampledAt = now,
-        .inGame = settled && statusName == "ingame",
-        .startsBaseline = startsBaseline,
-        .periodic = periodic,
-        .statusTransition = statusTransition};
+        .inGame = options.settled && statusName == "ingame",
+        .startsBaseline = options.startsBaseline,
+        .periodic = options.periodic,
+        .statusTransition = options.statusTransition};
 
     for (std::size_t i = 0; i < SKILL_NAMES.size() && i < GameState_s::STAT_COUNT; ++i)
     {
@@ -175,22 +159,9 @@ bool ExperienceLog::WriteSample(Sample_s sample)
 
 void ExperienceLog::Poll(Clock::time_point now)
 {
-    if (!m_write || m_write->completion.wait_for(0ms) != std::future_status::ready)
+    ReportWriteCompletion::Poll(m_write, [this](auto& write)
     {
-        return;
-    }
-
-    auto write = std::move(*m_write);
-    m_write.reset();
-
-    try
-    {
-        write.completion.get();
-
-        if (m_events)
-        {
-            m_events->Publish(m_accountName, write.sample.record);
-        }
+        ReportWriteCompletion::Publish(m_events, *m_logger, m_accountName, write.sample.record);
 
         if (m_writeFailed)
         {
@@ -199,6 +170,7 @@ void ExperienceLog::Poll(Clock::time_point now)
         }
 
         m_retryAt.reset();
+
         if (write.sample.inGame)
         {
             if (write.sample.startsBaseline)
@@ -222,8 +194,7 @@ void ExperienceLog::Poll(Clock::time_point now)
             m_hasBaseline = false;
             m_nextSample.reset();
         }
-    }
-    catch (const std::exception& e)
+    }, [this, now](auto& write, const std::exception& e)
     {
         if (write.sample.statusTransition)
         {
@@ -237,7 +208,7 @@ void ExperienceLog::Poll(Clock::time_point now)
         }
 
         m_retryAt = now + std::min(m_interval, std::chrono::minutes{1});
-    }
+    });
 }
 
 void ExperienceLog::Flush()

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EventAction_e.hpp"
+
 struct EventSubscription_s
 {
     std::string id;
@@ -9,7 +11,7 @@ struct EventSubscription_s
 
 struct EventCommand_s
 {
-    std::string action;
+    EventAction_e action;
     EventSubscription_s subscription;
 };
 

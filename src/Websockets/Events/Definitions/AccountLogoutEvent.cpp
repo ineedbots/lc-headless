@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-std::optional<std::size_t> AccountLogoutEvent::Measure(const AccountLogout_s&)
+std::optional<std::size_t> AccountLogoutEvent::ValidateAndMeasureOwnedBytes(const AccountLogout_s&)
 {
     return sizeof(AccountLogout_s);
 }

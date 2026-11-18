@@ -128,7 +128,7 @@ std::optional<bool> ScriptContext::SendBotMessage(std::string_view username, std
 bool ScriptContext::PublishEvent(std::string name, std::string dataJson)
 {
     auto event = PublishedScriptEvent_s{std::move(name), std::move(dataJson)};
-    if (!ScriptPublishedEvent::Measure(event))
+    if (!ScriptPublishedEvent::ValidateAndMeasureOwnedBytes(event))
     {
         throw std::invalid_argument{std::format("Event name must be 1..{} ASCII letters, digits, dots, underscores or hyphens; data must be valid JSON up to {} bytes and {} container levels", ScriptPublishedEvent::MAX_NAME_BYTES, ScriptPublishedEvent::MAX_DATA_BYTES, ScriptPublishedEvent::MAX_DATA_DEPTH)};
     }

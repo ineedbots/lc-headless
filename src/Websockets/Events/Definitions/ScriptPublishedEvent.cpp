@@ -35,7 +35,7 @@ namespace
     }
 }
 
-std::optional<std::size_t> ScriptPublishedEvent::Measure(const PublishedScriptEvent_s& payload)
+std::optional<std::size_t> ScriptPublishedEvent::ValidateAndMeasureOwnedBytes(const PublishedScriptEvent_s& payload)
 {
     if (payload.name.empty() || payload.name.size() > MAX_NAME_BYTES || !std::ranges::all_of(payload.name, [](unsigned char c)
     {

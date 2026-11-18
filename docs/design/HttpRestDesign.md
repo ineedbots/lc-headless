@@ -95,7 +95,9 @@ The HTTP callbacks, runner safe point, and script handler all run on the main th
 |---|---|
 | `NetLoop` / `AsioNetLoop` | Application-owned shared loop, injected into the runner. Owns the existing I/O context and work guard; creates HTTP transport objects through a narrow factory. |
 | `HttpServer` | Application-owned RAII interface. Its Asio implementation owns the TCP acceptor, session registry, and request-ID lookup, borrowing the shared loop's context. |
-| `HttpSession` | Main-thread connection state. Owns its Beast stream, bounded receive buffer, request parser, response message, and deadline timer. Handles one application request at a time. |
+| `AsioHttpSession` | Main-thread connection state. Owns its Beast stream, bounded receive buffer, request parser, response message, and deadline timer. Handles one application request at a time. |
+| `HttpSessionOwner` | Listener contract for request/session registration, WebSocket ownership transfer and callback accounting. Sessions read routing, settings, bridges and shutdown state through its const `HttpSessionContext_s` view, without accessing listener registries. |
+| `OperatorListenerPolicy` | Shared HTTP/WebSocket connection capacity, buffer bounds and transport deadlines. HTTP sessions track `Reading`, `AwaitingResult`, `Writing` and `Closed` phases; keep-alive and deadline expiry remain independent properties. |
 | `ApplicationRequestBridge` | Main-thread incoming and completed queues, admission accounting, request IDs, and close state. Has no socket, Beast, or Asio types and requires no cross-thread synchronization. |
 | `ApplicationRequestProcessor` | Main-thread component that dispatches request variants against `AccountRunner` and builds completed data. |
 | `CommandExecution` | Main-thread command context: output collector, dispatch outcome, recipient completion count, and request ID. Survives deferred script dispatch. |
@@ -316,7 +318,7 @@ Normal request handling remains nonblocking. The shutdown drain is bounded while
 5. **Beast server and lifecycle:** add the listener and sessions on the existing context, method/path routing, parser limits, request and transport deadlines, keep-alive handling, direct completed-result delivery, and application-owned teardown. Validate response lifetime through asynchronous writes and cancellation before expanding the endpoint set.
 6. **Integration and documentation:** add end-to-end tests, update `docs/Configuration.md` and `docs/Running.md`, document example requests, output semantics, and trusted-network deployment scope.
 
-Suggested files: `src/Http/HttpServer.hpp` for the application-facing lifecycle/result-delivery interface, `AsioHttpServer.hpp/.cpp`, `HttpSession.hpp/.cpp`, `HttpRouter.hpp/.cpp`, and HTTP JSON helpers; `src/Application/ApplicationRequestBridge.hpp/.cpp`, request/result types, and `ApplicationRequestProcessor.hpp/.cpp`; `src/Console/CommandExecution.hpp/.cpp`, capture scope/pause, and queued invocation types; `src/Config/Type/HttpSettings_s.hpp`. Update `NetLoop`/`AsioNetLoop` for the factory, pump budget, and capture pause, plus `Application`/`AccountRunner` for shared-loop injection and drain orchestration. Keep Beast/Asio types in concrete transport headers and JSON headers in implementation files.
+Suggested files: `src/Http/HttpServer.hpp` for the application-facing lifecycle/result-delivery interface, `AsioHttpServer.hpp/.cpp`, `AsioHttpSession.hpp/.cpp`, `HttpRouter.hpp/.cpp`, and HTTP JSON helpers; `src/Application/ApplicationRequestBridge.hpp/.cpp`, request/result types, and `ApplicationRequestProcessor.hpp/.cpp`; `src/Console/CommandExecution.hpp/.cpp`, capture scope/pause, and queued invocation types; `src/Config/Type/HttpSettings_s.hpp`. Update `NetLoop`/`AsioNetLoop` for the factory, pump budget, and capture pause, plus `Application`/`AccountRunner` for shared-loop injection and drain orchestration. Keep Beast/Asio types in concrete transport headers and JSON headers in implementation files.
 
 ## 9. Validation and acceptance
 
@@ -382,7 +384,7 @@ To add an endpoint:
 3. Register its route in `HttpRouter` and add its result overload to `HttpResponses`.
 4. Cover its validation and response contract, plus a real loopback request through the existing bridge.
 
-`AsioHttpServer` sessions own transport reads/writes, bounded parsers, admission, timers and connection
+`AsioHttpSession` owns transport reads/writes, bounded parsers, admission, timers and connection
 lifetime. They hold the matched route through body reading and forward only decoded values to the
 request bridge. New endpoint paths, validation rules and result schemas require no session changes.
 Shared response headers, sequential keep-alive and safe-point delivery apply to every endpoint.
@@ -409,3 +411,14 @@ by const reference. Decoder results remain owned application values. No URI/body
 the bridge, and HTTP callbacks continue to enqueue work without entering application/script execution.
 The existing `/api/v1/status` and console endpoints do not consume query parameters; templates such as
 `/api/v1/status/{id}` are examples for future endpoint registrations, rather than a new status-ID API.
+
+### Endpoint adapter contracts
+
+REST adapters declare `KIND`, `ResponsePayload` and `IS_DEFAULT_RESPONSE`; upgrade
+adapters declare their upgrade `KIND` without a response payload. C++20 concepts
+check the signatures. A result type has exactly one default serializer for raw
+routes and unmatched completions; alternate encoders retain their matched-route
+adapters. Fallback selection is independent of catalog order.
+
+`HttpJson::CompletedResponse` supplies request ID and optional error metadata. Each
+endpoint keeps its own result schema and HTTP status selection.
