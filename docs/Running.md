@@ -1,6 +1,6 @@
 # Running
 
-[Back to README](../README.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Features](Features.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Requirements](Requirements.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Configuration](Configuration.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Building](Building.md)
+[Back to README](../README.md) [Features](Features.md) [Requirements](Requirements.md) [Configuration](Configuration.md) [Building](Building.md)
 
 ## First login
 
