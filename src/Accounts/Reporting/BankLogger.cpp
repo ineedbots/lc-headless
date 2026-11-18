@@ -7,7 +7,7 @@
 
 #include "Game/State/GameStateQueries.hpp"
 #include "Utils/StringUtils.hpp"
-#include "Database/Type/FleetBankLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetBankLog_s.hpp"
 
 BankLogger::BankLogger(const GameCache_s& cache, std::shared_ptr<Logger> logger, std::string accountName, std::shared_ptr<FleetDatabase> database, std::shared_ptr<ApplicationEventPublisher> events)
     : m_cache{cache}

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Database/Type/FleetExperienceLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetExperienceLog_s.hpp"
 #include "Websockets/Events/FleetEventPayload.hpp"
 #include "Websockets/Events/EventLimits.hpp"
 #include "Websockets/Events/Type/EventScope_e.hpp"

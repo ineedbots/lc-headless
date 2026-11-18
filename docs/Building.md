@@ -285,10 +285,10 @@ src/
 ├── Application/              startup, the command line, Ctrl+C
 │   └── Requests/             request admission, safe-point dispatch, Operations/ and Type/
 ├── Accounts/                 each account's lifecycle, the main loop over all accounts and console commands
-│   └── Reporting/            fleet samplers, progress reports, file output, idle summaries and Type/
+│   └── Reporting/            fleet samplers, progress reports, file output, idle summaries and Type/ for reporting values and fleet payloads
 ├── Config/                   client.jsonc and the account files: the structs, parsing, rules, the JSONC editor
 ├── Console/                  the logger, log files and console output, console input and its commands
-├── Database/                 FleetDatabaseSchema for setup; FleetRecordStore for SQL/retention; FleetDatabase for queuing; Type/ for records
+├── Database/                 FleetDatabaseSchema for setup; FleetRecordStore for SQL/retention; FleetDatabase for queuing; Type/ for stream IDs and the record variant
 ├── Http/                     operator HTTP listener, routing and endpoints, including WebSocket upgrades
 ├── Websockets/
 │   ├── (root)                operator WebSocket session and buffered upgrade stream

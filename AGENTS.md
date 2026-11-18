@@ -64,11 +64,13 @@ features. Use those pages for the current script-facing contract.
   handlers and request/result types; application lifecycle events stay in
   `src/Application/Type/`.
 - `src/Accounts/Reporting/`: account sampling, progress reports, file output and
-  idle summaries; reporting value types live in its `Type/` folder.
+  idle summaries; reporting value types, including fleet record payloads shared
+  with persistence and events, live in its `Type/` folder.
 - `src/Config/`, `src/Console/`, `src/Http/`: settings, logging, console and HTTP.
   `AsioHttpServer` owns listener/session registries; `AsioHttpSession` owns each
   HTTP request lifecycle through the `HttpSessionOwner` contract.
-- `src/Database/`: SQLite fleet persistence, background writes and record types;
+- `src/Database/`: SQLite fleet persistence and background writes; `Type/` holds
+  `FleetStream_e` and the `FleetRecord` variant over reporting payload types;
   `FleetDatabaseSchema` opens connections and initializes schemas, `FleetRecordStore`
   owns SQL and transactions, and `FleetDatabase` schedules batches and completions.
 - `src/Websockets/`: operator WebSocket sessions, event publishing, subscriptions

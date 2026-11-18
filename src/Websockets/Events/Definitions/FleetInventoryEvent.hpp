@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Database/Type/FleetInventoryLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetInventoryLog_s.hpp"
 #include "Websockets/Events/FleetEventPayload.hpp"
 #include "Websockets/Events/EventLimits.hpp"
 #include "Websockets/Events/Type/EventScope_e.hpp"
