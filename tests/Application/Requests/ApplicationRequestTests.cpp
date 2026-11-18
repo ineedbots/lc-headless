@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "Application/Requests/ApplicationRequestProcessor.hpp"
+#include "Console/Type/CommandQueueResult_e.hpp"
 #include "Console/LogSinks.hpp"
 #include "Io/AsioNetLoop.hpp"
 #include "../../Support/Game/FakeGameServer.hpp"
@@ -135,7 +136,7 @@ def loop():
 
     auto execution = std::make_shared<CommandExecution>(1024, std::chrono::steady_clock::now() + 10s);
     auto token = std::make_shared<CommandRecipient>(execution, "main");
-    REQUIRE(fixture.host->ReceiveCommand({.name = "echo", .text = "only this command"}, token));
+    REQUIRE(fixture.host->QueueCommand({.name = "echo", .text = "only this command"}, token) == CommandQueueResult_e::Accepted);
     execution->dispatched = true;
     CHECK_FALSE(execution->IsComplete());
     CHECK(execution->capture.output.empty());
@@ -145,7 +146,7 @@ def loop():
     CHECK(execution->capture.output.find("only this command") != std::string::npos);
 
     auto failure = std::make_shared<CommandExecution>(4096, std::chrono::steady_clock::now() + 10s);
-    REQUIRE(fixture.host->ReceiveCommand({.name = "boom"}, std::make_shared<CommandRecipient>(failure, "main")));
+    REQUIRE(fixture.host->QueueCommand({.name = "boom"}, std::make_shared<CommandRecipient>(failure, "main")) == CommandQueueResult_e::Accepted);
     fixture.Step();
     CHECK(failure->recipients[0].outcome == "failed");
     CHECK(failure->capture.output.find("before error") != std::string::npos);
@@ -156,13 +157,13 @@ TEST_CASE("Tracked script cancellation prevents invocation on expiry and host de
 {
     auto fixture = HostFixture{"console.command('echo', lambda command: log('must not run'))\ndef loop():\n    return 1000\n"};
     auto execution = std::make_shared<CommandExecution>(1024, std::chrono::steady_clock::now() - 1ms);
-    REQUIRE(fixture.host->ReceiveCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "main")));
+    REQUIRE(fixture.host->QueueCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "main")) == CommandQueueResult_e::Accepted);
     fixture.Step();
     CHECK(execution->recipients[0].outcome == "cancelled");
     CHECK_FALSE(execution->started);
 
     auto pending = std::make_shared<CommandExecution>(1024, std::chrono::steady_clock::now() + 10s);
-    REQUIRE(fixture.host->ReceiveCommand({.name = "echo"}, std::make_shared<CommandRecipient>(pending, "main")));
+    REQUIRE(fixture.host->QueueCommand({.name = "echo"}, std::make_shared<CommandRecipient>(pending, "main")) == CommandQueueResult_e::Accepted);
     fixture.host.reset();
     CHECK(pending->recipients[0].outcome == "cancelled");
 }
@@ -175,8 +176,8 @@ TEST_CASE("Tracked broadcasts wait for every recipient and preserve partial outc
     second.capture.GetLogger()->SetSink(LogSinks::Make({}, {}, true));
 
     auto execution = std::make_shared<CommandExecution>(4096, std::chrono::steady_clock::now() + 10s);
-    REQUIRE(first.host->ReceiveCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "first")));
-    REQUIRE(second.host->ReceiveCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "second")));
+    REQUIRE(first.host->QueueCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "first")) == CommandQueueResult_e::Accepted);
+    REQUIRE(second.host->QueueCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "second")) == CommandQueueResult_e::Accepted);
     execution->dispatched = true;
     first.Step();
     CHECK_FALSE(execution->IsComplete());
@@ -197,15 +198,15 @@ def loop():
 )python"};
 
     auto execution = std::make_shared<CommandExecution>(4096, std::chrono::steady_clock::now() + 10s);
-    REQUIRE(fixture.host->ReceiveCommand({.name = "remove"}));
-    REQUIRE(fixture.host->ReceiveCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "main")));
+    REQUIRE(fixture.host->QueueCommand({.name = "remove"}) == CommandQueueResult_e::Accepted);
+    REQUIRE(fixture.host->QueueCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "main")) == CommandQueueResult_e::Accepted);
     fixture.Step();
     CHECK(execution->recipients[0].outcome == "rejected");
     CHECK(execution->recipients[0].errorCode == "command_removed");
 
     for (std::size_t i = 0; i < ScriptHost::MAX_COMMANDS; ++i)
     {
-        REQUIRE(fixture.host->ReceiveCommand({.name = "remove"}));
+        REQUIRE(fixture.host->QueueCommand({.name = "remove"}) == CommandQueueResult_e::Accepted);
     }
 
     CHECK(fixture.host->QueueCommand({.name = "remove"}) == CommandQueueResult_e::QueueFull);
@@ -220,7 +221,7 @@ TEST_CASE("Reload cancels tracked invocations while local commands retain their 
     fixture.host->Step(now);
     fixture.folder.RewriteFile("main.py", std::string{script} + "# changed\n");
     fixture.host->Step(now + ScriptHost::WATCH_INTERVAL);
-    REQUIRE(fixture.host->ReceiveCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "main")));
+    REQUIRE(fixture.host->QueueCommand({.name = "echo"}, std::make_shared<CommandRecipient>(execution, "main")) == CommandQueueResult_e::Accepted);
     fixture.host->Step(now + 2 * ScriptHost::WATCH_INTERVAL);
     CHECK(execution->recipients[0].outcome == "cancelled");
     CHECK(execution->recipients[0].errorCode == "vm_reloaded");

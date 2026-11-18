@@ -6,6 +6,7 @@
 #include "../Support/TempFolder.hpp"
 
 #include "Accounts/AccountCommands.hpp"
+#include "Console/Type/CommandQueueResult_e.hpp"
 #include "Game/Protocol/WordPack.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -62,7 +63,7 @@ def loop():
         {
             for (auto i = std::size_t{0}; i < ScriptHost::MAX_COMMANDS; ++i)
             {
-                REQUIRE(account.SendCommand({.name = "echo", .text = "waiting"}));
+                REQUIRE(account.QueueCommand({.name = "echo", .text = "waiting"}) == CommandQueueResult_e::Accepted);
             }
         }
 
@@ -196,7 +197,8 @@ TEST_CASE("AccountCommands broadcasts past a full queue to other matching script
     // One slot was consumed by the broadcast; the remaining slots still accept commands.
     for (auto i = std::size_t{1}; i < ScriptHost::MAX_COMMANDS; ++i)
     {
-        REQUIRE(available.SendCommand({.name = "echo"}));
+        REQUIRE(available.QueueCommand({.name = "echo"}) == CommandQueueResult_e::Accepted);
     }
-    CHECK_FALSE(available.SendCommand({.name = "echo"}));
+
+    CHECK(available.QueueCommand({.name = "echo"}) == CommandQueueResult_e::QueueFull);
 }

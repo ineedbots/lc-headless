@@ -99,7 +99,6 @@ public:
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
     // Queues a console command for the next Step that finds the player placed. False when the script isn't
     // running, hasn't added the command, or already has MAX_COMMANDS waiting.
-    [[nodiscard]] bool ReceiveCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
     [[nodiscard]] CommandQueueResult_e QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
     [[nodiscard]] ScriptStatus_e GetStatus() const;
     // Started and running, with the player placed and settled: when the loop and the hooks run.
