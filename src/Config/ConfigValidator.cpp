@@ -160,8 +160,8 @@ void ConfigValidator::Validate(const Config_s& config)
           std::format("must be from 0 (every change) to {}", MAX_INVENTORY_INTERVAL.count()));
     Check(scripting.accountDataIntervalSeconds >= 0s && scripting.accountDataIntervalSeconds <= MAX_INVENTORY_INTERVAL, "scripting.accountDataIntervalSeconds",
           std::format("must be from 0 (every change) to {}", MAX_INVENTORY_INTERVAL.count()));
-    Check(scripting.experienceIntervalMinutes >= std::chrono::minutes{0} && scripting.experienceIntervalMinutes <= MAX_EXPERIENCE_INTERVAL, "scripting.experienceIntervalMinutes",
-          std::format("must be from 0 (off) to {}", MAX_EXPERIENCE_INTERVAL.count()));
+    Check(scripting.experienceIntervalMinutes >= 1min && scripting.experienceIntervalMinutes <= MAX_EXPERIENCE_INTERVAL, "scripting.experienceIntervalMinutes",
+          std::format("must be from 1 to {}", MAX_EXPERIENCE_INTERVAL.count()));
 
     const auto validateRetention = [](const FleetRecordRetention_s& retention, std::string_view path)
     {

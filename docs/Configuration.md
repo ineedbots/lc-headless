@@ -126,7 +126,7 @@ Logging is enabled by default, including accounts without a script.
 | `fleetDatabasePath` | `data/fleet.sqlite` | SQLite database file shared by configured client processes; empty disables all fleet logging. |
 | `accountDataLogEnabled` | `true` | Store account state/session changes. |
 | `experienceLogEnabled` | `true` | Store skill samples and connection status changes. |
-| `experienceIntervalMinutes` | `1` | 0 to 1440 minutes; `0` disables experience logging, including status changes. |
+| `experienceIntervalMinutes` | `1` | 1 to 1440 minutes between skill samples; must be positive even when logging is disabled. Use `experienceLogEnabled` to disable experience logging. |
 | `bankLogEnabled` | `true` | Store bank contents on open. |
 | `inventoryLogEnabled` | `true` | Store backpack contents on change. |
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds; minimum time between backpack samples; `0` records every change. |

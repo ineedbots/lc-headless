@@ -33,15 +33,12 @@ ExperienceLog::ExperienceLog(std::string accountName, std::chrono::minutes inter
     , m_database{std::move(database)}
     , m_events{std::move(events)}
 {
+    assert(interval > 0min);
 }
 
 void ExperienceLog::Step(Clock::time_point now, const GameState_s& state, ClientStatus_e status, bool settled)
 {
     Poll(now);
-    if (m_interval <= std::chrono::minutes::zero())
-    {
-        return;
-    }
 
     const auto statusName = ReportingStatus::Name(status);
     const auto inGame = status == ClientStatus_e::InGame && settled;

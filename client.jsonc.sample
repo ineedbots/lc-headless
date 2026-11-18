@@ -52,7 +52,7 @@
         "bankLogEnabled": true,
         "inventoryLogEnabled": true,
         "equipmentLogEnabled": true,
-        // 0 disables experience logging; otherwise 1 to 1440 minutes.
+        // 1 to 1440 minutes between skill samples; use experienceLogEnabled to disable logging.
         "experienceIntervalMinutes": 1,
         // 0 records every backpack change; otherwise 1 to 86400 seconds.
         "inventoryIntervalSeconds": 5,

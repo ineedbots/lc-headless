@@ -21,8 +21,7 @@ AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s
     : m_progress{account.script ? account.script->progressReportMinutes : std::chrono::minutes{0}, std::filesystem::path{config.scripting.progressDirectory} / (account.name + ".txt"), logger, std::move(onReport)}
 {
     const auto& scripting = config.scripting;
-    const auto experienceEnabled = scripting.experienceLogEnabled && scripting.experienceIntervalMinutes > std::chrono::minutes::zero();
-    if (!scripting.fleetDatabasePath.empty() && (scripting.accountDataLogEnabled || experienceEnabled || scripting.bankLogEnabled || scripting.inventoryLogEnabled || scripting.equipmentLogEnabled))
+    if (!scripting.fleetDatabasePath.empty() && (scripting.accountDataLogEnabled || scripting.experienceLogEnabled || scripting.bankLogEnabled || scripting.inventoryLogEnabled || scripting.equipmentLogEnabled))
     {
         m_fleetDatabase = databaseProvider ? databaseProvider(scripting.fleetDatabasePath) : std::make_shared<FleetDatabase>(scripting.fleetDatabasePath, FleetDatabase::Mode_e::Inline, scripting.fleetRetention);
     }
@@ -32,7 +31,7 @@ AccountReporting::AccountReporting(const Config_s& config, const AccountConfig_s
         m_accountData.emplace(cache, logger, account.name, m_fleetDatabase, scripting.accountDataIntervalSeconds, events);
     }
 
-    if (m_fleetDatabase && experienceEnabled)
+    if (m_fleetDatabase && scripting.experienceLogEnabled)
     {
         m_experience.emplace(account.name, scripting.experienceIntervalMinutes, logger, m_fleetDatabase, events);
     }

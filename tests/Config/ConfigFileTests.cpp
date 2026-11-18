@@ -1180,6 +1180,36 @@ TEST_CASE("Account data settings round trip and validate intervals", "[ConfigFil
     }
 }
 
+TEST_CASE("Experience logging requires a positive sample interval independently of its enable flag", "[ConfigFile]")
+{
+    auto json = ParseJsonWithComments(EXAMPLE);
+    json["scripting"].erase("experienceIntervalMinutes");
+    CHECK(ConfigFile::Parse(json.dump()).scripting.experienceIntervalMinutes == 1min);
+
+    for (const auto enabled : {false, true})
+    {
+        json["scripting"]["experienceLogEnabled"] = enabled;
+
+        for (const auto interval : {1, 1440})
+        {
+            CAPTURE(enabled, interval);
+            json["scripting"]["experienceIntervalMinutes"] = interval;
+
+            const auto config = ConfigFile::Parse(json.dump());
+            const auto roundTrip = ConfigFile::Parse(ConfigFile::Serialize(config));
+            CHECK(roundTrip.scripting.experienceLogEnabled == enabled);
+            CHECK(roundTrip.scripting.experienceIntervalMinutes.count() == interval);
+        }
+
+        for (const auto interval : {-1, 0, 1441})
+        {
+            CAPTURE(enabled, interval);
+            json["scripting"]["experienceIntervalMinutes"] = interval;
+            CHECK_THROWS_WITH(ConfigFile::Parse(json.dump()), Catch::Matchers::ContainsSubstring("scripting.experienceIntervalMinutes") && Catch::Matchers::ContainsSubstring("must be from 1 to 1440"));
+        }
+    }
+}
+
 TEST_CASE("Fleet retention settings round trip and validate pruning limits", "[ConfigFile]")
 {
     const auto defaults = ConfigFile::Parse(EXAMPLE);
