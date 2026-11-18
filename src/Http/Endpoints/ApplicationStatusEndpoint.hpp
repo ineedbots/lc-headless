@@ -3,8 +3,8 @@
 #include "../Type/HttpRoute_s.hpp"
 #include "../Type/HttpEndpointKind_e.hpp"
 
-#include "../../Application/Type/ApplicationStatus_s.hpp"
-#include "../../Application/Type/CompletedApplicationRequest_s.hpp"
+#include "../../Application/Requests/Type/ApplicationStatus_s.hpp"
+#include "../../Application/Requests/Type/CompletedApplicationRequest_s.hpp"
 #include "../Type/HttpResponse_s.hpp"
 #include "../Type/HttpEndpointRequest_s.hpp"
 

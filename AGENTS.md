@@ -60,6 +60,9 @@ features. Use those pages for the current script-facing contract.
 
 - `src/Application/`, `src/Accounts/`: process startup, account lifecycles and the
   main loop.
+- `src/Application/Requests/`: request admission, safe-point processing, operation
+  handlers and request/result types; application lifecycle events stay in
+  `src/Application/Type/`.
 - `src/Accounts/Reporting/`: account sampling, progress reports, file output and
   idle summaries; reporting value types, including fleet record payloads shared
   with persistence and events, live in its `Type/` folder.

@@ -283,6 +283,7 @@ The [release workflow](../.github/workflows/release.yml) builds and tests Window
 src/
 ├── main.cpp
 ├── Application/              startup, the command line, Ctrl+C
+│   └── Requests/             request admission, safe-point dispatch, Operations/ and Type/
 ├── Accounts/                 each account's lifecycle, the main loop over all accounts and console commands
 │   └── Reporting/            fleet samplers, progress reports, file output, idle summaries and Type/ for reporting values and fleet payloads
 ├── Config/                   client.jsonc and the account files: the structs, parsing, rules, the JSONC editor

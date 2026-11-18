@@ -3,7 +3,7 @@
 
 #include "Type/HttpError_s.hpp"
 #include "Type/HttpResponse_s.hpp"
-#include "Application/Type/CompletedApplicationRequest_s.hpp"
+#include "Application/Requests/Type/CompletedApplicationRequest_s.hpp"
 
 #include <nlohmann/json.hpp>
 

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "ApplicationRequestBridge.hpp"
-#include "../Accounts/AccountRunner.hpp"
+#include "Type/RequestControl_s.hpp"
+#include "../../Accounts/AccountRunner.hpp"
 
 class ApplicationRequestProcessor
 {
