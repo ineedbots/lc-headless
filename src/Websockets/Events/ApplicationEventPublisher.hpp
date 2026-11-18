@@ -20,7 +20,7 @@ public:
             return false;
         }
 
-        if (account.size() > EventLimits::MAX_ACCOUNT_BYTES || !EventProtocol::Measure(payload))
+        if (account.size() > EventLimits::MAX_ACCOUNT_BYTES || !EventProtocol::ValidateAndMeasureOwnedBytes(payload))
         {
             RejectPublication();
             return false;
@@ -38,7 +38,7 @@ public:
             return false;
         }
 
-        if (!EventProtocol::Measure(payload))
+        if (!EventProtocol::ValidateAndMeasureOwnedBytes(payload))
         {
             RejectPublication();
             return false;

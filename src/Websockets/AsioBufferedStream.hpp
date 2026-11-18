@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Http/OperatorListenerPolicy.hpp"
+
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket/teardown.hpp>
@@ -10,7 +12,7 @@ public:
     AsioBufferedStream(boost::asio::ip::tcp::socket socket, std::string_view buffered)
         : buffered_read_stream{std::move(socket)}
     {
-        buffer() = boost::beast::flat_buffer{16384};
+        buffer() = boost::beast::flat_buffer{OperatorListenerPolicy::MAX_BUFFERED_BYTES};
         buffer().commit(boost::asio::buffer_copy(buffer().prepare(buffered.size()), boost::asio::buffer(buffered)));
     }
 

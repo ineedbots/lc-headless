@@ -7,7 +7,9 @@ behavior changes. Setting `fleetDatabasePath` to an empty string disables all fl
 In the source tree, `src/Database/` owns SQLite persistence and `Type/` holds the
 fleet records shared by persistence and live events. `FleetDatabaseSchema` opens
 and configures each connection, checks schema compatibility and creates new
-schemas; `FleetDatabase` owns queuing, batching, writes and retention. Account
+schemas. `FleetDatabase` owns queuing, batching and completion promises;
+`FleetRecordStore` owns SQL writes, transactions, retention and dictionary caches.
+Failed transactions invalidate their cached IDs before another batch can run. Account
 sampling and retry policies live in `src/Accounts/Reporting/`; live event definitions live in
 `src/Websockets/Events/Definitions/`.
 
@@ -47,6 +49,11 @@ event. Each logger retains up to 256 deferred session transitions or bank-open s
 that exceeds that limit is explicitly warned and rejected. Deferred session/status transitions are written
 in order, while coalescible gameplay and inventory changes keep their existing latest-sample policies.
 Completion handling and event publication stay on the account loop and happen only after commit.
+The samplers share `ReportWriteCompletion` for observing completed writes. Database
+completion failures enter each sampler's own retry policy. A live-event publication
+exception after commit is logged separately and does not retry the committed
+record or prevent its sampling state from advancing. A rejected live event remains
+best-effort delivery and does not undo the database commit.
 On normal runner shutdown, each started account's final state is sampled and accepted writes are drained
 before the event publisher stops. SQLite still serializes writers across client processes, so a busy batch
 can fail after the 25 ms wait and rely on the stream retry policy. SQLite is intended for a local

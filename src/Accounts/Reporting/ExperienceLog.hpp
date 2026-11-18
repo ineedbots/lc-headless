@@ -53,6 +53,14 @@ public:
     }
 
 private:
+    struct SampleOptions_s
+    {
+        bool settled = false;
+        bool startsBaseline = false;
+        bool periodic = false;
+        bool statusTransition = false;
+    };
+
     struct Sample_s
     {
         FleetExperienceLog_s record;
@@ -70,7 +78,7 @@ private:
         std::future<void> completion;
     };
 
-    [[nodiscard]] Sample_s MakeSample(Clock::time_point now, std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, bool settled, bool startsBaseline, bool periodic, bool statusTransition) const;
+    [[nodiscard]] Sample_s MakeSample(Clock::time_point now, std::chrono::system_clock::time_point time, const GameState_s& state, std::string_view statusName, SampleOptions_s options) const;
     bool WriteSample(Sample_s sample);
     void LogGains(const std::array<s32, GameState_s::STAT_COUNT>& xp, double hours);
 

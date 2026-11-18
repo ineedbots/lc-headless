@@ -1,6 +1,9 @@
 #include "pch.hpp"
 #include "AccountDataLog.hpp"
 
+#include "ReportWriteCompletion.hpp"
+#include "ReportingStatus.hpp"
+
 #include "Websockets/Events/ApplicationEventPublisher.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Console/Logger.hpp"
@@ -18,25 +21,6 @@ namespace
 {
     constexpr u16 SPECIAL_ENERGY_VARP = 300;
     constexpr u16 SPECIAL_ARMED_VARP = 301;
-
-    std::string_view StatusName(ClientStatus_e status)
-    {
-        switch (status)
-        {
-        case ClientStatus_e::Disconnected:
-            return "disconnected";
-        case ClientStatus_e::Connecting:
-            return "connecting";
-        case ClientStatus_e::InGame:
-            return "ingame";
-        case ClientStatus_e::LoggingOut:
-            return "logging out";
-        case ClientStatus_e::LoggedOut:
-            return "logged out";
-        }
-
-        return "unknown";
-    }
 
     FleetLogTile_s Tile(const Tile_s& tile)
     {
@@ -64,7 +48,7 @@ FleetAccountDataLog_s AccountDataLog::Read(const GameState_s& state, ClientStatu
     const auto settled = status == ClientStatus_e::InGame && state.IsSettled();
     auto sample = FleetAccountDataLog_s{
         .account = m_accountName,
-        .state = std::string{StatusName(status)},
+        .state = std::string{ReportingStatus::Name(status)},
         .settled = settled,
         .tick = state.tick};
     if (!settled)
@@ -205,31 +189,18 @@ void AccountDataLog::Step(Clock::time_point now, const GameState_s& state, Clien
 
 void AccountDataLog::Poll(Clock::time_point now)
 {
-    if (!m_write || m_write->completion.wait_for(0ms) != std::future_status::ready)
+    ReportWriteCompletion::Poll(m_write, [this](auto& write)
     {
-        return;
-    }
-
-    auto write = std::move(*m_write);
-    m_write.reset();
-
-    try
-    {
-        write.completion.get();
         m_lastSample = write.record;
 
-        if (m_events)
-        {
-            m_events->Publish(m_accountName, write.record);
-        }
+        ReportWriteCompletion::Publish(m_events, *m_logger, m_accountName, write.record);
 
         if (m_writeFailed)
         {
             m_logger->Info("Writing account data to {} again", m_database->GetPath().string());
             m_writeFailed = false;
         }
-    }
-    catch (const std::exception& e)
+    }, [this, now](auto& write, const std::exception& e)
     {
         if (write.sessionTransition)
         {
@@ -243,7 +214,7 @@ void AccountDataLog::Poll(Clock::time_point now)
         }
 
         m_nextSample = now + m_interval;
-    }
+    });
 }
 
 void AccountDataLog::Flush()

@@ -3,13 +3,14 @@
 #include "Websockets/Events/Type/ApplicationEvent_s.hpp"
 #include "ApplicationEventPublisher.hpp"
 #include "EventLimits.hpp"
+#include "EventOutbox.hpp"
 #include "Websockets/Events/Type/EventSubscription_s.hpp"
 
 class ApplicationEventBridge : public ApplicationEventPublisher
 {
 public:
     static constexpr std::size_t MAX_MESSAGE_BYTES = EventLimits::MAX_MESSAGE_BYTES;
-    static constexpr std::size_t MAX_EVENT_BYTES = EventLimits::MAX_EVENT_BYTES;
+    static constexpr std::size_t MAX_EVENT_ENVELOPE_BYTES = EventLimits::MAX_EVENT_ENVELOPE_BYTES;
     static constexpr std::size_t MAX_OUTBOX_BYTES = EventLimits::MAX_OUTBOX_BYTES;
     static constexpr std::size_t MAX_OUTBOX_ITEMS = EventLimits::MAX_OUTBOX_ITEMS;
     static constexpr std::size_t MAX_JOURNAL_ITEMS = EventLimits::MAX_JOURNAL_ITEMS;
@@ -53,8 +54,7 @@ private:
     struct Client_s
     {
         std::vector<EventSubscription_s> subscriptions;
-        std::deque<std::shared_ptr<const std::string>> outbox;
-        std::size_t bytes = 0;
+        EventOutbox outbox;
         bool closing = false;
     };
 

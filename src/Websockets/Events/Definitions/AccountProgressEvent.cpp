@@ -5,9 +5,9 @@
 
 #include <nlohmann/json.hpp>
 
-std::optional<std::size_t> AccountProgressEvent::Measure(const ProgressReport_s& payload)
+std::optional<std::size_t> AccountProgressEvent::ValidateAndMeasureOwnedBytes(const ProgressReport_s& payload)
 {
-    if (payload.rows.size() > 64)
+    if (payload.rows.size() > MAX_ROWS)
     {
         return {};
     }
@@ -15,7 +15,7 @@ std::optional<std::size_t> AccountProgressEvent::Measure(const ProgressReport_s&
     auto total = std::size_t{0};
     for (const auto& [name, value] : payload.rows)
     {
-        if (name.size() > 4096 - total || value.size() > 4096 - total - name.size())
+        if (name.size() > MAX_TOTAL_ROW_TEXT_BYTES - total || value.size() > MAX_TOTAL_ROW_TEXT_BYTES - total - name.size())
         {
             return {};
         }

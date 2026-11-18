@@ -51,18 +51,40 @@ The HTTP registry owns the connection until it transfers its socket and buffered
 bytes to `AsioWebSocketSession`. The WebSocket registry then owns the session;
 callbacks keep its state alive until retirement. Bridge connection IDs are never
 reused, so late completions cannot address a replacement connection.
+`AsioHttpSession` owns HTTP parsing, request admission, deadlines and the upgrade
+checks. Its `HttpSessionOwner` interface registers and retires requests and
+connections, transfers upgraded sessions and accounts for outstanding callbacks.
+The listener supplies a read-only `HttpSessionContext_s` view of routing, bridges,
+settings and shutdown state. HTTP session callbacks continue contributing to the
+listener's drain count after their connection leaves its registry.
 The upgrade passes the parsed request directly to Beast. `AsioBufferedStream`
 retains up to 16384 already-read bytes ahead of the TCP stream, preserving large
 coalesced frames without feeding headers back through Beast's smaller internal
 handshake buffer. Its teardown customization forwards to the owned TCP stream.
 
 To extend the catalog, follow [Registering operator HTTP endpoints and events](OperatorRegistration.md).
+`EventOutbox` owns each client's bounded immutable frames and byte accounting.
+The bridge owns subscriptions, snapshots, the ordered journal and fanout cursor;
+an outbox rejection still invokes the bridge's existing overflow/disconnect policy.
+`WebSocketEventDefinition` checks event adapter signatures before catalog use.
+`ValidateAndMeasureOwnedBytes` validates the budgeted owned payload, while
+`MAX_ENVELOPE_BYTES` limits the full encoded event. Fleet definitions share
+`FleetEventPayload<Record>` for validation and UTF-8-normalized serialization.
+`EventAction_e` represents decoded subscription actions; protocol encoding retains
+the public `subscribe` and `unsubscribe` strings.
+
 The typed catalog in `src/Websockets/Events/Type/ApplicationEvents_s.hpp` derives the payload variant,
 name validation, serializer and retention dispatch from per-event definitions.
 `AccountOptions_s::events` supplies one shared publisher for all account events;
 publication validates borrowed values before copying into the bounded journal.
-`EventLimits` centralizes shared limits, and bridge construction validates the
+`EventLimits` centralizes event limits and per-service budgets. `OperatorListenerPolicy`
+owns the shared HTTP/WebSocket connection capacity, buffers and transport deadlines.
+Bridge construction validates the
 aggregate snapshot budget for all retained event definitions.
+
+WebSocket sessions track `Handshaking`, `Open`, `Closing` and `Closed` phases.
+An in-flight write and a pending close request remain independent, so a requested
+close waits for the write to finish before starting the close handshake.
 
 ## Version 1 protocol
 

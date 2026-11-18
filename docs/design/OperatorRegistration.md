@@ -8,18 +8,23 @@ under `src/` requires no CMake source-list edits.
 
 `src/Http/HttpEndpoints.hpp` is the endpoint list. Each REST endpoint provides:
 
-- `Payload`: the owned **result** type it serializes.
+- `KIND`: `HttpEndpointKind_e::Rest`.
+- `ResponsePayload`: the owned **result** type it serializes.
+- `IS_DEFAULT_RESPONSE`: whether this endpoint supplies fallback encoding for that result type.
 - `Route()`: method, path template, content-type policy and request decoder.
-- `Respond(const CompletedApplicationRequest_s&, const Payload&)`: response encoding.
+- `Respond(const CompletedApplicationRequest_s&, const ResponsePayload&)`: response encoding.
 
 Add the endpoint to `HttpEndpoints::Catalog`. The catalog attaches its response
 adapter to the route. Multiple endpoints can reuse an operation/result and encode
 it differently. A matched route owns its adapter through deferred body reading
 and completion. Raw `HttpRoute_s` registrations remain supported.
 
-Upgrade endpoints provide only `Route()`, with `webSocket = true`; register them
-in the same catalog. This selects the existing subscription protocol/session,
-not a new arbitrary WebSocket protocol.
+Upgrade endpoints declare `KIND = HttpEndpointKind_e::WebSocketUpgrade` and
+provide `Route()` with `webSocket = true`; register them in the same catalog.
+They do not declare `ResponsePayload`. `HttpRestEndpoint` and `HttpUpgradeEndpoint`
+concepts check the adapter signatures, and route construction checks that the
+declared kind agrees with the route transport. This selects the existing
+subscription protocol/session, not a new arbitrary WebSocket protocol.
 
 For a new application operation:
 
@@ -49,9 +54,12 @@ shutdown and runner safe points continue to govern every operation.
 
 `HttpResponses::Complete` remains the fallback for raw routes and completions
 without a route-compatible result, such as cancellation before execution. Its
-serializer list also derives from the endpoint catalog; the first endpoint for a
-result type defines the fallback encoding. Keep that ordering stable when adding
-alternate encodings. Normal matched responses use their own endpoint adapter.
+serializer list also derives from the endpoint catalog. Exactly one endpoint
+per response type must declare `IS_DEFAULT_RESPONSE = true`; alternate encoders
+use `false`. `HasValidDefaults()` supports compile-time validation, and catalog
+route/response construction rejects missing or ambiguous defaults. Reordering
+registrations does not change fallback encoding. Normal matched responses use
+their own endpoint adapter.
 
 Test decoding/encoding and behavior at safe points. Transport tests should verify
 that a route's custom response survives asynchronous completion. Keep public wire
@@ -65,8 +73,10 @@ completion outcomes, errors and HTTP status selection in the endpoint adapter.
 so reserve it for types that need that input contract, such as configuration
 sections. Request validation remains explicit.
 
-`HttpError_s` supplies the shared code/message shape for endpoint and transport
-errors. Event message types keep their mappings beside their definitions.
+`HttpJson::CompletedResponse` adds request IDs and optional error metadata to a
+completed endpoint response; endpoints still choose payload shapes and HTTP
+statuses. `HttpError_s` supplies the shared code/message shape for endpoint and
+transport errors. Event message types keep their mappings beside their definitions.
 Acknowledgement and snapshot collections remain arrays; missing event accounts
 and error IDs remain explicit JSON nulls.
 
@@ -80,8 +90,8 @@ definition under `src/Websockets/Events/Definitions/` provides:
 - `SCOPE`: `EventScope_e::Account` or `EventScope_e::Global`.
 - `RETAINS_LATEST`: whether subscriptions receive the latest value per account
   for account events, or one latest value per event type for global events.
-- `MAX_SERIALIZED_BYTES`: the maximum **full event envelope**, including metadata.
-- `Measure(const Payload&)`: bounded validation/accounting before copying; return
+- `MAX_ENVELOPE_BYTES`: the maximum **full event envelope**, including metadata.
+- `ValidateAndMeasureOwnedBytes(const Payload&)`: bounded validation/accounting before copying; return
   an empty optional to reject the value. Include owned dynamic content and payload
   storage; the generic adapter adds envelope storage.
 - `Serialize(const Payload&)`: payload JSON; the protocol supplies the envelope.
@@ -90,11 +100,16 @@ Event payload types keep their nlohmann mappings beside their definitions. Their
 definitions' `Serialize` methods delegate to these mappings. Direct member
 mappings use the serialization-only macro; progress converts runtime to seconds,
 and script data uses the same bounded JSON parser as admission validation. Keep
-`Measure` checks in the event definition.
+`ValidateAndMeasureOwnedBytes` checks in the event definition or its shared
+payload adapter. Progress bounds use `MAX_ROWS` and `MAX_TOTAL_ROW_TEXT_BYTES`;
+fleet JSON admission reserves `FleetLogEvent::ENVELOPE_RESERVE_BYTES` for metadata.
 
 Add the definition to `ApplicationEvents_s`. Its payload variant, known-name
 validation, name lookup, encoding and retention dispatch derive from that list.
-Names, scopes and maximum envelope sizes are checked at compile time.
+The `WebSocketEventDefinition` concept checks the payload/codec contract before
+catalog instantiation. Names, scopes and maximum envelope sizes are checked at
+compile time. Owned-byte accounting and full-envelope wire limits remain separate;
+the bridge checks actual encoded envelope size before delivery.
 
 Emit from an account safe point using its optional shared publisher:
 
@@ -128,7 +143,8 @@ The owned `Publish(ApplicationEvent_s)` overload remains available when ownershi
 already exists. All publications and subscription changes retain journal ordering;
 no event-specific account option or application startup callback is needed.
 
-`EventLimits` owns the shared listener/event resource limits. A retained event
+`EventLimits` owns event resource limits and per-service budgets;
+`OperatorListenerPolicy` owns shared listener capacity and transport deadlines. A retained event
 reserves its declared maximum envelope size plus a separator per configured
 account for account scope, or once per event type for global scope. Bridge construction rejects a catalog/account combination whose snapshot
 plus framing/ack reserve exceeds the client outbox byte limit. Another retained
@@ -149,7 +165,11 @@ Python scripts publish bounded live `script.event` values using
 validation and serializer, while the host supplies the account config identity.
 See [script publication](../scripting/console-and-messages.md#operator-events).
 
-Fleet journal definitions use `FleetLogEvent` to validate bounded owned JSON and
-serialize it as an object payload. Producers pass the same UTF-8-normalized JSON
-line they successfully appended. The four fleet event types are account-scoped
+Fleet journal definitions inherit `FleetEventPayload<Record>`, which shares
+owned-byte validation and JSON serialization while leaving payload type, name,
+scope, retention and envelope limits explicit in each definition. The helper
+uses `FleetLogEvent` to validate bounded JSON and
+serialize it as an object payload. Producers publish typed records only after
+database commit. Item names use the same UTF-8 replacement policy for storage
+and event serialization. The four fleet event types are account-scoped
 and live only; they share validation without sharing a subscription name.

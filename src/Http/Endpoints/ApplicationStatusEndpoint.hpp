@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Type/HttpRoute_s.hpp"
+#include "../Type/HttpEndpointKind_e.hpp"
 
 #include "../../Application/Type/ApplicationStatus_s.hpp"
 #include "../../Application/Type/CompletedApplicationRequest_s.hpp"
@@ -11,7 +12,10 @@ class ApplicationStatusEndpoint
 {
 public:
     ApplicationStatusEndpoint() = delete;
-    using Payload = ApplicationStatus_s;
+    static constexpr auto KIND = HttpEndpointKind_e::Rest;
+    static constexpr bool IS_DEFAULT_RESPONSE = true;
+
+    using ResponsePayload = ApplicationStatus_s;
     [[nodiscard]] static HttpRoute_s Route();
     [[nodiscard]] static HttpResponse_s Respond(const CompletedApplicationRequest_s& result, const ApplicationStatus_s& status);
 

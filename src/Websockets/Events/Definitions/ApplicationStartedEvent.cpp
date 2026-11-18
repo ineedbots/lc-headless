@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-std::optional<std::size_t> ApplicationStartedEvent::Measure(const ApplicationStarted_s&)
+std::optional<std::size_t> ApplicationStartedEvent::ValidateAndMeasureOwnedBytes(const ApplicationStarted_s&)
 {
     return sizeof(ApplicationStarted_s);
 }

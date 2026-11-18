@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Type/HttpResponse_s.hpp"
+#include "Application/Type/CompletedApplicationRequest_s.hpp"
 #include <nlohmann/json.hpp>
 
 // Kept in the HTTP adapter; application and transport interfaces use owned values.
@@ -9,4 +10,5 @@ class HttpJson
 public:
     HttpJson() = delete;
     [[nodiscard]] static HttpResponse_s Response(unsigned status, const nlohmann::json& body);
+    [[nodiscard]] static HttpResponse_s CompletedResponse(unsigned status, nlohmann::json body, const CompletedApplicationRequest_s& result);
 };

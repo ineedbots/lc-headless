@@ -2,6 +2,7 @@
 
 #include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "Websockets/Events/EventProtocol.hpp"
+#include "Websockets/Events/Type/EventAction_e.hpp"
 #include "Websockets/Events/ApplicationEventPublisher.hpp"
 #include "Application/Type/ApplicationStarted_s.hpp"
 #include "Websockets/Events/Type/ApplicationEvent_s.hpp"
@@ -128,7 +129,7 @@ TEST_CASE("Event protocol validates versions types fields identifiers and filter
 TEST_CASE("Event message serializers preserve envelopes and empty snapshots", "[Events]")
 {
     const auto sequence = std::numeric_limits<u64>::max();
-    CHECK(Json::parse(EventProtocol::Ack("id", "subscribe", "instance", sequence)) ==
+    CHECK(Json::parse(EventProtocol::Ack("id", EventAction_e::Subscribe, "instance", sequence)) ==
           Json{{"version", 1}, {"type", "ack"}, {"id", "id"}, {"action", "subscribe"}, {"instance", "instance"}, {"sequence", sequence}});
     CHECK(Json::parse(EventProtocol::Error("", "invalid_message")) ==
           Json{{"version", 1}, {"type", "error"}, {"id", nullptr}, {"code", "invalid_message"}});
@@ -210,7 +211,7 @@ TEST_CASE("Event fanout continues across passes in order with bounded journal ad
         }
     }
 
-    for (std::size_t i = 0; i < ApplicationEventBridge::MAX_JOURNAL_BYTES / ApplicationEventBridge::MAX_EVENT_BYTES; ++i)
+    for (std::size_t i = 0; i < ApplicationEventBridge::MAX_JOURNAL_BYTES / ApplicationEventBridge::MAX_EVENT_ENVELOPE_BYTES; ++i)
     {
         REQUIRE(bridge.Publish("bot1", ProgressReport_s{1s, {}}));
     }

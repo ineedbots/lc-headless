@@ -143,7 +143,7 @@ def loop():
 
     SECTION("over capacity")
     {
-        for (std::size_t i = 0; i < ApplicationEventBridge::MAX_JOURNAL_BYTES / ApplicationEventBridge::MAX_EVENT_BYTES; ++i)
+        for (std::size_t i = 0; i < ApplicationEventBridge::MAX_JOURNAL_BYTES / ApplicationEventBridge::MAX_EVENT_ENVELOPE_BYTES; ++i)
         {
             REQUIRE(events->Publish(ApplicationStarted_s{}));
         }
@@ -168,12 +168,12 @@ TEST_CASE("Script event definitions reject malformed and excessive JSON before a
 
     for (const auto json : {"{", "NaN", "[1,]", "", "{bad}"})
     {
-        CHECK_FALSE(ScriptPublishedEvent::Measure({"valid", json}));
+        CHECK_FALSE(ScriptPublishedEvent::ValidateAndMeasureOwnedBytes({"valid", json}));
         CHECK_THROWS_AS(serialize(json), std::invalid_argument);
     }
 
-    CHECK(ScriptPublishedEvent::Measure({"valid", "null"}));
-    CHECK(ScriptPublishedEvent::Measure({"valid", R"({"text":"hello","list":[1,true,null]})"}));
+    CHECK(ScriptPublishedEvent::ValidateAndMeasureOwnedBytes({"valid", "null"}));
+    CHECK(ScriptPublishedEvent::ValidateAndMeasureOwnedBytes({"valid", R"({"text":"hello","list":[1,true,null]})"}));
 
     CHECK(serialize("null") == Json{{"name", "valid"}, {"data", nullptr}});
     CHECK(serialize(R"({"text":"hello","list":[1,true,null]})") ==
@@ -183,7 +183,7 @@ TEST_CASE("Script event definitions reject malformed and excessive JSON before a
     const auto tooDeep = std::string(ScriptPublishedEvent::MAX_DATA_DEPTH + 1, '[') + "0" + std::string(ScriptPublishedEvent::MAX_DATA_DEPTH + 1, ']');
     for (const auto& text : {oversized, tooDeep})
     {
-        CHECK_FALSE(ScriptPublishedEvent::Measure({"valid", text}));
+        CHECK_FALSE(ScriptPublishedEvent::ValidateAndMeasureOwnedBytes({"valid", text}));
         CHECK_THROWS_AS(serialize(text), std::invalid_argument);
     }
 }

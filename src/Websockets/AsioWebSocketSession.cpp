@@ -2,6 +2,7 @@
 #include "AsioWebSocketSession.hpp"
 
 #include "AsioBufferedStream.hpp"
+#include "Http/OperatorListenerPolicy.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"
 
 #include <boost/asio/steady_timer.hpp>
@@ -22,10 +23,16 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
     std::shared_ptr<ApplicationEventBridge> bridge;
     u64 client = 0;
     std::size_t operations = 0;
-    bool accepted = false;
+    enum class Phase_e
+    {
+        Handshaking,
+        Open,
+        Closing,
+        Closed,
+    };
+
+    Phase_e phase = Phase_e::Handshaking;
     bool writing = false;
-    bool closing = false;
-    bool closed = false;
     bool stopping = false;
     u16 closeCode = 0;
     std::string closeReason;
@@ -52,12 +59,12 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 
     void Close()
     {
-        if (closed)
+        if (phase == Phase_e::Closed)
         {
             return;
         }
 
-        closed = true;
+        phase = Phase_e::Closed;
         bridge->Disconnect(client);
         writeTimer.cancel();
 
@@ -78,21 +85,21 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 
         beast::get_lowest_layer(stream).expires_never();
         auto timeout = websocket::stream_base::timeout{};
-        timeout.handshake_timeout = 10s;
-        timeout.idle_timeout = 60s;
+        timeout.handshake_timeout = OperatorListenerPolicy::WEBSOCKET_HANDSHAKE_TIMEOUT;
+        timeout.idle_timeout = OperatorListenerPolicy::WEBSOCKET_IDLE_TIMEOUT;
         timeout.keep_alive_pings = true;
         stream.set_option(timeout);
         stream.read_message_max(ApplicationEventBridge::MAX_MESSAGE_BYTES);
         stream.async_accept(request, Track([self = shared_from_this()](boost::system::error_code error)
         {
             self->request = {};
-            if (error || self->closed)
+            if (error || self->phase == Phase_e::Closed)
             {
                 self->Close();
                 return;
             }
 
-            self->accepted = true;
+            self->phase = Phase_e::Open;
             self->Read();
             self->Service();
         }));
@@ -100,14 +107,14 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 
     void Read()
     {
-        if (closed || closing || closeCode != 0)
+        if (phase != Phase_e::Open || closeCode != 0)
         {
             return;
         }
 
         stream.async_read(input, Track([self = shared_from_this()](boost::system::error_code error, std::size_t)
         {
-            if (error || self->closed)
+            if (error || self->phase == Phase_e::Closed)
             {
                 self->Close();
                 return;
@@ -128,7 +135,7 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 
     void BeginClose(u16 code, std::string_view reason)
     {
-        if (closed || closing)
+        if (phase == Phase_e::Closed || phase == Phase_e::Closing)
         {
             return;
         }
@@ -141,13 +148,14 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
             return;
         }
 
-        closing = true;
         bridge->Disconnect(client);
-        if (!accepted)
+        if (phase != Phase_e::Open)
         {
             Close();
             return;
         }
+
+        phase = Phase_e::Closing;
 
         auto close = websocket::close_reason{};
         close.code = code;
@@ -160,7 +168,7 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 
     void Service()
     {
-        if (closed || closing || !accepted || writing)
+        if (phase != Phase_e::Open || writing)
         {
             return;
         }
@@ -185,7 +193,7 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
 
         writing = true;
         stream.text(true);
-        writeTimer.expires_after(10s);
+        writeTimer.expires_after(OperatorListenerPolicy::WEBSOCKET_WRITE_TIMEOUT);
         writeTimer.async_wait(Track([self = shared_from_this()](boost::system::error_code error)
         {
             if (!error)
@@ -201,7 +209,7 @@ struct AsioWebSocketSession::State : std::enable_shared_from_this<State>
             self->writeTimer.cancel();
             self->writing = false;
 
-            if (error || self->closed)
+            if (error || self->phase == Phase_e::Closed)
             {
                 self->Close();
                 return;
@@ -236,7 +244,7 @@ void AsioWebSocketSession::Service()
 void AsioWebSocketSession::Stop()
 {
     m_state->stopping = true;
-    if (!m_state->accepted)
+    if (m_state->phase == State::Phase_e::Handshaking)
     {
         m_state->Close();
     }
@@ -251,5 +259,5 @@ void AsioWebSocketSession::Close()
 
 bool AsioWebSocketSession::IsDrained() const
 {
-    return m_state->closed && m_state->operations == 0;
+    return m_state->phase == State::Phase_e::Closed && m_state->operations == 0;
 }
