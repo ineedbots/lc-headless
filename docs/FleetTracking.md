@@ -95,7 +95,7 @@ event publication.
 | `fleetDatabasePath` | `data/fleet.sqlite` | One database file for all enabled streams; empty disables fleet logging |
 | `accountDataLogEnabled` | `true` | Store account state/session changes |
 | `experienceLogEnabled` | `true` | Store skill samples and status changes |
-| `experienceIntervalMinutes` | `1` | 0 to 1440 minutes between samples; `0` turns experience logging off |
+| `experienceIntervalMinutes` | `1` | 1 to 1440 minutes between samples; must be positive even when `experienceLogEnabled` is `false` |
 | `bankLogEnabled` | `true` | Store bank snapshots |
 | `inventoryLogEnabled` | `true` | Store backpack changes |
 | `inventoryIntervalSeconds` | `5` | 0 to 86400 seconds between lines; `0` records every change |
@@ -283,7 +283,7 @@ Without `--config` the page cannot start or stop anything: the bar is hidden, an
 | Want | Set |
 |---|---|
 | No account data log | `"accountDataLogEnabled": false` |
-| No experience log | `"experienceLogEnabled": false` or `"experienceIntervalMinutes": 0` |
+| No experience log | `"experienceLogEnabled": false` |
 | No bank log | `"bankLogEnabled": false` |
 | No inventory log | `"inventoryLogEnabled": false` |
 | No equipment log | `"equipmentLogEnabled": false` |

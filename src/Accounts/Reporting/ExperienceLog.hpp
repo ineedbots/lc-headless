@@ -37,7 +37,7 @@ public:
         "runecraft",
     });
 
-    // A zero interval turns the log off; the account doesn't build one.
+    // The interval must be positive; experienceLogEnabled controls whether the account builds a log.
     ExperienceLog(std::string accountName, std::chrono::minutes interval, std::shared_ptr<Logger> logger, std::shared_ptr<FleetDatabase> database, std::shared_ptr<ApplicationEventPublisher> events = {});
 
     // Called every step. The account's status is recorded on every change, and skills are sampled while it
