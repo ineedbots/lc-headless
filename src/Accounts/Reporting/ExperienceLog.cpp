@@ -8,8 +8,8 @@
 
 #include "Utils/StringUtils.hpp"
 #include "Game/State/Type/Stat_s.hpp"
-#include "Database/Type/FleetExperienceLog_s.hpp"
-#include "Database/Type/FleetSkill_s.hpp"
+#include "Accounts/Reporting/Type/FleetExperienceLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetSkill_s.hpp"
 
 namespace
 {

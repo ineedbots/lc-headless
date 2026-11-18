@@ -3,7 +3,7 @@
 #include "../Support/TempFolder.hpp"
 #include "Database/FleetRecordStore.hpp"
 #include "Database/Type/FleetRecord.hpp"
-#include "Database/Type/FleetExperienceLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetExperienceLog_s.hpp"
 
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <catch2/catch_test_macros.hpp>

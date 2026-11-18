@@ -5,7 +5,7 @@
 #include "../Support/FleetDatabaseReader.hpp"
 #include "../Support/Application/EventCapture.hpp"
 #include "Accounts/Reporting/AccountReporting.hpp"
-#include "Database/Type/FleetBankLog_s.hpp"
+#include "Accounts/Reporting/Type/FleetBankLog_s.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "Websockets/Events/ApplicationEventPublisher.hpp"
 #include "Websockets/Events/Definitions/FleetBankEvent.hpp"
