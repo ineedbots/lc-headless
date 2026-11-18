@@ -4,6 +4,12 @@
 
 struct HttpSettings_s
 {
+    static constexpr auto PORT_RANGE = std::pair<s64, s64>{1, 65535};
+    static constexpr auto REQUEST_TIMEOUT_MS_RANGE = std::pair<s64, s64>{100, 120000};
+    static constexpr auto PENDING_REQUESTS_RANGE = std::pair<s64, s64>{1, 1024};
+    static constexpr auto REQUEST_BODY_BYTES_RANGE = std::pair<s64, s64>{1, 1048576};
+    static constexpr auto OUTPUT_BYTES_RANGE = std::pair<s64, s64>{1, 16777216};
+
     std::string host;
     s64 port = 8080;
     std::chrono::milliseconds requestTimeoutMs = 30000ms;
