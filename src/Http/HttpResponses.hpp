@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Application/ApplicationRequestBridge.hpp"
+#include "../Application/Requests/ApplicationRequestBridge.hpp"
 #include "Type/HttpResponse_s.hpp"
 
 class HttpResponses

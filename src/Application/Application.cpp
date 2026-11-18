@@ -23,7 +23,7 @@
 #include "../Script/ScriptRuntime.hpp"
 #include "CommandLine.hpp"
 #include "InterruptSignal.hpp"
-#include "ApplicationRequestProcessor.hpp"
+#include "Requests/ApplicationRequestProcessor.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "Type/ApplicationStarted_s.hpp"
 #include "EntryPoint.hpp"

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../Application/ApplicationRequestBridge.hpp"
+#include "../../Application/Requests/ApplicationRequestBridge.hpp"
 #include "HttpResponse_s.hpp"
 #include "HttpEndpointRequest_s.hpp"
-#include "../../Application/Type/CompletedApplicationRequest_s.hpp"
+#include "../../Application/Requests/Type/CompletedApplicationRequest_s.hpp"
 
 using HttpDecodeResult = std::variant<ApplicationRequestPayload, HttpResponse_s>;
 

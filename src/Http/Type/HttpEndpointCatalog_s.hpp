@@ -4,7 +4,7 @@
 #include "HttpEndpointKind_e.hpp"
 #include "HttpRoute_s.hpp"
 #include "HttpResponse_s.hpp"
-#include "Application/Type/CompletedApplicationRequest_s.hpp"
+#include "Application/Requests/Type/CompletedApplicationRequest_s.hpp"
 
 template <typename... Endpoints>
 struct HttpEndpointCatalog_s

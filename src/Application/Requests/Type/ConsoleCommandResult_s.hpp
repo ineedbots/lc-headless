@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Console/CommandExecution.hpp"
+#include "Console/Type/CommandRecipient_s.hpp"
 
 #include <nlohmann/json.hpp>
 

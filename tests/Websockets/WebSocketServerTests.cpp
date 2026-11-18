@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Application/ApplicationRequestBridge.hpp"
+#include "Application/Requests/ApplicationRequestBridge.hpp"
 #include "Websockets/Events/ApplicationEventBridge.hpp"
 #include "Application/Type/ApplicationStarted_s.hpp"
 #include "Accounts/Reporting/Type/ProgressReport_s.hpp"

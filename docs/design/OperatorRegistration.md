@@ -28,14 +28,14 @@ subscription protocol/session, not a new arbitrary WebSocket protocol.
 
 For a new application operation:
 
-1. Add owned request and result types under `src/Application/Type/` (or their
+1. Add owned request and result types under `src/Application/Requests/Type/` (or their
    domain's `Type/` folder).
-2. Add an operation class under `src/Application/Operations/`, with `Payload`
+2. Add an operation class under `src/Application/Requests/Operations/`, with `Payload`
    naming the request, `Result` naming the result, and
    `Execute(const ApplicationRequestContext_s&, const shared_ptr<RequestControl_s>&,
    const Payload&)` returning `optional<Result>`.
 3. Add the operation to `ApplicationOperations_s` in
-   `src/Application/Type/ApplicationOperations_s.hpp`. Request/result variants
+   `src/Application/Requests/Type/ApplicationOperations_s.hpp`. Request/result variants
    and execution dispatch derive from that list.
 4. Add the HTTP endpoint and its catalog entry as above. Validate and decode only
    in the endpoint; execute against the account facade only in the operation.
@@ -45,6 +45,11 @@ for the existing console-command completion lifecycle: the handler must install
 `RequestControl_s::execution`, and the processor finalizes it after all recipients
 finish. A new kind of deferred operation needs its own completion lifecycle before
 using this path; an empty optional is not a general async job mechanism.
+
+`ConsoleCommandCompletion` owns deferred command cancellation and result
+aggregation. The processor owns dispatch, completion delivery and retirement.
+`CommandRecipient_s` lives in `src/Console/Type/` so result types can use
+recipient values without including mutable command execution state.
 
 `AccountControl` is the narrow account facade available to application handlers.
 `AccountRunner` implements it; add domain capabilities there when an operation

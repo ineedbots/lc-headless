@@ -2,8 +2,8 @@
 #include "HttpResponses.hpp"
 
 #include "Type/HttpResponse_s.hpp"
-#include "../Application/Type/CompletedApplicationRequest_s.hpp"
-#include "../Application/Type/ConsoleCommandResult_s.hpp"
+#include "../Application/Requests/Type/CompletedApplicationRequest_s.hpp"
+#include "../Application/Requests/Type/ConsoleCommandResult_s.hpp"
 #include "HttpEndpoints.hpp"
 #include "HttpJson.hpp"
 #include "Type/HttpError_s.hpp"

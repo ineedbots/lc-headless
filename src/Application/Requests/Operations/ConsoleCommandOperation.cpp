@@ -2,9 +2,9 @@
 #include "ConsoleCommandOperation.hpp"
 
 #include "../Type/ConsoleCommandResult_s.hpp"
-#include "../../Console/ConsoleCapture.hpp"
-#include "../../Console/CommandExecution.hpp"
-#include "../../Accounts/AccountControl.hpp"
+#include "../../../Console/ConsoleCapture.hpp"
+#include "../../../Console/CommandExecution.hpp"
+#include "../../../Accounts/AccountControl.hpp"
 #include "../Type/RequestControl_s.hpp"
 #include "../Type/ExecuteConsoleCommand_s.hpp"
 #include "../Type/ApplicationRequestContext_s.hpp"

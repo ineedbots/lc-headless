@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Application/ApplicationRequestBridge.hpp"
+#include "../Application/Requests/ApplicationRequestBridge.hpp"
 
 class HttpServer
 {
