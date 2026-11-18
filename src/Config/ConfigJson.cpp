@@ -3,6 +3,7 @@
 
 #include "../Utils/StringUtils.hpp"
 #include "Error/ConfigError.hpp"
+#include "Type/HttpSettings_s.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -11,6 +12,13 @@ namespace
     constexpr auto INDENT = 4;
     constexpr auto ALLOW_EXCEPTIONS = true;
     constexpr auto IGNORE_COMMENTS = true;
+    constexpr auto HTTP_INTEGER_RANGES = std::array{
+        std::pair{"port"sv, HttpSettings_s::PORT_RANGE},
+        std::pair{"requestTimeoutMs"sv, HttpSettings_s::REQUEST_TIMEOUT_MS_RANGE},
+        std::pair{"maxPendingRequests"sv, HttpSettings_s::PENDING_REQUESTS_RANGE},
+        std::pair{"maxRequestBodyBytes"sv, HttpSettings_s::REQUEST_BODY_BYTES_RANGE},
+        std::pair{"maxOutputBytes"sv, HttpSettings_s::OUTPUT_BYTES_RANGE},
+    };
 
     struct TextPosition_s
     {
@@ -91,16 +99,16 @@ Config_s ConfigJson::ParseConfig(std::string_view text)
             throw ConfigError{"http: must be an object"};
         }
 
-        for (const auto& [key, low, high] : std::vector<std::tuple<std::string, s64, s64>>{
-                 {"port", 1, 65535}, {"requestTimeoutMs", 100, 120000}, {"maxPendingRequests", 1, 1024}, {"maxRequestBodyBytes", 1, 1048576}, {"maxOutputBytes", 1, 16777216}})
+        for (const auto& [key, range] : HTTP_INTEGER_RANGES)
         {
-            if (!http.contains(key))
+            const auto value = http.find(key);
+            if (value == http.end())
             {
                 continue;
             }
 
-            const auto& value = http.at(key);
-            if (!value.is_number_integer() || value < low || value > high)
+            const auto [low, high] = range;
+            if (!value->is_number_integer() || *value < low || *value > high)
             {
                 throw ConfigError{std::format("http.{}: must be an integer from {} to {}", key, low, high)};
             }

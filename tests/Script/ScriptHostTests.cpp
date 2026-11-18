@@ -13,6 +13,7 @@
 #include "Accounts/Reporting/Type/ProgressReport_s.hpp"
 #include "Cache/Type/GameCache_s.hpp"
 #include "Config/Type/Config_s.hpp"
+#include "Console/Type/CommandQueueResult_e.hpp"
 #include "Console/Type/ConsoleCommand_s.hpp"
 #include "Console/Type/LogLevel_e.hpp"
 #include "Console/Logger.hpp"
@@ -1790,12 +1791,12 @@ BOT = define_bot(name='Digger', create=Digger)
     const auto pause = std::string{"pause:Stops stepping the bot until resume; random events are still answered"};
     const auto resume = std::string{"resume:Starts the bot again after pause"};
     CHECK(names() == std::vector<std::string>{"echo:Logs the text", pause, resume});
-    CHECK_FALSE(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+    CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::UnknownCommand);
 
     fixture.host->Step(Clock::now());
     CHECK(names() == std::vector<std::string>{"dig:", "echo:Logs the text", pause, resume});
-    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "echo", .text = "hello  world", .args = {"hello", "world"}}));
-    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+    CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "echo", .text = "hello  world", .args = {"hello", "world"}}) == CommandQueueResult_e::Accepted);
+    CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::Accepted);
 
     fixture.host->Step(Clock::now());
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"echo hello  world ['hello', 'world']", "digging"});
@@ -1822,10 +1823,10 @@ BOT = define_bot(name='Walker', create=Walker)
 )python"};
 
     fixture.host->Step(Clock::now());
-    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "pause"}));
+    CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "pause"}) == CommandQueueResult_e::Accepted);
     fixture.host->Step(Clock::now());
     fixture.host->Step(Clock::now() + 1s);
-    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "resume"}));
+    CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "resume"}) == CommandQueueResult_e::Accepted);
     fixture.host->Step(Clock::now() + 2s);
     CHECK(fixture.GetScriptLines() == std::vector<std::string>{"loop", "paused", "resumed", "loop"});
 }
@@ -1835,7 +1836,7 @@ TEST_CASE("ScriptHost turns console commands down when the script can't take the
     SECTION("the script hasn't added it")
     {
         auto fixture = HostFixture{"def loop():\n    return 600\n"};
-        CHECK_FALSE(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+        CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::UnknownCommand);
     }
 
     SECTION("too many are waiting")
@@ -1843,29 +1844,29 @@ TEST_CASE("ScriptHost turns console commands down when the script can't take the
         auto fixture = HostFixture{"console.command('dig', lambda command: log('>', command.text))\n\ndef loop():\n    return 600\n"};
         for (auto i = std::size_t{0}; i < ScriptHost::MAX_COMMANDS; ++i)
         {
-            CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig", .text = std::to_string(i)}));
+            CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig", .text = std::to_string(i)}) == CommandQueueResult_e::Accepted);
         }
 
-        CHECK_FALSE(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+        CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::QueueFull);
         fixture.host->Step(Clock::now());
         CHECK(fixture.GetScriptLines().size() == ScriptHost::MAX_COMMANDS);
-        CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+        CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::Accepted);
     }
 
     SECTION("the script has stopped")
     {
         auto fixture = HostFixture{"console.command('dig', lambda command: None)\n\ndef on_start():\n    stop_script()\n\ndef loop():\n    return 600\n"};
-        CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+        CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::Accepted);
         fixture.host->Step(Clock::now());
         CHECK(fixture.host->GetCommands().empty());
-        CHECK_FALSE(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+        CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::Unavailable);
     }
 }
 
 TEST_CASE("ScriptHost stops a script whose console command fails", "[ScriptHost]")
 {
     auto fixture = HostFixture{"def dig(command):\n    raise ValueError('no spade')\n\nconsole.command('dig', dig)\n\ndef loop():\n    return 600\n"};
-    CHECK(fixture.host->ReceiveCommand(ConsoleCommand_s{.name = "dig"}));
+    CHECK(fixture.host->QueueCommand(ConsoleCommand_s{.name = "dig"}) == CommandQueueResult_e::Accepted);
     fixture.host->Step(Clock::now());
     CHECK(fixture.host->GetStatus() == ScriptStatus_e::Failed);
     CHECK(fixture.HasLog(LogLevel_e::Error, "Script error in the dig command, so the script has stopped"));

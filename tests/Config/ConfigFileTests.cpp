@@ -5,6 +5,8 @@
 
 #include "Config/AccountFile.hpp"
 #include "Config/ConfigFile.hpp"
+#include "Config/ConfigJson.hpp"
+#include "Config/ConfigValidator.hpp"
 #include "Config/Type/Config_s.hpp"
 #include "Config/Error/ConfigError.hpp"
 #include "Config/Type/Revision_e.hpp"
@@ -1255,4 +1257,58 @@ TEST_CASE("Legacy fleet directory settings are ignored", "[ConfigFile]")
     auto json = ParseJsonWithComments(EXAMPLE);
     json["scripting"]["fleetDatabasePath"] = "";
     CHECK(ConfigFile::Parse(json.dump()).scripting.fleetDatabasePath.empty());
+}
+
+TEST_CASE("HTTP settings trim hosts and round trip with strict numeric bounds", "[Http][Config][ConfigFile]")
+{
+    using Json = nlohmann::json;
+
+    CHECK(ConfigJson::ParseConfig("{}").http.host.empty());
+    CHECK(ConfigJson::ParseConfig(R"({"http":{"host":" \t "}})").http.host.empty());
+
+    const auto config = ConfigJson::ParseConfig(R"({"http":{"host":" ::1 ","port":12345,"requestTimeoutMs":100,"maxPendingRequests":1,"maxRequestBodyBytes":1,"maxOutputBytes":1}})");
+    const auto copy = ConfigJson::ParseConfig(ConfigJson::SerializeConfig(config));
+    CHECK(copy.http.host == "::1");
+    CHECK(copy.http.port == 12345);
+    CHECK(copy.http.requestTimeoutMs == 100ms);
+
+    const auto expectedRanges = std::array{
+        std::tuple{"port", 1, 65535},
+        std::tuple{"requestTimeoutMs", 100, 120000},
+        std::tuple{"maxPendingRequests", 1, 1024},
+        std::tuple{"maxRequestBodyBytes", 1, 1048576},
+        std::tuple{"maxOutputBytes", 1, 16777216},
+    };
+    for (const auto& [key, low, high] : expectedRanges)
+    {
+        INFO(key);
+
+        for (const auto value : {low, high})
+        {
+            CHECK_NOTHROW(ConfigJson::ParseConfig(Json{{"http", {{key, value}}}}.dump()));
+        }
+
+        for (const auto& value : std::vector<Json>{-1, low - 1, high + 1, 18446744073709551615ull, 1.5, "42", true, nullptr})
+        {
+            INFO(value.dump());
+            CHECK_THROWS_AS(ConfigJson::ParseConfig(Json{{"http", {{key, value}}}}.dump()), ConfigError);
+        }
+    }
+
+    const auto baseConfig = ConfigFile::Parse(EXAMPLE);
+    for (const auto host : {"127.0.0.1", "::1", "localhost", ""})
+    {
+        auto valid = baseConfig;
+        valid.http.host = host;
+        CHECK_NOTHROW(ConfigValidator::Validate(valid));
+    }
+
+    for (const auto host : {"http://localhost", "127.0.0.1:8080", "example.com", "localhost/path", "*", "[::1]:8080", "[::1]"})
+    {
+        INFO(host);
+
+        auto invalid = baseConfig;
+        invalid.http.host = host;
+        CHECK_THROWS_AS(ConfigValidator::Validate(invalid), ConfigError);
+    }
 }

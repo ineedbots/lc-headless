@@ -7,6 +7,7 @@
 #include "Type/AccountConfig_s.hpp"
 #include "Type/Config_s.hpp"
 #include "Error/ConfigError.hpp"
+#include "Type/HttpSettings_s.hpp"
 #include "Type/ProxySettings_s.hpp"
 #include "Type/Revision_e.hpp"
 #include "Type/ServerSettings_s.hpp"
@@ -45,6 +46,12 @@ namespace
         }
 
         throw ConfigError{std::format("{}: {}", path, rule)};
+    }
+
+    void CheckHttpRange(s64 value, std::string_view path, const std::pair<s64, s64>& range)
+    {
+        const auto [low, high] = range;
+        Check(value >= low && value <= high, path, std::format("must be from {} to {}", low, high));
     }
 
     bool IsCredential(std::string_view text, std::size_t maxLength)
@@ -125,11 +132,11 @@ void ConfigValidator::Validate(const Config_s& config)
         Check(!addressError && !embeddedPort && !invalidSyntax, "http.host", "must be an IPv4/IPv6 address, localhost or empty");
     }
 
-    Check(http.port >= 1 && http.port <= 65535, "http.port", "must be from 1 to 65535");
-    Check(http.requestTimeoutMs >= 100ms && http.requestTimeoutMs <= 120000ms, "http.requestTimeoutMs", "must be from 100 to 120000");
-    Check(http.maxPendingRequests >= 1 && http.maxPendingRequests <= 1024, "http.maxPendingRequests", "must be from 1 to 1024");
-    Check(http.maxRequestBodyBytes >= 1 && http.maxRequestBodyBytes <= 1048576, "http.maxRequestBodyBytes", "must be from 1 to 1048576");
-    Check(http.maxOutputBytes >= 1 && http.maxOutputBytes <= 16777216, "http.maxOutputBytes", "must be from 1 to 16777216");
+    CheckHttpRange(http.port, "http.port", HttpSettings_s::PORT_RANGE);
+    CheckHttpRange(http.requestTimeoutMs.count(), "http.requestTimeoutMs", HttpSettings_s::REQUEST_TIMEOUT_MS_RANGE);
+    CheckHttpRange(http.maxPendingRequests, "http.maxPendingRequests", HttpSettings_s::PENDING_REQUESTS_RANGE);
+    CheckHttpRange(http.maxRequestBodyBytes, "http.maxRequestBodyBytes", HttpSettings_s::REQUEST_BODY_BYTES_RANGE);
+    CheckHttpRange(http.maxOutputBytes, "http.maxOutputBytes", HttpSettings_s::OUTPUT_BYTES_RANGE);
     ValidateServer(config.server);
     ValidateProxy(config.proxy);
 

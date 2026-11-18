@@ -7,6 +7,7 @@
 
 #include "Accounts/Account.hpp"
 #include "Config/AccountFile.hpp"
+#include "Console/Type/CommandQueueResult_e.hpp"
 #include "Game/Protocol/ServerProt.hpp"
 #include "Utils/FileUtils.hpp"
 
@@ -320,7 +321,7 @@ TEST_CASE("Stopping a script keeps its account online without commands or loop d
     CHECK_FALSE(fixture.account->IsFinished());
     CHECK_FALSE(fixture.account->GetNextLoop());
     CHECK(fixture.account->GetCommands().empty());
-    CHECK_FALSE(fixture.account->SendCommand({.name = "echo"}));
+    CHECK(fixture.account->QueueCommand({.name = "echo"}) == CommandQueueResult_e::Unavailable);
     fixture.account->Step(0ms);
     CHECK(fixture.server.GetPackets(ClientProt_e::IfButton).empty());
     fixture.account->Interrupt();
@@ -368,7 +369,7 @@ TEST_CASE("An account stopped by its script reports an unconfirmed logout when i
     CHECK_FALSE(fixture.account->Succeeded());
     CHECK(fixture.account->DescribeStatus() == "disconnected without a confirmed logout");
     CHECK(fixture.account->GetCommands().empty());
-    CHECK_FALSE(fixture.account->SendCommand({.name = "pause"}));
+    CHECK(fixture.account->QueueCommand({.name = "pause"}) == CommandQueueResult_e::Unavailable);
     CHECK_FALSE(fixture.account->Say("too late"));
 }
 

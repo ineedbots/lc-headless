@@ -374,11 +374,6 @@ std::vector<ScriptCommand_s> Account::GetCommands() const
     return m_script->GetCommands();
 }
 
-bool Account::SendCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
-{
-    return QueueCommand(std::move(command), std::move(recipient)) == CommandQueueResult_e::Accepted;
-}
-
 CommandQueueResult_e Account::QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
 {
     if (!m_script || m_lifecycle.IsFinished())

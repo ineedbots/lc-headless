@@ -72,7 +72,6 @@ public:
     [[nodiscard]] std::string DescribeStatus() const;
     [[nodiscard]] std::vector<ScriptCommand_s> GetCommands() const;
     // False without a script.
-    [[nodiscard]] bool SendCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
     [[nodiscard]] CommandQueueResult_e QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient = {});
     // False, sending nothing, when the account isn't in game.
     [[nodiscard]] bool Say(std::string_view text);

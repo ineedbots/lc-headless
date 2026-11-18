@@ -207,11 +207,6 @@ std::vector<ScriptCommand_s> ScriptHost::GetCommands() const
     return m_hooks->GetCommands();
 }
 
-bool ScriptHost::ReceiveCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
-{
-    return QueueCommand(std::move(command), std::move(recipient)) == CommandQueueResult_e::Accepted;
-}
-
 CommandQueueResult_e ScriptHost::QueueCommand(ConsoleCommand_s command, std::shared_ptr<CommandRecipient> recipient)
 {
     PruneCommands();
