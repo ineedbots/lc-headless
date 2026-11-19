@@ -97,6 +97,21 @@ enable_testing()
 add_executable(${PROJECT_NAME}Tests)
 target_sources(${PROJECT_NAME}Tests PRIVATE ${TEST_SOURCES})
 configure_project_target(${PROJECT_NAME}Tests)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    include(CheckCXXSourceCompiles)
+    check_cxx_source_compiles([=[
+        #include <version>
+        #if !defined(_LIBCPP_VERSION) || _LIBCPP_VERSION < 190000 || _LIBCPP_VERSION >= 200000
+        #error Expected libc++ 19
+        #endif
+        int main() {}
+    ]=] RS2004_TESTS_USE_LIBCXX_19)
+    if(RS2004_TESTS_USE_LIBCXX_19)
+        # libc++ 19 guards the debugger test's std::jthread behind this flag.
+        target_compile_options(${PROJECT_NAME}Tests PRIVATE -fexperimental-library)
+        target_link_options(${PROJECT_NAME}Tests PRIVATE -fexperimental-library)
+    endif()
+endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Terminal tests inject one-shot syscall failures through GNU linker wrappers.
     target_link_options(${PROJECT_NAME}Tests PRIVATE

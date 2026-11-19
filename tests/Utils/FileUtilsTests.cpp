@@ -21,9 +21,14 @@ TEST_CASE("FileUtils handles a file that opens but fails during reading", "[File
 TEST_CASE("FileUtils::ReadText reads a whole file as it is", "[FileUtils]")
 {
     const auto folder = TempFolder{"rs2004-file-utils-tests"};
-    folder.WriteFile("text.txt", "line one\r\nline two\n\0end"s);
+    const auto name = std::filesystem::path{u8"text-\u6D4B\u8BD5.txt"};
+    const auto contents = std::string(20'000, 'x') + "\r\nline two\n\0end"s;
+    folder.WriteFile(name, contents);
 
-    CHECK(FileUtils::ReadText(folder.GetPath() / "text.txt") == "line one\r\nline two\n\0end"s);
+    const auto path = folder.GetPath() / name;
+    const auto writer = std::ofstream{path, std::ios::binary | std::ios::app};
+    REQUIRE(writer.is_open());
+    CHECK(FileUtils::ReadText(path) == contents);
     CHECK_FALSE(FileUtils::ReadText(folder.GetPath() / "missing.txt"));
     CHECK_FALSE(FileUtils::ReadText(folder.GetPath()));
 }

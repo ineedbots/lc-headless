@@ -1,0 +1,15 @@
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates clang-19 cmake curl git libc++-19-dev \
+    ninja-build perl pkg-config tar unzip zip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/microsoft/vcpkg /opt/vcpkg \
+    && /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+ENV VCPKG_ROOT=/opt/vcpkg
+COPY dsm-triplets/ /opt/dsm-triplets/
+COPY build-dsm.sh /usr/local/bin/build-dsm.sh
+WORKDIR /src
+ENTRYPOINT ["/bin/bash", "/usr/local/bin/build-dsm.sh"]

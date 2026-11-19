@@ -1,6 +1,10 @@
 #include "pch.hpp"
 #include "FileUtils.hpp"
 
+#ifdef _WIN32
+#include <share.h>
+#endif
+
 namespace
 {
     constexpr auto TEMPORARY_EXTENSION = ".tmp";
@@ -8,34 +12,40 @@ namespace
 
 std::optional<std::string> FileUtils::ReadText(const std::filesystem::path& path)
 {
-    // Linux opens a directory fine and only fails on the first read, with an exception
+    // Linux can open a directory as a file.
     auto error = std::error_code{};
     if (std::filesystem::is_directory(path, error))
     {
         return std::nullopt;
     }
 
-    auto file = std::ifstream{path, std::ios::binary};
+#ifdef _WIN32
+    auto* stream = _wfsopen(path.c_str(), L"rb", _SH_DENYNO);
+#else
+    auto* stream = std::fopen(path.c_str(), "rb");
+#endif
+
+    auto file = std::unique_ptr<std::FILE, decltype(&std::fclose)>{stream, &std::fclose};
     if (!file)
     {
         return std::nullopt;
     }
 
-    try
+    auto text = std::string{};
+    auto buffer = std::array<char, 8192>{};
+    auto size = std::size_t{};
+    do
     {
-        auto text = std::string{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+        size = std::fread(buffer.data(), 1, buffer.size(), file.get());
+        text.append(buffer.data(), size);
+    } while (size == buffer.size());
 
-        if (file.bad())
-        {
-            return std::nullopt;
-        }
-
-        return text;
-    }
-    catch (const std::ios_base::failure&)
+    if (std::ferror(file.get()) != 0)
     {
         return std::nullopt;
     }
+
+    return text;
 }
 
 std::optional<std::vector<u8>> FileUtils::ReadBytes(const std::filesystem::path& path)
