@@ -84,26 +84,6 @@ Each build produces `Rs2004Headless` and `Rs2004HeadlessTests` (with `.exe` on W
 
 To run a source-built client, keep the repository root as the working directory and invoke the executable by its output path. See the [running guide](Running.md#first-login).
 
-## Build for Synology DSM with Docker Compose
-
-For an x86-64 NAS running DSM with glibc 2.36, use the Debian 12 builder. You can run it on the NAS with Container Manager installed or on another x86-64 machine with Linux containers enabled. Run these commands from the source checkout. On DSM, use `sudo` if your SSH account requires it for Docker.
-
-```sh
-docker compose -f tools/docker/dsm/compose.dsm.yml build dsm-build
-docker compose -f tools/docker/dsm/compose.dsm.yml run --rm dsm-build
-```
-
-The service uses two parallel build jobs by default. Set `DSM_BUILD_JOBS` in your shell to change that limit. The named `dsm-build` volume keeps the build tree and vcpkg cache for subsequent runs.
-
-Copy `build/dsm/Rs2004Headless-dsm` and the entire `build/dsm/dsm-runtime/` directory into your existing app folder on the NAS. Run the executable from that folder.
-
-```sh
-chmod +x Rs2004Headless-dsm
-LD_LIBRARY_PATH="$PWD/dsm-runtime" ./Rs2004Headless-dsm
-```
-
-Keep the client configuration, accounts, cache and scripts in the app folder as described in the [running guide](Running.md#first-login). The executable loads the bundled C++ runtime and DSM's glibc.
-
 ## Test data
 
 The Catch2 suite uses fake game servers on loopback ports and does not require a live server. It also loads the example Python scripts, so changes that break an example are detected.
@@ -336,7 +316,7 @@ scripts/                      bot scripts: bots/, examples/, and typings/ for ed
 accounts/                     account files (ignored by git) and the sample file
 ports/pocketpy/               vcpkg overlay port for pocketpy 2.2.0
 docs/                         user guides, scripting reference, and design/ for designs and protocol references
-tools/                        data exporters for rs2b0t's walker and catalogs, docker/dsm/ for Synology builds, and fleet/ for the local fleet view
+tools/                        data exporters for rs2b0t's walker and catalogs, and fleet/ for the local fleet view
 thirdparty/                   licenses of the projects code was ported from
 ```
 
