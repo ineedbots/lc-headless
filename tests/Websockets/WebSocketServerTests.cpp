@@ -342,7 +342,7 @@ TEST_CASE("WebSocket fanout keeps REST progressing under a bounded multi-client 
             {
                 const auto event = co_await Read(*stream);
                 ordered = ordered && event["sequence"] == sequence;
-                maxDeliveryMs = std::max(maxDeliveryMs, (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() - publishedAt.load()) / 1000000);
+                maxDeliveryMs = std::max<s64>(maxDeliveryMs, (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() - publishedAt.load()) / 1000000);
                 ++count;
             }
 

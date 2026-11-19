@@ -228,8 +228,9 @@ void ApplicationEventBridge::Service()
                 }))
                 {
                     Send(id, m_fanout->event.text);
-                    m_diagnostics.maxDeliveryLagMs = std::max(m_diagnostics.maxDeliveryLagMs,
-                                                              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_fanout->created).count());
+
+                    const auto lag = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_fanout->created);
+                    m_diagnostics.maxDeliveryLagMs = std::max<s64>(m_diagnostics.maxDeliveryLagMs, lag.count());
                 }
 
                 m_fanout->cursor = id;

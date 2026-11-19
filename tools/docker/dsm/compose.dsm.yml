@@ -1,0 +1,17 @@
+name: rs2004-headless
+
+services:
+  dsm-build:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.dsm
+    environment:
+      DSM_BUILD_JOBS: ${DSM_BUILD_JOBS:-2}
+    volumes:
+      - ../../..:/src:ro
+      - ../../../build/dsm:/out
+      - dsm-build:/work
+
+volumes:
+  dsm-build:
