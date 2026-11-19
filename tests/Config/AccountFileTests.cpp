@@ -329,7 +329,7 @@ TEST_CASE("AccountFile::AddScriptSettings", "[AccountFile]")
         const auto before = std::filesystem::last_write_time(path);
         CHECK(AccountFile::AddScriptSettings(path, "Chicken killer", "{}").empty());
         CHECK(ReadFile(path) == ACCOUNT_EXAMPLE);
-        CHECK(std::filesystem::last_write_time(path) == before);
+        CHECK((std::filesystem::last_write_time(path) == before));
     }
 
     SECTION("puts the file's path in front of the message")
@@ -371,7 +371,7 @@ TEST_CASE("AccountFile::SetScriptSetting", "[AccountFile]")
         const auto before = std::filesystem::last_write_time(path);
         AccountFile::SetScriptSetting(path, "Chicken killer", "radius", "8");
         CHECK(ReadFile(path) == text);
-        CHECK(std::filesystem::last_write_time(path) == before);
+        CHECK((std::filesystem::last_write_time(path) == before));
     }
 
     SECTION("puts the file's path in front of the message")
