@@ -1171,7 +1171,7 @@ class QuestEngine(Task):
     def _monitor_progress(self, id, step, snap, combat_active):
         waiting = getattr(self.host, 'waiting_for_partner', None)
         partner_waiting = step.kind in ['wait', 'custom'] and step.cooperative == True and waiting is not None and waiting(id)
-        signature = progress_signature(snap.with_fields({'tile': None}))
+        signature = progress_signature(snap if step.navigation_progress else snap.with_fields({'tile': None}))
         key = f'{id}|{signature}'
         if partner_waiting:
             partner_key = getattr(self.host, 'partner_progress_key', None)
@@ -1191,7 +1191,8 @@ class QuestEngine(Task):
                 self._progress_key = key
                 self._progress_at = _now_ms()
             elif _now_ms() - self._progress_at >= 300000:
-                self._begin_recovery(id, 'five minutes without quest, inventory or combat progress')
+                reason = 'five minutes without navigation, quest, inventory or combat progress' if step.navigation_progress else 'five minutes without quest, inventory or combat progress'
+                self._begin_recovery(id, reason)
                 return None
         return partner_waiting
 
