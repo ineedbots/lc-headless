@@ -286,10 +286,16 @@ def arm_fire_arrow(log, bows=None):
 # Why: `inv_del(worn, $worn_ammo, 1)` runs before the `stat_random(ranged, 160, 300)` roll and one damp cloth makes one arrow, so a loop fires every later shot from an empty quiver. Koftik hands over another cloth when the pack has none, so the retry is decide() rebuilding the arrow and this step fires once.
 # Why: the trigger is `aploc1`, which only runs within 10 tiles and with line of sight (`inApproachDistance`). A stand that fails either produces no script at all, which reads like a miss unless the chat is read, and the map data can't answer line of sight, so the stands are probed until one draws a reply.
 SHOT_STANDS = [Tile(2448, 9721, 0), Tile(2447, 9720, 0), Tile(2450, 9720, 0), Tile(2446, 9722, 0), Tile(2452, 9721, 0)]
+SHOT_HIT = 'The arrow impales the rope support.'
+BRIDGE_CROSS_TICKS = 40
 
 
 def shoot_guiderope(log):
     """Fire the lit arrow at the bridge stay rope; the script walks the player across on a hit."""
+    def across():
+        here = game.tile()
+        return here is not None and here.x < 2445
+
     for stand in SHOT_STANDS:
         # Why: these 5 stands are a few tiles apart in one pocket, so an unwalkable stand is the next stand's turn. `walkTo` reaches for the pocket traveller, and one bad stand sent it sweeping the cavern end to end.
         _w22 = yield from traversal.walk_resilient(stand, radius=0, attempts=1, timeout_ms=20000)
@@ -304,7 +310,11 @@ def shoot_guiderope(log):
         if not (rope.interact('Fire-at')):
             log(f"the guide rope refused Fire-at (ops: {' | '.join(rope.actions())})")
             return False
-        crossed = yield from drive_until(lambda: (((game.tile().x if game.tile() is not None else None) if (game.tile().x if game.tile() is not None else None) is not None else 9999)) < 2445, [], log, 12000)
+        yield from drive_until(lambda: across() or game_messages.saw_since(mark, SHOT_HIT), [], log, 12000)
+        crossed = across()
+        if not crossed and game_messages.saw_since(mark, SHOT_HIT):
+            # The engine force-walks to the bridge before dropping it and teleporting the player across.
+            crossed = yield from execution.delay_until_ticks(across, BRIDGE_CROSS_TICKS)
         if crossed:
             log(f'the arrow impaled the rope from ({stand.x},{stand.z})')
             return True

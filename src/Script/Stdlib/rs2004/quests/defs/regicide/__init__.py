@@ -20,8 +20,8 @@ from rs2004.quests.engine.trace import format_tile
 
 __all__ = ['decide', 'regicide']
 
-def custom(name, run):
-    return (Record({'kind': 'custom', 'name': name, 'run': run}))
+def custom(name, run, navigation_progress=False):
+    return Record({'kind': 'custom', 'name': name, 'run': run, 'navigation_progress': navigation_progress})
 
 
 def flag(snap, name):
@@ -77,7 +77,7 @@ def cross_in(snap):
         if shaped:
             return shaped
     _v5 = ready_for_tirannwn(snap, kit)
-    return (_v5 if _v5 is not None else custom('walk the Underground Pass to the Well of Voyage', enter_tirannwn))
+    return (_v5 if _v5 is not None else custom('walk the Underground Pass to the Well of Voyage', enter_tirannwn, navigation_progress=True))
 
 
 def in_tirannwn(snap, area, step):
@@ -133,7 +133,7 @@ def gather_leg(snap):
             'item': RG_ITEM.LIMESTONE.name,
             'qty': 1,
             'anchor': RG_TILE.QUARRY,
-        }) if near_quarry(snap.tile) else custom('cross out to the Arandar quarry', lambda log: leave_tirannwn(RG_TILE.QUARRY, (snap.stage if snap.stage is not None else RG_STAGE.SPOKEN_IORWERTH2), log)))
+        }) if near_quarry(snap.tile) else custom('cross out to the Arandar quarry', lambda log: leave_tirannwn(RG_TILE.QUARRY, (snap.stage if snap.stage is not None else RG_STAGE.SPOKEN_IORWERTH2), log), navigation_progress=True))
     return None
 
 
@@ -187,7 +187,7 @@ def bomb_leg(snap, area):
         gather = gather_leg(snap)
         if gather:
             return gather
-        return custom('leave Tirannwn through the Arandar palisade', lambda log: leave_tirannwn(RG_TILE.ARDOUGNE_BANK, RG_STAGE.SPOKEN_IORWERTH2, log))
+        return custom('leave Tirannwn through the Arandar palisade', lambda log: leave_tirannwn(RG_TILE.ARDOUGNE_BANK, RG_STAGE.SPOKEN_IORWERTH2, log), navigation_progress=True)
     if area == 'mainland':
         return mainland_leg(snap)
     return cross_in(snap)
@@ -228,9 +228,9 @@ def stage_step(snap, area, stage):
     elif stage == RG_STAGE.KILLED_TYRAS:
         return in_tirannwn(snap, area, custom('tell Lord Iorwerth the deed is done', report_to_iorwerth))
     elif stage == RG_STAGE.REPORTED_IORWERTH:
-        return (custom('leave Tirannwn through the Arandar palisade', lambda log: leave_tirannwn(RG_TILE.ARDOUGNE_BANK, stage, log)) if area == 'tirannwn' else custom('take the Ardougne road past Arianwyn', meet_arianwyn))
+        return (custom('leave Tirannwn through the Arandar palisade', lambda log: leave_tirannwn(RG_TILE.ARDOUGNE_BANK, stage, log), navigation_progress=True) if area == 'tirannwn' else custom('take the Ardougne road past Arianwyn', meet_arianwyn))
     elif stage == RG_STAGE.SPOKEN_ARIANWYN:
-        return (custom('leave Tirannwn through the Arandar palisade', lambda log: leave_tirannwn(RG_TILE.ARDOUGNE_BANK, stage, log)) if area == 'tirannwn' else custom('hand King Lathas the letter', report_to_lathas))
+        return (custom('leave Tirannwn through the Arandar palisade', lambda log: leave_tirannwn(RG_TILE.ARDOUGNE_BANK, stage, log), navigation_progress=True) if area == 'tirannwn' else custom('hand King Lathas the letter', report_to_lathas))
     else:
         return Record({'kind': 'wait', 'reason': f'Regicide stage {stage} is not implemented'})
 

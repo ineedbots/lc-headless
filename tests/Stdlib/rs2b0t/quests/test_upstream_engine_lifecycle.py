@@ -213,15 +213,35 @@ def retaliation_and_progress():
     expect(state[0]).to_be(False)
     clock = [100]
     spy_on(engine, '_now_ms', impl=lambda: clock[0])
-    snap = QuestSnapshot(journal='in_progress', stage=1)
+    snap = QuestSnapshot(journal='in_progress', stage=1, tile=Tile(3200, 3200, 0))
     step = quest_step('wait', reason='blocked')
     expect(runner._monitor_progress('cook', step, snap, False)).to_be(False)
     clock[0] += 300001
-    expect(runner._monitor_progress('cook', step, snap, False)).to_be(None)
+    moved = snap.with_fields({'tile': Tile(3201, 3200, 0)})
+    expect(runner._monitor_progress('cook', step, moved, False)).to_be(None)
     expect(runner._recovery.mode).to_be('refresh')
 
 
-test('quest retaliation is confirmed and a five-minute stationary stall starts recovery', retaliation_and_progress)
+test('quest retaliation is confirmed and movement during an ordinary wait still permits recovery', retaliation_and_progress)
+
+
+def travel_progress_keeps_the_elapsed_watchdog_armed():
+    scene, host, runner, module, reset = world()
+    clock = [100]
+    spy_on(engine, '_now_ms', impl=lambda: clock[0])
+    step = quest_step('custom', name='cross the pass', navigation_progress=True)
+    before = QuestSnapshot(journal='in_progress', stage=11, tile=Tile(2371, 9666, 0))
+    after = before.with_fields({'tile': Tile(2370, 9718, 0)})
+    expect(runner._monitor_progress('cook', step, before, False)).to_be(False)
+    clock[0] += 300001
+    expect(runner._monitor_progress('cook', step, after, False)).to_be(False)
+    expect(runner._recovery).to_be(None)
+    clock[0] += 300001
+    expect(runner._monitor_progress('cook', step, after, False)).to_be(None)
+    expect(runner._recovery.mode).to_be('refresh')
+
+
+test('a travel step counts a changed position but still recovers after five stationary minutes', travel_progress_keeps_the_elapsed_watchdog_armed)
 
 
 def bounded_preparation():

@@ -126,8 +126,12 @@ def kill_kalrag(log):
     if held_id(UP_ITEM.DOLL.id) == 0:
         log('no doll of Iban in the pack — killing Kalrag now would waste the blood')
         return False
-    _result11 = yield from kill_npc(UP_NPC.KALRAG, UP_TILE.KALRAG, 'Kalrag', log)
-    return _result11
+    killed = yield from kill_npc(UP_NPC.KALRAG, UP_TILE.KALRAG, 'Kalrag', log)
+    if not killed:
+        return False
+    # Nearby spiders can keep the journal closed after Kalrag's death. Retreat toward the exit before the next read.
+    retreated = yield from walk_to(UP_TILE.TUNNEL_FROM_KALRAG, 6, log)
+    return retreated
 
 
 DEMONS = [
@@ -263,6 +267,8 @@ def robe_from_disciple(log):
 # Why: cheapest to lose first, because Regicide walks the pass again with the bow, arrows, rope and spade, and no shop near Ardougne sells a spade. rs2b0t's order dropped it first, which its recipes hide by seeding one per quest, and a queue parked at "not equipped for Tirannwn". This departs from rs2b0t.
 THROW_TRIES = 6
 THROW_MS = 12000
+IBAN_READY = 'Join the damned, mortal!'
+IBAN_INTRO_TICKS = 8
 SPENT = [UP_ITEM.HISTORY, UP_ITEM.BUCKET, UP_ITEM.ROPE, UP_ITEM.BRONZE_ARROW, UP_ITEM.SHORTBOW, UP_ITEM.SPADE]
 
 
@@ -328,11 +334,15 @@ def open_iban_door(log):
         shut = (_v29 if _v29 is not None else loc_by_id(UP_LOC.IBAN_DOOR_R, None, 8))
         op = ((shut.actions() if shut is not None else None) or [None])[0]
         if shut and op:
+            mark = game_messages.mark()
             if not (shut.interact(op)):
                 log("the doors on Iban's temple would not open")
                 return False
             # Why: the script force-moves you a tile west as it opens, so the door is the entry. There's no walk after: the pack has no walkable floor in the temple at all, altar and Iban's tile included.
-            yield from drive_until(lambda: inside_iban_temple(game.tile()), [], log, 12000)
+            entered = yield from drive_until(lambda: inside_iban_temple(game.tile()), [], log, 12000)
+            if entered:
+                # The first tile inside is visible before the door script releases the player after Iban's introduction.
+                yield from execution.delay_until_ticks(lambda: game_messages.saw_since(mark, IBAN_READY), IBAN_INTRO_TICKS)
     if inside_iban_temple(game.tile()):
         return True
     at = game.tile()

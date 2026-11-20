@@ -411,6 +411,7 @@ def demon_amulets():
     expect(run_wait(doll.kill_kalrag(scene.log))).to_be(False)
     scene.walk_ok = True
     expect(run_wait(doll.kill_kalrag(scene.log))).to_be(True)
+    expect(game.tile()).to_equal(UP_TILE.TUNNEL_FROM_KALRAG)
     scene.npc('Kalrag', ['Attack'], id=UP_NPC.KALRAG)
     fight = spy_on(doll, 'fight_until_gone', impl=answer(False))
     expect(run_wait(doll.kill_kalrag(scene.log))).to_be(False)

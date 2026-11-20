@@ -16,6 +16,7 @@ Record made by quest_step(kind, ...), with rs2b0t's kinds in snake case:
     custom        name, run(log), a generator that gives True when the step worked
     wait          reason
     done
+Custom travel steps can set navigation_progress to count tile changes toward the elapsed progress watchdog.
 A field the step doesn't set reads as None."""
 
 from rs2004.catalogs.record import Record

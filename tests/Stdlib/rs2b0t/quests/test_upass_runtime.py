@@ -150,6 +150,71 @@ def drop_gets_ticks_to_land():
 test('a drop gets a few ticks to land after its NPC leaves the scene', drop_gets_ticks_to_land)
 
 
+def bridge_shot_waits_for_the_forced_crossing():
+    ticks = [0]
+    rope = FakeLoc(2446, 9722)
+    lines = []
+
+    def advance(n):
+        ticks[0] += n
+
+    def settled(*args, **kwargs):
+        return True
+        yield
+
+    patch(_core, 'step_time', lambda: ticks[0] * 600)
+    patch(_core, 'tick', lambda: ticks[0])
+    patch(execution, 'Ticks', advance)
+    patch(bridge.traversal, 'walk_resilient', settled)
+    patch(bridge, 'settle_scene', settled)
+    patch(bridge, 'loc_by_id', lambda *args: rope)
+    spy_on(chat_dialog, 'is_open', returns=False)
+    spy_on(chat_dialog, 'can_continue', returns=False)
+    spy_on(game_messages, 'mark', returns=0)
+    spy_on(game_messages, 'since', impl=lambda mark: [Fake(text='The arrow impales the rope support.')] if ticks[0] >= 2 else [])
+    spy_on(game, 'tile', impl=lambda: Tile(2442 if ticks[0] >= 29 else 2446, 9722, 0))
+
+    expect(run_wait(bridge.shoot_guiderope(lines.append))).to_be(True)
+    expect(ticks[0]).to_be(29)
+    expect(rope.sent).to_equal(['Fire-at'])
+    expect(len(lines)).to_be(1)
+
+
+test('a confirmed bridge shot waits for the forced landing at normal tick speed', bridge_shot_waits_for_the_forced_crossing)
+
+
+def iban_door_waits_until_the_introduction_releases_the_player():
+    ticks = [0]
+    door = FakeLoc(2143, 4647)
+
+    def advance(n):
+        ticks[0] += n
+
+    def settled(*args):
+        return True
+        yield
+
+    patch(_core, 'step_time', lambda: ticks[0] * 600)
+    patch(_core, 'tick', lambda: ticks[0])
+    patch(execution, 'Ticks', advance)
+    patch(doll, 'walk_to', settled)
+    patch(doll, 'settle_scene', settled)
+    patch(doll, 'loc_by_id', lambda *args: Fake(actions=lambda: ['Open'], interact=door.interact))
+    spy_on(doll.equipment, 'items', returns=[Fake(id=UP_ITEM.ZAM_TOP.id), Fake(id=UP_ITEM.ZAM_BOTTOM.id)])
+    spy_on(chat_dialog, 'is_open', returns=False)
+    spy_on(chat_dialog, 'can_continue', returns=False)
+    spy_on(game_messages, 'mark', returns=0)
+    spy_on(game_messages, 'since', impl=lambda mark: [Fake(text='Iban: Join the damned, mortal!')] if ticks[0] >= 6 else [])
+    spy_on(game, 'tile', impl=lambda: Tile(2143 if ticks[0] >= 1 else 2144, 4647, 1))
+
+    expect(run_wait(doll.open_iban_door(lambda line: None))).to_be(True)
+    expect(ticks[0]).to_be(6)
+    expect(door.sent).to_equal(['Open'])
+
+
+test("entering Iban's temple waits for the introduction before the throw can start", iban_door_waits_until_the_introduction_releases_the_player)
+
+
 def run_nothing():
     return False
     yield
