@@ -514,7 +514,7 @@ class _Autocast:
         index = AUTOCAST_SPELLS.index(wanted)
         if index >= len(choices) or not _core.click_component(choices[index].id):
             return False
-        chosen = yield from execution.delay_until(lambda: _core.get_varp(ATTACKSTYLE_MAGIC_VARP) == AUTOCAST_CHOSEN, AUTOCAST_STEP_MS)
+        chosen = yield from execution.delay_until(lambda: _core.get_varp(ATTACKSTYLE_MAGIC_VARP) == AUTOCAST_CHOSEN and _tab(COMBAT_TAB) == staff_tab, AUTOCAST_STEP_MS)
         if not chosen:
             say(f'choosing {spell} did not take: is your Magic level too low?')
             return False
