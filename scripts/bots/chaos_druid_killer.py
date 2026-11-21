@@ -886,6 +886,8 @@ class ChaosDruidKiller(TaskBot):
         if self.food_count() < self.food_withdraw:
             self.park(f'restock verification failed: expected {self.food_withdraw} {self.food_name}, found {self.food_count()}. Add food, then restart.')
             return False
+        # A planned exit may not have been observed since the dungeon; rebase before arming the next trip.
+        self.last_area = chaos_druid_area(game.tile(), self.spot.dungeon)
         self.trip_prepared = True
         self.died = False
         self.trips += 1
