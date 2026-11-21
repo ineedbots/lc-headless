@@ -153,6 +153,15 @@ class AccountLeveler(LoopingBot):
                 self._phase = 'bank'
                 return
             snapshot = self._snapshot()
+            if plan.funding and plan.settings.get('target') == 'Man / Woman' and snapshot.levels.get('thieving') >= 10 and not game.in_combat():
+                self._activity.stop()
+                self._session.resupply(_core.step_time())
+                self._retry = None
+                self._pending_plans = []
+                self._phase = 'bank'
+                self._stock.invalidate()
+                self._set_status('Thieving 10 reached; banking before earning coins from farmers')
+                return
             if plan.death_walk and combat_level(snapshot.levels) >= 15 and not game.in_combat():
                 self._activity.stop()
                 self._session.resupply(_core.step_time())
@@ -165,7 +174,7 @@ class AccountLeveler(LoopingBot):
                 return
             reached = self._reached(plan, snapshot)
             pending_potions = plan.script == 'PotionMaker' and inventory.count_by_id(((herb_by_name(str(plan.settings.get('herb'))).unf_id if herb_by_name(str(plan.settings.get('herb'))) is not None else None) if (herb_by_name(str(plan.settings.get('herb'))).unf_id if herb_by_name(str(plan.settings.get('herb'))) is not None else None) is not None else 91)) > 0
-            exhausted = not plan.quest and not pending_potions and any([(stock_of(snapshot, requirement_key(need)) < need.minimum if need.minimum is not None else not need.equip and need.count > 1 and stock_of(snapshot, requirement_key(need)) == 0) for need in plan.needs])
+            exhausted = not plan.quest and not plan.funding and not pending_potions and any([(stock_of(snapshot, requirement_key(need)) < need.minimum if need.minimum is not None else not need.equip and need.count > 1 and stock_of(snapshot, requirement_key(need)) == 0) for need in plan.needs])
             depleted_on_finish = (self._activity.outcome.kind if self._activity.outcome is not None else None) == 'finished' and any([stock_of(snapshot, requirement_key(need)) < need.count for need in plan.needs])
             session_expired = self._session.remaining_ms <= 0 and not (plan.script == 'EssMiner' and plan.output)
             course_exit = plan.script != 'GnomeCourse' or self._activity.child is None or self._activity.child.can_leave()
@@ -285,6 +294,7 @@ class AccountLeveler(LoopingBot):
             'dragon_stage': self._dragon_stage,
             'quest_points': quests.points(),
             'target': self._target,
+            'tile': game.tile(),
             'wilderness': self._wilderness,
             'now': _core.step_time(),
             'unavailable_items': list(self._unavailable_items) + list([item for item, _2 in [(_1, until) for _1, until in list(self._temporarily_unavailable.items()) if until > _core.step_time()]]),
@@ -513,6 +523,7 @@ class AccountLeveler(LoopingBot):
             serializable(tile),
             [[i.id, i.count] for i in inventory.items()],
             quests.points(),
+            skills.effective('hitpoints'),
         ])
         self._session.observe(signature, _core.step_time())
 

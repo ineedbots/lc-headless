@@ -24,9 +24,13 @@ leather, mining and smelting bars, or collecting herbs and potion ingredients.
 ```
 
 Merge those sections into an existing account configuration with its login credentials.
-Start off Tutorial Island with access to a bank and enough coins to buy equipment, supplies
-and travel. The planner sources many consumables itself; it does not generate a starting
-coin allowance. Missing funds, inaccessible producers or exhausted shop stock can block an
+Start off Tutorial Island with access to a bank. The planner sources many consumables
+itself; it does not generate a starting coin allowance. When training is blocked by
+missing coins, it pickpockets men and women from Thieving 1 and farmers from level 10
+to fund the blocked budget plus a small travel buffer, then resumes normal planning.
+It uses existing food or waits for health and chooses a camp on the current side of
+coastal crossings. It does not require a purchased loadout or food-shopping budget to
+begin. Inaccessible producers or exhausted shop stock can still block an
 objective. Progress reports give the current action, shortage, cooldown and remaining work.
 Sold-out supplies cool down for 15 minutes, allowing equipment alternatives to remain
 eligible across shopping trips longer than a minute.
