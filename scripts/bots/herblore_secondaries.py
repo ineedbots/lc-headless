@@ -338,7 +338,7 @@ class Grind(Task):
                 return
             source = sources[0]
             before = bot.product_count()
-            want = min(5, bot.grind_left(), has_key=not bot.secondary.key_name or inventory.contains(bot.secondary.key_name))
+            want = min(5, bot.grind_left())
             sent = 0
             for _ in range(want):
                 if event_signal.pending() or not pestle.use_on(source):
