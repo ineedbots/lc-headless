@@ -13,6 +13,7 @@ from bots.account_leveler.shopping import SHOPPING_RESERVE
 from bots.account_leveler.priority import can_resume_objective, training_priority
 from bots.account_leveler.types import requirement_key, stock_of
 from bots.account_leveler.combat import scimitar_for
+from bots.account_leveler.funding import coin_plan
 enabled_skills = list(SKILL_NAMES.values())
 
 
@@ -43,8 +44,11 @@ def resolve_activity(s, plan, memory, random, chain=None):
                 return Record({
                     'kind': 'blocked',
                     'reason': f'Not enough banked Coins to buy {need.item} (budget {budget + reserve}, including travel reserve)',
+                    'coins_needed': budget + reserve,
                 })
             continue
+        if need.item == 'Coins':
+            return Record({'kind': 'blocked', 'reason': f'Need {need.count} Coins for {plan.label}', 'coins_needed': need.count})
         dependency = alternative or producer(s, plan.objective, need, memory, random)
         if not dependency:
             return Record({'kind': 'blocked', 'reason': f'Cannot source {need.count} {need.item} for {plan.label}'})
@@ -92,6 +96,7 @@ def plan_next(s, memory, random=None):
         ordered.remove(memory.objective)
         ordered.insert(0, memory.objective)
     reasons = []
+    funding = []
     for objective in ordered:
         method = method_for(s, objective, memory, random)
         if not method:
@@ -102,4 +107,9 @@ def plan_next(s, memory, random=None):
             return decision
         if decision.kind == 'blocked':
             reasons.append(decision.reason)
+            if decision.coins_needed and s.levels.get('thieving', 0) >= 1:
+                funding.append((decision.coins_needed, objective))
+    if funding:
+        budget, objective = min(funding, key=lambda entry: entry[0])
+        return resolve_activity(s, coin_plan(s, objective, budget), memory, random)
     return Record({'kind': 'blocked', 'reason': f"{priority.label}: {'; '.join(list(set(reasons)))}"})

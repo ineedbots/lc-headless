@@ -1,6 +1,6 @@
 """Ported from rs2b0t's src/bot/../../test/scripts/accountLevelerZanaris.test.ts (MIT, see thirdparty/rs2b0t)."""
 from bots.account_leveler.record import Record
-from bots.account_leveler.zanaris import enter_dragon_shop, game_zanaris_port, leave_zanaris
+from bots.account_leveler.zanaris import enter_dragon_shop, game_zanaris_port, leave_zanaris, open_zanaris_bank
 from bots.account_leveler.dragon_weapons import audit_dragon_weapons
 from bots.account_leveler.planner import enabled_skills
 
@@ -170,6 +170,49 @@ def _fn21(*_args):
     for patch in patches:
         restore_all()
 test('exit preparation banks a full pack before withdrawing its travel item', _fn21)
+
+def bank_npc_access():
+    opened = []
+
+    def open_access(access):
+        opened.append(access)
+        return True
+        yield
+
+    patches = [
+        spy_on(quests, 'status').mock_return_value('complete'),
+        spy_on(bank, 'is_open').mock_return_value(False),
+        spy_on(traversal, 'walk_resilient').mock_implementation(lambda *args, **kwargs: resolved_wait(True)),
+        spy_on(bank, 'open_npc_access').mock_implementation(open_access),
+        spy_on(bank, 'wait_ready').mock_implementation(lambda: resolved_wait(True)),
+    ]
+    try:
+        ready = yield from open_zanaris_bank(lambda message: None)
+        expect(ready).to_be(True)
+        expect(opened).to_equal([{'name': 'Banker', 'op': 'Bank'}])
+    except Exception as error:
+        restore_all()
+        raise error
+    restore_all()
+
+test('Zanaris banking opens the banker through the one-argument facade contract', bank_npc_access)
+
+
+def teleport_facade_result(sent):
+    spy_on(skills, 'level', returns=60)
+    spy_on(inventory, 'count', returns=100)
+    cast = spy_on(game, 'teleport', returns=sent)
+    try:
+        result = yield from game_zanaris_port(lambda message: None).teleport()
+        expect(result).to_be(sent)
+        expect(cast.calls).to_equal([('Varrock',)])
+    except Exception as error:
+        restore_all()
+        raise error
+    restore_all()
+
+test_each([True, False])('Zanaris exit propagates the synchronous teleport result %s', teleport_facade_result)
+
 
 def resolved_wait(value):
     if False:

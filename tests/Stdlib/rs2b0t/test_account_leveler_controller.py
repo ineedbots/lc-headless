@@ -120,6 +120,35 @@ def combat_boundary():
 test('reaching combat 15 finishes the current fight then banks for food without resuming the death walk', combat_boundary)
 
 
+def gnome_course_exit(reason):
+    setup()
+    bot = Controller()
+    plan = activity(False)
+    plan.script = 'GnomeCourse'
+    plan.objective = 'agility'
+    plan.prerequisite_levels = {'agility': 15}
+    bot.train(plan)
+    safe = [False]
+    bot._activity.child = Record({'can_leave': lambda: safe[0]})
+    if reason == 'goal':
+        bot.snap.levels['agility'] = 15
+    elif reason == 'session':
+        bot._session.remaining_ms = 0
+    else:
+        plan.needs = [Record({'item': 'Lobster', 'count': 12})]
+    run_wait(bot.loop())
+    assert bot._activity.calls == 1
+    assert bot._activity.stops == 0
+    assert bot._phase == 'train'
+    safe[0] = True
+    run_wait(bot.loop())
+    assert bot._activity.stops == 1
+    assert bot._phase == 'bank'
+
+
+test_each(['goal', 'session', 'supplies'])('gnome course finishes its lap before banking for %s', gnome_course_exit)
+
+
 def stale_death_walk(source):
     setup()
     bot = Controller()
@@ -209,6 +238,154 @@ def out_of_stock():
 
 
 test('empty shop stock retries without blacklisting the item or the activity', out_of_stock)
+
+
+def blocked_without_funds(cooldown):
+    setup()
+    bot = Controller()
+    now = _core.step_time()
+    bot.snap.stock['coins'] = 25
+    spy_on(controller, 'plan_next', returns=Record({'kind': 'blocked', 'reason': 'Supplier unavailable'}))
+    if cooldown is not None:
+        bot._session.memory.cooldowns['unused-method'] = now + cooldown
+    run_wait(bot.loop())
+    assert bot._phase == 'bank'
+    assert bot._waiting_until == now + (cooldown if cooldown is not None and 0 < cooldown < 30000 else 30000)
+    assert 'Supplier unavailable' in bot._status
+    assert 'waiting for another method' in bot._status
+    assert bot._activity.starts == []
+    assert bot._last_failure is None
+
+
+test_each([None, -1000, 5000, 45000])('blocked supplier waits without requiring an active cooldown: %s', blocked_without_funds)
+
+
+def funding_upgrade():
+    from bots.account_leveler.funding import coin_plan
+    setup()
+    bot = Controller()
+    bot.snap.stock['coins'] = 25
+    plan = coin_plan(bot.snap, 'attack', 872)
+    bot.train(plan)
+    run_wait(bot.loop())
+    assert bot._phase == 'train'
+    bot.snap.levels['thieving'] = 10
+    run_wait(bot.loop())
+    assert bot._phase == 'bank'
+    assert bot._activity.stops == 1
+    assert bot._retry is None
+    assert bot._session.plan is None
+    assert bot._session.memory.cooldowns._fields == {}
+    bot.snap.stock['coins'] = 100000
+    run_wait(bot.loop())
+    assert bot._session.plan.script == 'AutoFighter'
+
+
+test('funding upgrades at Thieving 10 and returns to melee once its budget is available', funding_upgrade)
+
+
+def regeneration_progress():
+    setup()
+    bot = Controller()
+    hp = [4]
+    now = [1000]
+    spy_on(_core, 'step_time', impl=lambda: now[0])
+    spy_on(skills, 'xp', returns=0)
+    spy_on(skills, 'effective', impl=lambda skill: hp[0])
+    spy_on(inventory, 'items', returns=[])
+    spy_on(quests, 'points', returns=0)
+    AccountLeveler._observe(bot)
+    now[0] += 60000
+    hp[0] = 5
+    AccountLeveler._observe(bot)
+    assert bot._session._progress_at == now[0]
+    assert not bot._session.stalled(now[0] + 120000)
+
+
+test('recovering HP counts as progress while funding waits for safe pickpockets', regeneration_progress)
+
+
+def funding_without_food():
+    from bots.account_leveler.funding import coin_plan
+    setup()
+    bot = Controller()
+    bot.snap.stock['coins'] = 25
+    bot.snap.stock['shrimps'] = 2
+    plan = coin_plan(bot.snap, 'attack', 872)
+    bot.train(plan)
+    bot.snap.stock['shrimps'] = 0
+    run_wait(bot.loop())
+    assert bot._phase == 'train'
+    assert bot._activity.stops == 0
+    assert bot._activity.calls == 1
+
+
+test('funding keeps the thiever health wait when its last carried food is consumed', funding_without_food)
+
+
+def sold_out_helm_alternatives():
+    from bots.account_leveler.equipment import melee_equipment
+    setup()
+    now = [1000]
+    sold_out = ['Adamant full helm']
+    spy_on(_core, 'step_time', impl=lambda: now[0])
+    bot = Controller()
+
+    def empty_shop(*args):
+        raise SupplyStockError('sold out', sold_out)
+        yield
+
+    spy_on(controller, 'provision', impl=empty_shop)
+    run_wait(bot.loop())
+    now[0] += 85000
+    sold_out[0] = 'Adamant med helm'
+    run_wait(bot.loop())
+    now[0] += 85000
+
+    spy_on(skills, 'level', returns=60)
+    spy_on(inventory, 'items', returns=[])
+    spy_on(equipment, 'items', returns=[])
+    spy_on(quests, 'all', returns=[])
+    spy_on(quests, 'points', returns=0)
+    spy_on(bank, 'ready', returns=True)
+    spy_on(bank, 'items', returns=[
+        Record({'id': 995, 'name': 'Coins', 'count': 1000000}),
+        Record({'id': 1333, 'name': 'Rune scimitar', 'count': 1}),
+        Record({'id': 1113, 'name': 'Rune chainbody', 'count': 1}),
+        Record({'id': 1079, 'name': 'Rune platelegs', 'count': 1}),
+    ])
+    current = AccountLeveler._snapshot(bot)
+    assert melee_equipment(current)[-1].item == 'Mithril full helm'
+    now[0] = bot._temporarily_unavailable['adamant full helm'] + 1
+    restocked = AccountLeveler._snapshot(bot)
+    assert melee_equipment(restocked)[-1].item == 'Adamant full helm'
+
+
+test('sold-out helms yield to a lower tier after shopping trips longer than a minute', sold_out_helm_alternatives)
+
+
+def quest_consumed_supplies(item):
+    setup()
+    bot = Controller()
+    plan = activity(needs=[Record({'item': item, 'count': 3, 'carry': 3})])
+    plan.script = 'AIOQuester'
+    plan.quest = 'Dragon Slayer'
+    bot.snap.quests['Dragon Slayer'] = False
+    bot.snap.stock[item.lower()] = 0
+    bot.train(plan)
+    run_wait(bot.loop())
+    assert bot._phase == 'train'
+    assert bot._session.plan is plan
+    assert bot._activity.calls == 1
+    assert bot._activity.stops == 0
+
+    bot.snap.quests['Dragon Slayer'] = True
+    run_wait(bot.loop())
+    assert bot._phase == 'bank'
+    assert bot._activity.stops == 1
+
+
+test_each(['Plank', 'Coins', 'Lobster'])('quest consumption of %s remains owned by the quest runner', quest_consumed_supplies)
 
 
 def exhausted_ammo():

@@ -36,7 +36,7 @@ def open_zanaris_bank(log):
     _w2 = yield from traversal.walk_resilient(BANK, radius=3, timeout_ms=120000, avoid_zones=leveler_travel_zones(), log=log)
     if not (_w2):
         return False
-    _w4 = yield from bank.open_npc_access({'name': 'Banker', 'op': 'Bank'}, log)
+    _w4 = yield from bank.open_npc_access({'name': 'Banker', 'op': 'Bank'})
     _c3 = _w4
     if _c3:
         _w5 = yield from bank.wait_ready()
@@ -94,8 +94,7 @@ def game_zanaris_port(log):
     def _fn16():
         if skills.level('magic') < 25 or not all([inventory.count(item.name) >= item.count for item in TELEPORT_RUNES]):
             return False
-        result = yield from game.teleport('Varrock')
-        return result
+        return game.teleport('Varrock')
         if False:
             yield
 

@@ -128,9 +128,11 @@ def _fn17(*_args):
     for _k, _v in {'objective': 'fishing'}.items():
         _merged18[_k] = _v
     result = plan_next(snapshot, Record(_merged18), lambda: 0)
-    expect(result.kind).to_be('blocked')
-    expect(result.kind == 'blocked' and result.reason).to_contain('Small fishing net')
-test('zero banked coins blocks a needed purchase with the missing item named', _fn17)
+    expect(result.kind).to_be('activity')
+    expect(result.plan.funding).to_be(True)
+    expect(result.plan.objective).to_be('fishing')
+    expect(result.plan.output.count).to_be(430)
+test('zero banked coins schedules funding for the fishing net and reserve', _fn17)
 
 def _fn20(_arg21, *_args):
     level, unstrung, strung, name = (_arg21.level, _arg21.unstrung, _arg21.strung, _arg21.name)
@@ -138,8 +140,8 @@ def _fn20(_arg21, *_args):
     snapshot.levels['ranged'] = level
     snapshot.stock = {'coins': 0, 'shrimps': 30, 'bronze arrow': 300, name.lower(): 20, f'#{unstrung}': 20}
     blocked = plan_next(snapshot, empty_memory(), lambda: 0)
-    expect(blocked.kind).to_be('blocked')
-    expect(blocked.kind == 'blocked' and blocked.reason).to_contain('Shortbow')
+    expect(blocked.kind).to_be('activity')
+    expect(blocked.plan.funding).to_be(True)
     snapshot.stock[f'#{strung}'] = 1
     ready = plan_next(snapshot, empty_memory(), lambda: 0)
     expect(ready.kind == 'activity' and ready.plan.script).to_be('AutoFighter')
@@ -156,8 +158,9 @@ def _fn23(*_args):
     s.levels['fishing'] = 1
     s.stock = Record({'coins': 100})
     result = plan_next(s, empty_memory(), lambda: 0)
-    expect(result.kind).to_be('blocked')
-    expect(result.kind == 'blocked' and result.reason).to_contain('budget 230')
+    expect(result.kind).to_be('activity')
+    expect(result.plan.funding).to_be(True)
+    expect(result.plan.output.count).to_be(430)
 test('a shopping dependency accounts for travel money before selecting an unaffordable activity', _fn23)
 
 def _fn24(*_args):
@@ -246,8 +249,10 @@ def _fn34(*_args):
     for _k, _v in {'objective': 'woodcutting'}.items():
         _merged35[_k] = _v
     next_ = plan_next(s, Record(_merged35), lambda: 0)
-    expect(next_.kind).to_be('blocked')
-test('blocked combat does not send a fragile account on an unrelated training trip', _fn34)
+    expect(next_.kind).to_be('activity')
+    expect(next_.plan.funding).to_be(True)
+    expect(['attack', 'strength', 'defence']).to_contain(next_.plan.objective)
+test('unfunded combat earns its budget without switching to unrelated woodcutting', _fn34)
 
 def _fn36(*_args):
     s = fresh()

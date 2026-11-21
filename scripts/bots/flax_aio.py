@@ -304,7 +304,7 @@ class GoToFieldTask(Task):
         self.bot = bot
 
     def validate(self):
-        return self.bot.picking and not inventory.is_full() and nearest_flax() is None
+        return self.bot.picking and not inventory.is_full() and (not at_field() or nearest_flax() is None)
 
     def execute(self):
         here = game.tile()

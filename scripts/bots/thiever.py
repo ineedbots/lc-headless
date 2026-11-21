@@ -10,8 +10,8 @@ STUNNED = ['been stunned', 'fail to pick']
 BOOTH = {'name': 'Bank booth', 'op': 'Use-quickly'}
 
 SETTINGS = {
-    'target': SettingDef('string', 'Man', 'Pickpocket target', options=PICKPOCKET_TARGET_NAMES,
-                         help='pick by exact in-game name (level in parens): Man/Woman 1, Farmer 10, Rogue 32, Guard 40, Knight of Ardougne 55, Paladin 70, Hero 80'),
+    'target': SettingDef('string', 'Man', 'Pickpocket target', options=PICKPOCKET_TARGET_NAMES + ['Man / Woman'],
+                         help='pick by in-game name (level in parens); Man / Woman accepts either: Man/Woman 1, Farmer 10, Rogue 32, Guard 40, Knight of Ardougne 55, Paladin 70, Hero 80'),
     'action': SettingDef('string', 'Pickpocket', 'Action', help='right-click op, e.g. Pickpocket / Steal-from'),
     'loadout': LOADOUT_SETTING,
     'food': SettingDef('string', '', 'Food', help='Food to eat and withdraw; blank uses the selected loadout.'),
@@ -205,7 +205,8 @@ class Steal(Task):
 
     def candidates(self):
         bot = self.bot
-        found = npcs.query().name(bot.target).action(bot.action).where(lambda n: tile_within_leash(bot, n.tile())).results()
+        targets = ['Man', 'Woman'] if bot.target == 'Man / Woman' else [bot.target]
+        found = npcs.query().where(lambda n: n.name in targets).action(bot.action).where(lambda n: tile_within_leash(bot, n.tile())).results()
         # Adjacent first: less walking between attempts once a stun lifts.
         found.sort(key=lambda n: (1 if n.distance() > 1 else 0, n.distance()))
         return found

@@ -910,6 +910,9 @@ def decide(snap):
             gear = gear_up(snap)
             if gear:
                 return gear
+            fare = coins_short(snap, KARAMJA_FARE)
+            if fare:
+                return fare
         return custom('board the Lady Lumbridge', board_for_crandor)
     # Why: off the island at this stage means she killed us; the re-stock includes boat fare since the navigator prunes Pay-fare crossings it can't afford.
     if not on_crandor(snap.tile):

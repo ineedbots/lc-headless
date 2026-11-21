@@ -24,10 +24,16 @@ leather, mining and smelting bars, or collecting herbs and potion ingredients.
 ```
 
 Merge those sections into an existing account configuration with its login credentials.
-Start off Tutorial Island with access to a bank and enough coins to buy equipment, supplies
-and travel. The planner sources many consumables itself; it does not generate a starting
-coin allowance. Missing funds, inaccessible producers or exhausted shop stock can block an
+Start off Tutorial Island with access to a bank. The planner sources many consumables
+itself; it does not generate a starting coin allowance. When training is blocked by
+missing coins, it pickpockets men and women from Thieving 1 and farmers from level 10
+to fund the blocked budget plus a small travel buffer, then resumes normal planning.
+It uses existing food or waits for health and chooses a camp on the current side of
+coastal crossings. It does not require a purchased loadout or food-shopping budget to
+begin. Inaccessible producers or exhausted shop stock can still block an
 objective. Progress reports give the current action, shortage, cooldown and remaining work.
+Sold-out supplies cool down for 15 minutes, allowing equipment alternatives to remain
+eligible across shopping trips longer than a minute.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -47,6 +53,8 @@ unless an allowed destination needs it, and avoids White Wolf Mountain.
 Dragon progression checks food, armour, Prayer and quest readiness. It can prepare Lost City,
 Druidic Ritual and Dragon Slayer, collect Paladin chaos runes, and buy dragon weapons after
 Lost City using the Zanaris bank, diamond gate and an escape route.
+Dragon Slayer draws return-fare coins before boarding for Crandor, where no bank
+can supply the later boat crossings.
 
 Combat camps progress through tougher surface and dungeon targets as stats improve.
 Quest, skill, food, tool and fare requirements gate each camp; Wilderness camps still
@@ -63,6 +71,10 @@ lower two camp tiers. Lobster and shark fishing can prepare travel food before d
 A parent tick observes XP and bank changes even while a child is waiting. Sessions end at
 their skill, stock, quest or duration goal; failures retain actionable shortages, back off
 preparation, and cool down failed combat routes. Death interrupts the child and replans.
+Delegated quests manage their own consumed supplies; using the last plank, coin or food
+does not by itself cancel the quest and force a parent bank trip.
+Gnome-course training finishes its current lap before a goal, session limit or supply
+shortage sends the parent to a bank, so it does not abandon the raised platforms.
 Recent camps encourage rotation. This is best-effort unattended training, not a guarantee
 that every account can reach 60 without intervention.
 
@@ -77,3 +89,6 @@ The implementation is `scripts/bots/account_leveler/`: `planner`, `methods`, `co
 and `equipment` prepare it; `dragons`, `dragon_weapons`, `runes`, `zanaris` and `travel`
 handle the higher-level prerequisites. `manifests` imports only a selected child's `BOT`.
 The entry is named `leveler.py` so pocketpy can distinguish it from the package.
+
+See the [revision 289 live validation record](https://github.com/ineedbots/lc-headless/issues/35#issuecomment-7056894788)
+for 600 ms provisioning and dragon scenarios, discovered failures and acceptance limits.
