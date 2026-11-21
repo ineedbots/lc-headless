@@ -120,6 +120,35 @@ def combat_boundary():
 test('reaching combat 15 finishes the current fight then banks for food without resuming the death walk', combat_boundary)
 
 
+def gnome_course_exit(reason):
+    setup()
+    bot = Controller()
+    plan = activity(False)
+    plan.script = 'GnomeCourse'
+    plan.objective = 'agility'
+    plan.prerequisite_levels = {'agility': 15}
+    bot.train(plan)
+    safe = [False]
+    bot._activity.child = Record({'can_leave': lambda: safe[0]})
+    if reason == 'goal':
+        bot.snap.levels['agility'] = 15
+    elif reason == 'session':
+        bot._session.remaining_ms = 0
+    else:
+        plan.needs = [Record({'item': 'Lobster', 'count': 12})]
+    run_wait(bot.loop())
+    assert bot._activity.calls == 1
+    assert bot._activity.stops == 0
+    assert bot._phase == 'train'
+    safe[0] = True
+    run_wait(bot.loop())
+    assert bot._activity.stops == 1
+    assert bot._phase == 'bank'
+
+
+test_each(['goal', 'session', 'supplies'])('gnome course finishes its lap before banking for %s', gnome_course_exit)
+
+
 def stale_death_walk(source):
     setup()
     bot = Controller()

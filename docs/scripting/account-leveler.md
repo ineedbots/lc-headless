@@ -69,6 +69,8 @@ their skill, stock, quest or duration goal; failures retain actionable shortages
 preparation, and cool down failed combat routes. Death interrupts the child and replans.
 Delegated quests manage their own consumed supplies; using the last plank, coin or food
 does not by itself cancel the quest and force a parent bank trip.
+Gnome-course training finishes its current lap before a goal, session limit or supply
+shortage sends the parent to a bank, so it does not abandon the raised platforms.
 Recent camps encourage rotation. This is best-effort unattended training, not a guarantee
 that every account can reach 60 without intervention.
 

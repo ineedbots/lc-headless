@@ -138,6 +138,11 @@ class AgilityBot(TaskBot):
     def current_name(self):
         return self.course[self.step] if self.step < len(self.course) else None
 
+    def can_leave(self):
+        """A completed lap is back outside the obstacles, where the bank walker can take over."""
+        here = game.tile()
+        return self.step == 0 and here is not None and here.level == 0
+
     def advance(self):
         self.step += 1
         if self.step >= len(self.course):
