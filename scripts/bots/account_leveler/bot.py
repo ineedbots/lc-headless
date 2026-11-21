@@ -376,8 +376,7 @@ class AccountLeveler(LoopingBot):
             return
         if decision.kind == 'blocked':
             now = _core.step_time()
-            cooldown = min([time for time in list(list(self._session.memory.cooldowns.values())) + list(list(self._temporarily_unavailable.values())) if time > now])
-            self._waiting_until = min(cooldown, now + 30000)
+            self._waiting_until = min([now + 30000] + [time for time in list(list(self._session.memory.cooldowns.values())) + list(list(self._temporarily_unavailable.values())) if time > now])
             self._unavailable_items.clear()
             self._stock.invalidate()
             self._set_status(f'waiting for another method: {decision.reason}; rechecking in {math.ceil((self._waiting_until - now) / 1000)}s')

@@ -240,6 +240,25 @@ def out_of_stock():
 test('empty shop stock retries without blacklisting the item or the activity', out_of_stock)
 
 
+def blocked_without_funds(cooldown):
+    setup()
+    bot = Controller()
+    now = _core.step_time()
+    bot.snap.stock['coins'] = 25
+    if cooldown is not None:
+        bot._session.memory.cooldowns['unused-method'] = now + cooldown
+    run_wait(bot.loop())
+    assert bot._phase == 'bank'
+    assert bot._waiting_until == now + (cooldown if cooldown is not None and 0 < cooldown < 30000 else 30000)
+    assert 'Not enough banked Coins' in bot._status
+    assert 'waiting for another method' in bot._status
+    assert bot._activity.starts == []
+    assert bot._last_failure is None
+
+
+test_each([None, -1000, 5000, 45000])('unfunded starter waits without requiring an active cooldown: %s', blocked_without_funds)
+
+
 def sold_out_helm_alternatives():
     from bots.account_leveler.equipment import melee_equipment
     setup()
