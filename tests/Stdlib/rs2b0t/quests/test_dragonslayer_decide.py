@@ -209,7 +209,7 @@ def _fn16():
         _merged37 = {}
         for _k, _v in (sailing._fields if isinstance(sailing, (Record, Fake)) else sailing).items():
             _merged37[_k] = _v
-        for _k, _v in {'worn_ids': set([DS_ID.SHIELD])}.items():
+        for _k, _v in {'worn_ids': set([DS_ID.SHIELD]), 'inv': {'coins': 100}}.items():
             _merged37[_k] = _v
         expect(decide(snapshot(Fake(**_merged37)))).to_match_object(Fake(**{'kind': 'custom'}))
         expect(decide(snapshot(sailing))).to_match_object(Fake(**{'kind': 'talk', 'stop': Fake(**{'npc': 'Duke Horacio'})}))
@@ -380,6 +380,29 @@ def _fn47():
         expect(step.name).to_be('go ashore')
     test('aboard with a hull supply still to fetch, the bot goes ashore first', _fn68)
 describe('Dragon Slayer sources its own shopping at the point of use', _fn47)
+
+def sailing_return_fare():
+    ready = snapshot(Fake(
+        progress=Fake(stage=DRAGON_STAGE.NED_GIVEN_MAP, flags=set()),
+        worn_ids=set([DS_ID.SHIELD]),
+        inv={'coins': 0},
+        bank={},
+        bank_coins=5000,
+    ))
+    step = decide(ready)
+    expect(step.kind).to_be('withdraw')
+    expect(step.items[0]['name']).to_be('Coins')
+    ready.inv['coins'] = step.items[0]['qty']
+    expect(ready.inv['coins']).to_be_greater_than_or_equal(100)
+    expect(decide(ready).name).to_be('board the Lady Lumbridge')
+
+    ready.tile = Tile(2836, 9599, 0)
+    ready.progress = Fake(stage=DRAGON_STAGE.SAILED_TO_CRANDOR, flags=set(['secret-passage']))
+    expect(decide(ready).name).to_be('kill Elvarg')
+
+
+test('sailing carries the return fare before Crandor loses access to the bank', sailing_return_fare)
+
 
 def snapshot_fields(**fields):
     for name in ['inv', 'inv_ids', 'bank', 'bank_ids']:

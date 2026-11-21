@@ -211,6 +211,71 @@ def out_of_stock():
 test('empty shop stock retries without blacklisting the item or the activity', out_of_stock)
 
 
+def sold_out_helm_alternatives():
+    from bots.account_leveler.equipment import melee_equipment
+    setup()
+    now = [1000]
+    sold_out = ['Adamant full helm']
+    spy_on(_core, 'step_time', impl=lambda: now[0])
+    bot = Controller()
+
+    def empty_shop(*args):
+        raise SupplyStockError('sold out', sold_out)
+        yield
+
+    spy_on(controller, 'provision', impl=empty_shop)
+    run_wait(bot.loop())
+    now[0] += 85000
+    sold_out[0] = 'Adamant med helm'
+    run_wait(bot.loop())
+    now[0] += 85000
+
+    spy_on(skills, 'level', returns=60)
+    spy_on(inventory, 'items', returns=[])
+    spy_on(equipment, 'items', returns=[])
+    spy_on(quests, 'all', returns=[])
+    spy_on(quests, 'points', returns=0)
+    spy_on(bank, 'ready', returns=True)
+    spy_on(bank, 'items', returns=[
+        Record({'id': 995, 'name': 'Coins', 'count': 1000000}),
+        Record({'id': 1333, 'name': 'Rune scimitar', 'count': 1}),
+        Record({'id': 1113, 'name': 'Rune chainbody', 'count': 1}),
+        Record({'id': 1079, 'name': 'Rune platelegs', 'count': 1}),
+    ])
+    current = AccountLeveler._snapshot(bot)
+    assert melee_equipment(current)[-1].item == 'Mithril full helm'
+    now[0] = bot._temporarily_unavailable['adamant full helm'] + 1
+    restocked = AccountLeveler._snapshot(bot)
+    assert melee_equipment(restocked)[-1].item == 'Adamant full helm'
+
+
+test('sold-out helms yield to a lower tier after shopping trips longer than a minute', sold_out_helm_alternatives)
+
+
+def quest_consumed_supplies(item):
+    setup()
+    bot = Controller()
+    plan = activity(needs=[Record({'item': item, 'count': 3, 'carry': 3})])
+    plan.script = 'AIOQuester'
+    plan.quest = 'Dragon Slayer'
+    bot.snap.quests['Dragon Slayer'] = False
+    bot.snap.stock[item.lower()] = 0
+    bot.train(plan)
+    run_wait(bot.loop())
+    assert bot._phase == 'train'
+    assert bot._session.plan is plan
+    assert bot._activity.calls == 1
+    assert bot._activity.stops == 0
+
+    bot.snap.quests['Dragon Slayer'] = True
+    run_wait(bot.loop())
+    assert bot._phase == 'bank'
+    assert bot._activity.stops == 1
+
+
+test_each(['Plank', 'Coins', 'Lobster'])('quest consumption of %s remains owned by the quest runner', quest_consumed_supplies)
+
+
 def exhausted_ammo():
     setup()
     bot = Controller()

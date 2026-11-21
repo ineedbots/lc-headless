@@ -42,6 +42,8 @@ SETTINGS = {
     'wilderness': SettingDef('boolean', True, label='Allow Wilderness training', help='Include suitable Wilderness combat camps and Edgeville monkey bars from Agility 15.'),
 }
 
+SUPPLY_STOCK_COOLDOWN = 15 * 60000
+
 
 class AccountLeveler(LoopingBot):
     loop_delay = 100
@@ -163,7 +165,7 @@ class AccountLeveler(LoopingBot):
                 return
             reached = self._reached(plan, snapshot)
             pending_potions = plan.script == 'PotionMaker' and inventory.count_by_id(((herb_by_name(str(plan.settings.get('herb'))).unf_id if herb_by_name(str(plan.settings.get('herb'))) is not None else None) if (herb_by_name(str(plan.settings.get('herb'))).unf_id if herb_by_name(str(plan.settings.get('herb'))) is not None else None) is not None else 91)) > 0
-            exhausted = not pending_potions and any([(stock_of(snapshot, requirement_key(need)) < need.minimum if need.minimum is not None else not need.equip and need.count > 1 and stock_of(snapshot, requirement_key(need)) == 0) for need in plan.needs])
+            exhausted = not plan.quest and not pending_potions and any([(stock_of(snapshot, requirement_key(need)) < need.minimum if need.minimum is not None else not need.equip and need.count > 1 and stock_of(snapshot, requirement_key(need)) == 0) for need in plan.needs])
             depleted_on_finish = (self._activity.outcome.kind if self._activity.outcome is not None else None) == 'finished' and any([stock_of(snapshot, requirement_key(need)) < need.count for need in plan.needs])
             session_expired = self._session.remaining_ms <= 0 and not (plan.script == 'EssMiner' and plan.output)
             if not game.in_combat() and (reached or exhausted or depleted_on_finish or session_expired):
@@ -210,7 +212,7 @@ class AccountLeveler(LoopingBot):
                 return
             if isinstance(error, SupplyStockError):
                 for item in error.items:
-                    self._temporarily_unavailable[item] = _core.step_time() + 60000
+                    self._temporarily_unavailable[item] = _core.step_time() + SUPPLY_STOCK_COOLDOWN
 
                 self._activity.stop()
                 self._session.resupply(_core.step_time())
