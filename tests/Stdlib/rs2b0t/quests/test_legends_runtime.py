@@ -137,3 +137,36 @@ def training_shut_early():
 
 
 test("a training conversation that shuts with sessions owed fails at once, for the engine's next attempt", training_shut_early)
+
+
+def training_retries_finish_quest():
+    world()
+    TRAINING['boxes'] = 0
+    sessions = {'awarded': 0, 'attempts': 0}
+    patch(guild, 'enter_main_hall', ok_walk)
+    spy_on(traversal, 'walk_resilient', impl=ok_walk)
+    spy_on(reach, 'npc_dialog', impl=said_done)
+    spy_on(chat_dialog, 'is_open', returns=False)
+    spy_on(chat_dialog, 'can_continue', returns=False)
+    spy_on(chat_dialog, 'options', returns=[])
+    spy_on(modals, 'is_open', returns=False)
+    spy_on(quests, 'status', impl=lambda name: 'complete' if sessions['awarded'] == 4 else 'in_progress')
+
+    def award_one_session(prefer, log, timeout_ms):
+        expect(prefer).to_equal(guild.training_prefer())
+        expect(timeout_ms).to_be(120000)
+        sessions['attempts'] += 1
+        sessions['awarded'] += 1
+        return None
+        yield
+
+    spy_on(guild, 'drive_to_end', impl=award_one_session)
+
+    for attempt in range(4):
+        result = run_wait(guild.take_training(lambda line: None))
+        expect(result).to_be(attempt == 3)
+
+    expect(sessions).to_equal({'awarded': 4, 'attempts': 4})
+
+
+test("Radimus closing after each session still completes on the engine's next attempts", training_retries_finish_quest)
