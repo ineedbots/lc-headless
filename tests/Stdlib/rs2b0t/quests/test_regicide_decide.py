@@ -3,6 +3,7 @@
 from rs2004.catalogs.record import Record
 from rs2004.quests.engine.types import QuestProgress, QuestSnapshot
 from rs2004.quests.defs.regicide import decide
+from rs2004.quests.defs.regicide.spade import reset_recovery
 from rs2004.quests.defs.regicide.areas import RG_ITEM
 from rs2004.quests.defs.regicide.journal import RG_FLAG, RG_STAGE
 from rs2004.quests.defs.regicide.supplies import ARROW_TARGET, COAL_TARGET, FOOD_TARGET, RETURN_KIT, ROPE_TARGET, STILL_FOOD, WOOL_TARGET
@@ -628,4 +629,20 @@ def _fn75():
 
 
 test('a saved loadout does not replace the armour already worn for Regicide', _fn75)
+
+
+def _fn76():
+    reset_recovery()
+    carried = [item for item in KIT if ((item[0] if isinstance(item, list) else item)) != RG_ITEM.SPADE.id]
+    step = decide(snapshot(Record({
+        'stage': RG_STAGE.SPOKEN_LATHAS,
+        'tile': ARDOUGNE,
+        'carried': carried,
+        'banked': [],
+    })))
+    expect(step.kind).to_be('custom')
+    expect(step.name).to_be('recover a spade from the nearest spawn')
+
+
+test('after a death restart, a missing unbanked spade is recovered from Ardougne before the pass', _fn76)
 

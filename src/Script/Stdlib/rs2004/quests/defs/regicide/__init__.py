@@ -12,6 +12,7 @@ from rs2004.quests.defs.regicide.journal import RG_FLAG, RG_STAGE, read_regicide
 from rs2004.quests.defs.regicide.pack import manage_pack
 from rs2004.quests.defs.regicide.pass_ import enter_tirannwn, leave_tirannwn
 from rs2004.quests.defs.regicide.pockets import pocket_at
+from rs2004.quests.defs.regicide.spade import recover_spade, recovery_failed as spade_recovery_failed, reset_recovery as reset_spade_recovery
 from rs2004.quests.defs.regicide.supplies import COAL_TARGET, KEEP_IDS, KIT, RETURN_KIT, STILL_FOOD, bow_carried, kit_shortfall, source_coal, source_kit
 from rs2004.quests.defs.upass import inside_pass
 from rs2004.quests.defs.upass.supplies import BOW_IDS, draw_gear, melee_carried, wear_gear
@@ -76,6 +77,11 @@ def cross_in(snap):
         shaped = (_v4 if _v4 is not None else source_kit(snap, kit))
         if shaped:
             return shaped
+        if carried(snap, RG_ITEM.SPADE) == 0:
+            if spade_recovery_failed():
+                return Record({'kind': 'wait', 'reason': 'no spade in pack or bank; the bounded spawn recovery failed'})
+            return custom('recover a spade from the nearest spawn', recover_spade)
+        reset_spade_recovery()
     _v5 = ready_for_tirannwn(snap, kit)
     return (_v5 if _v5 is not None else custom('walk the Underground Pass to the Well of Voyage', enter_tirannwn, navigation_progress=True))
 
