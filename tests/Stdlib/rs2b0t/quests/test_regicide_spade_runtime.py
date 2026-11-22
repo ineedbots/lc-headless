@@ -1,6 +1,7 @@
 """Regicide's lost-spade recovery across a death restart and failed sources."""
 
 from rs2004.execution import event_signal
+from rs2004.clues.tools import SPADE_SPAWNS
 from rs2004.quests.defs.regicide import decide, spade
 from rs2004.quests.defs.regicide.areas import RG_ITEM, RG_TILE
 from rs2004.quests.defs.regicide.journal import RG_STAGE
@@ -31,9 +32,10 @@ def reports_missing_spawn():
 
     expect(run_wait(spade.recover_spade(scene.log))).to_be(False)
     expect(scene.logged('no spade is available at the Ardougne spawn')).to_be(True)
-    expect(scene.walks).to_equal([spade.SPADE_SPAWN])
+    expect(scene.logged('no spade is available at the Falador spawn')).to_be(True)
+    expect(scene.walks).to_equal([spade.SPADE_SPAWN, SPADE_SPAWNS[1]])
     expect(run_wait(spade.recover_spade(scene.log))).to_be(False)
-    expect(scene.walks).to_equal([spade.SPADE_SPAWN])
+    expect(scene.walks).to_equal([spade.SPADE_SPAWN, SPADE_SPAWNS[1]])
     expect(scene.logged('already attempted and failed')).to_be(True)
 
     carried = {supply.item.id: supply.qty for supply in KIT if supply.item.id != RG_ITEM.SPADE.id}
@@ -49,7 +51,7 @@ def reports_missing_spawn():
         tile=RG_TILE.ARDOUGNE_BANK,
     ))
     expect(stopped.kind).to_be('wait')
-    expect(stopped.reason).to_be('no spade in pack or bank; the Ardougne spawn recovery attempt failed')
+    expect(stopped.reason).to_be('no spade in pack or bank; the bounded spawn recovery failed')
 
 
 test('an empty spawn fails with a clear reason after one visit', reports_missing_spawn)
@@ -63,7 +65,8 @@ def reports_unreachable_spawn():
 
     expect(run_wait(spade.recover_spade(scene.log))).to_be(False)
     expect(scene.logged('could not reach the Ardougne spade spawn')).to_be(True)
-    expect(scene.walks).to_equal([spade.SPADE_SPAWN])
+    expect(scene.logged('could not reach the Falador spade spawn')).to_be(True)
+    expect(scene.walks).to_equal([spade.SPADE_SPAWN, SPADE_SPAWNS[1]])
 
 
 test('an unreachable spawn fails after the bounded walk attempts', reports_unreachable_spawn)
@@ -76,8 +79,8 @@ def reports_failed_pickup():
     spy_on(event_signal, 'pending', returns=False)
 
     expect(run_wait(spade.recover_spade(scene.log))).to_be(False)
-    expect(scene.logged('the Ardougne spade was not acquired')).to_be(True)
-    expect(scene.walks).to_equal([spade.SPADE_SPAWN])
+    expect(scene.logged('the spade at the Ardougne spawn was not acquired')).to_be(True)
+    expect(scene.walks).to_equal([spade.SPADE_SPAWN, SPADE_SPAWNS[1]])
 
 
 test('a refused ground pickup fails with a clear reason', reports_failed_pickup)

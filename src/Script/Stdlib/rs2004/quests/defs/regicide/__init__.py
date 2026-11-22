@@ -79,8 +79,8 @@ def cross_in(snap):
             return shaped
         if carried(snap, RG_ITEM.SPADE) == 0:
             if spade_recovery_failed():
-                return Record({'kind': 'wait', 'reason': 'no spade in pack or bank; the Ardougne spawn recovery attempt failed'})
-            return custom('recover a spade from the Ardougne spawn', recover_spade)
+                return Record({'kind': 'wait', 'reason': 'no spade in pack or bank; the bounded spawn recovery failed'})
+            return custom('recover a spade from the nearest spawn', recover_spade)
         reset_spade_recovery()
     _v5 = ready_for_tirannwn(snap, kit)
     return (_v5 if _v5 is not None else custom('walk the Underground Pass to the Well of Voyage', enter_tirannwn, navigation_progress=True))

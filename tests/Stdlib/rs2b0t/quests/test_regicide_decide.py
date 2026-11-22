@@ -641,7 +641,7 @@ def _fn76():
         'banked': [],
     })))
     expect(step.kind).to_be('custom')
-    expect(step.name).to_be('recover a spade from the Ardougne spawn')
+    expect(step.name).to_be('recover a spade from the nearest spawn')
 
 
 test('after a death restart, a missing unbanked spade is recovered from Ardougne before the pass', _fn76)
