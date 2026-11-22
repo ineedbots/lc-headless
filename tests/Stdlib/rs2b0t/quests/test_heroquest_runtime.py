@@ -47,6 +47,28 @@ def enough_goes_straight():
 test('a purse that covers the price goes straight to the shop', enough_goes_straight)
 
 
+def reports_no_stockist():
+    def run(step, hops, log):
+        return False
+        yield
+
+    lines = []
+    spy_on(shops, 'return_to_street', impl=nothing)
+    spy_on(shops, 'execute_step', impl=run)
+    spy_on(inventory, 'count', returns=200000)
+    item = Record({'name': 'Rune chainbody', 'qty': 1, 'sources': [
+        shops.priced(HERO_SHOP.SCAVVO, 80000),
+    ]})
+    expect(run_wait(shops.buy_from_any(item, lines.append))).to_be(False)
+    expect(lines).to_equal([
+        'Scavvo had no Rune chainbody',
+        "no stockist has Rune chainbody; bank one before continuing Hero's Quest",
+    ])
+
+
+test('a missing rune-kit item names the banked-stock recovery', reports_no_stockist)
+
+
 def walked(*args, **kw):
     return True
     yield

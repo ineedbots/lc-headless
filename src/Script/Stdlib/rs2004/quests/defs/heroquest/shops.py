@@ -40,6 +40,7 @@ def buy_from_any(item, log):
         if bought:
             return True
         log(f'{source.npc} had no {item.name}')
+    log(f'no stockist has {item.name}; bank one before continuing Hero\'s Quest')
     return False
 
 

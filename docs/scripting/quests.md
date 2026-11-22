@@ -319,6 +319,7 @@ The live run added these departures from rs2b0t:
 
 - **Hero's Quest**
     - A short purse draws the difference from the bank before Scavvo, since the engine's own draw only tops up below a quarter of the price.
+    - The combat kit needs to be banked before a paired run if Scavvo's shared stock has been sold.
     - With the Ice Queen dead and no gloves on the floor, it waits up to five minutes for her respawn, since partners share her.
 - **Temple of Ikov**
     - `past_south_gate` needs the temple too, as the half-plane alone holds the surface.
