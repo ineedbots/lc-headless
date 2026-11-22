@@ -136,6 +136,7 @@ heroquest = QuestModule(**{
 ],
     'sustain': Record({'foods': ['Lobster', 'Swordfish', 'Tuna'], 'eat_below_hp': 0.5}),
     'read_progress': read_hero_quest_progress,
+    'exit': return_to_street,
     'resume_at': resumes_at,
     'warn_readiness': lambda: (None if partner_configured() else "Hero's Quest needs a rival-gang partner — the armband cannot be earned alone"),
     'decide': decide,

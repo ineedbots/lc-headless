@@ -6,6 +6,7 @@ from rs2004.quests.data import QUESTS
 from rs2004.quests.defs.heroquest import decide, heroquest, in_sealed_pocket
 from rs2004.quests.defs.heroquest.areas import HERO_ID
 from rs2004.quests.defs.heroquest.config import hero_config, reset_hero_gang_cache
+from rs2004.quests.defs.heroquest.doors import return_to_street
 from rs2004.quests.defs.heroquest.journal import HERO_STAGE
 from rs2004.quests.defs import QUEST_DEFS, def_by_id
 from rs2004.quests.defs.shieldofarrav.config import arrav_config
@@ -334,3 +335,10 @@ def resumes_in_the_pockets():
 
 
 test('a restart in a sealed pocket or on Entrana stays with the quest', resumes_in_the_pockets)
+
+
+def exits_sealed_areas_before_recovery_banking():
+    expect(heroquest.exit).to_be(return_to_street)
+
+
+test('the bank reset can leave a sealed quest area', exits_sealed_areas_before_recovery_banking)
