@@ -37,6 +37,16 @@ def policy_outcomes():
 test('preparation uses bank stock and keeps quest materials out of food', policy_outcomes)
 
 
+def death_plateau_preparation():
+    module = QuestModule(record=QuestRecord(id='death'))
+    request = quest_preparation_request(module, 'Trout', 'not_started', {})
+    expect([(r.item, r.count) for r in request.items]).to_equal([('Bread', 10), ('Trout', 10)])
+    expect(request.skills).to_be(None)
+
+
+test('Death Plateau leaves iron bar acquisition to the quest', death_plateau_preparation)
+
+
 def planning_outcomes():
     s = snapshot()
     request = Value({'skills': [Value({'skill': 'runecraft', 'level': 50})]})

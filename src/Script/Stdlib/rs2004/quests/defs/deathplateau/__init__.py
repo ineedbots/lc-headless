@@ -163,6 +163,12 @@ def source_named(snap, name, id, qty):
     short = qty - have
     in_bank = max(banked_name(snap, name), banked_id(snap, id))
     if in_bank <= 0:
+        if id == DEATH_ITEM.IRON_BAR.id:
+            space = make_space(snap, short)
+            if space is not None:
+                return space
+            return Record({'kind': 'grab_ground', 'item': name,
+                           'anchor': TILE.IRON_BAR_SPAWN, 'wait_if_missing': True})
         return Record({'kind': 'wait', 'reason': f'need {qty}× {name} in bank for Death Plateau'})
     _v3 = make_space(snap, short)
     return (_v3 if _v3 is not None else withdraw([{'name': name, 'qty': min(short, in_bank), 'id': id}]))

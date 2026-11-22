@@ -336,6 +336,10 @@ Goblin Diplomacy's `tools` is a function returning the current keep list, includ
 
 Before mining blurite, The Knight's Sword acquires a usable pickaxe even if its iron bars came from the bank. It also draws up to five banked Lobsters, Swordfish or Tuna when available; missing food does not block the quest, and it never leaves the cave to top food back up.
 
+Death Plateau uses a held or banked iron bar for Dunstan's boots first. If none is available, it collects the level 18 Wilderness iron bar spawn at (3111, 3657), waiting for a respawn when necessary. AIOQuester prepares the bread and trout but leaves the iron bar to the quest, so missing bars do not block preparation.
+
+If Harold's gamble dialogue stalls, Death Plateau closes it and retries the conversation up to twice before failing the step. These retries keep Harold's confirmed drink state and do not require another cocktail. A missed bet prompt logs the visible dialogue for diagnosis.
+
 `rs2004.karamja_recovery.missing_boat_fare(from_, dest, coins, missing)` recognises a stranded traveller whose only missing route item is the 30-coin fare. `recover_boat_fare(dest, missing, log)` collects Luthas's payment, filling the plantation crate first when needed. `traversal.walk_to` calls it after an unfunded route fails, then retries the destination; available routes and teleports are tried first.
 
 The phase-17h modules are registered too:

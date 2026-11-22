@@ -18,7 +18,7 @@ def supplies(*items):
 SUPPLIES = Record({
     'elemental_workshop': supplies('Hammer', 'Thread'),
     'priestperil': supplies('Bronze pickaxe'),
-    'death': supplies(['Bread', 10], ['Trout', 10], 'Iron bar'),
+    'death': supplies(['Bread', 10], ['Trout', 10]),
     'itwatchtower': supplies('Guam leaf', 'Bat bones', 'Gold bar'),
     'tbwt': supplies('Small fishing net', 'Seaweed'),
     'upass': supplies(['Bronze arrow', 50], 'Tinderbox', 'Spade', 'Bucket'),
