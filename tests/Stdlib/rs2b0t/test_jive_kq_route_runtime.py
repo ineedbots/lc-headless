@@ -4,6 +4,19 @@ from bots.jivekq import route
 from rs2004.game import game
 from rs2004.geometry import Tile
 from rs2004.dialogue import chat_dialog
+from rs2004.trade import shop
+
+
+def completed(value):
+    return value
+    yield
+
+
+class ShopStock:
+    def __init__(self, id, name, count):
+        self.id = id
+        self.name = name
+        self.count = count
 
 
 def refused_choice(option):
@@ -31,6 +44,44 @@ def disclaimer(confirmed):
 
 
 test_each([True, False])('Shantay disclaimer drop must be confirmed and preserves the pass: %s', disclaimer)
+
+
+def pass_shop_restock():
+    scene = Scene(Tile(3304, 3120))
+    scene.npc('Shantay', ['Talk-to', 'Trade'])
+    stock_count = [0]
+    purchases = []
+
+    def stock():
+        return [ShopStock(route.PASS, 'Shantay pass', stock_count[0])]
+
+    def buy(name, count):
+        purchases.append((name, count))
+
+        if len(purchases) == 1:
+            return completed(0)
+
+        scene.item(route.PASS, 'Shantay pass')
+        return completed(1)
+
+    scene.later(lambda: stock_count.__setitem__(0, 1))
+    spy_on(shop, 'open', impl=lambda keeper: completed(True))
+    spy_on(shop, 'stock', impl=stock)
+    spy_on(shop, 'buy', impl=buy)
+    spy_on(shop, 'is_open', returns=True)
+    spy_on(shop, 'stock_com', returns=3900)
+    spy_on(shop, 'side_com', returns=3823)
+    spy_on(shop, 'close', impl=lambda: completed(True))
+
+    expect(run_wait(route.buy_pass(scene.log))).to_be(True)
+    expect(purchases).to_equal([('Shantay pass', 1), ('Shantay pass', 1)])
+    expect(scene.has(route.PASS)).to_be(True)
+    expect(scene.logged('stock=[1854:Shantay passx0]')).to_be(True)
+    expect(scene.logged('stock is empty')).to_be(True)
+    expect(scene.logged('stock returned; retrying purchase')).to_be(True)
+
+
+test('Shantay pass purchase waits for empty shop stock to return', pass_shop_restock)
 
 
 def camelot():
