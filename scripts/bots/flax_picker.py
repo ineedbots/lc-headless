@@ -104,7 +104,7 @@ class GoToField(Task):
         self.bot = bot
 
     def validate(self):
-        return not inventory.is_full() and self.bot.nearest_flax() is None
+        return not inventory.is_full() and (not self.bot.at_field() or self.bot.nearest_flax() is None)
 
     def execute(self):
         bot = self.bot
