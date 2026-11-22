@@ -31,10 +31,12 @@ def trail_food_target(host_want, held_food, free_slots, reserve_slots):
     return max(0, min(capped, room))
 
 
-def hard_trail_food_target(held_food, free_slots, reserve_slots, minimum_sharks=15):
-    """The sharks a hard trail carries, or None when the pack can't hold the minimum."""
+def hard_trail_food_target(held_food, free_slots, reserve_slots, minimum_sharks=15, required_sharks=None):
+    """The preferred Sharks a hard trail carries, or None when the pack can't hold the guardian minimum."""
+    if required_sharks is None:
+        required_sharks = GUARDIAN_MIN_SHARKS
     target = min(minimum_sharks, held_food + max(0, free_slots - reserve_slots))
-    return target if target >= minimum_sharks else None
+    return target if target >= required_sharks else None
 
 
 def weapon_needed(weapon_name, in_backpack, equipped):

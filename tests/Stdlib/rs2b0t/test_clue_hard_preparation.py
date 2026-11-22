@@ -448,11 +448,12 @@ describe('ranged hard preparation', lambda: [
 
 def lacks(id):
     w = Vault().install()
+    w.pack[0] = Held(3526, 'Clue scroll (hard)')
     w.bank = [i for i in w.bank if i.id != id]
     task = SolveClue(Host(w))
     run(task)
     expect(w.solves).to_be(0)
-    expect(any([i.id == CLUE.id for i in w.pack])).to_be(True)
+    expect(any([i.id == 3526 for i in w.pack])).to_be(True)
     expect(task.validate()).to_be(False)
 
 
@@ -465,8 +466,27 @@ def fourteen_sharks():
     expect(w.solves).to_be(0)
 
 
+def tight_food_budget():
+    w = Vault().install()
+    spy_on(quests, 'status', lambda name: 'complete' if name in ['Lost City', 'Legends Quest'] else 'unknown')
+    w.pack = [Held(3532, 'Clue scroll (hard)'), Held(952, 'Spade'), Held(2574, 'Sextant'), Held(2575, 'Watch'), Held(2576, 'Chart'),
+              Held(975, 'Machete'), Held(1351, 'Bronze axe')] + [Held(2724, 'Clue casket') for _ in range(14)]
+    w.bank.extend([Held(975, 'Machete'), Held(1351, 'Bronze axe')])
+    task = SolveClue(Host(w))
+    run(task)
+    expect(w.solves).to_be(1)
+    expect(w.sharks()).to_be(6)
+    expect(any([i.id == 3532 for i in w.pack])).to_be(True)
+    expect(len([i for i in w.pack if i.id == 2724])).to_be(14)
+    expect(any([i.name == 'Machete' for i in w.pack])).to_be(True)
+    expect(any([i.name == 'Bronze axe' for i in w.pack])).to_be(True)
+    expect(w.banked(BOW.id)).to_be(1)
+    expect(any(['pack pressure' in message for message in w.logs])).to_be(True)
+
+
 def bank_only_kit():
     w = Vault().install()
+    w.pack[0] = Held(3526, 'Clue scroll (hard)')
     run(SolveClue(Host(w)))
     expect(w.solves).to_be(1)
     expect(w.worn[0].id).to_be(1231)
@@ -836,7 +856,8 @@ describe('hard kit preparation', lambda: [
     test('keeps the clue and suppresses retries when the READY bank lacks 2448', lambda: lacks(2448)),
     test('keeps the clue and suppresses retries when the READY bank lacks 385', lambda: lacks(385)),
     test('blocks fourteen Sharks', fourteen_sharks),
-    test('stocks a bank-only kit and equips DDS before the executor', bank_only_kit),
+    test('budgets food to the guardian minimum while preserving clue scrolls and a casket', tight_food_budget),
+    test('stocks the Saradomin Wizard kit from the bank and equips DDS before the executor', bank_only_kit),
     test('blocks an equip failure even when ownership and requirements pass', equip_fails),
     test('does not confuse an unknown bank with a confirmed shortage', unknown_bank),
     test('restoration remains runnable after the clue disappears', restoration_after_clue),

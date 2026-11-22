@@ -274,7 +274,7 @@ def stock_hard_supplies(reserve_slots, bankable_items, minimum_sharks=15):
             return False
 
     def target():
-        return hard_trail_food_target(inventory.count('Shark'), inventory.free(), reserve_slots, minimum_sharks)
+        return hard_trail_food_target(inventory.count('Shark'), inventory.free(), reserve_slots, minimum_sharks, GUARDIAN_MIN_SHARKS)
 
     available = min(minimum_sharks, inventory.count('Shark') + bank.count_by_id(SHARK_ID))
     if (target() or 0) < available:
@@ -291,7 +291,7 @@ def stock_hard_supplies(reserve_slots, bankable_items, minimum_sharks=15):
         took = yield from execution.delay_until(lambda: inventory.count('Shark') > before, 2500)
         if not took:
             break
-    return inventory.count('Shark') >= minimum_sharks
+    return want is not None and inventory.count('Shark') >= want
 
 
 # The protection: Superantipoison against the Saradomin wizard's poison, and the weapon (guardianKit.ts)

@@ -37,7 +37,7 @@ from rs2004.clues import SolveClue, SolveClueHost, held_clue_like_id, walk_to_ba
 | `is_food(name)`, `food_name()`, `food_withdraw()` | The host's food, and how many a grind trip takes; a trail packs at most 10 |
 | `weapon_name()` | Optional: the weapon a trail keeps in the pack and puts back after |
 | `enabled()` | Optional: whether to solve now; a fight in progress or a loot run returns `False` |
-| `hard_food_target` | Optional attribute: the Sharks a hard trail packs, 15 by default |
+| `hard_food_target` | Optional attribute: the preferred Sharks a hard trail packs, 15 by default; preparation budgets down to four if the required clue kit leaves less room |
 | `ranged_loadout()` | Optional: a `GuardianRangedLoadout(weapon, ammo, quantity, mode)` to fight the guardian with a bow, or `None` for melee |
 | `prepare_initial_bank()` | Optional, **Wait**: gets to the first bank the host's own way, such as out of a lair; `False` blocks the trail |
 | `restore_prayer()`, `use_teleports()` | Optional: whether to top up prayer at an altar before a hard trail, and whether legs route through teleports |
@@ -108,7 +108,7 @@ The driver is `rs2004.clues.puzzle_box`:
 
 ## Packing and the hard kit
 
-`trail_food_target(host_want, held_food, free_slots, reserve_slots)` caps a trail's food at `TRAIL_FOOD_CAP` and leaves room for the coordinate tools. `hard_trail_food_target` does the same for a hard trail's Sharks, never below the minimum.
+`trail_food_target(host_want, held_food, free_slots, reserve_slots)` caps a trail's food at `TRAIL_FOOD_CAP` and leaves room for the coordinate tools. `hard_trail_food_target` prefers the configured Shark count (15 by default), then budgets down to the pack space available while preserving the guardian minimum of four. It returns `None` if even those four Sharks cannot fit.
 
 `hard_clue_kit(HardKitSnapshot(attack, lost_city, items, ranged))` is `'ready'` or what's short: `'weapon'`, `'ammo'`, `'attack'` (60 for a dragon weapon), `'lost-city'` (which a dragon weapon needs), `'superantipoison'` or `'sharks'`. The guardian's weapons are `GUARDIAN_WEAPON_IDS`: the dragon dagger, its poisoned form, and the dragon longsword. A ranged loadout needs the bow worn and its ammo.
 
@@ -117,7 +117,7 @@ The driver is `rs2004.clues.puzzle_box`:
 At an open bank, two Waits stock the kit:
 
 - `stock_hard_weapon(entrana, remember, preferred_weapon, minimum_sharks, ranged)` wears the guardian's weapon, or the ranged loadout. It tells `remember(name)` what the weapon replaced.
-- `stock_hard_supplies(reserve_slots, bankable_items, minimum_sharks)` takes a dose and the Sharks.
+- `stock_hard_supplies(reserve_slots, bankable_items, minimum_sharks)` takes a dose and up to the preferred Shark count, budgeting down to the pack space available. It blocks if the bank cannot supply that budget or the pack cannot hold the guardian minimum.
 
 `TeleportKit` and `teleport_kit_for(world_state())` list the runes for the teleports this account can cast. `is_teleport_item(name, kit)` is whether a bank stop keeps an item for them.
 

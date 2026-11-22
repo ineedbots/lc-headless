@@ -29,7 +29,7 @@ from rs2004.clues.acquire import ensure_coord_tools, has_all_trio, has_coord_clu
 from rs2004.clues.data import CASKET_IDS, CLUE_DB
 from rs2004.clues.executor import ClueExecutor
 from rs2004.clues.guardian import hard_kit_fingerprint, hard_kit_snapshot, stock_hard_supplies, stock_hard_weapon, sustain_until
-from rs2004.clues.plan import COORD_TOOL_SLOTS, GUARDIAN_WEAPON_IDS, SHARK_ID, hard_clue_kit, teleport_rune_target, trail_food_target, weapon_needed
+from rs2004.clues.plan import COORD_TOOL_SLOTS, GUARDIAN_MIN_SHARKS, GUARDIAN_WEAPON_IDS, SHARK_ID, hard_clue_kit, teleport_rune_target, trail_food_target, weapon_needed
 from rs2004.clues.teleports import is_teleport_item, teleport_kit_for
 from rs2004.clues.tools import SPADE_NAME, trail_kit
 from rs2004.clues.travel import KHARAZI_CLUES, MACHETE, RADIMUS_NOTES, crosses_clue_duel, crosses_kharazi, crosses_tirannwn, has_jungle_map, held_axe
@@ -668,7 +668,7 @@ class SolveClue(Task):
             return False
         ranged = self._ranged()
         if self.hard_trail:
-            kit = hard_clue_kit(hard_kit_snapshot(True, ranged), self._hard_food_target())
+            kit = hard_clue_kit(hard_kit_snapshot(True, ranged), GUARDIAN_MIN_SHARKS)
             if kit != 'ready':
                 self.status = f'hard kit: {kit}'
                 self._log(f'hard kit short of {kit}: keeping the clue until the bank has it')
@@ -743,7 +743,7 @@ class SolveClue(Task):
                 if name not in solve.stripped_gear:
                     solve.stripped_gear.append(name)
 
-            armed = yield from stock_hard_weapon(entrana_strip, remember, self._weapon_name(), self._hard_food_target(), ranged)
+            armed = yield from stock_hard_weapon(entrana_strip, remember, self._weapon_name(), GUARDIAN_MIN_SHARKS, ranged)
             if not armed:
                 self._log('no guardian weapon came out of the bank: keeping the clue until it has one')
                 self._block_hard_kit()
@@ -781,9 +781,12 @@ class SolveClue(Task):
             bankable = self.stripped_gear + (['Sextant', 'Watch', 'Chart'] if puzzle_id is not None else [])
             supplied = yield from stock_hard_supplies((COORD_TOOL_SLOTS if fetching_coord_tools else 0) + puzzle_slots, bankable, self._hard_food_target())
             if not supplied:
-                self._log(f'{inventory.free()} slots free and {inventory.count("Shark")} sharks held, short of the minimum: keeping the clue')
+                self._log(f'{inventory.free()} slots free and {inventory.count("Shark")} Sharks held, short of the food budget: keeping the clue')
                 self._block_hard_kit()
                 return False
+            shark_count = inventory.count('Shark')
+            if shark_count < self._hard_food_target():
+                self._log(f'pack pressure: taking {shark_count} Sharks instead of the preferred {self._hard_food_target()}, preserving the clue kit')
         elif food != '':
             target = trail_food_target(self.host.food_withdraw(), inventory.count(food), inventory.free(), COORD_TOOL_SLOTS if fetching_coord_tools else 0)
             self.host.set_status(f'clue: withdrawing {food}')
@@ -805,7 +808,7 @@ class SolveClue(Task):
             yield from ensure_coord_tools(self._log)
         if self.hard_trail:
             yield from bank.close()
-            if not entrana_strip and hard_clue_kit(hard_kit_snapshot(False, ranged), self._hard_food_target()) != 'ready':
+            if not entrana_strip and hard_clue_kit(hard_kit_snapshot(False, ranged), GUARDIAN_MIN_SHARKS) != 'ready':
                 return False
         yield from self._top_up_prayer(scroll_id)
         return True
