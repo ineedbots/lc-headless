@@ -489,6 +489,29 @@ def gambles_for_the_iou():
     expect(run_wait(harold.gamble_with_harold(town.log))).to_be(True)
     expect(rounds).to_equal([101, 202, 404])
     town.drop(DEATH_ITEM.IOU.id)
+    drinks = []
+    retries = []
+
+    def confirms_drink(log):
+        drinks.append(True)
+        return True
+        yield
+
+    def interrupted_round(bet, log):
+        retries.append(bet)
+        if len(retries) == 1:
+            return 'abort'
+        town.hold(DEATH_ITEM.IOU.id, 'Iou')
+        return 'iou'
+        yield
+
+    spy_on(harold, 'give_blurberry_to_harold', impl=confirms_drink)
+    spy_on(harold, 'play_round', impl=interrupted_round)
+    expect(run_wait(harold.gamble_with_harold(town.log))).to_be(True)
+    expect(drinks).to_equal([True])
+    expect(retries).to_equal([101, 101])
+    expect(town.closed > 0).to_be(True)
+    town.drop(DEATH_ITEM.IOU.id)
     spy_on(harold, 'play_round', impl=lambda bet, log: result('abort'))
     expect(run_wait(harold.gamble_with_harold(town.log))).to_be(False)
     spy_on(harold, 'play_round', impl=lambda bet, log: result('win'))

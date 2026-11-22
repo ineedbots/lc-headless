@@ -225,7 +225,7 @@ def play_round(bet, log):
     # Why: `harold_gamble` runs `if_close` before `p_countdialog`, so the chat closing is a step in the chain.
     _w17 = yield from drive_until(lambda: reader.count_dialog_open() or dice_open(), ['Would you like to gamble?'], log, 30000)
     if not (_w17):
-        log('Harold gamble: the gamble option never led to the bet prompt')
+        log(f'Harold gamble: the gamble option never led to the bet prompt; chat={chat_dialog.texts()} options={chat_dialog.options()}')
         return 'abort'
     if reader.count_dialog_open():
         if not _core.answer_count(bet):
@@ -290,6 +290,7 @@ def gamble_with_harold(log):
         return False
     purse = HAROLD_PURSE_START
     round_ = 1
+    aborted = 0
     while round_ <= MAX_ROUNDS and not combination_found():
         bet = next_stake(purse, coins())
         if bet <= 0:
@@ -306,7 +307,17 @@ def gamble_with_harold(log):
         if result == 'iou':
             break
         if result == 'abort':
-            return combination_found()
+            if combination_found():
+                return True
+            aborted += 1
+            if aborted >= 3:
+                return False
+            # A stalled conversation must be closed before talking again; Harold stays drunk.
+            _core.close_interfaces()
+            yield from execution.delay_ticks(2)
+            log('Harold gamble: reopening the conversation without another cocktail')
+            continue
+        aborted = 0
         purse = purse_after(purse, bet, result)
         _c23 = not inside_harold_room(game.tile())
         if _c23:

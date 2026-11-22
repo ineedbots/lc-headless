@@ -41,6 +41,7 @@ BALL_PICKUP = [
 ]
 ALL_BALL_IDS = [b.id for b in BALL_PICKUP]
 TILE = Record({
+    'IRON_BAR_SPAWN': Tile(3111, 3657, 0),
     'DENULTH': Tile(2896, 3528, 0),
     'EOHRIC': Tile(2902, 3565, 1),
     'HAROLD': Tile(2905, 3539, 1),

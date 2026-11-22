@@ -3,6 +3,7 @@
 from rs2004.catalogs.record import Record as Value
 from rs2004.quests.engine.types import QuestModule, QuestSnapshot
 from rs2004.quests.engine.preparation_policy import quest_preparation_request, quest_food_request
+from rs2004.quests.data import quest_record
 from rs2004.quests.engine.recovery import QuestBankReset
 from rs2004.quests.types import QuestRecord, QuestRequirements, QuestItem, SkillReq
 from bots.account_leveler.record import Record
@@ -19,12 +20,12 @@ def snapshot():
 
 
 def policy_outcomes():
-    module = QuestModule(record=QuestRecord(id='squire', items=[QuestItem('Iron bar', 2, 'mustHave')]))
+    module = QuestModule(record=quest_record('squire'))
     request = quest_preparation_request(module, 'Trout', 'not_started', {})
-    expect([(s.skill, s.level) for s in request.skills]).to_equal([('smithing', 15), ('mining', 15)])
-    expect([(r.item, r.count) for r in request.items]).to_equal([('Iron bar', 2)])
+    expect({s.skill: s.level for s in request.skills}).to_equal({'mining': 15, 'cooking': 10, 'smithing': 15})
+    expect(request.items).to_be(None)
     banked = quest_preparation_request(module, 'Trout', 'not_started', {'iron bar': 2})
-    expect(banked.skills).to_be(None)
+    expect({s.skill: s.level for s in banked.skills}).to_equal({'mining': 10, 'cooking': 10})
     expect(quest_preparation_request(module, 'Trout', 'unknown')).to_be(None)
     module.record.id = 'crest'
     expect(quest_food_request(module, 'Tuna').item).to_be('Lobster')
@@ -35,6 +36,16 @@ def policy_outcomes():
 
 
 test('preparation uses bank stock and keeps quest materials out of food', policy_outcomes)
+
+
+def death_plateau_preparation():
+    module = QuestModule(record=QuestRecord(id='death'))
+    request = quest_preparation_request(module, 'Trout', 'not_started', {})
+    expect([(r.item, r.count) for r in request.items]).to_equal([('Bread', 10), ('Trout', 10)])
+    expect(request.skills).to_be(None)
+
+
+test('Death Plateau leaves iron bar acquisition to the quest', death_plateau_preparation)
 
 
 def planning_outcomes():

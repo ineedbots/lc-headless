@@ -59,6 +59,37 @@ def custom_name(step):
     return (step.name if step.kind == 'custom' else None)
 
 
+def iron_bar_supply_outcomes():
+    s = snap(Record({
+        'progress': progress(DP_STAGE.UNLOCKED_DOOR, [DP_FLAG.GIVEN_CERT]),
+        'inv_ids': [DEATH_ITEM.COMBINATION.id, DEATH_ITEM.CLIMBING_BOOTS.id],
+        'inv': ['Combination', 'Climbing boots'],
+    }))
+    s.bank_known = False
+    expect(decide(s).kind).to_be('scan_bank')
+    s.bank_known = True
+    step = decide(s)
+    expect(step.kind).to_be('grab_ground')
+    expect(step.item).to_be('Iron bar')
+    expect([step.anchor.x, step.anchor.z, step.anchor.level]).to_equal([3111, 3657, 0])
+    expect(step.wait_if_missing).to_be(True)
+    s.free_slots = 0
+    expect(decide(s).kind).to_be('deposit')
+    s.free_slots = 26
+    s.bank_ids = {DEATH_ITEM.IRON_BAR.id: 1}
+    step = decide(s)
+    expect(step.kind).to_be('withdraw')
+    expect(step.items).to_equal([{'name': 'Iron bar', 'qty': 1, 'id': DEATH_ITEM.IRON_BAR.id}])
+    s.inv_ids[DEATH_ITEM.IRON_BAR.id] = 1
+    expect(custom_name(decide(s))).to_be('have Dunstan spike the climbing boots')
+    s.inv_ids[DEATH_ITEM.IRON_BAR.id] = 0
+    s.inv_ids[DEATH_ITEM.SPIKED_BOOTS.id] = 1
+    expect(decide(s).reason).to_contain('Bread')
+
+
+test('Dunstan iron bar uses bank stock or the Wilderness spawn and stops after spiking', iron_bar_supply_outcomes)
+
+
 def withdraws_banked_paper(item):
     def run():
         s = snap(Record({'progress': progress(DP_STAGE.GIVEN_IOU)}))
