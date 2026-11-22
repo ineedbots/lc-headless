@@ -78,7 +78,19 @@ def buy_pass(log):
     if not opened:
         return False
     bought = yield from shop.buy('Shantay pass', 1)
+
+    if bought != 1:
+        stock = ', '.join([f'{item.id}:{item.name}x{item.count}' for item in shop.stock()])
+        keeper = npcs.query().name('Shantay').nearest()
+        keeper_actions = ', '.join(keeper.actions()) if keeper is not None else '<missing>'
+        log(
+            f'Shantay pass purchase failed: bought={bought}, stock=[{stock}], '
+            + f'coins={inventory.count("Coins")}, free={inventory.free()}, shop_open={shop.is_open()}, '
+            + f'stock_com={shop.stock_com()}, side_com={shop.side_com()}, Shantay_actions=[{keeper_actions}]'
+        )
+
     yield from shop.close()
+
     if bought != 1:
         raise RuntimeError('Could not buy a Shantay pass')
     log('bought Shantay pass')
