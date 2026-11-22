@@ -25,6 +25,24 @@ def walk(tile, radius, log):
     return arrived
 
 
+def _pass_stock():
+    return sum([item.count for item in shop.stock() if item.id == PASS])
+
+
+def _log_pass_purchase_failure(bought, log):
+    stock_items = shop.stock()
+    stock = ', '.join([f'{item.id}:{item.name}x{item.count}' for item in stock_items])
+    pass_stock = sum([item.count for item in stock_items if item.id == PASS])
+    keeper = npcs.query().name('Shantay').nearest()
+    keeper_actions = ', '.join(keeper.actions()) if keeper is not None else '<missing>'
+    log(
+        f'Shantay pass purchase failed: bought={bought}, stock=[{stock}], '
+        + f'coins={inventory.count("Coins")}, free={inventory.free()}, shop_open={shop.is_open()}, '
+        + f'stock_com={shop.stock_com()}, side_com={shop.side_com()}, Shantay_actions=[{keeper_actions}]'
+    )
+    return pass_stock
+
+
 def step(tile):
     return step_to(tile)
 
@@ -77,8 +95,30 @@ def buy_pass(log):
     opened = yield from shop.open('Shantay')
     if not opened:
         return False
-    bought = yield from shop.buy('Shantay pass', 1)
+    bought = 0
+
+    for attempt in range(3):
+        bought = yield from shop.buy('Shantay pass', 1)
+
+        if bought == 1:
+            break
+
+        pass_stock = _log_pass_purchase_failure(bought, log)
+
+        if pass_stock > 0 or attempt == 2:
+            break
+
+        log('Shantay pass stock is empty; waiting up to 10 seconds for restock')
+        restocked = yield from execution.delay_until(lambda: _pass_stock() > 0, 10000)
+
+        if not restocked:
+            log('Shantay pass stock did not return within 10 seconds')
+            break
+
+        log('Shantay pass stock returned; retrying purchase')
+
     yield from shop.close()
+
     if bought != 1:
         raise RuntimeError('Could not buy a Shantay pass')
     log('bought Shantay pass')
