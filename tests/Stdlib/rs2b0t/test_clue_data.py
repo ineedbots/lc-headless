@@ -76,10 +76,11 @@ describe('hard_clue_kit', lambda: [
         expect(hard_clue_kit(kit([item(1305, 0)] + READY[1:]))).not_.to_be('ready'),
     ]),
     test('a ranged hard-clue kit needs its configured bow and ammo, without melee unlocks', ranged_kit),
-    test('reserves the mandatory thirteen slots without lowering the minimum', lambda: [
+    test('budgets Sharks down to the guardian minimum when pack space is tight', lambda: [
         expect(hard_trail_food_target(0, 15, 0)).to_be(15),
         expect(hard_trail_food_target(0, 21, 1)).to_be(15),
-        expect(hard_trail_food_target(0, 14, 0)).to_be_null(),
+        expect(hard_trail_food_target(0, 14, 0)).to_be(14),
+        expect(hard_trail_food_target(0, 3, 0)).to_be_null(),
     ]),
 ])
 
