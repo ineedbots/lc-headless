@@ -67,8 +67,7 @@ MATERIAL_FOOD = Record({
 })
 FISH = [['Swordfish', 50, 45], ['Bass', 46, 43], ['Tuna', 35, 30], ['Salmon', 30, 25], ['Shrimps', 1, 1]]
 PROTECT = Record({'melee': 43, 'missiles': 40, 'magic': 37})
-# Iron bars remain ordinary supplies for other quests even though Death Plateau gathers its own.
-ORDINARY_SUPPLIES = set(['coins', 'iron bar'])
+ORDINARY_SUPPLIES = set(['coins'])
 for _key in SUPPLIES.keys():
     for _item in SUPPLIES.get(_key):
         ORDINARY_SUPPLIES.add(_item.item.lower())
