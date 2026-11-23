@@ -39,6 +39,11 @@ def walk_to(dest, radius, log):
 
 # Why: the jail key lies on the floor for 100 ticks and nothing else in the corridor drops one, so a slow pickup means killing the Jailer again.
 def take_jail_key(log):
+    # NPC removal can arrive before the ground-item update for its death drop.
+    ready = yield from execution.delay_until(lambda: ground_items.query().where(lambda g: g.id == SC_ID.JAIL_KEY).within(12).exists(), DOOR_MS)
+    if not ready:
+        log('scorpcatcher: no jail key appeared after the Jailer disappeared')
+        return False
     drop = ground_items.query().where(lambda g: g.id == SC_ID.JAIL_KEY).within(12).nearest()
     if not drop:
         return False

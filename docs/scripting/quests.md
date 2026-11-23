@@ -208,6 +208,9 @@ The phase-17b modules are registered too:
 
 Observatory Quest's goblin guard is fought with Troll Stronghold's `combat.fight` and `attackable`, so `rs2004.quests.defs.trollstronghold.combat` and `areas` were ported ahead of the quest itself. All nine phase-17b quests have completed in one live queue.
 
+Scorpion Catcher waits for the Jailer's ground-item update after the NPC disappears
+before collecting the jail key, so delayed loot does not restart the dungeon leg.
+
 The phase-17c modules are registered too:
 
 | Module in `rs2004.quests.defs` | Record id | Behaviour |
