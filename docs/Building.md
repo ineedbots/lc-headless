@@ -370,3 +370,5 @@ The [phase 16 end-to-end guide](../e2e/phase16/README.md) covers all eighteen F2
 quests, including both Shield of Arrav gangs and earned quest-point gates.
 The [phase 17g end-to-end guide](../e2e/phase17g/README.md) preserves the local-289
 setup and rerun commands for Hero's Quest, Temple of Ikov and The Fremennik Trials.
+The [phase 17a end-to-end guide](../e2e/phase17a/README.md) runs the twelve
+introductory members quests on separate scratch accounts.
