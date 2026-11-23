@@ -66,7 +66,7 @@ class RunTests(unittest.TestCase):
     def test_repeated_seeding_and_unprepared_runs_never_launch_a_client(self):
         run_dir = self.folder / 'run'
         run_dir.mkdir()
-        harness.write_json(run_dir / 'manifest.json', {'repo': str(harness.REPO), 'server': str(self.server), 'prefix': 'g17test', 'suite': 'phase17g'})
+        harness.write_json(run_dir / 'manifest.json', {'repo': str(harness.REPO), 'server': str(self.server), 'prefix': 'g17test'})
         (run_dir / 'seed-started').write_text('prior attempt', encoding='utf-8')
         args = SimpleNamespace(run_dir=run_dir, command='seed')
         with patch.object(harness.subprocess, 'Popen', side_effect=AssertionError('must not launch')):
