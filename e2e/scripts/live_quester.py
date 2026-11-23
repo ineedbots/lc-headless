@@ -1,6 +1,7 @@
 """Run the real AIOQuester, report its outcome, and log out when its queue stops."""
 
 import json
+from result_policy import completion_passed
 from bots.aio_quester import AIOQuester, AIO_SETTINGS
 from bots.aioquester.logic import queue_summary
 from rs2004 import execution
@@ -9,13 +10,14 @@ from rs2004.entities import npcs, ground_items
 from rs2004.game import chat, game, reader, skills
 from rs2004.items import inventory, equipment
 from rs2004.tabs import prayer, quests
-
-NAMES = {'ph': "Hero's Quest", 'ba': "Hero's Quest", 'ik': 'Temple of Ikov', 'ft': 'The Fremennik Trials'}
+from rs2004.quests.defs import record_by_id
 
 
 class AcceptanceQuester(AIOQuester):
     def on_start(self):
         yield from AIOQuester.on_start(self)
+        self.e2e_records = [record_by_id(id) for id in self.picked_ids()]
+        self.e2e_initial_done = [r.id for r in self.e2e_records if quests.status(r.name) == 'complete']
         if self.settings.bool('e2e_infinite_run', True):
             chat.command('infiniterun')
             yield from execution.delay_ticks(2)
@@ -29,11 +31,16 @@ class AcceptanceQuester(AIOQuester):
         summary = queue_summary(getattr(self, 'rows', []))
         deaths = getattr(self, 'deaths', 0)
         completed = getattr(self, 'completed', 0)
-        complete = quests.status(NAMES[case]) == 'complete'
-        passed = complete and completed == 1 and summary['done'] == 1 and summary['total'] == 1 and summary['stuck'] == 0 and deaths == 0
+        records = getattr(self, 'e2e_records', [])
+        initial = getattr(self, 'e2e_initial_done', [])
+        journal = {r.id: quests.status(r.name) for r in records}
+        complete = len(records) > 0 and all([status == 'complete' for status in journal.values()])
+        expected_qp = self.settings.num('e2e_expected_qp', 0)
+        passed = completion_passed(journal, initial, completed, deaths, summary, quests.points(), expected_qp)
         AIOQuester.on_stop(self, reason)
         self.log('E2E_RESULT ' + json.dumps({'case': case, 'name': game.my_name(), 'passed': passed,
                                           'quest_complete': complete, 'completed': completed, 'deaths': deaths,
+                                          'journal': journal, 'initial_done': initial,
                                           'queue': summary, 'qp': quests.points(), 'tile': str(game.tile()),
                                           'reason': getattr(self, 'e2e_finish_reason', str(reason))}))
 
@@ -50,6 +57,7 @@ def inspect_state(command):
 
 console.command('inspect', inspect_state, 'Inspect the live acceptance character')
 SCHEMA = {key: value for key, value in AIO_SETTINGS.items()}
-SCHEMA['e2e_case'] = SettingDef('string', 'ik', options=['ph', 'ba', 'ik', 'ft'])
+SCHEMA['e2e_case'] = SettingDef('string', '')
+SCHEMA['e2e_expected_qp'] = SettingDef('number', 0)
 SCHEMA['e2e_infinite_run'] = SettingDef('boolean', True)
 BOT = define_bot(name='AIOQuester', create=AcceptanceQuester, settings_schema=SCHEMA)
