@@ -1,6 +1,7 @@
 """Shared local-289 live acceptance launcher (CPython 3.12+)."""
 
 import argparse
+from contextlib import ExitStack
 import hashlib
 import json
 from pathlib import Path
@@ -73,11 +74,12 @@ def prepare(args, suite):
     for path in [client, args.cache_dir.resolve(), args.nav_dir.resolve(), server / 'src/app.ts']:
         if not path.exists():
             raise ValueError(f'Required path is missing: {path}')
+    batches = case_batches(list(suite['cases']), suite)
     login = dict(public_key(server), revision=289, lowMemory=True)
     manifest = {'version': 1, 'repo': str(REPO), 'server': str(server), 'client': str(client),
                 'client_sha': git_sha(REPO), 'engine_sha': git_sha(server), 'binary_sha256': digest(client),
                 'tick_ms': 600, 'infinite_run': not args.natural_run, 'prefix': prefix,
-                'suite': suite['name'], 'accounts': {case: prefix + case for case in suite['cases']}}
+                'suite': suite['name'], 'batches': batches, 'accounts': {case: prefix + case for case in suite['cases']}}
     run_dir.mkdir(parents=True)
     for folder in ['accounts', 'seed-accounts', 'scripts', 'sessions']:
         (run_dir / folder).mkdir()
@@ -106,10 +108,10 @@ def prepare(args, suite):
                    'settings': {'AIOQuester': settings}}}
         write_json(run_dir / 'accounts' / f'{name}.jsonc', account)
         account['randomEvents'] = False
-        account['script'] = {'file': 'seed.py', 'settings': {'kind': case}}
+        account['script'] = {'file': 'seed.py', 'settings': suite.get('seed_settings', lambda key: {'kind': key})(case)}
         write_json(run_dir / 'seed-accounts' / f'{name}.jsonc', account)
     write_json(run_dir / 'manifest.json', manifest)
-    print(f'Prepared {run_dir}\nAccounts: {", ".join(manifest["accounts"].values())}\nNext: run.py seed --run-dir {run_dir}')
+    print(f'Prepared {run_dir}\nAccounts: {", ".join(manifest["accounts"].values())}\nNext: {sys.argv[0]} seed --run-dir {run_dir}')
 
 
 def results(text, marker, expected):
@@ -150,6 +152,74 @@ def request_shutdown(process, port, names):
             process.wait()
 
 
+def case_batches(cases, suite):
+    groups = suite.get('groups') or [list(suite['cases'])[i:i + 16] for i in range(0, len(suite['cases']), 16)]
+    flattened = [case for group in groups for case in group]
+    if len(flattened) != len(set(flattened)) or set(flattened) != set(suite['cases']):
+        raise ValueError('Suite groups must cover every case exactly once.')
+    if len(cases) != len(set(cases)) or not set(cases).issubset(flattened):
+        raise ValueError('Selected cases must be unique suite cases.')
+    batches = [[case for case in group if case in cases] for group in groups]
+    batches = [group for group in batches if group]
+    if any(len(group) > 16 for group in batches):
+        raise ValueError('A client supports at most 16 accounts.')
+    for pair in suite.get('partners', []):
+        selected = [case for case in pair if case in cases]
+        if len(selected) == 2 and not any(set(selected).issubset(group) for group in batches):
+            raise ValueError('Gang partners must share a client process.')
+    return batches
+
+
+def run_clients(args, suite, manifest, run_dir, session, cases, client, seeding):
+    batches = case_batches(cases, suite)
+    original = read_json(run_dir / 'client.json')
+    base_port = args.operator_port or original['http']['port']
+    if not 1 <= base_port <= 65535 - len(batches) + 1:
+        raise ValueError('Operator port range is invalid.')
+    children = []
+    deadline = time.monotonic() + args.timeout_minutes * 60
+    with ExitStack() as resources:
+        try:
+            for index, batch in enumerate(batches):
+                folder = session if len(batches) == 1 else session / ('batch-' + str(index + 1))
+                folder.mkdir(exist_ok=True)
+                account_dir = folder / 'accounts'
+                account_dir.mkdir()
+                expected = {case: manifest['accounts'][case] for case in batch}
+                for name in expected.values():
+                    shutil.copy2(run_dir / ('seed-accounts' if seeding else 'accounts') / f'{name}.jsonc', account_dir)
+                config = read_json(run_dir / 'client.json')
+                config['scripting']['accountsDirectory'] = str(account_dir)
+                config['scripting']['fleetDatabasePath'] = str(folder / 'fleet.sqlite')
+                config['client']['logFile'] = str(folder / 'client.log')
+                config['http']['port'] = base_port + index
+                write_json(folder / 'client.json', config)
+                write_json(folder / 'version.json', {'client_sha': git_sha(REPO), 'engine_sha': git_sha(Path(manifest['server'])),
+                                                    'binary_sha256': digest(client), 'scripts_sha256': script_hashes(run_dir / 'scripts'), 'cases': batch})
+                print(f'Batch {index + 1}: {len(batch)} accounts, operator port {base_port + index}\nLog: {folder / "client.log"}', flush=True)
+                log = resources.enter_context((folder / 'console.log').open('w', encoding='utf-8'))
+                process = subprocess.Popen([str(client), str(folder / 'client.json')], cwd=REPO, stdout=log,
+                                           stderr=subprocess.STDOUT, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                children.append((process, config['http']['port'], expected, folder))
+            for process, port, expected, folder in children:
+                code = process.wait(timeout=max(0, deadline - time.monotonic()))
+                if code != 0:
+                    raise ValueError(f'Client exited with {code}; not a pass. Inspect {folder}')
+        except (KeyboardInterrupt, subprocess.TimeoutExpired):
+            raise ValueError(f'Run interrupted or timed out; not a pass. Inspect {session}') from None
+        finally:
+            for process, port, expected, folder in children:
+                if process.poll() is None:
+                    request_shutdown(process, port, expected.values())
+    found = {}
+    marker = 'E2E_SEEDED ' if seeding else 'E2E_RESULT '
+    for process, port, expected, folder in children:
+        rows = results((folder / 'client.log').read_text(encoding='utf-8'), marker, expected)
+        write_json(folder / 'results.json', rows)
+        found.update(rows)
+    return found
+
+
 def execute(args, suite):
     run_dir = args.run_dir.resolve()
     manifest = read_json(run_dir / 'manifest.json')
@@ -174,31 +244,8 @@ def execute(args, suite):
     expected = {case: manifest['accounts'][case] for case in cases}
     session = run_dir / 'sessions' / (time.strftime('%Y%m%dT%H%M%S') + '-' + args.command + '-' + secrets.token_hex(2))
     session.mkdir()
-    account_dir = session / 'accounts'
-    account_dir.mkdir()
-    for name in expected.values():
-        shutil.copy2(run_dir / ('seed-accounts' if seeding else 'accounts') / f'{name}.jsonc', account_dir)
-    config = read_json(run_dir / 'client.json')
-    config['scripting']['accountsDirectory'] = str(account_dir)
-    config['scripting']['fleetDatabasePath'] = str(session / 'fleet.sqlite')
-    config['client']['logFile'] = str(session / 'client.log')
-    config['http']['port'] = args.operator_port or config['http']['port']
-    write_json(session / 'client.json', config)
-    write_json(session / 'version.json', {'client_sha': git_sha(REPO), 'engine_sha': git_sha(Path(manifest['server'])),
-                                        'binary_sha256': digest(client), 'scripts_sha256': script_hashes(run_dir / 'scripts'), 'cases': cases})
-    print(f'Session: {session}\nLog: {session / "client.log"}', flush=True)
-    with (session / 'console.log').open('w', encoding='utf-8') as console_log:
-        process = subprocess.Popen([str(client), str(session / 'client.json')], cwd=REPO, stdout=console_log,
-                                   stderr=subprocess.STDOUT, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        try:
-            code = process.wait(timeout=args.timeout_minutes * 60)
-        except (KeyboardInterrupt, subprocess.TimeoutExpired):
-            request_shutdown(process, config['http']['port'], expected.values())
-            raise ValueError(f'Run interrupted or timed out; not a pass. Inspect {session}') from None
-    if code != 0:
-        raise ValueError(f'Client exited with {code}; not a pass. Inspect {session}')
-    marker = 'E2E_SEEDED ' if seeding else 'E2E_RESULT '
-    found = results((session / 'client.log').read_text(encoding='utf-8'), marker, expected)
+    print(f'Session: {session}', flush=True)
+    found = run_clients(args, suite, manifest, run_dir, session, cases, client, seeding)
     write_json(session / 'results.json', found)
     if seeding:
         write_json(seeded, found)

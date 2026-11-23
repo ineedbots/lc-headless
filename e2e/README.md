@@ -5,7 +5,7 @@ server. They are separate from the fake-server and stdlib tests run by CTest.
 
 | Scenario | Server | Coverage |
 |---|---|---|
-| [Phase 16](phase16/README.md) | Local revision 289 | All 18 F2P quests on both Shield of Arrav gangs; earned 12/32 QP gates |
+| [Phase 16](phase16/README.md) | Local revision 289 | 19 individual quest accounts, including both Arrav gangs; optional full queues with earned QP gates |
 | [Phase 17g](phase17g/README.md) | Local revision 289 | Both Hero's Quest gangs, Temple of Ikov (Guardians), The Fremennik Trials |
 
 Generated credentials, configurations, logs and results belong under the ignored

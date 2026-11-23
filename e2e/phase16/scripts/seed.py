@@ -1,4 +1,4 @@
-"""Seed preparation only; all eighteen target quests must remain unstarted."""
+"""Seed preparation; selected targets stay unstarted, with explicit QP prerequisites."""
 
 import json
 from rs2004 import execution
@@ -7,6 +7,7 @@ from rs2004.game import chat, game
 from rs2004.tabs import quests
 from rs2004.quests.data import quest_record
 from seed_helpers import send, stash
+from phase16_cases import prerequisite_flags, initial_points
 
 QUEST_IDS = ['runemysteries', 'doric', 'squire', 'sheep', 'priest', 'cook', 'imp', 'haunted', 'hetty', 'romeojuliet', 'prince', 'hunt', 'blackarmgang', 'gobdip', 'demon', 'blackknight', 'vampire', 'dragon']
 started = False
@@ -19,9 +20,12 @@ def loop():
     started = True
     yield from execution.delay_ticks(5)
     kind = settings.get('kind')
-    assert kind in ['ph', 'ba'], 'unknown phase 16 case'
+    target = settings.get('target')
+    targets = [target] if target else QUEST_IDS
+    assert all([id in QUEST_IDS for id in targets]), 'unknown phase 16 quest'
+    assert target or kind in ['ph', 'ba'], 'unknown phase 16 case'
     assert quests.points() == 0, 'fresh character must have zero quest points'
-    for id in QUEST_IDS:
+    for id in targets:
         assert quests.status(quest_record(id).name) == 'not_started', 'quest must be unstarted: ' + id
     yield from send('tele 0,50,53,5,8')
     yield from stash()
@@ -44,9 +48,15 @@ def loop():
     for name, count in [('Coins', 1000000), ('Lobster', 1000), ('Rune chainbody', 1), ('Rune platelegs', 1), ('Rune longsword', 1), ('Iron chainbody', 1), ('Bronze med helm', 1), ('Mind rune', 2000), ('Air rune', 4000), ('Fire rune', 6000), ('Bucket', 1), ('Pot', 1), ('Hammer', 1), ('Shears', 1), ('Spade', 1), ('Knife', 1), ('Tinderbox', 1), ('Bronze pickaxe', 1), ('Bronze axe', 1)]:
         assert bank.count(name) >= count, 'missing seeded supply: ' + name
     yield from bank.close()
-    for id in QUEST_IDS:
+    for id in targets:
         assert quests.status(quest_record(id).name) == 'not_started', 'preparation changed quest: ' + id
-    assert quests.points() == 0, 'preparation must not award quest points'
-    log('E2E_SEEDED ' + json.dumps({'case': kind, 'name': game.my_name(), 'passed': True, 'quests': QUEST_IDS, 'qp': quests.points(), 'tile': str(game.tile())}))
+    assert quests.points() == 0, 'ordinary preparation must not award quest points'
+    flags = prerequisite_flags(target)
+    for id, variable, value in flags:
+        assert id not in targets, 'must never seed the target quest'
+        yield from send('setvar ' + variable + ' ' + str(value))
+    if flags:
+        yield from send('setvar qp ' + str(initial_points(target)))
+    log('E2E_SEEDED ' + json.dumps({'case': kind, 'name': game.my_name(), 'passed': True, 'quests': targets, 'seeded_prerequisites': [row[0] for row in flags], 'expected_initial_qp': initial_points(target), 'qp': quests.points(), 'tile': str(game.tile())}))
     stop_account()
     return 600

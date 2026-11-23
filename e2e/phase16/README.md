@@ -1,9 +1,72 @@
-# Phase 16: all eighteen F2P quests
+# Phase 16: F2P quest acceptance
 
-Run the real AIOQuester against local revision 289 with two fresh scratch accounts.
-Both accounts run the full eighteen-quest queue. `ph` joins the Phoenix gang and
-`ba` joins Black Arm; they earn and exchange Shield of Arrav items through the
-client's normal partner coordination. Keep them in the same client process.
+Run the real AIOQuester against local revision 289. The recommended **individual
+mode** uses nineteen fresh scratch accounts: one per quest, plus a second Shield
+of Arrav account for the opposite gang. Each account runs only its target quest,
+so slow quests do not hold up the rest.
+
+## Individual quests: nineteen accounts
+
+From the repository root, after the build/server prerequisites below:
+
+```powershell
+python e2e/phase16/individual.py prepare --run-dir build/e2e/phase16-individual-night1 --operator-port 8095
+python e2e/phase16/individual.py seed --run-dir build/e2e/phase16-individual-night1
+python e2e/phase16/individual.py run --run-dir build/e2e/phase16-individual-night1 --timeout-minutes 720
+```
+
+The launcher starts two client processes concurrently with ten and nine accounts,
+within the client's sixteen-account limit. Both Arrav accounts stay together in the
+second process. Operator ports are consecutive (`8095` and `8096` above); reserve
+both. Logs, client configs, version records and results are in each session's
+`batch-1/` and `batch-2/` folders, with combined `results.json` in the session root.
+An interrupted launch shuts down both clients after checking their account sets.
+
+| Account suffix | Quest | Expected final QP |
+|---|---|---|
+| `ru` | Rune Mysteries Quest | 1 |
+| `do` | Doric's Quest | 1 |
+| `ks` | The Knight's Sword | 1 |
+| `sh` | Sheep Shearer | 1 |
+| `rg` | The Restless Ghost | 1 |
+| `co` | Cook's Assistant | 1 |
+| `im` | Imp Catcher | 1 |
+| `er` | Ernest the Chicken | 4 |
+| `wp` | Witch's Potion | 1 |
+| `rj` | Romeo & Juliet | 5 |
+| `pa` | Prince Ali Rescue | 3 |
+| `pt` | Pirate's Treasure | 2 |
+| `ph` | Shield of Arrav, Phoenix | 1 |
+| `ba` | Shield of Arrav, Black Arm | 1 |
+| `gd` | Goblin Diplomacy | 5 |
+| `de` | Demon Slayer | 3 |
+| `bk` | Black Knight's Fortress | 15 (12 seeded + 3 earned) |
+| `vs` | Vampire Slayer | 3 |
+| `ds` | Dragon Slayer | 34 (32 seeded + 2 earned) |
+
+All targets start unstarted. **Only** the fortress and Dragon Slayer accounts have
+prerequisite completion flags and QP seeded. The fortress gets Romeo & Juliet,
+Goblin Diplomacy, Doric's Quest and Cook's Assistant (12 QP). Dragon Slayer gets
+the fifteen prerequisite quests listed in `scripts/phase16_cases.py` (32 QP),
+excluding Dragon Slayer itself, Ernest the Chicken and Shield of Arrav. These
+flags make the QP gates stable when the server recounts points. The other
+seventeen accounts have zero QP and no completed quests seeded. Objective items
+and progress for each account's target are never seeded.
+
+Each pass requires exactly one newly earned target completion, its journal complete,
+no stuck queue rows, zero deaths, the QP shown above and clean logout. Seeded
+prerequisites are disclosed in `E2E_SEEDED`; they are not counted as tested quests.
+To resume a single unfinished case, use `individual.py run --cases ds` (for example).
+Use `--cases ph ba` together for unfinished Arrav handoffs. Never seed again or
+log the same character into another process while it is running.
+
+## Full queue: two accounts
+
+The original `run.py` mode remains available for integration coverage: both fresh
+accounts run all eighteen quests in one queue, earn every QP gate and coordinate
+Arrav's gang handoffs. This is slower and complements the individual checks.
+Keep both accounts in the same client process. Commands in the remaining sections
+use this full-queue mode unless they explicitly say `individual.py`.
 
 | Quest | Record ID | QP |
 |---|---|---|
@@ -94,7 +157,7 @@ names and preparation settings. Each execution records its current versions too.
 
 ## What is seeded
 
-`seed` first checks that every target quest is `not_started` and QP is zero. It
+In full-queue mode, `seed` checks that every target quest is `not_started` and QP is zero. It
 lets the client handle Tutorial Island, deposits the starter inventory, and seeds:
 
 - Attack, Strength and Defence 75; Hitpoints 85; Prayer 70; Magic 60.
@@ -106,14 +169,17 @@ lets the client handle Tutorial Island, deposits the starter inventory, and seed
 - 2,000 mind, 4,000 air and 6,000 fire runes.
 
 The seed checks supplies in the bank and repeats the zero-QP/unstarted assertions
-before reporting `E2E_SEEDED` and logging out. Seeding is one-shot: a failed or
+before reporting `E2E_SEEDED` and logging out. Individual mode performs the same
+preparation for its one target, then applies only its declared QP prerequisites. Seeding is one-shot: a failed or
 interrupted seed requires fresh characters, not rerunning the seed on saved progress.
 
 All quest objectives are earned: beads, wool, ores, dyes, blurite and its sword,
 the portrait and manor puzzles, rum delivery, disguising/rescuing Ali, both Arrav
 gang paths and handoffs, Silverlight, the vampire fight, Melzar's Maze, map pieces,
 ship repairs, the dragonfire shield and Elvarg. Tools and ordinary combat supplies
-are banked; no quest flags, QP, objective items or reward certificates are seeded.
+are banked. Full-queue mode seeds no quest flags or QP; individual mode seeds
+only the two gated accounts' declared prerequisites. Neither mode seeds target
+objective items or reward certificates.
 
 By default the wrapper enables per-character infinite run energy using the local
 developer command. Pass `--natural-run` to **prepare** to omit it. This is quest
@@ -154,7 +220,7 @@ preparation for a reproducible full rerun.
 
 ## Passing evidence
 
-For each account, the shared wrapper requires every selected journal entry complete,
+For each full-queue account, the shared wrapper requires every selected journal entry complete,
 all queue rows DONE with no stuck rows, zero deaths in the invocation, the expected
 39 QP and an earned completion count matching the number unfinished at login.
 It records `E2E_RESULT`, then logs the account out automatically. The launcher also

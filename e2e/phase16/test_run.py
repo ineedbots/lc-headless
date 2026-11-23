@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 import run as scenario
+import individual
 
 harness = scenario.harness
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
@@ -85,6 +86,91 @@ class Phase16Tests(unittest.TestCase):
         self.assertTrue(completion_passed(**dict(args, initial_done=['cook'], completed=17)))
         self.assertFalse(completion_passed(**dict(args, initial_done=['cook'], completed=16)))
         self.assertFalse(completion_passed({'ikov': 'complete'}, ['ikov'], 0, 0, {'done': 1, 'total': 1, 'stuck': 0}, 1, 0))
+
+
+class IndividualTests(unittest.TestCase):
+    def test_every_quest_has_its_own_account_and_arrav_partners_share_a_batch(self):
+        from phase16_cases import CASES, POINTS, initial_points, prerequisite_flags
+        self.assertEqual(len(CASES), 19)
+        self.assertEqual(set(CASES.values()), set(scenario.QUESTS))
+        self.assertEqual(list(CASES.values()).count('blackarmgang'), 2)
+        groups = harness.case_batches(list(CASES), individual.SUITE)
+        self.assertEqual([len(group) for group in groups], [10, 9])
+        self.assertTrue(any({'ph', 'ba'}.issubset(group) for group in groups))
+        for case, quest in CASES.items():
+            settings = individual.account_settings(case, 'f16test')
+            self.assertEqual(settings['quests'], [quest])
+            self.assertEqual(settings['e2e_expected_qp'], initial_points(quest) + POINTS[quest])
+            self.assertNotIn(quest, [row[0] for row in prerequisite_flags(quest)])
+        self.assertEqual(initial_points('blackknight'), 12)
+        self.assertEqual(initial_points('dragon'), 32)
+        self.assertEqual(harness.case_batches(['ph', 'ba'], individual.SUITE), [['ph', 'ba']])
+        with self.assertRaisesRegex(ValueError, 'share a client'):
+            harness.case_batches(['ph', 'ba'], dict(individual.SUITE, groups=[list(CASES)[:13], list(CASES)[13:]]))
+
+    def test_multi_client_launch_starts_both_batches_and_combines_verified_results(self):
+        self.exercise_launch(False)
+
+    def test_failed_batch_stops_the_other_owned_client_and_cannot_pass(self):
+        self.exercise_launch(True)
+
+    def exercise_launch(self, fail):
+        root = harness.REPO / 'build/e2e-unit'
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=root) as temporary:
+            folder = Path(temporary).resolve()
+            self.assertTrue(folder.is_relative_to(root.resolve()))
+            run_dir = folder / 'run'
+            run_dir.mkdir()
+            (run_dir / 'seed-accounts').mkdir()
+            (run_dir / 'scripts').mkdir()
+            session = run_dir / 'session'
+            session.mkdir()
+            manifest = {'server': str(folder), 'accounts': {case: 'f16test' + case for case in individual.CASES}}
+            for name in manifest['accounts'].values():
+                harness.write_json(run_dir / 'seed-accounts' / (name + '.jsonc'), {})
+            harness.write_json(run_dir / 'client.json', {'scripting': {}, 'client': {}, 'http': {'port': 8095}})
+            client = folder / 'client'
+            client.write_bytes(b'executable')
+            args = SimpleNamespace(operator_port=None, timeout_minutes=1)
+            events = []
+            processes = []
+
+            class Process:
+                finished = False
+
+                def poll(self):
+                    return 0 if self.finished else None
+
+                def wait(self, timeout):
+                    events.append('wait')
+                    self.finished = True
+                    return 1 if fail else 0
+
+            def launch(command, **kwargs):
+                events.append('launch')
+                config = harness.read_json(Path(command[1]))
+                names = [path.stem for path in Path(config['scripting']['accountsDirectory']).glob('*.jsonc')]
+                self.assertLessEqual(len(names), 16)
+                rows = [{'case': name[-2:], 'name': name, 'passed': True} for name in names]
+                Path(config['client']['logFile']).write_text('\n'.join('E2E_SEEDED ' + harness.json.dumps(row) for row in rows))
+                process = Process()
+                processes.append(process)
+                return process
+
+            with patch.object(harness.subprocess, 'Popen', side_effect=launch), patch.object(harness, 'git_sha', return_value='sha'), patch.object(harness, 'request_shutdown') as shutdown, contextlib.redirect_stdout(io.StringIO()):
+                if fail:
+                    with self.assertRaisesRegex(ValueError, 'not a pass'):
+                        harness.run_clients(args, individual.SUITE, manifest, run_dir, session, list(individual.CASES), client, True)
+                    shutdown.assert_called_once()
+                    self.assertIs(shutdown.call_args.args[0], processes[1])
+                else:
+                    result = harness.run_clients(args, individual.SUITE, manifest, run_dir, session, list(individual.CASES), client, True)
+                    self.assertEqual(set(result), set(individual.CASES))
+                    shutdown.assert_not_called()
+                    ports = [harness.read_json(path)['http']['port'] for path in sorted(session.glob('batch-*/client.json'))]
+                    self.assertEqual(ports, [8095, 8096])
+            self.assertEqual(events[:3], ['launch', 'launch', 'wait'])
 
 
 if __name__ == '__main__':
