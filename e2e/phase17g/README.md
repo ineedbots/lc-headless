@@ -173,7 +173,7 @@ Host-side safety/result checks and pocketpy syntax checks:
 
 ```powershell
 python -m unittest discover -s e2e/phase17g -p "test_*.py"
-python -I tools/port/lint.py e2e/phase17g/scripts
+python -I tools/port/lint.py e2e/scripts e2e/phase17g/scripts
 ```
 
 The original live acceptance completed Phoenix at 57 QP, Black Arm at 57 QP,
@@ -181,3 +181,6 @@ Fremennik at 3 QP and Ikov at 1 QP, with zero deaths during all four quest runs.
 Its supporting checks passed 4,482 stdlib assertions and all eleven CI jobs on
 `71e5f54`. Server messages, journal state, queue DONE and bank return established
 completion; a healthy client process alone did not.
+
+The launcher and acceptance wrapper are shared with phase 16 through `e2e/harness.py`
+and `e2e/scripts/`. Existing phase 17g commands and saved run directories still work.
