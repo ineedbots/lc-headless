@@ -48,7 +48,7 @@ def decide(snap):
     if stage >= VOTES_NEEDED:
         return Record({'kind': 'talk', 'stop': BRUNDT(['Ask about becoming a Fremennik'])})
     # Why: this is the order the map wants: the longhall trials, then the 2 east of town, then the maze, then the trade chain.
-    # Why: the seer and the warrior come last because both are walked with an empty pack, and Peer's spell empties it.
+    # The seer comes late because Peer's spell empties the pack; the warrior then collects food.
     _v1 = reveller_step(snap)
     _v2 = (_v1 if _v1 is not None else bard_step(snap))
     _v3 = (_v2 if _v2 is not None else hunter_step(snap))
@@ -56,7 +56,7 @@ def decide(snap):
     trial = (_v4 if _v4 is not None else merchant_step(snap))
     if trial:
         return trial
-    # Why: Peer only offers to bank your equipment while Thorvald's trial is open, and the last 2 trials are walked with nothing.
+    # Peer only offers to bank your equipment while Thorvald's trial is open.
     if not has_flag(snap.progress, 'warrior-started') and not has_flag(snap.progress, 'warrior-done'):
         return Record({'kind': 'talk', 'stop': THORVALD(['Yes'])})
     _v5 = seer_step(snap)

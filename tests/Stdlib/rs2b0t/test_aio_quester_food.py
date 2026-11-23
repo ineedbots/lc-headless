@@ -89,3 +89,31 @@ def consumed_during_damage():
 
 
 test('AIOQuester recognises consumed food when incoming damage masks its heal', consumed_during_damage)
+
+
+def koschei_food_forms():
+    from rs2004.geometry import Tile
+    from rs2004.quests.defs.fremenniktrials import warrior
+
+    scene = Scene(Tile(2671, 10098, 2))
+    bot = fixture()
+    bot.running_id = 'viking'
+    S['hp'] = 1
+    S['pack'] = [Food('Lobster', noted)]
+    target = scene.npc(warrior.KOSCHEI, ['Attack'], id=1290)
+    for form in [1290, 1291, 1292]:
+        target._fields['id'] = form
+        expect(bot.should_eat()).to_be(True)
+        yield from bot.eat_once()
+    expect(S['interactions']).to_equal(['Lobster:Eat', 'Lobster:Eat', 'Lobster:Eat'])
+    target._fields['id'] = 1293
+    expect(bot.should_eat()).to_be(False)
+    yield from bot.eat_once()
+    expect(len(S['interactions'])).to_be(3)
+    scene.npcs = []
+    expect(bot.should_eat()).to_be(False)
+    scene.at = Tile(2666, 3694, 0)
+    expect(bot.should_eat()).to_be(True)
+
+
+test('AIOQuester eats in Koschei forms one through three but preserves the fourth-form defeat across resumed steps', koschei_food_forms)

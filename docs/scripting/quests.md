@@ -318,6 +318,14 @@ The phase-17g modules are registered too:
 
 Hero's Quest and The Fremennik Trials own their inventories. All three declare `resume_at` over the pockets a walk can't leave. The Fremennik Trials warns below Prayer 70, since Koschei's forms outlast a lower pool under Protect from Melee, and Ikov's Fire Warrior needs about Ranged 70 for its 20 arrows.
 
+Before Koschei, the Fremennik script banks equipment through Peer and withdraws
+up to eight food items, using the configured quest food or its supported fallback
+foods. It waits for banked food when none is available. The first three forms
+use normal eating upkeep and Protect from Melee while prayer remains. The fourth
+form disables protection and stops eating so Koschei can deliver the intended
+safe defeat. Forms are identified by NPC type, including after a resumed step;
+food is withheld while the current form is unknown.
+
 The live run added these departures from rs2b0t:
 
 - **Hero's Quest**
