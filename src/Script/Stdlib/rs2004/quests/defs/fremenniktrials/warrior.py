@@ -2,21 +2,29 @@
 
 from rs2004 import execution
 from rs2004.catalogs.record import Record
+from rs2004.catalogs.tasks import sustain
 from rs2004.execution import event_signal
 from rs2004.game import game, skills
 from rs2004.quests.defs.fremenniktrials.areas import FT_LOC, FT_TILE, PEER, THORVALD, in_battleground
 from rs2004.quests.defs.fremenniktrials.seer import PEER_BANK
-from rs2004.quests.defs.fremenniktrials.supplies import walk_to
+from rs2004.quests.defs.fremenniktrials.supplies import FOOD_TARGET, banked, food_held, food_in_bank, food_names, scan_bank, walk_to, withdraw_step
 from rs2004.quests.defs.trollstronghold.combat import attackable
 from rs2004.quests.engine.types import has_flag
 from rs2004.quests.exec.prompts import settle_scene
-from rs2004.quests.prayer import prayer_upkeep
 from rs2004.reach import reach
 from rs2004.tabs import prayer
 
-__all__ = ['warrior_step', 'leave_loft_step', 'on_loft', 'PROTECT_MELEE_LEVEL', 'PROVEN_PRAYER']
+__all__ = ['warrior_step', 'leave_loft_step', 'on_loft', 'koschei_food_allowed', 'PROTECT_MELEE_LEVEL', 'PROVEN_PRAYER']
 
 KOSCHEI = 'Koschei the deathless'
+# The forms change type while retaining the same NPC index.
+KOSCHEI_FORMS = [1290, 1291, 1292, 1293]
+
+
+def koschei_food_allowed():
+    """Food is useful only while a known first, second or third form is present."""
+    target = attackable(KOSCHEI, 14)
+    return target is not None and target.id in KOSCHEI_FORMS[:3]
 
 
 # Why: `viking_honour_death` passes the trial on the blow that would have killed you.
@@ -29,9 +37,17 @@ def warrior_step(snap):
         return Record({'kind': 'talk', 'stop': THORVALD(['Yes'])})
     if in_battleground(snap.tile):
         return Record({'kind': 'custom', 'name': 'fight Koschei to the death', 'run': fight_koschei})
-    # Why: the ladder refuses anyone carrying armour, a weapon, runes, logs, arrows or a clue, and Peer's spell is the nearest bank.
-    if len(snap.inv) > 0 or len(snap.worn) > 0:
+    # Peer banks the entire pack, so clear equipment before withdrawing the food the ladder permits.
+    foods = set([name.lower() for name in food_names()])
+    if any([name not in foods for name in snap.inv]) or len(snap.worn) > 0:
         return Record({'kind': 'talk', 'stop': PEER(PEER_BANK)})
+    if not snap.bank_known:
+        return scan_bank()
+    food = food_in_bank(snap)
+    if food_held(snap) < FOOD_TARGET and food is not None:
+        return withdraw_step([{'name': food, 'qty': min(banked(snap, food), FOOD_TARGET - food_held(snap))}])
+    if food_held(snap) == 0:
+        return Record({'kind': 'wait', 'reason': 'bank food for Koschei\'s first three forms'})
     return Record({'kind': 'custom', 'name': "climb down to Thorvald's battleground", 'run': enter_battleground})
 
 
@@ -56,15 +72,14 @@ def enter_battleground(log):
 FIGHT_GUARD = 3000
 PROTECT_MELEE = 'protect from melee'
 PROTECT_MELEE_LEVEL = 43
-# Why: the prayer burns a point every 5 ticks, the three forms have 150 hitpoints to punch through and no potion may come in, so Prayer 43 runs dry in the second form, and the overshoot is an ordinary death. rs2b0t's recipe proved it at 70.
+# Prayer 70 provides a larger buffer while punching through the first three forms.
 PROVEN_PRAYER = 70
 
 
 # Why: only the 4th form is wired to `viking_honour_death`; the first 3 kill an unarmed character outright, even at 70 stats.
-# Why: Protect from Melee carries those 3 without costing the trial; `playerhit_n_melee_viking` zeroes damage while it holds, and the lethal blow lands once prayer drains on the 4th form.
-# Why: the shared `fight` helper spends every damaged tick calling `Sustain` for food this trial forbids carrying, and stops swinging while it does.
+# Protect from Melee blocks damage while it lasts; food covers the remainder, then protection drops for form 4.
 def fight_koschei(log):
-    """Beat Koschei's first 3 forms under prayer, then let the 4th win."""
+    """Beat the first 3 forms with food and prayer, then let the 4th win."""
     log('unarmed against Koschei — three forms to beat, then the fourth passes the trial by killing you')
     can_pray = skills.level('prayer') >= PROTECT_MELEE_LEVEL
     if not can_pray:
@@ -72,23 +87,37 @@ def fight_koschei(log):
     game.set_auto_retaliate(True)
     attacking = -1
     reported = -1
+    form = None
     for i in range(FIGHT_GUARD):
         if not in_battleground(game.tile()):
             if on_loft(game.tile()):
                 log('Koschei landed the last blow — the trial is passed')
                 return True
-            # Why: `combat_viking_damage_player` only calls `viking_honour_death` when the roll lands on the last remaining hitpoint, and an overkill is an ordinary death in Lumbridge.
-            log('Koschei overshot the killing blow — that was a real death, walking back for another round')
+            log('left Koschei\'s battleground without the safe loft landing — trial not passed')
             return False
         if event_signal.pending():
             log('yielding to a random event')
             return False
-        if can_pray and prayer.points() > 0 and not prayer.active(PROTECT_MELEE):
-            yield from prayer.set(PROTECT_MELEE, True)
-            continue
         target = attackable(KOSCHEI, 14)
         if not target:
             yield from execution.delay_ticks(2)
+            continue
+        if target.id != form:
+            form = target.id
+            if form in KOSCHEI_FORMS:
+                log(f'Koschei form {KOSCHEI_FORMS.index(form) + 1}/4')
+        if form in KOSCHEI_FORMS[:3]:
+            # Outside combat, shared upkeep drops protection; raising it again here would prevent reengaging.
+            if game.in_combat():
+                before = game.tick()
+                yield from sustain.run()
+                if game.tick() != before:
+                    continue
+            if can_pray and prayer.points() > 0 and not prayer.active(PROTECT_MELEE):
+                yield from prayer.set(PROTECT_MELEE, True)
+                continue
+        elif form == KOSCHEI_FORMS[3] and prayer.active(PROTECT_MELEE):
+            yield from prayer.set(PROTECT_MELEE, False)
             continue
         now = game.tick()
         if now - reported >= 40:
@@ -97,8 +126,6 @@ def fight_koschei(log):
         if target.index != attacking or not game.in_combat():
             if target.interact('Attack'):
                 attacking = target.index
-        else:
-            yield from prayer_upkeep()
         yield from execution.delay_ticks(1)
     log(f'gave up on Koschei after {FIGHT_GUARD} ticks')
     return False

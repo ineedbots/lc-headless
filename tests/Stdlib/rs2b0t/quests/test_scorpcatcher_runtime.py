@@ -257,6 +257,34 @@ def kills_jailer():
 test('the Jailer is fought until he drops the jail key, within the kill budget', kills_jailer)
 
 
+def delayed_jail_key():
+    world = Taverley()
+    world.npcs = [jailer(world)]
+    ticks = {'count': 0}
+
+    def advance():
+        ticks['count'] += 1
+        if ticks['count'] == 3:
+            world.npcs = []
+        if ticks['count'] == 5:
+            world.ground = [Fake(id=JAIL, distance=lambda: 1, interact=world.gives(JAIL))]
+
+    def until(cond, timeout_ms=6000):
+        deadline = world.now + timeout_ms
+        while not cond() and world.now < deadline:
+            world.advance()
+        return cond()
+        yield
+
+    world.on_tick = advance
+    patch(execution, 'delay_until', until)
+    expect(run_wait(dungeon.kill_jailer(world.log))).to_be(True)
+    expect(world.held(JAIL)).to_be(True)
+
+
+test('waits for the jail key when the NPC removal arrives before its ground item', delayed_jail_key)
+
+
 def doors():
     world = Taverley()
     inside = lambda: world.at == CELL

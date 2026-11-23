@@ -381,3 +381,119 @@ def koschei():
 
 
 test('Koschei distinguishes the honourable loft landing from a real death and yields to events', koschei)
+
+
+def koschei_food():
+    scene = world()
+    snap = QuestSnapshot(progress=QuestProgress(6, {'warrior-started'}),
+                         bank_known=True, bank={'lobster': 100}, tile=FT_TILE.WARRIOR_LADDER)
+    step = warrior.warrior_step(snap)
+    expect(step.kind).to_be('withdraw')
+    expect(step.items[0]['name']).to_be('Lobster')
+    expect(step.items[0]['qty']).to_be(8)
+    snap.inv = {'lobster': 5}
+    expect(warrior.warrior_step(snap).items[0]['qty']).to_be(3)
+    snap.bank = {'lobster': 1}
+    expect(warrior.warrior_step(snap).items[0]['qty']).to_be(1)
+    snap.inv = {'lobster': 8}
+    expect(warrior.warrior_step(snap).run).to_be(warrior.enter_battleground)
+    snap.inv['bronze axe'] = 1
+    expect(warrior.warrior_step(snap).kind).to_be('talk')
+    snap.inv = {}
+    snap.bank = {}
+    expect(warrior.warrior_step(snap).kind).to_be('wait')
+
+
+test('Koschei preparation brings food without returning it to Peer and refuses an empty food supply', koschei_food)
+
+
+def koschei_form_sustain():
+    scene = world()
+    scene.at = Tile(2671, 10098, 2)
+    spy_on(game, 'set_auto_retaliate', returns=None)
+    spy_on(prayer, 'points', returns=0)
+    target = scene.npc(warrior.KOSCHEI, ['Attack'], id=1290)
+    spy_on(warrior, 'attackable', returns=target)
+    forms = []
+
+    def upkeep():
+        forms.append(target.id)
+        target._fields['id'] += 1
+        yield from execution.delay_ticks(1)
+
+    from rs2004 import execution
+    from rs2004.catalogs.tasks import sustain
+    spy_on(sustain, 'run', impl=upkeep)
+    ticks = [0]
+
+    def fighting():
+        ticks[0] += 1
+        if ticks[0] > 5:
+            scene.at = FT_TILE.WARRIOR_LOFT
+        return True
+
+    spy_on(game, 'in_combat', impl=fighting)
+    expect(run_wait(warrior.fight_koschei(scene.log))).to_be(True)
+    expect(forms).to_equal([1290, 1291, 1292])
+    expect(target.id).to_be(1293)
+
+
+test('Koschei feeds sustain through the first three forms and stops at the fourth even on the same NPC index', koschei_form_sustain)
+
+
+def koschei_fourth_prayer():
+    scene = world()
+    scene.at = Tile(2671, 10098, 2)
+    spy_on(game, 'set_auto_retaliate', returns=None)
+    spy_on(prayer, 'points', returns=70)
+    active = spy_on(prayer, 'active', returns=True)
+    settings = []
+
+    def set_prayer(name, enabled):
+        settings.append((name, enabled))
+        active.mock_return_value(enabled)
+        return True
+        yield
+
+    spy_on(prayer, 'set', impl=set_prayer)
+    target = scene.npc(warrior.KOSCHEI, ['Attack'], id=1293,
+                       effect=lambda op: setattr(scene, 'at', FT_TILE.WARRIOR_LOFT))
+    spy_on(warrior, 'attackable', returns=target)
+    expect(run_wait(warrior.fight_koschei(scene.log))).to_be(True)
+    expect(settings).to_equal([(warrior.PROTECT_MELEE, False)])
+
+
+test('Koschei fourth form drops protection instead of restoring it while prayer points remain', koschei_fourth_prayer)
+
+
+def koschei_transition_reengages():
+    from rs2004 import execution
+    from rs2004.catalogs.tasks import sustain
+
+    scene = world()
+    scene.at = Tile(2671, 10098, 2)
+    spy_on(game, 'set_auto_retaliate', returns=None)
+    spy_on(game, 'in_combat', returns=False)
+    spy_on(warrior.skills, 'level', returns=70)
+    spy_on(prayer, 'points', returns=22)
+    active = spy_on(prayer, 'active', returns=True)
+
+    def set_prayer(name, enabled):
+        active.mock_return_value(enabled)
+        yield from execution.delay_ticks(1)
+        return True
+
+    def upkeep():
+        # Shared prayer upkeep drops protection when combat stops between forms.
+        if prayer.active(warrior.PROTECT_MELEE):
+            yield from set_prayer(warrior.PROTECT_MELEE, False)
+
+    spy_on(prayer, 'set', impl=set_prayer)
+    spy_on(sustain, 'run', impl=upkeep)
+    target = scene.npc(warrior.KOSCHEI, ['Attack'], id=1292,
+                       effect=lambda op: setattr(scene, 'at', FT_TILE.WARRIOR_LOFT))
+    spy_on(warrior, 'attackable', returns=target)
+    expect(run_wait(warrior.fight_koschei(scene.log))).to_be(True)
+
+
+test('Koschei reengages after a form transition instead of toggling protection forever outside combat', koschei_transition_reengages)

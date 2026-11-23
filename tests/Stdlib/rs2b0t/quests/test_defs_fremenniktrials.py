@@ -355,8 +355,8 @@ def _fn43():
         return only('warrior', ['warrior-started'] + list(extra))
 
     def _fn44():
-        expect(custom_name(decide(snap(Record({'flags': warrior()}))))).to_be("climb down to Thorvald's battleground")
-    test('climbs down with an empty pack', _fn44)
+        expect(custom_name(decide(snap(Record({'flags': warrior(), 'inv': ['Lobster']}))))).to_be("climb down to Thorvald's battleground")
+    test('climbs down with food and no equipment', _fn44)
 
     def _fn45():
         expect(talk_to(decide(snap(Record({'flags': warrior(), 'worn': ['Rune chainbody']}))))).to_be('Peer the Seer')

@@ -4,6 +4,9 @@ Reproduce the live acceptance behind [#145](https://github.com/ineedbots/lc-head
 and [PR #146](https://github.com/ineedbots/lc-headless/pull/146). Four fresh scratch
 characters run the actual `bots.aio_quester.AIOQuester`:
 
+The [recorded validation table](../VALIDATION.md#phase-17g) backfills time taken
+from the original manual acceptance logs, with its restart and cleanup limits.
+
 | Case | Quest | Preparation | Expected final QP |
 |---|---|---|---|
 | `ph` | Hero's Quest, Phoenix | Phoenix gang and completed prerequisite quests | 57 |

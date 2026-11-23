@@ -19,6 +19,8 @@ from rs2004.catalogs.record import Record
 
 from rs2004.catalogs import FOOD_OPTIONS, LOADOUT_SETTING, ContinueDialog, selected_loadout, sustain
 from rs2004.quests.defs import QUEST_DEFS, def_by_id
+from rs2004.quests.defs.fremenniktrials.areas import in_battleground
+from rs2004.quests.defs.fremenniktrials.warrior import koschei_food_allowed
 from rs2004.quests.engine.quest_engine import QuestEngine
 from rs2004.quests.food import quest_food
 from rs2004.quests.gear import quest_loadout
@@ -196,6 +198,9 @@ class AIOQuester(TaskBot):
         return resolve_sustain_policy(self.food_item(), quest.sustain if quest is not None else None)
 
     def select_food(self):
+        # The fourth Koschei form must win; an event or a resumed step must not resume eating there.
+        if self.running_id == 'viking' and in_battleground(game.tile()) and not koschei_food_allowed():
+            return None
         return select_sustain_consumable(inventory.items(), self.sustain_policy().foods, skills.effective('hitpoints'), skills.level('hitpoints'))
 
     def should_eat(self):
