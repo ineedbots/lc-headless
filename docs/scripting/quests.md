@@ -66,7 +66,7 @@ if arrived:
 | `cross_teleport_door(door)` | **Wait.** Crosses a `DoorCrossing`, a quest door whose Open teleports you through and shuts behind you. A game message after the click is a refusal; the far side is the only proof of a crossing |
 | `drive_choice(prefer, log)` | **Wait.** Like `drive_dialog`, but stops on an option list none of `prefer` matches: a loc's prompt often offers the refusal first |
 | `drive_until(expect, prefer, log, ms=30000)` | **Wait.** Keeps answering prompts until `expect()` holds or `ms` pass, holding the quest's protection prayer between them |
-| `drive_boxes(expect, ms, prefer=None, log=None)` | **Wait.** Clicks a chain of message boxes away one at a time, in either widget, testing `expect()` before each, so the box carrying the answer is still readable |
+| `drive_boxes(expect, ms, prefer=None, log=None, idle_ms=None)` | **Wait.** Clicks a chain of message boxes away one at a time, in either widget, testing `expect()` before each, so the box carrying the answer is still readable. Optional `idle_ms` ends the wait after that many milliseconds without a dialogue or modal; the return value still reports `expect()` |
 | `clear_boxes(max_boxes=8)` | **Wait.** Dismisses every standing message box |
 | `settle_scene()` | **Wait.** 2 ticks after a level or region change, as rs2b0t waits for its loc queries |
 | `loc_near(name, op, within=12)` | The nearest loc of that name offering `op`, or `None` |
@@ -404,6 +404,13 @@ AIOQuester offers `arrav_gang` (`random`, `phoenix` or `blackarm`), `arrav_partn
 ## Hero's Quest and its partner
 
 AIOQuester's `hero_partner` names the character running the other gang, since the master thief armband can't be earned alone. There is no gang setting: Grip refuses a Black Arm attacker and Katrine a Phoenix candlestick, so the gang is the one the character joined for Shield of Arrav.
+
+Restarting inside a sealed Brimhaven room, Velrak's cell, the deep Taverley dungeon or
+Entrana uses the quest's exit route before bank preparation, then resumes from the journal.
+Door challenges allow the full conversation to finish before retrying an unlocked entrance.
+Ice Queen preparation refills only missing food and keeps a free slot for her gloves.
+The pickup waits briefly for the ground-item update after her disappearance and can recover
+gloves already on the floor without starting another fight.
 
 Leave `arrav_partner` or `hero_partner` blank to pair automatically with an eligible opposite-gang
 AIOQuester in the same process and configured world. Pairing requires mutual claims, expires stale peers

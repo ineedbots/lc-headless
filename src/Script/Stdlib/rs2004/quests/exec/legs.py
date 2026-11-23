@@ -9,7 +9,7 @@ from rs2004.dialogue import chat_dialog, modals
 from rs2004.entities import locs
 from rs2004.game import game
 from rs2004.items import inventory
-from rs2004.quests.exec.prompts import LocPrompt, drive_choice, prompt_loc, settle_scene
+from rs2004.quests.exec.prompts import LocPrompt, drive_boxes, drive_choice, prompt_loc, settle_scene
 from rs2004.reach import reach
 from rs2004.traversal import traversal
 
@@ -71,14 +71,21 @@ def climb(loc_id, op, stand, arrive, log):
 
 
 # Why: talk_through never walks, and goto_npc's shared hop calls a stand 2 tiles off "arrived" without moving.
-def walk_and_talk(stop, prefer, log):
-    """Walks to a stop and drives its dialogue. Use with yield from."""
+def _open_stop_dialogue(stop, log):
     here = game.tile()
     if here is None or stop.anchor.distance_to(here) > stop.leash or here.level != stop.anchor.level:
         yield from traversal.walk_resilient(stop.anchor, radius=2, attempts=3, timeout_ms=WALK_MS, log=log)
     status = yield from reach.npc_dialog(stop.npc, stop.anchor, log=log)
     if status != 'done':
         log(f'could not open a dialogue with {stop.npc} ({status})')
+        return False
+    return True
+
+
+def walk_and_talk(stop, prefer, log):
+    """Walks to a stop and drives its dialogue. Use with yield from."""
+    opened = yield from _open_stop_dialogue(stop, log)
+    if not opened:
         return False
     driven = yield from drive_choice(list(prefer), log)
     return driven
@@ -131,17 +138,10 @@ def talk_until(stop, prefer, expect, log, ms=45000):
     """Drives a conversation that mixes chat with mesboxes, until the goal lands. Use with yield from."""
     if expect():
         return True
-    yield from walk_and_talk(stop, prefer, log)
-    deadline = _now_ms() + ms
-    while _now_ms() < deadline and not expect():
-        if chat_dialog.is_open() or chat_dialog.can_continue():
-            yield from drive_choice(list(prefer), log)
-            continue
-        if modals.main() != -1:
-            yield from modals.close()
-            yield from execution.delay_ticks(1)
-            continue
-        yield from execution.delay_ticks(1)
+    opened = yield from _open_stop_dialogue(stop, log)
+    if opened:
+        # A message box can cover a still-open chat root; drive each visible page without draining chat first.
+        yield from drive_boxes(expect, ms, list(prefer), log)
     # Why: the closing mesbox stays up after the goal lands, and a main modal blocks the next leg's player interaction.
     if modals.main() != -1:
         yield from modals.close()

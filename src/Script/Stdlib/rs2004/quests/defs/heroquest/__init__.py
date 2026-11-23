@@ -1,14 +1,15 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/heroquest/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
+from rs2004.game import game
 from rs2004.items import inventory
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.heroquest.areas import ACHIETTIES, HERO_ID, HERO_NAMED, TAVERLEY_HOP_DOWN, TAVERLEY_HOP_UP, in_brimhaven_hq, in_deep_dungeon, in_garden, in_kitchen, in_mansion, in_side_room, in_treasure_room, in_velrak_cell, in_yard, on_entrana
 from rs2004.quests.defs.heroquest.blackarm import blackarm_armband_step
 from rs2004.quests.defs.heroquest.config import hero_config, hero_gang, partner_configured
 from rs2004.quests.defs.heroquest.doors import return_to_street
-from rs2004.quests.defs.heroquest.eel import eel_step, free_velrak, leave_deep_dungeon
-from rs2004.quests.defs.heroquest.feather import feather_step
+from rs2004.quests.defs.heroquest.eel import cross_jail_door, eel_step, free_velrak, leave_deep_dungeon
+from rs2004.quests.defs.heroquest.feather import feather_step, sail_from_entrana
 from rs2004.quests.defs.heroquest.journal import HERO_STAGE, read_hero_quest_progress
 from rs2004.quests.defs.heroquest.partner import decide_hero_handoff, hero_handoff_step
 from rs2004.quests.defs.heroquest.phoenix import phoenix_armband_step, snipe_kit_step
@@ -16,7 +17,7 @@ from rs2004.quests.defs.heroquest.state import anywhere, banked_id, held_id
 from rs2004.quests.engine.types import QuestModule
 from rs2004.quests.exec.legs import talk_and_close, talk_until
 
-__all__ = ['in_sealed_pocket', 'decide', 'heroquest']
+__all__ = ['in_sealed_pocket', 'decide', 'leave_quest_area', 'heroquest']
 
 HAND_IN = [
     Record({'id': HERO_ID.FEATHER, 'name': HERO_NAMED.FEATHER}),
@@ -115,6 +116,18 @@ def resumes_at(t):
     return in_brimhaven_hq(t) or in_mansion(t) or in_treasure_room(t) or in_kitchen(t) or in_garden(t) or in_yard(t) or in_side_room(t) or in_deep_dungeon(t) or in_velrak_cell(t) or on_entrana(t)
 
 
+def leave_quest_area(log):
+    """Reach an ordinary bank route before restart preparation resets the loadout."""
+    tile = game.tile()
+    if in_deep_dungeon(tile):
+        return leave_deep_dungeon(log)
+    if in_velrak_cell(tile):
+        return cross_jail_door(False, log)
+    if on_entrana(tile):
+        return sail_from_entrana(log)
+    return return_to_street(log)
+
+
 heroquest = QuestModule(**{
     'record': quest_record('hero'),
     'pray': Record({'protect': 'melee', 'potions': 2}),
@@ -137,6 +150,7 @@ heroquest = QuestModule(**{
     'sustain': Record({'foods': ['Lobster', 'Swordfish', 'Tuna'], 'eat_below_hp': 0.5}),
     'read_progress': read_hero_quest_progress,
     'resume_at': resumes_at,
+    'exit': leave_quest_area,
     'warn_readiness': lambda: (None if partner_configured() else "Hero's Quest needs a rival-gang partner — the armband cannot be earned alone"),
     'decide': decide,
 })

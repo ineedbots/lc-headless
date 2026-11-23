@@ -119,6 +119,10 @@ Filters return the query, so they chain. Nothing is searched until a terminal ru
 | `targets_another_player()` | It's facing a player other than you |
 | `network_tile()` | The same as `tile()`, for rs2b0t compatibility |
 
+`Npc.interact(action, walk=True)` normally plans an approach before sending the action.
+Use `walk=False` to send only the NPC action, for example when shooting through an arrow slit
+from a chosen tile. The server still enforces range and line of sight and may move the character.
+
 ## `Player`
 
 | Field | Meaning |

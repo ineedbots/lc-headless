@@ -86,17 +86,29 @@ def drive_until(expect, prefer, log, ms=30000):
 
 # Why: drive_choice only clicks the chat modal and a loc script's ~mesbox chain lands in the main one, so drive_until would never click it away.
 # Why: the goal is tested before each dismissal so the box carrying the answer is still readable, and it eats between boxes since sustain is call-driven.
-def drive_boxes(expect, ms, prefer=None, log=None):
+def drive_boxes(expect, ms, prefer=None, log=None, idle_ms=None):
     """Drives a message-box chain, in either the chat or the main modal, until expect() holds, clicking each box
-    away as it comes. Use with yield from."""
+    away as it comes. idle_ms optionally ends a completed conversation after a quiet gap. Use with yield from."""
     if prefer is None:
         prefer = []
     if log is None:
         log = _quiet
     deadline = _core.step_time() + ms
+    last_box = _core.step_time()
     while _core.step_time() < deadline:
         if expect():
             return True
+        if _box_up():
+            last_box = _core.step_time()
+        elif idle_ms is not None and _core.step_time() - last_box >= idle_ms:
+            return expect()
+        # A mesbox can cover a retained chat panel whose old Continue or choices are still queryable.
+        if modals.is_open():
+            closed = yield from modals.close()
+            last_box = _core.step_time()
+            if not closed:
+                yield from execution.delay_ticks(1)
+            continue
         # Why: one click per pass, since drive_choice runs a chain to the end without re-testing the goal and a goal on the last box's text ("manage to force the doors open") gets clicked away unread.
         opts = chat_dialog.options()
         if len(opts) > 0:
@@ -109,17 +121,13 @@ def drive_boxes(expect, ms, prefer=None, log=None):
             # Why: without this a wrong topic and a right topic that led nowhere look the same in the log.
             log(f"chose \"{pick}\" from [{' | '.join(opts)}]")
             yield from chat_dialog.choose_option(pick)
+            last_box = _core.step_time()
             yield from execution.delay_ticks(2)
             continue
         if chat_dialog.can_continue():
             yield from chat_dialog.continue_()
+            last_box = _core.step_time()
             yield from execution.delay_ticks(1)
-            continue
-        if modals.is_open():
-            # Why: a modal root with no close button returns without changing anything, so a bare retry would spin without yielding a tick.
-            closed = yield from modals.close()
-            if not closed:
-                yield from execution.delay_ticks(1)
             continue
         yield from sustain.run()
         yield from execution.delay_ticks(1)
@@ -166,6 +174,8 @@ class DoorCrossing:
 DOOR_MS = 3000
 # Why: the server runs the door's script a tick after the click, so the dialogue check needs a window.
 DIALOG_MS = 2000
+# A challenge includes several server-paced chat pages before the door can be opened again.
+DOOR_DIALOG_MS = 30000
 # Why: the Brimhaven crossings are reached from Varrock by ferry, and a 2-minute budget times out mid-ocean and reports the door as missing.
 DOOR_WALK_MS = 300000
 
@@ -224,7 +234,7 @@ def cross_teleport_door(door):
     # Why: a refusal ends the wait too, so a door that says no doesn't cost the full cap.
     yield from execution.delay_until(lambda: is_far() or _box_up() or refused(), DIALOG_MS)
     if not is_far() and _box_up():
-        yield from drive_boxes(is_far, DIALOG_MS, list(door.prefer or []))
+        yield from drive_boxes(is_far, DOOR_DIALOG_MS, list(door.prefer or []), log, idle_ms=1200)
     yield from execution.delay_until(lambda: is_far() or refused(), DOOR_MS)
     if not is_far() and refused():
         # Why: a door that narrates its own crossing would otherwise be abandoned a tick early, and that costs a retry.

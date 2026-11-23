@@ -18,6 +18,17 @@ class LegWorld(PromptWorld):
         self.talks = []
         self.open_on_attempt = 1
         self.goal_at = None
+        self.retained_chat = False
+
+    def get_chat_modal(self):
+        if self.retained_chat and self.kind() == 'main':
+            return 100
+        return PromptWorld.get_chat_modal(self)
+
+    def find_continue(self):
+        if self.retained_chat and self.kind() == 'main':
+            return 101
+        return PromptWorld.find_continue(self)
 
     def __enter__(self):
         PromptWorld.__enter__(self)
@@ -182,7 +193,7 @@ def test_talk_until_drives_chat_after_intermediate_message_box():
         world.goal_at = 4000
         assert world.until(ms=10000)
         assert world.clicks == ['close', 'continue', 110]
-        assert world.logs == []
+        assert len(world.logs) == 1 and 'chose "Yes"' in world.logs[0]
 
 
 def test_talk_until_waits_across_gap_for_delayed_goal():
@@ -190,6 +201,18 @@ def test_talk_until_waits_across_gap_for_delayed_goal():
         world.goal_at = 2000
         assert world.until()
         assert world.now == 2000 and world.clicks == []
+
+
+def test_talk_until_handles_main_messages_while_the_chat_root_remains_open():
+    with LegWorld() as world:
+        world.retained_chat = True
+        world.talk_pages = [('main', ['You hand over the papers.']),
+                            ('continue', ['What are my duties?']),
+                            ('options', ['No', 'Yes, give me a task']),
+                            ('main', ['Grip hands you a key.'])]
+        goal = lambda: not world.pages and world.clicks == ['close', 'continue', 111, 'close']
+        assert world.run(legs.talk_until(world.stop, ['Yes'], goal, world.logs.append, ms=10000))
+        assert world.now < 10000
 
 
 def test_talk_until_timeout_logs_missing_result():

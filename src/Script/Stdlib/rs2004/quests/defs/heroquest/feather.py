@@ -18,7 +18,7 @@ from rs2004.quests.exec.prompts import settle_scene
 from rs2004.quests.food import FOOD_FLOAT
 from rs2004.traversal import traversal
 
-__all__ = ['combat_kit_step', 'kill_ice_queen', 'sail_to_entrana', 'sail_from_entrana', 'take_feather', 'feather_step', 'ENTRANA_LANDING']
+__all__ = ['combat_kit_step', 'take_ice_gloves', 'kill_ice_queen', 'sail_to_entrana', 'sail_from_entrana', 'take_feather', 'feather_step', 'ENTRANA_LANDING']
 
 # Why: the Ice Queen is level 111 with 104 hitpoints and the kit is Scavvo's on the Champions' Guild upper floor. Each float clears the asking price of a shop below base stock, which buys at more.
 COMBAT_KIT = [
@@ -30,6 +30,7 @@ FOOD_TARGET = FOOD_FLOAT
 FIREBIRD_MS = 90000
 ICE_QUEEN_TICKS = 600
 ICE_QUEEN_RESPAWN_MS = 300000
+GLOVE_DROP_MS = 8000
 PLANK_TRIES = 6
 
 
@@ -74,10 +75,27 @@ def gloves_on_floor():
     return ground_items.query().where(lambda g: g.id == HERO_ID.ICE_GLOVES).within(12).nearest()
 
 
+def take_ice_gloves(log):
+    if inventory.count_by_id(HERO_ID.ICE_GLOVES) > 0:
+        return True
+    appeared = yield from execution.delay_until(lambda: gloves_on_floor() is not None, GLOVE_DROP_MS)
+    drop = gloves_on_floor() if appeared else None
+    if not drop:
+        log('no ice gloves appeared after the Ice Queen disappeared; another player may own this kill')
+        return False
+    if not drop.interact('Take'):
+        return False
+    taken = yield from execution.delay_until(lambda: inventory.count_by_id(HERO_ID.ICE_GLOVES) > 0, 8000)
+    return taken
+
+
 def kill_ice_queen(log):
     """Kill the Ice Queen and take the gloves she drops."""
     if inventory.count_by_id(HERO_ID.ICE_GLOVES) > 0:
         return True
+    if gloves_on_floor() is not None:
+        taken = yield from take_ice_gloves(log)
+        return taken
     _w6 = yield from traversal.walk_resilient(HERO_TILE.ICE_QUEEN, radius=3, attempts=2, timeout_ms=180000, log=log)
     if not (_w6):
         log('could not reach the Ice Queen; the rockslide needs 50 Mining and a usable pickaxe')
@@ -98,14 +116,8 @@ def kill_ice_queen(log):
     }), log)
     if not won:
         return False
-    drop = gloves_on_floor()
-    if not drop:
-        log('the Ice Queen is down but no ice gloves are on the floor')
-        return False
-    if not drop.interact('Take'):
-        return False
-    _result8 = yield from execution.delay_until(lambda: inventory.count_by_id(HERO_ID.ICE_GLOVES) > 0, 8000)
-    return _result8
+    taken = yield from take_ice_gloves(log)
+    return taken
 
 
 # Why: every ferry lands on the deck at level 1 and the Gangplank loc is absent from the scene for a tick or 2 after the region change, so an early click leaves the bot aboard with `onEntrana` false.
@@ -225,6 +237,8 @@ def feather_step(snap):
                 'kind': 'withdraw',
                 'items': [{'name': HERO_NAMED.ICE_GLOVES, 'qty': 1, 'id': HERO_ID.ICE_GLOVES}],
             })
+        if gloves_on_floor() is not None and (snap.free_slots is None or snap.free_slots > 0):
+            return Record({'kind': 'custom', 'name': 'take the Ice Queen gloves from the floor', 'run': take_ice_gloves})
         mining = skills.level('mining')
         if mining < 50:
             return Record({'kind': 'wait', 'reason': '50 Mining is required to clear the Ice Queen rockslide'})
@@ -234,8 +248,13 @@ def feather_step(snap):
         pickaxe = pickaxe_at(snap, mining)
         if pickaxe:
             return pickaxe
+        missing_food = max(0, FOOD_TARGET - held_food(snap))
+        if snap.free_slots is not None and snap.free_slots < missing_food + 1:
+            keep = [food_name().lower(), 'coins', HERO_NAMED.ARMBAND.lower(), HERO_NAMED.LAVA_EEL.lower()]
+            keep += [name for name in snap.inv.keys() if name.endswith('pickaxe')]
+            return Record({'kind': 'deposit', 'keep': keep, 'exact_keep': True})
         if held_food(snap) < FOOD_TARGET:
-            return Record({'kind': 'withdraw', 'items': [{'name': food_name(), 'qty': FOOD_TARGET}]})
+            return Record({'kind': 'withdraw', 'items': [{'name': food_name(), 'qty': missing_food}]})
         return Record({'kind': 'custom', 'name': 'kill the Ice Queen for her gloves', 'run': kill_ice_queen})
     if has_entrana_spillover(snap):
         return Record({'kind': 'deposit', 'keep': entrana_keep(), 'bank': HERO_TILE.DRAYNOR_BANK, 'exact_keep': True})

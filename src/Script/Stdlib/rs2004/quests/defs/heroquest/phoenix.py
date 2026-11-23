@@ -108,6 +108,12 @@ def snipe_grip(log):
             log(f'Grip is down after {swings} shots')
             return True
         yield from sustain.run()
+        if game.tile() != HERO_TILE.ARROW_SLIT:
+            attacking = -1
+            held = yield from traversal.walk_resilient(HERO_TILE.ARROW_SLIT, radius=0, attempts=2, timeout_ms=10000, log=log)
+            if not held:
+                return False
+            continue
         target = grip_on_the_row()
         if not target:
             if not waited:
@@ -119,7 +125,7 @@ def snipe_grip(log):
         if target.index == attacking and game.in_combat():
             yield from execution.delay_ticks(1)
             continue
-        if target.interact('Attack'):
+        if target.interact('Attack', walk=False):
             if swings == 0:
                 log('Grip is on the row — shooting through the arrow slit')
             attacking = target.index

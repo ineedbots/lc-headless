@@ -23,6 +23,7 @@ def world():
                 finish=lambda reason: scene.lines.append('FINISH: ' + reason))
     runner = engine.QuestEngine(host)
     spy_on(runner, '_refresh_bank_counts')
+    spy_on(bank, 'side_items', impl=lambda: scene.pack)
     module = QuestModule(record=Record({'id': 'imp', 'name': 'Imp Catcher', 'items': []}), tools=[])
     snap = QuestSnapshot(journal='in_progress', inv_ids={}, bank_known=True, free_slots=0, tile=scene.at)
     return scene, runner, module, snap
@@ -32,8 +33,10 @@ def resumed_caps():
     scene, runner, module, snap = world()
     plan = Record({'keep_ids': [333], 'caps': [Record({'id': 333, 'qty': 1})]})
     spy_on(preparation, 'resume_preparation', returns=plan)
-    item = scene.item(333, 'Trout', count=3, actions=['Deposit-1'])
-    item._fields['interact'] = lambda op: setattr(item, 'count', item.count - 1) or True
+    item = scene.item(333, 'Trout', count=3, actions=['Eat', 'Drop'])
+    side = Fake(id=333, actions=lambda: ['Deposit-1'],
+                interact=lambda op: setattr(item, 'count', item.count - 1) or True)
+    spy_on(bank, 'side_items', returns=[side])
     spy_on(bank, 'backpack_ready', impl=lambda **kwargs: result(True))
     deposits = spy_on(engine, 'execute_step', impl=lambda *args: result(True))
     expect(run_wait(runner._prepare_resume(module, 'imp', snap, []))).to_be(True)

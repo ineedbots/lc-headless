@@ -426,6 +426,13 @@ class Scene:
 
     def npc(self, name, actions=None, tile=None, effect=None, id=0, dist=2, targets_me=False, others=False):
         thing = self._placed(self.npcs, id, name, actions, tile, effect, dist, None, targets_me, others)
+        action = thing.interact
+
+        def interact(op, walk=True):
+            thing._fields['last_walk'] = walk
+            return action(op)
+
+        thing._fields['interact'] = interact
         thing._fields['network_tile'] = thing.tile
         self.npcs.append(thing)
         return thing

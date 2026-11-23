@@ -179,6 +179,14 @@ def test_drive_boxes_feeds_sustain_while_waiting_between_boxes():
         assert world.clicks == []
 
 
+def test_drive_boxes_can_stop_after_a_completed_conversation_goes_quiet():
+    with PromptWorld() as world:
+        world.pages = [('continue', ['The door is now unlocked.'])]
+        assert world.run(prompts.drive_boxes(lambda: False, 30000, idle_ms=1200)) is False
+        assert not world.pages
+        assert 1200 <= world.now < 30000
+
+
 def test_drive_boxes_with_unclosable_modal_yields_and_times_out():
     with PromptWorld() as world:
         world.pages = [('main', ['Message'])]
@@ -248,6 +256,32 @@ def test_door_crossing_answers_challenge_without_selecting_refusal():
         world.outcome = 'dialogue'
         assert world.cross(prefer=['enter'])
         assert world.clicks == ['continue', 111]
+        assert world.far
+
+
+def test_door_crossing_finishes_a_multi_page_challenge_before_retrying():
+    with PromptWorld() as world:
+        world.outcome = 'silent'
+
+        def answer(op):
+            world.door_clicks.append(op)
+            if len(world.door_clicks) == 1:
+                world.pages = [('continue', ['Who are you?']),
+                               ('options', ['Leave', 'Four leaved clover.']),
+                               ('continue', ['Four leaved clover.']),
+                               ('continue', ['Welcome, fellow gang member.']),
+                               ('main', ['You hear the door being unbarred.'])]
+            else:
+                world.cross_pending = not world.pages
+            return True
+
+        world.locations = [FakeModule(id=123, name='Door', distance=lambda: 1,
+                                     actions=lambda: ['Open'], interact=answer)]
+        assert world.cross(prefer=['four leaved clover']) is False
+        assert not world.pages
+        assert world.clicks == ['continue', 111, 'continue', 'continue', 'close']
+        assert any(['chose' in line for line in world.logs])
+        assert world.cross(prefer=['four leaved clover'])
         assert world.far
 
 

@@ -9,6 +9,7 @@ from rs2004.quests.exec.prompts import cross_teleport_door, settle_scene, use_on
 __all__ = ['enter_brimhaven_hq', 'leave_brimhaven_hq', 'enter_mansion', 'leave_mansion', 'enter_kitchen', 'leave_kitchen', 'push_panel', 'push_panel_back', 'return_to_street', 'cross_side_door_in', 'cross_side_door_out', 'cross_treasure_door_in', 'cross_treasure_door_out']
 
 # Why: every door here is script-gated and absent from the baked graph, so the module owns both directions of each one; a crossing the navigator lacks seals whatever it guards.
+# Exact stands preserve the side that the server's check_axis uses to choose the crossing direction.
 def log2(log, mark, what):
     for line in game_messages.since(mark):
         log(f'{what}: {line.text}')
@@ -29,6 +30,7 @@ def enter_brimhaven_hq(log):
         yield from cross_teleport_door(Record({
             'id': HERO_LOC.GRUBOR_DOOR,
             'stand': HERO_TILE.GRUBOR_DOOR,
+            'stand_radius': 0,
             'is_far': lambda: in_brimhaven_hq(game.tile()),
             'prefer': [HERO_SAY.BLACK_ARM_PASSWORD],
             'log': log,
@@ -46,6 +48,7 @@ def leave_brimhaven_hq(log):
     _result2 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.GRUBOR_DOOR,
         'stand': HERO_TILE.GRUBOR_DOOR_INNER,
+        'stand_radius': 0,
         'is_far': lambda: not in_brimhaven_hq(game.tile()),
         'log': log,
     }))
@@ -70,6 +73,7 @@ def enter_mansion(log):
         yield from cross_teleport_door(Record({
             'id': HERO_LOC.GARV_DOOR,
             'stand': HERO_TILE.GARV_DOOR,
+            'stand_radius': 0,
             'is_far': lambda: in_mansion(game.tile()),
             'prefer': [],
             'log': log,
@@ -87,6 +91,7 @@ def leave_mansion(log):
     _result5 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.GARV_DOOR,
         'stand': HERO_TILE.GARV_DOOR_INNER,
+        'stand_radius': 0,
         'is_far': lambda: not in_mansion(game.tile()),
         'log': log,
     }))
@@ -103,6 +108,7 @@ def enter_kitchen(log):
     _result7 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.KITCHEN_DOOR,
         'stand': HERO_TILE.KITCHEN_DOOR,
+        'stand_radius': 0,
         'is_far': lambda: in_kitchen(game.tile()),
         'log': log,
     }))
@@ -115,6 +121,7 @@ def leave_kitchen(log):
     _result8 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.KITCHEN_DOOR,
         'stand': HERO_TILE.KITCHEN_DOOR_INNER,
+        'stand_radius': 0,
         'is_far': lambda: not in_kitchen(game.tile()),
         'log': log,
     }))
@@ -131,6 +138,7 @@ def push_panel(log):
     _result10 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.KITCHEN_PANEL,
         'stand': HERO_TILE.KITCHEN_PANEL,
+        'stand_radius': 0,
         'name': 'Wall',
         'op': 'Push',
         'is_far': lambda: in_garden(game.tile()),
@@ -146,6 +154,7 @@ def push_panel_back(log):
     _result11 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.KITCHEN_PANEL,
         'stand': HERO_TILE.KITCHEN_PANEL_INNER,
+        'stand_radius': 0,
         'name': 'Wall',
         'op': 'Push',
         'is_far': lambda: in_kitchen(game.tile()),
@@ -202,6 +211,7 @@ def cross_side_door_out(log):
     _result21 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.SIDE_DOOR,
         'stand': HERO_TILE.SIDE_ROOM,
+        'stand_radius': 0,
         'is_far': lambda: not in_side_room(game.tile()),
         'log': log,
     }))
@@ -225,6 +235,7 @@ def cross_treasure_door_out(log):
     _result22 = yield from cross_teleport_door(Record({
         'id': HERO_LOC.TREASURE_DOOR,
         'stand': HERO_TILE.TREASURE_DOOR_INNER,
+        'stand_radius': 0,
         'is_far': lambda: not in_treasure_room(game.tile()),
         'log': log,
     }))

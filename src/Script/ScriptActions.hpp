@@ -21,7 +21,7 @@ public:
     // False when the tile is in view but can't be reached, and nothing was sent.
     bool WalkTo(s32 x, s32 z, bool run);
     void WalkPath(std::span<const Tile_s> points, bool run);
-    bool InteractNpc(u16 index, u8 op);
+    bool InteractNpc(u16 index, u8 op, bool walk = true);
     bool InteractPlayer(u16 index, u8 op);
     void InteractLoc(u16 loc, s32 x, s32 z, u8 op);
     void InteractLocVia(std::span<const Tile_s> waypoints, u16 loc, s32 x, s32 z, u8 op);

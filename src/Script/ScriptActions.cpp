@@ -33,14 +33,14 @@ void ScriptActions::WalkPath(std::span<const Tile_s> points, bool run)
     m_actions.WalkPath(points, run);
 }
 
-bool ScriptActions::InteractNpc(u16 index, u8 op)
+bool ScriptActions::InteractNpc(u16 index, u8 op, bool walk)
 {
     if (m_state.FindNpc(index) == nullptr)
     {
         return false;
     }
 
-    m_actions.InteractNpc(index, op);
+    m_actions.InteractNpc(index, op, walk);
     return true;
 }
 
