@@ -5,6 +5,9 @@ mode** uses nineteen fresh scratch accounts: one per quest, plus a second Shield
 of Arrav account for the opposite gang. Each account runs only its target quest,
 so slow quests do not hold up the rest.
 
+See the [recorded validation table](../VALIDATION.md#phase-16) for per-quest results
+and measured time taken in the nineteen-account acceptance run.
+
 ## Individual quests: nineteen accounts
 
 From the repository root, after the build/server prerequisites below:

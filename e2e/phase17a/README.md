@@ -4,6 +4,9 @@ Twelve fresh scratch characters each run one members quest through the real
 `bots.aio_quester.AIOQuester`. This suite tracks
 [#149](https://github.com/ineedbots/lc-headless/issues/149).
 
+See the [recorded validation table](../VALIDATION.md#phase-17a) for per-quest results
+and measured time taken.
+
 | Case | Quest | Seeded completed prerequisites | Expected final QP |
 |---|---|---|---|
 | `dr` | Druidic Ritual | None | 4 |

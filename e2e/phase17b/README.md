@@ -4,6 +4,9 @@ Nine fresh scratch characters each run one members quest through the real
 `bots.aio_quester.AIOQuester`. This suite tracks
 [#151](https://github.com/ineedbots/lc-headless/issues/151).
 
+See the [recorded validation table](../VALIDATION.md#phase-17b) for all nine results
+and measured time taken, including Scorpion Catcher's resumed run.
+
 | Case | Quest | Expected final QP |
 |---|---|---|
 | `dc` | Dwarf Cannon | 1 |

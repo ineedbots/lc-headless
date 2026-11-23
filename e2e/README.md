@@ -16,3 +16,9 @@ The setup scripts deliberately seed preparation; consult each scenario's scope
 before treating its result as natural account progression or endurance evidence.
 
 All suites use [the shared launcher](harness.py) and runtime helpers in `scripts/`.
+
+[Recorded validation results](VALIDATION.md) include a **Time taken** column for
+each quest. Future acceptance tables should include this column too: measure from
+the account's first `AIOQuester, queue:` entry to its passing `E2E_RESULT`, including
+the final bank return. Exclude seeding and login staggering. Include and disclose
+restart gaps in elapsed time; retain the per-session breakdown for resumed cases.
