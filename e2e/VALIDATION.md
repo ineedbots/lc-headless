@@ -97,4 +97,3 @@ Original acceptance artifacts: `build/phase17g-live-20261122/{client,fremennik,i
 | `ba` | Hero's Quest, Black Arm | 57 | PASS | 50m 07s |
 | `ik` | Temple of Ikov, Guardians | 1 | PASS | 1h 44m 40s (resumed) |
 | `ft` | The Fremennik Trials | 3 | PASS | 59m 31s (resumed) |
-
