@@ -96,14 +96,14 @@ Original acceptance artifacts: `build/phase17g-live-20261122/{client,fremennik,i
 | `ph` | Hero's Quest, Phoenix | 57 | PASS | 42m 01s |
 | `ba` | Hero's Quest, Black Arm | 57 | PASS | 50m 07s |
 | `ik` | Temple of Ikov, Guardians | 1 | PASS | 1h 18m 31s |
-| `ft` | The Fremennik Trials | 3 | PASS | 59m 31s (resumed) |
+| `ft` | The Fremennik Trials | 3 | PASS | 52m 40s |
 
 Ikov's table timing now comes from the fresh uninterrupted run at
 `build/e2e/phase17g-uninterrupted-20261123/sessions/20261123T134304-run-20d6`,
 source `4b201aa`: zero deaths, no client restart or manual intervention, clean
 logout. Its original 1h 44m 40s resumed timing remains historical evidence.
 The newer Ikov timing uses the standard `E2E_RESULT` endpoint; the original
-manual-wrapper endpoint above applies to the other three phase 17g rows.
+manual-wrapper endpoint above applies to the two Hero's Quest rows.
 The fresh run's Fremennik account completed but failed acceptance with one real
 Koschei death, so its 58m 34s attempted timing does not replace the older row.
 The shared two-account launcher correctly rejected that overall session; Ikov's
@@ -111,7 +111,17 @@ individual passing record and clean logout are retained independently.
 A pre-run probe measured twenty ticks in 12,029 ms. The server's
 `combat_viking_damage_player` checks for exactly zero remaining HP, so an
 overkill bypasses its intended safe defeat. The user requested that the server
-remain unchanged; a fresh clean Fremennik run is therefore recorded as blocked
-in [#153](https://github.com/ineedbots/lc-headless/issues/153).
-Its older table row is historical manual acceptance, not a fresh clean pass.
-No server code was changed.
+remain unchanged. The failed attempt remains recorded in
+[#153](https://github.com/ineedbots/lc-headless/issues/153).
+
+Fremennik's table timing now uses fresh account `g17505881ft`, source `3e697e4`,
+artifacts `build/e2e/fremennik-retry-20261123/sessions/20261123T151055-run-09c2`.
+It passed with one earned completion, 3 QP, zero deaths, no restart or manual
+intervention, and a clean logout. Queue start was 21:10:57.107 UTC and passing
+`E2E_RESULT` was 22:03:37.357 UTC. Koschei triggered the intended safe defeat
+and returned the character to Thorvald's loft. A pre-run probe measured twenty
+ticks in 12,025 ms; standard suite preparation and infinite run were retained.
+The session records engine checkout `2395c968473333d13ff1454f5eff452a18a029b6`.
+No server code was changed by this validation. The prior 59m 31s resumed timing
+remains historical evidence. The successful retry does not resolve the server's
+overkill condition in #153.
