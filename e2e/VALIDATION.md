@@ -108,10 +108,13 @@ The fresh run's Fremennik account completed but failed acceptance with one real
 Koschei death, so its 58m 34s attempted timing does not replace the older row.
 The shared two-account launcher correctly rejected that overall session; Ikov's
 individual passing record and clean logout are retained independently.
-A pre-run probe measured twenty ticks in 12,029 ms. The server's
-`combat_viking_damage_player` checks for exactly zero remaining HP, so an
-overkill bypasses its intended safe defeat. The user requested that the server
-remain unchanged. The failed attempt remains recorded in
+A pre-run probe measured twenty ticks in 12,029 ms. The earlier attribution of
+the real death to fourth-form overkill was unproven: those logs did not record
+the NPC form. The server checks for exactly zero remaining HP, but its fourth
+form's configured Strength 5 and default strength bonus produce a maximum hit
+of 1. The equality check alone therefore does not reproduce overkill under
+these parameters. The user requested that the server remain unchanged.
+The failed attempt and corrected diagnosis remain recorded in
 [#153](https://github.com/ineedbots/lc-headless/issues/153).
 
 Fremennik's table timing now uses fresh account `g17505881ft`, source `3e697e4`,
@@ -123,5 +126,45 @@ and returned the character to Thorvald's loft. A pre-run probe measured twenty
 ticks in 12,025 ms; standard suite preparation and infinite run were retained.
 The session records engine checkout `2395c968473333d13ff1454f5eff452a18a029b6`.
 No server code was changed by this validation. The prior 59m 31s resumed timing
-remains historical evidence. The successful retry does not resolve the server's
-overkill condition in #153.
+remains historical evidence. The successful retry does not establish reliability
+of the earlier foodless client strategy; phase-aware food support is tracked
+in #153 and PR #152.
+
+### Focused Koschei food regression
+
+Fresh scratch account `klegf692a4ft`, client source `ec29f3e`, passed the warrior
+leg alone at normal 600 ms ticks (pre-run probe: twenty ticks in 12,041 ms).
+Other six votes and Thorvald-started were explicitly seeded; Thorvald-done was
+absent. Attack/Strength/Defence 75, HP85, Prayer43, 100 banked lobsters and infinite
+run were used. The real AIOQuester handled equipment cleanup, withdrew eight
+lobsters and ran the combat leg; the temporary wrapper only observed and stopped
+it on the safe loft return. No server code was edited.
+
+| Form | Lowest HP | Lobsters eaten |
+|---|---|---|
+| 1 | 85 | 0 |
+| 2 | 85 | 0 |
+| 3 | 68 | 3 |
+| 4 | 1 | 0 |
+
+| Scope | Result | Real deaths | Time taken |
+|---|---|---|---|
+| Warrior leg, including preparation and banking | PASS | 0 | 12m 21s |
+| Fight step through safe-return result | PASS | 0 | 6m 19s |
+
+Queue start: 22:33:54.112 UTC; fight step: 22:39:56.534 UTC; passing result:
+22:46:15.128 UTC. All four forms were observed, food remained unused in form 4,
+the character reached `(2667,3692,L1)` and logged out, and the client exited zero.
+The quest remained incomplete as intended. This does not replace the full-quest
+timing above. Engine checkout `2395c968473333d13ff1454f5eff452a18a029b6`, content
+checkout `f32c62f66302f76b43c752ede3181de0c0d01369`; artifacts:
+`build/e2e/koschei-leg-20261123-v5/sessions/20261123T163352-run-e4d6`.
+Temporary setup/rerun instructions are in `build/koschei-leg/README.md`.
+
+The first combat attempt (`koschei-leg-20261123-v4`, source `02636ff`) stalled on
+the third-form transition and was stopped as a failed attempt. Shared sustain
+dropped prayer outside combat while the combat loop re-enabled it, preventing
+reengagement. `ec29f3e` restricts shared sustain to combat and has a failing-before,
+passing-after runtime regression. The accepted v5 attempt used a fresh account
+with no restart or manual quest intervention. Earlier v1–v3 seed-verification
+failures occurred before combat and remain separate artifacts.
