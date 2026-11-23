@@ -575,6 +575,27 @@ TEST_CASE("Native named NPC actions return false after the target disappears", "
     fixture.Run("import _core\nnpc = npcs.query().first()\n");
     fixture.state.npcs.clear();
     REQUIRE_NOTHROW(fixture.Run("assert _core.interact_npc(npc, 'Attack') is False\n"));
+    REQUIRE_NOTHROW(fixture.Run("assert npc.interact('Attack', walk=False) is False\n"));
+}
+
+TEST_CASE("NPC actions can omit the client approach walk", "[ScriptBindings][GameActions]")
+{
+    auto server = FakeGameServer{TestWorld::Send};
+    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig())};
+    fixture.Login();
+    fixture.state.npcs.front().index = TestWorld::NPC_INDEX;
+    REQUIRE_NOTHROW(fixture.Run("npc = npcs.query().first()\nassert npc.interact('Attack', walk=False)\n"));
+    fixture.client.Pump();
+
+    REQUIRE(server.WaitForPacket(ClientProt_e::OpNpc2));
+    CHECK(server.GetPackets(ClientProt_e::MoveOpClick).empty());
+    CHECK_FALSE(fixture.client.GetState().walkDestination.has_value());
+    CHECK_THROWS_WITH(fixture.Run("npc.interact('Attack', walk='no')\n"), ContainsSubstring("walk must be True or False"));
+    REQUIRE_NOTHROW(fixture.Run("assert npc.interact('Attack')\n"));
+    fixture.client.Pump();
+
+    REQUIRE(server.WaitForPacket(ClientProt_e::MoveOpClick));
+    CHECK(fixture.client.GetState().walkDestination.has_value());
 }
 
 TEST_CASE("Native scenery bindings accept object and coordinate call forms", "[ScriptBindings][ActionBindingCoverage]")

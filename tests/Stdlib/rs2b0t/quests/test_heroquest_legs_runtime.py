@@ -4,6 +4,7 @@ from rs2004.execution import event_signal
 from rs2004.game import game
 from rs2004.geometry import Tile
 from rs2004.quests.defs.heroquest import blackarm, doors, eel, feather, phoenix, shops, state
+import rs2004.quests.defs.heroquest as hero
 from rs2004.quests.defs.heroquest.areas import HERO_ID, HERO_LOC, HERO_NAMED, HERO_NPC, HERO_TILE
 from rs2004.quests.defs.heroquest.journal import HERO_STAGE
 from rs2004.quests.engine.types import QuestSnapshot
@@ -124,6 +125,7 @@ def door(fn, region, entering):
     expect(run_wait(fn(scene.log))).to_be(False)
 
     def crossed(opts):
+        expect(opts.stand_radius).to_be(0)
         scene.region = region if entering else ''
         expect(opts.is_far()).to_be(True)
         return True
@@ -162,6 +164,29 @@ def keyed_doors_and_escape():
 
 
 test('keyed rooms and returning to the street enforce every pocket exit', keyed_doors_and_escape)
+
+
+def restart_exits():
+    scene = world()
+    expect(hero.heroquest.exit).to_be(hero.leave_quest_area)
+    for tile, name in [[HERO_TILE.GRUBOR_DOOR_INNER, 'return_to_street'],
+                       [HERO_TILE.KITCHEN_PANEL, 'return_to_street'],
+                       [HERO_TILE.DEEP_GATE_INNER, 'leave_deep_dungeon'],
+                       [HERO_TILE.JAIL_DOOR_INNER, 'cross_jail_door'],
+                       [HERO_TILE.FIREBIRD, 'sail_from_entrana']]:
+        scene.at = tile
+        expect(hero.resumes_at(tile)).to_be(True)
+        failed = spy_on(hero, name, impl=answer(False))
+        expect(run_wait(hero.leave_quest_area(scene.log))).to_be(False)
+        failed.mock_implementation(answer(True))
+        expect(run_wait(hero.leave_quest_area(scene.log))).to_be(True)
+        if name == 'cross_jail_door':
+            expect(failed.calls[0][0]).to_be(False)
+        restore_all()
+        scene = world()
+
+
+test('a restarted Hero quest leaves each sealed area before bank preparation', restart_exits)
 
 
 def herb_and_eel():
@@ -434,10 +459,37 @@ def arrow_slit():
     scene.npc('Grip', id=HERO_NPC.GRIP, tile=HERO_TILE.GRIP_LURE)
     expect(run_wait(phoenix.snipe_grip(scene.log))).to_be(False)
     scene.npcs = []
-    scene.npc('Grip', id=HERO_NPC.GRIP, tile=HERO_TILE.GRIP_LURE,
-              effect=lambda op: scene.on_ground(HERO_ID.GRIP_KEYS, 'Keyring'))
+    grip = scene.npc('Grip', id=HERO_NPC.GRIP, tile=HERO_TILE.GRIP_LURE,
+                     effect=lambda op: scene.on_ground(HERO_ID.GRIP_KEYS, 'Keyring'))
     expect(run_wait(phoenix.snipe_grip(scene.log))).to_be(True)
+    expect(grip.last_walk).to_be(False)
     expect(scene.logged('Grip is down')).to_be(True)
 
 
 test('the Phoenix role shoots only on the arrow slit row and confirms the shared keyring drop', arrow_slit)
+
+
+def recover_firing_position():
+    for can_return in [True, False]:
+        scene = world()
+        scene.at = HERO_TILE.ARROW_SLIT
+        shots = []
+        returns = can_return
+
+        def shot(op):
+            shots.append(scene.at)
+            if len(shots) == 1:
+                scene.at = Tile(2780, 3197, 0)
+                scene.walk_ok = returns
+            else:
+                scene.on_ground(HERO_ID.GRIP_KEYS, 'Keyring')
+            return True
+
+        grip = scene.npc('Grip', id=HERO_NPC.GRIP, tile=HERO_TILE.GRIP_LURE, effect=shot)
+        expect(run_wait(phoenix.snipe_grip(scene.log))).to_be(can_return)
+        expect(shots).to_equal([HERO_TILE.ARROW_SLIT, HERO_TILE.ARROW_SLIT] if can_return else [HERO_TILE.ARROW_SLIT])
+        expect(grip.last_walk).to_be(False)
+        restore_all()
+
+
+test('the sniper returns to its firing tile after a server chase and stops if it cannot', recover_firing_position)

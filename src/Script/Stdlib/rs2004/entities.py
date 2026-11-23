@@ -66,12 +66,12 @@ class Npc(_Located):
     """name, id, level (combat level, 0 for none), index, size, in_combat, health (0 until a hit shows it),
     max_health, animation (-1 for none), moving, and target: ('npc' or 'player', index) or None."""
 
-    def interact(self, action):
-        """Uses the option named action, walking there first. False when the NPC has no such option or has gone."""
+    def interact(self, action, walk=True):
+        """Uses the option, optionally omitting the client's approach walk. The server still controls reach."""
         op = op_index(self._ops, action)
         if op == -1:
             return False
-        return _core.interact_npc(self.index, op)
+        return _core.interact_npc(self.index, op, walk)
 
     def valid(self):
         current = _core.get_npc(self.index)

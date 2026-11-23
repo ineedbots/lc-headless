@@ -82,7 +82,8 @@ namespace
                 return Menus::FindNpcOp(context.GetState(), context.GetCache(), index, text);
             });
 
-            return BindingSupport::ReturnBool(op && context.GetActions().InteractNpc(index, *op));
+            const auto walk = PyValue::ToBool(py_arg(2), "walk");
+            return BindingSupport::ReturnBool(op && context.GetActions().InteractNpc(index, *op, walk));
         });
     }
 
@@ -423,7 +424,7 @@ void ActionBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"click_text(text, root=None)", ClickText},
                                           {"walk_to(x, z, run=False)", WalkTo},
                                           {"walk_path(points, run=False)", WalkPath},
-                                          {"interact_npc(npc, op)", InteractNpc},
+                                          {"interact_npc(npc, op, walk=True)", InteractNpc},
                                           {"talk_to_npc(npc)", TalkToNpc},
                                           {"attack_npc(npc)", AttackNpc},
                                           {"interact_player(player, op)", InteractPlayer},

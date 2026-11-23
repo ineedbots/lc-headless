@@ -43,9 +43,16 @@ void GameActions::WalkPath(std::span<const Tile_s> waypoints, bool run)
     m_client.SendMove(MoveKind_e::GameClick, waypoints, run);
 }
 
-void GameActions::InteractNpc(u16 npcIndex, u8 op)
+void GameActions::InteractNpc(u16 npcIndex, u8 op, bool walk)
 {
     const auto tile = GetNpcTile(npcIndex);
+
+    if (!walk)
+    {
+        m_client.Send(m_client.GetPackets().OpNpc(op, npcIndex));
+        return;
+    }
+
     Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpNpc(op, npcIndex));
 }
 

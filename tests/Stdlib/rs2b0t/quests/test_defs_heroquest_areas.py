@@ -99,6 +99,16 @@ def _fn1():
 describe("hero's quest Brimhaven pockets", _fn1)
 
 
+def restaurant_street_is_not_a_garden():
+    for x, z in [(2788, 3188), (2788, 3189), (2787, 3188), (2787, 3189), (2785, 3188), (2786, 3189)]:
+        expect(in_garden(at(x, z))).to_be(False)
+    for x, z in [(2783, 3188), (2784, 3189), (2786, 3190), (2787, 3194), (2788, 3199)]:
+        expect(in_garden(at(x, z))).to_be(True)
+
+
+test('the restaurant approach stays outside the sealed garden', restaurant_street_is_not_a_garden)
+
+
 # Why: the deep dungeon and the rest of Taverley's interleave across x 2881-2923, so the predicate is a
 # four-box cover of the flood rather than one rectangle over the pair.
 def _fn12():

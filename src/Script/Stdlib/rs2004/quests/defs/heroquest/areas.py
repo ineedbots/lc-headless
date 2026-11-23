@@ -208,7 +208,8 @@ def in_kitchen(t):
 
 def in_garden(t):
     """Mr Olbors' garden, reached only by pushing the kitchen wall panel."""
-    return within(t, 2783, 2788, 3188, 3199, 0) and not in_kitchen(t)
+    # The southern garden narrows before the restaurant; its doorway and street are outside the panel.
+    return within(t, 2783, 2784, 3188, 3199, 0) or within(t, 2785, 2786, 3190, 3197, 0) or within(t, 2787, 2788, 3193, 3199, 0)
 
 
 def in_yard(t):
