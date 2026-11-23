@@ -91,4 +91,3 @@ def loop():
     log('E2E_SEEDED ' + json.dumps({'case': kind, 'name': game.my_name(), 'passed': True, 'tile': str(game.tile())}))
     stop_account()
     return 600
-
