@@ -93,8 +93,7 @@ def fight_koschei(log):
             if on_loft(game.tile()):
                 log('Koschei landed the last blow — the trial is passed')
                 return True
-            # Why: `combat_viking_damage_player` only calls `viking_honour_death` when the roll lands on the last remaining hitpoint, and an overkill is an ordinary death in Lumbridge.
-            log('Koschei overshot the killing blow — that was a real death, walking back for another round')
+            log('left Koschei\'s battleground without the safe loft landing — trial not passed')
             return False
         if event_signal.pending():
             log('yielding to a random event')
@@ -108,10 +107,12 @@ def fight_koschei(log):
             if form in KOSCHEI_FORMS:
                 log(f'Koschei form {KOSCHEI_FORMS.index(form) + 1}/4')
         if form in KOSCHEI_FORMS[:3]:
-            before = game.tick()
-            yield from sustain.run()
-            if game.tick() != before:
-                continue
+            # Outside combat, shared upkeep drops protection; raising it again here would prevent reengaging.
+            if game.in_combat():
+                before = game.tick()
+                yield from sustain.run()
+                if game.tick() != before:
+                    continue
             if can_pray and prayer.points() > 0 and not prayer.active(PROTECT_MELEE):
                 yield from prayer.set(PROTECT_MELEE, True)
                 continue

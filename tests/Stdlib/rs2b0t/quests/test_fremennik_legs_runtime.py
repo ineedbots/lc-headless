@@ -464,3 +464,36 @@ def koschei_fourth_prayer():
 
 
 test('Koschei fourth form drops protection instead of restoring it while prayer points remain', koschei_fourth_prayer)
+
+
+def koschei_transition_reengages():
+    from rs2004 import execution
+    from rs2004.catalogs.tasks import sustain
+
+    scene = world()
+    scene.at = Tile(2671, 10098, 2)
+    spy_on(game, 'set_auto_retaliate', returns=None)
+    spy_on(game, 'in_combat', returns=False)
+    spy_on(warrior.skills, 'level', returns=70)
+    spy_on(prayer, 'points', returns=22)
+    active = spy_on(prayer, 'active', returns=True)
+
+    def set_prayer(name, enabled):
+        active.mock_return_value(enabled)
+        yield from execution.delay_ticks(1)
+        return True
+
+    def upkeep():
+        # Shared prayer upkeep drops protection when combat stops between forms.
+        if prayer.active(warrior.PROTECT_MELEE):
+            yield from set_prayer(warrior.PROTECT_MELEE, False)
+
+    spy_on(prayer, 'set', impl=set_prayer)
+    spy_on(sustain, 'run', impl=upkeep)
+    target = scene.npc(warrior.KOSCHEI, ['Attack'], id=1292,
+                       effect=lambda op: setattr(scene, 'at', FT_TILE.WARRIOR_LOFT))
+    spy_on(warrior, 'attackable', returns=target)
+    expect(run_wait(warrior.fight_koschei(scene.log))).to_be(True)
+
+
+test('Koschei reengages after a form transition instead of toggling protection forever outside combat', koschei_transition_reengages)
