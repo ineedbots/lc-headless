@@ -39,11 +39,14 @@ jobs:
       - name: Verify fleet tooling
         run: python -B -m unittest discover -s tools/fleet
 
+      - name: Verify live-test setup safeguards
+        run: python -B -m unittest discover -s e2e/phase17g -p 'test_*.py'
+
       - name: Check authored C++ formatting
         run: python -I tools/quality/format.py
 
       - name: Check pocketpy source and runtime specs
-        run: python -I tools/port/lint.py src/Script/Stdlib scripts tests/Stdlib
+        run: python -I tools/port/lint.py src/Script/Stdlib scripts tests/Stdlib e2e/phase17g/scripts
 
   coverage:
     name: Native and stdlib coverage (Linux x64)
