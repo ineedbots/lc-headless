@@ -319,6 +319,55 @@ def queen_and_feather():
 test('the Ice Queen drop is confirmed and the feather is taken only with ice gloves worn', queen_and_feather)
 
 
+def delayed_queen_gloves():
+    scene = world()
+    scene.npc('Ice Queen', id=HERO_NPC.ICE_QUEEN)
+
+    def died(opts, log):
+        current = scene
+        current.npcs = []
+        current.later(lambda: current.on_ground(HERO_ID.ICE_GLOVES, HERO_NAMED.ICE_GLOVES))
+        return True
+        yield
+
+    fight = spy_on(feather, 'fight', impl=died)
+    expect(run_wait(feather.kill_ice_queen(scene.log))).to_be(True)
+    expect(scene.has(HERO_ID.ICE_GLOVES)).to_be(True)
+    expect(len(fight.calls)).to_be(1)
+    scene.pack = []
+    scene.on_ground(HERO_ID.ICE_GLOVES, HERO_NAMED.ICE_GLOVES)
+    expect(run_wait(feather.kill_ice_queen(scene.log))).to_be(True)
+    expect(len(fight.calls)).to_be(1)
+
+
+test('the Queen drop may arrive after her removal and an existing drop does not start another fight', delayed_queen_gloves)
+
+
+def queen_food_capacity():
+    scene = world()
+    from rs2004.quests.food import quest_food
+    quest_food.name = 'Lobster'
+    snap = QuestSnapshot(inv={'lobster': 7, 'bronze pickaxe': 1, 'black platebody': 1},
+                         inv_ids={1265: 1}, worn_ids=set([1113, 1079, 1303]), free_slots=8)
+    step = feather.feather_step(snap)
+    expect(step.kind).to_be('withdraw')
+    expect(step.items[0]['qty']).to_be(1)
+    snap.free_slots = 0
+    step = feather.feather_step(snap)
+    expect(step.kind).to_be('deposit')
+    expect(step.exact_keep).to_be(True)
+    expect('bronze pickaxe' in step.keep).to_be(True)
+    expect('black platebody' in step.keep).to_be(False)
+    snap.inv['lobster'] = 15
+    expect(feather.feather_step(snap).kind).to_be('deposit')
+    snap.free_slots = 8
+    scene.on_ground(HERO_ID.ICE_GLOVES, HERO_NAMED.ICE_GLOVES)
+    expect(feather.feather_step(snap).run).to_be(feather.take_ice_gloves)
+
+
+test('Queen food refills request only the shortage and reserve a slot for gloves', queen_food_capacity)
+
+
 def ship_and_equipment():
     scene = world()
     scene.wear(HERO_NAMED.ICE_GLOVES)

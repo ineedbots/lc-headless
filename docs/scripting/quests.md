@@ -408,6 +408,9 @@ AIOQuester's `hero_partner` names the character running the other gang, since th
 Restarting inside a sealed Brimhaven room, Velrak's cell, the deep Taverley dungeon or
 Entrana uses the quest's exit route before bank preparation, then resumes from the journal.
 Door challenges allow the full conversation to finish before retrying an unlocked entrance.
+Ice Queen preparation refills only missing food and keeps a free slot for her gloves.
+The pickup waits briefly for the ground-item update after her disappearance and can recover
+gloves already on the floor without starting another fight.
 
 Leave `arrav_partner` or `hero_partner` blank to pair automatically with an eligible opposite-gang
 AIOQuester in the same process and configured world. Pairing requires mutual claims, expires stale peers
