@@ -77,13 +77,13 @@ Sources `0ea1238` (first session) and `a8a3159` (Scorpion Catcher resume). Artif
 | `sh` | Sheep Herder | 4 | PASS | 24m 55s |
 | `tg` | Tree Gnome Village | 2 | PASS | 18m 04s |
 | `wf` | Waterfall Quest | 1 | PASS | 23m 59s |
-| `sc` | Scorpion Catcher | 1 | PASS | 1h 7m 31s (resumed) |
+| `sc` | Scorpion Catcher | 1 | PASS | 1h 2m 35s |
 | `ob` | Observatory Quest | 2 | PASS | 29m 43s |
 | `fa` | Fight Arena | 2 | PASS | 20m 18s |
 | `mc` | Merlin's Crystal | 6 | PASS | 28m 48s |
 | `lc` | Lost City | 3 | PASS | 12m 40s |
 
-Scorpion Catcher: 1h 6m 42s summed active bot time, including the failed attempt; 19m 49s in the successful resumed session. Total elapsed above includes the rebuild gap. No target progress or objective items were seeded during recovery.
+Scorpion Catcher's table timing now comes from the fresh uninterrupted run at `build/e2e/phase17b-uninterrupted-20261123/sessions/20261123T134304-run-1fc1`, source `4b201aa`: zero deaths, no client restart or manual intervention, clean logout. The older resumed result remains historical evidence: 1h 7m 31s elapsed, 1h 6m 42s active, 19m 49s in its final session. No target progress or objective items were seeded during recovery.
 
 ## Phase 17g
 
@@ -95,5 +95,23 @@ Original acceptance artifacts: `build/phase17g-live-20261122/{client,fremennik,i
 |---|---|---|---|---|
 | `ph` | Hero's Quest, Phoenix | 57 | PASS | 42m 01s |
 | `ba` | Hero's Quest, Black Arm | 57 | PASS | 50m 07s |
-| `ik` | Temple of Ikov, Guardians | 1 | PASS | 1h 44m 40s (resumed) |
+| `ik` | Temple of Ikov, Guardians | 1 | PASS | 1h 18m 31s |
 | `ft` | The Fremennik Trials | 3 | PASS | 59m 31s (resumed) |
+
+Ikov's table timing now comes from the fresh uninterrupted run at
+`build/e2e/phase17g-uninterrupted-20261123/sessions/20261123T134304-run-20d6`,
+source `4b201aa`: zero deaths, no client restart or manual intervention, clean
+logout. Its original 1h 44m 40s resumed timing remains historical evidence.
+The newer Ikov timing uses the standard `E2E_RESULT` endpoint; the original
+manual-wrapper endpoint above applies to the other three phase 17g rows.
+The fresh run's Fremennik account completed but failed acceptance with one real
+Koschei death, so its 58m 34s attempted timing does not replace the older row.
+The shared two-account launcher correctly rejected that overall session; Ikov's
+individual passing record and clean logout are retained independently.
+A pre-run probe measured twenty ticks in 12,029 ms. The server's
+`combat_viking_damage_player` checks for exactly zero remaining HP, so an
+overkill bypasses its intended safe defeat. The user requested that the server
+remain unchanged; a fresh clean Fremennik run is therefore recorded as blocked
+in [#153](https://github.com/ineedbots/lc-headless/issues/153).
+Its older table row is historical manual acceptance, not a fresh clean pass.
+No server code was changed.
