@@ -28,6 +28,7 @@ from rs2004.messages import CANT_REACH, game_messages
 from rs2004.reach import close_op, is_open_barrier_leaf, is_openable_barrier, open_op
 from rs2004.routeplan import WEB_SLASH_KNIFE_NAME, WITHDRAW_COST, crossings, essence_session, explain_unreachable, gate_item_candidates, is_quest_lock_dialogue, is_quest_lock_text
 from rs2004.routeplan import missing_items_for_path, path_has_teleport, pick_choice, plan_bank_leg, post_quest_talk_for, records_have_slash_tool
+from rs2004.routeplan import is_content_knife_name, is_slash_weapon_name, is_slash_web_transport
 from rs2004.routeplan import resolve_path_follow_config, special_crossing_for_transport, teleport_by_id, virtualize_with_items
 from rs2004.settings import settings_store
 from rs2004.tabs import quests
@@ -1184,6 +1185,7 @@ class _Traversal:
                     yield from execution.delay_until(lambda: walkgeom.is_on_far_side(local_tile(), approach, step), 2500)
                 return True
         deadline = _core.step_time() + DOOR_CROSS_MS
+        web = is_slash_web_transport(transport.get('loc_name'), transport.get('action'))
         while _core.step_time() < deadline:
             here = local_tile()
             if walkgeom.is_on_far_side(here, approach, step):
@@ -1196,13 +1198,19 @@ class _Traversal:
                 shut = find_transport_loc(transport)
             if shut is not None:
                 mark = game_messages.mark()
-                if not shut.interact(transport['action']):
-                    say(f'{transport["loc_name"]} has no {transport["action"]} (it has {shut.actions()})')
+                blade = None
+                if web:
+                    # The server's Slash action checks worn weapons; a carried knife or blade needs item-on-loc.
+                    blade = ([item for item in inventory.items() if is_content_knife_name(item.name) or is_slash_weapon_name(item.name)] or [None])[0]
+                activated = blade.use_on(shut) if blade is not None else shut.interact(transport['action'])
+                if not activated:
+                    say(f'{transport["loc_name"]} refused {blade.name}' if blade is not None else f'{transport["loc_name"]} has no {transport["action"]} (it has {shut.actions()})')
                     return False
                 # Why: a door scripted to walk you through and shut again (Tenzing's, `open_and_close_door2`) is never seen
                 # open, so being on the far side is the crossing, as rs2b0t's door crossing polls for passage.
                 yield from execution.delay_until(lambda: find_transport_loc(transport) is None or _can_step(approach, step) or game_messages.saw_since(mark, CANT_REACH) or chat_shows_quest_lock()
-                                                 or lock_message_since(mark) or walkgeom.is_on_far_side(local_tile(), approach, step),
+                                                 or lock_message_since(mark) or walkgeom.is_on_far_side(local_tile(), approach, step)
+                                                 or (web and game_messages.saw_since(mark, 'You fail to cut through it.')),
                                                  TRANSPORT_WAIT_MS)
                 if walkgeom.is_on_far_side(local_tile(), approach, step):
                     say(f'through the {transport["loc_name"]} at {transport["loc_x"]},{transport["loc_z"]}')
@@ -1210,6 +1218,9 @@ class _Traversal:
                 if game_messages.saw_since(mark, CANT_REACH):
                     say(f"the server can't reach the {transport['loc_name']} at {transport['loc_x']},{transport['loc_z']}")
                     return False
+                if web and game_messages.saw_since(mark, 'You fail to cut through it.'):
+                    yield from execution.delay_ticks(1)
+                    continue
                 locked = yield from self._quest_lock(transport, say, mark)
                 if locked:
                     return False

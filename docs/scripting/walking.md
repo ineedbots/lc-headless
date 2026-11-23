@@ -105,7 +105,7 @@ yield from traversal.walk_to(dest, 2, **NAV_WITH_TELES)
 
 Each hop of a route is checked against the account: skill levels, quest status from the quest tab, the coins for a toll or fare, items it needs, and members' areas. A hop the account can't make isn't planned, so a walk into Al Kharid without 10 coins goes round rather than through the toll gate. On revision 225 the server doesn't say whether the world is members, so walks are planned as on a free world.
 
-`world_state()` gives what's checked, as a dict: `members`, `skills` (name to base level), `items` and `worn` (name to count), `quests` (name to `'not_started'`, `'started'`, `'complete'` or `'unknown'`), `free_slots`, `can_slash_web` (a knife or a bladed weapon held or worn), and `essence_exit_return` once it's known (see [The essence mine](#the-essence-mine)).
+`world_state()` gives what's checked, as a dict: `members`, `skills` (name to base level), `items` and `worn` (name to count), `quests` (name to `'not_started'`, `'started'`, `'complete'` or `'unknown'`), `free_slots`, `can_slash_web` (a knife or a bladed weapon held or worn), and `essence_exit_return` once it's known (see [The essence mine](#the-essence-mine)). Web crossings use a carried knife or blade directly on the web; with only a worn blade, they use the web's Slash action.
 
 When a route can't be planned, the walker plans it again as if the account held every crossing's item, and the log names what would open it, such as `unreachable without 30x Coins`. `last_missing_gate_items` keeps the list.
 

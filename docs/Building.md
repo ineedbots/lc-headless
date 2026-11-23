@@ -366,3 +366,5 @@ guards or a blanket 100% target. Bot scripts under `scripts/` are outside the em
 For live acceptance, use a scratch client configuration and accounts folder against the local engine,
 never the user's accounts. Record engine/client SHAs, tick duration, seeded prerequisites and logs;
 accelerated runs do not demonstrate 600 ms throughput.
+The [phase 17g end-to-end guide](../e2e/phase17g/README.md) preserves the local-289
+setup and rerun commands for Hero's Quest, Temple of Ikov and The Fremennik Trials.
