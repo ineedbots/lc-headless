@@ -726,7 +726,7 @@ class QuestEngine(Task):
                     if not ready:
                         prepared = False
                         break
-                    item = ([item for item in inventory.items() if item.id == cap.id] or [None])[0]
+                    item = ([item for item in bank.side_items() if item.id == cap.id] or [None])[0]
                     ops = [op for op in item.actions() if op.lower().replace('-', ' ') == 'deposit 1'] if item is not None else []
                     before = inventory.count_by_id(cap.id)
                     if not ops or not item.interact(ops[0]):
