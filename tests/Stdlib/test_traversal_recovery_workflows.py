@@ -383,6 +383,62 @@ def test_a_door_that_walks_you_through_and_shuts_again_counts_as_crossed():
         assert not any(['did not open' in line for line in world.logs])
 
 
+def test_web_crossing_uses_a_carried_blade_without_equipping_it():
+    for name in ['Knife', 'Rune longsword']:
+        for accepted in [True, False]:
+            with RouteWorld() as world:
+                web = Entity(world, 'Web', ['Slash'])
+                world.loc_items = [web]
+                used = []
+
+                def cut(target):
+                    used.append(target)
+                    if accepted:
+                        world.events.append(('open', web))
+                    return accepted
+
+                world.held = [FakeModule(name=name, count=1, use_on=cut)]
+                transport = {'kind': 'door', 'loc_name': 'Web', 'action': 'Slash', 'loc_x': 3200, 'loc_z': 3200}
+                result = world.run(walker._Traversal()._cross_door(world.here, Tile(3202, 3200), transport, world.logs.append))
+                assert result == accepted
+                assert used == [web]
+                assert world.interactions == []
+
+
+def test_web_with_worn_blade_and_ordinary_door_keep_the_loc_action():
+    for name, action, held in [('Web', 'Slash', []), ('Door', 'Open', [FakeModule(name='Knife')])]:
+        with RouteWorld() as world:
+            loc = Entity(world, name, [action])
+            world.loc_items = [loc]
+            world.held = held
+            loc.on_interact = lambda op: world.events.append(('open', loc)) or True
+            transport = {'kind': 'door', 'loc_name': name, 'action': action, 'loc_x': 3200, 'loc_z': 3200}
+            assert world.run(walker._Traversal()._cross_door(world.here, Tile(3202, 3200), transport, world.logs.append))
+            assert world.interactions == [(name, action)]
+
+
+def test_web_random_cut_failure_retries_before_abandoning_the_crossing():
+    for eventually_opens in [True, False]:
+        with RouteWorld() as world:
+            web = Entity(world, 'Web', ['Slash'])
+            world.loc_items = [web]
+            used = []
+
+            def cut(target):
+                used.append(target)
+                if eventually_opens and len(used) == 2:
+                    world.events.append(('open', web))
+                else:
+                    world.events.append(('message', 'You fail to cut through it.'))
+                return True
+
+            world.held = [FakeModule(name='Knife', count=1, use_on=cut)]
+            transport = {'kind': 'door', 'loc_name': 'Web', 'action': 'Slash', 'loc_x': 3200, 'loc_z': 3200}
+            assert world.run(walker._Traversal()._cross_door(world.here, Tile(3202, 3200), transport, world.logs.append)) == eventually_opens
+            assert len(used) >= 2
+            assert world.now <= walker.DOOR_CROSS_MS + walker.TRANSPORT_WAIT_MS
+
+
 def test_post_quest_unlock_failed_walk_missing_npc_and_silent_talk():
     for failure in ['walk', 'missing', 'silent', 'continue']:
         with RouteWorld() as world:
