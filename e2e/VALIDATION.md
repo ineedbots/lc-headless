@@ -362,9 +362,13 @@ failure stopped all attacks on an empty food pack; an idle food check now falls
 through to combat. Regressions reproduced both faults before the fixes and pass
 after the rebuild, along with focused mining/fight specs and dialect lint.
 The full ported Python suite passes all 2,906 native assertions. Fresh
-full-quest zero-death validation is seeding at
+full-quest zero-death validation is running at
 `build/e2e/phase17f-survival-20261124/`, target accounts `f17378cd6fc` and
-`f17378cd6hd`. Only these two cases will execute after suite seeding.
+`f17378cd6hd`. All five seed results passed with targets unstarted; only these two cases
+are executing, each with exactly one quest queued. Seed session
+`20261124T103448-seed-e492`, quest session `20261124T103741-run-db67`.
+20-tick probes took 11.987–12.010 seconds.
+Fresh completion and accepted timings are still pending.
 Source `aea870cb7eec475e5dd927cd7b522c2ba4358f40`; pinned executable
 `build/e2e-binaries/phase17f-survival.exe`, SHA-256
 `1e45cafa63d5ccc43e66d1b5d93773f1cbfcb1b1677ae18f541bf79bfaa63c07`.
