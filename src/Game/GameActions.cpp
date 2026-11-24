@@ -56,14 +56,27 @@ void GameActions::InteractNpc(u16 npcIndex, u8 op, bool walk)
     Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpNpc(op, npcIndex));
 }
 
-void GameActions::InteractPlayer(u16 playerIndex, u8 op)
+void GameActions::InteractPlayer(u16 playerIndex, u8 op, bool walk)
 {
     const auto tile = GetPlayerTile(playerIndex);
+
+    if (!walk)
+    {
+        m_client.Send(m_client.GetPackets().OpPlayer(op, playerIndex));
+        return;
+    }
+
     Approach(InteractionRoutes::FindEntityRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpPlayer(op, playerIndex));
 }
 
-void GameActions::InteractLoc(const Tile_s& tile, u16 loc, u8 op)
+void GameActions::InteractLoc(const Tile_s& tile, u16 loc, u8 op, bool walk)
 {
+    if (!walk)
+    {
+        m_client.Send(m_client.GetPackets().OpLoc(op, tile, loc));
+        return;
+    }
+
     ApproachLoc(tile, loc, m_client.GetPackets().OpLoc(op, tile, loc));
 }
 
@@ -72,8 +85,14 @@ void GameActions::InteractLocVia(std::span<const Tile_s> waypoints, const Tile_s
     ApproachVia(waypoints, m_client.GetPackets().OpLoc(op, tile, loc));
 }
 
-void GameActions::InteractGroundItem(const Tile_s& tile, u16 obj, u8 op)
+void GameActions::InteractGroundItem(const Tile_s& tile, u16 obj, u8 op, bool walk)
 {
+    if (!walk)
+    {
+        m_client.Send(m_client.GetPackets().OpObj(op, tile, obj));
+        return;
+    }
+
     Approach(InteractionRoutes::FindGroundItemRoute(GetMap(), GetStart(), tile), tile, m_client.GetPackets().OpObj(op, tile, obj));
 }
 

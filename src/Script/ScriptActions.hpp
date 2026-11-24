@@ -22,10 +22,10 @@ public:
     bool WalkTo(s32 x, s32 z, bool run);
     void WalkPath(std::span<const Tile_s> points, bool run);
     bool InteractNpc(u16 index, u8 op, bool walk = true);
-    bool InteractPlayer(u16 index, u8 op);
-    void InteractLoc(u16 loc, s32 x, s32 z, u8 op);
+    bool InteractPlayer(u16 index, u8 op, bool walk = true);
+    void InteractLoc(u16 loc, s32 x, s32 z, u8 op, bool walk = true);
     void InteractLocVia(std::span<const Tile_s> waypoints, u16 loc, s32 x, s32 z, u8 op);
-    bool InteractGroundItem(u16 obj, s32 x, s32 z, u8 op);
+    bool InteractGroundItem(u16 obj, s32 x, s32 z, u8 op, bool walk = true);
     bool ItemOp(const InventoryItem_s& item, u8 op);
     bool InventoryButton(const InventoryItem_s& item, u8 op);
     void MoveItem(u16 com, u16 fromSlot, u16 toSlot, DragMode_e mode = DragMode_e::Swap);

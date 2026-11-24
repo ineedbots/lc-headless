@@ -114,7 +114,8 @@ namespace
                 return Menus::FindPlayerOp(context.GetState(), context.GetRevision(), text);
             });
 
-            return BindingSupport::ReturnBool(context.GetActions().InteractPlayer(index, op));
+            const auto walk = PyValue::ToBool(py_arg(2), "walk");
+            return BindingSupport::ReturnBool(context.GetActions().InteractPlayer(index, op, walk));
         });
     }
 
@@ -146,7 +147,8 @@ namespace
                 return FindSceneLocOp(context, loc.id, loc.x, loc.z, text);
             });
 
-            context.GetActions().InteractLoc(loc.id, loc.x, loc.z, op);
+            const auto walk = PyValue::ToBool(py_arg(4), "walk");
+            context.GetActions().InteractLoc(loc.id, loc.x, loc.z, op, walk);
             return BindingSupport::ReturnBool(true);
         });
     }
@@ -179,7 +181,8 @@ namespace
                 return Menus::FindGroundItemOp(context.GetCache(), item.id, text);
             });
 
-            return BindingSupport::ReturnBool(context.GetActions().InteractGroundItem(item.id, item.x, item.z, op));
+            const auto walk = PyValue::ToBool(py_arg(2), "walk");
+            return BindingSupport::ReturnBool(context.GetActions().InteractGroundItem(item.id, item.x, item.z, op, walk));
         });
     }
 
@@ -427,10 +430,10 @@ void ActionBindings::Add(std::vector<BoundFunction_s>& functions)
                                           {"interact_npc(npc, op, walk=True)", InteractNpc},
                                           {"talk_to_npc(npc)", TalkToNpc},
                                           {"attack_npc(npc)", AttackNpc},
-                                          {"interact_player(player, op)", InteractPlayer},
-                                          {"interact_loc(target, x=None, z=None, op=None)", InteractLoc},
+                                          {"interact_player(player, op, walk=True)", InteractPlayer},
+                                          {"interact_loc(target, x=None, z=None, op=None, walk=True)", InteractLoc},
                                           {"interact_loc_via(points, id, x, z, op)", InteractLocVia},
-                                          {"interact_ground_item(item, op)", InteractGroundItem},
+                                          {"interact_ground_item(item, op, walk=True)", InteractGroundItem},
                                           {"take_ground_item(item)", TakeGroundItem},
                                           {"item_op(item, op)", ItemOp},
                                           {"inv_button(item, op)", InvButton},

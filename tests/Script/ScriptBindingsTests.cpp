@@ -540,6 +540,8 @@ assert _core.cast_on_ground_item(1, ground) is False
 assert _core.cast_on_item(1, item) is False
 assert _core.talk_to_npc(npc) is False
 assert _core.interact_player(player, 1) is False
+assert _core.interact_player(player, 1, walk=False) is False
+assert _core.interact_ground_item(ground, 3, walk=False) is False
 assert _core.take_ground_item(ground) is False
 )python"));
 }
@@ -596,6 +598,53 @@ TEST_CASE("NPC actions can omit the client approach walk", "[ScriptBindings][Gam
 
     REQUIRE(server.WaitForPacket(ClientProt_e::MoveOpClick));
     CHECK(fixture.client.GetState().walkDestination.has_value());
+}
+
+TEST_CASE("World object actions can omit the client approach walk", "[ScriptBindings][GameActions]")
+{
+    const auto [setup, action, packet] = GENERATE(
+        std::tuple{"target = players.query().first()", "Trade with", ClientProt_e::OpPlayer1},
+        std::tuple{"target = locs.at(game.tile().translate(1, 0))", "Open", ClientProt_e::OpLoc1},
+        std::tuple{"target = ground_items.query().first()", "Take", ClientProt_e::OpObj3});
+    auto server = FakeGameServer{TestWorld::Send};
+    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig())};
+    fixture.Login();
+    fixture.state.players.front().index = Fixtures::PID;
+    fixture.state.playerOps[0] = PlayerOp_s{.text = "Trade with"};
+    fixture.Run(setup);
+    fixture.Run("assert target.interact('Missing', walk=False) is False\n");
+    fixture.Run(std::format("assert target.interact('{}', walk=False)\n", action));
+    fixture.client.Pump();
+
+    REQUIRE(server.WaitForPacket(packet));
+    CHECK(server.GetPackets(ClientProt_e::MoveOpClick).empty());
+    CHECK_FALSE(fixture.client.GetState().walkDestination.has_value());
+    CHECK_THROWS_WITH(fixture.Run(std::format("target.interact('{}', walk=1)\n", action)), ContainsSubstring("walk must be True or False"));
+    fixture.Run(std::format("assert target.interact('{}')\n", action));
+    fixture.client.Pump();
+
+    REQUIRE(server.WaitForPacket(packet, 2));
+    REQUIRE(server.WaitForPacket(ClientProt_e::MoveOpClick));
+    CHECK(fixture.client.GetState().walkDestination.has_value());
+}
+
+TEST_CASE("Native scenery call forms can omit the client approach walk", "[ScriptBindings][GameActions]")
+{
+    const auto source = GENERATE(
+        "_core.interact_loc(door, 'Open', walk=False)",
+        "_core.interact_loc(door, op='Open', walk=False)",
+        "_core.interact_loc(1530, 3201, 3200, 'Open', False)");
+    auto server = FakeGameServer{TestWorld::Send};
+    auto fixture = BindingFixture{Revision_e::Rev289, false, std::make_shared<const Config_s>(server.MakeConfig())};
+    fixture.Login();
+    fixture.Run("import _core\ndoor = locs.at(game.tile().translate(1, 0))\n");
+    fixture.Run(std::format("assert {}\n", source));
+    fixture.client.Pump();
+
+    REQUIRE(server.WaitForPacket(ClientProt_e::OpLoc1));
+    CHECK(server.GetPackets(ClientProt_e::MoveOpClick).empty());
+    CHECK_FALSE(fixture.client.GetState().walkDestination.has_value());
+    CHECK_THROWS_WITH(fixture.Run("_core.interact_loc(door, 'Open', walk=None)\n"), ContainsSubstring("walk must be True or False"));
 }
 
 TEST_CASE("Native scenery bindings accept object and coordinate call forms", "[ScriptBindings][ActionBindingCoverage]")
