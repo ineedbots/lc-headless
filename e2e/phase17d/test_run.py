@@ -3,6 +3,7 @@
 import ast
 import contextlib
 import io
+import importlib.util
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -38,6 +39,25 @@ class Phase17dTests(unittest.TestCase):
         self.assertIn('druid', {row[0] for row in prerequisite_flags('mortton')})
         self.assertEqual(initial_points('tbwt'), 5)
         self.assertEqual(initial_points('zombiequeen'), 5)
+
+    def test_real_aio_selection_keeps_each_queue_to_its_target(self):
+        module_spec = importlib.util.spec_from_file_location('quest_selection', harness.REPO / 'scripts/bots/aioquester/quest_selection.py')
+        selection = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(selection)
+        source = ast.parse((harness.REPO / 'src/Script/Stdlib/rs2004/catalogs/_quests.py').read_text())
+        catalog = ast.literal_eval(next(node.value for node in source.body if isinstance(node, ast.Assign)))
+        records = []
+        for row in catalog:
+            requirements = row['requirements']
+            records.append(SimpleNamespace(id=row['id'], quest_points=row['quest_points'], requirements=SimpleNamespace(
+                quests=requirements.get('quests', []),
+                skills=[SimpleNamespace(**skill) for skill in requirements.get('skills', [])],
+                min_quest_points=requirements.get('min_quest_points', 0))))
+        for quest in CASES.values():
+            with self.subTest(quest=quest):
+                completed = {row[0] for row in prerequisite_flags(quest)}
+                picked = selection.plan_quest_selection([quest], [], records, completed, initial_points(quest))
+                self.assertEqual(picked, {quest})
 
     def test_swamp_access_does_not_start_the_nature_spirit_target(self):
         self.assertEqual(preparation_flags('mortton'), [('druidspirit', 5)])

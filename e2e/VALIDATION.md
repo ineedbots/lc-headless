@@ -157,17 +157,23 @@ Live validation is in progress; no completion timings are accepted yet.
 
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
-| Nature Spirit | `d1723575dns` | Pending | — |
-| Shades of Mort'ton | `d1723575dsm` | Pending | — |
-| Tai Bwo Wannai Trio | `d1723575dtw` | Pending | — |
-| Shilo Village | `d1723575dsv` | Pending | — |
+| Nature Spirit | `d171a75d1ns` | Pending | — |
+| Shades of Mort'ton | `d171a75d1sm` | Pending | — |
+| Tai Bwo Wannai Trio | `d171a75d1tw` | Pending | — |
+| Shilo Village | `d171a75d1sv` | Pending | — |
 
-Run root: `build/e2e/phase17d-validation-20261123`, prepared from
-`bad8f350237c29608b46ad06499d02c36dea109b`. Client binary SHA-256:
+Run root: `build/e2e/phase17d-validation-20261123-v2`, prepared from
+`bccb2ac`. Client binary SHA-256:
 `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
 Engine: `2395c968473333d13ff1454f5eff452a18a029b6`; content:
 `f32c62f66302f76b43c752ede3181de0c0d01369`. Preparation and its limits are
 documented in the suite guide. Server files remain unchanged by this validation.
+
+The first attempt (`phase17d-validation-20261123`) was stopped shortly after
+queue startup: Shades expanded to include Druidic Ritual through its Herblore
+requirement. The corrected seed includes that unlock and matching QP. The old
+attempt supplies no acceptance results. A regression now runs the real AIO quest
+selection against every prepared case and requires exactly its target.
 
 ## Phase 17g
 
