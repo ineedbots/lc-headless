@@ -39,10 +39,15 @@ Skills are 75 melee, 85 hitpoints, 70 prayer, 60 magic/ranged, 65 fishing,
 50 cooking, 35 herblore and 40 mining/smithing/crafting/woodcutting/firemaking/
 thieving/agility/fletching. Banks hold one million coins, 1,000 lobsters,
 100 prayer potions(3), rune melee equipment, combat runes and ordinary tools.
-There are no additional case-specific items. Elemental Workshop must source
+Family Crest additionally receives one cooked Swordfish, Bass, Tuna, Salmon and
+Shrimps, plus two Rubies. Caleb's active decision branch requires banked cooked
+fish; the gem shop has only one Ruby per restock. The initial account stopped
+on missing fish and is excluded from accepted completion timings. A fresh
+replacement must run uninterrupted with the corrected preparation.
+Elemental Workshop must source
 its supplies and make the shield; Digsite must pass all exams and obtain its
 chemicals/tablet; Holy Grail must reclaim Excalibur and defeat the Titan; Family
-Crest must source its fish, jewellery and spells; Horror must repair the bridge,
+Crest must make its perfect jewellery and source its spells; Horror must repair the bridge,
 complete its own barcrawl, repair the lighthouse and defeat both bosses.
 No barcrawl, target quest flags or target quest items are seeded.
 

@@ -263,7 +263,7 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 | Elemental Workshop | Running | — |
 | Digsite Quest | Running | — |
 | Holy Grail | Running | — |
-| Family Crest | Running | — |
+| Family Crest | Initial run blocked: missing banked cooked fish; fresh replacement pending | — |
 | Horror from the Deep | Running | — |
 Preparation source: `9c8b946`. Pinned client:
 `build/e2e-binaries/phase17ef-initial.exe`, SHA-256
@@ -276,6 +276,12 @@ See [preparation limits](phase17f/README.md#preparation-and-limits).
 Quest session: `20261124T054351-run-1ad4`; source `4fe2e0d`.
 Accounts: `f17649fb3ew`, `f17649fb3ds`, `f17649fb3hg`, `f17649fb3fc`, `f17649fb3hd`.
 All seed results passed; 20-tick probes took 11.983–11.996 seconds.
+
+Initial Family Crest account `f17649fb3fc` stopped at stage 2 with
+`passed=false`, zero completions and zero deaths after Caleb's cooked-fish
+bank shortfall exhausted recovery. It is not an accepted completion. Preparation
+now includes five cooked fish and two ordinary Rubies (the gem shop stocks one).
+The other eight original quest accounts continue without interruption.
 
 
 ## Phase 17g

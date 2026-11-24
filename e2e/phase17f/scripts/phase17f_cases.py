@@ -22,4 +22,10 @@ def preparation_flags(quest):
 
 
 def preparation_items(quest):
+    # Caleb's live decision branch only withdraws cooked fish from the bank.
+    # Supply two ordinary rubies too: the gem shop stocks only one per restock.
+    if quest == 'crest':
+        return [('swordfish', 'Swordfish', 1), ('bass', 'Bass', 1),
+                ('tuna', 'Tuna', 1), ('salmon', 'Salmon', 1),
+                ('shrimp', 'Shrimps', 1), ('ruby', 'Ruby', 2)]
     return []

@@ -60,6 +60,14 @@ class Phase17fTests(unittest.TestCase):
             self.assertEqual(preparation_flags(quest), [])
             self.assertNotIn(quest, {row[0] for row in prerequisite_flags(quest)})
 
+    def test_family_crest_has_banked_ordinary_inputs(self):
+        supplies = {name: count for symbol, name, count in preparation_items('crest')}
+        for fish in ['Swordfish', 'Bass', 'Tuna', 'Salmon', 'Shrimps']:
+            self.assertEqual(supplies[fish], 1)
+        self.assertEqual(supplies['Ruby'], 2)
+        for quest in ['elemental_workshop', 'itexam', 'grail', 'horror']:
+            self.assertEqual(preparation_items(quest), [])
+
     def test_nonmembers_and_existing_characters_are_refused(self):
         with tempfile.TemporaryDirectory() as temporary:
             server = Path(temporary)
