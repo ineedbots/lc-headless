@@ -534,17 +534,20 @@ See the [preparation limits and rerun instructions](phase17h/README.md).
 
 ## Phase 17i
 
-Fresh Legends Quest preparation started on November 24, 2026, under the same
-issue and PR. This remains pending live validation.
+Fresh Legends Quest validation started on November 24, 2026, under the same
+issue and PR. Completion remains pending.
 
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
-| Legends Quest | `i179a9d20lq` | Preparing | Pending |
+| Legends Quest | `i179a9d20lq` | Running | Pending |
 
 Evidence root: `build/e2e/phase17i-validation-20261124`.
 The setup uses the same frozen binary, source and unchanged engine/content
 versions as phase 17h. All 45 seeded completed quests, totaling 107 QP, are
 listed in `phase17i/scripts/phase17i_cases.py`; the target is never advanced.
+Seed session `20261124T130201-seed-0b5f` passed all 45 prerequisite journals,
+107 initial QP and a 20-tick probe of 12,020 ms. Quest session
+`20261124T130709-run-a174` selected only Legends Quest.
 See the [preparation limits and rerun instructions](phase17i/README.md).
 
 For both suites, acceptance requires a newly completed single-target AIO queue,
