@@ -9,7 +9,7 @@ from rs2004.tabs import quests
 from rs2004.quests.data import quest_record
 from rs2004.quests.journal_text import normalize_journal
 from seed_helpers import send, stash
-from phase17c_cases import CASES, prerequisite_flags, initial_points
+from phase17c_cases import CASES, prerequisite_flags, initial_points, preparation_flags, preparation_items
 
 QUEST_IDS = list(CASES.values())
 started = False
@@ -41,11 +41,14 @@ def loop():
                 'iron_chainbody 1', 'bronze_med_helm 1', 'bronze_pickaxe 1', 'bronze_axe 1', 'knife 1',
                 'tinderbox 1', 'hammer 1', 'shears 1', 'spade 1', 'bucket_empty 1', 'pot_empty 1',
                 'mindrune 2000', 'airrune 4000', 'firerune 6000']
-    if target == 'eadgar':
-        supplies.append('ranarr_weed 1')
     for item in supplies:
         yield from send('give ' + item)
     yield from stash()
+    # Keep the twenty non-stackable Death Plateau supplies within pack capacity.
+    for symbol, name, count in preparation_items(target):
+        yield from send('give ' + symbol + ' ' + str(count))
+    if preparation_items(target):
+        yield from stash()
     chat.command('~bank')
     ok = yield from execution.delay_until(bank.is_open, 8000)
     assert ok, 'verification bank absent'
@@ -53,8 +56,8 @@ def loop():
     assert ok, 'verification bank contents absent'
     for name, count in [('Coins', 1000000), ('Lobster', 1000), ('Prayer potion(3)', 100), ('Rune chainbody', 1), ('Rune platelegs', 1), ('Rune longsword', 1), ('Iron chainbody', 1), ('Bronze med helm', 1), ('Mind rune', 2000), ('Air rune', 4000), ('Fire rune', 6000), ('Bucket', 1), ('Pot', 1), ('Hammer', 1), ('Shears', 1), ('Spade', 1), ('Knife', 1), ('Tinderbox', 1), ('Bronze pickaxe', 1), ('Bronze axe', 1)]:
         assert bank.count(name) >= count, 'missing seeded supply: ' + name
-    if target == 'eadgar':
-        assert bank.count('Ranarr weed') == 1, 'missing potion ingredient'
+    for symbol, name, count in preparation_items(target):
+        assert bank.count(name) >= count, 'missing preparation item: ' + name
     yield from bank.close()
     for id in targets:
         assert quests.status(quest_record(id).name) == 'not_started', 'preparation changed quest: ' + id
@@ -63,9 +66,8 @@ def loop():
     for id, variable, value in flags:
         assert id not in targets, 'must never seed the target quest'
         yield from send('setvar ' + variable + ' ' + str(value))
-    if target == 'eadgar':
-        # Exercise the quest handler's recovery of Eadgar rather than skip it.
-        yield from send('setvar troll_freed_eadgar 0')
+    for variable, value in preparation_flags(target):
+        yield from send('setvar ' + variable + ' ' + str(value))
     if flags:
         yield from send('setvar qp ' + str(initial_points(target)))
     assert quests.points() == initial_points(target), 'prerequisite quest points mismatch'

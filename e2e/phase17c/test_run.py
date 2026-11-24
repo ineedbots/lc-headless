@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import run as scenario
-from phase17c_cases import CASES, POINTS, initial_points, prerequisite_flags
+from phase17c_cases import CASES, POINTS, initial_points, prerequisite_flags, preparation_flags, preparation_items
 
 harness = scenario.harness
 
@@ -35,6 +35,21 @@ class Phase17cTests(unittest.TestCase):
                 self.assertEqual(initial_points(quest), sum(records[id]['quest_points'] for id in prerequisites))
         self.assertEqual(initial_points('eadgar'), 6)
         self.assertEqual(initial_points('biohazard'), 1)
+
+    def test_preparation_satisfies_food_policy_and_completed_death_plateau_door_state(self):
+        source = ast.parse((harness.REPO / 'src/Script/Stdlib/rs2004/quests/engine/preparation_policy.py').read_text())
+        supplies = next(node.value for node in source.body if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'SUPPLIES' for t in node.targets)).args[0]
+        death = next(value for key, value in zip(supplies.keys, supplies.values) if ast.literal_eval(key) == 'death')
+        required = dict(ast.literal_eval(item) for item in death.args)
+        stocked = {name: count for symbol, name, count in preparation_items('death')}
+        for name, count in required.items():
+            self.assertGreaterEqual(stocked.get(name, 0), count)
+        # The completed journal alone does not open the hut: its door checks map >= 2.
+        for quest in ['troll', 'eadgar']:
+            self.assertGreaterEqual(dict(preparation_flags(quest)).get('death_map', 0), 2)
+        self.assertEqual(preparation_flags('death'), [])
+        self.assertEqual(dict(preparation_flags('eadgar'))['troll_freed_eadgar'], 0)
+        self.assertEqual(preparation_items('eadgar'), [('ranarr_weed', 'Ranarr weed', 1)])
 
     def test_nonmembers_and_existing_characters_are_refused(self):
         with tempfile.TemporaryDirectory() as temporary:

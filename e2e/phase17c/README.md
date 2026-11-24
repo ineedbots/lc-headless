@@ -40,7 +40,9 @@ never modified by the launcher.
 ## Preparation and limits
 
 Each target is unstarted before and after preparation. Only the table's
-prerequisite completion flags and matching QP are set. Eadgar remains imprisoned
+prerequisite completion flags and matching QP are set. Completed Death Plateau
+also seeds `death_map=8`, the scouted path state needed to enter Tenzing's hut;
+its completion flag alone does not permit entry. Eadgar remains imprisoned
 on his case so the handler must free him; no target progress is seeded.
 
 Skills are 75 melee, 85 hitpoints, 70 prayer, 60 magic, 50 cooking and 40
@@ -49,6 +51,8 @@ also receives 35 herblore and one banked raw ranarr weed, because its handler
 requires a banked herb or unfinished potion. It must mix its own potion and
 obtain thistle, parrot, scarecrow ingredients, keys and goutweed.
 
+Death Plateau also receives 10 bread and 10 trout, required by the shared
+quest preparation policy; gathering these foods is outside this suite.
 Banks contain coins, lobsters, prayer potions, rune melee equipment, combat
 runes and ordinary tools. No climbing/spiked boots, iron bar, quest drinks,
 IOU, balls, map, certificate, keys, gas mask, plague samples, gown or priest

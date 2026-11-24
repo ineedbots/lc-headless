@@ -15,3 +15,16 @@ def prerequisite_flags(quest):
 
 def initial_points(quest):
     return sum([POINTS[row[0]] for row in prerequisite_flags(quest)])
+
+
+def preparation_flags(quest):
+    flags = [('death_map', 8)] if quest in ['troll', 'eadgar'] else []
+    if quest == 'eadgar':
+        flags.append(('troll_freed_eadgar', 0))
+    return flags
+
+
+def preparation_items(quest):
+    if quest == 'death':
+        return [('bread', 'Bread', 10), ('trout', 'Trout', 10)]
+    return [('ranarr_weed', 'Ranarr weed', 1)] if quest == 'eadgar' else []
