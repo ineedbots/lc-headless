@@ -238,6 +238,14 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 | Watch Tower | Pending | — |
 | Big Chompy Bird Hunting | Pending | — |
 | The Grand Tree | Pending | — |
+Preparation source: `9c8b946`. Pinned client:
+`build/e2e-binaries/phase17ef-initial.exe`, SHA-256
+`45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+Engine `2395c968473333d13ff1454f5eff452a18a029b6`, content
+`f32c62f66302f76b43c752ede3181de0c0d01369`; server unchanged.
+Raw evidence: `build/e2e/phase17e-validation-20261124/`.
+See [preparation limits](phase17e/README.md#preparation-and-limits).
+
 
 ## Phase 17f
 
@@ -251,6 +259,14 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 | Holy Grail | Pending | — |
 | Family Crest | Pending | — |
 | Horror from the Deep | Pending | — |
+Preparation source: `9c8b946`. Pinned client:
+`build/e2e-binaries/phase17ef-initial.exe`, SHA-256
+`45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+Engine `2395c968473333d13ff1454f5eff452a18a029b6`, content
+`f32c62f66302f76b43c752ede3181de0c0d01369`; server unchanged.
+Raw evidence: `build/e2e/phase17f-validation-20261124/`.
+See [preparation limits](phase17f/README.md#preparation-and-limits).
+
 
 ## Phase 17g
 
