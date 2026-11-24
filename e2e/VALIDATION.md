@@ -291,7 +291,7 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| Elemental Workshop | Blocked entering workshop: unreachable stair | — |
+| Elemental Workshop | Entrance repaired; fresh replacement running | — |
 | Digsite Quest | Per-account PASS, zero deaths | 44m 35s |
 | Holy Grail | Per-account PASS, zero deaths | 37m 27s |
 | Family Crest | Replacement completed with one death; acceptance failed | 53m 49s (not accepted) |
@@ -338,7 +338,16 @@ Raw diagnostic logs: `build/e2e/elemental-entrance-probe/client.log`.
 These diagnostic interventions on the previously blocked account are excluded
 from acceptance timing. Runtime regressions fail against the old binary and
 pass after the repair; focused quest decision/runtime specs and dialect lint
-pass. A fresh full-quest run remains pending. Server unchanged.
+pass. The full ported Python suite also passes (2,906 native assertions).
+Server unchanged. Fresh full-quest validation is running on `f17310b14ew`,
+root `build/e2e/phase17f-elemental-20261124/`, seed session
+`20261124T102418-seed-6049`, quest session `20261124T102614-run-5c91`.
+All five seed results passed; only Elemental Workshop was queued and started
+with zero QP and an unstarted target. Source
+`f564da7d9a23f52911c775fbc2d86d3c34497c92`; pinned binary
+`build/e2e-binaries/phase17f-elemental.exe`, SHA-256
+`d1d7ffb82adcb2e7c72a749d9da1c685914408a2c38f21c6ec63a595a78f5b98`.
+Full completion and uninterrupted timing remain pending.
 
 
 ## Phase 17g
