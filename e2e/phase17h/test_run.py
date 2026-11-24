@@ -60,8 +60,17 @@ class Phase17hTests(unittest.TestCase):
 
     def test_preparation_does_not_advance_any_target(self):
         for quest in CASES.values():
-            self.assertEqual(preparation_flags(quest), [])
+            allowed = {'ibanmulti'} if quest == 'regicide' else set()
+            self.assertEqual({name for name, value in preparation_flags(quest)}, allowed)
             self.assertNotIn(quest, {row[0] for row in prerequisite_flags(quest)})
+
+    def test_completed_pass_preparation_opens_each_persistent_gate(self):
+        mask = dict(preparation_flags('regicide'))['ibanmulti']
+        self.assertTrue(mask & (1 << 11), 'cave entry requires Lathas started bit')
+        self.assertEqual((mask >> 5) & 15, 15, 'well requires all four burned orbs')
+        for bit in [14, 15, 16, 18]:
+            self.assertTrue(mask & (1 << bit), 'temple requires every crest and horn')
+        self.assertEqual(preparation_flags('upass'), [])
 
     def test_preparation_supplies_match_the_dungeon_profile(self):
         for quest in CASES.values():

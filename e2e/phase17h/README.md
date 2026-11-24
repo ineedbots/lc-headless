@@ -9,7 +9,11 @@ Run each target on a fresh scratch account through the real
 | `rg` | Regicide | Plague City, Biohazard, Underground Pass | 9 | 12 |
 
 Targets remain unstarted. Seeded prerequisite journals and their summed QP are
-verified. Regicide must wait for its messenger and traverse the pass itself;
+verified. Regicide preparation also sets Underground Pass's persistent
+`ibanmulti` bits 5–8, 11, 14–16 and 18: burned orbs, cave entry, paladin crests
+and unicorn horn. These prerequisite gates remain open after real completion;
+the completed journal flag alone does not open them.
+Regicide must wait for its messenger and traverse the pass itself;
 no summons, target flags, trap solutions, quest items or bomb components are seeded.
 
 ## Prepare and run

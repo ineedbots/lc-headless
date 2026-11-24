@@ -16,7 +16,11 @@ def initial_points(quest):
 
 
 def preparation_flags(quest):
-    return []
+    # Completing the prerequisite also persists cave entry, four burned orbs,
+    # three paladin crests and the unicorn horn. Its journal flag alone does not.
+    # These are Underground Pass gates, never Regicide target progress.
+    bits = [5, 6, 7, 8, 11, 14, 15, 16, 18]
+    return [('ibanmulti', sum([1 << bit for bit in bits]))] if quest == 'regicide' else []
 
 
 def preparation_items(quest):
