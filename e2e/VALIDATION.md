@@ -506,3 +506,129 @@ SHA-256: `30e876535dbdfb328c58e5179ea27a2b87b26dac68b9babc7a648f3d9af04c88`.
 Binary SHA-256: `e0bc1defada67cb31967ddd30fd9679cad77470ab4c4cc1a1f2c73c0ded21017`.
 Engine/content remained `2395c968` / `f32c62f6`, unchanged. Raw setup, logs and
 provenance: `build/e2e/biohazard-hq-20261123`.
+
+## Phase 17h
+
+Fresh local-289 acceptance completed on November 24, 2026, for
+[#160](https://github.com/ineedbots/lc-headless/issues/160), in
+[PR #161](https://github.com/ineedbots/lc-headless/pull/161).
+Both quests passed on fresh replacement accounts after the repairs below.
+
+| Quest | Account | Result | Time taken | Final QP |
+|---|---|---|---|---|
+| Underground Pass | `h174f033fup` | PASS, zero deaths | 41m 40s | 9 |
+| Regicide | `h176ebc68rg` | PASS, zero deaths | 1h 20m 47s | 12 |
+
+Each accepted account had exactly one selected target, one newly completed quest,
+a complete journal, queue done 1 / stuck 0 / total 1, expected QP, final banking
+and clean logout. Each selected launcher passed and exited cleanly. These are
+**two uninterrupted individual runs in separate sessions**; the original two-account
+phase 17h launcher failed and is excluded. Spare accounts used only for preparation
+are outside quest acceptance. No manual pauses, resumes or restarts occurred in
+the accepted runs; Regicide's quest-owned messenger relog is part of its workflow.
+
+| Quest | Queue start (UTC, November 24) | Passing result (UTC) | Seconds |
+|---|---|---|---|
+| Underground Pass | 19:38:36.240 | 20:20:15.825 | 2499.585 |
+| Regicide | 19:22:30.234 | 20:43:17.038 | 4846.804 |
+
+Time taken includes quest preparation performed by AIO and final banking, from
+its first per-account queue log through `E2E_RESULT`. It excludes seeding and
+login staggering. Whole-second labels round the measured elapsed seconds.
+
+Accepted evidence:
+
+- Underground Pass: `build/e2e/phase17h-upass-v2-20261124`, seed
+  `20261124T133635-seed-b6fc`, quest `20261124T133834-run-f1b8`.
+  Prepared/session source `5c92c41ce3c3791b94edffd1249365a375913c7e`.
+  Target unstarted with 4 initial QP; 20 ticks took 11,988 ms.
+  Frozen client `build/e2e-binaries/phase17h-brew.exe`, SHA-256
+  `830cb5de5384d7c304db9faae6416c7221de38662ca10121b6b3ac0281132712`.
+  Clean logout at 20:20:16.442 UTC.
+- Regicide: `build/e2e/phase17h-regicide-v2-20261124`, seed
+  `20261124T132028-seed-d0a8`, quest `20261124T132228-run-0bf9`.
+  Prepared source `4da00fd384148a0a1ba80e92e934a1c22b468c60`, session source
+  `fdc0b686c47f2be83cbb6ee8bb9a4bc4aadbd5b6` (documentation-only difference).
+  Target unstarted with 9 initial QP; 20 ticks took 11,997 ms.
+  Frozen client `build/e2e-binaries/phase17hi-initial.exe`, SHA-256
+  `9f548464cbb02672694722469c4cea57c4b066ba6300661da7b57a12f3079546`.
+  Clean logout at 20:43:17.637 UTC.
+
+The [setup guide](phase17h/README.md) discloses stats, ordinary supplies,
+infinite run and completed prerequisites. Regicide additionally receives sharks
+and Underground Pass's persistent `ibanmulti=379360` gates: bits 5–8 (burned
+orbs), 11 (cave entry), 14–16 (paladin crests) and 18 (unicorn horn).
+These represent completed prerequisite progress; no Regicide progress or quest
+items are seeded. The Underground Pass target receives none of these bits.
+
+Failed attempts and repairs:
+
+- Original `h17270e59rg` reached Regicide stage 2 but could not enter the cave:
+  its completed Underground Pass journal flag alone did not open the separate
+  persistent gates. Only that account was stopped at 19:19:38 UTC, incomplete
+  with zero deaths. Fix `4da00fd` supplies the prerequisite gate bits and adds
+  a regression for cave, orb-well and paladin-door requirements.
+- Original `h17270e59up` reached stage 7 but stood at `(2327,9801,0)` outside
+  the brew hut. Its three-tile arrival radius accepted a stand through the north
+  wall, so bucket use repeatedly failed. Bounded retries and safe-exit recovery
+  ended the account at 19:31:11 UTC, incomplete with zero deaths and 4 QP.
+  Fix `5c92c41` walks to `(2326,9799,0)`, inside the hut, via the existing door
+  route. The runtime regression fails before the change and passes after it.
+
+Original evidence: `build/e2e/phase17h-validation-20261124`, seed
+`20261124T130003-seed-e3c8`, failed quest session `20261124T130201-run-dad0`.
+Neither original account contributes an accepted completion time.
+
+A focused live brew leg on the stopped original account opened/crossed the door
+at `(2325,9801,0)`, filled the bucket and logged out cleanly. Its 6.001-second
+result at 19:35:35.623–19:35:41.624 UTC is **leg-only**, excluded from full-quest
+timing. No quest flags, positions or items were seeded for this diagnostic.
+Evidence: `build/e2e/upass-brew-probe-20261124` and
+`build/upass-brew-leg-stdout.log`.
+
+Engine/content remained unchanged at
+`2395c968473333d13ff1454f5eff452a18a029b6` /
+`f32c62f66302f76b43c752ede3181de0c0d01369`. Normal 600 ms ticks were verified.
+Release build, seven phase 17h launcher tests, changed-file dialect lint, focused
+runtime regression and full ported Python suite (2,906 native assertions) passed.
+
+## Phase 17i
+
+Fresh Legends Quest acceptance completed on November 24, 2026, under the same
+issue and PR, in its original uninterrupted session.
+
+| Quest | Account | Result | Time taken | Final QP |
+|---|---|---|---|---|
+| Legends Quest | `i179a9d20lq` | PASS, zero deaths | 1h 46m 36s | 111 |
+
+The account selected only Legends Quest, recorded one newly completed quest,
+a complete journal, queue done 1 / stuck 0 / total 1 and expected 111 QP.
+It completed the final bank return and logged out cleanly at 20:53:48.239 UTC;
+the selected launcher passed and exited cleanly. No manual intervention, pause,
+resume or restart occurred. Queue start: 19:07:11.643 UTC; passing result:
+20:53:47.643 UTC; elapsed: **6396.000 seconds**. Timing follows phase 17h's
+queue-to-result convention.
+
+Evidence: `build/e2e/phase17i-validation-20261124`, seed
+`20261124T130201-seed-0b5f`, quest `20261124T130709-run-a174`.
+Prepared source `914a7c85bc5a6a85625f47c7ae71d1014cd0b512`, session source
+`383325e8366ad3e6215b8c469de829d30bab1929` (documentation-only difference).
+Frozen client `build/e2e-binaries/phase17hi-initial.exe`, SHA-256
+`9f548464cbb02672694722469c4cea57c4b066ba6300661da7b57a12f3079546`.
+Engine/content versions match phase 17h and were left unchanged.
+
+Preparation verified all 45 completed prerequisite/QP-gate journals, totaling
+107 initial QP, with Legends unstarted. The 20-tick probe took 12,020 ms.
+The [setup guide](phase17i/README.md) and `scripts/phase17i_cases.py` list all
+preparation, including ordinary gems, lockpicks, orbs, cosmic runes and rune axe.
+No target quest flags or target quest items were seeded. Six phase 17i launcher
+tests, focused runtime checks and setup dialect lint passed.
+
+All three accepted launchers retain `results.json`, `version.json`, client logs
+and per-root `timings.json`. An independent audit checked result/queue/QP fields,
+exactly one queue/result per account, matching snapshots and binary hashes,
+clean logout, launcher PASS and empty launcher stderr. Combined report:
+`build/e2e/phase17hi-final-results.json`. The failed original phase 17h launcher
+is not an aggregate pass. All quest accounts are now logged out.
+These suites cover prepared quest completion; Kharazi/Isafdar clue workflows
+from historical issue #34 are outside this request.

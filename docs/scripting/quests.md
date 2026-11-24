@@ -383,6 +383,7 @@ Both own their inventories and declare `resume_at` over the pockets a walk can't
 The live run added these departures from rs2b0t:
 
 - **Underground Pass**
+    - Filling dwarf brew walks to the west side of the barrel inside the hut; being within three tiles outside its north wall does not make it usable.
     - A crossing sends its op to the loc cardinal to its stand, as a row of ledges ties by distance and the diagonal one refuses.
     - A crossing still landing is waited out, and a step back onto the walkable graph asks again whether the rest can be walked, so a tunnel door beside the target isn't taken by accident.
     - Fights renew a lapsed attack and eat as they go, since a second paladin engaging lapses the first attack.
