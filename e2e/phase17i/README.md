@@ -7,6 +7,10 @@ Run Legends Quest on its own fresh scratch account through the real
 |---|---|---|---|---|
 | `lq` | Legends Quest | Required ancestors plus explicit QP-gate preparation | 107 | 111 |
 
+The fresh uninterrupted account passed in **1h 46m 36s**, with zero deaths,
+111 final QP and clean logout. See the
+[validation evidence](../VALIDATION.md#phase-17i).
+
 The complete preparation list is the `FLAGS` table in
 [phase17i_cases.py](scripts/phase17i_cases.py). Its 45 completed quests sum to
 107 QP; each journal and the total are verified before the target runs. The list

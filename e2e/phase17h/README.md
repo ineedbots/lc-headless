@@ -8,6 +8,11 @@ Run each target on a fresh scratch account through the real
 | `up` | Underground Pass | Plague City, Biohazard | 4 | 9 |
 | `rg` | Regicide | Plague City, Biohazard, Underground Pass | 9 | 12 |
 
+Fresh uninterrupted replacements passed Underground Pass in **41m 40s** and
+Regicide in **1h 20m 47s**, both with zero deaths and clean logout. See the
+[validation evidence](../VALIDATION.md#phase-17h), including the failed original
+attempts and their repairs.
+
 Targets remain unstarted. Seeded prerequisite journals and their summed QP are
 verified. Regicide preparation also sets Underground Pass's persistent
 `ibanmulti` bits 5–8, 11, 14–16 and 18: burned orbs, cave entry, paladin crests
