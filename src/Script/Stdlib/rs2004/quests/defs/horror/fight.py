@@ -192,8 +192,11 @@ def _fight_rounds(plan, prayers, state, log):
             yield from prayers.hold()
             continue
         if hungry():
+            before = [(item.id, item.count) for item in inventory.items()]
             yield from sustain.run()
-            continue
+            # An empty pack or a failed eat must not suppress every attack.
+            if [(item.id, item.count) for item in inventory.items()] != before:
+                continue
         if plan.melee is not None and plan.melee(target):
             # Already swinging at this form: the op stands, so don't re-target.
             if target.index == meleeing and game.facing() == ('npc', target.index):

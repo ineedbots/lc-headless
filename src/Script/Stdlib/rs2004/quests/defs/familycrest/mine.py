@@ -1,11 +1,13 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/familycrest/mine.ts (MIT, see thirdparty/rs2b0t)."""
 
+import _core
 from rs2004 import execution
 from rs2004.catalogs.record import Record
 from rs2004.catalogs.tasks import sustain
 from rs2004.dialogue import chat_dialog
 from rs2004.entities import locs
-from rs2004.game import game
+from rs2004.execution import event_signal
+from rs2004.game import game, skills
 from rs2004.geometry import Tile
 from rs2004.items import inventory
 from rs2004.messages import game_messages
@@ -293,7 +295,14 @@ def mine_perfect_gold(log):
         before = held_id(FC_ID.PERFECT_GOLD_ORE)
         if not (rock.interact('Mine')):
             continue
-        yield from execution.delay_until(lambda: held_id(FC_ID.PERFECT_GOLD_ORE) > before, 20000)
+        # Hellhounds keep attacking during the mining roll. A bare 20-second
+        # wait can kill an account that still has food in its pack.
+        deadline = _core.step_time() + 20000
+        while held_id(FC_ID.PERFECT_GOLD_ORE) <= before and _core.step_time() < deadline:
+            if event_signal.pending() or skills.effective('hitpoints') <= 0:
+                return False
+            yield from sustain.run()
+            yield from execution.delay_ticks(1)
     return held_id(FC_ID.PERFECT_GOLD_ORE) >= PERFECT_ORE_NEEDED
 
 

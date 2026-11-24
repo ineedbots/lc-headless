@@ -343,6 +343,7 @@ def decide(snap):
 familycrest = QuestModule(**{
     'auto_retaliate': lambda snap: not in_chronozon_lair(snap.tile),
     'record': quest_record('crest'),
+    'pray': Record({'protect': 'melee', 'potions': 2}),
     'bank': 'nearest',
     'owns_inventory': True,
     'tools': ['coins', 'ruby', 'ring mould', 'necklace mould', 'antipoison'],

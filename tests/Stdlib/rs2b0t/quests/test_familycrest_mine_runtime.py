@@ -232,3 +232,42 @@ def chronozon_finish():
 
 
 test('Chronozon requires landed blasts and the last crest before all fragments combine', chronozon_finish)
+
+
+def eats_while_waiting_for_perfect_gold():
+    scene = Scene(FC_LOC.GOLD_STAND)
+    scene.mining = False
+    scene.mining_upkeep = 0
+    def upkeep():
+        if scene.mining:
+            scene.mining_upkeep += 1
+        yield
+    spy_on(mine.sustain, 'run', impl=upkeep)
+    def ore_arrives():
+        scene.item(FC_ID.PERFECT_GOLD_ORE, FC_ITEM.PERFECT_GOLD_ORE)
+        scene.mining = False
+    def start_mining(op):
+        scene.mining = True
+        scene.after_wait.append(ore_arrives)
+    scene.loc('Rock', ['Mine'], id=2098, effect=start_mining)
+    expect(run_wait(mine.mine_perfect_gold(scene.log))).to_be(True)
+    expect(scene.mining_upkeep).to_be_greater_than_or_equal(2)
+
+
+test('food upkeep continues between a mining click and the perfect ore arriving', eats_while_waiting_for_perfect_gold)
+
+
+def mining_stops_on_interruption():
+    scene = Scene(FC_LOC.GOLD_STAND)
+    scene.interrupted = False
+    clicks = [0]
+    spy_on(mine.event_signal, 'pending', impl=lambda: scene.interrupted)
+    def interrupt(op):
+        clicks[0] += 1
+        scene.interrupted = True
+    scene.loc('Rock', ['Mine'], id=2098, effect=interrupt)
+    expect(run_wait(mine.mine_perfect_gold(scene.log))).to_be(False)
+    expect(clicks[0]).to_be(1)
+
+
+test('the mining wait yields to an interruption without clicking more rocks', mining_stops_on_interruption)

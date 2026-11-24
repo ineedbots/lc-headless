@@ -36,10 +36,11 @@ SEERS_BANK = Tile(2725, 3491, 0)
 BOOKCASE = Tile(2716, 3481, 0)
 # House south of the smithy often has a ground Knife near the range.
 KNIFE_SPAWN = Tile(2714, 3477, 0)
-# Outside the Seers smithy, walkable stand; the odd-looking wall tile itself is blocked.
-SMITHY = Tile(2709, 3499, 0)
-# Spiral stairs land at 0_42_54_21_41, i.e. (2709, 3497). Approach from the west.
-STAIRS_TOP = Tile(2708, 3497, 0)
+# Approach the odd-looking wall from outside its south face.
+SMITHY = Tile(2709, 3494, 0)
+# The 2x2 stairs at (2710,3497), angle 2, forbid the west approach.
+# Stand immediately south, inside the wall, before sending Climb-down.
+STAIRS_TOP = Tile(2710, 3496, 0)
 # Spiral stairs land at 0_42_154_28_32, i.e. (2716, 9888).
 WORKSHOP_ARRIVAL = Tile(2716, 9888, 0)
 # West chamber approach; the rock loc tile itself is unwalkable.

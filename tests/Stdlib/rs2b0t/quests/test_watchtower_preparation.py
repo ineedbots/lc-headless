@@ -162,3 +162,18 @@ def supplies_before_special_areas():
 
 
 test('banked cave payments and potion ingredients are withdrawn before reissuing supplies', supplies_before_special_areas)
+
+
+def tribal_food_reserve():
+    state = snap(2).with_fields({'bank': {'lobster': 30}, 'free_slots': 24})
+    step = wt.stage_tribes(state, 'yanille')
+    expect(step.kind).to_be('withdraw')
+    expect(step.items[0]['name']).to_be('Lobster')
+    expect(step.items[0]['qty']).to_be(8)
+    state = state.with_fields({'inv': {'lobster': 4}})
+    expect(wt.stage_tribes(state, 'yanille').name).to_be('talk to Og')
+    state = state.with_fields({'inv': {'lobster': 3}})
+    expect(wt.stage_tribes(state, 'tobanCamp').name).to_be("leave Toban's camp")
+
+
+test('tribal errands carry food and leave hostile pockets before restocking', tribal_food_reserve)

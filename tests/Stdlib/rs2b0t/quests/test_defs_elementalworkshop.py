@@ -385,3 +385,15 @@ def _fn33():
 
 
 describe('Elemental Workshop supplies helpers', _fn33)
+
+
+def leaves_to_bank_crate_junk():
+    state = snap(Record({'stage': EW_STAGE.ENTERED, 'tile': WORKSHOP,
+                         'free_slots': 0, 'inv': ['Buttons', 'Old boot']}))
+    step = decide(state)
+    expect(step.name).to_be('leave workshop to bank crate junk')
+    surface = state.with_fields({'tile': SEERS})
+    expect(decide(surface).kind).to_be('deposit')
+
+
+test('a full junk pack exits the workshop and banks before collecting more supplies', leaves_to_bank_crate_junk)

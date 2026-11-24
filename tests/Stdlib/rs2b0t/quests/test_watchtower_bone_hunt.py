@@ -47,7 +47,7 @@ def hunt_world(mode):
         scene.at = Tile(2946, 3369, 0)
         return behavior != 'exit'
         yield
-    def deposit(predicate, log=None):
+    def deposit(predicate):
         scene.pack = [item for item in scene.pack if not predicate(item.name, item.id)]
         return True
         yield

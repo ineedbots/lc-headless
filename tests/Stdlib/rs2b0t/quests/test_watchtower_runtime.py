@@ -715,3 +715,24 @@ def east_exit():
 
 
 test('the paid east gate opens for the return trip', east_exit)
+
+
+def delayed_toban_scene():
+    scene = world(tribes)
+    spy_on(tribes, 'enter_toban_camp', impl=answer(True))
+    attempts = [0]
+    def approach(*args, **kwargs):
+        attempts[0] += 1
+        return 'retry' if attempts[0] < 3 else 'done'
+        yield
+    spy_on(tribes.reach, 'npc_dialog', impl=approach)
+    talks = spy_on(tribes, 'talk_strict', impl=answer(True))
+    expect(run_wait(tribes.talk_to_toban(scene.log))).to_be(True)
+    expect(attempts[0]).to_be(3)
+    expect(len(talks.calls)).to_be(1)
+    spy_on(tribes.reach, 'npc_dialog', impl=answer('retry'))
+    expect(run_wait(tribes.talk_to_toban(scene.log))).to_be(False)
+    expect(len(talks.calls)).to_be(1)
+
+
+test('Toban dialogue retries a newly loaded camp without leaving it', delayed_toban_scene)

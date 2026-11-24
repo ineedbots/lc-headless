@@ -164,7 +164,7 @@ def source_food(snap, want):
         stocked = snap.bank.get(food.lower(), 0) if snap.bank is not None else 0
         if stocked > 0:
             return Record({'kind': 'withdraw', 'items': [{'name': food, 'qty': min(want - carried, stocked, room)}], 'bank': WT_TILE.YANILLE_BANK})
-    return Record({'kind': 'wait', 'reason': 'no food in the bank for the shaman enclave'})
+    return Record({'kind': 'wait', 'reason': 'no food in the bank for Watch Tower'})
 
 
 QUEST_ITEMS = [getattr(WT_ITEM, key) for key in WT_ITEM.keys()]

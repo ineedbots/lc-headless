@@ -227,6 +227,171 @@ the Release client builds, and the complete ported Python suite passes with
 2,906 assertions. All eleven CI checks passed at `07f6e9a`; subsequent changes
 in this evidence update are documentation only.
 
+## Phase 17e
+
+All 4 targets have fresh, uninterrupted **individual passes**, with
+zero deaths, complete journals, exactly one completion per account, no stuck
+queue entries, expected final QP, final bank return and clean logout. Tracks
+[#158](https://github.com/ineedbots/lc-headless/issues/158) and
+[PR #159](https://github.com/ineedbots/lc-headless/pull/159).
+
+| Quest | Account | Result | Time taken | Final QP |
+|---|---|---|---|---|
+| The Tourist Trap | `e17989d00tt` | PASS, zero deaths | 27m 03s | 2 |
+| Watch Tower | `e17713b4ewt` | PASS, zero deaths | 2h 46m 19s | 8 |
+| Big Chompy Bird Hunting | `e17989d00cb` | PASS, zero deaths | 24m 16s | 2 |
+| The Grand Tree | `e17989d00gt` | PASS, zero deaths | 36m 07s | 5 |
+
+| Quest | Queue start (UTC) | Passing result (UTC) | Seconds |
+|---|---|---|---|
+| The Tourist Trap | 2026-11-24T11:43:43.765Z | 2026-11-24T12:10:46.750Z | 1622.985 |
+| Watch Tower | 2026-11-24T13:03:07.121Z | 2026-11-24T15:49:25.741Z | 9978.620 |
+| Big Chompy Bird Hunting | 2026-11-24T11:43:36.536Z | 2026-11-24T12:07:52.759Z | 1456.223 |
+| The Grand Tree | 2026-11-24T11:43:40.733Z | 2026-11-24T12:19:47.927Z | 2167.194 |
+
+Timings start at the first per-account queue entry and end at the passing
+`E2E_RESULT`, including final banking and excluding seeding/login staggering.
+The combined independently verified report is
+`build/e2e/phase17ef-final-results.json`. Each accepted account has exactly one
+quest session, one queue start, one final result and an unstarted target at seed
+completion. Failed, interrupted and diagnostic attempts are excluded.
+
+The three initial non-Watch-Tower accounts passed and logged out before the
+original Watch Tower failure caused their shared client to exit 1. Thus these
+are individual account passes; the original four-account launcher did not pass.
+The fresh Watch Tower replacement's launcher passed with a clean process exit.
+
+Preparation: [phase 17e guide](phase17e/README.md#preparation-and-limits).
+Watch Tower seeds Druidic Ritual, Guam leaf, Bat bones and Gold bar; its fresh
+replacement also seeds an ordinary Dragonfire shield. Dragon bones and all
+quest-specific materials are obtained live. Other targets seed no completed
+quest prerequisites or special materials. Standard prepared stats/supplies and
+per-account infinite run apply. Normal 600 ms ticks were verified by 20-tick
+probes taking 11.991–12.023 seconds initially and 11.997–12.010 seconds in the
+Watch Tower replacement suite.
+
+Original Watch Tower failure: one real death near Toban at
+`2026-11-24T12:00:31.109Z`, with no food and repeated camp entry/approach retries,
+followed later by a `deposit_all_matching` argument-count error in dragon-hunt
+cleanup. The repair replenishes eight food below a four-item reserve, retries
+pending Toban approaches within the same visit, and uses the bank API's single
+predicate argument. The regression mock enforces that signature. Fresh Watch
+Tower passed after those repairs; the failed original account is excluded.
+
+Accepted evidence and versions:
+
+- `build/e2e/phase17e-validation-20261124/`, session `20261124T054333-run-71ac`. Preparation source
+  `9c8b946c3a16c3c8daea180dd38c031171f08bb5`, quest-session source
+  `4fe2e0d4cc37602eb3e00952c097c790e860ade0`, binary SHA-256
+  `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+- `build/e2e/phase17e-watchtower-20261124/`, session `20261124T070305-run-0967`. Preparation source
+  `c65c005d9fc98d29af5ac540e6e45e775af1957a`, quest-session source
+  `c65c005d9fc98d29af5ac540e6e45e775af1957a`, binary SHA-256
+  `eda7edb173bf5b8b5a69066306feca356d6e98a5ca8618a50ea96b380e9f50c3`.
+
+Engine `2395c968473333d13ff1454f5eff452a18a029b6`, content
+`f32c62f66302f76b43c752ede3181de0c0d01369`; server implementation unchanged.
+Local Release build, relevant launcher checks, focused runtime regressions,
+dialect lint and full ported Python suite (2,906 native assertions) passed.
+Regressions reproduced the old failures before the fixes. CI status belongs
+to its checked commit; this evidence does not imply checks on a later commit.
+
+## Phase 17f
+
+All 5 targets have fresh, uninterrupted **individual passes**, with
+zero deaths, complete journals, exactly one completion per account, no stuck
+queue entries, expected final QP, final bank return and clean logout. Tracks
+[#158](https://github.com/ineedbots/lc-headless/issues/158) and
+[PR #159](https://github.com/ineedbots/lc-headless/pull/159).
+
+| Quest | Account | Result | Time taken | Final QP |
+|---|---|---|---|---|
+| Elemental Workshop | `f17b5c196ew` | PASS, zero deaths | 22m 52s | 1 |
+| Digsite Quest | `f17649fb3ds` | PASS, zero deaths | 44m 35s | 6 |
+| Holy Grail | `f17649fb3hg` | PASS, zero deaths | 37m 27s | 8 |
+| Family Crest | `f17378cd6fc` | PASS, zero deaths | 48m 25s | 1 |
+| Horror from the Deep | `f17378cd6hd` | PASS, zero deaths | 1h 24m 04s | 2 |
+
+| Quest | Queue start (UTC) | Passing result (UTC) | Seconds |
+|---|---|---|---|
+| Elemental Workshop | 2026-11-24T17:19:00.524Z | 2026-11-24T17:41:52.148Z | 1371.624 |
+| Digsite Quest | 2026-11-24T11:43:54.520Z | 2026-11-24T12:28:29.935Z | 2675.415 |
+| Holy Grail | 2026-11-24T11:44:07.131Z | 2026-11-24T12:21:34.143Z | 2247.012 |
+| Family Crest | 2026-11-24T16:37:43.120Z | 2026-11-24T17:26:08.375Z | 2905.255 |
+| Horror from the Deep | 2026-11-24T16:37:46.132Z | 2026-11-24T18:01:49.734Z | 5043.602 |
+
+Timings start at the first per-account queue entry and end at the passing
+`E2E_RESULT`, including final banking and excluding seeding/login staggering.
+The combined independently verified report is
+`build/e2e/phase17ef-final-results.json`. Each accepted account has exactly one
+quest session, one queue start, one final result and an unstarted target at seed
+completion. Failed, interrupted and diagnostic attempts are excluded.
+
+The original phase 17f launcher correctly rejected the failed Elemental,
+Family Crest and Horror accounts, although Digsite and Holy Grail passed and
+logged out individually. The accepted replacements have separate clean launcher
+passes: one for Elemental Workshop and one shared by Family Crest/Horror.
+No aggregate pass is claimed for the original five-account launcher.
+
+Preparation: [phase 17f guide](phase17f/README.md#preparation-and-limits).
+Digsite seeds Druidic Ritual; Holy Grail seeds Merlin's Crystal. Family Crest
+supplies five ordinary cooked fish and two Rubies, because its active Caleb
+branch expects banked fish and the gem shop stocks one Ruby per restock.
+Other quest materials are obtained live. Target progress and Horror's barcrawl
+are not seeded. Standard prepared stats/supplies and infinite run apply;
+no max-stat workaround was used. Normal 600 ms ticks were verified by 20-tick
+probes: initial suite 11.983–11.996 seconds, survival replacements
+11.987–12.010 seconds. The fresh Elemental v2 seed also passed its tick probes.
+
+Failures and repairs retained as evidence:
+
+- Initial Family Crest stopped on missing banked cooked fish; preparation was
+  corrected. Its first replacement completed in 53m49s with a real death in the
+  perfect-gold mine at `2026-11-24T12:20:07.111Z`. A 20-second ore wait skipped
+  food upkeep despite carried food. The repair runs upkeep each tick, stops on
+  runtime interruption/death, and enables melee protection for mine attackers.
+  The accepted fresh replacement passed with the same combat profile.
+- Initial Horror completed in 1h31m39s with a real death during the mother fight
+  at `2026-11-24T13:00:27.507Z`. Shared melee prayer upkeep conflicted with the
+  fight's missile protection. The fights now own their protection prayer; an
+  empty food check also no longer suppresses every attack. The accepted fresh
+  replacement passed both fights with zero deaths.
+- Initial Elemental Workshop was blocked at the entrance. A focused live
+  diagnostic on the stopped account reproduced the bad west stand and verified
+  the corrected route: approach the wall from `(2709,3494,0)`, then the exact
+  inside south stair stand `(2710,3496,0)`. The actual 2x2 stair is loc 3415 at
+  `(2710,3497,0)`, angle 2; its rotated approach restriction forbids the west.
+  Diagnostic log: `build/e2e/elemental-entrance-probe/client.log`.
+- The first Elemental replacement was interrupted after the user spotted a full
+  junk pack from generic crate searches. Searches now target only loc 3394
+  (bowl), 3397 (leather) and 3395 (needle), approach before searching, reserve
+  reward space, and bank cramped junk packs before more supplies/coal.
+  Its disclosed diagnostic resumes banked the junk, repaired the bellows and
+  completed with zero deaths at `2026-11-24T17:20:34.735Z`; those interrupted
+  sessions are excluded from accepted timing. The separate fresh v2 passed.
+
+Accepted evidence and versions:
+
+- `build/e2e/phase17f-elemental-v2-20261124/`, session `20261124T111858-run-23e6`. Preparation source
+  `2dca84eb067b7c96c24d90b100f7f444d395ab11`, quest-session source
+  `ce7e02fb57af0595c015e3a7748d4b9157263c6b`, binary SHA-256
+  `9f548464cbb02672694722469c4cea57c4b066ba6300661da7b57a12f3079546`.
+- `build/e2e/phase17f-validation-20261124/`, session `20261124T054351-run-1ad4`. Preparation source
+  `9c8b946c3a16c3c8daea180dd38c031171f08bb5`, quest-session source
+  `4fe2e0d4cc37602eb3e00952c097c790e860ade0`, binary SHA-256
+  `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+- `build/e2e/phase17f-survival-20261124/`, session `20261124T103741-run-db67`. Preparation source
+  `aea870cb7eec475e5dd927cd7b522c2ba4358f40`, quest-session source
+  `8d13c0a4d7423132b44437905e1cb6c4d382a744`, binary SHA-256
+  `1e45cafa63d5ccc43e66d1b5d93773f1cbfcb1b1677ae18f541bf79bfaa63c07`.
+
+Engine `2395c968473333d13ff1454f5eff452a18a029b6`, content
+`f32c62f66302f76b43c752ede3181de0c0d01369`; server implementation unchanged.
+Local Release build, relevant launcher checks, focused runtime regressions,
+dialect lint and full ported Python suite (2,906 native assertions) passed.
+Regressions reproduced the old failures before the fixes. CI status belongs
+to its checked commit; this evidence does not imply checks on a later commit.
+
 ## Phase 17g
 
 [Suite](phase17g/README.md) · [PR #146](https://github.com/ineedbots/lc-headless/pull/146)

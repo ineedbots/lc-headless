@@ -271,6 +271,8 @@ The live run added more departures from rs2b0t:
 - **Watch Tower**
     - Its own inventory is left alone by the engine, so while it is still collecting its kit a full pack banks everything except quest items, food and prayer potions.
     - It fights Gorad, swinging and eating, rather than waiting for his tooth.
+    - Tribal errands replenish food to eight when fewer than four remain, leaving a sealed pocket before banking. Toban's dialogue retries a pending NPC approach within the same camp visit.
+    - The dragon-bone hunt requires a Dragonfire shield and a one-handed melee weapon. Cleanup preserves the Dragon bones while depositing the other backpack items through the bank API.
     - It asks Og, Toban and then Grew for replacement relic parts lost in a death. A part the wizard answers "I already have that part" is not offered again.
     - It buys the riddle's death rune from Aubury when Magic is under the Magic Guild's 66.
     - It draws no more enclave food than the pack has room for.
@@ -311,8 +313,11 @@ Each keeps rs2b0t's package. Elemental Workshop, Digsite Quest, Family Crest and
 
 The live run added these departures from rs2b0t:
 
-- **Family Crest** kills whatever else is hitting the account before it casts at Chronozon, since the lair is single-way and the server refuses the cast otherwise.
+- **Elemental Workshop** approaches the keyed wall from its south face and requires the exact inside stand south of the stairs before climbing. A visible staircase after a failed approach does not trigger a climb. Supply searches target the three quest crate ids and approach each crate before waiting for its reward; cramped packs leave to bank junk before collecting more materials.
+- **Family Crest** runs food and prayer upkeep every tick while waiting for perfect gold, and uses melee protection against attackers along the mine route. It kills whatever else is hitting the account before it casts at Chronozon, since the lair is single-way and the server refuses the cast otherwise.
 - **Horror from the Deep**
+    - Its fights own protection prayer: melee for the junior, missiles for the mother. Shared quest upkeep does not replace that protection.
+    - A failed or empty food check does not suppress attacks for the rest of the fight.
     - It reads its bridge flag off the open page's raw text, since `quests.journal` gives lines without colour tags.
     - It draws no more food than the pack has room for, and with a full pack banks what the stage has no use for.
     - Its dungeon load carries three prayer potions when the bank has them, and its fights drink one at the prayer floor.

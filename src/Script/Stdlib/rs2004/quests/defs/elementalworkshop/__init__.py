@@ -4,7 +4,7 @@ from rs2004.catalogs.record import Record
 from rs2004.quests.data import quest_record
 from rs2004.quests.defs.elementalworkshop.areas import EW_ITEM, KNIFE_SPAWN, SEERS_BANK, ew_area
 from rs2004.quests.defs.elementalworkshop.journal import ELEMENTAL_WORKSHOP_QUEST, EW_FLAG, EW_STAGE, parse_elemental_workshop_journal, read_elemental_workshop_progress
-from rs2004.quests.defs.elementalworkshop.supplies import COAL_NEED, EW_FAILED_COMBAT, EW_OFFICIAL_SKILLS, EW_PROBE_COMBAT, EW_PROVEN_COMBAT_FLOOR, EW_RECOMMENDED_COMBAT, EW_TESTED_COMBAT, FOOD_WITHDRAW, best_bank_weapon, best_held_pickaxe, from_bank, has_held_slash_tool, has_pickaxe, has_slash_tool, has_weapon, held, surface_loadout, warn_elemental_workshop_readiness
+from rs2004.quests.defs.elementalworkshop.supplies import COAL_NEED, EW_FAILED_COMBAT, EW_OFFICIAL_SKILLS, EW_PROBE_COMBAT, EW_PROVEN_COMBAT_FLOOR, EW_RECOMMENDED_COMBAT, EW_TESTED_COMBAT, FOOD_WITHDRAW, best_bank_weapon, best_held_pickaxe, from_bank, has_held_slash_tool, has_pickaxe, has_slash_tool, has_weapon, held, keep_names_for_entry, surface_loadout, warn_elemental_workshop_readiness
 from rs2004.quests.defs.elementalworkshop.workshop import enter_workshop, fix_bellows, leave_workshop, light_furnace, mine_elemental_ore, read_battered_book, search_bookcase, search_crates_for, slash_book_for_key, smelt_elemental_bar, smith_elemental_shield, start_water_wheel
 from rs2004.quests.engine.types import QuestModule, has_flag
 
@@ -55,6 +55,10 @@ def decide(snap):
     if stage == EW_STAGE.COMPLETE:
         return Record({'kind': 'done'})
     area = ew_area(snap.tile)
+    if area == 'workshop' and snap.free_slots is not None and snap.free_slots < 3:
+        keep = keep_names_for_entry()
+        if any([name.lower() not in keep for name in (snap.inv or {}).keys()]):
+            return custom('leave workshop to bank crate junk', leave_workshop)
     # Start: book
     if stage == EW_STAGE.NOT_STARTED:
         if held(snap, EW_ITEM.BATTERED_BOOK.id) == 0:

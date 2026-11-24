@@ -325,3 +325,65 @@ def lighthouse_escape_recovery():
 
 
 test('a restart upstairs in the lighthouse descends, leaves the doorway and reaches the causeway', lighthouse_escape_recovery)
+
+
+def shared_upkeep_does_not_replace_the_mother_prayer():
+    from rs2004.catalogs.tasks import sustain
+    from rs2004.quests.defs.horror import horror
+    from rs2004.quests.prayer import prayer_upkeep, set_quest_prayer
+    run_upkeep = type(sustain).run
+    scene = fight_world()
+    spy_on(sustain, 'run', impl=lambda: run_upkeep(sustain))
+    scene.fighting = True
+    scene.stats['prayer'] = 70
+    scene.fed = False
+    scene.protection = ''
+    changes = []
+    spy_on(prayer, 'max', returns=70)
+    spy_on(prayer, 'available', returns=True)
+    spy_on(prayer, 'active', impl=lambda name: scene.protection == name.lower())
+    def set_prayer(name, on):
+        scene.protection = name.lower() if on else ''
+        changes.append(scene.protection)
+        return True
+        yield
+    spy_on(prayer, 'set', impl=set_prayer)
+    def upkeep():
+        yield from prayer_upkeep()
+        scene.fed = True
+    stub(sustain, hook=upkeep, running=False)
+    set_quest_prayer(horror.pray, scene.log)
+    protection = fight.Protection('missiles')
+    try:
+        run_wait(protection.hold())
+        run_wait(sustain.run())
+        expect(scene.fed).to_be(True)
+        expect(protection.active()).to_be('missiles')
+        expect(changes).to_equal(['protect from missiles'])
+    except Exception:
+        set_quest_prayer(None, None)
+        raise
+    set_quest_prayer(None, None)
+
+
+test('the mother keeps missile protection when its food hook runs shared quest upkeep', shared_upkeep_does_not_replace_the_mother_prayer)
+
+
+def missing_food_does_not_stop_casting():
+    scene = fight_world()
+    scene.won = False
+    scene.stats['prayer'] = 70
+    target = scene.npc('Dagannoth mother', ['Attack'], id=1352)
+    spy_on(fight, 'hungry', returns=True)
+    def cast(spell, npc):
+        scene.won = True
+        return True
+    cast_spy = spy_on(game, 'cast_on_npc', impl=cast)
+    plan = Fake(what='mother', protect='missiles', guard=8, target=lambda: target,
+                won=lambda: scene.won, melee=None, element=lambda npc: 'Water blast',
+                summon_delay=8, handover=None)
+    expect(run_wait(fight.fight_loop(plan, scene.log))).to_be(True)
+    expect(len(cast_spy.calls)).to_be(1)
+
+
+test('an empty food pack does not spend every mother-fight round on idle upkeep', missing_food_does_not_stop_casting)
