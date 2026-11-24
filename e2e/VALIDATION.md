@@ -506,3 +506,53 @@ SHA-256: `30e876535dbdfb328c58e5179ea27a2b87b26dac68b9babc7a648f3d9af04c88`.
 Binary SHA-256: `e0bc1defada67cb31967ddd30fd9679cad77470ab4c4cc1a1f2c73c0ded21017`.
 Engine/content remained `2395c968` / `f32c62f6`, unchanged. Raw setup, logs and
 provenance: `build/e2e/biohazard-hq-20261123`.
+
+## Phase 17h
+
+Fresh local-289 validation started on November 24, 2026, for
+[#160](https://github.com/ineedbots/lc-headless/issues/160), in
+[PR #161](https://github.com/ineedbots/lc-headless/pull/161).
+Completion evidence is pending; startup and preparation are not passes.
+
+| Quest | Account | Result | Time taken |
+|---|---|---|---|
+| Underground Pass | `h17270e59up` | Running | Pending |
+| Regicide | `h17270e59rg` | Running | Pending |
+
+Both seed checks passed with unstarted targets, complete prerequisite journals,
+ordinary supplies and correct initial QP (4 / 9). Each 20-tick probe took
+11,999 ms. Quest session `20261124T130201-run-dad0` follows seed session
+`20261124T130003-seed-e3c8`.
+Evidence root: `build/e2e/phase17h-validation-20261124`.
+
+Preparation/runtime source: `914a7c85bc5a6a85625f47c7ae71d1014cd0b512`.
+Frozen client: `build/e2e-binaries/phase17hi-initial.exe`, SHA-256
+`9f548464cbb02672694722469c4cea57c4b066ba6300661da7b57a12f3079546`.
+Engine/content: `2395c968473333d13ff1454f5eff452a18a029b6` /
+`f32c62f66302f76b43c752ede3181de0c0d01369`, left unchanged.
+See the [preparation limits and rerun instructions](phase17h/README.md).
+
+## Phase 17i
+
+Fresh Legends Quest preparation started on November 24, 2026, under the same
+issue and PR. This remains pending live validation.
+
+| Quest | Account | Result | Time taken |
+|---|---|---|---|
+| Legends Quest | `i179a9d20lq` | Preparing | Pending |
+
+Evidence root: `build/e2e/phase17i-validation-20261124`.
+The setup uses the same frozen binary, source and unchanged engine/content
+versions as phase 17h. All 45 seeded completed quests, totaling 107 QP, are
+listed in `phase17i/scripts/phase17i_cases.py`; the target is never advanced.
+See the [preparation limits and rerun instructions](phase17i/README.md).
+
+For both suites, acceptance requires a newly completed single-target AIO queue,
+complete target journal, zero deaths, expected final QP and clean logout/process
+exit. Time taken runs from the first per-account queue log to its passing result,
+including final banking. Interrupted attempts and resumed diagnostic sessions
+cannot supply uninterrupted timings. These suites cover quest completion;
+Kharazi/Isafdar clue workflows are outside this request.
+
+Release client/tests build, six launcher tests per phase, focused Underground
+Pass/Regicide/Legends runtime specs and setup dialect lint passed.
