@@ -153,11 +153,11 @@ Neither interrupted Eadgar attempt supplies a completion time.
 [Suite](phase17d/README.md) · [PR #157](https://github.com/ineedbots/lc-headless/pull/157)
 · [Issue #156](https://github.com/ineedbots/lc-headless/issues/156)
 
-Live validation is in progress. Shades has passed; other completion timings remain pending.
+Live validation is in progress. Nature Spirit and Shades have passed; other completion timings remain pending.
 
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
-| Nature Spirit | `d171a75d1ns` | Pending | — |
+| Nature Spirit | `d171a75d1ns` | PASS, 1 completed, QP 5, zero deaths | 31m 39s |
 | Shades of Mort'ton | `d171a75d1sm` | PASS, 1 completed, QP 9, zero deaths | 23m 53s |
 | Tai Bwo Wannai Trio | `d17a6a47dtw` | Fresh rerun pending | — |
 | Shilo Village | `d171a75d1sv` | Pending | — |
@@ -179,6 +179,11 @@ Shades completed uninterrupted in quest session `20261123T211645-run-9313`,
 from `2026-11-24T03:16:50.950Z` to `2026-11-24T03:40:44.330Z`
 (1,433.380 seconds including the final bank return), then logged out. Its
 individual result passes; the shared process is still running other accounts.
+
+Nature Spirit also completed uninterrupted in `20261123T211645-run-9313`,
+from `2026-11-24T03:16:47.937Z` to `2026-11-24T03:48:26.944Z`
+(1,899.007 seconds including final banking), then logged out. Target complete,
+one completed quest, QP 5, zero deaths and no stuck queue entries.
 
 The v2 Trio account `d171a75d1tw` logged out with a failed result before quest
 start (zero completed, one stuck, QP 5, zero deaths). Shared supply preparation
