@@ -236,7 +236,7 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 | Quest | Result | Time taken |
 |---|---|---|
 | The Tourist Trap | Per-account PASS, zero deaths | 27m 03s |
-| Watch Tower | Failed: one death and dragon-hunt bank API error | — |
+| Watch Tower | Fresh replacement PASS, zero deaths | 2h 46m 19s |
 | Big Chompy Bird Hunting | Per-account PASS, zero deaths | 24m 16s |
 | The Grand Tree | Per-account PASS, zero deaths | 36m 07s |
 Preparation source: `9c8b946`. Pinned client:
@@ -266,7 +266,7 @@ Dragon-hunt cleanup now uses the bank API's single predicate argument; its
 regression mock enforces that signature. Fresh preparation includes an ordinary
 Dragonfire shield, but no Dragon bones. Focused Watch Tower runtime specs,
 the full ported Python suite (2,906 native assertions), six launcher tests and
-dialect lint pass. Fresh live validation is running on `e17713b4ewt`, with exactly one target
+dialect lint pass. Fresh live validation **passed** on `e17713b4ewt`, with exactly one target
 queued and zero target progress at seed completion. Root:
 `build/e2e/phase17e-watchtower-20261124/`; seed session
 `20261124T070031-seed-bde7`, quest session `20261124T070305-run-0967`.
@@ -274,7 +274,13 @@ Source `c65c005d9fc98d29af5ac540e6e45e775af1957a`; pinned executable
 `build/e2e-binaries/phase17e-watchtower.exe`, SHA-256
 `eda7edb173bf5b8b5a69066306feca356d6e98a5ca8618a50ea96b380e9f50c3`.
 All seed results passed; Watch Tower's 20 ticks took 11.997 seconds.
-No fresh completion or accepted timing claimed yet.
+The uninterrupted quest session ran from `2026-11-24T13:03:07.121Z` to
+`2026-11-24T15:49:25.741Z`: **9,978.620 seconds (2h 46m 19s)**, including
+final banking. Target journal complete, exactly one completion, queue 1/1 with
+zero stuck entries, zero deaths, final QP 8 and clean logout. The launcher
+reported PASS with empty stderr and wrote `results.json`; the supervisor wrote
+`timings.json`. Exactly one queue start and one final result were verified.
+The failed original Watch Tower account remains excluded from accepted timing.
 
 
 ## Phase 17f
