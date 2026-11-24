@@ -190,6 +190,9 @@ def buys_boots_and_prepares():
     potions = snap.with_fields({'bank': {'prayer potion(4)': 1, 'prayer potion(3)': 5, 'coins': 0}, 'tile': FALADOR,
                                 'inv': {'lobster': 9}, 'inv_ids': {}})
     step = supplies.prepare(potions, 'mainland', 4)
+    expect(step.kind).to_be('deposit')
+    expect([(cap.id, cap.qty) for cap in step.caps]).to_equal([(379, 4)])
+    step = supplies.prepare(potions.with_fields({'inv': {'lobster': 4}}), 'mainland', 4)
     expect(step.kind).to_be('withdraw')
     expect(step.items).to_equal([{'name': 'Prayer potion(4)', 'qty': 1}, {'name': 'Prayer potion(3)', 'qty': 1}])
 
@@ -452,3 +455,47 @@ def decides_hands_and_warns():
 
 
 test("the parrot and the fake man come from the pack, the bank or Eadgar, and the readiness warning names what's short", decides_hands_and_warns)
+
+
+def banks_excess_food_to_finish_the_scarecrow_pack():
+    from rs2004.quests.food import quest_food
+    quest_food.name = 'Lobster'
+    ids = {995: 926, 143: 1, 1349: 1, 946: 1, 1511: 1, 379: 8, 2138: 5, 141: 1, 1947: 9}
+    names = {'coins': 926, 'prayer potion(1)': 1, 'iron axe': 1, 'knife': 1, 'logs': 1,
+             'lobster': 8, 'raw chicken': 5, 'prayer potion(2)': 1, 'grain': 9}
+    snap = QuestSnapshot(journal='in_progress', stage=EADGAR_STAGE.HID_PARROT,
+                         progress=QuestProgress(EADGAR_STAGE.HID_PARROT, set([EADGAR_FLAG.EADGAR_FREED])),
+                         inv=names, inv_ids=ids, worn=set(['climbing boots']), worn_ids=set([3105]),
+                         bank={'lobster': 100}, bank_ids={379: 100}, bank_known=True, free_slots=0,
+                         tile=Tile(2642, 3344, 0))
+    step = eadgar.decide(snap)
+    expect(step.kind).to_be('deposit')
+    expect([(cap.id, cap.qty) for cap in step.caps]).to_equal([(379, 6)])
+    expect(ER_ITEM.GRAIN.id in step.keep_ids).to_be(True)
+    expect(ER_ITEM.RAW_CHICKEN.id in step.keep_ids).to_be(True)
+
+    # After banking two lobsters, it picks the final grain instead of looping on a full pack.
+    names['lobster'] = 6
+    ids[379] = 6
+    snap = snap.with_fields({'inv': names, 'inv_ids': ids, 'free_slots': 2})
+    expect(eadgar.decide(snap).kind).to_be('pick_loc')
+    names['grain'] = 10
+    ids[1947] = 10
+    step = eadgar.decide(snap.with_fields({'free_slots': 1}))
+    expect(step.kind).to_be('custom')
+    expect(step.name).to_be('talk to Eadgar')
+
+    mixed = snap.with_fields({'inv': {'coins': 926, 'lobster': 7, 'shark': 2}, 'inv_ids': {995: 926, 379: 7, 385: 2}})
+    step = supplies.prepare(mixed, 'mainland', 6)
+    expect([(cap.id, cap.qty) for cap in step.caps]).to_equal([(379, 6), (385, 0)])
+    expect(supplies.prepare(mixed, 'trollside', 6)).to_be(None)
+
+    # The reduced cap is only for gathering; after turn-in the mountain food float returns.
+    later = snap.with_fields({'stage': EADGAR_STAGE.NEEDS_POTION,
+                             'progress': QuestProgress(EADGAR_STAGE.NEEDS_POTION, set([EADGAR_FLAG.EADGAR_FREED]))})
+    step = eadgar.decide(later)
+    expect(step.kind).to_be('withdraw')
+    expect(step.items[0]).to_equal({'name': 'Lobster', 'qty': 2})
+
+
+test('Eadgar banks excess food before gathering the final scarecrow supplies', banks_excess_food_to_finish_the_scarecrow_pack)

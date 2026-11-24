@@ -625,3 +625,58 @@ def passes_the_east_gate():
 
 
 test("the Varrock east gate's search is sat out both ways, and refuses anyone carrying a vial", passes_the_east_gate)
+
+
+def closes_the_open_headquarters_leaf_before_leaving():
+    town = Ardougne(HQ_TOP)
+    closed = []
+    leaf_tile = Tile(2547, 3325, 0)
+    stand = Tile(2547, 3326, 0)
+
+    def close(op):
+        closed.append(op)
+        town.locs = []
+        return True
+
+    leaf = Fake(id=1531, name='Door', tile=lambda: leaf_tile, actions=lambda: ['Close'],
+                distance=lambda: 1, interact=close)
+    town.locs = [leaf]
+
+    def walk(tile, radius=2, attempts=None, timeout_ms=None, log=None):
+        town.walks.append(tile)
+        # The swung leaf blocks the corridor to the exit, but not its north side.
+        if tile == BIO_TILE.HQ_INSIDE and town.locs:
+            return False
+        town.at = tile
+        return True
+        yield
+
+    spy_on(traversal, 'walk_resilient', impl=walk)
+    town.prompt_lands = WEST
+    expect(run_wait(travel.leave_hq(town.log))).to_be(True)
+    expect(closed).to_equal(['Close'])
+    expect(town.walks[0]).to_equal(stand)
+    expect(town.at).to_equal(WEST)
+
+    # Closing must succeed before attempting the exit; a failed packet or unchanged leaf retries later.
+    town.at = stand
+    town.locs = [Fake(id=1531, name='Door', tile=lambda: leaf_tile, actions=lambda: ['Close'],
+                      distance=lambda: 1, interact=lambda op: False)]
+    before = len(town.prompts)
+    expect(run_wait(travel.leave_hq(town.log))).to_be(False)
+    expect(len(town.prompts)).to_be(before)
+    town.locs[0].interact = lambda op: True
+    expect(run_wait(travel.leave_hq(town.log))).to_be(False)
+    expect(len(town.prompts)).to_be(before)
+
+    # A neighbouring/upstairs door is outside this recovery, and a naturally shut leaf needs no action.
+    town.locs = [Fake(id=1531, name='Door', tile=lambda: Tile(2547, 3325, 1), actions=lambda: ['Close'],
+                      distance=lambda: 1, interact=lambda op: closed.append(op))]
+    expect(run_wait(travel.leave_hq(town.log))).to_be(True)
+    expect(closed).to_equal(['Close'])
+    town.at = HQ
+    town.locs = []
+    expect(run_wait(travel.leave_hq(town.log))).to_be(True)
+
+
+test('HQ exit closes the downstairs door leaf instead of waiting for its reset', closes_the_open_headquarters_leaf_before_leaving)
