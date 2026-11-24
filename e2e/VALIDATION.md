@@ -291,10 +291,10 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| Elemental Workshop | Crate loop repaired; diagnostic resume progressed; fresh v2 seeding | — |
+| Elemental Workshop | Resumed account complete; fresh uninterrupted v2 running | — |
 | Digsite Quest | Per-account PASS, zero deaths | 44m 35s |
 | Holy Grail | Per-account PASS, zero deaths | 37m 27s |
-| Family Crest | Replacement completed with one death; acceptance failed | 53m 49s (not accepted) |
+| Family Crest | Fresh survival replacement PASS, zero deaths | 48m 25s |
 | Horror from the Deep | Completed with one death; acceptance failed | 1h 31m 39s (not accepted) |
 Preparation source: `9c8b946`. Pinned client:
 `build/e2e-binaries/phase17ef-initial.exe`, SHA-256
@@ -513,3 +513,22 @@ SHA-256: `30e876535dbdfb328c58e5179ea27a2b87b26dac68b9babc7a648f3d9af04c88`.
 Binary SHA-256: `e0bc1defada67cb31967ddd30fd9679cad77470ab4c4cc1a1f2c73c0ded21017`.
 Engine/content remained `2395c968` / `f32c62f6`, unchanged. Raw setup, logs and
 provenance: `build/e2e/biohazard-hq-20261123`.
+
+## Phase 17f survival progress
+
+Family Crest fresh survival replacement `f17378cd6fc` passed in one uninterrupted
+quest session: start `2026-11-24T16:37:43.120Z`, result
+`2026-11-24T17:26:08.375Z`, elapsed **2,905.255 seconds (48m 25s)**.
+Complete target journal, exactly one completed quest, queue 1/1 with zero stuck
+entries, zero deaths, QP 1, final bank return and clean logout. Raw evidence:
+`build/e2e/phase17f-survival-20261124/sessions/20261124T103741-run-db67/`.
+The shared client remains active for Horror, so no aggregate client-exit pass
+is claimed yet. The previous one-death Family Crest attempt stays excluded.
+
+Elemental Workshop diagnostic resume `f17310b14ew` also completed with zero
+deaths at `2026-11-24T17:20:34.735Z`, QP 1 and clean logout, using
+`20261124T111634-run-9300`. Its interrupted history means no uninterrupted time
+is accepted. The separate fresh account `f17b5c196ew` is running in
+`build/e2e/phase17f-elemental-v2-20261124/sessions/20261124T111858-run-23e6/`.
+Both the fresh Elemental Workshop and Horror account remain pending, with zero
+deaths at this check.
