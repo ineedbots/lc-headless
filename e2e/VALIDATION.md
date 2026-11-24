@@ -516,7 +516,7 @@ Completion evidence is pending; startup and preparation are not passes.
 
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
-| Underground Pass | `h17270e59up` | Running | Pending |
+| Underground Pass | `h174f033fup` | Fresh replacement running | Pending |
 | Regicide | `h176ebc68rg` | Fresh replacement running | Pending |
 
 Both seed checks passed with unstarted targets, complete prerequisite journals,
@@ -524,6 +524,32 @@ ordinary supplies and correct initial QP (4 / 9). Each 20-tick probe took
 11,999 ms. Quest session `20261124T130201-run-dad0` follows seed session
 `20261124T130003-seed-e3c8`.
 Evidence root: `build/e2e/phase17h-validation-20261124`.
+
+Original Underground Pass account `h17270e59up` also did **not** complete.
+At stage 7 it stood outside the brew hut at `(2327,9801,0)` and repeatedly used
+the bucket through its north wall. The three-tile arrival radius incorrectly
+accepted this stand. After bounded retries and failed safe-exit recovery it
+logged out at 19:31:11 UTC, incomplete with zero deaths and 4 QP. This attempt
+is excluded from accepted quest timing.
+
+Fix `5c92c41` walks to `(2326,9799,0)`, the barrel's west side inside the hut.
+The regression failed before and passed after the change. A focused live leg
+on the stopped original account used the real door route at `(2325,9801,0)`,
+filled the bucket and logged out cleanly. Its six-second result is **leg-only**:
+19:35:35.623–19:35:41.624 UTC. No quest flags, positions or items were seeded
+for this diagnostic. Evidence: `build/e2e/upass-brew-probe-20261124` and
+`build/upass-brew-leg-stdout.log`.
+
+Fresh Underground Pass root: `build/e2e/phase17h-upass-v2-20261124`, source
+`5c92c41`, target `h174f033fup`. Both cases are prepared; only `up` will run.
+Frozen client `build/e2e-binaries/phase17h-brew.exe`, SHA-256
+`830cb5de5384d7c304db9faae6416c7221de38662ca10121b6b3ac0281132712`.
+Seed `20261124T133635-seed-b6fc` passed, with the target unstarted, 4 initial QP
+and a 20-tick probe of 11,988 ms. Single-target quest session
+`20261124T133834-run-f1b8` started at 19:38:36.240 UTC. The repaired Release
+build, focused regression, changed-file lint and full ported Python suite
+(2,906 native assertions) passed. Whole-quest completion remains pending.
+Regicide and Legends continue their existing sessions on the original binary.
 
 The original Regicide account `h17270e59rg` did **not** complete. Its seeded
 Underground Pass completion flag lacked the separate persistent gates in
