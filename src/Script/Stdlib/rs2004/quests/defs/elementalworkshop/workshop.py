@@ -323,20 +323,40 @@ def search_crates_for(want, log):
 
     if not need_bowl() and not need_leather() and not need_needle():
         return True
-    crates = list(locs.query().name('Crate').action('Search').within(18).results()) + list(locs.query().name('Boxes').action('Search').within(18).results())
-    if len(crates) == 0:
-        log('no Crates/Boxes to Search in the workshop')
+    targets = [(3394, EW_ITEM.STONE_BOWL, need_bowl),
+               (3397, EW_ITEM.LEATHER, need_leather),
+               (3395, EW_ITEM.NEEDLE, need_needle)]
+    missing = sum([1 for crate_id, item, needed in targets if needed()])
+    if inventory.free() < missing:
+        log('not enough room for workshop crate supplies; bank junk first')
         return False
-    for crate in crates:
-        if not need_bowl() and not need_leather() and not need_needle():
-            return True
-        before_bowl = held_id(EW_ITEM.STONE_BOWL.id)
-        before_leather = held_id(EW_ITEM.LEATHER.id)
-        before_needle = held_id(EW_ITEM.NEEDLE.id)
-        log(f"searching {(crate.name if crate.name is not None else 'crate')} for workshop supplies")
-        if not (crate.interact('Search')):
+    found = False
+    for crate_id, item, needed in targets:
+        if not needed():
             continue
-        yield from execution.delay_until(lambda: held_id(EW_ITEM.STONE_BOWL.id) > before_bowl or held_id(EW_ITEM.LEATHER.id) > before_leather or held_id(EW_ITEM.NEEDLE.id) > before_needle, 3000)
+        # Generic crates can give junk; only these three locs supply the kit.
+        def find_crate():
+            wanted = crate_id
+            return locs.query().where(lambda loc: loc.id == wanted).action('Search').within(24).nearest()
+        crate = find_crate()
+        if not crate:
+            continue
+        found = True
+        approached = yield from walk_near(crate.tile(), 1, log)
+        if not approached:
+            continue
+        yield from settle_scene()
+        crate = find_crate()
+        if not crate:
+            continue
+        before = held_id(item.id)
+        log(f"searching {crate.name} for {item.name}")
+        if not crate.interact('Search'):
+            continue
+        # Start the reward timeout after arriving, rather than during the walk.
+        yield from execution.delay_until(lambda: held_id(item.id) > before, 5000)
+    if not found:
+        log('no Crates/Boxes for the missing workshop supplies')
     if need_bowl() or need_leather() or need_needle():
         log(f'crate search incomplete (bowl={need_bowl()} leather={need_leather()} needle={need_needle()})')
         return False

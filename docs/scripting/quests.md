@@ -313,7 +313,7 @@ Each keeps rs2b0t's package. Elemental Workshop, Digsite Quest, Family Crest and
 
 The live run added these departures from rs2b0t:
 
-- **Elemental Workshop** approaches the keyed wall from its south face and requires the exact inside stand south of the stairs before climbing. A visible staircase after a failed approach does not trigger a climb.
+- **Elemental Workshop** approaches the keyed wall from its south face and requires the exact inside stand south of the stairs before climbing. A visible staircase after a failed approach does not trigger a climb. Supply searches target the three quest crate ids and approach each crate before waiting for its reward; cramped packs leave to bank junk before collecting more materials.
 - **Family Crest** runs food and prayer upkeep every tick while waiting for perfect gold, and uses melee protection against attackers along the mine route. It kills whatever else is hitting the account before it casts at Chronozon, since the lair is single-way and the server refuses the cast otherwise.
 - **Horror from the Deep**
     - Its fights own protection prayer: melee for the junior, missiles for the mother. Shared quest upkeep does not replace that protection.

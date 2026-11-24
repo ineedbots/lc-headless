@@ -375,6 +375,18 @@ Source `aea870cb7eec475e5dd927cd7b522c2ba4358f40`; pinned executable
 The prepared stats and supplies match the preceding acceptance profile;
 no max-stat workaround or target-progress seed is used. Server unchanged.
 
+Elemental Workshop's first replacement was interrupted after the user spotted
+a full junk pack during crate searches. Inspection confirmed 28 occupied slots,
+including Buttons, Rusty sword, Old boot and Broken arrow, with no Needle.
+The search matched all generic `Crate`/`Boxes` names and gave each click only
+three seconds, including its approach walk. It now targets only loc 3394
+(bowl), 3397 (leather) and 3395 (needle), approaches before searching, reserves
+space for missing rewards, and leaves a cramped junk pack for banking. Surface
+bank cleanup now precedes additional coal gathering. Regressions reproduce the
+old generic-crate, full-pack and approach-timeout failures and pass after the
+rebuild; focused specs and dialect lint pass. The interrupted replacement and
+its diagnostic resume cannot supply uninterrupted acceptance timings.
+
 
 ## Phase 17g
 

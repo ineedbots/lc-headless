@@ -498,9 +498,9 @@ test('an elemental fighting someone else is left to them', contested_threat_is_l
 
 def crate_scene():
     scene = Scene(CRATE_HUB)
-    scene.loc('Crate', ['Search'], effect=lambda op: give(scene, EW_ITEM.STONE_BOWL) and True, id=1)
-    scene.loc('Crate', ['Search'], effect=lambda op: give(scene, EW_ITEM.LEATHER) and True, id=2)
-    scene.loc('Boxes', ['Search'], effect=lambda op: give(scene, EW_ITEM.NEEDLE) and True, id=3)
+    scene.loc('Crate', ['Search'], effect=lambda op: give(scene, EW_ITEM.STONE_BOWL) and True, id=3394)
+    scene.loc('Boxes', ['Search'], effect=lambda op: give(scene, EW_ITEM.LEATHER) and True, id=3397)
+    scene.loc('Crate', ['Search'], effect=lambda op: give(scene, EW_ITEM.NEEDLE) and True, id=3395)
     return scene
 
 
@@ -547,8 +547,8 @@ def crates_failures():
     expect(scene.logged('no Crates/Boxes')).to_be(True)
 
     scene = Scene(CRATE_HUB)
-    scene.loc('Crate', ['Search'], effect=lambda op: False)
-    scene.loc('Boxes', ['Search'])
+    scene.loc('Crate', ['Search'], id=3394, effect=lambda op: False)
+    scene.loc('Boxes', ['Search'], id=3397)
     expect(run_wait(workshop.search_crates_for(WANT_ALL, scene.log))).to_be(False)
     expect(scene.logged('crate search incomplete (bowl=True leather=True needle=True)')).to_be(True)
 
@@ -1217,3 +1217,44 @@ def smith_gates():
 
 
 test('smithing checks for the shield, the metal, the book and the hammer, and the walk', smith_gates)
+
+
+def ignores_unrelated_crate_junk():
+    scene = Scene(CRATE_HUB)
+    def junk(op):
+        raise AssertionError('searched an unrelated junk crate')
+    scene.loc('Crate', ['Search'], id=357, effect=junk)
+    scene.loc('Crate', ['Search'], id=3395, effect=lambda op: give(scene, EW_ITEM.NEEDLE))
+    want = Fake(bowl=False, leather=False, needle=True)
+    expect(run_wait(workshop.search_crates_for(want, scene.log))).to_be(True)
+    expect(scene.has(EW_ITEM.NEEDLE.id)).to_be(True)
+
+
+test('only the known supply crate is searched even when generic crates share its name', ignores_unrelated_crate_junk)
+
+
+def does_not_search_with_a_full_pack():
+    scene = crate_scene()
+    for i in range(28):
+        scene.item(10000 + i, 'Junk')
+    expect(run_wait(workshop.search_crates_for(WANT_ALL, scene.log))).to_be(False)
+    expect(scene.pack).to_have_length(28)
+    expect(scene.logged('searching Crate')).to_be(False)
+
+
+test('a full pack returns without consuming a one-time crate reward', does_not_search_with_a_full_pack)
+
+
+def approaches_the_needle_crate_before_searching():
+    scene = Scene(CRATE_HUB)
+    target = CRATE_HUB.translate(12, 0)
+    def search(op):
+        if scene.at.distance_to(target) > 1:
+            return False
+        give(scene, EW_ITEM.NEEDLE)
+    scene.loc('Crate', ['Search'], tile=target, id=3395, effect=search, dist=None)
+    expect(run_wait(workshop.search_crates_for(Fake(bowl=False, leather=False, needle=True), scene.log))).to_be(True)
+    expect(scene.walks).to_equal([target])
+
+
+test('a distant supply crate is approached before its search timeout begins', approaches_the_needle_crate_before_searching)

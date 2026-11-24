@@ -193,10 +193,6 @@ def surface_loadout(snap, need_bellows_fix, need_smelt):
     """Tools and materials needed before committing to the spiral stairs. Bank first: scan, deposit junk, withdraw the missing kit (food and weapon included)."""
     if not snap.bank_known:
         return scan_bank()
-    if need_smelt:
-        coal = gather_coal(snap)
-        if coal:
-            return coal
     # Drop junk before packing so a full pack of misc loot cannot block withdraws.
     # Entry kit can need ~12 free slots (tools + coal + food).
     keep = keep_names_for_entry()
@@ -210,6 +206,10 @@ def surface_loadout(snap, need_bellows_fix, need_smelt):
             'bank': SEERS_BANK,
             'exact_keep': True,
         })
+    if need_smelt:
+        coal = gather_coal(snap)
+        if coal:
+            return coal
     needed = []
 
     def push_missing(item, qty):
