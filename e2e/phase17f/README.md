@@ -11,6 +11,10 @@ Each fresh scratch account runs exactly one target through the real
 | `fc` | Family Crest | None | 0 | 1 |
 | `hd` | Horror from the Deep | None | 0 | 2 |
 
+Fresh uninterrupted replacements passed Elemental Workshop in **22m 52s**
+and Family Crest in **48m 25s**, both with zero deaths after their repairs.
+Horror validation remains pending. See the [validation table](../VALIDATION.md#phase-17f).
+
 Target quests remain unstarted after preparation. Druidic Ritual unlocks
 Herblore where the actual AIO planner requires it. Prerequisite journals and QP
 are verified; the planner regression requires exactly one selected target.

@@ -291,7 +291,7 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| Elemental Workshop | Resumed account complete; fresh uninterrupted v2 running | — |
+| Elemental Workshop | Fresh uninterrupted v2 PASS, zero deaths | 22m 52s |
 | Digsite Quest | Per-account PASS, zero deaths | 44m 35s |
 | Holy Grail | Per-account PASS, zero deaths | 37m 27s |
 | Family Crest | Fresh survival replacement PASS, zero deaths | 48m 25s |
@@ -532,3 +532,16 @@ is accepted. The separate fresh account `f17b5c196ew` is running in
 `build/e2e/phase17f-elemental-v2-20261124/sessions/20261124T111858-run-23e6/`.
 Both the fresh Elemental Workshop and Horror account remain pending, with zero
 deaths at this check.
+
+Elemental Workshop fresh v2 `f17b5c196ew` passed uninterrupted: queue start
+`2026-11-24T17:19:00.524Z`, passing result `2026-11-24T17:41:52.148Z`,
+elapsed **1,371.624 seconds (22m 52s)** including final banking. Verified exactly
+one quest session, one queue start and one final result; target journal complete,
+completed=1, queue 1/1 with zero stuck entries, initial_done=[], zero deaths,
+QP 1 and clean logout. Launcher PASS, empty stderr, `results.json` and
+`timings.json` verified. Preparation/session source
+`2dca84eb067b7c96c24d90b100f7f444d395ab11`; pinned binary SHA-256
+`9f548464cbb02672694722469c4cea57c4b066ba6300661da7b57a12f3079546`.
+All failed/interrupted/resumed Elemental Workshop attempts stay excluded from
+this accepted timing. Eight individual phase17e/f targets now have clean passes;
+Horror remains pending, zero deaths and no script errors at this check.
