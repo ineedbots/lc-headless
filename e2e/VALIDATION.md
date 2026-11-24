@@ -229,16 +229,16 @@ in this evidence update are documentation only.
 
 ## Phase 17e
 
-Live validation is running. All accounts passed one-shot seeding and queued
-exactly one target each. No quest completion is claimed yet.
+Live validation is incomplete. All accounts passed one-shot seeding and queued
+exactly one target each. Results below distinguish individual passes from suite acceptance.
 Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| The Tourist Trap | Running | — |
-| Watch Tower | Running | — |
-| Big Chompy Bird Hunting | Running | — |
-| The Grand Tree | Running | — |
+| The Tourist Trap | Per-account PASS, zero deaths | 27m 03s |
+| Watch Tower | Failed: one death and dragon-hunt bank API error | — |
+| Big Chompy Bird Hunting | Per-account PASS, zero deaths | 24m 16s |
+| The Grand Tree | Per-account PASS, zero deaths | 36m 07s |
 Preparation source: `9c8b946`. Pinned client:
 `build/e2e-binaries/phase17ef-initial.exe`, SHA-256
 `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
@@ -251,18 +251,25 @@ Quest session: `20261124T054333-run-71ac`; source `4fe2e0d`.
 Accounts: `e17989d00tt`, `e17989d00wt`, `e17989d00cb`, `e17989d00gt`.
 All seed results passed; 20-tick probes took 11.991–12.023 seconds.
 
+Three accounts emitted passing results and logged out before Watch Tower's
+failure. The shared client exited 1 after Watch Tower raised
+`TypeError: too many arguments (deposit_all_matching)` from
+`watchtower/bones.py:43` during dragon-hunt cleanup. Watch Tower also recorded
+one death. Thus the overall suite failed; individual successful quest timings
+are retained as evidence, without claiming a clean suite exit.
+
 
 ## Phase 17f
 
-Live validation is running. All accounts passed one-shot seeding and queued
-exactly one target each. No quest completion is claimed yet.
+Live validation is incomplete. All accounts passed one-shot seeding and queued
+exactly one target each. Results below distinguish individual passes from suite acceptance.
 Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| Elemental Workshop | Running | — |
-| Digsite Quest | Running | — |
-| Holy Grail | Running | — |
+| Elemental Workshop | Blocked entering workshop: unreachable stair | — |
+| Digsite Quest | Per-account PASS, zero deaths | 44m 35s |
+| Holy Grail | Per-account PASS, zero deaths | 37m 27s |
 | Family Crest | Initial run blocked: missing banked cooked fish; fresh replacement pending | — |
 | Horror from the Deep | Running | — |
 Preparation source: `9c8b946`. Pinned client:
@@ -282,6 +289,14 @@ Initial Family Crest account `f17649fb3fc` stopped at stage 2 with
 bank shortfall exhausted recovery. It is not an accepted completion. Preparation
 now includes five cooked fish and two ordinary Rubies (the gem shop stocks one).
 The other eight original quest accounts continue without interruption.
+
+Holy Grail and Digsite emitted passing results and logged out; their client
+remains running for Horror from the Deep. Elemental Workshop exhausted recovery
+at its entrance, repeatedly receiving `I can't reach that!` after the key/wall
+interaction and stair climb. The fresh Family Crest account `f173ac952fc`
+passed corrected seeding and reached Chronozon, but has recorded one death;
+it cannot meet zero-death acceptance even if it finishes. It is still running
+and returning the restored crest. Horror remains running at the lighthouse.
 
 
 ## Phase 17g
