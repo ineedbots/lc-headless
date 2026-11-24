@@ -517,13 +517,27 @@ Completion evidence is pending; startup and preparation are not passes.
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
 | Underground Pass | `h17270e59up` | Running | Pending |
-| Regicide | `h17270e59rg` | Running | Pending |
+| Regicide | `h176ebc68rg` | Fresh replacement preparing | Pending |
 
 Both seed checks passed with unstarted targets, complete prerequisite journals,
 ordinary supplies and correct initial QP (4 / 9). Each 20-tick probe took
 11,999 ms. Quest session `20261124T130201-run-dad0` follows seed session
 `20261124T130003-seed-e3c8`.
 Evidence root: `build/e2e/phase17h-validation-20261124`.
+
+The original Regicide account `h17270e59rg` did **not** complete. Its seeded
+Underground Pass completion flag lacked the separate persistent gates in
+`ibanmulti`, so cave entry repeatedly said to talk to King Lathas despite
+Regicide being at stage 2. The affected account alone was stopped cleanly at
+19:19:38 UTC, incomplete with zero deaths; Underground Pass continued without
+interruption. The original launcher therefore cannot be an aggregate pass.
+Preparation now includes prerequisite bits 5–8 (burned orbs), 11 (cave entry),
+14–16 (paladin crests) and 18 (unicorn horn). No Regicide progress is seeded.
+Seven phase 17h launcher tests and setup lint pass after the correction.
+
+Fresh replacement root: `build/e2e/phase17h-regicide-v2-20261124`, prepared
+from `4da00fd` on the same frozen binary. Both setup cases are seeded, but only
+`rg` will run; its spare Underground Pass account is outside quest acceptance.
 
 Preparation/runtime source: `914a7c85bc5a6a85625f47c7ae71d1014cd0b512`.
 Frozen client: `build/e2e-binaries/phase17hi-initial.exe`, SHA-256
@@ -557,5 +571,5 @@ including final banking. Interrupted attempts and resumed diagnostic sessions
 cannot supply uninterrupted timings. These suites cover quest completion;
 Kharazi/Isafdar clue workflows are outside this request.
 
-Release client/tests build, six launcher tests per phase, focused Underground
+Release client/tests build, seven phase 17h and six phase 17i launcher tests, focused Underground
 Pass/Regicide/Legends runtime specs and setup dialect lint passed.
