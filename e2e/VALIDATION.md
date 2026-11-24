@@ -266,7 +266,15 @@ Dragon-hunt cleanup now uses the bank API's single predicate argument; its
 regression mock enforces that signature. Fresh preparation includes an ordinary
 Dragonfire shield, but no Dragon bones. Focused Watch Tower runtime specs,
 the full ported Python suite (2,906 native assertions), six launcher tests and
-dialect lint pass. Fresh live validation remains pending.
+dialect lint pass. Fresh live validation is running on `e17713b4ewt`, with exactly one target
+queued and zero target progress at seed completion. Root:
+`build/e2e/phase17e-watchtower-20261124/`; seed session
+`20261124T070031-seed-bde7`, quest session `20261124T070305-run-0967`.
+Source `c65c005d9fc98d29af5ac540e6e45e775af1957a`; pinned executable
+`build/e2e-binaries/phase17e-watchtower.exe`, SHA-256
+`eda7edb173bf5b8b5a69066306feca356d6e98a5ca8618a50ea96b380e9f50c3`.
+All seed results passed; Watch Tower's 20 ticks took 11.997 seconds.
+No fresh completion or accepted timing claimed yet.
 
 
 ## Phase 17f
