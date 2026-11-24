@@ -157,6 +157,9 @@ def entering_scene():
     scene.loc('Odd looking wall', ['Push'])
 
     def down(op):
+        # The staircase is visible from the old, unreachable west stand too.
+        if scene.at != STAIRS_TOP:
+            return False
         scene.at = WORKSHOP_ARRIVAL
 
     scene.loc('Staircase', ['Climb-down'], effect=down)
@@ -193,14 +196,28 @@ test('inside the workshop there is nothing to enter', already_inside)
 
 def stairs_visible_after_a_failed_walk():
     scene = entering_scene()
-    # Close enough to the smithy to stay put, too far from the stairs.
-    scene.at = Tile(SMITHY.x + 4, SMITHY.z, 0)
     scene.no_walk = [STAIRS_TOP]
-    expect(run_wait(workshop.enter_workshop(scene.log))).to_be(True)
+    expect(run_wait(workshop.enter_workshop(scene.log))).to_be(False)
     expect(scene.walks).to_equal([STAIRS_TOP])
+    expect(scene.logged('climbing down')).to_be(False)
+    expect(scene.logged('could not reach the workshop stairs')).to_be(True)
+    expect(scene.at).to_equal(SMITHY)
 
 
-test('a failed walk to the stairs still tries a climb when they are in view', stairs_visible_after_a_failed_walk)
+test('a visible staircase is not clicked when its inside approach fails', stairs_visible_after_a_failed_walk)
+
+
+def enters_from_outside_the_south_wall():
+    scene = entering_scene()
+    scene.at = Tile(2708, 3497, 0)
+    expect(run_wait(workshop.enter_workshop(scene.log))).to_be(True)
+    expect(scene.walks).to_equal([SMITHY, STAIRS_TOP])
+    expect(SMITHY).to_equal(Tile(2709, 3494, 0))
+    expect(STAIRS_TOP).to_equal(Tile(2710, 3496, 0))
+    expect(scene.at).to_equal(WORKSHOP_ARRIVAL)
+
+
+test('entry reaches the south wall and exact south stair stand from the old west stand', enters_from_outside_the_south_wall)
 
 
 def enter_failures():

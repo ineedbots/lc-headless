@@ -327,6 +327,19 @@ Horror also completed and logged out, with one death: passing quest journal but
 neither is an accepted zero-death completion time. All original and replacement
 quest accounts have now logged out; no quest runs remain active.
 
+Elemental Workshop entrance repair: a live diagnostic on the stopped original
+account reproduced the failure from `(2708,3497,0)`. The actual entrance stair
+is loc 3415 at `(2710,3497,0)`, angle 2, with a 2x2 footprint; its rotated
+approach restriction forbids the west side. The wall must be approached from
+outside its south face at `(2709,3494,0)`, then the inside south stair stand
+`(2710,3496,0)` must be reached exactly. A live diagnostic using those exact
+stands entered at `(2716,9888,0)` successfully at `2026-11-24T16:22:15.531Z`.
+Raw diagnostic logs: `build/e2e/elemental-entrance-probe/client.log`.
+These diagnostic interventions on the previously blocked account are excluded
+from acceptance timing. Runtime regressions fail against the old binary and
+pass after the repair; focused quest decision/runtime specs and dialect lint
+pass. A fresh full-quest run remains pending. Server unchanged.
+
 
 ## Phase 17g
 

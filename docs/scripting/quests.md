@@ -313,6 +313,7 @@ Each keeps rs2b0t's package. Elemental Workshop, Digsite Quest, Family Crest and
 
 The live run added these departures from rs2b0t:
 
+- **Elemental Workshop** approaches the keyed wall from its south face and requires the exact inside stand south of the stairs before climbing. A visible staircase after a failed approach does not trigger a climb.
 - **Family Crest** kills whatever else is hitting the account before it casts at Chronozon, since the lair is single-way and the server refuses the cast otherwise.
 - **Horror from the Deep**
     - It reads its bridge flag off the open page's raw text, since `quests.journal` gives lines without colour tags.

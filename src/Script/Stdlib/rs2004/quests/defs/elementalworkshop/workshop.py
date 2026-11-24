@@ -114,7 +114,7 @@ def enter_workshop(log):
     if ew_area(game.tile()) == 'workshop':
         return True
     # Stand outside the smithy; the wall loc tile is unwalkable.
-    _w7 = yield from walk_near(SMITHY, 4, log)
+    _w7 = yield from walk_near(SMITHY, 0, log)
     if not (_w7):
         return False
     yield from settle_scene()
@@ -141,13 +141,13 @@ def enter_workshop(log):
         else:
             log('need the Battered key for the Odd looking wall')
             return False
-    # Stairs are inside; walk if needed, then Climb-down into the workshop pocket.
-    _w8 = yield from walk_near(STAIRS_TOP, 3, log)
+    # Visibility from outside does not prove the keyed wall has opened.
+    # Require the exact stand on the stairs' allowed south side.
+    _w8 = yield from walk_near(STAIRS_TOP, 0, log)
     if not (_w8):
-        # Still try the climb from wherever we are if the stairs are visible.
-        yield from settle_scene()
-    else:
-        yield from settle_scene()
+        log('could not reach the workshop stairs through the odd-looking wall')
+        return False
+    yield from settle_scene()
     stairs = locs.query().name('Staircase').action('Climb-down').within(8).nearest()
     if not stairs:
         log('no Staircase to Climb-down in the Seers smithy')
