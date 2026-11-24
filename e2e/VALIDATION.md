@@ -291,7 +291,7 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| Elemental Workshop | Entrance repaired; fresh replacement running | — |
+| Elemental Workshop | Crate loop repaired; diagnostic resume progressed; fresh v2 seeding | — |
 | Digsite Quest | Per-account PASS, zero deaths | 44m 35s |
 | Holy Grail | Per-account PASS, zero deaths | 37m 27s |
 | Family Crest | Replacement completed with one death; acceptance failed | 53m 49s (not accepted) |
@@ -386,6 +386,17 @@ bank cleanup now precedes additional coal gathering. Regressions reproduce the
 old generic-crate, full-pack and approach-timeout failures and pass after the
 rebuild; focused specs and dialect lint pass. The interrupted replacement and
 its diagnostic resume cannot supply uninterrupted acceptance timings.
+The resumed account banked its junk at `2026-11-24T17:16:49.117Z`, collected
+the Needle at `17:17:19.119Z`, repaired the bellows at `17:17:34.119Z` and
+continued to the furnace. Diagnostic resumes are
+`20261124T111508-run-9554` and `20261124T111634-run-9300` under the original
+root. The full ported Python suite also passed (2,906 native assertions).
+Fresh uninterrupted validation is seeding at
+`build/e2e/phase17f-elemental-v2-20261124/`, target `f17b5c196ew`, source
+`2dca84eb067b7c96c24d90b100f7f444d395ab11`. Pinned executable
+`build/e2e-binaries/phase17f-elemental-crates.exe`, SHA-256
+`9f548464cbb02672694722469c4cea57c4b066ba6300661da7b57a12f3079546`. Only Elemental Workshop will execute after
+suite seeding. No uninterrupted completion claimed yet.
 
 
 ## Phase 17g
