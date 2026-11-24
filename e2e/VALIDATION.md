@@ -361,7 +361,15 @@ ownership is removed, leaving protection to its fights. A second reproduced
 failure stopped all attacks on an empty food pack; an idle food check now falls
 through to combat. Regressions reproduced both faults before the fixes and pass
 after the rebuild, along with focused mining/fight specs and dialect lint.
-Fresh full-quest zero-death validation is still required. Server unchanged.
+The full ported Python suite passes all 2,906 native assertions. Fresh
+full-quest zero-death validation is seeding at
+`build/e2e/phase17f-survival-20261124/`, target accounts `f17378cd6fc` and
+`f17378cd6hd`. Only these two cases will execute after suite seeding.
+Source `aea870cb7eec475e5dd927cd7b522c2ba4358f40`; pinned executable
+`build/e2e-binaries/phase17f-survival.exe`, SHA-256
+`1e45cafa63d5ccc43e66d1b5d93773f1cbfcb1b1677ae18f541bf79bfaa63c07`.
+The prepared stats and supplies match the preceding acceptance profile;
+no max-stat workaround or target-progress seed is used. Server unchanged.
 
 
 ## Phase 17g
