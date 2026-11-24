@@ -227,6 +227,31 @@ the Release client builds, and the complete ported Python suite passes with
 2,906 assertions. All eleven CI checks passed at `07f6e9a`; subsequent changes
 in this evidence update are documentation only.
 
+## Phase 17e
+
+Live validation pending. One fresh account per target; no completion claimed.
+Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
+
+| Quest | Result | Time taken |
+|---|---|---|
+| The Tourist Trap | Pending | — |
+| Watch Tower | Pending | — |
+| Big Chompy Bird Hunting | Pending | — |
+| The Grand Tree | Pending | — |
+
+## Phase 17f
+
+Live validation pending. One fresh account per target; no completion claimed.
+Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
+
+| Quest | Result | Time taken |
+|---|---|---|
+| Elemental Workshop | Pending | — |
+| Digsite Quest | Pending | — |
+| Holy Grail | Pending | — |
+| Family Crest | Pending | — |
+| Horror from the Deep | Pending | — |
+
 ## Phase 17g
 
 [Suite](phase17g/README.md) · [PR #146](https://github.com/ineedbots/lc-headless/pull/146)
