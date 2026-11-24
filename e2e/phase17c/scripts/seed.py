@@ -71,10 +71,15 @@ def loop():
     assert quests.points() == initial_points(target), 'prerequisite quest points mismatch'
     for id, variable, value in flags:
         # setvar updates the server flag, but list colours refresh only on login.
+        _core.close_interfaces()
+        closed = yield from execution.delay_until(lambda: _core.get_main_modal() == -1, 8000)
+        assert closed, 'previous interface did not close'
+        yield from execution.delay_ticks(2)
         lines = yield from quests.journal(quest_record(id).name)
+        log('SEED prerequisite journal', id, lines)
         assert 'quest complete!' in normalize_journal(lines), 'prerequisite journal not complete: ' + id
         _core.close_interfaces()
-        yield from execution.delay_ticks(1)
+        yield from execution.delay_ticks(2)
     assert quests.status(quest_record(target).name) == 'not_started', 'target changed during prerequisite setup'
     tick = game.tick()
     start = _core.step_time()
