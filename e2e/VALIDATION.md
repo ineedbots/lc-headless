@@ -153,12 +153,12 @@ Neither interrupted Eadgar attempt supplies a completion time.
 [Suite](phase17d/README.md) · [PR #157](https://github.com/ineedbots/lc-headless/pull/157)
 · [Issue #156](https://github.com/ineedbots/lc-headless/issues/156)
 
-Live validation is in progress; no completion timings are accepted yet.
+Live validation is in progress. Shades has passed; other completion timings remain pending.
 
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
 | Nature Spirit | `d171a75d1ns` | Pending | — |
-| Shades of Mort'ton | `d171a75d1sm` | Pending | — |
+| Shades of Mort'ton | `d171a75d1sm` | PASS, 1 completed, QP 9, zero deaths | 23m 53s |
 | Tai Bwo Wannai Trio | `d17a6a47dtw` | Fresh rerun pending | — |
 | Shilo Village | `d171a75d1sv` | Pending | — |
 
@@ -174,6 +174,11 @@ queue startup: Shades expanded to include Druidic Ritual through its Herblore
 requirement. The corrected seed includes that unlock and matching QP. The old
 attempt supplies no acceptance results. A regression now runs the real AIO quest
 selection against every prepared case and requires exactly its target.
+
+Shades completed uninterrupted in quest session `20261123T211645-run-9313`,
+from `2026-11-24T03:16:50.950Z` to `2026-11-24T03:40:44.330Z`
+(1,433.380 seconds including the final bank return), then logged out. Its
+individual result passes; the shared process is still running other accounts.
 
 The v2 Trio account `d171a75d1tw` logged out with a failed result before quest
 start (zero completed, one stuck, QP 5, zero deaths). Shared supply preparation
