@@ -369,6 +369,36 @@ def doll_elements():
 test('ashes, shadow and dove are each consumed into the doll', doll_elements)
 
 
+def brew_barrel_from_outside_the_hut():
+    scene = world()
+    scene.at = Tile(2327, 9801, 0)
+    stand = Tile(2326, 9799, 0)
+    scene.no_walk = [UP_TILE.BREW_BARREL]
+
+    def approach(dest, radius, log):
+        if scene.at.distance_to(dest) <= radius:
+            return True
+        arrived = yield from scene._walk(dest, radius, log=log)
+        return arrived
+
+    spy_on(doll, 'walk_to', impl=approach)
+    scene.loc('Barrel', id=UP_LOC.BREW_BARREL, tile=UP_TILE.BREW_BARREL)
+
+    def fill(target):
+        if scene.at != stand:
+            return False
+        scene.take(UP_ITEM.BUCKET.id)
+        scene.item(UP_ITEM.DWARF_BREW.id, UP_ITEM.DWARF_BREW.name)
+        return True
+
+    scene.item(UP_ITEM.BUCKET.id, UP_ITEM.BUCKET.name, on_use=fill)
+    expect(run_wait(doll.fill_brew(scene.log))).to_be(True)
+    expect(scene.at).to_equal(stand)
+
+
+test('brew barrel is approached inside the hut instead of used through its north wall', brew_barrel_from_outside_the_hut)
+
+
 def brew_and_tomb():
     scene = world()
     scene.walk_ok = False

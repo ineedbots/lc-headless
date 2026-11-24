@@ -44,7 +44,10 @@ def fill_brew(log):
     """Bucket under the dwarves' brew barrel."""
     if held_id(UP_ITEM.DWARF_BREW.id) > 0:
         return True
-    _w2 = yield from walk_to(UP_TILE.BREW_BARREL, 3, log)
+    # The north wall is only two tiles from the barrel; the west side inside
+    # the hut is the usable stand, reached through its door rather than the wall.
+    stand = Tile(UP_TILE.BREW_BARREL.x - 1, UP_TILE.BREW_BARREL.z, UP_TILE.BREW_BARREL.level)
+    _w2 = yield from walk_to(stand, 0, log)
     if not (_w2):
         return False
     yield from settle_scene()
