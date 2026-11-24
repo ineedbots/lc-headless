@@ -229,15 +229,16 @@ in this evidence update are documentation only.
 
 ## Phase 17e
 
-Live validation pending. One fresh account per target; no completion claimed.
+Live validation is running. All accounts passed one-shot seeding and queued
+exactly one target each. No quest completion is claimed yet.
 Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| The Tourist Trap | Pending | — |
-| Watch Tower | Pending | — |
-| Big Chompy Bird Hunting | Pending | — |
-| The Grand Tree | Pending | — |
+| The Tourist Trap | Running | — |
+| Watch Tower | Running | — |
+| Big Chompy Bird Hunting | Running | — |
+| The Grand Tree | Running | — |
 Preparation source: `9c8b946`. Pinned client:
 `build/e2e-binaries/phase17ef-initial.exe`, SHA-256
 `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
@@ -246,19 +247,24 @@ Engine `2395c968473333d13ff1454f5eff452a18a029b6`, content
 Raw evidence: `build/e2e/phase17e-validation-20261124/`.
 See [preparation limits](phase17e/README.md#preparation-and-limits).
 
+Quest session: `20261124T054333-run-71ac`; source `4fe2e0d`.
+Accounts: `e17989d00tt`, `e17989d00wt`, `e17989d00cb`, `e17989d00gt`.
+All seed results passed; 20-tick probes took 11.991–12.023 seconds.
+
 
 ## Phase 17f
 
-Live validation pending. One fresh account per target; no completion claimed.
+Live validation is running. All accounts passed one-shot seeding and queued
+exactly one target each. No quest completion is claimed yet.
 Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 
 | Quest | Result | Time taken |
 |---|---|---|
-| Elemental Workshop | Pending | — |
-| Digsite Quest | Pending | — |
-| Holy Grail | Pending | — |
-| Family Crest | Pending | — |
-| Horror from the Deep | Pending | — |
+| Elemental Workshop | Running | — |
+| Digsite Quest | Running | — |
+| Holy Grail | Running | — |
+| Family Crest | Running | — |
+| Horror from the Deep | Running | — |
 Preparation source: `9c8b946`. Pinned client:
 `build/e2e-binaries/phase17ef-initial.exe`, SHA-256
 `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
@@ -266,6 +272,10 @@ Engine `2395c968473333d13ff1454f5eff452a18a029b6`, content
 `f32c62f66302f76b43c752ede3181de0c0d01369`; server unchanged.
 Raw evidence: `build/e2e/phase17f-validation-20261124/`.
 See [preparation limits](phase17f/README.md#preparation-and-limits).
+
+Quest session: `20261124T054351-run-1ad4`; source `4fe2e0d`.
+Accounts: `f17649fb3ew`, `f17649fb3ds`, `f17649fb3hg`, `f17649fb3fc`, `f17649fb3hd`.
+All seed results passed; 20-tick probes took 11.983–11.996 seconds.
 
 
 ## Phase 17g
