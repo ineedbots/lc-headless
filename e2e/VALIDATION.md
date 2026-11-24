@@ -159,7 +159,7 @@ Live validation is in progress; no completion timings are accepted yet.
 |---|---|---|---|
 | Nature Spirit | `d171a75d1ns` | Pending | — |
 | Shades of Mort'ton | `d171a75d1sm` | Pending | — |
-| Tai Bwo Wannai Trio | `d171a75d1tw` | Pending | — |
+| Tai Bwo Wannai Trio | `d17a6a47dtw` | Fresh rerun pending | — |
 | Shilo Village | `d171a75d1sv` | Pending | — |
 
 Run root: `build/e2e/phase17d-validation-20261123-v2`, prepared from
@@ -174,6 +174,15 @@ queue startup: Shades expanded to include Druidic Ritual through its Herblore
 requirement. The corrected seed includes that unlock and matching QP. The old
 attempt supplies no acceptance results. A regression now runs the real AIO quest
 selection against every prepared case and requires exactly its target.
+
+The v2 Trio account `d171a75d1tw` logged out with a failed result before quest
+start (zero completed, one stuck, QP 5, zero deaths). Shared supply preparation
+tried `skills.xp('supplies')` while gathering seaweed. `62b38e9` restricts objective
+XP tracking to real skills, retaining item counts and explicit prerequisite XP.
+The new runtime regression reproduced the error before the fix and passes after
+it. A fresh Trio account runs from `build/e2e/phase17d-trio-20261123`, using the
+same binary and server with the corrected script snapshot. The other three v2
+accounts continue unchanged. Neither failed attempt has an accepted time.
 
 ## Phase 17g
 
