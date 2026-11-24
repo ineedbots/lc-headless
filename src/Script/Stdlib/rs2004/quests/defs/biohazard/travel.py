@@ -1,8 +1,10 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/biohazard/travel.ts (MIT, see thirdparty/rs2b0t)."""
 
+from rs2004 import execution
 from rs2004.catalogs.record import Record
 from rs2004.entities import locs
 from rs2004.game import game
+from rs2004.geometry import Tile
 from rs2004.quests.defs.biohazard.areas import BIO_ITEM, BIO_LOC, BIO_NPC, BIO_TILE, bio_area
 from rs2004.quests.defs.biohazard.gear import wear
 from rs2004.quests.exec.primitives import talk_strict
@@ -14,6 +16,8 @@ __all__ = ['area', 'loc_by_id', 'walk_to', 'talk_at', 'enter_hq', 'go_west', 'go
 
 OMART_CROSS = ['Ok, lets do it.']
 KILRON_CROSS = ['Yes I do.']
+HQ_PASSAGE_STAND = Tile(2547, 3326, 0)
+HQ_OPEN_LEAF = Tile(2547, 3325, 0)
 
 
 def area():
@@ -97,16 +101,30 @@ def enter_hq(log):
     return landed
 
 
+def hq_open_leaf():
+    return locs.query().where(lambda loc: loc.id == 1531 and loc.tile() == HQ_OPEN_LEAF).action('Close').nearest()
+
+
 def leave_hq(log):
-    """The same door from the inside, where the script opens it for anyone."""
-    _c9 = area() == 'hqUpstairs'
-    if _c9:
-        _w10 = yield from walk_to(BIO_TILE.HQ_INSIDE, 4, log)
-        _c9 = not (_w10)
-    if _c9:
-        return False
+    """Cross to the east side of the inner door, then shut its leaf out of the exit corridor."""
+    here = game.tile()
+    if area() == 'hqUpstairs' or (area() == 'hq' and here.x <= 2546):
+        walked = yield from walk_to(HQ_PASSAGE_STAND, 0, log)
+        if not walked:
+            return False
     if area() != 'hq':
         return area() == 'west' or area() == 'mainland'
+    leaf = hq_open_leaf()
+    if leaf:
+        # The open door occupies (2547,3325), sealing the narrow passage beside the furniture.
+        # Close only after crossing east of the shut door at (2546,3325).
+        log('closing the open HQ door at (2547,3325) to clear the exit passage')
+        if not leaf.interact('Close'):
+            return False
+        closed = yield from execution.delay_until(lambda: hq_open_leaf() is None, 4000)
+        if not closed:
+            return False
+        yield from settle_scene()
     out = yield from cross_hq_door(BIO_TILE.HQ_INSIDE, lambda a: a == 'west' or a == 'mainland', log)
     if out:
         yield from settle_scene()

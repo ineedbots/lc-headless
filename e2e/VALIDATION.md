@@ -168,3 +168,34 @@ reengagement. `ec29f3e` restricts shared sustain to combat and has a failing-bef
 passing-after runtime regression. The accepted v5 attempt used a fresh account
 with no restart or manual quest intervention. Earlier v1–v3 seed-verification
 failures occurred before combat and remain separate artifacts.
+
+
+## Focused Biohazard HQ exit regression
+
+The phase 17c v2 account repeatedly repathed while leaving the headquarters:
+the downstairs door at `(2546,3325,0)` opens onto `(2547,3325,0)`, blocking the
+corridor beside the furniture. The exit leg now crosses to `(2547,3326,0)`, closes
+that specific open leaf, verifies closure and continues to the scripted HQ exit.
+The regression fails before the change and passes after it, including refused
+or unchanged closure and an unrelated upstairs leaf.
+
+| Scope | Result | Time taken |
+|---|---|---|
+| HQ upstairs to West Ardougne, including explicit leaf closure | PASS | 15s |
+
+On November 23, 2026 (local time), spare prepared account `c1762b0d8bh` was placed
+at `(2550,3326,1)` and ran the real `biohazard.travel.leave_hq` handler with normal
+600 ms ticks. No door state was seeded. It opened/crossed the inner door, logged
+explicit closure at 00:25:58.334 UTC on November 24, and emitted a passing
+`HQ_EXIT_RESULT` at 00:26:04.903 UTC at `(2551,3320,0)`. The start was
+00:25:49.903 UTC. The character logged out and the process ended.
+
+This is **leg-only** validation, not a Biohazard completion or full quest timing.
+The spare account came from v3 preparation and never ran the full quest. The
+ongoing v2/v3 quest clients continued on their original binary, without restart;
+they do not execute this new fix. The focused client was built separately as
+`Rs2004Headless-hq-test.exe` from parent `f380a40` plus the HQ fix. Runtime source
+SHA-256: `30e876535dbdfb328c58e5179ea27a2b87b26dac68b9babc7a648f3d9af04c88`.
+Binary SHA-256: `e0bc1defada67cb31967ddd30fd9679cad77470ab4c4cc1a1f2c73c0ded21017`.
+Engine/content remained `2395c968` / `f32c62f6`, unchanged. Raw setup, logs and
+provenance: `build/e2e/biohazard-hq-20261123`.

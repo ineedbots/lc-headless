@@ -223,6 +223,12 @@ The phase-17c modules are registered too:
 
 Each keeps rs2b0t's package. Plague City and Biohazard walk out of West Ardougne, the mourners' headquarters and the sewer before any bank leg, since none has a bank. Troll Stronghold and Eadgar's Ruse bank only below the stile; above it they wear what they carry and go on. Death Plateau's dice game reads the panel's buttons with `reader.modal_buttons` and presses them with `_core.click_component`, which sends a pause button's resume.
 
+Biohazard's HQ exit crosses to the east side of the downstairs inner door, then
+closes its open leaf at `(2547,3325,0)` before approaching the outer exit. The
+closed door is at `(2546,3325,0)`; its open leaf blocks the narrow passage beside
+the furniture. Closure is verified with a bounded wait instead of waiting for
+the door's timed reset. Other doors and upstairs leaves are left alone.
+
 All five phase-17c quests have completed in one live queue. Eadgar's Ruse departs from rs2b0t in drawing two prayer potions for the Trollheim crossings, and Death Plateau in closing Harold's menu before it reads the IOU.
 
 The phase-17d modules are registered too:
