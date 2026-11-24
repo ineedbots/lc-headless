@@ -85,6 +85,61 @@ Sources `0ea1238` (first session) and `a8a3159` (Scorpion Catcher resume). Artif
 
 Scorpion Catcher's table timing now comes from the fresh uninterrupted run at `build/e2e/phase17b-uninterrupted-20261123/sessions/20261123T134304-run-1fc1`, source `4b201aa`: zero deaths, no client restart or manual intervention, clean logout. The older resumed result remains historical evidence: 1h 7m 31s elapsed, 1h 6m 42s active, 19m 49s in its final session. No target progress or objective items were seeded during recovery.
 
+## Phase 17c
+
+[Suite](phase17c/README.md) · [PR #155](https://github.com/ineedbots/lc-headless/pull/155)
+
+| Quest | Case | Final QP | Result | Time taken |
+|---|---|---|---|---|
+| Death Plateau | `dp` | 1 | PASS, 0 deaths | 31m 46s |
+| Troll Stronghold | `ts` | 2 | PASS, 0 deaths | 14m 14s |
+| Eadgar's Ruse | `er` | Pending | Resumed; completion pending | Pending |
+| Plague City | `pc` | 1 | PASS, 0 deaths | 35m 14s |
+| Biohazard | `bh` | 4 | PASS, 0 deaths | 29m 43s |
+
+Plague City and Biohazard used source `794a2ed`, artifacts
+`build/e2e/phase17c-validation-20261123-v2/sessions/20261123T180249-run-f2f5`.
+Death Plateau and Troll Stronghold used source `f380a40`, artifacts
+`build/e2e/phase17c-validation-20261123-v3/sessions/20261123T181719-run-1f6b`.
+All four accepted account runs were uninterrupted and logged out on passing
+results; each shared client later exited cleanly. The aggregate launchers
+correctly reported failure for other failed/interrupted cases in those sessions.
+These are per-account results, not an aggregate five-account suite pass.
+
+Each target began unstarted. Preparation used the suite's boosted skills,
+ordinary equipment/consumables, prerequisite completions/QP, one raw ranarr weed
+for Eadgar and ten bread/trout for Death Plateau. Completed Death Plateau also
+requires its scouted-path state (`death_map=8`) for Tenzing's door. Eadgar was
+left imprisoned so its handler had to free him. The server remained unchanged,
+with normal 600 ms ticks (v3 twenty-tick probes 11,989–12,026 ms), and per-character
+infinite run. Earlier v1 journal verification and v2 food/path setup failures are
+retained separately and are not passes.
+
+Biohazard's passing full quest predates the HQ exit fix; its observed door-reset
+delay remains included in the time above. The separate focused test below
+validates the explicit closure fix.
+
+Eadgar's v3 run stalled at stage 60 with nine grain and a full pack of eight
+lobsters, scarecrow supplies, two prayer containers and tools. The six-food
+scarecrow preparation target limited withdrawals but did not bank surplus food.
+`160e9df` adds total food caps through the existing verified deposit step,
+preserving quest supplies and restoring normal replenishment after gathering.
+A full-pack regression fails before and passes after, including mixed foods and
+committed mountain travel. The first resume at `160e9df`, session
+`20261123T190019-run-d6da`, exposed a shared deposit-cap bug: it tried Deposit
+through the normal inventory panel instead of the bank side panel. That attempt
+failed, recovered its supplies through banking, and logged out incomplete with
+zero deaths. `8727343` fixes cap clicks and count acknowledgements to use the bank
+side panel. A regression distinguishes normal Eat/Drop actions from side-panel
+Deposit actions, including stale normal counts, rejected/unchanged deposits and
+a zero cap. The same account resumed without reseeding in v3 session
+`20261123T190309-run-aca4`. Live logs confirm the capped deposit succeeded
+(`lobster 8→6`, 1.8 seconds) at 01:03:28.115 UTC. It then collected the tenth
+grain at 01:03:55.711 UTC and advanced to the Eadgar hand-in journey. The full
+ported stdlib suite passes after both fixes (2,899 native assertions). Its eventual time must
+include both interruptions from its original queue start at 00:17:24.718 UTC on
+November 24 (November 23 local time). Completion remains pending.
+
 ## Phase 17g
 
 [Suite](phase17g/README.md) · [PR #146](https://github.com/ineedbots/lc-headless/pull/146)

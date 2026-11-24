@@ -11,6 +11,9 @@ Five fresh scratch accounts each run one quest through the real
 | `pc` | Plague City | None | 0 | 1 |
 | `bh` | Biohazard | Plague City | 1 | 4 |
 
+See the [recorded validation table](../VALIDATION.md#phase-17c) for completed
+cases and timings; Eadgar's resumed completion remains pending.
+
 ## Prepare and run
 
 Use the [phase 17g prerequisites](../phase17g/README.md#prerequisites): a built
