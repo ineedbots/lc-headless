@@ -63,7 +63,7 @@ class GameEnvironment:
         self.stock.invalidate()
 
     def progress(self, plan):
-        targets = plan.prerequisite_levels or {plan.objective: 0}
+        targets = plan.prerequisite_levels or ({plan.objective: 0} if plan.objective in enabled_skills else {})
         return json.dumps([{skill: skills.xp(skill) for skill in targets.keys()}, stock_of(self.snapshot(), plan.output.item) if plan.output else None])
 
     def can_stop(self):

@@ -148,6 +148,85 @@ resume (`20261123T190309-run-aca4`) successfully banked two lobsters and collect
 the tenth grain, but was stopped at the user's request to start the fresh run.
 Neither interrupted Eadgar attempt supplies a completion time.
 
+## Phase 17d
+
+[Suite](phase17d/README.md) · [PR #157](https://github.com/ineedbots/lc-headless/pull/157)
+· [Issue #156](https://github.com/ineedbots/lc-headless/issues/156)
+
+All four targets passed on fresh individual accounts at normal 600 ms ticks.
+Each accepted account ran uninterrupted, returned to a bank and logged out.
+The results span two client sessions: Trio uses a fresh account after its
+original preparation failure, rather than a resumed timing.
+
+| Quest | Account | Final QP | Result | Time taken |
+|---|---|---|---|---|
+| Nature Spirit | `d171a75d1ns` | 5 | PASS | 31m 39s |
+| Shades of Mort'ton | `d171a75d1sm` | 9 | PASS | 23m 53s |
+| Tai Bwo Wannai Trio | `d17a6a47dtw` | 7 | PASS | 1h 7m 34s |
+| Shilo Village | `d171a75d1sv` | 7 | PASS | 40m 40s |
+
+Every accepted result has a complete target journal, exactly one newly completed
+quest, zero deaths, expected final QP, no initially completed target and a queue
+with one done and zero stuck. Both native clients exited with code zero. The
+original shared launcher correctly rejected its aggregate result because its
+first Trio account failed; the three independent passing accounts are retained.
+The separate fresh Trio launcher passed. These are four individual passes,
+not a claim that the original four-account session passed as a whole.
+
+Times run from each account's first `AIOQuester, queue:` to its passing
+`E2E_RESULT`, including final banking and excluding seed/login staggering:
+
+| Case | Queue start (UTC, 2026-11-24) | Passing result (UTC) | Exact seconds |
+|---|---|---|---|
+| `ns` | 03:16:47.937 | 03:48:26.944 | 1899.007 |
+| `sm` | 03:16:50.950 | 03:40:44.330 | 1433.380 |
+| `tw` | 03:37:31.128 | 04:45:04.734 | 4053.606 |
+| `sv` | 03:16:53.922 | 03:57:34.152 | 2440.230 |
+
+These timestamps fall on **November 23 locally (America/Regina)**.
+
+Evidence and versions:
+
+- Nature Spirit, Shades and Shilo: `build/e2e/phase17d-validation-20261123-v2`,
+  seed `20261123T211440-seed-b1c0`, quest `20261123T211645-run-9313`.
+  Prepared source `bccb2aca143888037ddbf6dd499fdf52b7a9e3e2`; quest-session
+  source `3cf4c8f419c0a79ddd0a7719fc170383e6c5d1e9` adds the selection regression.
+  Twenty-tick probes: 11,994–12,032 ms.
+- Fresh Trio: `build/e2e/phase17d-trio-20261123`, seed
+  `20261123T213523-seed-3466`, quest `20261123T213728-run-8ed4`.
+  Prepared source `62b38e9fed9b7f5616c6a14a05754091772efdee`; quest-session
+  source `3eaaa9d296293dbc33d8fdf98eee5c6af5c9944b` adds evidence documentation.
+  Twenty-tick probes: 11,998–12,021 ms. `timings.json` and the quest session's
+  `results.json` record its passing fresh run.
+- Combined checked results and exact timings: `build/e2e/phase17d-final-results.json`.
+  Original logs, seed acceptance, manifests, script hashes and session version
+  files remain in the two run roots. Credentials remain ignored.
+- Both runs use the same pinned client executable SHA-256:
+  `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+  The supply fix changes external bot scripts, so no executable change was needed.
+- Engine: `2395c968473333d13ff1454f5eff452a18a029b6`; content:
+  `f32c62f66302f76b43c752ede3181de0c0d01369`. Server files remain unchanged by
+  this validation. Preparation and its limits are documented in the suite guide.
+
+The first attempt (`phase17d-validation-20261123`) was stopped shortly after
+queue startup: Shades expanded to include Druidic Ritual through its Herblore
+requirement. The corrected seed includes that unlock and matching QP. A
+regression runs the real AIO quest selection against every prepared case and
+requires exactly its target. No result or timing is accepted from that attempt.
+
+The v2 Trio account `d171a75d1tw` failed before quest start (zero completed, one
+stuck, QP 5, zero deaths). Shared supply preparation tried `skills.xp('supplies')`
+while gathering seaweed. `62b38e9` restricts objective XP tracking to real skills,
+retaining item counts and explicit prerequisite XP. Its runtime regression
+reproduced the error before the fix and passes after it. The fresh Trio run
+exercised seaweed gathering successfully and completed the quest. No failed
+attempt contributes to its accepted time.
+
+Validation: five launcher safeguards pass, changed scripts pass pocketpy lint,
+the Release client builds, and the complete ported Python suite passes with
+2,906 assertions. All eleven CI checks passed at `07f6e9a`; subsequent changes
+in this evidence update are documentation only.
+
 ## Phase 17g
 
 [Suite](phase17g/README.md) · [PR #146](https://github.com/ineedbots/lc-headless/pull/146)
