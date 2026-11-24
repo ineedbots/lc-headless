@@ -294,8 +294,8 @@ Tracks [#158](https://github.com/ineedbots/lc-headless/issues/158).
 | Elemental Workshop | Blocked entering workshop: unreachable stair | — |
 | Digsite Quest | Per-account PASS, zero deaths | 44m 35s |
 | Holy Grail | Per-account PASS, zero deaths | 37m 27s |
-| Family Crest | Initial run blocked: missing banked cooked fish; fresh replacement pending | — |
-| Horror from the Deep | Running | — |
+| Family Crest | Replacement completed with one death; acceptance failed | 53m 49s (not accepted) |
+| Horror from the Deep | Completed with one death; acceptance failed | 1h 31m 39s (not accepted) |
 Preparation source: `9c8b946`. Pinned client:
 `build/e2e-binaries/phase17ef-initial.exe`, SHA-256
 `45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
@@ -319,8 +319,13 @@ remains running for Horror from the Deep. Elemental Workshop exhausted recovery
 at its entrance, repeatedly receiving `I can't reach that!` after the key/wall
 interaction and stair climb. The fresh Family Crest account `f173ac952fc`
 passed corrected seeding and reached Chronozon, but has recorded one death;
-it cannot meet zero-death acceptance even if it finishes. It is still running
-and returning the restored crest. Horror remains running at the lighthouse.
+it failed zero-death acceptance. It completed the quest and logged out at
+`2026-11-24T12:52:43.134Z` after 3,229.204 seconds (53m 49s).
+Horror also completed and logged out, with one death: passing quest journal but
+`passed=false`, QP 2, elapsed 5,499.032 seconds (1h 31m 39s), result at
+`2026-11-24T13:15:43.157Z`. Both durations describe failed acceptance runs;
+neither is an accepted zero-death completion time. All original and replacement
+quest accounts have now logged out; no quest runs remain active.
 
 
 ## Phase 17g
