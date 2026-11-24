@@ -89,56 +89,64 @@ Scorpion Catcher's table timing now comes from the fresh uninterrupted run at `b
 
 [Suite](phase17c/README.md) · [PR #155](https://github.com/ineedbots/lc-headless/pull/155)
 
+All five fresh accounts passed in one uninterrupted quest session, with no
+restarts or manual quest intervention. These timings supersede the earlier
+phase 17c observations below. Every target journal was complete, exactly one
+quest was newly completed per account, no queue entries were stuck, all final
+QP totals matched, and all accounts logged out before the client exited zero.
+
 | Quest | Case | Final QP | Result | Time taken |
 |---|---|---|---|---|
-| Death Plateau | `dp` | 1 | PASS, 0 deaths | 31m 46s |
-| Troll Stronghold | `ts` | 2 | PASS, 0 deaths | 14m 14s |
-| Eadgar's Ruse | `er` | Pending | Resumed; completion pending | Pending |
-| Plague City | `pc` | 1 | PASS, 0 deaths | 35m 14s |
-| Biohazard | `bh` | 4 | PASS, 0 deaths | 29m 43s |
+| Death Plateau | `dp` | 1 | PASS, 0 deaths | 32m 23s |
+| Troll Stronghold | `ts` | 2 | PASS, 0 deaths | 14m 54s |
+| Eadgar's Ruse | `er` | 7 | PASS, 0 deaths | 1h 28m 32s |
+| Plague City | `pc` | 1 | PASS, 0 deaths | 35m 04s |
+| Biohazard | `bh` | 4 | PASS, 0 deaths | 25m 19s |
 
-Plague City and Biohazard used source `794a2ed`, artifacts
-`build/e2e/phase17c-validation-20261123-v2/sessions/20261123T180249-run-f2f5`.
-Death Plateau and Troll Stronghold used source `f380a40`, artifacts
-`build/e2e/phase17c-validation-20261123-v3/sessions/20261123T181719-run-1f6b`.
-All four accepted account runs were uninterrupted and logged out on passing
-results; each shared client later exited cleanly. The aggregate launchers
-correctly reported failure for other failed/interrupted cases in those sessions.
-These are per-account results, not an aggregate five-account suite pass.
+Source `11dd4b1de72388bfd467f4bbaa1baa2dde887b16`; pinned executable SHA-256
+`45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+Artifacts: `build/e2e/phase17c-uninterrupted-20261123`, quest session
+`sessions/20261123T190816-run-df48`, seed session
+`sessions/20261123T190616-seed-52a4`. The root's `timings.json` records each
+account's queue/result timestamps and unrounded elapsed seconds; `results.json`
+in the quest session records the passing outcomes. Timings include the final
+bank return, excluding seeding and login staggering. The run occurred on
+November 23, 2026 local time (November 24 UTC).
 
 Each target began unstarted. Preparation used the suite's boosted skills,
 ordinary equipment/consumables, prerequisite completions/QP, one raw ranarr weed
 for Eadgar and ten bread/trout for Death Plateau. Completed Death Plateau also
-requires its scouted-path state (`death_map=8`) for Tenzing's door. Eadgar was
-left imprisoned so its handler had to free him. The server remained unchanged,
-with normal 600 ms ticks (v3 twenty-tick probes 11,989–12,026 ms), and per-character
-infinite run. Earlier v1 journal verification and v2 food/path setup failures are
-retained separately and are not passes.
+requires its scouted-path state (`death_map=8`) for Tenzing's door. Mad Eadgar was
+left imprisoned so the handler had to free him. Per-character infinite run was
+enabled. Normal 600 ms ticks were checked before execution: twenty-tick probes
+measured 11,970–12,028 ms. Engine `2395c968473333d13ff1454f5eff452a18a029b6` and
+content `f32c62f66302f76b43c752ede3181de0c0d01369` remained unchanged.
 
-Biohazard's passing full quest predates the HQ exit fix; its observed door-reset
-delay remains included in the time above. The separate focused test below
-validates the explicit closure fix.
+The fresh full run exercised explicit HQ leaf closure at `(2547,3325,0)` and
+Eadgar's excess-food deposit (`lobster 8→6`), followed by quest completion.
+The full ported stdlib suite passed after both fixes (2,899 native assertions),
+as did four suite safeguard tests and changed-script lint. All 11 CI checks
+passed on the tested source `11dd4b1`.
 
-Eadgar's v3 run stalled at stage 60 with nine grain and a full pack of eight
-lobsters, scarecrow supplies, two prayer containers and tools. The six-food
-scarecrow preparation target limited withdrawals but did not bank surplus food.
-`160e9df` adds total food caps through the existing verified deposit step,
-preserving quest supplies and restoring normal replenishment after gathering.
-A full-pack regression fails before and passes after, including mixed foods and
-committed mountain travel. The first resume at `160e9df`, session
-`20261123T190019-run-d6da`, exposed a shared deposit-cap bug: it tried Deposit
-through the normal inventory panel instead of the bank side panel. That attempt
-failed, recovered its supplies through banking, and logged out incomplete with
-zero deaths. `8727343` fixes cap clicks and count acknowledgements to use the bank
-side panel. A regression distinguishes normal Eat/Drop actions from side-panel
-Deposit actions, including stale normal counts, rejected/unchanged deposits and
-a zero cap. The same account resumed without reseeding in v3 session
-`20261123T190309-run-aca4`. Live logs confirm the capped deposit succeeded
-(`lobster 8→6`, 1.8 seconds) at 01:03:28.115 UTC. It then collected the tenth
-grain at 01:03:55.711 UTC and advanced to the Eadgar hand-in journey. The full
-ported stdlib suite passes after both fixes (2,899 native assertions). Its eventual time must
-include both interruptions from its original queue start at 00:17:24.718 UTC on
-November 24 (November 23 local time). Completion remains pending.
+Earlier diagnostic runs remain separate. Plague City/Biohazard used `794a2ed`
+in `build/e2e/phase17c-validation-20261123-v2/sessions/20261123T180249-run-f2f5`;
+Death Plateau/Troll Stronghold used `f380a40` in
+`build/e2e/phase17c-validation-20261123-v3/sessions/20261123T181719-run-1f6b`.
+Their per-account zero-death passes took 35m 14s / 29m 43s / 31m 46s / 14m 14s
+respectively; aggregate launchers correctly rejected other failed cases.
+These older timings are superseded by the fresh five-account table above.
+
+Earlier v1 journal verification and v2 food/path setup failures are not passes.
+Eadgar's v3 stage-60 run filled its pack at nine grain because its smaller food
+float did not bank surplus food. `160e9df` added food quantity caps; its first
+resume (`20261123T190019-run-d6da`) then exposed a shared cap executor bug using
+normal inventory actions instead of the bank side panel. `8727343` corrected
+cap clicks and acknowledgements. Both regressions failed before and passed
+after their fixes, including mixed food, committed mountain travel, stale normal
+counts, rejected/unchanged deposits and a zero cap. The next saved-progress
+resume (`20261123T190309-run-aca4`) successfully banked two lobsters and collected
+the tenth grain, but was stopped at the user's request to start the fresh run.
+Neither interrupted Eadgar attempt supplies a completion time.
 
 ## Phase 17g
 
