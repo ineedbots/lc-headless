@@ -247,15 +247,19 @@ def _deposit(step, log):
         yield from bank.deposit_all_matching(unkept)
         ok = yield from bank.backpack_ready(log=log)
         ok = ok and not any([unkept(item.name or '', item.id) for item in inventory.items()])
+    # Quantity caps act on the bank's side panel; normal backpack actions are Eat/Drop.
+    def side_count(id):
+        return sum([item.count for item in bank.side_items() if item.id == id])
+
     for cap in step.caps or []:
-        while ok and inventory.count_by_id(cap.id) > cap.qty:
-            before = inventory.count_by_id(cap.id)
-            items = [item for item in inventory.items() if item.id == cap.id]
+        while ok and side_count(cap.id) > cap.qty:
+            before = side_count(cap.id)
+            items = [item for item in bank.side_items() if item.id == cap.id]
             ops = [op for op in items[0].actions() if op.lower().replace('-', ' ') == 'deposit 1'] if items else []
             if not ops or not items[0].interact(ops[0]):
                 ok = False
                 break
-            ok = yield from execution.delay_until(lambda: inventory.count_by_id(cap.id) < before, 3000)
+            ok = yield from execution.delay_until(lambda: side_count(cap.id) < before, 3000)
             if ok:
                 ok = yield from bank.backpack_ready(log=log)
     if not ok:
