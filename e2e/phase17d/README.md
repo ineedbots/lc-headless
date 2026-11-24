@@ -16,6 +16,11 @@ target progress. All four target quests remain unstarted after preparation.
 Druidic Ritual is included for Shades' Herblore requirement, which the AIO quest
 selection expands into a quest prerequisite.
 
+All four targets have passed on fresh accounts with uninterrupted per-account
+runs and zero deaths. Trio uses a fresh run after a preparation bug was fixed.
+See the [validation table](../VALIDATION.md#phase-17d) for measured completion
+times, version details and the two-session acceptance scope.
+
 ## Prepare and run
 
 Use the [phase 17g prerequisites](../phase17g/README.md#prerequisites): a built
