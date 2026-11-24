@@ -517,7 +517,7 @@ Completion evidence is pending; startup and preparation are not passes.
 | Quest | Account | Result | Time taken |
 |---|---|---|---|
 | Underground Pass | `h17270e59up` | Running | Pending |
-| Regicide | `h176ebc68rg` | Fresh replacement preparing | Pending |
+| Regicide | `h176ebc68rg` | Fresh replacement running | Pending |
 
 Both seed checks passed with unstarted targets, complete prerequisite journals,
 ordinary supplies and correct initial QP (4 / 9). Each 20-tick probe took
@@ -538,6 +538,10 @@ Seven phase 17h launcher tests and setup lint pass after the correction.
 Fresh replacement root: `build/e2e/phase17h-regicide-v2-20261124`, prepared
 from `4da00fd` on the same frozen binary. Both setup cases are seeded, but only
 `rg` will run; its spare Underground Pass account is outside quest acceptance.
+Seed `20261124T132028-seed-d0a8` passed, explicitly setting `ibanmulti=379360`;
+Regicide's 20-tick probe took 11,997 ms. Quest session
+`20261124T132228-run-0bf9` started its single Regicide queue at
+19:22:30.234 UTC. Completion and uninterrupted timing remain pending.
 
 Preparation/runtime source: `914a7c85bc5a6a85625f47c7ae71d1014cd0b512`.
 Frozen client: `build/e2e-binaries/phase17hi-initial.exe`, SHA-256
