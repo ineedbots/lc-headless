@@ -2,6 +2,7 @@
 
 from rs2004 import execution
 from rs2004.catalogs.record import Record
+from rs2004.catalogs.tables import item_db
 from rs2004.entities import ground_items, locs, npcs
 from rs2004.game import game
 from rs2004.geometry import Tile
@@ -23,6 +24,7 @@ FOOD_TARGET = FOOD_FLOAT
 # Why: the scarecrow is 16 slots of grain and chicken, so the float shrinks to make room while that load is still being gathered.
 # Why: holding it down across stages 60 and 70 means crossing the thrower gauntlet on 4 lobsters, which killed 3 runs.
 SCARECROW_FOOD_TARGET = 6
+FOOD_IDS = {item.name.lower(): item.id for item in item_db() if item.consumable == 'eat'}
 FOOD_FLOOR = 2
 PRICE = Record({'PINEAPPLE': 5, 'LIQUOR': 20, 'KNIFE': 20, 'PESTLE': 20, 'TINDERBOX': 10, 'AXE': 100, 'VIAL': 10})
 # Why: `Shop.open` requires the stock owner's display name; no NPC is named "Shop keeper".
@@ -162,12 +164,25 @@ def prepare(snap, zone, food_want=None):
     if not snap.bank_known:
         return scan_bank(snap)
     keep = keep_names(snap)
-    if any([not (name in keep) for name in list(list(snap.inv.keys()))]):
+    caps = []
+    # A smaller gathering float must also trim food already carried from the mountain.
+    # Keep a total across food types, preserving the configured food first.
+    if food_want < FOOD_TARGET and food_held(snap) > food_want:
+        remaining = food_want
+        for name in food_names():
+            count = pack_count(snap, name)
+            kept = min(count, remaining)
+            remaining -= kept
+            id = FOOD_IDS.get(name.lower())
+            if id is not None and count > kept:
+                caps.append(Record({'id': id, 'qty': kept}))
+    if caps or any([not (name in keep) for name in list(list(snap.inv.keys()))]):
         return Record({
             'kind': 'deposit',
             'keep': keep,
             'keep_ids': keep_ids(),
             'exact_keep': True,
+            'caps': caps,
             'bank': quest_bank(snap),
         })
     from_vault = []

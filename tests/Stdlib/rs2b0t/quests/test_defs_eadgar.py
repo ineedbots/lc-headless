@@ -62,7 +62,7 @@ def ready(options=None):
     if options is None:
         options = Record({})
     _merged4 = {}
-    for _k, _v in {'food': 8, 'worn': [ER_ITEM.CLIMBING_BOOTS]}.items():
+    for _k, _v in {'food': (6 if options.stage == EADGAR_STAGE.HID_PARROT else 8), 'worn': [ER_ITEM.CLIMBING_BOOTS]}.items():
         _merged4[_k] = _v
     for _k, _v in (options._fields if isinstance(options, Record) else options).items():
         _merged4[_k] = _v

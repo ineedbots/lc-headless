@@ -229,6 +229,11 @@ closed door is at `(2546,3325,0)`; its open leaf blocks the narrow passage besid
 the furniture. Closure is verified with a bounded wait instead of waiting for
 the door's timed reset. Other doors and upstairs leaves are left alone.
 
+Eadgar's scarecrow gathering banks food above its reduced six-food float,
+including food carried from earlier mountain legs. The cap applies to the total
+across food types and preserves the quest ingredients. Once gathering is over,
+normal food replenishment resumes before further mountain travel.
+
 All five phase-17c quests have completed in one live queue. Eadgar's Ruse departs from rs2b0t in drawing two prayer potions for the Trollheim crossings, and Death Plateau in closing Harold's menu before it reads the IOU.
 
 The phase-17d modules are registered too:
