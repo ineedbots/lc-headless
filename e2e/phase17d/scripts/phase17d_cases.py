@@ -11,6 +11,9 @@ def prerequisite_flags(quest):
         flags = [('runemysteries', 'runemysteries', 6), ('priestperil', 'priestperil', 61)]
         if quest == 'druidspirit':
             flags.append(('priest', 'prieststart', 5))
+        else:
+            # AIO quest selection adds Druidic Ritual for Herblore requirements.
+            flags.append(('druid', 'druidquest', 4))
         return flags
     return [('druid', 'druidquest', 4), ('junglepotion', 'junglepotion', 13)]
 

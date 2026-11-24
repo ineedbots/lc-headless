@@ -34,7 +34,8 @@ class Phase17dTests(unittest.TestCase):
                 self.assertTrue(set(records[quest]['requirements'].get('quests', [])).issubset(prerequisites))
                 self.assertEqual(initial_points(quest), sum(records[id]['quest_points'] for id in prerequisites))
         self.assertEqual(initial_points('druidspirit'), 3)
-        self.assertEqual(initial_points('mortton'), 2)
+        self.assertEqual(initial_points('mortton'), 6)
+        self.assertIn('druid', {row[0] for row in prerequisite_flags('mortton')})
         self.assertEqual(initial_points('tbwt'), 5)
         self.assertEqual(initial_points('zombiequeen'), 5)
 

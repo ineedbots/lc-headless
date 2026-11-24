@@ -6,13 +6,15 @@ Four fresh scratch accounts each run one quest through the real
 | Case | Quest | Seeded completed prerequisites | Initial QP | Final QP |
 |---|---|---|---|---|
 | `ns` | Nature Spirit | Rune Mysteries, Priest in Peril, The Restless Ghost | 3 | 5 |
-| `sm` | Shades of Mort'ton | Rune Mysteries, Priest in Peril | 2 | 5 |
+| `sm` | Shades of Mort'ton | Rune Mysteries, Priest in Peril, Druidic Ritual | 6 | 9 |
 | `tw` | Tai Bwo Wannai Trio | Druidic Ritual, Jungle Potion | 5 | 7 |
 | `sv` | Shilo Village | Druidic Ritual, Jungle Potion | 5 | 7 |
 
 Shades also seeds Nature Spirit **started** (`druidspirit=5`) solely to open
 the Mort Myre gate; this awards no QP. Nature Spirit's own account starts at zero
 target progress. All four target quests remain unstarted after preparation.
+Druidic Ritual is included for Shades' Herblore requirement, which the AIO quest
+selection expands into a quest prerequisite.
 
 ## Prepare and run
 
