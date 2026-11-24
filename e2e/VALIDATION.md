@@ -349,6 +349,20 @@ with zero QP and an unstarted target. Source
 `d1d7ffb82adcb2e7c72a749d9da1c685914408a2c38f21c6ec63a595a78f5b98`.
 Full completion and uninterrupted timing remain pending.
 
+Family Crest / Horror survival investigation: Family Crest's real death at
+`2026-11-24T12:20:07.111Z` occurred in the perfect-gold mine, while waiting for
+ore, with food still carried. The mining wait previously slept up to 20 seconds
+without food upkeep. It now pumps upkeep each tick and stops on runtime events
+or death; the quest also declares melee protection for the mine's attackers.
+Horror's real death at `2026-11-24T13:00:27.507Z` occurred in the mother fight.
+The shared melee prayer conflicted with fight-owned missile protection; logs
+show repeated melee re-arms and no active fight prayer. Shared Horror prayer
+ownership is removed, leaving protection to its fights. A second reproduced
+failure stopped all attacks on an empty food pack; an idle food check now falls
+through to combat. Regressions reproduced both faults before the fixes and pass
+after the rebuild, along with focused mining/fight specs and dialect lint.
+Fresh full-quest zero-death validation is still required. Server unchanged.
+
 
 ## Phase 17g
 

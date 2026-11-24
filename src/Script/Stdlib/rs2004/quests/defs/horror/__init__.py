@@ -170,7 +170,8 @@ def decide(snap):
 horror = QuestModule(**{
     'auto_retaliate': False,
     'record': quest_record('horror'),
-    'pray': Record({'protect': 'melee', 'potions': 2}),
+    # The fight owns protection: melee for the junior, missiles for the mother.
+    # Shared melee upkeep would replace the mother's prayer during food upkeep.
     'bank': 'nearest',
     'tools': list(HORROR_TOOLS),
     'owns_inventory': True,
