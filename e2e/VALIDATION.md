@@ -258,6 +258,16 @@ failure. The shared client exited 1 after Watch Tower raised
 one death. Thus the overall suite failed; individual successful quest timings
 are retained as evidence, without claiming a clean suite exit.
 
+Watch Tower repair: logs place the real death near Toban at
+`2026-11-24T12:00:31.109Z`, before the dragon hunt, after repeated camp
+entry/dialogue failures with no food. Tribal errands now replenish eight food
+when below four, and Toban retries pending approaches within the same visit.
+Dragon-hunt cleanup now uses the bank API's single predicate argument; its
+regression mock enforces that signature. Fresh preparation includes an ordinary
+Dragonfire shield, but no Dragon bones. Focused Watch Tower runtime specs,
+the full ported Python suite (2,906 native assertions), six launcher tests and
+dialect lint pass. Fresh live validation remains pending.
+
 
 ## Phase 17f
 

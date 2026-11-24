@@ -67,6 +67,12 @@ def need_rope(snap, area):
 
 
 def stage_tribes(snap, area):
+    # The tribal camps are hostile even before the scripted Gorad fight.
+    # Keep a travel reserve without banking again after every bite.
+    if food_count(snap) < 4:
+        food = source_food(snap, ENCLAVE_FOOD)
+        if food:
+            return at(area, 'yanille', food)
     progress = snap.progress
     if not has_flag(progress, 'helped-og'):
         if held(snap, WT_ITEM.STOLEN_GOLD.id) > 0 or not has_flag(progress, 'spoken-og'):

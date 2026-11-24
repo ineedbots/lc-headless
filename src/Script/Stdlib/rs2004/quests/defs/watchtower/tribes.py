@@ -97,8 +97,16 @@ def talk_to_toban(log):
     _w10 = yield from enter_toban_camp(log)
     if not (_w10):
         return False
-    _w11 = yield from reach.npc_dialog(WT_NPC.TOBAN, WT_TILE.TOBAN, log=log)
-    if (_w11) != 'done':
+    # A newly loaded camp can have scenery before Toban's NPC arrives.
+    # Finish the approach here instead of letting area recovery take us out.
+    status = 'retry'
+    for attempt in range(3):
+        yield from sustain.run()
+        status = yield from reach.npc_dialog(WT_NPC.TOBAN, WT_TILE.TOBAN, log=log)
+        if status != 'retry':
+            break
+        yield from execution.delay_ticks(2)
+    if status != 'done':
         return False
     # The unmatched option here is "Die, creature!"
     _result12 = yield from talk_strict(WT_NPC.TOBAN, [

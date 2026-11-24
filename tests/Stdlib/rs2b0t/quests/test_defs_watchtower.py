@@ -200,7 +200,7 @@ def snapshot(o=None):
         o = Fake(**{})
     return QuestSnapshot(**{
         'journal': (o.journal if o.journal is not None else 'in_progress'),
-        'inv': (o.inv if o.inv is not None else {}),
+        'inv': (o.inv if o.inv is not None else ({'lobster': 8} if o.stage == 2 or (o.progress is not None and o.progress.stage == 2) else {})),
         'inv_ids': (o.inv_ids if o.inv_ids is not None else {}),
         'worn': (o.worn if o.worn is not None else set()),
         'worn_ids': (o.worn_ids if o.worn_ids is not None else set()),
@@ -937,7 +937,7 @@ def _upstream_fn123():
     test('the Grew trip carries a rope without future cave and potion supplies', _upstream_fn125)
 
     def _upstream_fn126():
-        step = decide(started())
+        step = decide(started(Fake(**{'inv': {}})))
         names = ([i.get('name') for i in step.items] if step.kind == 'withdraw' else [])
         expect(names).to_contain('Lobster')
     test('the configured food rides along in the same trip', _upstream_fn126)

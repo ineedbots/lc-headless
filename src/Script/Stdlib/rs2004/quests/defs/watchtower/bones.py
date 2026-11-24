@@ -40,7 +40,7 @@ def refresh_dragon_bank(log):
     _w1 = yield from banking.open(stand=TAVERLEY_BLUE.bank, log=log)
     if not (_w1):
         return False
-    yield from bank.deposit_all_matching(lambda _name, id: id != WT_ITEM.DRAGON_BONES.id, log)
+    yield from bank.deposit_all_matching(lambda _name, id: id != WT_ITEM.DRAGON_BONES.id)
     if any([item.id != WT_ITEM.DRAGON_BONES.id for item in inventory.items()]):
         return False
     bank_pending = False

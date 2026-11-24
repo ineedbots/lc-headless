@@ -60,6 +60,11 @@ class Phase17eTests(unittest.TestCase):
             self.assertEqual(preparation_flags(quest), [])
             self.assertNotIn(quest, {row[0] for row in prerequisite_flags(quest)})
 
+    def test_watchtower_has_fire_protection_but_no_seeded_dragon_bones(self):
+        supplies = {name: count for symbol, name, count in preparation_items('itwatchtower')}
+        self.assertEqual(supplies['Dragonfire shield'], 1)
+        self.assertNotIn('Dragon bones', supplies)
+
     def test_nonmembers_and_existing_characters_are_refused(self):
         with tempfile.TemporaryDirectory() as temporary:
             server = Path(temporary)

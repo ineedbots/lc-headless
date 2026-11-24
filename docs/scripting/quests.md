@@ -271,6 +271,8 @@ The live run added more departures from rs2b0t:
 - **Watch Tower**
     - Its own inventory is left alone by the engine, so while it is still collecting its kit a full pack banks everything except quest items, food and prayer potions.
     - It fights Gorad, swinging and eating, rather than waiting for his tooth.
+    - Tribal errands replenish food to eight when fewer than four remain, leaving a sealed pocket before banking. Toban's dialogue retries a pending NPC approach within the same camp visit.
+    - The dragon-bone hunt requires a Dragonfire shield and a one-handed melee weapon. Cleanup preserves the Dragon bones while depositing the other backpack items through the bank API.
     - It asks Og, Toban and then Grew for replacement relic parts lost in a death. A part the wizard answers "I already have that part" is not offered again.
     - It buys the riddle's death rune from Aubury when Magic is under the Magic Guild's 66.
     - It draws no more enclave food than the pack has room for.

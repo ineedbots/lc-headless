@@ -20,5 +20,6 @@ def preparation_items(quest):
     # These three inputs have no world source in the Watch Tower module.
     if quest == 'itwatchtower':
         return [('guam_leaf', 'Guam leaf', 1), ('bat_bones', 'Bat bones', 1),
-                ('gold_bar', 'Gold bar', 1)]
+                ('gold_bar', 'Gold bar', 1),
+                ('antidragonbreathshield', 'Dragonfire shield', 1)]
     return []

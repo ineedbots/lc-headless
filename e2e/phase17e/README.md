@@ -39,7 +39,8 @@ Skills are 75 melee, 85 hitpoints, 70 prayer, 60 magic/ranged, 65 fishing,
 thieving/agility/fletching. Banks hold one million coins, 1,000 lobsters,
 100 prayer potions(3), rune melee equipment, combat runes and ordinary tools.
 Watch Tower additionally receives one Guam leaf, Bat bones and Gold bar:
-its module has no world source for these inputs. Dragon bones must be obtained
+its module has no world source for these inputs. It also receives an ordinary
+Dragonfire shield for its melee dragon hunt. Dragon bones must be obtained
 live, along with all relics, crystals, potion intermediates and quest materials.
 The Tourist Trap must make its prototype dart and rescue Ana; Chompy must make
 its arrows, obtain bait and hunt; The Grand Tree must acquire its quest items
