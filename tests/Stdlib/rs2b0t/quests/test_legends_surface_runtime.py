@@ -23,6 +23,7 @@ def totem_axe_and_healing():
     tree.mock_return_value(Fake())
     expect(run_wait(totem.axe_on(1, 'Tree', scene.at, 2, scene.log))).to_be(True)
     spy_on(combat, 'hurt', returns=True)
+    scene.item(379, 'Lobster', actions=['Eat'])
     plan = Fake(done=lambda: False, ms=1000)
     expect(run_wait(combat.fight_loop(plan, False, scene.log))).to_be(False)
 

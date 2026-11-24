@@ -7,6 +7,7 @@ from rs2004.quests.defs.regicide.areas import RG_ITEM, RG_TILE, banked, carried
 from rs2004.quests.defs.upass.supplies import BOW_IDS, bow_worn
 from rs2004.quests.engine.provisioning import gp_short
 from rs2004.quests.food import FOOD_FLOAT
+from rs2004.quests.prayer import PRAYER_POTION_IDS
 
 __all__ = ['usable_bows', 'bow_carried', 'ARDOUGNE_STORE', 'TAVERLEY_HERBLORE', 'CATHERBY_ARCHERY', 'COAL_ROCKS', 'ARDOUGNE_RANGE', 'FOOD_TARGET', 'WOOL_TARGET', 'ROPE_TARGET', 'ARROW_TARGET', 'STILL_FOOD', 'COAL_TARGET', 'BARREL_TARGET', 'scan_bank', 'withdraw', 'from_bank', 'KIT', 'KEEP_IDS', 'RETURN_KIT', 'source_kit', 'kit_shortfall', 'source_coal']
 
@@ -126,7 +127,7 @@ KIT = [
     'min': 1,
 }),
 ]
-KEEP_IDS = [RG_ITEM.get(key).id for key in RG_ITEM.keys()] + list(BOW_IDS)
+KEEP_IDS = [RG_ITEM.get(key).id for key in RG_ITEM.keys()] + list(BOW_IDS) + PRAYER_POTION_IDS
 # Why: the walk back in carries the crossings and the food and nothing that built the bomb: the wool is already cloth, the limestone already dust, and the pickaxe and pestle have no rock or lump left to work. The full kit would be 9 slots of dead weight beside a barrel bomb that has to fit too.
 RETURN_IDS = set([
     RG_ITEM.SPADE.id,

@@ -73,8 +73,16 @@ def climb(ledge, dir, log):
     if not (_w1):
         return False
     yield from settle_scene()
+    def arrived():
+        at = pocket()
+        if at == leg.to:
+            return True
+        if dir == 'down' and at in DESCENT_ORDER:
+            return DESCENT_ORDER.index(at) >= DESCENT_ORDER.index(leg.to)
+        return dir == 'down' and at == 'viyeldi_source'
+
     for i in range(CLIMB_ATTEMPTS):
-        if pocket() == leg.to:
+        if arrived():
             yield from settle_scene()
             return True
         ok = yield from prompt_loc(Record({
@@ -84,10 +92,10 @@ def climb(ledge, dir, log):
             'within': 6,
             'id': ledge.id,
             'prefer': ['Yes, I can think of nothing more exciting!', 'Yes, I want to climb over the rocks.'],
-            'expect': lambda: pocket() == leg.to,
+            'expect': arrived,
             'expect_ms': 25000,
         }), log)
-        if ok:
+        if ok or arrived():
             yield from settle_scene()
             return True
         yield from traversal.walk_resilient(leg.stand, radius=0, attempts=2, timeout_ms=30000, log=log)

@@ -143,9 +143,9 @@ def _fn3():
     })))
         expect(step.kind).to_be('withdraw')
         drawn = ([i['name'].lower() for i in step.items] if step.kind == 'withdraw' else [])
-        expect(drawn).to_equal(['rune scimitar'])
+        expect(drawn).to_equal(['rune scimitar', 'rune chainbody', 'rune platelegs', 'rune full helm', 'rune kiteshield'])
         expect(drawn).not_.to_contain(RG_ITEM.SHARK.name.lower())
-    test('a missing combat weapon is drawn without requiring bank armour', _fn12)
+    test('an unarmoured character draws its banked combat kit', _fn12)
 
     def _fn13():
         expect(name(decide(snapshot(Record({'stage': RG_STAGE.SPOKEN_LATHAS}))))).to_contain('elf scouts')
@@ -565,7 +565,6 @@ def _fn66():
     test_each([
         Record({'armour': ['leather body', 'leather chaps', 'coif']}),
         Record({'armour': ["monk's robe", 'wizard hat']}),
-        Record({'armour': []}),
     ])('does not draw metal armour over the worn setup %j', _fn68)
 
     def _fn70():

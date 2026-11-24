@@ -42,6 +42,7 @@ class Fighter:
         spy_on(combat.npcs, 'query', impl=querying(lambda: self.npcs))
         spy_on(combat.game, 'tick', impl=lambda: self.now)
         spy_on(combat.game, 'in_combat', impl=lambda: self.fighting)
+        spy_on(combat.game, 'facing', impl=lambda: ('npc', self.foe.index) if self.foe is not None else None)
         spy_on(combat.game, 'set_auto_retaliate', returns=None)
         spy_on(combat.event_signal, 'pending', impl=lambda: self.pending)
         spy_on(sustain, 'run', impl=self.eat)
@@ -139,6 +140,7 @@ def fights():
     troll = Troll(fighter, 6)
     fighter.npcs = [troll]
     fighter.hp = 50
+    fighter.pack.append(Fake(id=379, name='Lobster', actions=lambda: ['Eat']))
     fighter.potion()
     expect(run_wait(combat.fight(plan(fighter), fighter.log))).to_be(True)
     expect(troll.attacks).to_be(1)
