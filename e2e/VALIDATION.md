@@ -148,6 +148,27 @@ resume (`20261123T190309-run-aca4`) successfully banked two lobsters and collect
 the tenth grain, but was stopped at the user's request to start the fresh run.
 Neither interrupted Eadgar attempt supplies a completion time.
 
+## Phase 17d
+
+[Suite](phase17d/README.md) · [PR #157](https://github.com/ineedbots/lc-headless/pull/157)
+· [Issue #156](https://github.com/ineedbots/lc-headless/issues/156)
+
+Live validation is in progress; no completion timings are accepted yet.
+
+| Quest | Account | Result | Time taken |
+|---|---|---|---|
+| Nature Spirit | `d1723575dns` | Pending | — |
+| Shades of Mort'ton | `d1723575dsm` | Pending | — |
+| Tai Bwo Wannai Trio | `d1723575dtw` | Pending | — |
+| Shilo Village | `d1723575dsv` | Pending | — |
+
+Run root: `build/e2e/phase17d-validation-20261123`, prepared from
+`bad8f350237c29608b46ad06499d02c36dea109b`. Client binary SHA-256:
+`45fe1bf80a17870b18c33eeb6517fd3ab3ac093f13b4c341706ab7db89a97ebe`.
+Engine: `2395c968473333d13ff1454f5eff452a18a029b6`; content:
+`f32c62f66302f76b43c752ede3181de0c0d01369`. Preparation and its limits are
+documented in the suite guide. Server files remain unchanged by this validation.
+
 ## Phase 17g
 
 [Suite](phase17g/README.md) · [PR #146](https://github.com/ineedbots/lc-headless/pull/146)
