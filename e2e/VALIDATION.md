@@ -865,3 +865,10 @@ the reward continuation before checking completion. Runtime regressions cover
 permission-gated climbing, delayed hand-in dialogue, unchanged journal state,
 and reward dialogue gating completion. Live validation of these follow-ups is
 pending; the completed `ab4bc87` run is evidence of the original behavior.
+
+A fresh combined validation uses account `e17f863a2wt` under
+`build/e2e/watchtower-tower-20261125`, source `ca5f972`, frozen binary SHA-256
+`f956d9ee9cd3f35ae14bd8861ace88992bdd63e1ace6f82674152eb83718c8a9`.
+Seeding passed in session `20261125T153852-seed-f880`, including the normal
+600 ms tick probe and clean logout. The full quest rerun has been launched;
+completion and the single-visit/tower behavior remain pending.
