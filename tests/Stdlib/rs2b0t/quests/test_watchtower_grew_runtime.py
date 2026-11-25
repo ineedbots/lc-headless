@@ -40,6 +40,7 @@ def aggressor(scene):
 
 def interrupted():
     scene = island()
+    bystander = scene.npc('Ogre', ['Attack'], others=True)
 
     def talk(*args):
         scene.conversations += 1
@@ -55,6 +56,7 @@ def interrupted():
     expect(run_wait(tribes.talk_to_grew(scene.log))).to_be(True)
     expect(scene.conversations).to_be(2)
     expect(scene.kills).to_be(1)
+    expect(scene.npcs).to_equal([bystander])
     expect(scene.walks).to_equal([])
     expect(scene.at).to_equal(WT_TILE.GREW)
 
