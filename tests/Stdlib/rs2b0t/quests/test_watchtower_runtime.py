@@ -129,6 +129,8 @@ def wizard_tasks():
     expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(False)
     scene.npc(WT_NPC.WIZARD)
     scene.item(WT_ITEM.CRYSTAL1.id, WT_ITEM.CRYSTAL1.name)
+    scene.chat.pages = ['continue']
+    spy_on(tower, 'read_watchtower_progress', impl=answer(QuestProgress(11, set())))
     expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(True)
     scene.walk_ok = False
     expect(run_wait(tower.pull_lever(scene.log))).to_be(False)
@@ -150,6 +152,75 @@ def wizard_tasks():
 
 
 test('wizard tasks stop on a failed climb and hand in only present items', wizard_tasks)
+
+
+def tower_guard_continuation():
+    scene = world(tower)
+
+    def permission(op):
+        scene.chat.pages = ['continue']
+
+    def continue_guard():
+        scene.chat.pages = []
+        scene.at = Tile(scene.at.x, scene.at.z, 1)
+        return True
+        yield
+
+    scene.loc('Ladder', ['Climb-up'], id=WT_LOC.TOWER_LADDER, effect=permission)
+    spy_on(tower.chat_dialog, 'continue_', impl=continue_guard)
+    expect(run_wait(tower.climb_tower_ladder(scene.log))).to_be(True)
+    expect(scene.at.level).to_be(1)
+    expect(scene.chat.pages).to_equal([])
+    expect(scene.clock < 10000).to_be(True)
+
+
+test('the ground ladder continues the guard permission before waiting for the climb', tower_guard_continuation)
+
+
+def delayed_crystal_dialogue():
+    scene = world(tower, 'towerFloor', 2)
+    scene.npc(WT_NPC.WIZARD)
+
+    def opens():
+        scene.chat.pages = ['continue']
+
+    def use_crystal(target):
+        scene.later(opens)
+
+    scene.item(WT_ITEM.CRYSTAL1.id, WT_ITEM.CRYSTAL1.name, on_use=use_crystal)
+    progress = spy_on(tower, 'read_watchtower_progress', impl=answer(QuestProgress(11, set())))
+    expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(True)
+    expect(scene.chat.pages).to_equal([])
+    progress.mock_implementation(answer(QuestProgress(10, set())))
+    expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(False)
+    scene.pack = []
+    scene.item(WT_ITEM.CRYSTAL1.id, WT_ITEM.CRYSTAL1.name)
+    expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(False)
+
+
+test('crystal hand-in waits for the initial dialogue and requires the journal to advance', delayed_crystal_dialogue)
+
+
+def lever_reward_dialogue():
+    scene = world(tower, 'towerFloor', 2)
+
+    def activate(op):
+        scene.chat.pages = ['continue']
+
+    def finish():
+        scene.chat.pages = []
+        scene.status = 'complete'
+        return True
+        yield
+
+    scene.loc('Lever', ['Pull'], id=WT_LOC.LEVER, effect=activate)
+    spy_on(tower.chat_dialog, 'continue_', impl=finish)
+    expect(run_wait(tower.pull_lever(scene.log))).to_be(True)
+    expect(scene.status).to_be('complete')
+    expect(scene.clock < 40000).to_be(True)
+
+
+test('the lever finishes the reward continuation before checking quest completion', lever_reward_dialogue)
 
 
 def relic_parts():

@@ -9,7 +9,7 @@ from rs2004.entities import locs, npcs
 from rs2004.game import game, reader
 from rs2004.items import inventory
 from rs2004.quests.defs.watchtower.areas import WT_ITEM, WT_LOC, WT_NPC, WT_TILE, watchtower_area
-from rs2004.quests.defs.watchtower.journal import WATCHTOWER_QUEST, WATCHTOWER_STAGE
+from rs2004.quests.defs.watchtower.journal import WATCHTOWER_QUEST, WATCHTOWER_STAGE, read_watchtower_progress
 from rs2004.quests.defs.watchtower.scene import settle_scene
 from rs2004.quests.exec.primitives import drive_dialog, talk_through
 from rs2004.reach import reach
@@ -47,6 +47,14 @@ def climb_tower_ladder(log):
     if not ladder or not (ladder.interact('Climb-up')):
         log('no Watchtower ladder in range')
         return False
+    # The guard's permission page blocks the climb until it is continued.
+    ready = yield from execution.delay_until(lambda: level() == 1 or chat_dialog.can_continue(), 8000)
+    if not ready:
+        return False
+    if chat_dialog.can_continue():
+        continued = yield from drive_dialog([], log)
+        if not continued:
+            return False
     _result5 = yield from execution.delay_until(lambda: level() == 1, 10000)
     return _result5
 
@@ -73,6 +81,8 @@ def climb_to_wizard(stage, log):
         log('no ladder to the wizard floor in range')
         return False
     _result10 = yield from execution.delay_until(lambda: watchtower_area(game.tile()) == 'towerFloor', 10000)
+    if _result10:
+        yield from settle_scene()
     return _result10
 
 
@@ -202,8 +212,16 @@ def show_crystals_to_wizard(log):
     wizard = npcs.query().name(WT_NPC.WIZARD).nearest()
     if not crystal or not wizard or not (crystal.use_on(wizard)):
         return False
-    _result29 = yield from drive_dialog(['This is the last one.', 'I have found another crystal!'], log)
-    return _result29
+    # Use-on may still be approaching the wandering wizard. The driver's short
+    # page gap is not a deadline for opening the initial dialogue.
+    opened = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 8000)
+    if not opened:
+        return False
+    driven = yield from drive_dialog(['This is the last one.', 'I have found another crystal!'], log)
+    if not driven:
+        return False
+    progress = yield from read_watchtower_progress()
+    return progress is not None and progress.stage >= WATCHTOWER_STAGE.FOUND_ALL_CRYSTALS
 
 
 def pull_lever(log):
@@ -217,6 +235,13 @@ def pull_lever(log):
     if not lever or not (lever.interact('Pull')):
         log('no Watchtower lever in range')
         return False
+    ready = yield from execution.delay_until(lambda: quests.status(WATCHTOWER_QUEST) == 'complete' or chat_dialog.can_continue(), 40000)
+    if not ready:
+        return False
+    if chat_dialog.can_continue():
+        driven = yield from drive_dialog([], log)
+        if not driven:
+            return False
     _result32 = yield from execution.delay_until(lambda: quests.status(WATCHTOWER_QUEST) == 'complete', 40000)
     return _result32
 

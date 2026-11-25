@@ -87,6 +87,9 @@ enclave visit. It still retreats when its food, health or inventory reserve is
 exhausted, and stops for pending interruptions. Older binaries returned after
 each shaman, causing area recovery to leave the enclave and consume another
 nightshade on each entry. Single-visit live validation of this change is pending.
+Tower entry continues the guard's permission page, crystal hand-in waits for
+dialogue and journal confirmation, and the lever finishes the reward dialogue.
+Live validation of these continuation fixes is pending.
 See [recorded validation](../VALIDATION.md#phase-17e).
 
 ```powershell

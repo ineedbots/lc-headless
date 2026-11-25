@@ -809,10 +809,23 @@ The earlier fresh pilot `e17ae4679wt` exposed prayer flasks being deposited
 again during Dusty key preparation. Its failed dragon hunt and deliberate stop
 at the bank remain under `build/e2e/watchtower-prayer-dialogue-20261125`.
 The keep list now preserves every prayer dose form through that bank stop.
-A fresh full run on all fixes uses `e176371cawt` under
+A fresh full run of the prayer, Toban and Grew fixes used `e176371cawt` under
 `build/e2e/watchtower-all-fixes-20261125`, source `ab4bc87`, binary SHA-256
 `d2f2ff78fc6df27af3b7b449cfd3687f672a746240eefa6a06f9de8e9c3b56f5`.
-Its seed passed the 600 ms tick probe; full completion remains pending.
+Its seed passed the 600 ms tick probe. It completed without interruption, but
+exposed the enclave and tower inefficiencies described below; it predates those
+follow-up fixes.
+
+| Validation | Account | Result | Time taken |
+|---|---|---|---|
+| Resumed remainder after Grew fix | `e17148d46wt` | PASS, 8 QP, zero deaths, clean logout | 1h 9m 29s |
+| Fresh full quest, source `ab4bc87` | `e176371cawt` | PASS, 8 QP, zero deaths, clean logout | 2h 13m 53s |
+
+The resumed remainder ran from `19:13:48.022Z` to `20:23:17.414Z`
+(4169.392 seconds). The fresh run ran from `19:20:43.215Z` to
+`21:34:36.615Z` (8033.400 seconds), including final banking, and logged out
+cleanly at `21:34:37.222Z`. These are distinct results; neither replaces the
+original interrupted grand-run result.
 No server files were changed for these fixes. See
 [PR #165](https://github.com/ineedbots/lc-headless/pull/165) and
 [issue #164](https://github.com/ineedbots/lc-headless/issues/164).
@@ -832,5 +845,23 @@ rock after receiving the shaman crystal. Food, health, space and interruption
 checks remain active. Runtime regression coverage exercises one nightshade
 entry, six distinct dissolves and both crystals without leaving; incomplete
 circuits and safety exits do not claim completion. Single-visit live validation
-is pending. The existing full run keeps its frozen older binary and has not
-been interrupted to apply this change.
+is pending. The completed full run retained its frozen older binary throughout.
+
+### Watchtower tower continuations
+
+The same fresh run repeatedly failed to climb from the ground floor, retried
+the crystal hand-in, and was then sent downstairs by area recovery before
+another attempt. It eventually advanced to stage 11 at `21:32:52.207Z`.
+Read-only revision-289 server inspection confirms that the ground ladder opens
+a guard permission continuation before climbing; the client was waiting only
+for a level change. The crystal use-on also drove dialogue immediately, with a
+short page-gap timeout that could expire during approach to the wandering
+wizard. The lever timed out while its reward dialogue was still waiting.
+
+The ladder now continues the permission page before waiting for the floor
+change, and the top-floor arrival settles the scene. Crystal hand-in waits for
+the initial dialogue and requires journal advancement; lever activation drives
+the reward continuation before checking completion. Runtime regressions cover
+permission-gated climbing, delayed hand-in dialogue, unchanged journal state,
+and reward dialogue gating completion. Live validation of these follow-ups is
+pending; the completed `ab4bc87` run is evidence of the original behavior.
