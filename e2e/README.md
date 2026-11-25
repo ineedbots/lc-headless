@@ -5,6 +5,7 @@ server. They are separate from the fake-server and stdlib tests run by CTest.
 
 | Scenario | Server | Coverage |
 |---|---|---|
+| [Grand concurrent run](grand/README.md) | Local revision 289 | All 65 individual cases across phase 16 and phases 17a–i, seeded then run concurrently |
 | [Phase 16](phase16/README.md) | Local revision 289 | 19 individual quest accounts, including both Arrav gangs; optional full queues with earned QP gates |
 | [Phase 17a](phase17a/README.md) | Local revision 289 | 12 individual accounts for the introductory members quests |
 | [Phase 17b](phase17b/README.md) | Local revision 289 | 9 individual accounts, including Scorpion Catcher's barcrawl |
