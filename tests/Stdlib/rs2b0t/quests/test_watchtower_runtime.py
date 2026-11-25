@@ -540,6 +540,91 @@ def enclave_gathering():
 test('enclave crystals are mined, searched from the robe and dissolved with potion', enclave_gathering)
 
 
+def shaman_circuit():
+    scene = world(enclave, 'surface')
+    scene.item(333, 'Trout', count=8)
+    targets = []
+    entries = []
+
+    def enter(target):
+        entries.append(target.index)
+        scene.take(WT_ITEM.NIGHTSHADE.id)
+        scene.area = 'enclave'
+
+    scene.npc(WT_NPC.ENCLAVE_GUARD)
+    scene.item(WT_ITEM.NIGHTSHADE.id, WT_ITEM.NIGHTSHADE.name, on_use=enter)
+    for spot in WT_TILE.SHAMANS:
+        scene.npc(WT_NPC.SHAMAN, tile=spot, dist=None)
+
+    def dissolve(target):
+        targets.append(target.index)
+        scene.npcs = [npc for npc in scene.npcs if npc.index != target.index]
+        scene.say('The ogre dissolves into spirit form')
+        if len(targets) == 6:
+            scene.take(WT_ITEM.MAGIC_OGRE_POTION.id)
+            scene.item(WT_ITEM.CRYSTAL3.id, WT_ITEM.CRYSTAL3.name)
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    exits = spy_on(enclave, 'leave_enclave', impl=answer(True))
+    scene.loc('Rock', ['Mine'], id=WT_LOC.ROCK_OF_DALGROTH, effect=give(scene, WT_ITEM.CRYSTAL4))
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(True)
+    expect(len(set(targets))).to_be(6)
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(True)
+    expect(scene.has(WT_ITEM.CRYSTAL4.id)).to_be(True)
+    expect(len(entries)).to_be(1)
+    expect(scene.has(WT_ITEM.NIGHTSHADE.id)).to_be(False)
+    expect(len(exits.calls)).to_be(0)
+
+
+test('one enclave action dissolves all six shamans and mines the rock without leaving', shaman_circuit)
+
+
+def shaman_partial_circuit():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN, tile=WT_TILE.SHAMANS[0], dist=None)
+
+    def dissolve(npc):
+        scene.npcs = []
+        scene.say('The ogre dissolves into spirit form')
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    mines = spy_on(enclave, 'mine_dalgroth', impl=answer(True))
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+    expect(len(mines.calls)).to_be(0)
+
+
+test('an incomplete shaman circuit does not claim success or start mining', shaman_partial_circuit)
+
+
+def shaman_retreats():
+    for interrupted in [False, True]:
+        scene = world(enclave, 'enclave')
+        food = scene.item(333, 'Trout', count=8)
+        scene.npc(WT_NPC.SHAMAN, tile=WT_TILE.SHAMANS[0], dist=None)
+        targets = []
+
+        def dissolve(target):
+            targets.append(target.index)
+            scene.say('The ogre dissolves into spirit form')
+            food._fields['count'] = 1
+
+        scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+        spy_on(enclave.event_signal, 'pending', impl=lambda: interrupted and len(targets) > 0)
+        exits = spy_on(enclave, 'leave_enclave', impl=answer(True))
+        mines = spy_on(enclave, 'mine_dalgroth', impl=answer(True))
+        expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+        expect(len(targets)).to_be(1)
+        expect(len(mines.calls)).to_be(0)
+        expect(len(exits.calls)).to_be(0 if interrupted else 1)
+        expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+        restore_all()
+
+
+test('the shaman circuit stops for an interruption or exhausted food without claiming completion', shaman_retreats)
+
+
 def city_offers():
     for fn, item, npc, end in [
         [gutanoth.offer_relic, WT_ITEM.OGRE_RELIC, WT_NPC.OGRE_GUARD, Tile(2500, 3060, 0)],

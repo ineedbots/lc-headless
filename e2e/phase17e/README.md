@@ -82,6 +82,11 @@ Record **Time taken** from the first per-account `AIOQuester, queue:` log to the
 passing `E2E_RESULT`, including final banking and excluding seeding/login staggering.
 Fresh uninterrupted reruns are required after fixes for accepted uninterrupted
 timings. Pending runs and interrupted attempts are not passes.
+The Watchtower shaman action keeps all six dissolves and Dalgroth mining in one
+enclave visit. It still retreats when its food, health or inventory reserve is
+exhausted, and stops for pending interruptions. Older binaries returned after
+each shaman, causing area recovery to leave the enclave and consume another
+nightshade on each entry. Single-visit live validation of this change is pending.
 See [recorded validation](../VALIDATION.md#phase-17e).
 
 ```powershell

@@ -127,8 +127,13 @@ def dissolve_shamans(log):
         if event_signal.pending():
             return False
         execution.note_progress()
-        return True
-    log('no reachable ogre shaman dissolved')
+        # Returning after one dissolve lets the engine's area recovery leave the
+        # enclave before the next decision. Finish the remaining shamans and
+        # mine the rock within this visit, keeping the reserve checks above.
+        if held_id(WT_ITEM.CRYSTAL3.id) > 0:
+            mined = yield from mine_dalgroth(log)
+            return mined
+    log('shaman circuit ended before the crystal was obtained')
     return False
 
 

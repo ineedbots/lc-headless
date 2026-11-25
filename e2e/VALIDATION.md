@@ -816,3 +816,21 @@ Its seed passed the 600 ms tick probe; full completion remains pending.
 No server files were changed for these fixes. See
 [PR #165](https://github.com/ineedbots/lc-headless/pull/165) and
 [issue #164](https://github.com/ineedbots/lc-headless/issues/164).
+
+### Watchtower repeated enclave visits
+
+The fresh `ab4bc87` run above exposed an inefficient shaman circuit. Its log
+records six `dissolve the ogre shamans` actions, from `21:04:52.816Z` to
+`21:18:16.814Z`, followed by another entry to mine Dalgroth at `21:19:52.215Z`.
+Each dissolve action returned success after one target. Before the next planner
+decision, the engine's area recovery left the enclave; the outside planner then
+acquired another nightshade and refilled food as needed. These were planned
+exits, not reserve-exhaustion retreats.
+
+The action now continues through the remaining shaman positions and mines the
+rock after receiving the shaman crystal. Food, health, space and interruption
+checks remain active. Runtime regression coverage exercises one nightshade
+entry, six distinct dissolves and both crystals without leaving; incomplete
+circuits and safety exits do not claim completion. Single-visit live validation
+is pending. The existing full run keeps its frozen older binary and has not
+been interrupted to apply this change.
