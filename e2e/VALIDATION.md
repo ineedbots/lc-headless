@@ -889,3 +889,12 @@ answer matches the request; replacement-key requests no longer prefer the
 competing "I have your gold" answer. Runtime regressions cover interruptions,
 gold hand-in, replacement key/part requests, unrelated players' ogres, safer
 positioning, the retry deadline and safety stops. Live validation is pending.
+
+A separate fresh validation uses `e176054eewt` under
+`build/e2e/watchtower-og-20261125`, source `7870570`, binary SHA-256
+`cf18a4d3db01e71ab7415777c87f516525a34f531793abfb797e4c556c323940`.
+It uses the normal phase 17e preparation, with no target quest flags or rewards
+seeded. The earlier `e17f863a2wt` run continues separately on its frozen binary.
+Seeding passed in session `20261125T155635-seed-8f77`, including the 600 ms
+tick probe and clean logout. The fresh full quest has been launched; live Og
+behavior and completion remain pending.
