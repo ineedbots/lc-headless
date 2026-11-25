@@ -161,3 +161,39 @@ def holds_stand():
 
 
 test('island combat does not chase distant attackers away from the selected stand', holds_stand)
+
+
+def journal_not_ready():
+    scene = island()
+    reads = []
+
+    def progress():
+        reads.append(True)
+        return None if len(reads) == 1 else QuestProgress(2, set(scene.flags))
+        yield
+
+    def talk(*args):
+        scene.flags.add('spoken-grew')
+        scene.conversations += 1
+        return True
+        yield
+
+    spy_on(tribes, 'read_watchtower_progress', impl=progress)
+    spy_on(tribes, 'talk_strict', impl=talk)
+    expect(run_wait(tribes.talk_to_grew(scene.log))).to_be(True)
+    expect(len(reads)).to_be(3)
+    expect(scene.conversations).to_be(1)
+
+
+test('Grew waits for the journal instead of accepting an unknown initial state', journal_not_ready)
+
+
+def combat_never_settles():
+    scene = island()
+    spy_on(tribes.game, 'in_combat', returns=True)
+    expect(run_wait(tribes.quiet_grew_island(3000, scene.log))).to_be(False)
+    expect(scene.clock).to_be(3000)
+    expect(scene.kills).to_be(0)
+
+
+test('waiting for island combat to settle respects the local deadline', combat_never_settles)

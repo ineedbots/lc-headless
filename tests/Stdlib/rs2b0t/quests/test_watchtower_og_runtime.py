@@ -144,3 +144,69 @@ def stand():
 
 
 test('Og selects a reachable side away from the surrounding ogres', stand)
+
+
+def failed_approaches():
+    scene = camp()
+    scene.walk_ok = False
+    expect(run_wait(tribes.talk_to_og(scene.log))).to_be(False)
+    expect(scene.walks).to_equal([WT_TILE.OG])
+    scene.walk_ok = True
+    og = scene.npc('Og', ['Talk-to'], tile=WT_TILE.OG)
+    og._fields['size'] = 2
+    spy_on(tribes.reachability, 'can_reach', returns=False)
+    expect(run_wait(tribes.talk_to_og(scene.log))).to_be(False)
+    spy_on(tribes.reachability, 'can_reach', returns=True)
+    destination = tribes.ogre_dialogue_stand('Og', WT_TILE.OG, 'yanille')
+    scene.no_walk = [destination]
+    expect(run_wait(tribes.talk_to_og(scene.log))).to_be(False)
+    expect(scene.walks[-1]).to_equal(destination)
+    expect(scene.conversations).to_equal([])
+
+
+test('Og stops when the camp or the selected conversation tile cannot be reached', failed_approaches)
+
+
+def journal_not_ready():
+    scene = camp()
+    reads = []
+
+    def progress():
+        reads.append(True)
+        return None if len(reads) == 1 else QuestProgress(2, set(scene.flags))
+        yield
+
+    def talk(name, prefer, log):
+        scene.conversations.append(prefer)
+        scene.flags.add('spoken-og')
+        scene.item(WT_ITEM.TOBAN_KEY.id, 'Toban key')
+        return True
+        yield
+
+    spy_on(tribes, 'read_watchtower_progress', impl=progress)
+    spy_on(tribes, 'talk_strict', impl=talk)
+    expect(run_wait(tribes.talk_to_og(scene.log))).to_be(True)
+    expect(len(reads)).to_be(3)
+    expect(len(scene.conversations)).to_be(1)
+    expect(scene.has(WT_ITEM.TOBAN_KEY.id)).to_be(True)
+
+
+test('Og waits for an unavailable journal before beginning the conversation', journal_not_ready)
+
+
+def interrupted_by_event():
+    scene = camp()
+    pending = []
+
+    def talk(name, prefer, log):
+        pending.append(True)
+        return True
+        yield
+
+    spy_on(tribes.event_signal, 'pending', impl=lambda: bool(pending))
+    spy_on(tribes, 'talk_strict', impl=talk)
+    expect(run_wait(tribes.talk_to_og(scene.log))).to_be(False)
+    expect(scene.has(WT_ITEM.TOBAN_KEY.id)).to_be(False)
+
+
+test('a random event arriving during Og dialogue stops the local retry', interrupted_by_event)
