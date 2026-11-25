@@ -95,7 +95,7 @@ class DragonHost:
         return ''
 
     def keep_extra(self):
-        return [WT_ITEM.DRAGON_BONES.name]
+        return [WT_ITEM.DRAGON_BONES.name] + PRAYER_DOSES
 
     def leave_by_walk(self):
         return True

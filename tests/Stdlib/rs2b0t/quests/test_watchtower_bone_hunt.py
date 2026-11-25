@@ -4,6 +4,7 @@ import rs2004.quests.defs.watchtower.bones as hunt
 from rs2004.quests.defs.watchtower import watchtower
 from rs2004.catalogs.record import Record
 from rs2004.geometry import Tile
+from rs2004.hunting.supply import deposit_loot
 
 
 def result(value):
@@ -110,6 +111,26 @@ def partial_prayer_flasks():
 
 
 test('the dragon hunt stocks available three-dose prayer flasks and respects the protection level', partial_prayer_flasks)
+
+
+def key_trip_preserves_prayer():
+    scene = Scene()
+    scene.item(139, 'Prayer potion(3)')
+    scene.item(143, 'Prayer potion(1)')
+    scene.item(526, 'Bones')
+
+    def deposit(predicate):
+        scene.pack = [item for item in scene.pack if not predicate(item.name, item.id)]
+        return True
+        yield
+
+    spy_on(hunt.bank, 'deposit_all_matching', impl=deposit)
+    host = hunt.dragon_host('Lobster', scene.log)
+    expect(run_wait(deposit_loot(host, hunt.TAVERLEY_BLUE))).to_be(None)
+    expect([item.id for item in scene.pack]).to_equal([139, 143])
+
+
+test('the Dusty key bank stop preserves the dragon hunt prayer flasks', key_trip_preserves_prayer)
 
 
 def fails(mode):
