@@ -21,7 +21,8 @@ before approaching him, so it cannot be mistaken for his dialogue. These follow-
 repairs are tracked in [#164](https://github.com/ineedbots/lc-headless/issues/164);
 the historical completion time above predates them.
 
-Grew conversations clear ogres attacking the account and retry on the island for
+Grew conversations choose a reachable side away from the other island ogres,
+hold that position rather than chasing distant attackers, and retry on the island for
 up to four minutes. A closed chat box alone cannot complete the leg: the expected
 journal flag or replacement reward must arrive. Low hitpoints without food and
 pending random events stop the retry so normal recovery can take over.

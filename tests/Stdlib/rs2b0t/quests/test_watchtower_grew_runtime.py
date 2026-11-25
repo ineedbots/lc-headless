@@ -35,6 +35,7 @@ def aggressor(scene):
     ogre = scene.npc('Ogre', ['Attack'], targets_me=True, effect=defeat)
     ogre._fields['max_health'] = 60
     ogre._fields['health'] = 60
+    ogre._fields['size'] = 2
     return ogre
 
 
@@ -128,3 +129,35 @@ def unsafe():
 
 
 test('low health without food and pending random events stop island combat', unsafe)
+
+
+def safer_stand():
+    scene = island()
+    grew = scene.npc('Grew', ['Talk-to'], tile=WT_TILE.GREW)
+    grew._fields['size'] = 2
+    ogre = scene.npc('Ogre', ['Attack'], tile=Tile(2510, 3083, 0))
+    ogre._fields['size'] = 2
+    spy_on(tribes.reachability, 'can_reach', returns=True)
+    stand = tribes.grew_dialogue_stand()
+    expect(stand).to_equal(Tile(2515, 3085, 0))
+    expect(tribes.distance_from_npc(stand, ogre)).to_be(4)
+    spy_on(tribes.reachability, 'can_reach', impl=lambda tile: tile.x != 2515)
+    expect(tribes.grew_dialogue_stand().x == 2515).to_be(False)
+    spy_on(tribes.reachability, 'can_reach', returns=False)
+    expect(tribes.grew_dialogue_stand()).to_be(None)
+
+
+test('Grew uses the reachable side away from ogres instead of the old crowded anchor', safer_stand)
+
+
+def holds_stand():
+    scene = island()
+    ogre = aggressor(scene)
+    ogre._fields['tile'] = lambda: Tile(2505, 3080, 0)
+    spy_on(tribes.game, 'in_combat', returns=False)
+    expect(run_wait(tribes.quiet_grew_island(10000, scene.log))).to_be(True)
+    expect(scene.kills).to_be(0)
+    expect(scene.walks).to_equal([])
+
+
+test('island combat does not chase distant attackers away from the selected stand', holds_stand)

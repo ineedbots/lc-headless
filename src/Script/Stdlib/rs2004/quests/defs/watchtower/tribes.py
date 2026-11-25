@@ -7,7 +7,9 @@ from rs2004.dialogue import chat_dialog
 from rs2004.execution import event_signal
 from rs2004.entities import ground_items, locs, npcs
 from rs2004.game import game, skills
+from rs2004.geometry import Tile
 from rs2004.items import inventory
+from rs2004.navigation import reachability
 from rs2004.quests.defs.watchtower.areas import WT_ITEM, WT_LOC, WT_NPC, WT_TILE, watchtower_area
 from rs2004.quests.defs.watchtower.journal import read_watchtower_progress
 from rs2004.quests.defs.watchtower.scene import settle_scene
@@ -177,6 +179,13 @@ def talk_to_grew(log):
     before_part = held_id(WT_ITEM.RELIC_PART2.id)
     before_crystal = held_id(WT_ITEM.CRYSTAL1.id)
     while _core.step_time() < deadline:
+        stand = grew_dialogue_stand()
+        if stand is None:
+            return False
+        if game.tile() != stand:
+            walked = yield from traversal.walk_resilient(stand, radius=0, attempts=1, timeout_ms=15000, log=log)
+            if not walked:
+                return False
         quiet = yield from quiet_grew_island(deadline, log)
         if not quiet:
             return False
@@ -186,7 +195,7 @@ def talk_to_grew(log):
                 yield from execution.delay_ticks(2)
                 continue
         game.set_auto_retaliate(False)
-        status = yield from reach.npc_dialog(WT_NPC.GREW, WT_TILE.GREW, log=log)
+        status = yield from reach.npc_dialog(WT_NPC.GREW, stand, log=log)
         if status == 'done':
             # The unmatched option here is "You will have to kill me first."
             yield from talk_strict(WT_NPC.GREW, [
@@ -211,6 +220,30 @@ def talk_to_grew(log):
     return False
 
 
+def distance_from_npc(tile, npc):
+    at = npc.tile()
+    return max(0, at.x - tile.x, tile.x - at.x - npc.size + 1, at.z - tile.z, tile.z - at.z - npc.size + 1)
+
+
+def grew_dialogue_stand():
+    """Use the reachable side of Grew furthest from the island's other ogres."""
+    grew = npcs.query().name(WT_NPC.GREW).nearest()
+    if grew is None:
+        return WT_TILE.GREW
+    at = grew.tile()
+    ogres = npcs.query().name('Ogre').within(16).where(lambda npc: watchtower_area(npc.tile()) == 'grewIsland').results()
+    candidates = []
+    for offset in range(grew.size):
+        candidates.extend([Tile(at.x - 1, at.z + offset, at.level), Tile(at.x + grew.size, at.z + offset, at.level),
+                           Tile(at.x + offset, at.z - 1, at.level), Tile(at.x + offset, at.z + grew.size, at.level)])
+    candidates = [tile for tile in candidates if watchtower_area(tile) == 'grewIsland' and reachability.can_reach(tile)
+                  and not any([distance_from_npc(tile, npc) == 0 for npc in ogres])]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda tile: (min([distance_from_npc(tile, npc) for npc in ogres]) if ogres else 16,
+                                           -tile.distance_to(game.tile()), tile.x, tile.z))
+
+
 def quiet_grew_island(deadline, log):
     """Defeat only ogres attacking us before opening a conversation."""
     target_index = None
@@ -222,7 +255,9 @@ def quiet_grew_island(deadline, log):
             return False
         yield from sustain.run()
         yield from prayer_upkeep()
-        ogre = npcs.query().name('Ogre').action('Attack').within(12).where(lambda npc: npc.targets_me() and not (npc.max_health > 0 and npc.health == 0)).nearest()
+        # Hold the safer dialogue tile; chasing an attacker would put us back
+        # amongst the respawns. Let it approach before returning its attacks.
+        ogre = npcs.query().name('Ogre').action('Attack').within(12).where(lambda npc: npc.targets_me() and distance_from_npc(game.tile(), npc) <= 1 and not (npc.max_health > 0 and npc.health == 0)).nearest()
         if ogre is None:
             if not game.in_combat():
                 return True
