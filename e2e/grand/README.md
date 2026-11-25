@@ -3,8 +3,8 @@
 This publishes the orchestrator used for the November 24 grand run, replacing its
 hard-coded run folder and Windows executable with command-line options. It runs
 phase 16's individual suite and phases 17a–i: **65 fresh accounts**, with both
-Arrav and Hero gang partners kept together. Optional phase 16 full queues and the
-focused combat probes are separate scenarios.
+Arrav and Hero gang partners kept together. Optional phase 16 full queues are a
+separate scenario.
 
 Use the build/server prerequisites in [the E2E guide](../README.md) and the linked
 phase guides. Start the local members-enabled 289 server yourself at normal

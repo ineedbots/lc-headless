@@ -16,7 +16,6 @@ server. They are separate from the fake-server and stdlib tests run by CTest.
 | [Phase 17g](phase17g/README.md) | Local revision 289 | Both Hero's Quest gangs, Temple of Ikov (Guardians), The Fremennik Trials |
 | [Phase 17h](phase17h/README.md) | Local revision 289 | Separate Underground Pass and Regicide accounts |
 | [Phase 17i](phase17i/README.md) | Local revision 289 | Legends Quest with explicit prerequisite and QP-gate preparation |
-| [Combat legs](combat_legs/README.md) | Local revision 289 | Ice Queen, Regicide soldier/quarry, and Legends descent/guardians checkpoints |
 
 Generated credentials, configurations, logs and results belong under the ignored
 `build/e2e/` directory. Each new acceptance run uses fresh scratch characters.

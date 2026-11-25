@@ -163,7 +163,7 @@ def run(args):
     shutil.copy2(args.client, binary)
     harness.write_json(root / 'provenance.json', {
         'client_sha': harness.git_sha(REPO), 'binary_sha256': harness.digest(binary),
-        'scope': 'All individual phase16 and phase17a-i cases; optional phase16 full queues and combat probes excluded',
+        'scope': 'All individual phase16 and phase17a-i cases; optional phase16 full queues excluded',
         'started_at_utc': utc_now(), 'operator_port': args.operator_port,
         'seed_timeout_minutes': args.seed_timeout_minutes, 'timeout_minutes': args.timeout_minutes})
     children, stage = {}, 'prepare'

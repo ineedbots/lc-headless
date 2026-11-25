@@ -719,14 +719,12 @@ their individually passing cases are not aggregate phase passes.
 | 17h | Regicide | `h17178307rg` | FAIL | 58m 16s | 9 | 1 |
 | 17i | Legends Quest | `i17da08c3lq` | FAIL | 1h 26m 14s | 107 | 1 |
 
-The death diagnosis, fixes and separate live checkpoint evidence are in the
-[combat leg guide](combat_legs/README.md). The fresh full-quest replacement results follow below.
+The fresh full-quest replacement results follow below.
 
 ## Death prevention full-quest reruns
 
-After fixing the three grand-run death causes, each affected leg was tested
-on a fresh checkpoint account before launching fresh full-quest replacements.
-Both Hero gang partners ran together. All four full cases passed with zero
+After fixing the three grand-run death causes, fresh full-quest replacements
+ran with both Hero gang partners together. All four full cases passed with zero
 deaths, one newly completed quest, complete journals, queue done 1 / stuck 0 /
 total 1, expected final QP, final banking and confirmed clean logout. All three
 selected launchers passed and exited cleanly. No manual pause, resume, restart
@@ -764,8 +762,9 @@ script snapshots, one seed/run session, launcher results and exact `timings.json
 Combined independent audit: `build/e2e/death-prevention-report.json`.
 The original failed grand-run accounts and evidence were preserved.
 
-The [combat leg guide](combat_legs/README.md) records the original causes,
-checkpoint setup failures, accepted leg results and rerun instructions.
+The fixes address missing prayer supplies in Hero's Quest, unarmoured and
+unprotected combat in Regicide, and ledge overshoots and blocked prayer upkeep
+in Legends Quest.
 Regicide defeated the soldier without spending its seven remaining sharks and
 crossed the original quarry death location at 84% HP with six sharks. Both
 Hero accounts obtained their gloves and completed the feather chain. Legends
