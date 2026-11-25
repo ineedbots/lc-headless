@@ -90,6 +90,7 @@ class ChickenKiller(TaskBot):
         opened = yield from banking.open()
         if not opened:
             log('could not open the bank; trying again')
+            self.restore_flicking()
             yield from execution.delay_ticks(3)
             return
 
