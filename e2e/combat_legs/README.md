@@ -19,7 +19,8 @@ Mining/Agility/Magic/Cooking/Crafting 70. Ordinary worn equipment is a rune
 chainbody, platelegs and longsword. Heroes and Regicide carry eight food and two
 prayer potions(3); Legends carries nine lobsters and three potions(3). No ice
 gloves, crystal sections or finished heart are seeded. The runner uses real
-quest functions and AIOQuester food/prayer upkeep, then logs out.
+quest functions and AIOQuester food/prayer upkeep. Heroes returns to Catherby
+bank before logging out so nearby ice warriors cannot keep the session in combat.
 
 ```powershell
 python e2e/combat_legs/run.py prepare --run-dir build/e2e/combat-legs-night1
@@ -48,6 +49,26 @@ starting tile `(2838,3515)` was unreachable, and the Legends account lacked the
 furnace's Crafting requirement. Corrected tests use fresh characters and the
 checkpoints and stats documented above. These setup failures are not passes.
 
+## Focused validation
+
+Focused results on November 24, 2026, against the unchanged engine/content
+versions documented in phase 17h/i:
+
+| Leg | Fresh account | Result | Time taken | Final HP |
+|---|---|---|---|---|
+| Ice Queen, gloves and bank return | `cld2341chq` | PASS, zero deaths, clean logout | 4m 16s | 85/85 |
+| Tyras soldier and quarry crossing | `clc6987erg` | PASS case, zero deaths, clean logout | 5m 11s | 85/85 |
+| Viyeldi descent, guardians and forged crystal | `cl789261lq` | PASS, zero deaths, clean logout | 6m 31s | 85/85 |
+
+Times use the runner's `elapsed_ms` field and include the Heroes bank return.
+Evidence folders are `build/e2e/combat-hero-final-20261124`,
+`build/e2e/combat-legs-20261124`, and `build/e2e/combat-legends-20261124`.
+The first batch's overall launcher failed because its other two setups failed;
+its Regicide case completed and logged out cleanly. The replacement Heroes and
+Legends launchers passed. A separate Heroes probe killed the Queen, but its
+combat logout could not be confirmed; it is superseded by the fresh bank-return
+test and is not counted as a clean pass.
+
 ## Full quest acceptance after the legs
 
 Prepare new runs using [phase 17g](../phase17g/README.md),
@@ -56,3 +77,8 @@ Run both Hero gang partners together (`run --cases ph ba`), Regicide
 (`run --cases rg`), and Legends (`run --cases lq`). Preserve the original failed
 grand-run results. Record fresh uninterrupted elapsed times and zero deaths
 before accepting the fixes.
+
+Fresh full-quest replacements subsequently passed for both Hero gangs, Regicide
+and Legends, all with zero deaths and clean logouts. The [full validation
+tables](../VALIDATION.md#death-prevention-full-quest-reruns) include account names,
+queue-to-result timings, QP and provenance.

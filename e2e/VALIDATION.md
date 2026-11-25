@@ -632,3 +632,147 @@ clean logout, launcher PASS and empty launcher stderr. Combined report:
 is not an aggregate pass. All quest accounts are now logged out.
 These suites cover prepared quest completion; Kharazi/Isafdar clue workflows
 from historical issue #34 are outside this request.
+
+## Grand concurrent run
+
+The November 24, 2026 grand run launched all 65 individual cases concurrently
+at normal 600 ms ticks. **62 cases passed; three failed after real deaths:**
+Phoenix Heroes, Regicide, and Legends. All accounts have stopped. The last
+passing result was Watch Tower at 23:52:23.633 UTC. The aggregate grand run
+**failed**; later replacements do not erase its failures.
+
+Source: `767b558ca8b3736b74cae7f93ef5dbe768005e48`. Frozen binary SHA-256:
+`830cb5de5384d7c304db9faae6416c7221de38662ca10121b6b3ac0281132712`. Evidence: `build/e2e/grand-20261124`,
+including `provenance.json`, `results.json`, and per-phase session logs.
+Each account started its queue once, without manual intervention, pause, resume
+or restart. Optional phase 16 two-account full queues were excluded. Time taken
+is queue start through result, including the final bank return for passing cases;
+failed-case time ends at its failure result. Exact seconds are retained in JSON.
+Mixed phase 17g/h client groups and phase 17i have failed launcher outcomes;
+their individually passing cases are not aggregate phase passes.
+
+| Phase | Quest | Account | Result | Time taken | Final QP | Deaths |
+|---|---|---|---|---|---|---|
+| 16 | Rune Mysteries Quest | `f16ac6b5cru` | PASS | 11m 23s | 1 | 0 |
+| 16 | Doric's Quest | `f16ac6b5cdo` | PASS | 6m 41s | 1 | 0 |
+| 16 | The Knight's Sword | `f16ac6b5cks` | PASS | 24m 12s | 1 | 0 |
+| 16 | Sheep Shearer | `f16ac6b5csh` | PASS | 10m 25s | 1 | 0 |
+| 16 | The Restless Ghost | `f16ac6b5crg` | PASS | 10m 14s | 1 | 0 |
+| 16 | Cook's Assistant | `f16ac6b5cco` | PASS | 7m 47s | 1 | 0 |
+| 16 | Imp Catcher | `f16ac6b5cim` | PASS | 19m 02s | 1 | 0 |
+| 16 | Ernest the Chicken | `f16ac6b5cer` | PASS | 11m 27s | 4 | 0 |
+| 16 | Witch's Potion | `f16ac6b5cwp` | PASS | 5m 49s | 1 | 0 |
+| 16 | Romeo & Juliet | `f16ac6b5crj` | PASS | 6m 10s | 5 | 0 |
+| 16 | Prince Ali Rescue | `f16ac6b5cpa` | PASS | 23m 21s | 3 | 0 |
+| 16 | Pirate's Treasure | `f16ac6b5cpt` | PASS | 13m 23s | 2 | 0 |
+| 16 | Shield of Arrav (Phoenix) | `f16ac6b5cph` | PASS | 10m 12s | 1 | 0 |
+| 16 | Shield of Arrav (Black Arm) | `f16ac6b5cba` | PASS | 10m 30s | 1 | 0 |
+| 16 | Goblin Diplomacy | `f16ac6b5cgd` | PASS | 21m 23s | 5 | 0 |
+| 16 | Demon Slayer | `f16ac6b5cde` | PASS | 17m 43s | 3 | 0 |
+| 16 | Black Knight's Fortress | `f16ac6b5cbk` | PASS | 9m 23s | 15 | 0 |
+| 16 | Vampire Slayer | `f16ac6b5cvs` | PASS | 14m 05s | 3 | 0 |
+| 16 | Dragon Slayer | `f16ac6b5cds` | PASS | 54m 46s | 34 | 0 |
+| 17a | Druidic Ritual | `a179fbc34dr` | PASS | 14m 23s | 4 | 0 |
+| 17a | Monk's Friend | `a179fbc34mf` | PASS | 10m 53s | 1 | 0 |
+| 17a | Gertrude's Cat | `a179fbc34gc` | PASS | 11m 14s | 1 | 0 |
+| 17a | Jungle Potion | `a179fbc34jp` | PASS | 14m 06s | 5 | 0 |
+| 17a | Clock Tower | `a179fbc34ct` | PASS | 11m 58s | 1 | 0 |
+| 17a | Hazeel Cult | `a179fbc34hc` | PASS | 11m 07s | 1 | 0 |
+| 17a | Witch's House | `a179fbc34wh` | PASS | 14m 59s | 4 | 0 |
+| 17a | Fishing Contest | `a179fbc34fc` | PASS | 11m 19s | 1 | 0 |
+| 17a | Murder Mystery | `a179fbc34mm` | PASS | 8m 09s | 3 | 0 |
+| 17a | Sea Slug Quest | `a179fbc34ss` | PASS | 12m 46s | 1 | 0 |
+| 17a | Priest in Peril | `a179fbc34pp` | PASS | 35m 55s | 2 | 0 |
+| 17a | Tribal Totem | `a179fbc34tt` | PASS | 10m 09s | 1 | 0 |
+| 17b | Dwarf Cannon | `b17129a5bdc` | PASS | 25m 01s | 1 | 0 |
+| 17b | Sheep Herder | `b17129a5bsh` | PASS | 25m 33s | 4 | 0 |
+| 17b | Tree Gnome Village | `b17129a5btg` | PASS | 17m 46s | 2 | 0 |
+| 17b | Waterfall Quest | `b17129a5bwf` | PASS | 23m 56s | 1 | 0 |
+| 17b | Scorpion Catcher | `b17129a5bsc` | PASS | 50m 17s | 1 | 0 |
+| 17b | Observatory Quest | `b17129a5bob` | PASS | 29m 22s | 2 | 0 |
+| 17b | Fight Arena | `b17129a5bfa` | PASS | 19m 41s | 2 | 0 |
+| 17b | Merlin's Crystal | `b17129a5bmc` | PASS | 28m 39s | 6 | 0 |
+| 17b | Lost City | `b17129a5blc` | PASS | 13m 35s | 3 | 0 |
+| 17c | Death Plateau | `c17a36543dp` | PASS | 32m 07s | 1 | 0 |
+| 17c | Troll Stronghold | `c17a36543ts` | PASS | 15m 31s | 2 | 0 |
+| 17c | Eadgar's Ruse | `c17a36543er` | PASS | 1h 28m 21s | 7 | 0 |
+| 17c | Plague City | `c17a36543pc` | PASS | 33m 26s | 1 | 0 |
+| 17c | Biohazard | `c17a36543bh` | PASS | 25m 39s | 4 | 0 |
+| 17d | Nature Spirit | `d170e1029ns` | PASS | 31m 01s | 5 | 0 |
+| 17d | Shades of Mortton | `d170e1029sm` | PASS | 24m 08s | 9 | 0 |
+| 17d | Tai Bwo Wannai Trio | `d170e1029tw` | PASS | 1h 10m 29s | 7 | 0 |
+| 17d | Shilo Village | `d170e1029sv` | PASS | 39m 03s | 7 | 0 |
+| 17e | The Tourist Trap | `e17ad30bdtt` | PASS | 23m 59s | 2 | 0 |
+| 17e | Watch Tower | `e17ad30bdwt` | PASS | 2h 12m 04s | 8 | 0 |
+| 17e | Big Chompy Bird Hunting | `e17ad30bdcb` | PASS | 29m 26s | 2 | 0 |
+| 17e | The Grand Tree | `e17ad30bdgt` | PASS | 39m 53s | 5 | 0 |
+| 17f | Elemental Workshop | `f176837d7ew` | PASS | 20m 38s | 1 | 0 |
+| 17f | Digsite Quest | `f176837d7ds` | PASS | 39m 41s | 6 | 0 |
+| 17f | Holy Grail | `f176837d7hg` | PASS | 36m 46s | 8 | 0 |
+| 17f | Family Crest | `f176837d7fc` | PASS | 48m 56s | 1 | 0 |
+| 17f | Horror from the Deep | `f176837d7hd` | PASS | 1h 25m 37s | 2 | 0 |
+| 17g | Hero's Quest (Phoenix) | `g178f773bph` | FAIL | 42m 26s | 56 | 1 |
+| 17g | Hero's Quest (Black Arm) | `g178f773bba` | PASS | 40m 49s | 57 | 0 |
+| 17g | Temple of Ikov | `g178f773bik` | PASS | 1h 7m 38s | 1 | 0 |
+| 17g | The Fremennik Trials | `g178f773bft` | PASS | 57m 34s | 3 | 0 |
+| 17h | Underground Pass | `h17178307up` | PASS | 40m 39s | 9 | 0 |
+| 17h | Regicide | `h17178307rg` | FAIL | 58m 16s | 9 | 1 |
+| 17i | Legends Quest | `i17da08c3lq` | FAIL | 1h 26m 14s | 107 | 1 |
+
+The death diagnosis, fixes and separate live checkpoint evidence are in the
+[combat leg guide](combat_legs/README.md). The fresh full-quest replacement results follow below.
+
+## Death prevention full-quest reruns
+
+After fixing the three grand-run death causes, each affected leg was tested
+on a fresh checkpoint account before launching fresh full-quest replacements.
+Both Hero gang partners ran together. All four full cases passed with zero
+deaths, one newly completed quest, complete journals, queue done 1 / stuck 0 /
+total 1, expected final QP, final banking and confirmed clean logout. All three
+selected launchers passed and exited cleanly. No manual pause, resume, restart
+or script reload occurred. Each full character began at target stage 0 and
+logged exactly one queue start and one result. Times include all automatic
+travel retries and the final bank return.
+
+| Quest | Fresh account | Result | Time taken | Final QP |
+|---|---|---|---|---|
+| Hero's Quest (Phoenix) | `g176daadbph` | PASS, zero deaths | 43m 38s | 57 |
+| Hero's Quest (Black Arm) | `g176daadbba` | PASS, zero deaths | 41m 39s | 57 |
+| Regicide | `h17600dcbrg` | PASS, zero deaths | 1h 29m 18s | 12 |
+| Legends Quest | `i17243641lq` | PASS, zero deaths | 1h 42m 04s | 111 |
+
+| Account | Queue start (UTC) | Passing result (UTC) | Elapsed seconds |
+|---|---|---|---|
+| `g176daadbph` | 2026-11-24T23:50:31.461Z | 2026-11-25T00:34:09.235Z | 2617.774 |
+| `g176daadbba` | 2026-11-24T23:50:28.423Z | 2026-11-25T00:32:07.441Z | 2499.018 |
+| `h17600dcbrg` | 2026-11-24T23:44:42.222Z | 2026-11-25T01:14:00.227Z | 5358.005 |
+| `i17243641lq` | 2026-11-24T23:47:25.432Z | 2026-11-25T01:29:29.627Z | 6124.195 |
+
+Fix source: `07f50a4f` on PR #163. Every full session used the same frozen
+client, SHA-256 `2f43faa167f2eeee8006bf738c998d78af1ebb7f8b7126cb5f290976393b40c8`.
+The Regicide session records base `fce88a0b` because its identical fixed binary
+was built and launched from the working tree before that tree was committed as
+`07f50a4f`. Session binary hashes were independently checked against the frozen
+file. Other full sessions record `07f50a4f`. Engine/content stayed unchanged at
+`2395c968473333d13ff1454f5eff452a18a029b6` /
+`f32c62f66302f76b43c752ede3181de0c0d01369`; normal 600 ms seed probes passed.
+
+Evidence: `build/e2e/full-heroes-deathfix-20261124`,
+`build/e2e/full-regicide-deathfix-20261124`, and
+`build/e2e/full-legends-deathfix-20261124`. Each root retains its manifest,
+script snapshots, one seed/run session, launcher results and exact `timings.json`.
+Combined independent audit: `build/e2e/death-prevention-report.json`.
+The original failed grand-run accounts and evidence were preserved.
+
+The [combat leg guide](combat_legs/README.md) records the original causes,
+checkpoint setup failures, accepted leg results and rerun instructions.
+Regicide defeated the soldier without spending its seven remaining sharks and
+crossed the original quarry death location at 84% HP with six sharks. Both
+Hero accounts obtained their gloves and completed the feather chain. Legends
+restored prayer through the guardian fights and completed the remaining quest.
+
+Validation: embedded stdlib suite passed 4,496 native assertions across four
+test cases; the focused death-prevention specs also passed after adding the
+complete-armour preparation assertion. All 18 phase 17g/h/i host-side launcher
+tests, changed-file pocketpy dialect lint and whitespace checks passed. All 11
+CI checks on fix commit `07f50a4f` passed.
