@@ -139,7 +139,7 @@ def test_player_entity_menu_validity_targets_and_waypoint_interaction():
             get_pid=lambda: 7, interact_loc_via=lambda *args: calls.append(args) or True,
             get_npc=lambda index: None))
         assert player.actions() == ['Trade with', 'Follow'] and player.interact(3)
-        assert calls[-1] == (2, 3) and not player.interact(2)
+        assert calls[-1] == (2, 3, True) and not player.interact(2)
         assert player.valid() and player.targets_me() and 'Alice' in repr(player)
         world.patch(entities, '_core', FakeModule(get_players=lambda: []))
         assert not player.valid()

@@ -44,20 +44,20 @@ bool ScriptActions::InteractNpc(u16 index, u8 op, bool walk)
     return true;
 }
 
-bool ScriptActions::InteractPlayer(u16 index, u8 op)
+bool ScriptActions::InteractPlayer(u16 index, u8 op, bool walk)
 {
     if (m_state.FindPlayer(index) == nullptr)
     {
         return false;
     }
 
-    m_actions.InteractPlayer(index, op);
+    m_actions.InteractPlayer(index, op, walk);
     return true;
 }
 
-void ScriptActions::InteractLoc(u16 loc, s32 x, s32 z, u8 op)
+void ScriptActions::InteractLoc(u16 loc, s32 x, s32 z, u8 op, bool walk)
 {
-    m_actions.InteractLoc(ToTile(x, z), loc, op);
+    m_actions.InteractLoc(ToTile(x, z), loc, op, walk);
 }
 
 void ScriptActions::InteractLocVia(std::span<const Tile_s> waypoints, u16 loc, s32 x, s32 z, u8 op)
@@ -65,7 +65,7 @@ void ScriptActions::InteractLocVia(std::span<const Tile_s> waypoints, u16 loc, s
     m_actions.InteractLocVia(waypoints, ToTile(x, z), loc, op);
 }
 
-bool ScriptActions::InteractGroundItem(u16 obj, s32 x, s32 z, u8 op)
+bool ScriptActions::InteractGroundItem(u16 obj, s32 x, s32 z, u8 op, bool walk)
 {
     const auto tile = ToTile(x, z);
     if (!HasGroundItem(obj, tile))
@@ -73,7 +73,7 @@ bool ScriptActions::InteractGroundItem(u16 obj, s32 x, s32 z, u8 op)
         return false;
     }
 
-    m_actions.InteractGroundItem(tile, obj, op);
+    m_actions.InteractGroundItem(tile, obj, op, walk);
     return true;
 }
 

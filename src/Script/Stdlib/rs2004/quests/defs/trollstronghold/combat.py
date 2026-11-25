@@ -166,8 +166,9 @@ def fight_rounds(plan, prayers, log):
         if prayers.usable and not prayers.up() and prayer.points() > 0:
             yield from prayers.hold()
             continue
-        if hungry():
+        if hungry() and any(['Eat' in item.actions() for item in inventory.items()]):
             yield from sustain.run()
+            yield from execution.delay_ticks(1)
             continue
         target = plan.target()
         if not target:
@@ -182,10 +183,11 @@ def fight_rounds(plan, prayers, log):
             continue
         if now - reported >= 40:
             reported = now
-            log(f"{plan.what}: hp={skills.effective('hitpoints')}/{skills.level('hitpoints')}" + f' prayer={prayer.points()} attacks={swings}')
+            log(f"{plan.what}: hp={skills.effective('hitpoints')}/{skills.level('hitpoints')}" + f' prayer={prayer.points()} attacks={swings} facing={game.facing()} target={target.index}')
         # Why: melee keeps swinging on its own, so re-clicking the same target spends the tick's one action re-targeting.
         # Why: Dad's slam knocks us 7 tiles clear and drops combat, which is when to re-issue.
-        if target.index == attacking and game.in_combat():
+        # Auto-retaliation can switch to a nearby aggressor while this target remains alive.
+        if target.index == attacking and game.in_combat() and game.facing() == ('npc', target.index):
             yield from execution.delay_ticks(1)
             continue
         if target.interact('Attack'):

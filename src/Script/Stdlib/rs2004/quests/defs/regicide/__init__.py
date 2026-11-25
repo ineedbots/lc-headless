@@ -1,6 +1,7 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/regicide/index.ts (MIT, see thirdparty/rs2b0t)."""
 
 from rs2004.catalogs.record import Record
+from rs2004.catalogs._items import ITEM_DB
 from rs2004.game import skills
 from rs2004.messages import game_messages
 from rs2004.quests.data import quest_record
@@ -18,6 +19,7 @@ from rs2004.quests.defs.upass import inside_pass
 from rs2004.quests.defs.upass.supplies import BOW_IDS, draw_gear, melee_carried, wear_gear
 from rs2004.quests.engine.types import QuestModule, has_flag
 from rs2004.quests.engine.trace import format_tile
+from rs2004.quests.prayer import PRAYER_POTION_IDS, potion_step
 
 __all__ = ['decide', 'regicide']
 
@@ -31,6 +33,12 @@ def flag(snap, name):
 
 # Why: Distillation and forest pickups need free slots; deposit only when removable items exist or the planner repeats a no-op bank step.
 SLOTS_NEEDED = 6
+ARMOUR_NAMES = set([row['name'].lower() for row in ITEM_DB if row.get('slot') in ['torso', 'legs', 'hat']])
+
+
+def gear_slots(snap):
+    # Keep an existing outfit; provision banked armour when the character arrived without any.
+    return 'weapon' if any([name in ARMOUR_NAMES for name in snap.worn]) else 'all'
 
 
 def outfit(snap, area):
@@ -40,8 +48,11 @@ def outfit(snap, area):
     junk = any([not (id in KEEP_IDS) for id in (snap.inv_ids if snap.inv_ids is not None else {}).keys()])
     if junk and ((snap.free_slots if snap.free_slots is not None else SLOTS_NEEDED)) < SLOTS_NEEDED:
         return Record({'kind': 'deposit', 'keep': [RG_ITEM.SHARK.name], 'keep_ids': KEEP_IDS, 'bank': RG_TILE.ARDOUGNE_BANK})
-    _v3 = wear_gear(snap, 'weapon')
-    return (_v3 if _v3 is not None else source_kit(snap))
+    gear = wear_gear(snap, gear_slots(snap))
+    if gear:
+        return gear
+    potions = potion_step(snap, 2, RG_TILE.ARDOUGNE_BANK)
+    return potions if potions else source_kit(snap)
 
 
 # Why: past the Arandar palisade there's one shop and no bank, and the way back in is the Underground Pass walked end to end, so a pack short of the kit stops on the mainland and says what's missing.
@@ -61,7 +72,7 @@ FIRE_ARROW_SLOTS = 3
 def return_run():
     return (Record({
         'what': 'the walk back through the pass',
-        'allow': list(BOW_IDS),
+        'allow': list(BOW_IDS) + PRAYER_POTION_IDS,
         'caps': [(Record({'item': supply.item, 'qty': supply.qty})) for supply in [supply for supply in RETURN_KIT if supply.item.id != RG_ITEM.SHORTBOW.id]],
         'free_needed': FIRE_ARROW_SLOTS,
     }))
@@ -77,6 +88,9 @@ def cross_in(snap):
         shaped = (_v4 if _v4 is not None else source_kit(snap, kit))
         if shaped:
             return shaped
+        potions = potion_step(snap, 2, RG_TILE.ARDOUGNE_BANK)
+        if potions:
+            return potions
         if carried(snap, RG_ITEM.SPADE) == 0:
             if spade_recovery_failed():
                 return Record({'kind': 'wait', 'reason': 'no spade in pack or bank; the bounded spawn recovery failed'})
@@ -200,7 +214,12 @@ def bomb_leg(snap, area):
 
 
 def stage_step(snap, area, stage):
-    gear = draw_gear(snap, 'weapon')
+    # Finish dressing at the bank as one operation before a packed piece becomes the chosen outfit.
+    if area == 'mainland' and stage <= RG_STAGE.SPOKEN_LATHAS:
+        prepared = outfit(snap, area)
+        if prepared:
+            return prepared
+    gear = draw_gear(snap, gear_slots(snap))
     if gear:
         return gear
     if stage == RG_STAGE.NOT_STARTED:
@@ -308,6 +327,7 @@ regicide = QuestModule(**{
     'record': quest_record('regicide'),
     'bank': RG_TILE.ARDOUGNE_BANK,
     'owns_inventory': True,
+    'pray': Record({'protect': 'melee', 'potions': 2}),
     'read_progress': read_regicide_progress,
     'resume_at': inside_regicide,
     'sustain': Record({'foods': [RG_ITEM.SHARK.name], 'eat_below_hp': 0.7}),

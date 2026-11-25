@@ -42,7 +42,7 @@ def drink_prayer(log):
 
 
 # Why: the server runs one op per tick and drops the rest, so a pass that eats, prays and swings loses 2 of the 3, and the one it loses is the food.
-# Why: the order is eat, then top the prayer up, then swing, which keeps hitpoints off the floor against a level-187 demon at 70s.
+# Prayer restoration precedes the food branch so an injured fighter with no food can still hold protection.
 def fight(plan, log):
     """Fight one named NPC to a goal, holding Protect from Melee and eating as needed."""
     want_pray = plan.pray != False and prayer.known(PROTECT_MELEE) and skills.level('prayer') >= 43
@@ -74,15 +74,16 @@ def fight_loop(plan, want_pray, log):
             yield from execution.delay_ticks(1)
             continue
         last_tick = tick
-        if hurt():
-            yield from sustain.run()
-            continue
         if want_pray and prayer.points() <= PRAYER_FLOOR:
             drank = yield from drink_prayer(log)
             if drank:
                 continue
         if want_pray and not prayer.active(PROTECT_MELEE) and prayer.available(PROTECT_MELEE):
             yield from prayer.set(PROTECT_MELEE, True)
+            continue
+        if hurt() and any(['Eat' in item.actions() for item in inventory.items()]):
+            yield from sustain.run()
+            yield from execution.delay_ticks(1)
             continue
         enemy = target(plan.npc)
         if not enemy:

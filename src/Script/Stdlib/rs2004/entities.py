@@ -97,11 +97,11 @@ class Player(_Located):
     def actions(self):
         return present_ops(_core.get_player_menu())
 
-    def interact(self, action):
+    def interact(self, action, walk=True):
         op = op_index(_core.get_player_menu(), action)
         if op == -1:
             return False
-        return _core.interact_player(self.index, op)
+        return _core.interact_player(self.index, op, walk)
 
     def valid(self):
         for player in _core.get_players():
@@ -120,11 +120,11 @@ class Loc(_Located):
     """Scenery: name, id (-1 when the server removed it), shape, angle, layer (a LAYER_* constant), and
     changed: False as the cache has it, True when the server changed it."""
 
-    def interact(self, action):
+    def interact(self, action, walk=True):
         op = op_index(self._ops, action)
         if op == -1:
             return False
-        return _core.interact_loc(self.id, self._x, self._z, op)
+        return _core.interact_loc(self.id, self._x, self._z, op, walk)
 
     def interact_via(self, points, action):
         """The same, walking the given (x, z) waypoints, each in a straight line, instead of a route."""
@@ -144,11 +144,11 @@ class Loc(_Located):
 class GroundItem(_Located):
     """An item on the ground: name, id and count."""
 
-    def interact(self, action):
+    def interact(self, action, walk=True):
         op = op_index(self._ops, action)
         if op == -1:
             return False
-        return _core.interact_ground_item(self, op)
+        return _core.interact_ground_item(self, op, walk)
 
     def valid(self):
         for item in _core.get_ground_items([self.id]):

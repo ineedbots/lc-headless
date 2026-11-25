@@ -21,10 +21,10 @@ public:
     void WalkPath(std::span<const Tile_s> waypoints, bool run = false);
 
     void InteractNpc(u16 npcIndex, u8 op, bool walk = true);
-    void InteractPlayer(u16 playerIndex, u8 op);
-    void InteractLoc(const Tile_s& tile, u16 loc, u8 op);
+    void InteractPlayer(u16 playerIndex, u8 op, bool walk = true);
+    void InteractLoc(const Tile_s& tile, u16 loc, u8 op, bool walk = true);
     void InteractLocVia(std::span<const Tile_s> waypoints, const Tile_s& tile, u16 loc, u8 op);
-    void InteractGroundItem(const Tile_s& tile, u16 obj, u8 op);
+    void InteractGroundItem(const Tile_s& tile, u16 obj, u8 op, bool walk = true);
     void InteractGroundItemVia(std::span<const Tile_s> waypoints, const Tile_s& tile, u16 obj, u8 op);
 
     void UseItemOnNpc(const ItemRef_s& item, u16 npcIndex);

@@ -41,6 +41,7 @@ jobs:
 
       - name: Verify live-test setup safeguards
         run: |
+          python -B -m unittest discover -s e2e/grand -p 'test_*.py'
           python -B -m unittest discover -s e2e/phase17g -p 'test_*.py'
           python -B -m unittest discover -s e2e/phase16 -p 'test_*.py'
           python -B -m unittest discover -s e2e/phase17a -p 'test_*.py'

@@ -94,7 +94,7 @@ Filters return the query, so they chain. Nothing is searched until a terminal ru
 | `tile()` | Where it is, as a `Tile` (an NPC's south-west tile) |
 | `distance()` | Chebyshev tiles from you; another level counts as 1,000,000 or more |
 | `actions()` | The options its right-click menu shows, without empty slots |
-| `interact(action)` | Walks there and uses the option. See [interact()](#interactaction) |
+| `interact(action, walk=True)` | Walks there and uses the option; `walk=False` omits the client approach. See [interact()](#interactaction) |
 | `valid()` | Whether it's still there |
 
 ## `Npc`
@@ -118,10 +118,6 @@ Filters return the query, so they chain. Nothing is searched until a terminal ru
 | `targets_me()` | It's facing you |
 | `targets_another_player()` | It's facing a player other than you |
 | `network_tile()` | The same as `tile()`, for rs2b0t compatibility |
-
-`Npc.interact(action, walk=True)` normally plans an approach before sending the action.
-Use `walk=False` to send only the NPC action, for example when shooting through an arrow slit
-from a chosen tile. The server still enforces range and line of sight and may move the character.
 
 ## `Player`
 
@@ -185,7 +181,12 @@ Passed to the `projectile` event; not found by a query.
 
 `action` is the option's text as the menu shows it, matched without regard to case (`'Attack'`, `'chop down'`), or its number, 1 to 5.
 
-- It walks to the thing first, routing around walls and scenery as the game's own client does, then uses the option. It returns at once, after queuing the packets: the effects show in the state over the next ticks.
+`Npc`, `Player`, `Loc` and `GroundItem` accept `interact(action, walk=True)`.
+Use `walk=False` to send only the interaction, for example when shooting through an arrow slit
+from a chosen tile. The server still enforces range and line of sight and may move the character.
+`walk` must be a boolean. `InvItem.interact(action)` has no walking argument.
+
+- By default it walks to the thing first, routing around walls and scenery as the game's own client does, then uses the option. It returns at once, after queuing the packets: the effects show in the state over the next ticks.
 - **Returns** `False`, sending nothing, when the thing has no such option (including a number outside 1 to 5, or an empty slot) or has gone; `True` otherwise.
 
 ```python

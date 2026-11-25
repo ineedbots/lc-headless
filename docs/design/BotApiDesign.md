@@ -227,7 +227,7 @@ How the objects are built:
 - `PyConvert` builds them as instances of the stdlib's classes, found in builtins by name, as it built the prelude's.
 - A thing's tile is kept in private `_x`, `_z` and `_plane` fields, which `tile()` reads. A public `level` would clash with rs2b0t's `npc.level`.
 - Its menu is a private `_ops` list, from `ScriptApi::GetNpcMenu`, `GetLocMenu`, `GetGroundItemMenu` and `GetItemMenu`, which add the "Take" and "Drop" the menu shows.
-- `interact(action)` matches the text against `_ops` and returns `False` without sending when it isn't there, as rs2b0t's `interact` does; the core's text matching, which raised `ValueError`, stays for `_core` callers.
+- `interact(action)` matches the text against `_ops` and returns `False` without sending when it isn't there, as rs2b0t's `interact` does; the core's text matching, which raised `ValueError`, stays for `_core` callers. `Npc`, `Player`, `Loc` and `GroundItem` also accept `walk=True`; `walk=False` sends only the action packet and leaves reach enforcement to the server. `InvItem` has no walking argument.
 - Reachability for `reachable()` is `ScriptApi::CanReachEntity`, `CanReachGroundItem` and `CanReachLoc`.
 
 Kept from before because rs2b0t has nothing public for them:

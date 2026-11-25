@@ -16,6 +16,7 @@ from rs2004.quests.defs.trollstronghold.combat import fight
 from rs2004.quests.exec.primitives import talk_through
 from rs2004.quests.exec.prompts import settle_scene
 from rs2004.quests.food import FOOD_FLOAT
+from rs2004.quests.prayer import potion_step
 from rs2004.traversal import traversal
 
 __all__ = ['combat_kit_step', 'take_ice_gloves', 'kill_ice_queen', 'sail_to_entrana', 'sail_from_entrana', 'take_feather', 'feather_step', 'ENTRANA_LANDING']
@@ -248,10 +249,14 @@ def feather_step(snap):
         pickaxe = pickaxe_at(snap, mining)
         if pickaxe:
             return pickaxe
+        potions = potion_step(snap, 2)
+        if potions:
+            return potions
         missing_food = max(0, FOOD_TARGET - held_food(snap))
         if snap.free_slots is not None and snap.free_slots < missing_food + 1:
             keep = [food_name().lower(), 'coins', HERO_NAMED.ARMBAND.lower(), HERO_NAMED.LAVA_EEL.lower()]
             keep += [name for name in snap.inv.keys() if name.endswith('pickaxe')]
+            keep += [name for name in snap.inv.keys() if name.startswith('prayer potion')]
             return Record({'kind': 'deposit', 'keep': keep, 'exact_keep': True})
         if held_food(snap) < FOOD_TARGET:
             return Record({'kind': 'withdraw', 'items': [{'name': food_name(), 'qty': missing_food}]})

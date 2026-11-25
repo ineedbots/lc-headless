@@ -3,13 +3,14 @@ declares its prayer as {protect: 'melee', 'magic' or 'missiles', potions: doses 
 the upkeep at it, and prayer_upkeep, which the prompts call between boxes, spends a tick on it when one's needed."""
 
 from rs2004 import execution
+from rs2004.catalogs.record import Record
 from rs2004.game import game
 from rs2004.items import inventory
 from rs2004.tabs import PROTECT_FROM_MAGIC, PROTECT_FROM_MELEE, PROTECT_FROM_MISSILES, prayer
 
 __all__ = [
     'PRAYER_FLOOR', 'PROTECT_LEVEL', 'PROTECTION_NAME', 'PRAYER_POTION', 'PRAYER_POTION_IDS', 'prayer_upkeep_action',
-    'protection_name', 'protection_level', 'quest_prayer_state', 'set_quest_prayer', 'prayer_upkeep',
+    'protection_name', 'protection_level', 'quest_prayer_state', 'set_quest_prayer', 'prayer_upkeep', 'potion_step',
 ]
 
 # Points at which a dose is worth more than the swing it costs.
@@ -25,6 +26,22 @@ PRAYER_POTION = 'Prayer potion(4)'
 
 # Every dose form, so a half-used flask still counts as a dose in the pack.
 PRAYER_POTION_IDS = [2434, 139, 141, 143]
+
+
+def potion_step(snap, want, bank=None):
+    """Draw protection supplies for quests that own their inventory, accepting partially used flasks."""
+    pack = snap.inv_ids or {}
+    stock_ids = snap.bank_ids or {}
+    have = sum([pack.get(id, 0) for id in PRAYER_POTION_IDS])
+    if have >= want:
+        return None
+    if not snap.bank_known:
+        return Record({'kind': 'scan_bank', 'bank': bank})
+    for id, name in zip(PRAYER_POTION_IDS, ['Prayer potion(4)', 'Prayer potion(3)', 'Prayer potion(2)', 'Prayer potion(1)']):
+        stock = stock_ids.get(id, 0)
+        if stock > 0:
+            return Record({'kind': 'withdraw', 'bank': bank, 'items': [{'id': id, 'name': name, 'qty': min(want - have, stock)}]})
+    return None
 
 
 def prayer_upkeep_action(in_combat, protect_active, protect_available, points, doses):

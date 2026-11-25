@@ -348,7 +348,7 @@ def queen_food_capacity():
     from rs2004.quests.food import quest_food
     quest_food.name = 'Lobster'
     snap = QuestSnapshot(inv={'lobster': 7, 'bronze pickaxe': 1, 'black platebody': 1},
-                         inv_ids={1265: 1}, worn_ids=set([1113, 1079, 1303]), free_slots=8)
+                         inv_ids={1265: 1}, bank_ids={}, bank_known=True, worn_ids=set([1113, 1079, 1303]), free_slots=8)
     step = feather.feather_step(snap)
     expect(step.kind).to_be('withdraw')
     expect(step.items[0]['qty']).to_be(1)
