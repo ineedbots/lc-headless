@@ -297,6 +297,8 @@ def tribal_talks():
         expect(run_wait(fn(scene.log))).to_be(False)
     enter.mock_implementation(answer(True))
     swing.mock_implementation(answer(True))
+    spy_on(tribes, 'quiet_grew_island', impl=answer(True))
+    spy_on(tribes, 'read_watchtower_progress', impl=answer(QuestProgress(2, {'spoken-grew'})))
     scene.talk_status = 'unreachable'
     for fn in [tribes.talk_to_toban, tribes.talk_to_grew, tribes.talk_to_og, tribes.kill_gorad]:
         expect(run_wait(fn(scene.log))).to_be(False)

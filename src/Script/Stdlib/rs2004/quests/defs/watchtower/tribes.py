@@ -1,14 +1,19 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/watchtower/tribes.ts (MIT, see thirdparty/rs2b0t)."""
 
+import _core
 from rs2004 import execution
 from rs2004.catalogs.tasks import sustain
 from rs2004.dialogue import chat_dialog
+from rs2004.execution import event_signal
 from rs2004.entities import ground_items, locs, npcs
-from rs2004.game import game
+from rs2004.game import game, skills
 from rs2004.items import inventory
 from rs2004.quests.defs.watchtower.areas import WT_ITEM, WT_LOC, WT_NPC, WT_TILE, watchtower_area
+from rs2004.quests.defs.watchtower.journal import read_watchtower_progress
 from rs2004.quests.defs.watchtower.scene import settle_scene
 from rs2004.quests.exec.primitives import talk_strict, talk_through
+from rs2004.quests.engine.types import has_flag
+from rs2004.quests.prayer import prayer_upkeep
 from rs2004.reach import reach
 from rs2004.traversal import traversal
 
@@ -166,16 +171,69 @@ def talk_to_grew(log):
     _w17 = yield from swing_to_grew_island(log)
     if not (_w17):
         return False
-    _w18 = yield from reach.npc_dialog(WT_NPC.GREW, WT_TILE.GREW, log=log)
-    if (_w18) != 'done':
-        return False
-    # The unmatched option here is "You will have to kill me first."
-    _result19 = yield from talk_strict(WT_NPC.GREW, [
-        "Don't eat me; I can help you.",
-        "I've lost the relic part you gave me.",
-        "I've lost the crystal you gave me.",
-    ], log)
-    return _result19
+    deadline = _core.step_time() + 240000
+    initial = None
+    want = 'helped-grew' if held_id(WT_ITEM.OGRE_TOOTH.id) > 0 else 'spoken-grew'
+    before_part = held_id(WT_ITEM.RELIC_PART2.id)
+    before_crystal = held_id(WT_ITEM.CRYSTAL1.id)
+    while _core.step_time() < deadline:
+        quiet = yield from quiet_grew_island(deadline, log)
+        if not quiet:
+            return False
+        if initial is None:
+            initial = yield from read_watchtower_progress()
+            if initial is None:
+                yield from execution.delay_ticks(2)
+                continue
+        game.set_auto_retaliate(False)
+        status = yield from reach.npc_dialog(WT_NPC.GREW, WT_TILE.GREW, log=log)
+        if status == 'done':
+            # The unmatched option here is "You will have to kill me first."
+            yield from talk_strict(WT_NPC.GREW, [
+                "Don't eat me; I can help you.",
+                "I've lost the relic part you gave me.",
+                "I've lost the crystal you gave me.",
+            ], log)
+            if event_signal.pending() or skills.effective('hitpoints') <= 0:
+                return False
+            # Attacks close dialogue boxes too. Only the quest's state proves
+            # that the conversation reached its useful end.
+            if not chat_dialog.is_open():
+                progress = yield from read_watchtower_progress()
+                if has_flag(initial, 'helped-grew'):
+                    if held_id(WT_ITEM.RELIC_PART2.id) > before_part or held_id(WT_ITEM.CRYSTAL1.id) > before_crystal:
+                        return True
+                elif has_flag(progress, want):
+                    return True
+        log('Grew conversation did not finish; clearing attackers and retrying on the island')
+        yield from execution.delay_ticks(2)
+    log('Grew conversation exceeded its four-minute island budget')
+    return False
+
+
+def quiet_grew_island(deadline, log):
+    """Defeat only ogres attacking us before opening a conversation."""
+    target_index = None
+    while _core.step_time() < deadline:
+        if event_signal.pending() or skills.effective('hitpoints') <= 0 or watchtower_area(game.tile()) != 'grewIsland':
+            return False
+        if skills.effective('hitpoints') < skills.level('hitpoints') * 0.4 and not any(['Eat' in item.actions() for item in inventory.items()]):
+            log('leaving Grew dialogue retry: low hitpoints and no food')
+            return False
+        yield from sustain.run()
+        yield from prayer_upkeep()
+        ogre = npcs.query().name('Ogre').action('Attack').within(12).where(lambda npc: npc.targets_me() and not (npc.max_health > 0 and npc.health == 0)).nearest()
+        if ogre is None:
+            if not game.in_combat():
+                return True
+        else:
+            if ogre.index != target_index:
+                target_index = ogre.index
+                log(f'clearing aggressive island Ogre {target_index} before talking to Grew')
+            if game.facing() != ('npc', ogre.index):
+                ogre.interact('Attack')
+        yield from execution.delay_ticks(1)
+    return False
 
 
 def pick_jangerberries(log):
