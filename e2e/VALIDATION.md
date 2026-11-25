@@ -775,3 +775,44 @@ test cases; the focused death-prevention specs also passed after adding the
 complete-armour preparation assertion. All 18 phase 17g/h/i host-side launcher
 tests, changed-file pocketpy dialect lint and whitespace checks passed. All 11
 CI checks on fix commit `07f50a4f` passed.
+
+## Watchtower Grew interruption recovery
+
+On November 25, 2026, the grand run's Watchtower account repeatedly bought a
+rope, entered Grew's island, had its dialogue interrupted by aggressive ogres,
+and left without progressing. Closing a chat box had been accepted as success.
+The corrected leg chooses a reachable side of Grew away from other ogres,
+holds that position while clearing attackers, and retries on the island until
+the expected journal flag or replacement reward arrives. It stops for unsafe
+hitpoints without food, pending random events, or its local retry limit.
+
+| Validation | Account | Result | Time taken |
+|---|---|---|---|
+| Grew introduction, resumed at stage 2 | `e17148d46wt` | PASS, journal-confirmed; proceeded to Gorad | 3m 14s |
+
+The leg ran from `2026-11-25T19:16:19.813Z` to
+`2026-11-25T19:19:33.612Z` (**193.799 seconds**, including travel). The account
+crossed onto the island once, cleared two attackers, finished the introduction,
+and restocked food before selecting "knock out one of Gorad's teeth" at
+`19:20:21.006Z`. Food fell from five lobsters to three; deaths stayed zero.
+Evidence: `build/e2e/watchtower-grew-position-20261125`, session
+`20261125T131345-run-f478`, source `fdba399`, binary SHA-256
+`e1c5e9af1df48b2b05f2d6a18cd96400b79ae1e4739946597d3e4e26bb3734e7`.
+
+This is a resumed leg result. Applying the fix interrupted the original grand
+account at the bank at `19:00:42Z`; its original timing is not an uninterrupted
+pass. The first clearing-only diagnostic exhausted its retry budget as ogres
+respawned; preserve `build/e2e/watchtower-grew-resume-20261125` as failed evidence.
+Both diagnostics used the existing save without reseeding target progress.
+
+The earlier fresh pilot `e17ae4679wt` exposed prayer flasks being deposited
+again during Dusty key preparation. Its failed dragon hunt and deliberate stop
+at the bank remain under `build/e2e/watchtower-prayer-dialogue-20261125`.
+The keep list now preserves every prayer dose form through that bank stop.
+A fresh full run on all fixes uses `e176371cawt` under
+`build/e2e/watchtower-all-fixes-20261125`, source `ab4bc87`, binary SHA-256
+`d2f2ff78fc6df27af3b7b449cfd3687f672a746240eefa6a06f9de8e9c3b56f5`.
+Its seed passed the 600 ms tick probe; full completion remains pending.
+No server files were changed for these fixes. See
+[PR #165](https://github.com/ineedbots/lc-headless/pull/165) and
+[issue #164](https://github.com/ineedbots/lc-headless/issues/164).
