@@ -369,12 +369,20 @@ def tribal_talks():
     enter.mock_implementation(answer(True))
     swing.mock_implementation(answer(True))
     spy_on(tribes, 'quiet_grew_island', impl=answer(True))
-    spy_on(tribes, 'read_watchtower_progress', impl=answer(QuestProgress(2, {'spoken-grew'})))
+    spy_on(tribes, 'quiet_ogre_dialogue', impl=answer(True))
+    spy_on(tribes, 'read_watchtower_progress', impl=answer(QuestProgress(2, {'spoken-grew', 'spoken-og'})))
     scene.talk_status = 'unreachable'
     for fn in [tribes.talk_to_toban, tribes.talk_to_grew, tribes.talk_to_og, tribes.kill_gorad]:
         expect(run_wait(fn(scene.log))).to_be(False)
     scene.talk_status = 'done'
-    talks = spy_on(tribes, 'talk_strict', impl=answer(True))
+
+    def tribal_reply(name, prefer, log):
+        if name == WT_NPC.OG:
+            scene.item(WT_ITEM.TOBAN_KEY.id, WT_ITEM.TOBAN_KEY.name)
+        return True
+        yield
+
+    talks = spy_on(tribes, 'talk_strict', impl=tribal_reply)
     for fn in [tribes.talk_to_toban, tribes.talk_to_grew, tribes.talk_to_og]:
         expect(run_wait(fn(scene.log))).to_be(True)
     expect(len(talks.calls)).to_be(3)
@@ -384,6 +392,7 @@ def tribal_talks():
     fight = spy_on(tribes, 'fight_gorad', impl=answer(True))
     expect(run_wait(tribes.kill_gorad(scene.log))).to_be(True)
     expect(len(fight.calls)).to_be(1)
+    scene.pack = []
     for i in range(28):
         scene.item(i, 'Filler')
     expect(run_wait(tribes.kill_gorad(scene.log))).to_be(False)

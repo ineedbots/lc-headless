@@ -872,3 +872,20 @@ A fresh combined validation uses account `e17f863a2wt` under
 Seeding passed in session `20261125T153852-seed-f880`, including the normal
 600 ms tick probe and clean logout. The full quest rerun has been launched;
 completion and the single-visit/tower behavior remain pending.
+
+### Watchtower Og interruption recovery
+
+The `ca5f972` run above exposed another interrupted tribal introduction:
+`talk to Og` retried 46 times from `21:48:55.846Z` to `21:55:05.446Z`
+(6m 9.600s), finally receiving Toban's key and proceeding to the chest. Many
+closed dialogues had been reported as successful without journal or inventory
+progress. The run recovered without intervention and remains uninterrupted;
+it has not been restarted to apply the Og follow-up.
+
+Og now uses the same reachable-side selection and targeted attacker clearing
+as Grew. A bounded local retry requires the introduction flag and key, the
+gold hand-in flag, or an actual replacement item gain. Its preferred menu
+answer matches the request; replacement-key requests no longer prefer the
+competing "I have your gold" answer. Runtime regressions cover interruptions,
+gold hand-in, replacement key/part requests, unrelated players' ogres, safer
+positioning, the retry deadline and safety stops. Live validation is pending.

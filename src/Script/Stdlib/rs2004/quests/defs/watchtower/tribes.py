@@ -33,17 +33,63 @@ def loc_near(id, op, within=8):
 
 
 def talk_to_og(log):
-    _w1 = yield from reach.npc_dialog(WT_NPC.OG, WT_TILE.OG, log=log)
-    if (_w1) != 'done':
+    approached = yield from traversal.walk_resilient(WT_TILE.OG, radius=6, attempts=3, timeout_ms=300000, log=log)
+    if not approached:
         return False
-    # The unmatched option here is "I have come to kill you."
-    _result2 = yield from talk_strict(WT_NPC.OG, [
-        'I seek entrance to the city of ogres.',
-        'I have your gold.',
-        'I have lost the key!',
-        'I have lost the relic part you gave me.',
-    ], log)
-    return _result2
+    deadline = _core.step_time() + 240000
+    before_key = held_id(WT_ITEM.TOBAN_KEY.id)
+    before_part = held_id(WT_ITEM.RELIC_PART1.id)
+    gold = held_id(WT_ITEM.STOLEN_GOLD.id) > 0
+    initial = None
+    while _core.step_time() < deadline:
+        stand = ogre_dialogue_stand(WT_NPC.OG, WT_TILE.OG, 'yanille')
+        if stand is None:
+            return False
+        if game.tile() != stand:
+            walked = yield from traversal.walk_resilient(stand, radius=0, attempts=1, timeout_ms=15000, log=log)
+            if not walked:
+                return False
+        quiet = yield from quiet_ogre_dialogue(deadline, log, WT_NPC.OG, 'yanille')
+        if not quiet:
+            return False
+        if initial is None:
+            initial = yield from read_watchtower_progress()
+            if initial is None:
+                yield from execution.delay_ticks(2)
+                continue
+        # Never choose the hostile option or claim to have gold when asking
+        # for another key: Og offers both answers in the same menu.
+        if has_flag(initial, 'helped-og'):
+            prefer = ['I have lost the relic part you gave me.']
+        elif gold:
+            prefer = ['I have your gold.']
+        elif has_flag(initial, 'spoken-og'):
+            prefer = ['I have lost the key!']
+        else:
+            prefer = ['I seek entrance to the city of ogres.']
+        game.set_auto_retaliate(False)
+        status = yield from reach.npc_dialog(WT_NPC.OG, stand, log=log)
+        if status == 'done':
+            yield from talk_strict(WT_NPC.OG, prefer, log)
+            if event_signal.pending() or skills.effective('hitpoints') <= 0:
+                return False
+            if not chat_dialog.is_open():
+                progress = yield from read_watchtower_progress()
+                if has_flag(initial, 'helped-og'):
+                    if held_id(WT_ITEM.RELIC_PART1.id) > before_part:
+                        return True
+                elif gold:
+                    if has_flag(progress, 'helped-og'):
+                        return True
+                elif has_flag(initial, 'spoken-og'):
+                    if held_id(WT_ITEM.TOBAN_KEY.id) > before_key:
+                        return True
+                elif has_flag(progress, 'spoken-og') and held_id(WT_ITEM.TOBAN_KEY.id) > 0:
+                    return True
+        log('Og conversation did not finish; clearing attackers and retrying locally')
+        yield from execution.delay_ticks(2)
+    log('Og conversation exceeded its four-minute local budget')
+    return False
 
 
 def enter_toban_camp(log):
@@ -227,16 +273,21 @@ def distance_from_npc(tile, npc):
 
 def grew_dialogue_stand():
     """Use the reachable side of Grew furthest from the island's other ogres."""
-    grew = npcs.query().name(WT_NPC.GREW).nearest()
+    return ogre_dialogue_stand(WT_NPC.GREW, WT_TILE.GREW, 'grewIsland')
+
+
+def ogre_dialogue_stand(name, anchor, area):
+    """Keep a tribal conversation beside its NPC and away from nearby ogres."""
+    grew = npcs.query().name(name).nearest()
     if grew is None:
-        return WT_TILE.GREW
+        return anchor
     at = grew.tile()
-    ogres = npcs.query().name('Ogre').within(16).where(lambda npc: watchtower_area(npc.tile()) == 'grewIsland').results()
+    ogres = npcs.query().name('Ogre').within(16).where(lambda npc: watchtower_area(npc.tile()) == area).results()
     candidates = []
     for offset in range(grew.size):
         candidates.extend([Tile(at.x - 1, at.z + offset, at.level), Tile(at.x + grew.size, at.z + offset, at.level),
                            Tile(at.x + offset, at.z - 1, at.level), Tile(at.x + offset, at.z + grew.size, at.level)])
-    candidates = [tile for tile in candidates if watchtower_area(tile) == 'grewIsland' and reachability.can_reach(tile)
+    candidates = [tile for tile in candidates if watchtower_area(tile) == area and reachability.can_reach(tile)
                   and not any([distance_from_npc(tile, npc) == 0 for npc in ogres])]
     if not candidates:
         return None
@@ -246,12 +297,17 @@ def grew_dialogue_stand():
 
 def quiet_grew_island(deadline, log):
     """Defeat only ogres attacking us before opening a conversation."""
+    result = yield from quiet_ogre_dialogue(deadline, log, WT_NPC.GREW, 'grewIsland')
+    return result
+
+
+def quiet_ogre_dialogue(deadline, log, name, area):
     target_index = None
     while _core.step_time() < deadline:
-        if event_signal.pending() or skills.effective('hitpoints') <= 0 or watchtower_area(game.tile()) != 'grewIsland':
+        if event_signal.pending() or skills.effective('hitpoints') <= 0 or watchtower_area(game.tile()) != area:
             return False
         if skills.effective('hitpoints') < skills.level('hitpoints') * 0.4 and not any(['Eat' in item.actions() for item in inventory.items()]):
-            log('leaving Grew dialogue retry: low hitpoints and no food')
+            log(f'leaving {name} dialogue retry: low hitpoints and no food')
             return False
         yield from sustain.run()
         yield from prayer_upkeep()
@@ -264,7 +320,7 @@ def quiet_grew_island(deadline, log):
         else:
             if ogre.index != target_index:
                 target_index = ogre.index
-                log(f'clearing aggressive island Ogre {target_index} before talking to Grew')
+                log(f'clearing aggressive Ogre {target_index} before talking to {name}')
             if game.facing() != ('npc', ogre.index):
                 ogre.interact('Attack')
         yield from execution.delay_ticks(1)

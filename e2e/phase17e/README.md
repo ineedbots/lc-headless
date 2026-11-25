@@ -90,6 +90,9 @@ nightshade on each entry. Single-visit live validation of this change is pending
 Tower entry continues the guard's permission page, crystal hand-in waits for
 dialogue and journal confirmation, and the lever finishes the reward dialogue.
 Live validation of these continuation fixes is pending.
+Og also clears attacking ogres and retries locally, requiring journal or item
+evidence and selecting the answer for the current introduction, gold hand-in
+or replacement request. Live validation of this follow-up is pending.
 See [recorded validation](../VALIDATION.md#phase-17e).
 
 ```powershell
