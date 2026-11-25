@@ -736,3 +736,29 @@ def delayed_toban_scene():
 
 
 test('Toban dialogue retries a newly loaded camp without leaving it', delayed_toban_scene)
+
+
+def toban_tunnel_dialogue():
+    scene = world(tribes)
+
+    def enter(op):
+        scene.area = 'tobanCamp'
+        scene.chat.pages = ['continue']
+        scene.chat.shown = ['Wow! That tunnel went a long way.']
+
+    scene.loc('Cave', ['Enter'], id=WT_LOC.TOBAN_CAVE, effect=enter)
+    approaches = []
+
+    def approach(*args, **kwargs):
+        approaches.append(scene.chat.is_open())
+        return 'retry' if scene.chat.is_open() else 'done'
+        yield
+
+    spy_on(tribes.reach, 'npc_dialog', impl=approach)
+    spy_on(tribes, 'talk_strict', impl=answer(True))
+    expect(run_wait(tribes.talk_to_toban(scene.log))).to_be(True)
+    expect(approaches).to_equal([False])
+    expect(scene.area).to_be('tobanCamp')
+
+
+test('the Toban tunnel continuation closes before the NPC approach begins', toban_tunnel_dialogue)

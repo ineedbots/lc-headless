@@ -14,6 +14,13 @@ Watch Tower's fresh replacement passed uninterrupted in **2h 46m 19s** with
 zero deaths after the food, dialogue and cleanup repairs. See the
 [validation evidence](../VALIDATION.md#phase-17e) for individual results and limits.
 
+Watch Tower's dragon hunt uses Protect from Melee when available, alongside its
+dragonfire shield, and draws up to two available prayer potion flasks. Partial
+flasks count toward that supply. Toban's cave entrance continuation is finished
+before approaching him, so it cannot be mistaken for his dialogue. These follow-up
+repairs are tracked in [#164](https://github.com/ineedbots/lc-headless/issues/164);
+the historical completion time above predates them.
+
 Target quests remain unstarted after preparation. Druidic Ritual unlocks
 Herblore where the actual AIO planner requires it. Prerequisite journals and QP
 are verified; the planner regression requires exactly one selected target.

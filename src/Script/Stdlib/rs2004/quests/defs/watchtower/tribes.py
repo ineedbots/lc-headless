@@ -2,6 +2,7 @@
 
 from rs2004 import execution
 from rs2004.catalogs.tasks import sustain
+from rs2004.dialogue import chat_dialog
 from rs2004.entities import ground_items, locs, npcs
 from rs2004.game import game
 from rs2004.items import inventory
@@ -52,6 +53,13 @@ def enter_toban_camp(log):
     if not (_w4):
         return False
     yield from settle_scene()
+    # The tunnel opens a player dialogue, not Toban's conversation. Reach must
+    # see it closed before deciding whether it has reached the wandering NPC.
+    if chat_dialog.can_continue():
+        yield from chat_dialog.continue_()
+        closed = yield from execution.delay_until(lambda: not chat_dialog.is_open(), 5000)
+        if not closed:
+            return False
     return True
 
 
