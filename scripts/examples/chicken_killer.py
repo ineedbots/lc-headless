@@ -25,6 +25,7 @@ PFM = 'Protect from melee'
 class ChickenKiller(TaskBot):
     def on_reconnect(self):
         self.last_kill_time = time.time()
+        self.restore_flicking()
         log('Killing', CHICKEN_NAME, 'around', self.settings.start_location, ', starting at', game.tile(), ', pid', players.local().index)
 
     def on_start(self):
@@ -41,6 +42,7 @@ class ChickenKiller(TaskBot):
         self.last_bank_tick = game.tick()
         self.last_flick_tick = 0
         self.allow_flicking = True
+        self.old_flicking_state = self.allow_flicking
         self.loot_target = None
 
         self.on_reconnect()
@@ -131,8 +133,6 @@ class ChickenKiller(TaskBot):
         secs = random.randint(1, 15)
         log('relogging due to lower pid out killing us, will log in in', secs, 'secs')
         relog(secs)
-
-        self.restore_flicking()
 
     def ensure_reachable(self, tile, force=False):
         if not force and direct_navigator.reachable(tile):
