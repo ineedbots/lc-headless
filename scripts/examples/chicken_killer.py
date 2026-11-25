@@ -20,6 +20,7 @@ POLL_TICKS = 1
 CHICKEN_NAME = 'Chicken'
 LOOT_EXTRA_DIST = 3
 RELOG_WHEN_NO_KILLS = 60
+PFM = 'Protect from melee'
 
 class ChickenKiller(TaskBot):
     def on_reconnect(self):
@@ -38,6 +39,9 @@ class ChickenKiller(TaskBot):
         self.dying_targets = set()
         self.pre_attack_id = None
         self.last_bank_tick = game.tick()
+        self.last_flick_tick = 0
+        self.allow_flicking = True
+        self.loot_target = None
 
         self.on_reconnect()
 
@@ -54,6 +58,15 @@ class ChickenKiller(TaskBot):
             Task(lambda: True, self.attack, label='attack'),
         )
 
+    def kill_flicking(self):
+        self.old_flicking_state = self.allow_flicking
+        self.allow_flicking = False
+        if prayer.active(PFM):
+            prayer.toggle(PFM, False)
+
+    def restore_flicking(self):
+        self.allow_flicking = self.old_flicking_state
+
     def should_bank(self):
         if inventory.used() <= 0:
             return False
@@ -68,6 +81,8 @@ class ChickenKiller(TaskBot):
         return False
 
     def do_bank(self):
+        self.kill_flicking()
+
         log('banking...')
         publish_event('banking')
         self.last_bank_tick = game.tick()
@@ -89,6 +104,8 @@ class ChickenKiller(TaskBot):
         self.last_bank_tick = game.tick()
         self.on_reconnect()
 
+        self.restore_flicking()
+
     def should_relog_due_to_comp(self):
         if time.time() - self.last_kill_time < RELOG_WHEN_NO_KILLS:
             return False
@@ -108,9 +125,13 @@ class ChickenKiller(TaskBot):
         return True
 
     def relog_due_to_comp(self):
+        self.kill_flicking()
+
         secs = random.randint(1, 15)
         log('relogging due to lower pid out killing us, will log in in', secs, 'secs')
         relog(secs)
+
+        self.restore_flicking()
 
     def ensure_reachable(self, tile, force=False):
         if not force and direct_navigator.reachable(tile):
@@ -233,28 +254,34 @@ class ChickenKiller(TaskBot):
         if not loot.interact('Take'):
             return
 
+        self.loot_target = loot
         yield from execution.delay_until(lambda: inventory.count(name) != before or not loot.valid(), 10000)
+        self.loot_target = None
 
         if inventory.count(name) == before:
             self.loot_skip[self.key_for_item(loot)] = game.tick() + SKIP_TICKS
             log('Could not pick up', loot, '- leaving it for a while')
 
     def bury(self):
+        self.kill_flicking() # burying bones causes missed ticks for flicking so we leak pray points
+
         while inventory.contains('Bones'):
             bones = inventory.first('Bones')
             if bones is None:
-                return
+                break
 
             self.target = None
             log('Burying bone')
 
             before = inventory.count('Bones')
             if not bones.interact('Bury'):
-                return
+                break
 
             buried = yield from execution.delay_until(lambda: inventory.count('Bones') < before, 3000)
             if buried:
                 self.buried += 1
+
+        self.restore_flicking()
 
     def next_target(self):
         if game.in_combat():
@@ -324,10 +351,29 @@ class ChickenKiller(TaskBot):
         yield from execution.delay_until(finish_waiting_for_attack, 5000)
 
     def on_tick(self, e):
+        now_tick = e.tick
+        if self.allow_flicking and abs(now_tick - self.last_flick_tick) >= 3:
+            self.last_flick_tick = now_tick
+
+            if prayer.available(PFM):
+                if not prayer.active(PFM):
+                    prayer.toggle(PFM, True)
+                else:
+                    prayer.toggle(PFM, False) # toggle checks if its active or not, this tick it is active
+                    prayer.toggle(PFM, False) # so setting it False twice will turn it off and back on
+
+                if self.target is not None:
+                    npc = npcs.get(self.target)
+                    if npc is not None:
+                        npc.interact('Attack', False)
+
+                if self.loot_target is not None and self.loot_target.valid():
+                    self.loot_target.interact('Take', False)
+
         if self.pre_attack_id is not None:
             npc = npcs.get(int(self.pre_attack_id))
             if npc is not None: # 2004scape patches pre attack by checking if the client's snapshot contains the npc
-                npc.interact('Attack')
+                npc.interact('Attack', False)
 
     def on_npc_spawned(self, npc):
         if npc.name == CHICKEN_NAME:
@@ -360,6 +406,10 @@ class ChickenKiller(TaskBot):
 
     def on_progress_report(self):
         return {'Kills': self.kills, 'Feathers held': inventory.count('Feather'), 'Bones buried': self.buried}
+
+    def on_kill_signal(self):
+        self.kill_flicking()
+        stop_account()
 
 
 BOT = define_bot(
