@@ -25,7 +25,6 @@ PFM = 'Protect from melee'
 class ChickenKiller(TaskBot):
     def on_reconnect(self):
         self.last_kill_time = time.time()
-        self.restore_flicking()
         log('Killing', CHICKEN_NAME, 'around', self.settings.start_location, ', starting at', game.tile(), ', pid', players.local().index)
 
     def on_start(self):
@@ -92,7 +91,6 @@ class ChickenKiller(TaskBot):
         opened = yield from banking.open()
         if not opened:
             log('could not open the bank; trying again')
-            self.restore_flicking()
             yield from execution.delay_ticks(3)
             return
 
@@ -106,8 +104,6 @@ class ChickenKiller(TaskBot):
 
         self.last_bank_tick = game.tick()
         self.on_reconnect()
-
-        self.restore_flicking()
 
     def should_relog_due_to_comp(self):
         if time.time() - self.last_kill_time < RELOG_WHEN_NO_KILLS:
@@ -149,6 +145,8 @@ class ChickenKiller(TaskBot):
 
     def is_fighting_target(self):
         self.pre_attack_id = None
+        self.restore_flicking()
+
         if self.target is None:
             return False
 
@@ -281,8 +279,6 @@ class ChickenKiller(TaskBot):
             buried = yield from execution.delay_until(lambda: inventory.count('Bones') < before, 3000)
             if buried:
                 self.buried += 1
-
-        self.restore_flicking()
 
     def next_target(self):
         if game.in_combat():
