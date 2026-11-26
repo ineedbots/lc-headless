@@ -10,10 +10,11 @@ from rs2004.execution import event_signal
 from rs2004.game import game, skills
 from rs2004.hunting.combat import Fight, Retreat
 from rs2004.hunting.sites import TAVERLEY_BLUE
-from rs2004.hunting.supply import SHIELD, acquire_key, bank_routine, enter_lair, in_cell, leave_cell, leave_lair
+from rs2004.hunting.supply import SHIELD, PRAYER_DOSES, FlaskPlan, acquire_key, bank_routine, enter_lair, in_cell, leave_cell, leave_lair, withdraw_flasks
 from rs2004.items import equipment, inventory
 from rs2004.quests.defs.watchtower.areas import WT_ITEM
 from rs2004.quests.food import quest_food
+from rs2004.quests.prayer import prayer_upkeep, protection_level
 from rs2004.quests.weapons import quest_done, wieldable
 from rs2004.traversal import traversal
 
@@ -94,7 +95,7 @@ class DragonHost:
         return ''
 
     def keep_extra(self):
-        return [WT_ITEM.DRAGON_BONES.name]
+        return [WT_ITEM.DRAGON_BONES.name] + PRAYER_DOSES
 
     def leave_by_walk(self):
         return True
@@ -210,6 +211,9 @@ def fight_for_bones(host, food, log):
     if inventory.count(food) < FOOD:
         log(f'need {FOOD} {food} for the dragon-bone hunt')
         return False
+    supplied = yield from supply_dragon_prayer(host)
+    if not supplied:
+        return False
     _w16 = yield from acquire_key(host, TAVERLEY_BLUE)
     if _w16 != 'held' or event_signal.pending() or host.died:
         return False
@@ -236,6 +240,7 @@ def fight_for_bones(host, food, log):
         if event_signal.pending() or host.died:
             return False
         yield from sustain.run()
+        yield from prayer_upkeep()
         if event_signal.pending() or host.died:
             return False
         if retreat.validate():
@@ -272,3 +277,23 @@ def fight_for_bones(host, food, log):
             if not (_w28):
                 break
         yield from execution.delay_ticks(1)
+
+
+def supply_dragon_prayer(host):
+    """Inventory-owning hunts restock their own flasks, including partial doses."""
+    if skills.level('prayer') < protection_level({'protect': 'melee'}):
+        return True
+    opened = yield from banking.open(stand=TAVERLEY_BLUE.bank, log=host.log)
+    if not opened:
+        return False
+    try:
+        for name in PRAYER_DOSES:
+            if sum([inventory.count(dose) for dose in PRAYER_DOSES]) >= 2:
+                break
+            if bank.count(name) > 0:
+                yield from withdraw_flasks(host, [FlaskPlan(name, PRAYER_DOSES, 2)])
+    except Exception:
+        yield from bank.close()
+        raise
+    yield from bank.close()
+    return True

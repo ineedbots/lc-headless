@@ -416,6 +416,7 @@ def decide(snap):
     return fit_supplies(snap, decide_next(snap))
 
 watchtower = QuestModule(**{
+    'pray': Record({'protect': 'melee', 'potions': 2}),
     'auto_retaliate': lambda snap: not in_dragon_lair(snap.tile) and watchtower_area(snap.tile) != 'enclave',
     'recover': lambda tile: Record({'kind': 'custom', 'name': 'leave the dragon lair', 'run': leave_dragon_lair}) if in_dragon_lair(tile) else escape_pocket(watchtower_area(tile), 'yanille'),
     'record': quest_record('itwatchtower'),

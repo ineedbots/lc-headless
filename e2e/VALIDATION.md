@@ -775,3 +775,215 @@ test cases; the focused death-prevention specs also passed after adding the
 complete-armour preparation assertion. All 18 phase 17g/h/i host-side launcher
 tests, changed-file pocketpy dialect lint and whitespace checks passed. All 11
 CI checks on fix commit `07f50a4f` passed.
+
+## Watchtower Grew interruption recovery
+
+On November 25, 2026, the grand run's Watchtower account repeatedly bought a
+rope, entered Grew's island, had its dialogue interrupted by aggressive ogres,
+and left without progressing. Closing a chat box had been accepted as success.
+The corrected leg chooses a reachable side of Grew away from other ogres,
+holds that position while clearing attackers, and retries on the island until
+the expected journal flag or replacement reward arrives. It stops for unsafe
+hitpoints without food, pending random events, or its local retry limit.
+
+| Validation | Account | Result | Time taken |
+|---|---|---|---|
+| Grew introduction, resumed at stage 2 | `e17148d46wt` | PASS, journal-confirmed; proceeded to Gorad | 3m 14s |
+
+The leg ran from `2026-11-25T19:16:19.813Z` to
+`2026-11-25T19:19:33.612Z` (**193.799 seconds**, including travel). The account
+crossed onto the island once, cleared two attackers, finished the introduction,
+and restocked food before selecting "knock out one of Gorad's teeth" at
+`19:20:21.006Z`. Food fell from five lobsters to three; deaths stayed zero.
+Evidence: `build/e2e/watchtower-grew-position-20261125`, session
+`20261125T131345-run-f478`, source `fdba399`, binary SHA-256
+`e1c5e9af1df48b2b05f2d6a18cd96400b79ae1e4739946597d3e4e26bb3734e7`.
+
+This is a resumed leg result. Applying the fix interrupted the original grand
+account at the bank at `19:00:42Z`; its original timing is not an uninterrupted
+pass. The first clearing-only diagnostic exhausted its retry budget as ogres
+respawned; preserve `build/e2e/watchtower-grew-resume-20261125` as failed evidence.
+Both diagnostics used the existing save without reseeding target progress.
+
+The earlier fresh pilot `e17ae4679wt` exposed prayer flasks being deposited
+again during Dusty key preparation. Its failed dragon hunt and deliberate stop
+at the bank remain under `build/e2e/watchtower-prayer-dialogue-20261125`.
+The keep list now preserves every prayer dose form through that bank stop.
+A fresh full run of the prayer, Toban and Grew fixes used `e176371cawt` under
+`build/e2e/watchtower-all-fixes-20261125`, source `ab4bc87`, binary SHA-256
+`d2f2ff78fc6df27af3b7b449cfd3687f672a746240eefa6a06f9de8e9c3b56f5`.
+Its seed passed the 600 ms tick probe. It completed without interruption, but
+exposed the enclave and tower inefficiencies described below; it predates those
+follow-up fixes.
+
+| Validation | Account | Result | Time taken |
+|---|---|---|---|
+| Resumed remainder after Grew fix | `e17148d46wt` | PASS, 8 QP, zero deaths, clean logout | 1h 9m 29s |
+| Fresh full quest, source `ab4bc87` | `e176371cawt` | PASS, 8 QP, zero deaths, clean logout | 2h 13m 53s |
+
+The resumed remainder ran from `19:13:48.022Z` to `20:23:17.414Z`
+(4169.392 seconds). The fresh run ran from `19:20:43.215Z` to
+`21:34:36.615Z` (8033.400 seconds), including final banking, and logged out
+cleanly at `21:34:37.222Z`. These are distinct results; neither replaces the
+original interrupted grand-run result.
+No server files were changed for these fixes. See
+[PR #165](https://github.com/ineedbots/lc-headless/pull/165) and
+[issue #164](https://github.com/ineedbots/lc-headless/issues/164).
+
+### Watchtower repeated enclave visits
+
+The fresh `ab4bc87` run above exposed an inefficient shaman circuit. Its log
+records six `dissolve the ogre shamans` actions, from `21:04:52.816Z` to
+`21:18:16.814Z`, followed by another entry to mine Dalgroth at `21:19:52.215Z`.
+Each dissolve action returned success after one target. Before the next planner
+decision, the engine's area recovery left the enclave; the outside planner then
+acquired another nightshade and refilled food as needed. These were planned
+exits, not reserve-exhaustion retreats.
+
+The action now continues through the remaining shaman positions and mines the
+rock after receiving the shaman crystal. Food, health, space and interruption
+checks remain active. Runtime regression coverage exercises one nightshade
+entry, six distinct dissolves and both crystals without leaving; incomplete
+circuits and safety exits do not claim completion. Later live runs completed
+the quest but still needed two or three circuits; the single-visit objective
+remains unmet. See the completion audit below. The original completed full run
+retained its frozen older binary throughout.
+
+### Watchtower tower continuations
+
+The same fresh run repeatedly failed to climb from the ground floor, retried
+the crystal hand-in, and was then sent downstairs by area recovery before
+another attempt. It eventually advanced to stage 11 at `21:32:52.207Z`.
+Read-only revision-289 server inspection confirms that the ground ladder opens
+a guard permission continuation before climbing; the client was waiting only
+for a level change. The crystal use-on also drove dialogue immediately, with a
+short page-gap timeout that could expire during approach to the wandering
+wizard. The lever timed out while its reward dialogue was still waiting.
+
+The ladder now continues the permission page before waiting for the floor
+change, and the top-floor arrival settles the scene. Crystal hand-in waits for
+the initial dialogue and requires journal advancement; lever activation drives
+the reward continuation before checking completion. Runtime regressions cover
+permission-gated climbing, delayed hand-in dialogue, unchanged journal state,
+and reward dialogue gating completion. Both later full runs passed crystal
+hand-in and lever activation on their first attempts; the completed `ab4bc87`
+run remains evidence of the original behavior.
+
+A fresh combined validation uses account `e17f863a2wt` under
+`build/e2e/watchtower-tower-20261125`, source `ca5f972`, frozen binary SHA-256
+`f956d9ee9cd3f35ae14bd8861ace88992bdd63e1ace6f82674152eb83718c8a9`.
+Seeding passed in session `20261125T153852-seed-f880`, including the normal
+600 ms tick probe and clean logout. The full quest rerun passed uninterrupted;
+the shaman single-visit objective remains unmet.
+
+### Watchtower Og interruption recovery
+
+The `ca5f972` run above exposed another interrupted tribal introduction:
+`talk to Og` retried 46 times from `21:48:55.846Z` to `21:55:05.446Z`
+(6m 9.600s), finally receiving Toban's key and proceeding to the chest. Many
+closed dialogues had been reported as successful without journal or inventory
+progress. The run recovered without intervention and completed uninterrupted;
+it was not restarted to apply the Og follow-up.
+
+Og now uses the same reachable-side selection and targeted attacker clearing
+as Grew. A bounded local retry requires the introduction flag and key, the
+gold hand-in flag, or an actual replacement item gain. Its preferred menu
+answer matches the request; replacement-key requests no longer prefer the
+competing "I have your gold" answer. Runtime regressions cover interruptions,
+gold hand-in, replacement key/part requests, unrelated players' ogres, safer
+positioning, the retry deadline and safety stops. The later live run passed
+both the introduction and gold hand-in, including clearing an attacking ogre.
+
+A separate fresh validation uses `e176054eewt` under
+`build/e2e/watchtower-og-20261125`, source `7870570`, binary SHA-256
+`cf18a4d3db01e71ab7415777c87f516525a34f531793abfb797e4c556c323940`.
+It uses the normal phase 17e preparation, with no target quest flags or rewards
+seeded. The earlier `e17f863a2wt` run completed separately on its frozen binary.
+Seeding passed in session `20261125T155635-seed-8f77`, including the 600 ms
+tick probe and clean logout. The fresh full quest passed uninterrupted.
+
+### Watchtower continuation completion audit
+
+Both full reruns completed on November 25, 2026, with a complete journal,
+exactly one newly completed quest, 8 QP, zero deaths, no stuck queue entries,
+and clean logout. Times include final banking and exclude seeding.
+
+| Account | Source | Result | Time taken |
+|---|---|---|---|
+| `e17f863a2wt` | `ca5f972` | PASS, uninterrupted; predates Og fix | 1h 39m 16s |
+| `e176054eewt` | `7870570` | PASS, uninterrupted; includes Og fix | 1h 55m 37s |
+
+The first ran from `21:40:57.618Z` to `23:20:13.841Z` (5956.223 seconds),
+session `20261125T154055-run-5273`, and logged out at `23:20:14.415Z`.
+The second ran from `21:58:37.856Z` to `23:54:14.453Z` (6936.597 seconds),
+session `20261125T155835-run-ee64`, and logged out at `23:54:15.020Z`.
+Artifact roots and frozen binary hashes are recorded above.
+
+On the Og-fix account, introduction passed in 52.784 seconds. Gold hand-in
+passed in 130.227 seconds, including clearing attacker 4790, consuming one
+lobster, and receiving relic part 1. Crystal hand-in and lever activation each
+completed in one announced action on both accounts, without the old tower
+retry loop.
+
+The enclave improvement is partial: `ca5f972` required two shaman actions;
+`7870570` required three. A bounded circuit sometimes exhausted its positions
+before receiving the crystal, causing an exit and another nightshade trip.
+The final successful circuit also mined Dalgroth before leaving, but a complete
+single-visit circuit had not been demonstrated by those versions. The later
+live-position targeting validation below closes this limitation.
+
+All 11 CI checks passed on test follow-up `a295a71` (run `45713964464`),
+including native and stdlib coverage. Full local script coverage passed all
+443 file floors, with `tribes.py` at 321/329 (97.57%) and overall coverage at
+79,136/80,873 (97.85%). All 134,954 local assertions passed; 78 cache-dependent
+cases skipped without configured cache data. No server files were changed.
+
+### Watchtower live shaman targeting
+
+The preceding runs exhausted their fixed stand positions while some shamans
+were still more than four tiles away. The corrected action approaches visible
+shamans at their actual positions, remembers confirmed NPC indices to avoid
+respawns, and uses the old positions to search for unloaded targets. The visit
+still has a four-minute budget and checks food, health, space and interruptions.
+
+| Validation | Account | Result | Time taken |
+|---|---|---|---|
+| Seeded shaman leg, source `f6ae9cf` | `e17285fb7wt` | PASS: one entry, six dissolves, both crystals, zero deaths | 1m 16s |
+| Fresh full quest, source `f6ae9cf` | `e17b0e516wt` | PASS: uninterrupted, one shaman-stage entry, 8 QP, zero deaths, clean logout | 1h 29m 05s |
+
+The diagnostic ran from `2026-11-26T00:14:04.222Z` to
+`2026-11-26T00:15:20.436Z`, reporting 76,213 ms internally. It explicitly seeded
+target stage 10, zero shaman kills, an enchanted potion and one nightshade;
+this is a leg result, not full-quest completion. All six different NPC indices
+(2330, 2335, 2342, 2347, 2348, 2343) were confirmed dissolved before mining
+Dalgroth. No reserve retreat or re-entry occurred.
+
+Evidence: `build/e2e/watchtower-shaman-leg-20261125/leg-client.log`;
+standard seed session `20261125T181143-seed-4452` passed the 600 ms tick probe.
+Frozen binary SHA-256:
+`a244dde443b5b0a6dd242af63546ab2b2f8e9e8ec351f602b03246a86bc43353`.
+The diagnostic script and rerun instructions are in `e2e/phase17e`.
+
+A separate full-quest account `e17b0e516wt` completed under
+`build/e2e/watchtower-shamans-full-20261125`, with the same source and frozen
+binary. Its normal seed session `20261125T181305-seed-6d09` passed and did not
+set target flags or rewards. The uninterrupted queue ran from
+`2026-11-26T00:15:49.237Z` to `2026-11-26T01:44:54.640Z` (5345.403 seconds),
+including final banking. The account had a complete journal, exactly one new
+quest, 8 QP, zero deaths and no stuck queue entries; it logged out cleanly at
+`01:44:55.215Z`. Run session: `20261125T181547-run-fa60`.
+
+Its only stage-10 shaman action ran from `01:39:57.031Z` to `01:42:13.238Z`
+(136.207 seconds, including travel). It entered once at `01:40:38.986Z`,
+confirmed six different shaman indices, obtained the shaman crystal, and mined
+Dalgroth before leaving. Food fell from eight to five lobsters. No shaman
+retry, bank retreat, reserve exhaustion or re-entry occurred during this action.
+This confirms the single-visit behavior within the full quest, in addition to
+the separately seeded diagnostic.
+
+All 11 CI checks passed on `ef960d9` (run `45727520147`), including coverage.
+The full local collector passes all 443 file floors: `enclave.py` 189/194
+(97.42%), `tribes.py` 321/329 (97.57%), overall 79,161/80,896 (97.86%). All
+134,947 assertions passed; 78 cache-dependent cases skipped without cache data.
+Earlier failed circuits and timings above remain preserved; no server files
+were changed.

@@ -129,6 +129,8 @@ def wizard_tasks():
     expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(False)
     scene.npc(WT_NPC.WIZARD)
     scene.item(WT_ITEM.CRYSTAL1.id, WT_ITEM.CRYSTAL1.name)
+    scene.chat.pages = ['continue']
+    spy_on(tower, 'read_watchtower_progress', impl=answer(QuestProgress(11, set())))
     expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(True)
     scene.walk_ok = False
     expect(run_wait(tower.pull_lever(scene.log))).to_be(False)
@@ -150,6 +152,75 @@ def wizard_tasks():
 
 
 test('wizard tasks stop on a failed climb and hand in only present items', wizard_tasks)
+
+
+def tower_guard_continuation():
+    scene = world(tower)
+
+    def permission(op):
+        scene.chat.pages = ['continue']
+
+    def continue_guard():
+        scene.chat.pages = []
+        scene.at = Tile(scene.at.x, scene.at.z, 1)
+        return True
+        yield
+
+    scene.loc('Ladder', ['Climb-up'], id=WT_LOC.TOWER_LADDER, effect=permission)
+    spy_on(tower.chat_dialog, 'continue_', impl=continue_guard)
+    expect(run_wait(tower.climb_tower_ladder(scene.log))).to_be(True)
+    expect(scene.at.level).to_be(1)
+    expect(scene.chat.pages).to_equal([])
+    expect(scene.clock < 10000).to_be(True)
+
+
+test('the ground ladder continues the guard permission before waiting for the climb', tower_guard_continuation)
+
+
+def delayed_crystal_dialogue():
+    scene = world(tower, 'towerFloor', 2)
+    scene.npc(WT_NPC.WIZARD)
+
+    def opens():
+        scene.chat.pages = ['continue']
+
+    def use_crystal(target):
+        scene.later(opens)
+
+    scene.item(WT_ITEM.CRYSTAL1.id, WT_ITEM.CRYSTAL1.name, on_use=use_crystal)
+    progress = spy_on(tower, 'read_watchtower_progress', impl=answer(QuestProgress(11, set())))
+    expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(True)
+    expect(scene.chat.pages).to_equal([])
+    progress.mock_implementation(answer(QuestProgress(10, set())))
+    expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(False)
+    scene.pack = []
+    scene.item(WT_ITEM.CRYSTAL1.id, WT_ITEM.CRYSTAL1.name)
+    expect(run_wait(tower.show_crystals_to_wizard(scene.log))).to_be(False)
+
+
+test('crystal hand-in waits for the initial dialogue and requires the journal to advance', delayed_crystal_dialogue)
+
+
+def lever_reward_dialogue():
+    scene = world(tower, 'towerFloor', 2)
+
+    def activate(op):
+        scene.chat.pages = ['continue']
+
+    def finish():
+        scene.chat.pages = []
+        scene.status = 'complete'
+        return True
+        yield
+
+    scene.loc('Lever', ['Pull'], id=WT_LOC.LEVER, effect=activate)
+    spy_on(tower.chat_dialog, 'continue_', impl=finish)
+    expect(run_wait(tower.pull_lever(scene.log))).to_be(True)
+    expect(scene.status).to_be('complete')
+    expect(scene.clock < 40000).to_be(True)
+
+
+test('the lever finishes the reward continuation before checking quest completion', lever_reward_dialogue)
 
 
 def relic_parts():
@@ -297,11 +368,21 @@ def tribal_talks():
         expect(run_wait(fn(scene.log))).to_be(False)
     enter.mock_implementation(answer(True))
     swing.mock_implementation(answer(True))
+    spy_on(tribes, 'quiet_grew_island', impl=answer(True))
+    spy_on(tribes, 'quiet_ogre_dialogue', impl=answer(True))
+    spy_on(tribes, 'read_watchtower_progress', impl=answer(QuestProgress(2, {'spoken-grew', 'spoken-og'})))
     scene.talk_status = 'unreachable'
     for fn in [tribes.talk_to_toban, tribes.talk_to_grew, tribes.talk_to_og, tribes.kill_gorad]:
         expect(run_wait(fn(scene.log))).to_be(False)
     scene.talk_status = 'done'
-    talks = spy_on(tribes, 'talk_strict', impl=answer(True))
+
+    def tribal_reply(name, prefer, log):
+        if name == WT_NPC.OG:
+            scene.item(WT_ITEM.TOBAN_KEY.id, WT_ITEM.TOBAN_KEY.name)
+        return True
+        yield
+
+    talks = spy_on(tribes, 'talk_strict', impl=tribal_reply)
     for fn in [tribes.talk_to_toban, tribes.talk_to_grew, tribes.talk_to_og]:
         expect(run_wait(fn(scene.log))).to_be(True)
     expect(len(talks.calls)).to_be(3)
@@ -311,6 +392,7 @@ def tribal_talks():
     fight = spy_on(tribes, 'fight_gorad', impl=answer(True))
     expect(run_wait(tribes.kill_gorad(scene.log))).to_be(True)
     expect(len(fight.calls)).to_be(1)
+    scene.pack = []
     for i in range(28):
         scene.item(i, 'Filler')
     expect(run_wait(tribes.kill_gorad(scene.log))).to_be(False)
@@ -538,6 +620,170 @@ def enclave_gathering():
 test('enclave crystals are mined, searched from the robe and dissolved with potion', enclave_gathering)
 
 
+def shaman_circuit():
+    scene = world(enclave, 'surface')
+    scene.item(333, 'Trout', count=8)
+    targets = []
+    entries = []
+
+    def enter(target):
+        entries.append(target.index)
+        scene.take(WT_ITEM.NIGHTSHADE.id)
+        scene.area = 'enclave'
+
+    scene.npc(WT_NPC.ENCLAVE_GUARD)
+    scene.item(WT_ITEM.NIGHTSHADE.id, WT_ITEM.NIGHTSHADE.name, on_use=enter)
+    positions = [Tile(spot.x + 5, spot.z + 5, spot.level) for spot in WT_TILE.SHAMANS]
+    for spot in positions:
+        scene.npc(WT_NPC.SHAMAN, tile=spot, dist=None)
+
+    def dissolve(target):
+        targets.append(target.index)
+        scene.npcs = [npc for npc in scene.npcs if npc.index != target.index]
+        scene.say('The ogre dissolves into spirit form')
+        if len(targets) == 6:
+            scene.take(WT_ITEM.MAGIC_OGRE_POTION.id)
+            scene.item(WT_ITEM.CRYSTAL3.id, WT_ITEM.CRYSTAL3.name)
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    exits = spy_on(enclave, 'leave_enclave', impl=answer(True))
+    scene.loc('Rock', ['Mine'], id=WT_LOC.ROCK_OF_DALGROTH, effect=give(scene, WT_ITEM.CRYSTAL4))
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(True)
+    expect(len(set(targets))).to_be(6)
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(True)
+    expect(scene.has(WT_ITEM.CRYSTAL4.id)).to_be(True)
+    expect(len(entries)).to_be(1)
+    expect(scene.has(WT_ITEM.NIGHTSHADE.id)).to_be(False)
+    expect(len(exits.calls)).to_be(0)
+    expect(all([spot in scene.walks for spot in positions])).to_be(True)
+
+
+test('one enclave action finds six displaced shamans and mines the rock without leaving', shaman_circuit)
+
+
+def shaman_partial_circuit():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN, tile=WT_TILE.SHAMANS[0], dist=None)
+
+    def dissolve(npc):
+        scene.npcs = []
+        scene.say('The ogre dissolves into spirit form')
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    mines = spy_on(enclave, 'mine_dalgroth', impl=answer(True))
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+    expect(len(mines.calls)).to_be(0)
+
+
+test('an incomplete shaman circuit does not claim success or start mining', shaman_partial_circuit)
+
+
+def shaman_retreats():
+    for interrupted in [False, True]:
+        scene = world(enclave, 'enclave')
+        food = scene.item(333, 'Trout', count=8)
+        scene.npc(WT_NPC.SHAMAN, tile=WT_TILE.SHAMANS[0], dist=None)
+        targets = []
+
+        def dissolve(target):
+            targets.append(target.index)
+            scene.say('The ogre dissolves into spirit form')
+            food._fields['count'] = 1
+
+        scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+        spy_on(enclave.event_signal, 'pending', impl=lambda: interrupted and len(targets) > 0)
+        exits = spy_on(enclave, 'leave_enclave', impl=answer(True))
+        mines = spy_on(enclave, 'mine_dalgroth', impl=answer(True))
+        expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+        expect(len(targets)).to_be(1)
+        expect(len(mines.calls)).to_be(0)
+        expect(len(exits.calls)).to_be(0 if interrupted else 1)
+        expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+        restore_all()
+
+
+test('the shaman circuit stops for an interruption or exhausted food without claiming completion', shaman_retreats)
+
+
+def shaman_unreachable():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name)
+    scene.npc(WT_NPC.SHAMAN, tile=WT_TILE.SHAMANS[0], dist=None)
+    scene.walk_ok = False
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(len(scene.walks)).to_be(1 + len(WT_TILE.SHAMANS))
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+
+
+test('a blocked shaman is not retried forever and does not count as dissolved', shaman_unreachable)
+
+
+def shaman_dialogue_interruption():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN)
+    interrupted = []
+
+    def dissolve(target):
+        scene.say('The ogre dissolves into spirit form')
+        scene.chat.pages = ['continue']
+
+    def dialogue(*args):
+        interrupted.append(True)
+        return False
+        yield
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    spy_on(enclave, 'drive_dialog', impl=dialogue)
+    spy_on(enclave.event_signal, 'pending', impl=lambda: bool(interrupted))
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+
+
+test('an event during a shaman continuation stops the circuit', shaman_dialogue_interruption)
+
+
+def shaman_deadline():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN)
+
+    def dissolve(target):
+        scene.say('The ogre dissolves into spirit form')
+        scene.clock = 240000
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.logged('four-minute enclave budget')).to_be(True)
+
+
+test('the enclave circuit ends at its local deadline without a false pass', shaman_deadline)
+
+
+def shaman_disappears():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN)
+    uses = []
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=lambda target: uses.append(target.index))
+
+    def walk(*args, **kwargs):
+        scene.npcs = []
+        return True
+        yield
+
+    spy_on(enclave.traversal, 'walk_resilient', impl=walk)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(uses).to_equal([])
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+
+
+test('a shaman disappearing during approach is not clicked or counted as dissolved', shaman_disappears)
+
+
 def city_offers():
     for fn, item, npc, end in [
         [gutanoth.offer_relic, WT_ITEM.OGRE_RELIC, WT_NPC.OGRE_GUARD, Tile(2500, 3060, 0)],
@@ -736,3 +982,29 @@ def delayed_toban_scene():
 
 
 test('Toban dialogue retries a newly loaded camp without leaving it', delayed_toban_scene)
+
+
+def toban_tunnel_dialogue():
+    scene = world(tribes)
+
+    def enter(op):
+        scene.area = 'tobanCamp'
+        scene.chat.pages = ['continue']
+        scene.chat.shown = ['Wow! That tunnel went a long way.']
+
+    scene.loc('Cave', ['Enter'], id=WT_LOC.TOBAN_CAVE, effect=enter)
+    approaches = []
+
+    def approach(*args, **kwargs):
+        approaches.append(scene.chat.is_open())
+        return 'retry' if scene.chat.is_open() else 'done'
+        yield
+
+    spy_on(tribes.reach, 'npc_dialog', impl=approach)
+    spy_on(tribes, 'talk_strict', impl=answer(True))
+    expect(run_wait(tribes.talk_to_toban(scene.log))).to_be(True)
+    expect(approaches).to_equal([False])
+    expect(scene.area).to_be('tobanCamp')
+
+
+test('the Toban tunnel continuation closes before the NPC approach begins', toban_tunnel_dialogue)

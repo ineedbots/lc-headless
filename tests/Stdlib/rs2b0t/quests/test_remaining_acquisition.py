@@ -154,7 +154,7 @@ def dragon_host_contract():
     expect(host.ammo_name()).to_be('')
     expect(host.spell_name()).to_be('')
     expect(host.leave_by_walk()).to_be(True)
-    expect(host.keep_extra()).to_equal(['Dragon bones'])
+    expect(host.keep_extra()).to_equal(['Dragon bones', 'Prayer potion(4)', 'Prayer potion(3)', 'Prayer potion(2)', 'Prayer potion(1)'])
     expect(host.bone_name()).to_be('Dragon bones')
     expect(host.bury_bones()).to_be(False)
     expect(host.died).to_be(False)

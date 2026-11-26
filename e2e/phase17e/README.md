@@ -14,6 +14,19 @@ Watch Tower's fresh replacement passed uninterrupted in **2h 46m 19s** with
 zero deaths after the food, dialogue and cleanup repairs. See the
 [validation evidence](../VALIDATION.md#phase-17e) for individual results and limits.
 
+Watch Tower's dragon hunt uses Protect from Melee when available, alongside its
+dragonfire shield, and draws up to two available prayer potion flasks. Partial
+flasks count toward that supply. Toban's cave entrance continuation is finished
+before approaching him, so it cannot be mistaken for his dialogue. These follow-up
+repairs are tracked in [#164](https://github.com/ineedbots/lc-headless/issues/164);
+the historical completion time above predates them.
+
+Grew conversations choose a reachable side away from the other island ogres,
+hold that position rather than chasing distant attackers, and retry on the island for
+up to four minutes. A closed chat box alone cannot complete the leg: the expected
+journal flag or replacement reward must arrive. Low hitpoints without food and
+pending random events stop the retry so normal recovery can take over.
+
 Target quests remain unstarted after preparation. Druidic Ritual unlocks
 Herblore where the actual AIO planner requires it. Prerequisite journals and QP
 are verified; the planner regression requires exactly one selected target.
@@ -69,8 +82,51 @@ Record **Time taken** from the first per-account `AIOQuester, queue:` log to the
 passing `E2E_RESULT`, including final banking and excluding seeding/login staggering.
 Fresh uninterrupted reruns are required after fixes for accepted uninterrupted
 timings. Pending runs and interrupted attempts are not passes.
+The Watchtower shaman action keeps all six dissolves and Dalgroth mining in one
+enclave visit. It still retreats when its food, health or inventory reserve is
+exhausted, and stops for pending interruptions. Older binaries returned after
+each shaman, causing area recovery to leave the enclave and consume another
+nightshade on each entry. Later full reruns passed but still needed two or three
+shaman circuits. The subsequent live-position targeting fix passed both a
+seeded single-visit leg and a fresh uninterrupted full quest in **1h 29m 05s**:
+one shaman-stage entry, six dissolves and Dalgroth mining before leaving, zero
+deaths, 8 QP and clean logout. See the latest validation table for provenance.
+Tower entry continues the guard's permission page, crystal hand-in waits for
+dialogue and journal confirmation, and the lever finishes the reward dialogue.
+Both later full reruns passed crystal hand-in and lever activation without the
+old tower retry loop.
+Og also clears attacking ogres and retries locally, requiring journal or item
+evidence and selecting the answer for the current introduction, gold hand-in
+or replacement request. The later full run passed both Og visits, including
+clearing an attacker during gold hand-in.
 See [recorded validation](../VALIDATION.md#phase-17e).
 
 ```powershell
 python -B -m unittest discover -s e2e/phase17e -p 'test_*.py'
 ```
+
+## Shaman leg diagnostic
+
+Use a fresh phase 17e preparation and successful seed, then select its Watchtower
+account for this diagnostic. It explicitly seeds target stage 10, zero shaman
+kills, an enchanted potion and one nightshade. It requires all six dissolves
+and the Dalgroth crystal in one visit, with no deaths. This account must not be
+used for full-quest acceptance afterwards; its `SHAMAN_LEG_RESULT` is a leg
+result, not an `E2E_RESULT` quest completion.
+
+After the standard `prepare` and `seed` commands above, set the matching run
+directory and create a separate account override:
+
+```powershell
+$legRoot = 'build/e2e/phase17e-night1'
+$legManifest = Get-Content "$legRoot/manifest.json" -Raw | ConvertFrom-Json
+$legAccount = Get-Content "$legRoot/accounts/$($legManifest.accounts.wt).jsonc" -Raw | ConvertFrom-Json
+$legAccount.randomEvents = $false
+$legAccount.script = @{ file = 'watchtower_shaman_leg.py'; settings = @{} }
+$legAccount | ConvertTo-Json -Depth 10 | Set-Content "$legRoot/shaman-leg.jsonc"
+& $legManifest.client "$legRoot/client.json" --account "$legRoot/shaman-leg.jsonc"
+```
+
+Capture the console output and require `SHAMAN_LEG_RESULT` with `passed: true`,
+`entries: 1`, `dissolves: 6`, both crystal counts equal to one, and a clean
+logout. The diagnostic exits the enclave after recording its result.

@@ -1,8 +1,10 @@
 """A dragon-bone hunt cleans up on success, interruption, failed preparation and exceptions."""
 
 import rs2004.quests.defs.watchtower.bones as hunt
+from rs2004.quests.defs.watchtower import watchtower
 from rs2004.catalogs.record import Record
 from rs2004.geometry import Tile
+from rs2004.hunting.supply import deposit_loot
 
 
 def result(value):
@@ -57,6 +59,8 @@ def hunt_world(mode):
         return True
         yield
     spy_on(hunt, 'bank_routine', impl=bank)
+    spy_on(hunt, 'supply_dragon_prayer', impl=lambda host: result(True))
+    spy_on(hunt, 'prayer_upkeep', impl=lambda: result(False))
     spy_on(hunt, 'acquire_key', impl=lambda *args: result('missing' if behavior == 'key' else 'held'))
     spy_on(hunt, 'enter_lair', impl=enter)
     spy_on(hunt, 'leave_lair', impl=leave)
@@ -71,14 +75,62 @@ def hunt_world(mode):
 
 def completes():
     scene = hunt_world('success')
+    upkeep = spy_on(hunt, 'prayer_upkeep', impl=lambda: result(False))
     expect(run_wait(hunt.hunt_dragon_bones('Lobster', scene.log))).to_be(True)
     expect(scene.fights).to_be(1)
     expect(scene.left).to_be(1)
     expect(hunt.dragon_bank_pending()).to_be(False)
     expect([item.name for item in scene.pack]).to_equal(['Dragon bones'])
+    expect(len(upkeep.calls) > 0).to_be(True)
+    expect(watchtower.pray.protect).to_be('melee')
 
 
 test('Watchtower kills once, takes the bones, exits and refreshes its bank view', completes)
+
+
+def partial_prayer_flasks():
+    scene = Scene()
+    scene.stats['prayer'] = 75
+    spy_on(hunt.banking, 'open', impl=lambda **kwargs: result(True))
+    closes = spy_on(hunt.bank, 'close', impl=lambda: result(True))
+    spy_on(hunt.bank, 'count', impl=lambda name: 100 if name == 'Prayer potion(3)' else 0)
+    scene.item(143, 'Prayer potion(1)')
+    def draw(name, op):
+        scene.item(139, name)
+        return True
+
+    draws = spy_on(hunt.bank, 'withdraw', impl=draw)
+    expect(run_wait(hunt.supply_dragon_prayer(hunt.dragon_host('Lobster', scene.log)))).to_be(True)
+    expect(len(draws.calls)).to_be(1)
+    expect(hunt.inventory.count('Prayer potion(1)')).to_be(1)
+    expect(hunt.inventory.count('Prayer potion(3)')).to_be(1)
+    expect(len(closes.calls)).to_be(1)
+    scene.stats['prayer'] = 42
+    expect(run_wait(hunt.supply_dragon_prayer(hunt.dragon_host('Lobster', scene.log)))).to_be(True)
+    expect(len(draws.calls)).to_be(1)
+
+
+test('the dragon hunt stocks available three-dose prayer flasks and respects the protection level', partial_prayer_flasks)
+
+
+def key_trip_preserves_prayer():
+    scene = Scene()
+    scene.item(139, 'Prayer potion(3)')
+    scene.item(143, 'Prayer potion(1)')
+    scene.item(526, 'Bones')
+
+    def deposit(predicate):
+        scene.pack = [item for item in scene.pack if not predicate(item.name, item.id)]
+        return True
+        yield
+
+    spy_on(hunt.bank, 'deposit_all_matching', impl=deposit)
+    host = hunt.dragon_host('Lobster', scene.log)
+    expect(run_wait(deposit_loot(host, hunt.TAVERLEY_BLUE))).to_be(None)
+    expect([item.id for item in scene.pack]).to_equal([139, 143])
+
+
+test('the Dusty key bank stop preserves the dragon hunt prayer flasks', key_trip_preserves_prayer)
 
 
 def fails(mode):
