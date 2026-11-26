@@ -929,8 +929,8 @@ The enclave improvement is partial: `ca5f972` required two shaman actions;
 `7870570` required three. A bounded circuit sometimes exhausted its positions
 before receiving the crystal, causing an exit and another nightshade trip.
 The final successful circuit also mined Dalgroth before leaving, but a complete
-single-visit circuit has not been demonstrated. Keep this limitation open;
-these passing quest results do not establish that acceptance criterion.
+single-visit circuit had not been demonstrated by those versions. The later
+live-position targeting validation below closes this limitation.
 
 All 11 CI checks passed on test follow-up `a295a71` (run `45713964464`),
 including native and stdlib coverage. Full local script coverage passed all
@@ -949,6 +949,7 @@ still has a four-minute budget and checks food, health, space and interruptions.
 | Validation | Account | Result | Time taken |
 |---|---|---|---|
 | Seeded shaman leg, source `f6ae9cf` | `e17285fb7wt` | PASS: one entry, six dissolves, both crystals, zero deaths | 1m 16s |
+| Fresh full quest, source `f6ae9cf` | `e17b0e516wt` | PASS: uninterrupted, one shaman-stage entry, 8 QP, zero deaths, clean logout | 1h 29m 05s |
 
 The diagnostic ran from `2026-11-26T00:14:04.222Z` to
 `2026-11-26T00:15:20.436Z`, reporting 76,213 ms internally. It explicitly seeded
@@ -963,8 +964,26 @@ Frozen binary SHA-256:
 `a244dde443b5b0a6dd242af63546ab2b2f8e9e8ec351f602b03246a86bc43353`.
 The diagnostic script and rerun instructions are in `e2e/phase17e`.
 
-A separate full-quest account `e17b0e516wt` is running under
+A separate full-quest account `e17b0e516wt` completed under
 `build/e2e/watchtower-shamans-full-20261125`, with the same source and frozen
 binary. Its normal seed session `20261125T181305-seed-6d09` passed and did not
-set target flags or rewards. Full completion remains pending. Earlier failed
-circuits and timings above remain preserved; no server files were changed.
+set target flags or rewards. The uninterrupted queue ran from
+`2026-11-26T00:15:49.237Z` to `2026-11-26T01:44:54.640Z` (5345.403 seconds),
+including final banking. The account had a complete journal, exactly one new
+quest, 8 QP, zero deaths and no stuck queue entries; it logged out cleanly at
+`01:44:55.215Z`. Run session: `20261125T181547-run-fa60`.
+
+Its only stage-10 shaman action ran from `01:39:57.031Z` to `01:42:13.238Z`
+(136.207 seconds, including travel). It entered once at `01:40:38.986Z`,
+confirmed six different shaman indices, obtained the shaman crystal, and mined
+Dalgroth before leaving. Food fell from eight to five lobsters. No shaman
+retry, bank retreat, reserve exhaustion or re-entry occurred during this action.
+This confirms the single-visit behavior within the full quest, in addition to
+the separately seeded diagnostic.
+
+All 11 CI checks passed on `ef960d9` (run `45727520147`), including coverage.
+The full local collector passes all 443 file floors: `enclave.py` 189/194
+(97.42%), `tribes.py` 321/329 (97.57%), overall 79,161/80,896 (97.86%). All
+134,947 assertions passed; 78 cache-dependent cases skipped without cache data.
+Earlier failed circuits and timings above remain preserved; no server files
+were changed.
