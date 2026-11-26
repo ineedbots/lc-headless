@@ -86,13 +86,16 @@ The Watchtower shaman action keeps all six dissolves and Dalgroth mining in one
 enclave visit. It still retreats when its food, health or inventory reserve is
 exhausted, and stops for pending interruptions. Older binaries returned after
 each shaman, causing area recovery to leave the enclave and consume another
-nightshade on each entry. Single-visit live validation of this change is pending.
+nightshade on each entry. Later full reruns passed but still needed two or three
+shaman circuits; the single-visit objective remains unmet.
 Tower entry continues the guard's permission page, crystal hand-in waits for
 dialogue and journal confirmation, and the lever finishes the reward dialogue.
-Live validation of these continuation fixes is pending.
+Both later full reruns passed crystal hand-in and lever activation without the
+old tower retry loop.
 Og also clears attacking ogres and retries locally, requiring journal or item
 evidence and selecting the answer for the current introduction, gold hand-in
-or replacement request. Live validation of this follow-up is pending.
+or replacement request. The later full run passed both Og visits, including
+clearing an attacker during gold hand-in.
 See [recorded validation](../VALIDATION.md#phase-17e).
 
 ```powershell

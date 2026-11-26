@@ -844,8 +844,10 @@ The action now continues through the remaining shaman positions and mines the
 rock after receiving the shaman crystal. Food, health, space and interruption
 checks remain active. Runtime regression coverage exercises one nightshade
 entry, six distinct dissolves and both crystals without leaving; incomplete
-circuits and safety exits do not claim completion. Single-visit live validation
-is pending. The completed full run retained its frozen older binary throughout.
+circuits and safety exits do not claim completion. Later live runs completed
+the quest but still needed two or three circuits; the single-visit objective
+remains unmet. See the completion audit below. The original completed full run
+retained its frozen older binary throughout.
 
 ### Watchtower tower continuations
 
@@ -863,15 +865,16 @@ change, and the top-floor arrival settles the scene. Crystal hand-in waits for
 the initial dialogue and requires journal advancement; lever activation drives
 the reward continuation before checking completion. Runtime regressions cover
 permission-gated climbing, delayed hand-in dialogue, unchanged journal state,
-and reward dialogue gating completion. Live validation of these follow-ups is
-pending; the completed `ab4bc87` run is evidence of the original behavior.
+and reward dialogue gating completion. Both later full runs passed crystal
+hand-in and lever activation on their first attempts; the completed `ab4bc87`
+run remains evidence of the original behavior.
 
 A fresh combined validation uses account `e17f863a2wt` under
 `build/e2e/watchtower-tower-20261125`, source `ca5f972`, frozen binary SHA-256
 `f956d9ee9cd3f35ae14bd8861ace88992bdd63e1ace6f82674152eb83718c8a9`.
 Seeding passed in session `20261125T153852-seed-f880`, including the normal
-600 ms tick probe and clean logout. The full quest rerun has been launched;
-completion and the single-visit/tower behavior remain pending.
+600 ms tick probe and clean logout. The full quest rerun passed uninterrupted;
+the shaman single-visit objective remains unmet.
 
 ### Watchtower Og interruption recovery
 
@@ -879,8 +882,8 @@ The `ca5f972` run above exposed another interrupted tribal introduction:
 `talk to Og` retried 46 times from `21:48:55.846Z` to `21:55:05.446Z`
 (6m 9.600s), finally receiving Toban's key and proceeding to the chest. Many
 closed dialogues had been reported as successful without journal or inventory
-progress. The run recovered without intervention and remains uninterrupted;
-it has not been restarted to apply the Og follow-up.
+progress. The run recovered without intervention and completed uninterrupted;
+it was not restarted to apply the Og follow-up.
 
 Og now uses the same reachable-side selection and targeted attacker clearing
 as Grew. A bounded local retry requires the introduction flag and key, the
@@ -888,13 +891,49 @@ gold hand-in flag, or an actual replacement item gain. Its preferred menu
 answer matches the request; replacement-key requests no longer prefer the
 competing "I have your gold" answer. Runtime regressions cover interruptions,
 gold hand-in, replacement key/part requests, unrelated players' ogres, safer
-positioning, the retry deadline and safety stops. Live validation is pending.
+positioning, the retry deadline and safety stops. The later live run passed
+both the introduction and gold hand-in, including clearing an attacking ogre.
 
 A separate fresh validation uses `e176054eewt` under
 `build/e2e/watchtower-og-20261125`, source `7870570`, binary SHA-256
 `cf18a4d3db01e71ab7415777c87f516525a34f531793abfb797e4c556c323940`.
 It uses the normal phase 17e preparation, with no target quest flags or rewards
-seeded. The earlier `e17f863a2wt` run continues separately on its frozen binary.
+seeded. The earlier `e17f863a2wt` run completed separately on its frozen binary.
 Seeding passed in session `20261125T155635-seed-8f77`, including the 600 ms
-tick probe and clean logout. The fresh full quest has been launched; live Og
-behavior and completion remain pending.
+tick probe and clean logout. The fresh full quest passed uninterrupted.
+
+### Watchtower continuation completion audit
+
+Both full reruns completed on November 25, 2026, with a complete journal,
+exactly one newly completed quest, 8 QP, zero deaths, no stuck queue entries,
+and clean logout. Times include final banking and exclude seeding.
+
+| Account | Source | Result | Time taken |
+|---|---|---|---|
+| `e17f863a2wt` | `ca5f972` | PASS, uninterrupted; predates Og fix | 1h 39m 16s |
+| `e176054eewt` | `7870570` | PASS, uninterrupted; includes Og fix | 1h 55m 37s |
+
+The first ran from `21:40:57.618Z` to `23:20:13.841Z` (5956.223 seconds),
+session `20261125T154055-run-5273`, and logged out at `23:20:14.415Z`.
+The second ran from `21:58:37.856Z` to `23:54:14.453Z` (6936.597 seconds),
+session `20261125T155835-run-ee64`, and logged out at `23:54:15.020Z`.
+Artifact roots and frozen binary hashes are recorded above.
+
+On the Og-fix account, introduction passed in 52.784 seconds. Gold hand-in
+passed in 130.227 seconds, including clearing attacker 4790, consuming one
+lobster, and receiving relic part 1. Crystal hand-in and lever activation each
+completed in one announced action on both accounts, without the old tower
+retry loop.
+
+The enclave improvement is partial: `ca5f972` required two shaman actions;
+`7870570` required three. A bounded circuit sometimes exhausted its positions
+before receiving the crystal, causing an exit and another nightshade trip.
+The final successful circuit also mined Dalgroth before leaving, but a complete
+single-visit circuit has not been demonstrated. Keep this limitation open;
+these passing quest results do not establish that acceptance criterion.
+
+All 11 CI checks passed on test follow-up `a295a71` (run `45713964464`),
+including native and stdlib coverage. Full local script coverage passed all
+443 file floors, with `tribes.py` at 321/329 (97.57%) and overall coverage at
+79,136/80,873 (97.85%). All 134,954 local assertions passed; 78 cache-dependent
+cases skipped without configured cache data. No server files were changed.
