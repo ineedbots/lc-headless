@@ -763,6 +763,27 @@ def shaman_deadline():
 test('the enclave circuit ends at its local deadline without a false pass', shaman_deadline)
 
 
+def shaman_disappears():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN)
+    uses = []
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=lambda target: uses.append(target.index))
+
+    def walk(*args, **kwargs):
+        scene.npcs = []
+        return True
+        yield
+
+    spy_on(enclave.traversal, 'walk_resilient', impl=walk)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(uses).to_equal([])
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+
+
+test('a shaman disappearing during approach is not clicked or counted as dissolved', shaman_disappears)
+
+
 def city_offers():
     for fn, item, npc, end in [
         [gutanoth.offer_relic, WT_ITEM.OGRE_RELIC, WT_NPC.OGRE_GUARD, Tile(2500, 3060, 0)],

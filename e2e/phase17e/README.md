@@ -87,7 +87,8 @@ enclave visit. It still retreats when its food, health or inventory reserve is
 exhausted, and stops for pending interruptions. Older binaries returned after
 each shaman, causing area recovery to leave the enclave and consume another
 nightshade on each entry. Later full reruns passed but still needed two or three
-shaman circuits; the single-visit objective remains unmet.
+shaman circuits. The subsequent live-position targeting fix passed a seeded
+single-visit leg; fresh full-quest validation of that fix is running.
 Tower entry continues the guard's permission page, crystal hand-in waits for
 dialogue and journal confirmation, and the lever finishes the reward dialogue.
 Both later full reruns passed crystal hand-in and lever activation without the

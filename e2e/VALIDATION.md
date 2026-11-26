@@ -937,3 +937,34 @@ including native and stdlib coverage. Full local script coverage passed all
 443 file floors, with `tribes.py` at 321/329 (97.57%) and overall coverage at
 79,136/80,873 (97.85%). All 134,954 local assertions passed; 78 cache-dependent
 cases skipped without configured cache data. No server files were changed.
+
+### Watchtower live shaman targeting
+
+The preceding runs exhausted their fixed stand positions while some shamans
+were still more than four tiles away. The corrected action approaches visible
+shamans at their actual positions, remembers confirmed NPC indices to avoid
+respawns, and uses the old positions to search for unloaded targets. The visit
+still has a four-minute budget and checks food, health, space and interruptions.
+
+| Validation | Account | Result | Time taken |
+|---|---|---|---|
+| Seeded shaman leg, source `f6ae9cf` | `e17285fb7wt` | PASS: one entry, six dissolves, both crystals, zero deaths | 1m 16s |
+
+The diagnostic ran from `2026-11-26T00:14:04.222Z` to
+`2026-11-26T00:15:20.436Z`, reporting 76,213 ms internally. It explicitly seeded
+target stage 10, zero shaman kills, an enchanted potion and one nightshade;
+this is a leg result, not full-quest completion. All six different NPC indices
+(2330, 2335, 2342, 2347, 2348, 2343) were confirmed dissolved before mining
+Dalgroth. No reserve retreat or re-entry occurred.
+
+Evidence: `build/e2e/watchtower-shaman-leg-20261125/leg-client.log`;
+standard seed session `20261125T181143-seed-4452` passed the 600 ms tick probe.
+Frozen binary SHA-256:
+`a244dde443b5b0a6dd242af63546ab2b2f8e9e8ec351f602b03246a86bc43353`.
+The diagnostic script and rerun instructions are in `e2e/phase17e`.
+
+A separate full-quest account `e17b0e516wt` is running under
+`build/e2e/watchtower-shamans-full-20261125`, with the same source and frozen
+binary. Its normal seed session `20261125T181305-seed-6d09` passed and did not
+set target flags or rewards. Full completion remains pending. Earlier failed
+circuits and timings above remain preserved; no server files were changed.
