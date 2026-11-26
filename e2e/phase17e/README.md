@@ -101,3 +101,29 @@ See [recorded validation](../VALIDATION.md#phase-17e).
 ```powershell
 python -B -m unittest discover -s e2e/phase17e -p 'test_*.py'
 ```
+
+## Shaman leg diagnostic
+
+Use a fresh phase 17e preparation and successful seed, then select its Watchtower
+account for this diagnostic. It explicitly seeds target stage 10, zero shaman
+kills, an enchanted potion and one nightshade. It requires all six dissolves
+and the Dalgroth crystal in one visit, with no deaths. This account must not be
+used for full-quest acceptance afterwards; its `SHAMAN_LEG_RESULT` is a leg
+result, not an `E2E_RESULT` quest completion.
+
+After the standard `prepare` and `seed` commands above, set the matching run
+directory and create a separate account override:
+
+```powershell
+$legRoot = 'build/e2e/phase17e-night1'
+$legManifest = Get-Content "$legRoot/manifest.json" -Raw | ConvertFrom-Json
+$legAccount = Get-Content "$legRoot/accounts/$($legManifest.accounts.wt).jsonc" -Raw | ConvertFrom-Json
+$legAccount.randomEvents = $false
+$legAccount.script = @{ file = 'watchtower_shaman_leg.py'; settings = @{} }
+$legAccount | ConvertTo-Json -Depth 10 | Set-Content "$legRoot/shaman-leg.jsonc"
+& $legManifest.client "$legRoot/client.json" --account "$legRoot/shaman-leg.jsonc"
+```
+
+Capture the console output and require `SHAMAN_LEG_RESULT` with `passed: true`,
+`entries: 1`, `dissolves: 6`, both crystal counts equal to one, and a clean
+logout. The diagnostic exits the enclave after recording its result.

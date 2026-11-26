@@ -633,7 +633,8 @@ def shaman_circuit():
 
     scene.npc(WT_NPC.ENCLAVE_GUARD)
     scene.item(WT_ITEM.NIGHTSHADE.id, WT_ITEM.NIGHTSHADE.name, on_use=enter)
-    for spot in WT_TILE.SHAMANS:
+    positions = [Tile(spot.x + 5, spot.z + 5, spot.level) for spot in WT_TILE.SHAMANS]
+    for spot in positions:
         scene.npc(WT_NPC.SHAMAN, tile=spot, dist=None)
 
     def dissolve(target):
@@ -654,9 +655,10 @@ def shaman_circuit():
     expect(len(entries)).to_be(1)
     expect(scene.has(WT_ITEM.NIGHTSHADE.id)).to_be(False)
     expect(len(exits.calls)).to_be(0)
+    expect(all([spot in scene.walks for spot in positions])).to_be(True)
 
 
-test('one enclave action dissolves all six shamans and mines the rock without leaving', shaman_circuit)
+test('one enclave action finds six displaced shamans and mines the rock without leaving', shaman_circuit)
 
 
 def shaman_partial_circuit():
@@ -703,6 +705,62 @@ def shaman_retreats():
 
 
 test('the shaman circuit stops for an interruption or exhausted food without claiming completion', shaman_retreats)
+
+
+def shaman_unreachable():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name)
+    scene.npc(WT_NPC.SHAMAN, tile=WT_TILE.SHAMANS[0], dist=None)
+    scene.walk_ok = False
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(len(scene.walks)).to_be(1 + len(WT_TILE.SHAMANS))
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+
+
+test('a blocked shaman is not retried forever and does not count as dissolved', shaman_unreachable)
+
+
+def shaman_dialogue_interruption():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN)
+    interrupted = []
+
+    def dissolve(target):
+        scene.say('The ogre dissolves into spirit form')
+        scene.chat.pages = ['continue']
+
+    def dialogue(*args):
+        interrupted.append(True)
+        return False
+        yield
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    spy_on(enclave, 'drive_dialog', impl=dialogue)
+    spy_on(enclave.event_signal, 'pending', impl=lambda: bool(interrupted))
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.has(WT_ITEM.CRYSTAL3.id)).to_be(False)
+
+
+test('an event during a shaman continuation stops the circuit', shaman_dialogue_interruption)
+
+
+def shaman_deadline():
+    scene = world(enclave, 'enclave')
+    scene.item(333, 'Trout', count=8)
+    scene.npc(WT_NPC.SHAMAN)
+
+    def dissolve(target):
+        scene.say('The ogre dissolves into spirit form')
+        scene.clock = 240000
+
+    scene.item(WT_ITEM.MAGIC_OGRE_POTION.id, WT_ITEM.MAGIC_OGRE_POTION.name, on_use=dissolve)
+    expect(run_wait(enclave.dissolve_shamans(scene.log))).to_be(False)
+    expect(scene.logged('four-minute enclave budget')).to_be(True)
+
+
+test('the enclave circuit ends at its local deadline without a false pass', shaman_deadline)
 
 
 def city_offers():

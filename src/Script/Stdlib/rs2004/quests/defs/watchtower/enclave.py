@@ -1,5 +1,7 @@
 """Ported from rs2b0t's src/bot/api/ai/quests/defs/watchtower/enclave.ts (MIT, see thirdparty/rs2b0t)."""
 
+import _core
+
 from rs2004 import execution
 from rs2004.catalogs.tasks import sustain
 from rs2004.dialogue import chat_dialog
@@ -97,19 +99,40 @@ def dissolve_shamans(log):
         _c6 = not (_w9)
     if _c6:
         return False
-    for spot in WT_TILE.SHAMANS:
+    deadline = _core.step_time() + 240000
+    dissolved = set()
+    blocked = set()
+    patrol = 0
+    while _core.step_time() < deadline:
         _w10 = yield from safe_to_continue(log)
         if not (_w10) or held_id(WT_ITEM.MAGIC_OGRE_POTION.id) == 0:
             return False
-        _w11 = yield from traversal.walk_resilient(spot, radius=2, attempts=2, timeout_ms=90000, log=log)
+        # The old stand positions are search waypoints, not evidence that a
+        # shaman is absent when it stands more than four tiles from them.
+        shaman = npcs.query().name(WT_NPC.SHAMAN).where(lambda npc: npc.index not in dissolved and npc.index not in blocked and watchtower_area(npc.tile()) == 'enclave').nearest()
+        if shaman is None:
+            if patrol >= len(WT_TILE.SHAMANS):
+                log('no remaining shaman found after patrolling the enclave')
+                return False
+            spot = WT_TILE.SHAMANS[patrol]
+            patrol += 1
+        else:
+            spot = shaman.tile()
+            log(f'approaching shaman {shaman.index} at {spot}')
+        _w11 = yield from traversal.walk_resilient(spot, radius=2, attempts=1, timeout_ms=max(1, min(15000, deadline - _core.step_time())), log=log)
         if not (_w11):
             if event_signal.pending():
                 return False
+            if shaman is not None:
+                blocked.add(shaman.index)
+            continue
+        if shaman is None:
             continue
         _w12 = yield from safe_to_continue(log)
         if not (_w12):
             return False
-        shaman = npcs.query().name(WT_NPC.SHAMAN).where(lambda npc: npc.distance() <= 4).nearest()
+        index = shaman.index
+        shaman = npcs.query().name(WT_NPC.SHAMAN).where(lambda npc: npc.index == index).nearest()
         potion = ([item for item in inventory.items() if item.id == WT_ITEM.MAGIC_OGRE_POTION.id] or [None])[0]
         if not shaman or not potion:
             continue
@@ -119,6 +142,9 @@ def dissolve_shamans(log):
         _w13 = yield from execution.delay_until(lambda: game_messages.saw_since(mark, 'the ogre dissolves into spirit form'), 8000)
         if not (_w13):
             return False
+        dissolved.add(index)
+        patrol = 0
+        log(f'dissolved shaman {index}; {len(dissolved)} confirmed in this visit')
         if event_signal.pending():
             return False
         _w14 = yield from execution.delay_until(lambda: chat_dialog.is_open() or chat_dialog.can_continue(), 8000)
@@ -133,7 +159,7 @@ def dissolve_shamans(log):
         if held_id(WT_ITEM.CRYSTAL3.id) > 0:
             mined = yield from mine_dalgroth(log)
             return mined
-    log('shaman circuit ended before the crystal was obtained')
+    log('shaman circuit exceeded its four-minute enclave budget')
     return False
 
 
